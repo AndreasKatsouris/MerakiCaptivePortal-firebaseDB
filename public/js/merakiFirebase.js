@@ -5,12 +5,13 @@ in a Firebase database, then log the user into the Meraki WiFi network.
 
 // Initialize Firebase -- UPDATE THIS
 var config = {
-    apiKey: "YourAPIKey",
-    authDomain: "YourAppName.firebaseapp.com",
-    databaseURL: "https://YourAppName.firebaseio.com",
-    projectId: "YourProjectID",
-    storageBucket: "YourAppName.appspot.com",
-    messagingSenderId: "YourSenderId"
+    apiKey: "AIzaSyBf96GNLhtz6FDdbLxIW9efh98WG__eQmk",
+    authDomain: "merakicaptiveportal-firebasedb.firebaseapp.com",
+    projectId: "merakicaptiveportal-firebasedb",
+    storageBucket: "merakicaptiveportal-firebasedb.appspot.com",
+    messagingSenderId: "899985637961",
+    appId: "1:899985637961:web:9c00572c7fec3a671e3598",
+    measurementId: "G-476KXB93TV"
 };
 
 firebase.initializeApp(config);
