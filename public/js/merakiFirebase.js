@@ -4,7 +4,7 @@ in a Firebase database, then log the user into the Meraki WiFi network.
 */
 
 // Initialize Firebase -- UPDATE THIS
-//var config = {
+/*var config = {
     apiKey: "AIzaSyBf96GNLhtz6FDdbLxIW9efh98WG__eQmk",
     authDomain: "merakicaptiveportal-firebasedb.firebaseapp.com",
     projectId: "merakicaptiveportal-firebasedb",
@@ -12,8 +12,12 @@ in a Firebase database, then log the user into the Meraki WiFi network.
     messagingSenderId: "899985637961",
     appId: "1:899985637961:web:9c00572c7fec3a671e3598",
     measurementId: "G-476KXB93TV"
-//};
+};*/
 // For Firebase JS SDK v7.20.0 and later, measurementId is optional
+import { initializeApp } from "firebase/app";
+import { getDatabase } from "firebase/database";
+
+
 const firebaseConfig = {
     apiKey: "AIzaSyBf96GNLhtz6FDdbLxIW9efh98WG__eQmk",
     authDomain: "merakicaptiveportal-firebasedb.firebaseapp.com",
@@ -25,10 +29,17 @@ const firebaseConfig = {
     measurementId: "G-476KXB93TV"
   };
 
-firebase.initializeApp(config);
+//firebase.initializeApp(config);
+// Initialize Firebase
+const app = initializeApp(firebaseConfig);
+
+
+// Initialize Realtime Database and get a reference to the service
+const database = getDatabase(app);
+
 
 // Get a reference to the database service
-var database = firebase.database();
+//var database = firebase.database();
 
 // Parse Meraki supplied parameters
 var base_grant_url = decodeURIComponent(GetURLParameter("base_grant_url"));
