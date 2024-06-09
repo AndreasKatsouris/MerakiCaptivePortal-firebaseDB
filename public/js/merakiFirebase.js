@@ -4,7 +4,7 @@ in a Firebase database, then log the user into the Meraki WiFi network.
 */
 
 // Initialize Firebase -- UPDATE THIS
-var config = {
+//var config = {
     apiKey: "AIzaSyBf96GNLhtz6FDdbLxIW9efh98WG__eQmk",
     authDomain: "merakicaptiveportal-firebasedb.firebaseapp.com",
     projectId: "merakicaptiveportal-firebasedb",
@@ -12,7 +12,18 @@ var config = {
     messagingSenderId: "899985637961",
     appId: "1:899985637961:web:9c00572c7fec3a671e3598",
     measurementId: "G-476KXB93TV"
-};
+//};
+// For Firebase JS SDK v7.20.0 and later, measurementId is optional
+const firebaseConfig = {
+    apiKey: "AIzaSyBf96GNLhtz6FDdbLxIW9efh98WG__eQmk",
+    authDomain: "merakicaptiveportal-firebasedb.firebaseapp.com",
+    databaseURL: "https://merakicaptiveportal-firebasedb-default-rtdb.firebaseio.com",
+    projectId: "merakicaptiveportal-firebasedb",
+    storageBucket: "merakicaptiveportal-firebasedb.appspot.com",
+    messagingSenderId: "899985637961",
+    appId: "1:899985637961:web:9c00572c7fec3a671e3598",
+    measurementId: "G-476KXB93TV"
+  };
 
 firebase.initializeApp(config);
 
