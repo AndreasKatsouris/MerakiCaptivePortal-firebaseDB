@@ -14,8 +14,8 @@ in a Firebase database, then log the user into the Meraki WiFi network.
     measurementId: "G-476KXB93TV"
 };*/
 // For Firebase JS SDK v7.20.0 and later, measurementId is optional
-import { initializeApp } from "firebase/app";
-import { getDatabase } from "firebase/database";
+//import { initializeApp } from "firebase/app";
+//import { getDatabase } from "firebase/database";
 
 
 const firebaseConfig = {
