@@ -1,5 +1,12 @@
 {
   "projects": {
     "default": "merakicaptiveportal-firebasedb"
-  }
+  },
+  "targets": {},
+  "etags": {
+    "merakicaptiveportal-firebasedb": {
+      "extensionInstances": {}
+    }
+  },
+  "dataconnectEmulatorConfig": {}
 }
