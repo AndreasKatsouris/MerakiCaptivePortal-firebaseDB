@@ -38,12 +38,21 @@ document.addEventListener('DOMContentLoaded', function() {
     console.log("base_grant_url:", base_grant_url);
     console.log("client_ip:", client_ip);
 
-    // Display Parameters for Demo (if necessary)
-    document.querySelector("div.baseGrantURL").textContent = base_grant_url;
-    document.querySelector("div.userContinueURL").textContent = user_continue_url;
-    document.querySelector("div.clientIP").textContent = client_ip;
-    document.querySelector("div.clientMAC").textContent = client_mac;
-    document.querySelector("div.nodeMAC").textContent = node_mac;
+    // Display Parameters for Demo (only if elements exist)
+    const baseGrantElement = document.querySelector("div.baseGrantURL");
+    if (baseGrantElement) baseGrantElement.textContent = base_grant_url;
+
+    const userContinueElement = document.querySelector("div.userContinueURL");
+    if (userContinueElement) userContinueElement.textContent = user_continue_url;
+
+    const clientIPElement = document.querySelector("div.clientIP");
+    if (clientIPElement) clientIPElement.textContent = client_ip;
+
+    const clientMACElement = document.querySelector("div.clientMAC");
+    if (clientMACElement) clientMACElement.textContent = client_mac;
+
+    const nodeMACElement = document.querySelector("div.nodeMAC");
+    if (nodeMACElement) nodeMACElement.textContent = node_mac;
 
     // Function to show validation messages
     function showValidationMessage(element, message) {
