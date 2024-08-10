@@ -145,7 +145,7 @@ document.addEventListener('DOMContentLoaded', function() {
 
     // Function to write user data to Firebase
     function writeUserData(data, client_mac, node_mac) {
-        const timestamp = new Date().toISOString();
+        const localTimestamp = new Date().toISOString();
         const timeZone = Intl.DateTimeFormat().resolvedOptions().timeZone; // User's time zone
         database.ref('wifiLogins/' + Date.now()).set({
             name: data.name,
@@ -153,7 +153,7 @@ document.addEventListener('DOMContentLoaded', function() {
             company: data.company,
             macAddress: client_mac,
             accessPointMAC: node_mac,
-            timeStamp: timestamp,
+            timeStamp: localTimestamp,
             timeZone: timeZone // Time zone information
         });
     }
