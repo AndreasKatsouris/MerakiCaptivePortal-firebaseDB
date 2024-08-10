@@ -147,7 +147,7 @@ document.addEventListener('DOMContentLoaded', function() {
     function writeUserData(data, client_mac, node_mac) {
         const date = new Date();
         const localTimestamp = date.toLocaleString(); // User's local time
-        const timeZoneOffset = date.getTimezoneOffset(); // Time zone offset from UTC in minutes
+        //const timeZoneOffset = date.getTimezoneOffset(); // Time zone offset from UTC in minutes
         const timeZone = Intl.DateTimeFormat().resolvedOptions().timeZone; // User's time zone
         database.ref('wifiLogins/' + Date.now()).set({
             name: data.name,
@@ -156,8 +156,8 @@ document.addEventListener('DOMContentLoaded', function() {
             macAddress: client_mac,
             accessPointMAC: node_mac,
             localTimeStamp: localTimestamp, // User's local time
-            timeZone: timeZone, // User's time zone name
-            timeZoneOffset: timeZoneOffset // User's time zone offset from UTC
+            timeZone: timeZone // User's time zone name
+            //timeZoneOffset: timeZoneOffset // User's time zone offset from UTC
         });    }
 
     // Helper function to parse URL parameters
