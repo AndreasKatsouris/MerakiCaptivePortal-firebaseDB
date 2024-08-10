@@ -146,13 +146,15 @@ document.addEventListener('DOMContentLoaded', function() {
     // Function to write user data to Firebase
     function writeUserData(data, client_mac, node_mac) {
         const timestamp = new Date().toISOString();
+        const timeZone = Intl.DateTimeFormat().resolvedOptions().timeZone; // User's time zone
         database.ref('wifiLogins/' + Date.now()).set({
             name: data.name,
             email: data.email,
             company: data.company,
             macAddress: client_mac,
             accessPointMAC: node_mac,
-            timeStamp: timestamp
+            timeStamp: timestamp,
+            timeZone: timeZone // Time zone information
         });
     }
 
