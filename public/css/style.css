@@ -1,4 +1,3 @@
-<!-- Style provided by Colorlib -->
 @import url(https://fonts.googleapis.com/css?family=Roboto:400,300,600,400italic);
 * {
   margin: 10;
@@ -9,7 +8,6 @@
   -webkit-font-smoothing: antialiased;
   -moz-font-smoothing: antialiased;
   -o-font-smoothing: antialiased;
-  font-smoothing: antialiased;
   text-rendering: optimizeLegibility;
 }
 
@@ -90,4 +88,28 @@ input::-webkit-input-placeholder {
 	font-size: 11px;
 	text-align: center;
 }
+
+.form-control {
+  width: 100%;
+  box-sizing: border-box;
+  padding-right: 30px; /* Adds extra padding to accommodate the validation message */
+}
+
+.form-control:invalid {
+  border-color: red; /* Highlights the border in red when invalid */
+}
+
+.form-control::placeholder {
+  color: #aaa; /* Placeholder text color */
+}
+
+.validation-message {
+  font-size: 0.875em; /* Adjust the size of the validation message */
+  color: red; /* Color of the validation message */
+  position: absolute; /* Positions it without affecting the layout */
+  right: 0;
+  top: 100%; /* Positions below the input field */
+  transform: translateY(-50%);
+}
+
 
