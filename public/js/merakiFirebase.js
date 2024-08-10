@@ -145,7 +145,9 @@ document.addEventListener('DOMContentLoaded', function() {
 
     // Function to write user data to Firebase
     function writeUserData(data, client_mac, node_mac) {
-        const localTimestamp = new Date().toISOString();
+        const date = new Date();
+        const localTimestamp = date.toLocaleString(); // User's local time
+        const timeZoneOffset = date.getTimezoneOffset(); // Time zone offset from UTC in minutes
         const timeZone = Intl.DateTimeFormat().resolvedOptions().timeZone; // User's time zone
         database.ref('wifiLogins/' + Date.now()).set({
             name: data.name,
@@ -153,10 +155,10 @@ document.addEventListener('DOMContentLoaded', function() {
             company: data.company,
             macAddress: client_mac,
             accessPointMAC: node_mac,
-            timeStamp: localTimestamp,
-            timeZone: timeZone // Time zone information
-        });
-    }
+            localTimeStamp: localTimestamp, // User's local time
+            timeZone: timeZone, // User's time zone name
+            timeZoneOffset: timeZoneOffset // User's time zone offset from UTC
+        });    }
 
     // Helper function to parse URL parameters
     function GetURLParameter(sParam) {
