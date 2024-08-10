@@ -1,10 +1,9 @@
-@import url(https://fonts.googleapis.com/css?family=Roboto:400,300,600,400italic);
+@import url('https://fonts.googleapis.com/css2?family=Open+Sans:wght@400;600&display=swap');
+
 * {
-  margin: 10;
-  padding: 10;
+  margin: 0;
+  padding: 0;
   box-sizing: border-box;
-  -webkit-box-sizing: border-box;
-  -moz-box-sizing: border-box;
   -webkit-font-smoothing: antialiased;
   -moz-font-smoothing: antialiased;
   -o-font-smoothing: antialiased;
@@ -12,104 +11,140 @@
 }
 
 body {
-  font-family: "Roboto", Helvetica, Arial, sans-serif;
+  font-family: "Open Sans", Helvetica, Arial, sans-serif;
   font-weight: 100;
-  font-size: 12px;
-  line-height: 30px;
-  color: #777;
-  background: #f4f4f4;
+  font-size: 14px;
+  line-height: 1.6;
+  color: #333;
+  background: linear-gradient(135deg, #f0f4f8 0%, #ffffff 100%);
   margin: 50px;
 }
 
 form {
-    max-width: 480px;
-    margin: auto;
+  max-width: 480px;
+  margin: auto;
 }
 
-
-.main{
- 	margin-top: 70px;
+.main {
+  margin-top: 70px;
 }
 
 h1.title {
-	font-size: 50px;
-	font-family: 'Helvetica';
-	font-weight: 400;
-    
-}
- h2.title {
-     color: #1D770B;
- }
-
-hr{
-	width: 10%;
-	color: #fff;
+  font-size: 50px;
+  font-family: 'Open Sans', sans-serif;
+  font-weight: 400;
 }
 
-.form-group{
-	margin-bottom: 15px;
+h2.title {
+  color: #1D770B;
+  font-weight: 600;
 }
 
-label{
-	margin-bottom: 15px;
+hr {
+  width: 10%;
+  color: #fff;
+}
+
+.form-group {
+  margin-bottom: 20px;
+  position: relative;
+}
+
+label {
+  margin-bottom: 15px;
 }
 
 input,
 input::-webkit-input-placeholder {
-    font-size: 11px;
-    padding-top: 3px;
+  font-size: 14px;
+  padding-top: 3px;
 }
 
-.main-login{
- 	background-color: #fff;
-    /* shadows and rounded borders */
-    -moz-border-radius: 2px;
-    -webkit-border-radius: 2px;
-    border-radius: 2px;
-    -moz-box-shadow: 0px 2px 2px rgba(0, 0, 0, 0.3);
-    -webkit-box-shadow: 0px 2px 2px rgba(0, 0, 0, 0.3);
-    box-shadow: 0px 2px 2px rgba(0, 0, 0, 0.3);
-
+.main-login {
+  background-color: #ffffff;
+  border-radius: 5px;
+  box-shadow: 0px 4px 6px rgba(0, 0, 0, 0.1);
+  padding: 20px;
 }
 
-.main-center{
- 	margin-top: 30px;
- 	margin: 0 auto;
- 	max-width: 330px;
-    padding: 40px 40px;
-
+.main-center {
+  margin-top: 30px;
+  margin: 0 auto;
+  max-width: 330px;
+  padding: 40px 40px;
 }
 
-.login-button{
-	margin-top: 5px;
+.login-button {
+  background-color: #0074D9; /* Ocean Basket's primary blue */
+  color: #fff;
+  border: none;
+  border-radius: 5px;
+  padding: 10px 20px;
+  font-size: 14px;
+  font-weight: bold;
+  text-transform: uppercase;
+  cursor: pointer;
+  transition: background-color 0.3s ease;
+  margin-top: 5px;
 }
 
-.login-register{
-	font-size: 11px;
-	text-align: center;
+.login-button:hover {
+  background-color: #0056a6; /* Darker blue on hover */
 }
 
 .form-control {
   width: 100%;
   box-sizing: border-box;
-  padding-right: 30px; /* Adds extra padding to accommodate the validation message */
+  padding: 10px;
+  font-size: 14px;
+  border: 1px solid #d1d5db;
+  border-radius: 5px;
+  margin-bottom: 20px;
 }
 
-.form-control:invalid {
-  border-color: red; /* Highlights the border in red when invalid */
+.form-control:focus {
+  border-color: #0074D9; /* Focus state color */
+  box-shadow: 0 0 5px rgba(0, 116, 217, 0.5);
+  outline: none;
 }
 
 .form-control::placeholder {
-  color: #aaa; /* Placeholder text color */
+  color: #aaa;
 }
 
 .validation-message {
-  font-size: 0.875em; /* Adjust the size of the validation message */
-  color: red; /* Color of the validation message */
-  position: absolute; /* Positions it without affecting the layout */
-  right: 0;
-  top: 100%; /* Positions below the input field */
-  transform: translateY(-50%);
+  font-size: 0.875em;
+  color: red;
+  position: absolute;
+  left: 0;
+  top: 100%;
+  margin-top: 5px;
+  white-space: nowrap;
 }
 
+#terms {
+  margin-right: 5px; /* Small space between the checkbox and label */
+}
 
+.checkbox-group {
+  position: relative;
+  padding-left: 20px;
+}
+
+.checkbox-group .validation-message {
+  left: 20px;
+  top: 20px;
+}
+
+.validation-message-checkbox {
+  font-size: 0.875em;
+  color: red;
+  margin-top: 5px;
+  position: absolute;
+  top: 20px;
+}
+
+.login-register {
+  font-size: 11px;
+  text-align: center;
+}
