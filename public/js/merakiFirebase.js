@@ -44,6 +44,32 @@ document.addEventListener('DOMContentLoaded', function() {
         console.log("processing loginForm");
 
         event.preventDefault();
+            // Get form values
+    var name = $("input#username").val();
+    var email = $("input#email").val();
+    var company = $("input#company").val();
+
+        // Validate the inputs
+    if (!validateName(name)) {
+        alert("Please enter a valid name.");
+        return;
+    }
+    
+    if (!validateEmail(email)) {
+        alert("Please enter a valid email address.");
+        return;
+    }
+
+    if (!validateCompany(company)) {
+        alert("Please enter a valid company name.");
+        return;
+    }
+
+    if (!$("#terms").is(":checked")) {
+        alert("You must agree to the terms and conditions.");
+        return;
+    }
+
 
         // Store form data into variable
         var formData = {
@@ -72,6 +98,22 @@ document.addEventListener('DOMContentLoaded', function() {
         // redirect browser to meraki auth URL.
         window.location.href = loginUrl;
     });
+
+    function validateName(name) {
+        // Example validation: Name must not be empty and must not contain special characters
+        return name.trim() !== "" && /^[a-zA-Z\s]+$/.test(name);
+    }
+    
+    function validateEmail(email) {
+        // Basic email format validation
+        var emailPattern = /^[a-zA-Z0-9._-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,6}$/;
+        return emailPattern.test(email);
+    }
+    
+    function validateCompany(company) {
+        // Example validation: Company name must not be empty
+        return company.trim() !== "";
+    }
 
     // Write to Firebase database
     function writeUserData(data, client_mac, node_mac) {
