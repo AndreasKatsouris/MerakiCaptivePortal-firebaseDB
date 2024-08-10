@@ -67,11 +67,16 @@ document.addEventListener('DOMContentLoaded', function() {
         event.preventDefault();
         
         // Get form values
+        var isValid = true;
+
+        // Clear previous validation messages
+        $(".validation-message").text("");
         var name = $("input#username");
         var email = $("input#email");
         //var email = $("#email").val();
         //var emailValidationMessage = $("#emailValidationMessage");
         var company = $("input#company");
+        var termsChecked = $("#terms").is(":checked");
         
         // Validate the inputs
 
@@ -89,10 +94,15 @@ document.addEventListener('DOMContentLoaded', function() {
             showValidationMessage(company[0], "Please enter a valid company name.");
             return;
         }
-    
-        if (!$("#terms").is(":checked")) {
-            alert("You must agree to the terms and conditions.");
-            return;
+        // Validate the Terms and Conditions checkbox
+        if (!termsChecked) {
+            $("#termsValidationMessage").text("You must agree to the terms and conditions.");
+            isValid = false;
+        }
+
+        // If all validations pass, submit the form
+        if (isValid) {
+            this.submit();
         }
     
         // Store form data into variable
