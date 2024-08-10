@@ -73,8 +73,6 @@ document.addEventListener('DOMContentLoaded', function() {
         $(".validation-message").text("");
         var name = $("input#username");
         var email = $("input#email");
-        //var email = $("#email").val();
-        //var emailValidationMessage = $("#emailValidationMessage");
         var company = $("input#company");
         var termsChecked = $("#terms").is(":checked");
         
@@ -82,43 +80,41 @@ document.addEventListener('DOMContentLoaded', function() {
 
         if (!validateName(name.val())) {
             showValidationMessage(name[0], "Please enter a valid full name (first name and surname).");
-            return;
+            isValid = false;
         }
 
         if (!validateEmail(email.val())) {
             showValidationMessage(email[0], "Please enter a valid email address.");
-            return;
+            isValid = false;
         }
     
         if (!validateCompany(company.val())) {
             showValidationMessage(company[0], "Please enter a valid company name.");
-            return;
+            isValid = false;
         }
         // Validate the Terms and Conditions checkbox
         if (!termsChecked) {
-            $("#termsValidationMessage").text("You must agree to the terms and conditions.");
+            //$("#termsValidationMessage").text("You must agree to the terms and conditions.");
+            showValidationMessage($("#terms")[0], "You must agree to the terms and conditions.");
             isValid = false;
         }
 
         // If all validations pass, submit the form
         if (isValid) {
-            this.submit();
-        }
-    
-        // Store form data into variable
-        var formData = {
-            "name": $("input#username").val(),
-            "email": $("input#email").val(),
-            "company": $("input#company").val()
-        };
-
-        // Log the form submission event to Firebase Analytics
-    const analytics = firebase.analytics();
-    analytics.logEvent('form_submission', {
-        name: formData.name,
-        email: formData.email,
-        company: formData.company
-    });
+           
+            // Store form data into variable
+            var formData = {
+                "name": $("input#username").val(),
+                "email": $("input#email").val(),
+                "company": $("input#company").val()
+            };
+                // Log the form submission event to Firebase Analytics
+            const analytics = firebase.analytics();
+            analytics.logEvent('form_submission', {
+                    name: formData.name,
+                    email: formData.email,
+                    company: formData.company
+            });
 
 
         // Save Data to Firebase
@@ -140,6 +136,7 @@ document.addEventListener('DOMContentLoaded', function() {
         console.log("Logging in... ", loginUrl);
         // redirect browser to meraki auth URL.
         window.location.href = loginUrl;
+    }
     });
 
     function validateName(name) {
