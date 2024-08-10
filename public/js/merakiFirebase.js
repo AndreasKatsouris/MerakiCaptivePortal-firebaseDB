@@ -17,6 +17,11 @@ const config = {
 
 document.addEventListener('DOMContentLoaded', function() {
     firebase.initializeApp(config);
+    // Initialize Firebase Analytics
+    const analytics = firebase.analytics();
+
+    // Log an event when the page loads
+    analytics.logEvent('page_view', { page: 'captive_portal' });
 
     // Get a reference to the database service
     var database = firebase.database();
@@ -39,44 +44,70 @@ document.addEventListener('DOMContentLoaded', function() {
     $("div.clientMAC").text(client_mac);
     $("div.nodeMAC").text(node_mac);
 
+    function showValidationMessage(element, message) {
+        var messageElement = document.createElement('div');
+        messageElement.className = 'validation-message';
+        messageElement.textContent = message;
+        element.parentNode.appendChild(messageElement);
+    }
+    
+    function removeValidationMessages() {
+        var messages = document.querySelectorAll('.validation-message');
+        messages.forEach(function(message) {
+            message.remove();
+        });
+    }
+    
+
+
     // Handle Form Submission
     $('form').submit(function(event) {    
         console.log("processing loginForm");
-
+        removeValidationMessages();
         event.preventDefault();
-            // Get form values
-    var name = $("input#username").val();
-    var email = $("input#email").val();
-    var company = $("input#company").val();
-
+        
+        // Get form values
+        var name = $("input#username").val();
+        var email = $("input#email").val();
+        var company = $("input#company").val();
+        
         // Validate the inputs
-    if (!validateName(name)) {
-        alert("Please enter a valid name.");
-        return;
-    }
+
+        if (!validateName(name.val())) {
+            showValidationMessage(name[0], "Please enter a valid full name (first name and surname).");
+            return;
+        }
+
+        if (!validateEmail(email.val())) {
+            showValidationMessage(email[0], "Please enter a valid email address.");
+            return;
+        }
     
-    if (!validateEmail(email)) {
-        alert("Please enter a valid email address.");
-        return;
-    }
-
-    if (!validateCompany(company)) {
-        alert("Please enter a valid company name.");
-        return;
-    }
-
-    if (!$("#terms").is(":checked")) {
-        alert("You must agree to the terms and conditions.");
-        return;
-    }
-
-
+        if (!validateCompany(company.val())) {
+            showValidationMessage(company[0], "Please enter a valid company name.");
+            return;
+        }
+    
+        if (!$("#terms").is(":checked")) {
+            alert("You must agree to the terms and conditions.");
+            return;
+        }
+    
         // Store form data into variable
         var formData = {
             "name": $("input#username").val(),
             "email": $("input#email").val(),
             "company": $("input#company").val()
         };
+
+        // Log the form submission event to Firebase Analytics
+    const analytics = firebase.analytics();
+    analytics.logEvent('form_submission', {
+        name: formData.name,
+        email: formData.email,
+        company: formData.company
+    });
+
 
         // Save Data to Firebase
         console.log("saving form data", formData);
@@ -100,8 +131,25 @@ document.addEventListener('DOMContentLoaded', function() {
     });
 
     function validateName(name) {
-        // Example validation: Name must not be empty and must not contain special characters
-        return name.trim() !== "" && /^[a-zA-Z\s]+$/.test(name);
+        // Trim the name to remove extra spaces
+        name = name.trim();
+    
+        // Split the name by spaces
+        var nameParts = name.split(/\s+/);
+    
+        // Check if there are at least two parts (first name and last name)
+        if (nameParts.length < 2) {
+            return false;
+        }
+    
+        // Ensure all parts of the name contain only letters and optional hyphens/apostrophes
+        for (var i = 0; i < nameParts.length; i++) {
+            if (!/^[a-zA-Z'-]+$/.test(nameParts[i])) {
+                return false;
+            }
+        }
+    
+        return true;
     }
     
     function validateEmail(email) {
