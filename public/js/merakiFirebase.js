@@ -75,6 +75,7 @@ document.addEventListener('DOMContentLoaded', function() {
 
     // Write to Firebase database
     function writeUserData(data, client_mac, node_mac) {
+        var timestamp = new Date().toISOString();
         database.ref('wifiLogins/' + Date.now()).set({
             name: data.name,
             email: data.email,
