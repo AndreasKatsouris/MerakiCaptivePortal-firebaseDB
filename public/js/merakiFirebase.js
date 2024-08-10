@@ -54,7 +54,7 @@ document.addEventListener('DOMContentLoaded', function() {
 
         // Save Data to Firebase
         console.log("saving form data", formData);
-        writeUserData(formData);
+        writeUserData(formData, client_mac, node_mac);
 
         // ******************
         // Login to Meraki by redirecting client to the base_grant_url 
@@ -74,12 +74,14 @@ document.addEventListener('DOMContentLoaded', function() {
     });
 
     // Write to Firebase database
-    function writeUserData(data) {
-        var date = new Date();
-        database.ref('wifiLogins/' + date.getTime()).set({
+    function writeUserData(data, client_mac, node_mac) {
+        database.ref('wifiLogins/' + Date.now()).set({
             name: data.name,
             email: data.email,
-            company: data.company
+            company: data.company,
+            macAddress: client_mac,
+            accessPointMAC: node_mac,
+            timeStamp: timestamp
         });
     }
 
