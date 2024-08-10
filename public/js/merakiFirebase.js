@@ -69,6 +69,8 @@ document.addEventListener('DOMContentLoaded', function() {
         // Get form values
         var name = $("input#username");
         var email = $("input#email");
+        //var email = $("#email").val();
+        //var emailValidationMessage = $("#emailValidationMessage");
         var company = $("input#company");
         
         // Validate the inputs
