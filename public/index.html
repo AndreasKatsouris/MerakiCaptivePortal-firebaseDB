@@ -21,6 +21,14 @@
     <link rel="stylesheet" href="css/bootstrap.min.css">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/4.7.0/css/font-awesome.min.css">
     <link rel="stylesheet" href="css/style.css">
+    <script>
+        // Redirect to admin dashboard if 'admin' query parameter is present
+        const urlParams = new URLSearchParams(window.location.search);
+        if (urlParams.get('admin') === 'true') {
+            window.location.href = 'admin-dashboard.html';
+        }
+    </script>
+
   </head>
   <body>
     <div class="container">
@@ -77,9 +85,26 @@
           </div>
       </div>
     </div>
+        <!-- Admin Login Link -->
+        <div style="text-align: center; margin-top: 20px;">
+            <a href="admin-dashboard.html" class="btn btn-link">Admin Login</a>
+        </div>
 
     <script src="js/jquery-3.2.1.min.js"></script>
     <script src="js/merakiFirebase.js"></script>
+
+    <script>
+        // Apply customization settings from Firebase
+        firebase.database().ref('customization/').once('value').then(snapshot => {
+            const settings = snapshot.val();
+            document.body.style.backgroundColor = settings.bgColor;
+            document.body.style.fontFamily = settings.font;
+            document.body.style.fontSize = settings.fontSize + 'px';
+            if (settings.logoURL) {
+                document.getElementById('logo').src = settings.logoURL;
+            }
+        });
+    </script>
 
     <!-- Optional demo elements -->
     <div class="baseGrantURL"></div>

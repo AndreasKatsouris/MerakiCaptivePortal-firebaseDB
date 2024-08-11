@@ -1,0 +1,63 @@
+<!-- admin-dashboard.html -->
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Admin Dashboard</title>
+</head>
+<body>
+    <script>
+        // Ensure the user is authenticated before allowing access to the dashboard
+        firebase.auth().onAuthStateChanged((user) => {
+            if (!user) {
+                window.location.href = 'admin-login.html'; // Redirect to login if not authenticated
+            }
+        });
+    </script>
+    <h2>Customize Captive Portal</h2>
+    <form id="customizationForm">
+        <label for="bgColor">Background Color:</label>
+        <input type="color" id="bgColor" name="bgColor">
+
+        <label for="font">Font:</label>
+        <input type="text" id="font" name="font">
+
+        <label for="fontSize">Font Size:</label>
+        <input type="number" id="fontSize" name="fontSize" min="8" max="72">
+
+        <label for="logo">Upload Logo:</label>
+        <input type="file" id="logo" name="logo">
+
+        <button type="submit">Save Changes</button>
+    </form>
+
+    <script>
+        document.getElementById('customizationForm').addEventListener('submit', function(event) {
+            event.preventDefault();
+            const bgColor = document.getElementById('bgColor').value;
+            const font = document.getElementById('font').value;
+            const fontSize = document.getElementById('fontSize').value;
+            const logo = document.getElementById('logo').files[0];
+
+            // Store customization settings in Firebase
+            const storageRef = firebase.storage().ref();
+            if (logo) {
+                const logoRef = storageRef.child('logos/' + logo.name);
+                logoRef.put(logo).then(snapshot => {
+                    snapshot.ref.getDownloadURL().then(url => {
+                        saveCustomization({ bgColor, font, fontSize, logoURL: url });
+                    });
+                });
+            } else {
+                saveCustomization({ bgColor, font, fontSize });
+            }
+        });
+
+        function saveCustomization(settings) {
+            firebase.database().ref('customization/').set(settings)
+                .then(() => alert('Customization saved!'))
+                .catch(error => console.error('Error saving customization:', error));
+        }
+    </script>
+</body>
+</html>
