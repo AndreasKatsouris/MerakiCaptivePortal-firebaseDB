@@ -93,17 +93,22 @@
     <script src="js/jquery-3.2.1.min.js"></script>
     <script src="js/merakiFirebase.js"></script>
 
+    <!-- Apply customization settings from Firebase -->
     <script>
-        // Apply customization settings from Firebase
         firebase.database().ref('customization/').once('value').then(snapshot => {
             const settings = snapshot.val();
-            document.body.style.backgroundColor = settings.bgColor;
-            document.body.style.fontFamily = settings.font;
-            document.body.style.fontSize = settings.fontSize + 'px';
-            if (settings.logoURL) {
-                document.getElementById('logo').src = settings.logoURL;
+            console.log('Retrieved settings:', settings); // Debugging: Output retrieved settings
+            if (settings) {
+                document.body.style.backgroundColor = settings.bgColor;
+                document.body.style.fontFamily = settings.font;
+                document.body.style.fontSize = settings.fontSize + 'px';
+                if (settings.logoURL) {
+                    document.getElementById('logo').src = settings.logoURL;
+                }
+            } else {
+                console.error('No customization settings found.');
             }
-        });
+        }).catch(error => console.error('Error retrieving settings:', error));
     </script>
 
     <!-- Optional demo elements -->

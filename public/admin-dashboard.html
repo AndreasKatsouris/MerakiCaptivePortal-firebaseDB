@@ -54,10 +54,12 @@
         });
 
         function saveCustomization(settings) {
-            firebase.database().ref('customization/').set(settings)
-                .then(() => alert('Customization saved!'))
-                .catch(error => console.error('Error saving customization:', error));
-        }
+    console.log('Saving settings:', settings); // Debugging statement
+    firebase.database().ref('customization/').set(settings)
+        .then(() => console.log('Customization saved!'))
+        .catch(error => console.error('Error saving customization:', error));
+}
+
     </script>
 </body>
 </html>
