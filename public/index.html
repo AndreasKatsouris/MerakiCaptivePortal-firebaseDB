@@ -34,9 +34,12 @@
                 const settings = snapshot.val();
                 console.log('Retrieved settings:', settings); // Debugging: Output retrieved settings
                 if (settings) {
+                    const styleSheet = document.styleSheets[0]; // Assuming it's the first stylesheet
+                    styleSheet.insertRule(`body { background-color: ${settings.bgColor}; }`, styleSheet.cssRules.length);
                     document.body.style.backgroundColor = settings.bgColor;
                     document.body.style.fontFamily = settings.font;
                     document.body.style.fontSize = settings.fontSize + 'px';
+                    
                     if (settings.logoURL) {
                         document.getElementById('logo').src = settings.logoURL;
                     }
