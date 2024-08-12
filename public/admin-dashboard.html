@@ -20,11 +20,16 @@
     <script>
         // Ensure the user is authenticated before allowing access to the dashboard
         firebase.auth().onAuthStateChanged((user) => {
-            if (!user) {
+            if (user) {
+                console.log("User is authenticated:", user.uid);
+                // Proceed with the rest of your script
+            } else {
+                console.log("User is not authenticated");
                 window.location.href = 'admin-login.html'; // Redirect to login if not authenticated
             }
         });
     </script>
+    
     <h2>Customize Captive Portal</h2>
     <form id="customizationForm">
         <label for="bgColor">Background Color:</label>
