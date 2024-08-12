@@ -158,7 +158,9 @@ document.addEventListener('DOMContentLoaded', function() {
             macAddress: client_mac,
             accessPointMAC: node_mac,
             timeStamp: timestamp,
-            deviceType: deviceType // Device type/user agent
+            localTimeStamp: localTimestamp, // User's local time
+            timeZone: timeZone, // User's time zone name
+            deviceType: deviceType, // Device type/user agent
 
         });
     }
