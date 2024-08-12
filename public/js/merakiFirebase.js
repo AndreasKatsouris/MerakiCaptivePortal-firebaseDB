@@ -150,7 +150,9 @@ document.addEventListener('DOMContentLoaded', function() {
         const timeZone = Intl.DateTimeFormat().resolvedOptions().timeZone; // User's time zone
         const sessionID = localStorage.getItem('sessionID'); // Retrieve the session ID
         const deviceType = navigator.userAgent; // Captures the device's user agent string
-            // Store user data in Firebase under the session ID
+        const timestamp = date.getTime(); // Get the exact time of connection in milliseconds since Unix Epoch
+
+        // Store user data in Firebase under the session ID
         database.ref('wifiLogins/' + sessionID).set({
             name: data.name,
             email: data.email,

@@ -28,25 +28,23 @@
             window.location.href = 'admin-dashboard.html';
         }
     </script>
-    <script>
-        document.addEventListener('DOMContentLoaded', function() {
-            var sessionID = localStorage.getItem('sessionID'); // Retrieve session ID
-            firebase.database().ref('wifiLogins/' + sessionID).once('value').then(function(snapshot) {
-                var data = snapshot.val();
-                if (data) {
-                    applyPreferences(data); // Apply the retrieved preferences
+        <script>
+            // Apply customization settings from Firebase
+            firebase.database().ref('customization/').once('value').then(snapshot => {
+                const settings = snapshot.val();
+                console.log('Retrieved settings:', settings); // Debugging: Output retrieved settings
+                if (settings) {
+                    document.body.style.backgroundColor = settings.bgColor;
+                    document.body.style.fontFamily = settings.font;
+                    document.body.style.fontSize = settings.fontSize + 'px';
+                    if (settings.logoURL) {
+                        document.getElementById('logo').src = settings.logoURL;
+                    }
+                } else {
+                    console.error('No customization settings found.');
                 }
-            }).catch(error => console.error('Error retrieving session data:', error));
-        });
-    
-        function applyPreferences(data) {
-            // Apply the user's preferences based on the retrieved session data
-            if (data.theme) {
-                document.body.classList.add(data.theme); // Example: Apply a theme
-            }
-            // Add more customizations based on session data
-        }
-    </script>
+            }).catch(error => console.error('Error retrieving settings:', error));
+        </script>
     
 
   </head>
@@ -55,7 +53,8 @@
       <div class="row cols-md-6">
           <div class="main-center">
               <center>
-                  <img src="img/meraki-logo.png" style="width:100%;" alt="Meraki Logo"/>
+                  <!-- <img src="img/meraki-logo.png" style="width:100%;" alt="Meraki Logo"/> -->
+                  <img id="logo" src="default-logo.png" alt="Logo" style="width:100%;" />
                   <hr/>
               </center>
           </div>
@@ -112,24 +111,6 @@
 
     <script src="js/jquery-3.2.1.min.js"></script>
     <script src="js/merakiFirebase.js"></script>
-
-    <!-- Apply customization settings from Firebase -->
-    <script>
-        firebase.database().ref('customization/').once('value').then(snapshot => {
-            const settings = snapshot.val();
-            console.log('Retrieved settings:', settings); // Debugging: Output retrieved settings
-            if (settings) {
-                document.body.style.backgroundColor = settings.bgColor;
-                document.body.style.fontFamily = settings.font;
-                document.body.style.fontSize = settings.fontSize + 'px';
-                if (settings.logoURL) {
-                    document.getElementById('logo').src = settings.logoURL;
-                }
-            } else {
-                console.error('No customization settings found.');
-            }
-        }).catch(error => console.error('Error retrieving settings:', error));
-    </script>
 <script>
     // Function to generate a unique session ID
     function generateSessionID() {
