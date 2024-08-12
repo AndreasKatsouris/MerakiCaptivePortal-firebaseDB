@@ -147,18 +147,37 @@ document.addEventListener('DOMContentLoaded', function() {
     function writeUserData(data, client_mac, node_mac) {
         const date = new Date();
         const localTimestamp = date.toLocaleString(); // User's local time
-        //const timeZoneOffset = date.getTimezoneOffset(); // Time zone offset from UTC in minutes
         const timeZone = Intl.DateTimeFormat().resolvedOptions().timeZone; // User's time zone
-        database.ref('wifiLogins/' + Date.now()).set({
+        const sessionID = localStorage.getItem('sessionID'); // Retrieve the session ID
+        const deviceType = navigator.userAgent; // Captures the device's user agent string
+            // Store user data in Firebase under the session ID
+        database.ref('wifiLogins/' + sessionID).set({
             name: data.name,
             email: data.email,
             company: data.company,
             macAddress: client_mac,
             accessPointMAC: node_mac,
-            localTimeStamp: localTimestamp, // User's local time
-            timeZone: timeZone // User's time zone name
-            //timeZoneOffset: timeZoneOffset // User's time zone offset from UTC
-        });    }
+            timeStamp: timestamp,
+            deviceType: deviceType // Device type/user agent
+
+        });
+    }
+        // Function to store user preferences in Firebase using MAC address as the key
+        function storeUserPreferences(macAddress, preferences) {
+            firebase.database().ref('users/' + macAddress).set(preferences)
+                .then(() => console.log('Preferences saved for MAC:', macAddress)) // Log success
+                .catch(error => console.error('Error saving preferences:', error)); // Log any errors
+        }
+
+        // Example usage: Store preferences when the user selects them
+        var userPreferences = {
+            theme: 'dark', // User's preferred theme
+            language: 'en' // User's preferred language
+            // Additional preferences can be added here
+        };
+        storeUserPreferences(client_mac, userPreferences);
+    
+    
 
     // Helper function to parse URL parameters
     function GetURLParameter(sParam) {

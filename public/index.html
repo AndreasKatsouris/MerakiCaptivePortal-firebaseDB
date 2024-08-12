@@ -28,6 +28,26 @@
             window.location.href = 'admin-dashboard.html';
         }
     </script>
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            var sessionID = localStorage.getItem('sessionID'); // Retrieve session ID
+            firebase.database().ref('wifiLogins/' + sessionID).once('value').then(function(snapshot) {
+                var data = snapshot.val();
+                if (data) {
+                    applyPreferences(data); // Apply the retrieved preferences
+                }
+            }).catch(error => console.error('Error retrieving session data:', error));
+        });
+    
+        function applyPreferences(data) {
+            // Apply the user's preferences based on the retrieved session data
+            if (data.theme) {
+                document.body.classList.add(data.theme); // Example: Apply a theme
+            }
+            // Add more customizations based on session data
+        }
+    </script>
+    
 
   </head>
   <body>
@@ -110,6 +130,39 @@
             }
         }).catch(error => console.error('Error retrieving settings:', error));
     </script>
+<script>
+    // Function to generate a unique session ID
+    function generateSessionID() {
+        return 'session-' + Math.random().toString(36).substr(2, 9);
+    }
+
+    // Retrieve the existing session ID from local storage if it exists
+    let sessionID = localStorage.getItem('sessionID');
+    
+    // If no session ID is found, generate a new one and store it in local storage
+    if (!sessionID) {
+        sessionID = generateSessionID();
+        localStorage.setItem('sessionID', sessionID);
+    }
+
+    // Output the session ID to the console for debugging purposes
+    console.log("Session ID:", sessionID);
+</script>
+
+<script>
+    document.addEventListener('DOMContentLoaded', function() {
+        var sessionID = localStorage.getItem('sessionID'); // Get the session ID from local storage
+        firebase.database().ref('wifiLogins/' + sessionID).once('value').then(function(snapshot) {
+            var data = snapshot.val(); // Retrieve the data associated with the session ID
+            if (data) {
+                console.log('Session data:', data); // Log the session data for debugging
+                // Apply session-specific data (e.g., apply a theme, language, etc.)
+            }
+        }).catch(error => console.error('Error retrieving session data:', error));
+    });
+</script>
+
+    
 
     <!-- Optional demo elements -->
     <div class="baseGrantURL"></div>
