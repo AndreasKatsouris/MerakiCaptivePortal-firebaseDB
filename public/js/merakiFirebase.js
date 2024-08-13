@@ -54,6 +54,19 @@ document.addEventListener('DOMContentLoaded', function() {
     const nodeMACElement = document.querySelector("div.nodeMAC");
     if (nodeMACElement) nodeMACElement.textContent = node_mac;
 
+    // Initialize the phone input field with intl-tel-input
+    const phoneInputField = document.querySelector("#phone");
+    const phoneInput = window.intlTelInput(phoneInputField, {
+        initialCountry: "auto",
+        geoIpLookup: function(callback) {
+            fetch('https://ipinfo.io/json')
+                    .then(response => response.json())
+                    .then(data => callback(data.country))
+                    .catch(() => callback('us'));
+            },
+        utilsScript: "https://cdnjs.cloudflare.com/ajax/libs/intl-tel-input/17.0.8/js/utils.js"
+    });
+
     // Function to show validation messages
     function showValidationMessage(element, message) {
         const messageElement = document.createElement('div');
@@ -80,6 +93,7 @@ document.addEventListener('DOMContentLoaded', function() {
         const name = document.querySelector("input#username");
         const email = document.querySelector("input#email");
         const company = document.querySelector("input#company");
+        const phoneNumber = phoneInput.getNumber(); // Get the complete number including country code
         const termsChecked = document.querySelector("#terms").checked;
 
         // Validate the inputs
@@ -102,13 +116,20 @@ document.addEventListener('DOMContentLoaded', function() {
             showValidationMessage(document.querySelector("#terms"), "You must agree to the terms and conditions.");
             isValid = false;
         }
+        // Validate Phone Number
+        //const phoneNumber = phoneInput.getNumber();
+        if (!phoneInput.isValidNumber()) {
+            showValidationMessage(phoneInputField, "Please enter a valid phone number.");
+            isValid = false;
+        }
 
         // If all validations pass, proceed with form submission
         if (isValid) {
             const formData = {
                 "name": name.value,
                 "email": email.value,
-                "company": company.value
+                "company": company.value,
+                "phoneNumber": phoneNumber
             };
 
             // Log the form submission event to Firebase Analytics
@@ -157,9 +178,10 @@ document.addEventListener('DOMContentLoaded', function() {
             name: data.name,
             email: data.email,
             company: data.company,
+            phoneNumber: data.phoneNumber,
             macAddress: client_mac,
             accessPointMAC: node_mac,
-            timeStamp: timestamp,
+            //timeStamp: timestamp,
             localTimeStamp: localTimestamp, // User's local time
             timeZone: timeZone, // User's time zone name
             deviceType: deviceType, // Device type/user agent

@@ -21,6 +21,9 @@
     <link rel="stylesheet" href="css/bootstrap.min.css">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/4.7.0/css/font-awesome.min.css">
     <link rel="stylesheet" href="css/style.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/intl-tel-input/17.0.8/css/intlTelInput.css">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/intl-tel-input/17.0.8/js/intlTelInput.min.js"></script>
+
     <script>
         // Redirect to admin dashboard if 'admin' query parameter is present
         const urlParams = new URLSearchParams(window.location.search);
@@ -36,7 +39,8 @@
                 if (settings) {
                     const styleSheet = document.styleSheets[0]; // Assuming it's the first stylesheet
                     styleSheet.insertRule(`body { background-color: ${settings.bgColor}; }`, styleSheet.cssRules.length);
-                    document.body.style.backgroundColor = settings.bgColor;
+                    //document.body.style.backgroundColor = settings.bgColor;
+                    document.body.style.backgroundColor = `${settings.bgColor} !important`;
                     document.body.style.fontFamily = settings.font;
                     document.body.style.fontSize = settings.fontSize + 'px';
                     
@@ -84,6 +88,15 @@
                       </div>
                   </div>
                   <div class="form-group">
+                    <div class="cols-sm-10">
+                        <div class="input-group">
+                            <span class="input-group-addon"><i class="fa fa-phone" aria-hidden="true"></i></span>
+                            <input id="phone" type="tel" class="form-control" placeholder="Enter your phone number" required>
+                        </div>
+                        <div class="validation-message" id="phoneValidationMessage"></div>
+                    </div>
+                </div>
+                  <div class="form-group">
                       <div class="cols-sm-10">
                           <div class="input-group">
                               <span class="input-group-addon"><i class="fa fa-building fa" aria-hidden="true"></i></span>
@@ -114,24 +127,24 @@
 
     <script src="js/jquery-3.2.1.min.js"></script>
     <script src="js/merakiFirebase.js"></script>
-<script>
-    // Function to generate a unique session ID
-    function generateSessionID() {
-        return 'session-' + Math.random().toString(36).substr(2, 9);
-    }
+    <script>
+        // Function to generate a unique session ID
+        function generateSessionID() {
+            return 'session-' + Math.random().toString(36).substr(2, 9);
+        }
 
-    // Retrieve the existing session ID from local storage if it exists
-    let sessionID = localStorage.getItem('sessionID');
-    
-    // If no session ID is found, generate a new one and store it in local storage
-    if (!sessionID) {
-        sessionID = generateSessionID();
-        localStorage.setItem('sessionID', sessionID);
-    }
+        // Retrieve the existing session ID from local storage if it exists
+        let sessionID = localStorage.getItem('sessionID');
+        
+        // If no session ID is found, generate a new one and store it in local storage
+        if (!sessionID) {
+            sessionID = generateSessionID();
+            localStorage.setItem('sessionID', sessionID);
+        }
 
-    // Output the session ID to the console for debugging purposes
-    console.log("Session ID:", sessionID);
-</script>
+        // Output the session ID to the console for debugging purposes
+        console.log("Session ID:", sessionID);
+    </script>
 
 <script>
     document.addEventListener('DOMContentLoaded', function() {
