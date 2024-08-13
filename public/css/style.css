@@ -226,3 +226,25 @@ input.form-control:focus:invalid + .validation-message {
 .checkbox-group input:focus:invalid + .validation-message-checkbox {
   display: block;
 }
+
+.iti {
+  width: 100%; /* Make the phone input take up the full width */
+}
+
+.iti input {
+  width: 100%;
+  padding-left: 50px; /* Adjust padding to align with the other inputs */
+}
+
+.input-group-addon {
+  vertical-align: middle; /* Ensure icons are vertically aligned */
+}
+.form-control {
+  width: 100%;
+  box-sizing: border-box;
+  padding-right: 10px; /* Ensure enough space for placeholder text */
+}
+
+.input-group {
+  width: 100%; /* Ensure the input group is also 100% width */
+}
