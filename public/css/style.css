@@ -16,7 +16,7 @@ body {
   font-size: 14px;
   line-height: 1.6;
   color: #333;
-  background: linear-gradient(135deg, #f0f4f8 0%, #ffffff 100%);
+  /*background: linear-gradient(135deg, #f0f4f8 0%, #ffffff 100%);*/
   margin: 50px;
 }
 
@@ -228,38 +228,7 @@ input.form-control:focus:invalid + .validation-message {
   display: block;
 }
 
-.iti {
-  width: 100%; /* Ensure the phone input takes up the full width */
-}
 
-.iti .form-control {
-  padding-left: 55px; /* Adjust padding for alignment */
-  height: auto; /* Ensure consistent height with other input fields */
-  padding-top: 3px;
-  padding-bottom: 3px;
-}
-
-.iti input.form-control {
-  padding-left: 48px; /* Ensure enough space for the flag */
-}
-
-.iti input[type="tel"] {
-  width: 100%;
-  box-sizing: border-box;
-  padding-left: 48px; /* Adjust padding to ensure alignment */
-}
-
-/* Flag container alignment */
-.iti .iti__flag-container {
-  position: absolute;
-  top: 50%;
-  left: 12px;
-  transform: translateY(-50%); /* Center the flag vertically */
-}
-
-.iti .iti__selected-flag {
-  margin-right: 12px;
-}
 
 /* Adjusting the alignment of the icons */
 .input-group-addon {
@@ -288,7 +257,7 @@ input.form-control:focus:invalid + .validation-message {
 
 .input-group .form-control {
   height: 44px; /* Ensures consistency in height */
-  padding-left: 55px; /* Adjust to match the icon's space */
+  /*padding-left: 55px; /* Adjust to match the icon's space */
 }
 
 .input-group-addon {
@@ -302,6 +271,7 @@ input.form-control:focus:invalid + .validation-message {
 }
 
 .iti input[type="tel"] {
+  width: 100%;
   padding-left: 55px; /* Ensure padding aligns with the flag and input text */
 }
 
