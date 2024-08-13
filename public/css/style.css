@@ -232,7 +232,7 @@ input.form-control:focus:invalid + .validation-message {
 }
 
 .iti .form-control {
-  padding-left: 48px; /* Adjust padding for alignment */
+  padding-left: 55px; /* Adjust padding for alignment */
   height: auto; /* Ensure consistent height with other input fields */
   padding-top: 3px;
   padding-bottom: 3px;
@@ -277,4 +277,42 @@ input.form-control:focus:invalid + .validation-message {
   border-top-right-radius: 0;
   border-bottom-right-radius: 0;
 }
+
+.input-group {
+  display: flex;
+  align-items: center;
+  width: 100%;
+}
+
+.input-group .form-control {
+  height: 44px; /* Ensures consistency in height */
+  padding-left: 50px; /* Adjust to match the icon's space */
+}
+
+.input-group-addon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 44px; /* Ensure this matches the input height */
+  background-color: #eee;
+  border: 1px solid #d1d5db;
+  border-radius: 5px 0 0 5px;
+}
+
+.iti input[type="tel"] {
+  padding-left: 55px; /* Ensure padding aligns with the flag and input text */
+}
+
+
+.form-control::placeholder {
+  color: #aaa; /* Light gray for the placeholder text */
+  opacity: 1; /* Ensure the placeholder is fully visible */
+}
+
+.iti .iti__flag-container {
+  left: 15px; /* Move the flag a bit more to the left */
+  top: 50%; /* Center vertically */
+  transform: translateY(-50%);
+}
+
 
