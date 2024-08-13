@@ -96,10 +96,10 @@ input::-webkit-input-placeholder {
   width: 100%;
   box-sizing: border-box;
   padding: 10px;
+  padding-right: 10px; /* Space for placeholder text */
   font-size: 14px;
   border: 1px solid #d1d5db;
   border-radius: 5px;
-  margin-bottom: 20px;
 }
 
 .form-control:focus {
@@ -228,23 +228,53 @@ input.form-control:focus:invalid + .validation-message {
 }
 
 .iti {
-  width: 100%; /* Make the phone input take up the full width */
+  width: 100%; /* Ensure the phone input takes up the full width */
 }
 
-.iti input {
-  width: 100%;
-  padding-left: 50px; /* Adjust padding to align with the other inputs */
+.iti .form-control {
+  padding-left: 48px; /* Adjust padding for alignment */
+  height: auto; /* Ensure consistent height with other input fields */
+  padding-top: 3px;
+  padding-bottom: 3px;
+}
+.iti input.form-control {
+  padding-left: 48px; /* Ensure enough space for the flag */
 }
 
-.input-group-addon {
-  vertical-align: middle; /* Ensure icons are vertically aligned */
-}
-.form-control {
+.iti input[type="tel"] {
   width: 100%;
   box-sizing: border-box;
-  padding-right: 10px; /* Ensure enough space for placeholder text */
+  padding-left: 48px; /* Adjust padding to ensure alignment */
 }
 
-.input-group {
-  width: 100%; /* Ensure the input group is also 100% width */
+/* Flag container alignment */
+.iti .iti__flag-container {
+  position: absolute;
+  top: 50%;
+  left: 12px;
+  transform: translateY(-50%); /* Center the flag vertically */
 }
+
+.iti .iti__selected-flag {
+  margin-right: 12px;
+}
+
+/* Adjusting the alignment of the icons */
+.input-group-addon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 100%;
+  padding: 6px 12px;
+  font-size: 14px;
+  font-weight: 400;
+  line-height: 1;
+  color: #555;
+  text-align: center;
+  background-color: #eee;
+  border: 1px solid #ccc;
+  border-radius: 4px;
+  border-top-right-radius: 0;
+  border-bottom-right-radius: 0;
+}
+
