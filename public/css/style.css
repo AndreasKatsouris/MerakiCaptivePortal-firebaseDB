@@ -148,6 +148,7 @@ input::-webkit-input-placeholder {
   font-size: 11px;
   text-align: center;
 }
+
 .form-group {
   position: relative; /* Ensure the validation message is positioned relative to the form group */
   margin-bottom: 20px;
@@ -237,6 +238,7 @@ input.form-control:focus:invalid + .validation-message {
   padding-top: 3px;
   padding-bottom: 3px;
 }
+
 .iti input.form-control {
   padding-left: 48px; /* Ensure enough space for the flag */
 }
@@ -264,7 +266,7 @@ input.form-control:focus:invalid + .validation-message {
   display: flex;
   align-items: center;
   justify-content: center;
-  height: 100%;
+  height: 44px;
   padding: 6px 12px;
   font-size: 14px;
   font-weight: 400;
@@ -286,7 +288,7 @@ input.form-control:focus:invalid + .validation-message {
 
 .input-group .form-control {
   height: 44px; /* Ensures consistency in height */
-  padding-left: 50px; /* Adjust to match the icon's space */
+  padding-left: 55px; /* Adjust to match the icon's space */
 }
 
 .input-group-addon {
@@ -303,7 +305,6 @@ input.form-control:focus:invalid + .validation-message {
   padding-left: 55px; /* Ensure padding aligns with the flag and input text */
 }
 
-
 .form-control::placeholder {
   color: #aaa; /* Light gray for the placeholder text */
   opacity: 1; /* Ensure the placeholder is fully visible */
@@ -314,5 +315,3 @@ input.form-control:focus:invalid + .validation-message {
   top: 50%; /* Center vertically */
   transform: translateY(-50%);
 }
-
-
