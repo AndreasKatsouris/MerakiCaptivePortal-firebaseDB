@@ -131,7 +131,7 @@ document.addEventListener('DOMContentLoaded', function() {
             // Redirect to Meraki auth URL
             let loginUrl = base_grant_url;
             if (user_continue_url !== "undefined") {
-                loginUrl += "?continue_url=" + user_continue_url;
+                loginUrl += "?continue_url=" + encodeURIComponent(user_continue_url);
             }
             console.log("Logging in...", loginUrl);
             window.location.href = loginUrl;
