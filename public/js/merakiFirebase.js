@@ -36,11 +36,11 @@ document.addEventListener('DOMContentLoaded', function() {
 
 
 // Initialize Realtime Database and get a reference to the service
-const database = getDatabase(app);
+//const database = getDatabase(app);
 
 
 // Get a reference to the database service
-//var database = firebase.database();
+var database = firebase.database();
 
 // Parse Meraki supplied parameters
 var base_grant_url = decodeURIComponent(GetURLParameter("base_grant_url"));
