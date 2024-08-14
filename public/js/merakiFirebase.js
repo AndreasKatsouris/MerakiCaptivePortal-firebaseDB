@@ -133,8 +133,8 @@ document.addEventListener('DOMContentLoaded', function() {
             const formData = {
                 "name": name.value,
                 "email": email.value,
-                "company": company.value,
-                "phoneNumber": phoneNumber
+                "company": company.value//,
+                //"phoneNumber": phoneNumber
             };
 
             // Log the form submission event to Firebase Analytics
