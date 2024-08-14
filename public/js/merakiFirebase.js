@@ -31,7 +31,8 @@ const firebaseConfig = {
 
 //firebase.initializeApp(config);
 // Initialize Firebase
-const app = initializeApp(firebaseConfig);
+document.addEventListener('DOMContentLoaded', function() {
+    firebase.initializeApp(config);
 
 
 // Initialize Realtime Database and get a reference to the service
@@ -120,3 +121,4 @@ function GetURLParameter(sParam)
         }
     }
 }
+});
