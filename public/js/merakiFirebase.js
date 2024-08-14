@@ -18,7 +18,7 @@ in a Firebase database, then log the user into the Meraki WiFi network.
 //import { getDatabase } from "firebase/database";
 
 
-const firebaseConfig = {
+const config = {
     apiKey: "AIzaSyBf96GNLhtz6FDdbLxIW9efh98WG__eQmk",
     authDomain: "merakicaptiveportal-firebasedb.firebaseapp.com",
     databaseURL: "https://merakicaptiveportal-firebasedb-default-rtdb.firebaseio.com",
