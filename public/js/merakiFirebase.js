@@ -37,6 +37,7 @@ document.addEventListener('DOMContentLoaded', function() {
     // Print Meraki provided parameters to console
     console.log("base_grant_url:", base_grant_url);
     console.log("client_ip:", client_ip);
+    console.log("user_continue_url:", user_continue_url);
 
     // Display Parameters for Demo (only if elements exist)
     const baseGrantElement = document.querySelector("div.baseGrantURL");
@@ -54,18 +55,6 @@ document.addEventListener('DOMContentLoaded', function() {
     const nodeMACElement = document.querySelector("div.nodeMAC");
     if (nodeMACElement) nodeMACElement.textContent = node_mac;
 
-    // Initialize the phone input field with intl-tel-input
-    const phoneInputField = document.querySelector("#phone");
-    const phoneInput = window.intlTelInput(phoneInputField, {
-        initialCountry: "auto",
-        geoIpLookup: function(callback) {
-            fetch('https://ipinfo.io/json')
-                    .then(response => response.json())
-                    .then(data => callback(data.country))
-                    .catch(() => callback('us'));
-            },
-        utilsScript: "https://cdnjs.cloudflare.com/ajax/libs/intl-tel-input/17.0.8/js/utils.js"
-    });
 
     // Function to show validation messages
     function showValidationMessage(element, message) {
@@ -164,14 +153,29 @@ document.addEventListener('DOMContentLoaded', function() {
         return company.trim() !== "";
     }
 
+        // Initialize the phone input field with intl-tel-input
+        const phoneInputField = document.querySelector("#phone");
+        const phoneInput = window.intlTelInput(phoneInputField, {
+            initialCountry: "auto",
+            geoIpLookup: function(callback) {
+                fetch('https://ipinfo.io/json')
+                        .then(response => response.json())
+                        .then(data => callback(data.country))
+                        .catch(() => callback('us'));
+                },
+            utilsScript: "https://cdnjs.cloudflare.com/ajax/libs/intl-tel-input/17.0.8/js/utils.js"
+        });
+    
+
     // Function to write user data to Firebase
     function writeUserData(data, client_mac, node_mac) {
         const date = new Date();
         const localTimestamp = date.toLocaleString(); // User's local time
         const timeZone = Intl.DateTimeFormat().resolvedOptions().timeZone; // User's time zone
-        const sessionID = localStorage.getItem('sessionID'); // Retrieve the session ID
+        const sessionID = localStorage.getItem('sessionID') || generateNewSessionID(); // Retrieve the session ID
+        localStorage.setItem('sessionID', sessionID);
         const deviceType = navigator.userAgent; // Captures the device's user agent string
-        const timestamp = date.getTime(); // Get the exact time of connection in milliseconds since Unix Epoch
+        //const timestamp = date.getTime(); // Get the exact time of connection in milliseconds since Unix Epoch
 
         // Store user data in Firebase under the session ID
         database.ref('wifiLogins/' + sessionID).set({

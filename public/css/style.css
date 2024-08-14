@@ -19,6 +19,20 @@ body {
   /*background: linear-gradient(135deg, #f0f4f8 0%, #ffffff 100%);*/
   margin: 50px;
 }
+.iti {
+  position: relative;
+  z-index: 1000; /* Ensure it is above other elements */
+}
+
+.iti__flag-container {
+  top: 10px;
+  left: 10px;
+}
+
+.iti__dropdown {
+  margin-top: 5px;
+  z-index: 1001;
+}
 
 form {
   max-width: 480px;
