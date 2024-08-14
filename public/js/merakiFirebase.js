@@ -145,11 +145,21 @@ document.addEventListener('DOMContentLoaded', function() {
             console.log("Saving form data", formData);
             writeUserData(formData, client_mac, node_mac);
 
-            // Redirect to Meraki auth URL
+            /** Redirect to Meraki auth URL
             let loginUrl = base_grant_url;
             if (user_continue_url !== "undefined") {
                 loginUrl += "?continue_url=" + encodeURIComponent(user_continue_url);
-            }
+            }*/
+                var loginUrl = base_grant_url;
+                if(user_continue_url !== "undefined"){
+                    // add the users intended website to the login parameters.
+                    // You could also re-write the user_continue_url if you wanted a custom 
+                    // landing page.
+                     loginUrl += "?continue_url="+user_continue_url;
+                }
+
+
+
             console.log("Logging in...", loginUrl);
             window.location.href = loginUrl;
         }
