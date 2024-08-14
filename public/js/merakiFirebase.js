@@ -82,6 +82,23 @@ document.addEventListener('DOMContentLoaded', function() {
         const name = document.querySelector("input#username");
         const email = document.querySelector("input#email");
         const company = document.querySelector("input#company");
+        const phoneInputField = document.querySelector("input#phone");
+        const phoneInput = window.intlTelInput(phoneInputField, {
+            initialCountry: "auto",
+            geoIpLookup: function(callback) {
+                fetch('https://ipinfo.io/json')
+                        .then(response => response.json())
+                        .then(data => callback(data.country))
+                        .catch(() => callback('us'));
+                },
+            utilsScript: "https://cdnjs.cloudflare.com/ajax/libs/intl-tel-input/17.0.8/js/utils.js"
+        });
+        //const phoneInput = window.intlTelInput(phoneInputField, {
+        //    utilsScript:
+        //      "https://cdnjs.cloudflare.com/ajax/libs/intl-tel-input/17.0.8/js/utils.js",
+        //  });
+
+        
         const phoneNumber = phoneInput.getNumber(); // Get the complete number including country code
         const termsChecked = document.querySelector("#terms").checked;
 
@@ -107,7 +124,7 @@ document.addEventListener('DOMContentLoaded', function() {
         }
         // Validate Phone Number
         //const phoneNumber = phoneInput.getNumber();
-        if (!phoneInput.isValidNumber()) {
+        if (!phoneNumber.isValidNumber()) {
             showValidationMessage(phoneInputField, "Please enter a valid phone number.");
             isValid = false;
         }
@@ -152,20 +169,6 @@ document.addEventListener('DOMContentLoaded', function() {
     function validateCompany(company) {
         return company.trim() !== "";
     }
-
-        // Initialize the phone input field with intl-tel-input
-        const phoneInputField = document.querySelector("#phone");
-        const phoneInput = window.intlTelInput(phoneInputField, {
-            initialCountry: "auto",
-            geoIpLookup: function(callback) {
-                fetch('https://ipinfo.io/json')
-                        .then(response => response.json())
-                        .then(data => callback(data.country))
-                        .catch(() => callback('us'));
-                },
-            utilsScript: "https://cdnjs.cloudflare.com/ajax/libs/intl-tel-input/17.0.8/js/utils.js"
-        });
-    
 
     // Function to write user data to Firebase
     function writeUserData(data, client_mac, node_mac) {
