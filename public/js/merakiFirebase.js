@@ -98,7 +98,7 @@ document.addEventListener('DOMContentLoaded', function() {
         //      "https://cdnjs.cloudflare.com/ajax/libs/intl-tel-input/17.0.8/js/utils.js",
         //  });
 
-        
+
         const phoneNumber = phoneInput.getNumber(); // Get the complete number including country code
         const termsChecked = document.querySelector("#terms").checked;
 
@@ -124,10 +124,10 @@ document.addEventListener('DOMContentLoaded', function() {
         }
         // Validate Phone Number
         //const phoneNumber = phoneInput.getNumber();
-        if (!phoneNumber.isValidNumber()) {
-            showValidationMessage(phoneInputField, "Please enter a valid phone number.");
-            isValid = false;
-        }
+        //if (!phoneNumber.isValidNumber()) {
+        //    showValidationMessage(phoneInputField, "Please enter a valid phone number.");
+        //    isValid = false;
+        //}
 
         // If all validations pass, proceed with form submission
         if (isValid) {
