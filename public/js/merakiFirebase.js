@@ -128,7 +128,7 @@ document.addEventListener('DOMContentLoaded', function() {
         //    showValidationMessage(phoneInputField, "Please enter a valid phone number.");
         //    isValid = false;
         //}
-
+        console.log("Is all DATA valid ?", isValid);
         // If all validations pass, proceed with form submission
         if (isValid) {
             const formData = {
