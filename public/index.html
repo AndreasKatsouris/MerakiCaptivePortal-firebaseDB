@@ -32,7 +32,7 @@
         }
     </script>
         <script>
-            document.addEventListener('DOMConetentLoaded',function() {
+            document.addEventListener('DOMContentLoaded',function() {
             // Apply customization settings from Firebase
             firebase.database().ref('customization/').once('value').then(snapshot => {
                 const settings = snapshot.val();
