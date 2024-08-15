@@ -17,22 +17,22 @@ const config = {
 
 document.addEventListener('DOMContentLoaded', function() {
 
-    alert('Step 1: DOMContentLoaded event triggered. Press OK to initialize Firebase.');
+    //alert('Step 1: DOMContentLoaded event triggered. Press OK to initialize Firebase.');
     firebase.initializeApp(config);
     
-    alert('Step 2: Firebase initialized. Press OK to proceed to analytics initialization.');
+   // alert('Step 2: Firebase initialized. Press OK to proceed to analytics initialization.');
     // Initialize Firebase Analytics
     const analytics = firebase.analytics();
 
     // Log an event when the page loads
     analytics.logEvent('page_view', { page: 'captive_portal' });
 
-    alert('Step 3: Firebase Analytics initialized. Press OK to proceed to database reference setup.');
+   // alert('Step 3: Firebase Analytics initialized. Press OK to proceed to database reference setup.');
 
     // Get a reference to the database service
     const database = firebase.database();
 
-    alert('Step 4: Database reference set up. Press OK to parse Meraki parameters.');
+   // alert('Step 4: Database reference set up. Press OK to parse Meraki parameters.');
 
     // Parse Meraki supplied parameters
     const base_grant_url = decodeURIComponent(GetURLParameter("base_grant_url"));
@@ -41,14 +41,14 @@ document.addEventListener('DOMContentLoaded', function() {
     const client_ip = GetURLParameter("client_ip");
     const client_mac = GetURLParameter("client_mac");
 
-    alert(`Step 5: Parameters parsed.\nBase Grant URL: ${base_grant_url}\nUser Continue URL: ${user_continue_url}\nClient IP: ${client_ip}\nPress OK to log these parameters to the console.`);
+   // alert(`Step 5: Parameters parsed.\nBase Grant URL: ${base_grant_url}\nUser Continue URL: ${user_continue_url}\nClient IP: ${client_ip}\nPress OK to log these parameters to the console.`);
 
     // Print Meraki provided parameters to console
     console.log("base_grant_url:", base_grant_url);
     console.log("client_ip:", client_ip);
     console.log("user_continue_url:", user_continue_url);
 
-    alert('Step 6: Parameters logged. Press OK to proceed to form submission setup.');
+   // alert('Step 6: Parameters logged. Press OK to proceed to form submission setup.');
 
     // Display Parameters for Demo (only if elements exist)
     const baseGrantElement = document.querySelector("div.baseGrantURL");
@@ -83,7 +83,7 @@ document.addEventListener('DOMContentLoaded', function() {
 
     // Handle Form Submission
     document.querySelector('form').addEventListener('submit', function(event) {
-        alert('Step 7: Form submission triggered. Press OK to start validation.');
+        //alert('Step 7: Form submission triggered. Press OK to start validation.');
         console.log("Processing loginForm");
         event.preventDefault();
         removeValidationMessages();
@@ -95,7 +95,7 @@ document.addEventListener('DOMContentLoaded', function() {
         const email = document.querySelector("input#email");
         const company = document.querySelector("input#company");
 
-        alert('Step 8: Form values captured. Press OK to validate.');
+        //alert('Step 8: Form values captured. Press OK to validate.');
 
         //const phoneInputField = document.querySelector("input#phone");
         /** const phoneInput = window.intlTelInput(phoneInputField, {
@@ -143,7 +143,7 @@ document.addEventListener('DOMContentLoaded', function() {
         //    isValid = false;
         //}
 
-        alert(`Step 9: Validation complete. Is the data valid? ${isValid}. Press OK to proceed.`);
+        //alert(`Step 9: Validation complete. Is the data valid? ${isValid}. Press OK to proceed.`);
 
         console.log("Is all DATA valid ?", isValid);
         // If all validations pass, proceed with form submission
@@ -154,11 +154,11 @@ document.addEventListener('DOMContentLoaded', function() {
                 "company": company.value//,
                 //"phoneNumber": phoneNumber
             };
-            alert('Step 10: Data is valid. Press OK to log the form submission to Firebase Analytics.');
+            //alert('Step 10: Data is valid. Press OK to log the form submission to Firebase Analytics.');
              // Log the form submission event to Firebase Analytics
             analytics.logEvent('form_submission', formData);
 
-            alert('Step 11: Data logged to analytics. Press OK to save data to Firebase.');
+            //alert('Step 11: Data logged to analytics. Press OK to save data to Firebase.');
 
             // Save data to Firebase
             console.log("Saving form data", formData);
@@ -177,7 +177,7 @@ document.addEventListener('DOMContentLoaded', function() {
                     // landing page.
                     loginUrl += "?continue_url="+user_continue_url + "?duration=" + duration;
                 }
-            alert(`Step 12: Form data saved. Press OK to log in.\nRedirecting to: ${loginUrl}`);
+            //alert(`Step 12: Form data saved. Press OK to log in.\nRedirecting to: ${loginUrl}`);
             console.log("Logging in...", loginUrl);
             window.location.href = loginUrl;
         }
