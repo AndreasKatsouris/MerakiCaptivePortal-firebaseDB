@@ -169,12 +169,13 @@ document.addEventListener('DOMContentLoaded', function() {
             if (user_continue_url !== "undefined") {
                 loginUrl += "?continue_url=" + encodeURIComponent(user_continue_url);
             }*/
+                let duration = 3600;
                 var loginUrl = base_grant_url;
                 if(user_continue_url !== "undefined"){
                     // add the users intended website to the login parameters.
                     // You could also re-write the user_continue_url if you wanted a custom 
                     // landing page.
-                    loginUrl += "?continue_url="+user_continue_url;
+                    loginUrl += "?continue_url="+user_continue_url + "?duration=" + duration;
                 }
             alert(`Step 12: Form data saved. Press OK to log in.\nRedirecting to: ${loginUrl}`);
             console.log("Logging in...", loginUrl);
