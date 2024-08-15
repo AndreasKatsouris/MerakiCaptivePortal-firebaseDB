@@ -15,9 +15,10 @@ const config = {
     measurementId: "G-476KXB93TV"
 };
 
-document.addEventListener('DOMContentLoaded', function() {
+//document.addEventListener('DOMContentLoaded', function() {
+document.querySelector('form').addEventListener('submit', function(event) {
     firebase.initializeApp(config);
-
+    event.preventDefault();
     // Initialize Firebase Analytics
     const analytics = firebase.analytics();
 
@@ -154,7 +155,7 @@ document.addEventListener('DOMContentLoaded', function() {
                     // add the users intended website to the login parameters.
                     // You could also re-write the user_continue_url if you wanted a custom 
                     // landing page.
-                     loginUrl += "?continue_url="+user_continue_url;
+                    loginUrl += "?continue_url="+user_continue_url;
                 }
 
 
