@@ -15,10 +15,11 @@ const config = {
     measurementId: "G-476KXB93TV"
 };
 
-//document.addEventListener('DOMContentLoaded', function() {
-document.querySelector('form').addEventListener('submit', function(event) {
+document.addEventListener('DOMContentLoaded', function() {
+
+    alert('Step 1: DOMContentLoaded event triggered. Press OK to initialize Firebase.');
     firebase.initializeApp(config);
-    event.preventDefault();
+    
     // Initialize Firebase Analytics
     const analytics = firebase.analytics();
 
