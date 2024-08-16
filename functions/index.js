@@ -20,6 +20,8 @@ exports.merakiWebhook = onRequest((req, res) => {
 
     const sharedSecret = 'Giulietta!16';
     const signature = req.headers['x-cisco-meraki-signature'];
+    console.log('Received headers:', req.headers); // Log all headers
+      
     console.log('Signature from headers:', signature);
 
     const hmac = crypto.createHmac('sha1', sharedSecret);
