@@ -1,13 +1,14 @@
 // Import necessary modules
-import { https } from 'firebase-functions';
-import { initializeApp, database } from 'firebase-admin';
-import { createHmac } from 'crypto';
-import getRawBody from 'raw-body';
+const functions = require('firebase-functions');
+const admin = require('firebase-admin');
+const crypto = require('crypto');
+const getRawBody = require('raw-body');
 
 // Initialize Firebase Admin SDK
-initializeApp();
+admin.initializeApp();
 
-export const merakiWebhook = https.onRequest(async (req, res) => {
+// Create a Cloud Function to handle HTTP requests (e.g., webhook calls from Meraki)
+exports.merakiWebhook = functions.https.onRequest(async (req, res) => {
     console.log('Webhook received'); // Log the receipt of the webhook
 
     try {
@@ -26,7 +27,7 @@ export const merakiWebhook = https.onRequest(async (req, res) => {
         console.log('Signature from headers:', signature); // Log the signature received from Meraki
 
         // Compute the HMAC-SHA1 hash of the raw request body using the shared secret
-        const hmac = createHmac('sha1', sharedSecret);
+        const hmac = crypto.createHmac('sha1', sharedSecret);
         hmac.update(rawBody);
         const computedSignature = hmac.digest('hex');
         console.log('Computed signature:', computedSignature); // Log the computed signature
@@ -45,7 +46,7 @@ export const merakiWebhook = https.onRequest(async (req, res) => {
         console.log('Data received:', JSON.stringify(data, null, 2)); // Log the received data for detailed inspection
 
         // Store the received data in Firebase Realtime Database under 'scanningData' node
-        const ref = database().ref('scanningData').push(); // Create a new database entry
+        const ref = admin.database().ref('scanningData').push(); // Create a new database entry
         await ref.set(data);
         console.log('Data successfully stored in Firebase'); // Log successful data storage
         res.status(200).send('Data received and stored'); // Respond with success
