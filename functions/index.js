@@ -1,10 +1,12 @@
-const functions = require("firebase-functions");
-const admin = require("firebase-admin");
-const crypto = require("crypto");
+const { onRequest } = require('firebase-functions/v2/https');
+const admin = require('firebase-admin');
+const crypto = require('crypto');
 
+// Initialize Firebase Admin SDK
 admin.initializeApp();
 
-exports.merakiWebhook = functions.https.onRequest((req, res) => {
+// Create a Cloud Function to handle HTTP requests
+exports.merakiWebhook = onRequest((req, res) => {
     // Check if it's a GET request for validation
     if (req.method === 'GET') {
         const validator = "371de0de57b8741627daa5e30f25beb917614141"; // Replace with your validator string
