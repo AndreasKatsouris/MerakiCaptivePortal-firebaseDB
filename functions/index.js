@@ -38,13 +38,6 @@ testRef.set({test: "data 2"})
         res.status(200).send(validator);
         return;
     }
-    if (req.method === 'POST') {
-        const validator = "371de0de57b8741627daa5e30f25beb917614141"; // Replace with your validator string
-        console.log("Validator string requested");
-        res.status(200).send(validator);
-        return;
-    }
-
 
     // Handle POST request from Meraki Scanning API
     console.log('Webhook received');
