@@ -19,6 +19,9 @@ exports.merakiWebhook = onRequest((req, res) => {
     console.log('Webhook received');
 
     const sharedSecret = 'Giulietta!16';
+
+    console.log('Received headers:', req.headers); // Log all headers
+
     //const signature = req.headers['x-cisco-meraki-signature'];
     const signature = req.headers['x-cisco-meraki-signature'] || req.headers['X-Cisco-Meraki-Signature'] || req.headers['x-cisco-Meraki-Signature'];
 
