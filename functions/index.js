@@ -8,7 +8,7 @@ admin.initializeApp({
     credential: admin.credential.applicationDefault(),
     databaseURL: "https://merakicaptiveportal-firebasedb-default-rtdb.firebaseio.com",
 });
-
+/**
 const testRef = admin.database().ref('test').push();
 testRef.set({test: "data"})
     .then(() => {
@@ -17,20 +17,20 @@ testRef.set({test: "data"})
     .catch(error => {
         console.error('Error storing test data:', error);
     });
-
+ */
 
 // Create a Cloud Function to handle HTTP requests
 exports.merakiWebhook = onRequest((req, res) => {
-
+/**
     const testRef = admin.database().ref('test').push();
-testRef.set({test: "data 2"})
+    testRef.set({test: "data 2"})
     .then(() => {
         console.log('Test 2 data successfully stored in Firebase');
     })
     .catch(error => {
         console.error('Error storing test 2 data:', error);
     });
-
+ */
     // Check if it's a GET request for validation
     if (req.method === 'GET') {
         const validator = "371de0de57b8741627daa5e30f25beb917614141"; // Replace with your validator string
@@ -62,7 +62,7 @@ testRef.set({test: "data 2"})
 
     //const ref = admin.database().ref('scanningData').push();
     const ref = admin.database().ref('scanningData').push();
-console.log('Database reference path:', ref.path.toString());
+    //console.log('Database reference path:', ref.path.toString());
 
     ref.set(data)
         .then(() => {
