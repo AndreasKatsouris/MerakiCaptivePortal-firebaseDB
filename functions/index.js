@@ -1,11 +1,12 @@
 const { onRequest } = require('firebase-functions/v2/https');
 const admin = require('firebase-admin');
-const crypto = require('crypto');
+//const crypto = require('crypto');
+//const appConfig = functions.config().firebase;
 
 // Initialize Firebase Admin SDK
 admin.initializeApp({
     credential: admin.credential.applicationDefault(),
-    databaseURL: "https://merakicaptiveportal-firebasedb.firebaseio.com"
+    databaseURL: "https://merakicaptiveportal-firebasedb-default-rtdb.firebaseio.com",
 });
 
 const testRef = admin.database().ref('test').push();
