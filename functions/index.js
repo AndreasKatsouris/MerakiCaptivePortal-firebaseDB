@@ -23,7 +23,7 @@ testRef.set({test: "data"})
 exports.merakiWebhook = onRequest((req, res) => {
 
     const testRef = admin.database().ref('test').push();
-testRef.set({test: "data"})
+testRef.set({test: "data 2"})
     .then(() => {
         console.log('Test 2 data successfully stored in Firebase');
     })
