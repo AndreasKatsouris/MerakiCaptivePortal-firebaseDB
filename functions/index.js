@@ -3,10 +3,33 @@ const admin = require('firebase-admin');
 const crypto = require('crypto');
 
 // Initialize Firebase Admin SDK
-admin.initializeApp();
+admin.initializeApp({
+    credential: admin.credential.applicationDefault(),
+    databaseURL: "https://merakicaptiveportal-firebasedb.firebaseio.com"
+});
+
+const testRef = admin.database().ref('test').push();
+testRef.set({test: "data"})
+    .then(() => {
+        console.log('Test data successfully stored in Firebase');
+    })
+    .catch(error => {
+        console.error('Error storing test data:', error);
+    });
+
 
 // Create a Cloud Function to handle HTTP requests
 exports.merakiWebhook = onRequest((req, res) => {
+
+    const testRef = admin.database().ref('test').push();
+testRef.set({test: "data"})
+    .then(() => {
+        console.log('Test 2 data successfully stored in Firebase');
+    })
+    .catch(error => {
+        console.error('Error storing test 2 data:', error);
+    });
+
     // Check if it's a GET request for validation
     if (req.method === 'GET') {
         const validator = "371de0de57b8741627daa5e30f25beb917614141"; // Replace with your validator string
@@ -40,7 +63,13 @@ exports.merakiWebhook = onRequest((req, res) => {
     const data = req.body;
     console.log('Data received:', JSON.stringify(data, null, 2));
 
+    console.log('Storing data to Firebase:', JSON.stringify(data, null, 2));
+
+
+    //const ref = admin.database().ref('scanningData').push();
     const ref = admin.database().ref('scanningData').push();
+console.log('Database reference path:', ref.path.toString());
+
     ref.set(data)
         .then(() => {
             console.log('Data successfully stored in Firebase');
