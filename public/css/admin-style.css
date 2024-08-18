@@ -81,3 +81,44 @@ button:hover {
     border: 1px solid #ccc;
     border-radius: 4px;
 }
+.sidebar ul {
+    list-style-type: none;
+    padding-left: 0;
+}
+
+.sidebar .menu-item {
+    position: relative;
+}
+
+.sidebar .menu-item > a {
+    display: block;
+    padding: 10px 20px;
+    color: #333;
+    text-decoration: none;
+}
+
+.sidebar .menu-item > a:hover {
+    background-color: #0074D9;
+    color: #fff;
+}
+
+.sidebar .submenu {
+    display: none; /* Hide submenus by default */
+    padding-left: 20px; /* Indentation for nested items */
+}
+
+.sidebar .submenu a {
+    padding: 8px 20px;
+    display: block;
+    color: #333;
+    text-decoration: none;
+}
+
+.sidebar .submenu a:hover {
+    background-color: #0074D9;
+    color: #fff;
+}
+
+.sidebar .menu-item:hover .submenu {
+    display: block; /* Show submenu on hover */
+}
