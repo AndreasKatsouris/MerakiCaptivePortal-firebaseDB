@@ -35,12 +35,26 @@
     
         <!-- Sidebar -->
         <div class="sidebar">
-            <a href="#wifi-settings">WiFi Settings</a>
-            <a href="#wifi-reports">WiFi Reports</a>
-            <a href="#loyalty-receipt-scanning">Receipt Scanning</a>
-            <a href="#loyalty-settings">Loyalty Settings</a>
-            <a href="#loyalty-reports">Loyalty Reports</a>
+            <ul>
+                <li class="menu-item">
+                    <a href="#">Wifi</a>
+                    <ul class="submenu">
+                        <li><a href="#">Wifi Settings</a></li>
+                        <li><a href="#">Wifi Reports</a></li>
+                    </ul>
+                </li>
+                <li class="menu-item">
+                    <a href="#">Loyalty</a>
+                    <ul class="submenu">
+                        <li><a href="#">Receipt Scanning</a></li>
+                        <li><a href="#">Loyalty Settings</a></li>
+                        <li><a href="#">Reports</a></li>
+                    </ul>
+                </li>
+            </ul>
         </div>
+        
+        
     
         <!-- Main Content -->
         <div class="content">
@@ -98,6 +112,17 @@
                     .then(() => console.log('Customization saved!'))
                     .catch(error => console.error('Error saving customization:', error));
             }
+        </script>
+        <script>
+            document.querySelectorAll('.menu-item > a').forEach(item => {
+                item.addEventListener('click', function(e) {
+                    e.preventDefault();
+                    let submenu = this.nextElementSibling;
+                    if (submenu) {
+                        submenu.style.display = submenu.style.display === 'block' ? 'none' : 'block';
+                    }
+                });
+        });
         </script>
     </body>
     </html>
