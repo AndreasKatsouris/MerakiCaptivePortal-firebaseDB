@@ -97,4 +97,79 @@ function displaySection(sectionId) {
             .then(() => console.log('Customization saved!'))
             .catch(error => console.error('Error saving customization:', error));
     }
+    // Event listener for Data Deletion menu item
+    document.querySelector('#dataDeletionMenu').addEventListener('click', function(e) {
+        e.preventDefault();
+        displaySection('dataDeletionContent'); // Display the data deletion section
+        loadDataForDeletion(); // Load the data for deletion
+    });
+
+
+// FUNCTIONS FOR DELETING DATA FROM THE DATABASE
+function loadDataForDeletion() {
+    const ref = firebase.database().ref('scanningData/');
+    ref.once('value', snapshot => {
+        const data = snapshot.val();
+        if (data) {
+            renderDataList(data);
+        } else {
+            console.log("No data available.");
+        }
+    }).catch(error => console.error('Error retrieving data:', error));
+}
+function renderDataList(data) {
+    const tableBody = document.querySelector('#data-table tbody');
+    tableBody.innerHTML = ''; // Clear existing rows
+
+    Object.keys(data).forEach(key => {
+        const item = data[key];
+        const row = document.createElement('tr');
+
+        row.innerHTML = `
+            <td><input type="checkbox" class="delete-checkbox" data-key="${key}"></td>
+            <td>${item.clientMac || 'N/A'}</td>
+            <td>${item.apMac || 'N/A'}</td>
+            <td>${item.rssi || 'N/A'}</td>
+            <td>${item.manufacturer || 'N/A'}</td>
+            <td><button class="btn btn-danger delete-button" data-key="${key}">Delete</button></td>
+        `;
+
+        tableBody.appendChild(row);
+    });
+
+    // Attach event listeners to the delete buttons
+    document.querySelectorAll('.delete-button').forEach(button => {
+        button.addEventListener('click', function() {
+            const key = this.getAttribute('data-key');
+            deleteData(key);
+        });
+    });
+
+    // Attach event listener to the delete selected button
+    document.querySelector('#delete-selected').addEventListener('click', function() {
+        deleteSelectedData();
+    });
+}
+function deleteSelectedData() {
+    const checkboxes = document.querySelectorAll('.delete-checkbox:checked');
+    const keysToDelete = Array.from(checkboxes).map(checkbox => checkbox.getAttribute('data-key'));
+
+    keysToDelete.forEach(key => {
+        deleteData(key);
+    });
+}
+
+function deleteData(key) {
+    const ref = firebase.database().ref('scanningData/' + key);
+    ref.remove()
+        .then(() => {
+            console.log('Data successfully deleted from Firebase');
+            loadDataForDeletion(); // Reload the data list after deletion
+        })
+        .catch(error => {
+            console.error('Error deleting data:', error);
+        });
+}
+
+
 });
