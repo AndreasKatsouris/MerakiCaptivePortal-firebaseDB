@@ -165,3 +165,21 @@ button:hover {
         padding: 10px;
     }
 }
+@media (max-width: 768px) {
+    .sidebar {
+        width: 100%;
+    }
+
+    .content {
+        margin-left: 0;
+    }
+
+    .menu-item > a {
+        font-size: 1.2rem;
+    }
+
+    .submenu {
+        padding-left: 10px;
+    }
+}
+

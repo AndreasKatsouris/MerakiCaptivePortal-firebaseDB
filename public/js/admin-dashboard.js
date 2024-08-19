@@ -31,7 +31,55 @@ document.addEventListener('DOMContentLoaded', function() {
     } else {
         console.error("Element with ID 'liveDataMenu' not found.");
     }
+// Add event listener for the Live Data menu item
+    document.querySelector('.menu-item-live-data > a').addEventListener('click', function(e) {
+    e.preventDefault();
+    displaySection('liveDataContent'); // Display the live data section
+    fetchLiveData(); // Fetch and display the live data
+});
 
+// Function to fetch live data from Firebase
+function fetchLiveData() {
+    const liveDataDisplay = document.getElementById('liveDataDisplay');
+    liveDataDisplay.innerHTML = ''; // Clear any previous data
+
+    firebase.database().ref('scanningData/').limitToLast(10).once('value')
+        .then(snapshot => {
+            const data = snapshot.val();
+            if (data) {
+                Object.keys(data).forEach(key => {
+                    const record = data[key];
+                    const recordElement = document.createElement('div');
+                    recordElement.className = 'live-data-record';
+                    recordElement.innerHTML = `
+                        <p><strong>Client MAC:</strong> ${record.clientMac}</p>
+                        <p><strong>Access Point MAC:</strong> ${record.apMac}</p>
+                        <p><strong>Signal Strength (RSSI):</strong> ${record.rssi}</p>
+                        <p><strong>Manufacturer:</strong> ${record.manufacturer}</p>
+                        <hr/>
+                    `;
+                    liveDataDisplay.appendChild(recordElement);
+                });
+            } else {
+                liveDataDisplay.innerHTML = '<p>No live data available.</p>';
+            }
+        })
+        .catch(error => {
+            console.error('Error fetching live data:', error);
+            liveDataDisplay.innerHTML = '<p>Error fetching live data. Please try again later.</p>';
+        });
+}
+
+// Function to show the selected content section and hide others
+function displaySection(sectionId) {
+    document.querySelectorAll('.content-section').forEach(section => {
+        section.style.display = section.id === sectionId ? 'block' : 'none';
+    });
+}
+
+
+
+// Customization Form Handling:
     document.getElementById('customizationForm').addEventListener('submit', function(event) {
         event.preventDefault();
         const bgColor = document.getElementById('bgColor').value;
