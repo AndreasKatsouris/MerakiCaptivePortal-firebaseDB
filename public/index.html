@@ -103,9 +103,11 @@
         <div style="text-align: center; margin-top: 20px;">
             <a href="admin-login.html" class="btn btn-link">Admin Login</a>
         </div>
+    <!-- Error Container -->
+    <div id="error-container" style="display: none; color: red; text-align: center; margin-top: 20px;">
+        <!-- Error messages will be displayed here -->
+    </div>
 
-    <script src="js/jquery-3.2.1.min.js"></script>
-    <script src="js/merakiFirebase.js"></script>
     <script>
         // Function to generate a unique session ID
         function generateSessionID() {
@@ -153,6 +155,10 @@
         <div class="clientIP"></div>
         <div class="clientMAC"></div>
         <div class="nodeMAC"></div>
+
+        <script src="js/jquery-3.2.1.min.js"></script>
+        <script src="js/merakiFirebase.js"></script>
+
   </body>
 
 </html>
