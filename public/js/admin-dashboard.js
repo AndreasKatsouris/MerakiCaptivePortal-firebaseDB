@@ -45,6 +45,17 @@ document.addEventListener('DOMContentLoaded', function () {
         console.error("Element with ID 'dataDeletionMenu' not found.");
     }
 
+    // Add event listener for "Select All" checkbox
+    const selectAllCheckbox = document.getElementById('select-all');
+    if (selectAllCheckbox) {
+        selectAllCheckbox.addEventListener('change', function() {
+            const checkboxes = document.querySelectorAll('.delete-checkbox');
+            checkboxes.forEach(checkbox => {
+                checkbox.checked = this.checked;
+            });
+        });
+    }
+
     // Customization Form Handling
     document.getElementById('customizationForm').addEventListener('submit', function (event) {
         event.preventDefault();
