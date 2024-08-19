@@ -182,4 +182,20 @@ button:hover {
         padding-left: 10px;
     }
 }
+.live-data-record {
+    padding: 10px;
+    border: 1px solid #ccc;
+    border-radius: 5px;
+    margin-bottom: 10px;
+    background-color: #f9f9f9;
+}
+
+.live-data-record p {
+    margin: 5px 0;
+}
+
+.live-data-record hr {
+    border-top: 1px solid #ddd;
+}
+
 
