@@ -19,174 +19,60 @@
     <link rel="stylesheet" href="css/admin-style.css">
 </head>
 <body>
-    <script>
-        // Ensure the user is authenticated before allowing access to the dashboard
-        firebase.auth().onAuthStateChanged((user) => {
-            if (user) {
-                console.log("User is authenticated:", user.uid);
-            } else {
-                console.log("User is not authenticated");
-                window.location.href = 'admin-login.html'; // Redirect to login if not authenticated
-            }
-        });
-    </script>
 
     <!-- Sidebar -->
     <div class="sidebar">
         <ul>
             <li class="menu-item">
-                <a href="#" data-target="wifiSettings">Wifi</a>
+                <a href="#" id="wifiMenu">Wifi</a>
                 <ul class="submenu">
-                    <li><a href="#" data-target="wifiSettings">Wifi Settings</a></li>
-                    <li><a href="#" data-target="wifiReports">Wifi Reports</a></li>
+                    <li><a href="#" id="wifiSettingsMenu">Wifi Settings</a></li>
+                    <li><a href="#" id="wifiReportsMenu">Wifi Reports</a></li>
                 </ul>
             </li>
             <li class="menu-item">
-                <a href="#" data-target="loyalty">Loyalty</a>
+                <a href="#" id="loyaltyMenu">Loyalty</a>
                 <ul class="submenu">
-                    <li><a href="#" data-target="receiptScanning">Receipt Scanning</a></li>
-                    <li><a href="#" data-target="loyaltySettings">Loyalty Settings</a></li>
-                    <li><a href="#" data-target="loyaltyReports">Reports</a></li>
+                    <li><a href="#" id="receiptScanningMenu">Receipt Scanning</a></li>
+                    <li><a href="#" id="loyaltySettingsMenu">Loyalty Settings</a></li>
+                    <li><a href="#" id="loyaltyReportsMenu">Reports</a></li>
                 </ul>
             </li>
             <li class="menu-item">
-                <a href="#" data-target="liveData">Live Data</a>
-                <ul class="submenu">
-                    <li><a href="#" data-target="realTimeDashboard">Real-time Dashboard</a></li>
-                    <li><a href="#" data-target="analytics">Analytics</a></li>
-                </ul>
+                <a href="#" id="liveDataMenu">Live Data</a>
             </li>
         </ul>
     </div>
-
+    
     <!-- Main Content -->
     <div class="content">
-        <div id="wifiSettings" class="content-section" style="display: none;">
-            <h2>Customize Captive Portal</h2>
-            <form id="customizationForm">
-                <div class="form-group">
-                    <label for="bgColor">Background Color:</label>
-                    <input type="color" id="bgColor" name="bgColor" value="#ffffff">
-                </div>
-
-                <div class="form-group">
-                    <label for="font">Font:</label>
-                    <input type="text" id="font" name="font">
-                </div>
-
-                <div class="form-group">
-                    <label for="fontSize">Font Size:</label>
-                    <input type="number" id="fontSize" name="fontSize" min="8" max="72">
-                </div>
-
-                <div class="form-group">
-                    <label for="logo">Upload Logo:</label>
-                    <input type="file" id="logo" name="logo">
-                </div>
-
-                <button type="submit">Save Changes</button>
-            </form>
-        </div>
-
-        <div id="wifiReports" class="content-section" style="display: none;">
-            <h2>Wifi Reports</h2>
-            <!-- Add Wifi Reports content here -->
-        </div>
-
-        <div id="receiptScanning" class="content-section" style="display: none;">
-            <h2>Receipt Scanning</h2>
-            <!-- Add Receipt Scanning content here -->
-        </div>
-
-        <div id="loyaltySettings" class="content-section" style="display: none;">
-            <h2>Loyalty Settings</h2>
-            <!-- Add Loyalty Settings content here -->
-        </div>
-
-        <div id="loyaltyReports" class="content-section" style="display: none;">
-            <h2>Loyalty Reports</h2>
-            <!-- Add Loyalty Reports content here -->
-        </div>
-
-        <div id="realTimeDashboard" class="content-section" style="display: none;">
-            <h2>Real-time Dashboard</h2>
-            <!-- Add Real-time Dashboard content here -->
-            <div id="liveDataContent" style="display:none;">
-                <h2>Live WiFi Usage Analytics</h2>
-                <div id="activeUsersContainer">
-                    <p>Loading active user data...</p>
-                </div>
+        <h2>Customize Captive Portal</h2>
+        <form id="customizationForm">
+            <div class="form-group">
+                <label for="bgColor">Background Color:</label>
+                <input type="color" id="bgColor" name="bgColor" value="#ffffff">
             </div>
-            
-        </div>
 
-        <div id="analytics" class="content-section" style="display: none;">
-            <h2>Analytics</h2>
-            <!-- Add Analytics content here -->
-        </div>
+            <div class="form-group">
+                <label for="font">Font:</label>
+                <input type="text" id="font" name="font">
+            </div>
+
+            <div class="form-group">
+                <label for="fontSize">Font Size:</label>
+                <input type="number" id="fontSize" name="fontSize" min="8" max="72">
+            </div>
+
+            <div class="form-group">
+                <label for="logo">Upload Logo:</label>
+                <input type="file" id="logo" name="logo">
+            </div>
+
+            <button type="submit">Save Changes</button>
+        </form>
     </div>
 
-    <script>
-        // Handle menu clicks to show/hide the relevant content sections
-        document.querySelectorAll('.menu-item > a, .submenu > li > a').forEach(item => {
-        item.addEventListener('click', function(e) {
-        e.preventDefault();
-
-        // Hide all content sections
-        document.querySelectorAll('.content-section').forEach(section => {
-            if (section) {
-                section.style.display = 'none';
-            }
-        });
-
-        // Show the selected content section
-        const target = this.getAttribute('data-target');
-        const targetElement = document.getElementById(target);
-        if (targetElement) {
-            targetElement.style.display = 'block';
-        } else {
-            console.error(`Element with ID ${target} not found.`);
-        }
-    });
-});
-
-    </script>
-
-    <script>
-        function displayActiveUsers() {
-            const activeUsersContainer = document.getElementById('activeUsersContainer');
-
-            // Fetch active users from Firebase
-            firebase.database().ref('activeUsers').on('value', (snapshot) => {
-                const users = snapshot.val();
-                activeUsersContainer.innerHTML = ''; // Clear previous data
-
-                if (users) {
-                    Object.keys(users).forEach((sessionID) => {
-                        const user = users[sessionID];
-                        if (user.status === 'connected') { // Only show connected users
-                            activeUsersContainer.innerHTML += `
-                                <div class="user-info">
-                                    <p><strong>Name:</strong> ${user.name}</p>
-                                    <p><strong>Email:</strong> ${user.email}</p>
-                                    <p><strong>Company:</strong> ${user.company}</p>
-                                    <p><strong>Connection Time:</strong> ${user.connectionTime}</p>
-                                </div>
-                                <hr>
-                            `;
-                        }
-                    });
-                } else {
-                    activeUsersContainer.innerHTML = '<p>No active users at the moment.</p>';
-                }
-            });
-        }
-
-        // Ensure this is called when the "Live Data" menu is selected
-        document.querySelector('#liveDataMenu').addEventListener('click', function() {
-            displayActiveUsers();
-        });
-
-    </script>
+    <!-- Link to the external JavaScript file -->
+    <script src="js/admin-dashboard.js"></script>
 </body>
 </html>
