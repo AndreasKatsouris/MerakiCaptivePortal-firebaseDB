@@ -41,8 +41,46 @@ document.addEventListener('DOMContentLoaded', function() {
     const client_ip = GetURLParameter("client_ip");
     const client_mac = GetURLParameter("client_mac");
 
-     // Apply customization settings from Firebase
+    // Apply customization settings from Firebase
+    // Updated Customization Settings
+    firebase.database().ref('customization/').once('value')
+     .then(snapshot => {
+         const settings = snapshot.val();
+         if (settings) {
+             applySettings(settings);
+         } else {
+             console.error('No customization settings found.');
+             displayError('No customization settings found. Default settings will be applied.');
+         }
+     })
+     .catch(error => {
+         console.error('Error retrieving settings:', error);
+         displayError('Error retrieving settings. Default settings will be applied.');
+     });
+     function applySettings(settings) {
+        document.body.style.backgroundColor = settings.bgColor || '#ffffff'; // Default to white if no bgColor
+        document.body.style.fontFamily = settings.font || 'Arial, sans-serif'; // Default to Arial if no font
+        document.body.style.fontSize = settings.fontSize ? settings.fontSize + 'px' : '14px'; // Default to 14px if no fontSize
+    
+        const logoElement = document.getElementById('logo');
+        if (settings.logoURL && logoElement) {
+            logoElement.src = settings.logoURL;
+        } else {
+            displayError('No logo URL found. Default logo will be displayed.');
+        }
+     }
+     function displayError(message) {
+        const errorContainer = document.getElementById('error-container');
+        if (errorContainer) {
+            errorContainer.textContent = message;
+            errorContainer.style.display = 'block';
+        } else {
+            console.warn('Error container not found on the page.');
+        }
+    }
+     /** 
      firebase.database().ref('customization/').once('value').then(snapshot => {
+        
         const settings = snapshot.val();
         console.log('Retrieved settings:', settings); // Debugging: Output retrieved settings
         if (settings) {
@@ -60,7 +98,7 @@ document.addEventListener('DOMContentLoaded', function() {
             console.error('No customization settings found.');
         }
     }).catch(error => console.error('Error retrieving settings:', error));
-
+*/
    // alert(`Step 5: Parameters parsed.\nBase Grant URL: ${base_grant_url}\nUser Continue URL: ${user_continue_url}\nClient IP: ${client_ip}\nPress OK to log these parameters to the console.`);
 
     // Print Meraki provided parameters to console
