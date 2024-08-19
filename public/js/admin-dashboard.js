@@ -22,11 +22,20 @@ document.addEventListener('DOMContentLoaded', function() {
     });
 
 // Add event listener for the Live Data menu item
-    document.querySelector('.menu-item-live-data > a').addEventListener('click', function(e) {
-    e.preventDefault();
-    displaySection('liveDataContent'); // Display the live data section
-    fetchLiveData(); // Fetch and display the live data
+document.addEventListener('DOMContentLoaded', function() {
+    // Ensure the element exists before adding an event listener
+    const liveDataMenu = document.querySelector('.menu-item-live-data > a');
+    if (liveDataMenu) {
+        liveDataMenu.addEventListener('click', function(e) {
+            e.preventDefault();
+            displaySection('liveDataContent'); // Display the live data section
+            fetchLiveData(); // Fetch and display the live data
+        });
+    } else {
+        console.error("Element with class 'menu-item-live-data' and 'a' tag not found.");
+    }
 });
+
 
 // Function to fetch live data from Firebase
 function fetchLiveData() {
