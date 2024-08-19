@@ -98,12 +98,19 @@ function displaySection(sectionId) {
             .catch(error => console.error('Error saving customization:', error));
     }
     // Event listener for Data Deletion menu item
-    document.querySelector('#dataDeletionMenu').addEventListener('click', function(e) {
-        e.preventDefault();
-        displaySection('dataDeletionContent'); // Display the data deletion section
-        loadDataForDeletion(); // Load the data for deletion
+    document.addEventListener('DOMContentLoaded', function() {
+        const dataDeletionMenu = document.querySelector('#dataDeletionMenu');
+        if (dataDeletionMenu) {
+            dataDeletionMenu.addEventListener('click', function(e) {
+                e.preventDefault();
+                displaySection('dataDeletionContent');
+                loadDataForDeletion();
+            });
+        } else {
+            console.error("Element with ID 'dataDeletionMenu' not found.");
+        }
     });
-
+    
 
 // FUNCTIONS FOR DELETING DATA FROM THE DATABASE
 function loadDataForDeletion() {

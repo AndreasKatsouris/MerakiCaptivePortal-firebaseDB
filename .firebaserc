@@ -5,7 +5,9 @@
   "targets": {},
   "etags": {
     "merakicaptiveportal-firebasedb": {
-      "extensionInstances": {}
+      "extensionInstances": {
+        "delete-user-data": "593f289a4c80cb4a77b3f30e6cd502d55e959a51e81c214991b893f05ab630a6"
+      }
     }
   },
   "dataconnectEmulatorConfig": {}
