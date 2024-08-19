@@ -111,6 +111,13 @@
         <div id="realTimeDashboard" class="content-section" style="display: none;">
             <h2>Real-time Dashboard</h2>
             <!-- Add Real-time Dashboard content here -->
+            <div id="liveDataContent" style="display:none;">
+                <h2>Live WiFi Usage Analytics</h2>
+                <div id="activeUsersContainer">
+                    <p>Loading active user data...</p>
+                </div>
+            </div>
+            
         </div>
 
         <div id="analytics" class="content-section" style="display: none;">
@@ -122,21 +129,64 @@
     <script>
         // Handle menu clicks to show/hide the relevant content sections
         document.querySelectorAll('.menu-item > a, .submenu > li > a').forEach(item => {
-            item.addEventListener('click', function(e) {
-                e.preventDefault();
+        item.addEventListener('click', function(e) {
+        e.preventDefault();
 
-                // Hide all content sections
-                document.querySelectorAll('.content-section').forEach(section => {
-                    section.style.display = 'none';
-                });
+        // Hide all content sections
+        document.querySelectorAll('.content-section').forEach(section => {
+            if (section) {
+                section.style.display = 'none';
+            }
+        });
 
-                // Show the selected content section
-                const target = this.getAttribute('data-target');
-                if (target) {
-                    document.getElementById(target).style.display = 'block';
+        // Show the selected content section
+        const target = this.getAttribute('data-target');
+        const targetElement = document.getElementById(target);
+        if (targetElement) {
+            targetElement.style.display = 'block';
+        } else {
+            console.error(`Element with ID ${target} not found.`);
+        }
+    });
+});
+
+    </script>
+
+    <script>
+        function displayActiveUsers() {
+            const activeUsersContainer = document.getElementById('activeUsersContainer');
+
+            // Fetch active users from Firebase
+            firebase.database().ref('activeUsers').on('value', (snapshot) => {
+                const users = snapshot.val();
+                activeUsersContainer.innerHTML = ''; // Clear previous data
+
+                if (users) {
+                    Object.keys(users).forEach((sessionID) => {
+                        const user = users[sessionID];
+                        if (user.status === 'connected') { // Only show connected users
+                            activeUsersContainer.innerHTML += `
+                                <div class="user-info">
+                                    <p><strong>Name:</strong> ${user.name}</p>
+                                    <p><strong>Email:</strong> ${user.email}</p>
+                                    <p><strong>Company:</strong> ${user.company}</p>
+                                    <p><strong>Connection Time:</strong> ${user.connectionTime}</p>
+                                </div>
+                                <hr>
+                            `;
+                        }
+                    });
+                } else {
+                    activeUsersContainer.innerHTML = '<p>No active users at the moment.</p>';
                 }
             });
+        }
+
+        // Ensure this is called when the "Live Data" menu is selected
+        document.querySelector('#liveDataMenu').addEventListener('click', function() {
+            displayActiveUsers();
         });
+
     </script>
 </body>
 </html>

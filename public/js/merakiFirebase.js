@@ -302,6 +302,36 @@ document.addEventListener('DOMContentLoaded', function() {
         };
         storeUserPreferences(client_mac, userPreferences);
     
+    // Capturing Connection Data
+    function logUserConnection(data) {
+        const date = new Date();
+        const localTimestamp = date.toLocaleString(); // User's local time
+        const sessionID = localStorage.getItem('sessionID') || generateNewSessionID(); // Retrieve or generate the session ID
+        localStorage.setItem('sessionID', sessionID);
+    
+        const connectionData = {
+            sessionID: sessionID,
+            name: data.name,
+            email: data.email,
+            company: data.company,
+            macAddress: data.macAddress,
+            connectionTime: localTimestamp,
+            status: 'connected' // Indicate the user is currently connected
+        };
+    
+        // Store the connection data in Firebase under the 'activeUsers' node
+        firebase.database().ref('activeUsers/' + sessionID).set(connectionData);
+    }
+    function logUserDisconnection(sessionID) {
+        const disconnectionTime = new Date().toLocaleString(); // Get the current time
+    
+        // Update the status of the session to 'disconnected'
+        firebase.database().ref('activeUsers/' + sessionID).update({
+            status: 'disconnected',
+            disconnectionTime: disconnectionTime
+        });
+    }
+    
     
 
     // Helper function to parse URL parameters
