@@ -41,6 +41,26 @@ document.addEventListener('DOMContentLoaded', function() {
     const client_ip = GetURLParameter("client_ip");
     const client_mac = GetURLParameter("client_mac");
 
+     // Apply customization settings from Firebase
+     firebase.database().ref('customization/').once('value').then(snapshot => {
+        const settings = snapshot.val();
+        console.log('Retrieved settings:', settings); // Debugging: Output retrieved settings
+        if (settings) {
+            const styleSheet = document.styleSheets[0]; // Assuming it's the first stylesheet
+            styleSheet.insertRule(`body { background-color: ${settings.bgColor}; }`, styleSheet.cssRules.length);
+            //document.body.style.backgroundColor = settings.bgColor;
+            document.body.style.backgroundColor = `${settings.bgColor} !important`;
+            document.body.style.fontFamily = settings.font;
+            document.body.style.fontSize = settings.fontSize + 'px';
+  
+            if (settings.logoURL) {
+                document.getElementById('logo').src = settings.logoURL;
+            }
+        } else {
+            console.error('No customization settings found.');
+        }
+    }).catch(error => console.error('Error retrieving settings:', error));
+
    // alert(`Step 5: Parameters parsed.\nBase Grant URL: ${base_grant_url}\nUser Continue URL: ${user_continue_url}\nClient IP: ${client_ip}\nPress OK to log these parameters to the console.`);
 
     // Print Meraki provided parameters to console
