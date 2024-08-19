@@ -21,16 +21,6 @@ document.addEventListener('DOMContentLoaded', function() {
         });
     });
 
-    const liveDataMenu = document.querySelector('#liveDataMenu');
-    if (liveDataMenu) {
-        liveDataMenu.addEventListener('click', function() {
-            displayActiveUsers();
-            document.getElementById('liveDataContent').style.display = 'block';
-            // Hide other content sections as needed
-        });
-    } else {
-        console.error("Element with ID 'liveDataMenu' not found.");
-    }
 // Add event listener for the Live Data menu item
     document.querySelector('.menu-item-live-data > a').addEventListener('click', function(e) {
     e.preventDefault();
