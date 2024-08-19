@@ -1,4 +1,4 @@
-document.addEventListener('DOMContentLoaded', function() {
+document.addEventListener('DOMContentLoaded', function () {
     // Ensure the user is authenticated before allowing access to the dashboard
     firebase.auth().onAuthStateChanged((user) => {
         if (user) {
@@ -10,9 +10,9 @@ document.addEventListener('DOMContentLoaded', function() {
         }
     });
 
-    // Event listener for menu items
+    // Event listener for menu items (WiFi, Loyalty)
     document.querySelectorAll('.menu-item > a').forEach(item => {
-        item.addEventListener('click', function(e) {
+        item.addEventListener('click', function (e) {
             e.preventDefault();
             let submenu = this.nextElementSibling;
             if (submenu) {
@@ -21,12 +21,10 @@ document.addEventListener('DOMContentLoaded', function() {
         });
     });
 
-// Add event listener for the Live Data menu item
-document.addEventListener('DOMContentLoaded', function() {
-    // Ensure the element exists before adding an event listener
+    // Event listener for the Live Data menu item
     const liveDataMenu = document.querySelector('.menu-item-live-data > a');
     if (liveDataMenu) {
-        liveDataMenu.addEventListener('click', function(e) {
+        liveDataMenu.addEventListener('click', function (e) {
             e.preventDefault();
             displaySection('liveDataContent'); // Display the live data section
             fetchLiveData(); // Fetch and display the live data
@@ -34,52 +32,21 @@ document.addEventListener('DOMContentLoaded', function() {
     } else {
         console.error("Element with class 'menu-item-live-data' and 'a' tag not found.");
     }
-});
 
-
-// Function to fetch live data from Firebase
-function fetchLiveData() {
-    const liveDataDisplay = document.getElementById('liveDataDisplay');
-    liveDataDisplay.innerHTML = ''; // Clear any previous data
-
-    firebase.database().ref('scanningData/').limitToLast(10).once('value')
-        .then(snapshot => {
-            const data = snapshot.val();
-            if (data) {
-                Object.keys(data).forEach(key => {
-                    const record = data[key];
-                    const recordElement = document.createElement('div');
-                    recordElement.className = 'live-data-record';
-                    recordElement.innerHTML = `
-                        <p><strong>Client MAC:</strong> ${record.clientMac}</p>
-                        <p><strong>Access Point MAC:</strong> ${record.apMac}</p>
-                        <p><strong>Signal Strength (RSSI):</strong> ${record.rssi}</p>
-                        <p><strong>Manufacturer:</strong> ${record.manufacturer}</p>
-                        <hr/>
-                    `;
-                    liveDataDisplay.appendChild(recordElement);
-                });
-            } else {
-                liveDataDisplay.innerHTML = '<p>No live data available.</p>';
-            }
-        })
-        .catch(error => {
-            console.error('Error fetching live data:', error);
-            liveDataDisplay.innerHTML = '<p>Error fetching live data. Please try again later.</p>';
+    // Event listener for Data Deletion menu item
+    const dataDeletionMenu = document.querySelector('#dataDeletionMenu');
+    if (dataDeletionMenu) {
+        dataDeletionMenu.addEventListener('click', function (e) {
+            e.preventDefault();
+            displaySection('dataDeletionContent');
+            loadDataForDeletion();
         });
-}
+    } else {
+        console.error("Element with ID 'dataDeletionMenu' not found.");
+    }
 
-// Function to show the selected content section and hide others
-function displaySection(sectionId) {
-    document.querySelectorAll('.content-section').forEach(section => {
-        section.style.display = section.id === sectionId ? 'block' : 'none';
-    });
-}
-
-
-
-// Customization Form Handling:
-    document.getElementById('customizationForm').addEventListener('submit', function(event) {
+    // Customization Form Handling
+    document.getElementById('customizationForm').addEventListener('submit', function (event) {
         event.preventDefault();
         const bgColor = document.getElementById('bgColor').value;
         const font = document.getElementById('font').value;
@@ -106,86 +73,111 @@ function displaySection(sectionId) {
             .then(() => console.log('Customization saved!'))
             .catch(error => console.error('Error saving customization:', error));
     }
-    // Event listener for Data Deletion menu item
-    document.addEventListener('DOMContentLoaded', function() {
-        const dataDeletionMenu = document.querySelector('#dataDeletionMenu');
-        if (dataDeletionMenu) {
-            dataDeletionMenu.addEventListener('click', function(e) {
-                e.preventDefault();
-                displaySection('dataDeletionContent');
-                loadDataForDeletion();
+
+    // Functions for Fetching and Displaying Live Data
+    function fetchLiveData() {
+        const liveDataDisplay = document.getElementById('liveDataDisplay');
+        liveDataDisplay.innerHTML = ''; // Clear any previous data
+
+        firebase.database().ref('scanningData/').limitToLast(10).once('value')
+            .then(snapshot => {
+                const data = snapshot.val();
+                if (data) {
+                    Object.keys(data).forEach(key => {
+                        const record = data[key];
+                        const recordElement = document.createElement('div');
+                        recordElement.className = 'live-data-record';
+                        recordElement.innerHTML = `
+                            <p><strong>Client MAC:</strong> ${record.clientMac}</p>
+                            <p><strong>Access Point MAC:</strong> ${record.apMac}</p>
+                            <p><strong>Signal Strength (RSSI):</strong> ${record.rssi}</p>
+                            <p><strong>Manufacturer:</strong> ${record.manufacturer}</p>
+                            <hr/>
+                        `;
+                        liveDataDisplay.appendChild(recordElement);
+                    });
+                } else {
+                    liveDataDisplay.innerHTML = '<p>No live data available.</p>';
+                }
+            })
+            .catch(error => {
+                console.error('Error fetching live data:', error);
+                liveDataDisplay.innerHTML = '<p>Error fetching live data. Please try again later.</p>';
             });
-        } else {
-            console.error("Element with ID 'dataDeletionMenu' not found.");
-        }
-    });
-    
+    }
 
-// FUNCTIONS FOR DELETING DATA FROM THE DATABASE
-function loadDataForDeletion() {
-    const ref = firebase.database().ref('scanningData/');
-    ref.once('value', snapshot => {
-        const data = snapshot.val();
-        if (data) {
-            renderDataList(data);
-        } else {
-            console.log("No data available.");
-        }
-    }).catch(error => console.error('Error retrieving data:', error));
-}
-function renderDataList(data) {
-    const tableBody = document.querySelector('#data-table tbody');
-    tableBody.innerHTML = ''; // Clear existing rows
+    // Functions for Deleting Data from the Database
+    function loadDataForDeletion() {
+        const ref = firebase.database().ref('scanningData/');
+        ref.once('value', snapshot => {
+            const data = snapshot.val();
+            if (data) {
+                renderDataList(data);
+            } else {
+                console.log("No data available.");
+            }
+        }).catch(error => console.error('Error retrieving data:', error));
+    }
 
-    Object.keys(data).forEach(key => {
-        const item = data[key];
-        const row = document.createElement('tr');
+    function renderDataList(data) {
+        const tableBody = document.querySelector('#data-table tbody');
+        tableBody.innerHTML = ''; // Clear existing rows
 
-        row.innerHTML = `
-            <td><input type="checkbox" class="delete-checkbox" data-key="${key}"></td>
-            <td>${item.clientMac || 'N/A'}</td>
-            <td>${item.apMac || 'N/A'}</td>
-            <td>${item.rssi || 'N/A'}</td>
-            <td>${item.manufacturer || 'N/A'}</td>
-            <td><button class="btn btn-danger delete-button" data-key="${key}">Delete</button></td>
-        `;
+        Object.keys(data).forEach(key => {
+            const item = data[key];
+            const row = document.createElement('tr');
 
-        tableBody.appendChild(row);
-    });
+            row.innerHTML = `
+                <td><input type="checkbox" class="delete-checkbox" data-key="${key}"></td>
+                <td>${item.clientMac || 'N/A'}</td>
+                <td>${item.apMac || 'N/A'}</td>
+                <td>${item.rssi || 'N/A'}</td>
+                <td>${item.manufacturer || 'N/A'}</td>
+                <td><button class="btn btn-danger delete-button" data-key="${key}">Delete</button></td>
+            `;
 
-    // Attach event listeners to the delete buttons
-    document.querySelectorAll('.delete-button').forEach(button => {
-        button.addEventListener('click', function() {
-            const key = this.getAttribute('data-key');
+            tableBody.appendChild(row);
+        });
+
+        // Attach event listeners to the delete buttons
+        document.querySelectorAll('.delete-button').forEach(button => {
+            button.addEventListener('click', function () {
+                const key = this.getAttribute('data-key');
+                deleteData(key);
+            });
+        });
+
+        // Attach event listener to the delete selected button
+        document.querySelector('#delete-selected').addEventListener('click', function () {
+            deleteSelectedData();
+        });
+    }
+
+    function deleteSelectedData() {
+        const checkboxes = document.querySelectorAll('.delete-checkbox:checked');
+        const keysToDelete = Array.from(checkboxes).map(checkbox => checkbox.getAttribute('data-key'));
+
+        keysToDelete.forEach(key => {
             deleteData(key);
         });
-    });
+    }
 
-    // Attach event listener to the delete selected button
-    document.querySelector('#delete-selected').addEventListener('click', function() {
-        deleteSelectedData();
-    });
-}
-function deleteSelectedData() {
-    const checkboxes = document.querySelectorAll('.delete-checkbox:checked');
-    const keysToDelete = Array.from(checkboxes).map(checkbox => checkbox.getAttribute('data-key'));
+    function deleteData(key) {
+        const ref = firebase.database().ref('scanningData/' + key);
+        ref.remove()
+            .then(() => {
+                console.log('Data successfully deleted from Firebase');
+                loadDataForDeletion(); // Reload the data list after deletion
+            })
+            .catch(error => {
+                console.error('Error deleting data:', error);
+            });
+    }
 
-    keysToDelete.forEach(key => {
-        deleteData(key);
-    });
-}
-
-function deleteData(key) {
-    const ref = firebase.database().ref('scanningData/' + key);
-    ref.remove()
-        .then(() => {
-            console.log('Data successfully deleted from Firebase');
-            loadDataForDeletion(); // Reload the data list after deletion
-        })
-        .catch(error => {
-            console.error('Error deleting data:', error);
+    // Function to show the selected content section and hide others
+    function displaySection(sectionId) {
+        document.querySelectorAll('.content-section').forEach(section => {
+            section.style.display = section.id === sectionId ? 'block' : 'none';
         });
-}
-
-
+    }
 });
