@@ -122,3 +122,46 @@ button:hover {
 .sidebar .menu-item:hover .submenu {
     display: block; /* Show submenu on hover */
 }
+/* Default styles for larger screens */
+.sidebar {
+    width: 250px;
+    background-color: #2c3e50;
+    padding: 15px;
+    position: fixed;
+    height: 100%;
+    overflow-y: auto;
+}
+
+.content {
+    margin-left: 270px;
+    padding: 20px;
+}
+
+/* Responsive styles for smaller screens */
+@media screen and (max-width: 768px) {
+    .sidebar {
+        width: 100%;
+        height: auto;
+        position: relative;
+    }
+    .content {
+        margin-left: 0;
+    }
+    .menu-item {
+        padding: 15px;
+        font-size: 18px;
+    }
+    .submenu li a {
+        padding: 12px;
+    }
+}
+
+@media screen and (max-width: 480px) {
+    .menu-item {
+        padding: 10px;
+        font-size: 16px;
+    }
+    .submenu li a {
+        padding: 10px;
+    }
+}

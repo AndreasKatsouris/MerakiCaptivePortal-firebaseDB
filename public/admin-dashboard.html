@@ -1,128 +1,142 @@
 <!DOCTYPE html>
 <html lang="en">
-    <head>
-        <meta charset="UTF-8">
-        <meta name="viewport" content="width=device-width, initial-scale=1.0">
-        <title>Admin Dashboard</title>
-    
-        <!-- Include Firebase SDKs -->
-        <script src="/__/firebase/10.12.5/firebase-app-compat.js"></script>
-        <script src="/__/firebase/10.12.5/firebase-auth-compat.js"></script>
-        <script src="/__/firebase/10.12.5/firebase-database-compat.js"></script>
-        <script src="/__/firebase/10.12.5/firebase-storage-compat.js"></script>
-        <script src="/__/firebase/init.js?useEmulator=false"></script>
-    
-        <!-- Link to Bootstrap and FontAwesome -->
-        <link rel="stylesheet" href="css/bootstrap.min.css">
-        <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/4.7.0/css/font-awesome.min.css">
-    
-        <!-- Link to the new admin-specific stylesheet -->
-        <link rel="stylesheet" href="css/admin-style.css">
-    </head>
-    <body>
-        <script>
-            // Ensure the user is authenticated before allowing access to the dashboard
-            firebase.auth().onAuthStateChanged((user) => {
-                if (user) {
-                    console.log("User is authenticated:", user.uid);
-                    // Proceed with the rest of your script
-                } else {
-                    console.log("User is not authenticated");
-                    window.location.href = 'admin-login.html'; // Redirect to login if not authenticated
-                }
-            });
-        </script>
-    
-        <!-- Sidebar -->
-        <div class="sidebar">
-            <ul>
-                <li class="menu-item">
-                    <a href="#">Wifi</a>
-                    <ul class="submenu">
-                        <li><a href="#">Wifi Settings</a></li>
-                        <li><a href="#">Wifi Reports</a></li>
-                    </ul>
-                </li>
-                <li class="menu-item">
-                    <a href="#">Loyalty</a>
-                    <ul class="submenu">
-                        <li><a href="#">Receipt Scanning</a></li>
-                        <li><a href="#">Loyalty Settings</a></li>
-                        <li><a href="#">Reports</a></li>
-                    </ul>
-                </li>
-            </ul>
-        </div>
-        
-        
-    
-        <!-- Main Content -->
-        <div class="content">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Admin Dashboard</title>
+
+    <!-- Include Firebase SDKs -->
+    <script src="/__/firebase/10.12.5/firebase-app-compat.js"></script>
+    <script src="/__/firebase/10.12.5/firebase-auth-compat.js"></script>
+    <script src="/__/firebase/10.12.5/firebase-database-compat.js"></script>
+    <script src="/__/firebase/10.12.5/firebase-storage-compat.js"></script>
+    <script src="/__/firebase/init.js?useEmulator=false"></script>
+
+    <!-- Link to Bootstrap and FontAwesome -->
+    <link rel="stylesheet" href="css/bootstrap.min.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/4.7.0/css/font-awesome.min.css">
+    <!-- Link to the new admin-specific stylesheet -->
+    <link rel="stylesheet" href="css/admin-style.css">
+</head>
+<body>
+    <script>
+        // Ensure the user is authenticated before allowing access to the dashboard
+        firebase.auth().onAuthStateChanged((user) => {
+            if (user) {
+                console.log("User is authenticated:", user.uid);
+            } else {
+                console.log("User is not authenticated");
+                window.location.href = 'admin-login.html'; // Redirect to login if not authenticated
+            }
+        });
+    </script>
+
+    <!-- Sidebar -->
+    <div class="sidebar">
+        <ul>
+            <li class="menu-item">
+                <a href="#" data-target="wifiSettings">Wifi</a>
+                <ul class="submenu">
+                    <li><a href="#" data-target="wifiSettings">Wifi Settings</a></li>
+                    <li><a href="#" data-target="wifiReports">Wifi Reports</a></li>
+                </ul>
+            </li>
+            <li class="menu-item">
+                <a href="#" data-target="loyalty">Loyalty</a>
+                <ul class="submenu">
+                    <li><a href="#" data-target="receiptScanning">Receipt Scanning</a></li>
+                    <li><a href="#" data-target="loyaltySettings">Loyalty Settings</a></li>
+                    <li><a href="#" data-target="loyaltyReports">Reports</a></li>
+                </ul>
+            </li>
+            <li class="menu-item">
+                <a href="#" data-target="liveData">Live Data</a>
+                <ul class="submenu">
+                    <li><a href="#" data-target="realTimeDashboard">Real-time Dashboard</a></li>
+                    <li><a href="#" data-target="analytics">Analytics</a></li>
+                </ul>
+            </li>
+        </ul>
+    </div>
+
+    <!-- Main Content -->
+    <div class="content">
+        <div id="wifiSettings" class="content-section" style="display: none;">
             <h2>Customize Captive Portal</h2>
             <form id="customizationForm">
                 <div class="form-group">
                     <label for="bgColor">Background Color:</label>
                     <input type="color" id="bgColor" name="bgColor" value="#ffffff">
                 </div>
-    
+
                 <div class="form-group">
                     <label for="font">Font:</label>
                     <input type="text" id="font" name="font">
                 </div>
-    
+
                 <div class="form-group">
                     <label for="fontSize">Font Size:</label>
                     <input type="number" id="fontSize" name="fontSize" min="8" max="72">
                 </div>
-    
+
                 <div class="form-group">
                     <label for="logo">Upload Logo:</label>
                     <input type="file" id="logo" name="logo">
                 </div>
-    
+
                 <button type="submit">Save Changes</button>
             </form>
         </div>
-    
-        <script>
-            document.getElementById('customizationForm').addEventListener('submit', function(event) {
-                event.preventDefault();
-                const bgColor = document.getElementById('bgColor').value;
-                const font = document.getElementById('font').value;
-                const fontSize = document.getElementById('fontSize').value;
-                const logo = document.getElementById('logo').files[0];
-    
-                // Store customization settings in Firebase
-                const storageRef = firebase.storage().ref();
-                if (logo) {
-                    const logoRef = storageRef.child('logos/' + logo.name);
-                    logoRef.put(logo).then(snapshot => {
-                        snapshot.ref.getDownloadURL().then(url => {
-                            saveCustomization({ bgColor, font, fontSize, logoURL: url });
-                        });
-                    });
-                } else {
-                    saveCustomization({ bgColor, font, fontSize });
+
+        <div id="wifiReports" class="content-section" style="display: none;">
+            <h2>Wifi Reports</h2>
+            <!-- Add Wifi Reports content here -->
+        </div>
+
+        <div id="receiptScanning" class="content-section" style="display: none;">
+            <h2>Receipt Scanning</h2>
+            <!-- Add Receipt Scanning content here -->
+        </div>
+
+        <div id="loyaltySettings" class="content-section" style="display: none;">
+            <h2>Loyalty Settings</h2>
+            <!-- Add Loyalty Settings content here -->
+        </div>
+
+        <div id="loyaltyReports" class="content-section" style="display: none;">
+            <h2>Loyalty Reports</h2>
+            <!-- Add Loyalty Reports content here -->
+        </div>
+
+        <div id="realTimeDashboard" class="content-section" style="display: none;">
+            <h2>Real-time Dashboard</h2>
+            <!-- Add Real-time Dashboard content here -->
+        </div>
+
+        <div id="analytics" class="content-section" style="display: none;">
+            <h2>Analytics</h2>
+            <!-- Add Analytics content here -->
+        </div>
+    </div>
+
+    <script>
+        // Handle menu clicks to show/hide the relevant content sections
+        document.querySelectorAll('.menu-item > a, .submenu > li > a').forEach(item => {
+            item.addEventListener('click', function(e) {
+                e.preventDefault();
+
+                // Hide all content sections
+                document.querySelectorAll('.content-section').forEach(section => {
+                    section.style.display = 'none';
+                });
+
+                // Show the selected content section
+                const target = this.getAttribute('data-target');
+                if (target) {
+                    document.getElementById(target).style.display = 'block';
                 }
             });
-    
-            function saveCustomization(settings) {
-                console.log('Saving settings:', settings); // Debugging statement
-                firebase.database().ref('customization/').set(settings)
-                    .then(() => console.log('Customization saved!'))
-                    .catch(error => console.error('Error saving customization:', error));
-            }
-        </script>
-        <script>
-            document.querySelectorAll('.menu-item > a').forEach(item => {
-                item.addEventListener('click', function(e) {
-                    e.preventDefault();
-                    let submenu = this.nextElementSibling;
-                    if (submenu) {
-                        submenu.style.display = submenu.style.display === 'block' ? 'none' : 'block';
-                    }
-                });
         });
-        </script>
-    </body>
-    </html>
+    </script>
+</body>
+</html>
