@@ -218,3 +218,17 @@ button:hover {
             display: none;
         }
 
+        .sidebar .logout-button {
+            color: #fff;
+            background-color: #d9534f; /* Bootstrap's danger color */
+            padding: 10px;
+            text-align: center;
+            display: block;
+            margin-top: auto; /* Push it to the bottom of the sidebar */
+            text-decoration: none;
+        }
+        
+        .sidebar .logout-button:hover {
+            background-color: #c9302c; /* Darker shade on hover */
+        }
+        
