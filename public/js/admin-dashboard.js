@@ -20,6 +20,19 @@ document.addEventListener('DOMContentLoaded', function () {
             }
         });
     });
+    // Logout Button Event Listener
+    const logoutButton = document.getElementById('logoutButton');
+    if (logoutButton) {
+        logoutButton.addEventListener('click', function() {
+            firebase.auth().signOut().then(() => {
+                console.log('User signed out');
+                window.location.href = 'admin-login.html'; // Redirect to login page after logout
+            }).catch((error) => {
+                console.error('Error signing out:', error);
+            });
+        });
+    }
+
 
     // Event listener for the Live Data menu item
     const liveDataMenu = document.querySelector('.menu-item-live-data > a');
