@@ -73,8 +73,9 @@ document.addEventListener('DOMContentLoaded', function() {
         Background Color: ${settings.bgColor}
         Font: ${settings.font}
         Font Size: ${settings.fontSize}
-        Logo URL: ${settings.logoURL ? settings.logoURL : 'No logo uploaded'}`);
-     }*/
+        Logo URL: ${settings.logoURL ? settings.logoURL : 'No logo uploaded'}`);*/
+
+     }
      function displayError(message) {
         const errorContainer = document.getElementById('error-container');
         if (errorContainer) {
