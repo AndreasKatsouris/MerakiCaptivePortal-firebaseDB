@@ -69,12 +69,12 @@ document.addEventListener('DOMContentLoaded', function() {
             displayError('No logo URL found. Default logo will be displayed.');
         }
          // Display an alert with the loaded settings
-    alert(`Customization Settings Loaded:
+    /** alert(`Customization Settings Loaded:
         Background Color: ${settings.bgColor}
         Font: ${settings.font}
         Font Size: ${settings.fontSize}
         Logo URL: ${settings.logoURL ? settings.logoURL : 'No logo uploaded'}`);
-     }
+     }*/
      function displayError(message) {
         const errorContainer = document.getElementById('error-container');
         if (errorContainer) {

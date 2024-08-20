@@ -56,6 +56,12 @@ document.addEventListener('DOMContentLoaded', function () {
         });
     }
 
+    // Display WiFi Settings when the corresponding menu is clicked
+    document.getElementById('wifiSettingsMenu').addEventListener('click', function(e) {
+        e.preventDefault();
+        displaySection('wifiSettingsContent');
+    });
+
     // Customization Form Handling
     document.getElementById('customizationForm').addEventListener('submit', function (event) {
         event.preventDefault();

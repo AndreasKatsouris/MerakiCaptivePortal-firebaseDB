@@ -197,5 +197,24 @@ button:hover {
 .live-data-record hr {
     border-top: 1px solid #ddd;
 }
+        /* Style for the submenu */
+        .submenu {
+            display: none;
+            list-style: none;
+            padding-left: 15px;
+        }
+        
+        .menu-item:hover > .submenu {
+            display: block;
+        }
 
+        /* Style for active menu item */
+        .menu-item.active > .submenu {
+            display: block;
+        }
+
+        /* Main content display */
+        .content-section {
+            display: none;
+        }
 

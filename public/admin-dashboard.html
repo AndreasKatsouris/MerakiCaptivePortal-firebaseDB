@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Admin Dashboard</title>
+    <title>RDP - Admin Dashboard</title>
 
     <!-- Include Firebase SDKs -->
     <script src="/__/firebase/10.12.5/firebase-app-compat.js"></script>
@@ -40,79 +40,74 @@
             </li>
             <li class="menu-item menu-item-live-data">
                 <a href="#">Live Data</a>
-            </li>
-           
-            <li class="menu-item">
-                <a href="#" id="dataDeletionMenu">Delete Data</a>
-            </li>
-            
+                <ul class="submenu">
+                    <li><a href="#" id="dataDeletionMenu">Delete Data</a></li>
+                </ul>
+            </li>            
         </ul>
     </div>
 
-    <!-- Main Content -->
-    <div class="content">
-        <div id="wifiSettingsContent" class="content-section" style="display: none;">
-            <h2>Customize Captive Portal</h2>
-            <form id="customizationForm">
-                <div class="form-group">
-                    <label for="bgColor">Background Color:</label>
-                    <input type="color" id="bgColor" name="bgColor" value="#ffffff">
-                </div>
-
-                <div class="form-group">
-                    <label for="font">Font:</label>
-                    <input type="text" id="font" name="font">
-                </div>
-
-                <div class="form-group">
-                    <label for="fontSize">Font Size:</label>
-                    <input type="number" id="fontSize" name="fontSize" min="8" max="72">
-                </div>
-
-                <div class="form-group">
-                    <label for="logo">Upload Logo:</label>
-                    <input type="file" id="logo" name="logo">
-                </div>
-
-                <button type="submit">Save Changes</button>
-            </form>
-        </div>
-
-        <div id="liveDataContent" class="content-section" style="display: none;">
-            <h2>Live Data</h2>
-            <div id="liveDataDisplay">
-                <div id="liveDataContainer">
-                    <p><strong>Client MAC:</strong> <span id="clientMac">undefined</span></p>
-                    <p><strong>Access Point MAC:</strong> <span id="apMac">undefined</span></p>
-                    <p><strong>Signal Strength (RSSI):</strong> <span id="rssi">undefined</span></p>
-                    <p><strong>Manufacturer:</strong> <span id="manufacturer">undefined</span></p>
-                </div>
+<!-- Main Content -->
+<div class="content">
+    <div id="wifiSettingsContent" class="content-section">
+        <h2>Customize Captive Portal</h2>
+        <form id="customizationForm">
+            <div class="form-group">
+                <label for="bgColor">Background Color:</label>
+                <input type="color" id="bgColor" name="bgColor" value="#ffffff">
             </div>
-        </div>
 
-        <div id="dataDeletionContent" class="content-section" style="display: none;">
-            <h2>Delete Scanning Data</h2>
-            <button id="delete-selected" class="btn btn-danger">Delete Selected</button>
-            <table id="data-table" class="table">
-                <thead>
-                    <tr>
-                        <th><input type="checkbox" id="select-all">Select</th>
-                        <th>Client MAC</th>
-                        <th>Access Point MAC</th>
-                        <th>RSSI</th>
-                        <th>Manufacturer</th>
-                        <th>Actions</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    <!-- Data rows will be injected here by JavaScript -->
-                </tbody>
-            </table>
-        </div>
-        
+            <div class="form-group">
+                <label for="font">Font:</label>
+                <input type="text" id="font" name="font">
+            </div>
 
+            <div class="form-group">
+                <label for="fontSize">Font Size:</label>
+                <input type="number" id="fontSize" name="fontSize" min="8" max="72">
+            </div>
+
+            <div class="form-group">
+                <label for="logo">Upload Logo:</label>
+                <input type="file" id="logo" name="logo">
+            </div>
+
+            <button type="submit">Save Changes</button>
+        </form>
     </div>
 
+    <div id="liveDataContent" class="content-section">
+        <h2>Live Data</h2>
+        <div id="liveDataDisplay">
+            <div id="liveDataContainer">
+                <p><strong>Client MAC:</strong> <span id="clientMac">undefined</span></p>
+                <p><strong>Access Point MAC:</strong> <span id="apMac">undefined</span></p>
+                <p><strong>Signal Strength (RSSI):</strong> <span id="rssi">undefined</span></p>
+                <p><strong>Manufacturer:</strong> <span id="manufacturer">undefined</span></p>
+            </div>
+        </div>
+    </div>
+
+    <div id="dataDeletionContent" class="content-section">
+        <h2>Delete Scanning Data</h2>
+        <button id="delete-selected" class="btn btn-danger">Delete Selected</button>
+        <table id="data-table" class="table">
+            <thead>
+                <tr>
+                    <th><input type="checkbox" id="select-all">Select</th>
+                    <th>Client MAC</th>
+                    <th>Access Point MAC</th>
+                    <th>RSSI</th>
+                    <th>Manufacturer</th>
+                    <th>Actions</th>
+                </tr>
+            </thead>
+            <tbody>
+                <!-- Data rows will be injected here by JavaScript -->
+            </tbody>
+        </table>
+    </div>
+</div>
     <!-- Link to the external JavaScript file -->
     <script src="js/admin-dashboard.js"></script>
 </body>
