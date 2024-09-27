@@ -120,33 +120,31 @@
             </tbody>
         </table>
     </div>
-    
+    <!-- start of wifi devices form-->
     <div id="wifiDevicesContent" class="content-section" style="display: none;">
-        <h2>WiFi Devices</h2>
-    
-        <!-- Form to Add/Edit Access Points -->
-        <form id="wifidevicesform">
+        <h2>Manage Wifi Devices</h2>
+        <form id="wifiDevicesForm">
             <div class="form-group">
-                <label for="macAddress">MAC Address:</label>
-                <input type="text" id="macAddress" class="form-control" placeholder="Enter MAC Address" required>
+                <label for="deviceMac">Device MAC Address:</label>
+                <input type="text" id="deviceMac" name="deviceMac" class="form-control" required>
             </div>
             <div class="form-group">
                 <label for="storeId">Store ID:</label>
-                <input type="text" id="storeId" class="form-control" placeholder="Enter Store ID" required>
+                <input type="text" id="storeId" name="storeId" class="form-control" required>
             </div>
             <div class="form-group">
                 <label for="location">Location:</label>
-                <input type="text" id="location" class="form-control" placeholder="Enter Location" required>
+                <input type="text" id="location" name="location" class="form-control" required>
             </div>
             <div class="form-group">
                 <label for="deviceType">Device Type:</label>
-                <input type="text" id="deviceType" class="form-control" placeholder="Enter Device Type" required>
+                <input type="text" id="deviceType" name="deviceType" class="form-control" required>
             </div>
-            <button type="submit" class="btn btn-primary">Save Access Point</button>
+            <button type="submit" class="btn btn-primary">Add Device</button>
         </form>
     
-        <h3>Existing Access Points</h3>
-        <table id="accessPointsTable" class="table">
+        <h3>Existing Devices</h3>
+        <table class="table" id="devicesTable">
             <thead>
                 <tr>
                     <th>MAC Address</th>
@@ -157,10 +155,11 @@
                 </tr>
             </thead>
             <tbody>
-                <!-- Rows will be populated by JavaScript -->
+                <!-- Rows will be dynamically inserted here -->
             </tbody>
         </table>
     </div>
+    
     
 
     <div id="liveDataContent" class="content-section">
