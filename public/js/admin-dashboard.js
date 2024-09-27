@@ -159,6 +159,7 @@ function applyFilters() {
     // Load existing devices from Firebase
     function loadDevices() {
         const devicesTable = document.querySelector('#devicesTable tbody');
+        console.log(devicesTable); // Check if this outputs the correct element
         devicesTable.innerHTML = ''; // Clear the table
 
         // Fetch all unique MAC addresses from wifiLogins and accessPoints
