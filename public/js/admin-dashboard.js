@@ -109,8 +109,6 @@ function applyFilters() {
 
 
 // Event listener for WiFi Devices submenu
-document.addEventListener('DOMContentLoaded', function() {
-    // Sidebar Navigation
     document.querySelectorAll('.menu-item > a').forEach(item => {
         item.addEventListener('click', function(e) {
             e.preventDefault();
@@ -245,7 +243,6 @@ document.addEventListener('DOMContentLoaded', function() {
             console.error('Error fetching device data for editing:', error);
         });
     }
-});
 
 // end of wifi devices
 
