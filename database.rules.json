@@ -5,6 +5,10 @@
     "scanningData": {
       ".read": true,
       ".write": true
+    },
+  "customization": {
+      ".read": true,
+      ".write": true
     }
   }
 }

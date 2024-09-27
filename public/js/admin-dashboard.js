@@ -210,4 +210,29 @@ document.addEventListener('DOMContentLoaded', function () {
             section.style.display = section.id === sectionId ? 'block' : 'none';
         });
     }
+
+
+    // Add event listener for the "Delete All Data" option in the sidebar
+    const deleteAllDataMenu = document.getElementById('deleteAllDataMenu');
+    if (deleteAllDataMenu) {
+        deleteAllDataMenu.addEventListener('click', function(e) {
+            e.preventDefault();
+            if (confirm("Are you sure you want to delete all data? This action cannot be undone.")) {
+                deleteAllScanningData();
+            }
+        });
+    }
+
+    // Function to delete all data from Firebase without loading it
+    function deleteAllScanningData() {
+        const ref = firebase.database().ref('scanningData/');
+        ref.remove()
+            .then(() => {
+                console.log('All data successfully deleted from Firebase');
+                alert('All data has been deleted.');
+            })
+            .catch(error => {
+                console.error('Error deleting all data:', error);
+                alert('Error deleting data. Please try again later.');
+            });
 });
