@@ -82,6 +82,45 @@
         </form>
     </div>
 
+    <div id="wifiReportsContent" class="content-section" style="display: none;">
+        <h2>WiFi Reports</h2>
+        
+        <!-- Filter Inputs -->
+        <div class="filter-container">
+            <label for="nameFilter">Name:</label>
+            <input type="text" id="nameFilter" placeholder="Filter by Name">
+            
+            <label for="emailFilter">Email:</label>
+            <input type="text" id="emailFilter" placeholder="Filter by Email">
+            
+            <label for="timestampFilter">Login Timestamp:</label>
+            <input type="text" id="timestampFilter" placeholder="Filter by Timestamp">
+            
+            <label for="apMacFilter">Access Point MAC:</label>
+            <input type="text" id="apMacFilter" placeholder="Filter by AP MAC">
+            
+            <label for="sessionIdFilter">Session ID:</label>
+            <input type="text" id="sessionIdFilter" placeholder="Filter by Session ID">
+        </div>
+        
+        <!-- Table to display WiFi Login Data -->
+        <table id="wifiReportsTable" class="table">
+            <thead>
+                <tr>
+                    <th>Name</th>
+                    <th>Email</th>
+                    <th>Login Timestamp</th>
+                    <th>Access Point MAC</th>
+                    <th>Session ID</th>
+                </tr>
+            </thead>
+            <tbody>
+                <!-- Rows will be populated by JavaScript -->
+            </tbody>
+        </table>
+    </div>
+    
+
     <div id="liveDataContent" class="content-section">
         <h2>Live Data</h2>
         <div id="liveDataDisplay">

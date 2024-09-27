@@ -33,6 +33,81 @@ document.addEventListener('DOMContentLoaded', function () {
         });
     }
 
+    // Event listener for WiFi Reports menu item
+document.querySelector('#wifiReportsMenu').addEventListener('click', function(e) {
+    e.preventDefault();
+    displaySection('wifiReportsContent'); // Display the WiFi Reports section
+    fetchWiFiReports(); // Fetch and display the WiFi reports
+});
+
+// Function to fetch WiFi Login data from Firebase
+function fetchWiFiReports() {
+    const tableBody = document.querySelector('#wifiReportsTable tbody');
+    tableBody.innerHTML = ''; // Clear existing rows
+
+    firebase.database().ref('wifiLogins/').once('value')
+        .then(snapshot => {
+            const data = snapshot.val();
+            if (data) {
+                Object.keys(data).forEach(key => {
+                    const record = data[key];
+                    const row = document.createElement('tr');
+                    row.innerHTML = `
+                        <td>${record.name || 'N/A'}</td>
+                        <td>${record.email || 'N/A'}</td>
+                        <td>${record.localTimeStamp || 'N/A'}</td>
+                        <td>${record.accessPointMAC || 'N/A'}</td>
+                        <td>${key}</td>
+                    `;
+                    tableBody.appendChild(row);
+                });
+                applyFilters(); // Apply filters after loading data
+            } else {
+                tableBody.innerHTML = '<tr><td colspan="5">No data available</td></tr>';
+            }
+        })
+        .catch(error => {
+            console.error('Error fetching WiFi login data:', error);
+        });
+}
+
+// Function to apply filters to the table
+function applyFilters() {
+    const nameFilter = document.querySelector('#nameFilter');
+    const emailFilter = document.querySelector('#emailFilter');
+    const timestampFilter = document.querySelector('#timestampFilter');
+    const apMacFilter = document.querySelector('#apMacFilter');
+    const sessionIdFilter = document.querySelector('#sessionIdFilter');
+
+    const tableRows = document.querySelectorAll('#wifiReportsTable tbody tr');
+
+    [nameFilter, emailFilter, timestampFilter, apMacFilter, sessionIdFilter].forEach(filter => {
+        filter.addEventListener('input', function() {
+            const nameValue = nameFilter.value.toLowerCase();
+            const emailValue = emailFilter.value.toLowerCase();
+            const timestampValue = timestampFilter.value.toLowerCase();
+            const apMacValue = apMacFilter.value.toLowerCase();
+            const sessionIdValue = sessionIdFilter.value.toLowerCase();
+
+            tableRows.forEach(row => {
+                const [nameCell, emailCell, timestampCell, apMacCell, sessionIdCell] = row.children;
+                const matchesName = nameCell.textContent.toLowerCase().includes(nameValue);
+                const matchesEmail = emailCell.textContent.toLowerCase().includes(emailValue);
+                const matchesTimestamp = timestampCell.textContent.toLowerCase().includes(timestampValue);
+                const matchesApMac = apMacCell.textContent.toLowerCase().includes(apMacValue);
+                const matchesSessionId = sessionIdCell.textContent.toLowerCase().includes(sessionIdValue);
+
+                if (matchesName && matchesEmail && matchesTimestamp && matchesApMac && matchesSessionId) {
+                    row.style.display = '';
+                } else {
+                    row.style.display = 'none';
+                }
+            });
+        });
+    });
+}
+
+
 
     // Event listener for the Live Data menu item
     const liveDataMenu = document.querySelector('.menu-item-live-data > a');
