@@ -247,6 +247,43 @@ function applyFilters() {
 
 // end of wifi devices
 
+// Function to sort the table by column
+function sortTable(column, order) {
+    const table = document.querySelector("#wifiReportsTable tbody");
+    const rows = Array.from(table.querySelectorAll("tr"));
+
+    rows.sort((rowA, rowB) => {
+        const cellA = rowA.querySelector(`td:nth-child(${column})`).textContent.trim().toLowerCase();
+        const cellB = rowB.querySelector(`td:nth-child(${column})`).textContent.trim().toLowerCase();
+
+        if (order === "asc") {
+            return cellA > cellB ? 1 : (cellA < cellB ? -1 : 0);
+        } else {
+            return cellA < cellB ? 1 : (cellA > cellB ? -1 : 0);
+        }
+    });
+
+    // Re-append the sorted rows to the table body
+    rows.forEach(row => table.appendChild(row));
+}
+
+// Add event listeners to column headers for sorting
+document.querySelectorAll("#wifiReportsTable th").forEach(header => {
+    header.addEventListener("click", () => {
+        const column = header.getAttribute("data-column");
+        const order = header.getAttribute("data-order");
+        const columnIndex = Array.from(header.parentNode.children).indexOf(header) + 1;
+
+        // Toggle the order for next click
+        const newOrder = order === "asc" ? "desc" : "asc";
+        header.setAttribute("data-order", newOrder);
+
+        // Perform the sort
+        sortTable(columnIndex, newOrder);
+    });
+});
+// end of sort event listeners
+
 
     // Event listener for the Live Data menu item
     const liveDataMenu = document.querySelector('.menu-item-live-data > a');
