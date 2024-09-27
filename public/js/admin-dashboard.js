@@ -235,4 +235,5 @@ document.addEventListener('DOMContentLoaded', function () {
                 console.error('Error deleting all data:', error);
                 alert('Error deleting data. Please try again later.');
             });
+        }
 });
