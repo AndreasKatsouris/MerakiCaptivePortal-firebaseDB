@@ -270,6 +270,19 @@ function applyFilters() {
     } else {
         console.error("Element with ID 'dataDeletionMenu' not found.");
     }
+    // Event listener for Wifi Devices menu item
+    const wifiDevicesMenu = document.querySelector('#wifiDevicesMenu');
+    if (wifiDevicesMenu) {
+        wifiDevicesMenu.addEventListener('click', function(e) {
+            e.preventDefault();
+            displaySection('wifiDevicesContent');
+            loadDevices();
+        });
+    } else {
+        console.error("Element '#wifiDevicesMenu' not found.");
+    }
+    
+    // end of wifi devices event listener
 
     // Add event listener for "Select All" checkbox
     const selectAllCheckbox = document.getElementById('select-all');
