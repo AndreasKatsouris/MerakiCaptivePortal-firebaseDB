@@ -27,6 +27,7 @@
                 <a href="#" id="wifiMenu">Wifi</a>
                 <ul class="submenu">
                     <li><a href="#" id="wifiSettingsMenu">Wifi Settings</a></li>
+                    <li><a href="#" id="wifiDevicesMenu">WiFi Devices</a></li>
                     <li><a href="#" id="wifiReportsMenu">Wifi Reports</a></li>
                 </ul>
             </li>
@@ -112,6 +113,47 @@
                     <th>Login Timestamp</th>
                     <th>Access Point MAC</th>
                     <th>Session ID</th>
+                </tr>
+            </thead>
+            <tbody>
+                <!-- Rows will be populated by JavaScript -->
+            </tbody>
+        </table>
+    </div>
+    
+    <div id="wifiDevicesContent" class="content-section" style="display: none;">
+        <h2>WiFi Devices</h2>
+    
+        <!-- Form to Add/Edit Access Points -->
+        <form id="accessPointForm">
+            <div class="form-group">
+                <label for="macAddress">MAC Address:</label>
+                <input type="text" id="macAddress" class="form-control" placeholder="Enter MAC Address" required>
+            </div>
+            <div class="form-group">
+                <label for="storeId">Store ID:</label>
+                <input type="text" id="storeId" class="form-control" placeholder="Enter Store ID" required>
+            </div>
+            <div class="form-group">
+                <label for="location">Location:</label>
+                <input type="text" id="location" class="form-control" placeholder="Enter Location" required>
+            </div>
+            <div class="form-group">
+                <label for="deviceType">Device Type:</label>
+                <input type="text" id="deviceType" class="form-control" placeholder="Enter Device Type" required>
+            </div>
+            <button type="submit" class="btn btn-primary">Save Access Point</button>
+        </form>
+    
+        <h3>Existing Access Points</h3>
+        <table id="accessPointsTable" class="table">
+            <thead>
+                <tr>
+                    <th>MAC Address</th>
+                    <th>Store ID</th>
+                    <th>Location</th>
+                    <th>Device Type</th>
+                    <th>Actions</th>
                 </tr>
             </thead>
             <tbody>
