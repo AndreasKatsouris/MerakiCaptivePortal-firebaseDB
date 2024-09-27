@@ -109,128 +109,145 @@ function applyFilters() {
 
 
 // Event listener for WiFi Devices submenu
-document.querySelector('#wifiDevicesMenu').addEventListener('click', function(e) {
-    e.preventDefault();
-    displaySection('wifiDevicesContent'); // Display the WiFi Devices section
-    fetchAccessPoints(); // Fetch and display existing access points
-});
+document.addEventListener('DOMContentLoaded', function() {
+    // Sidebar Navigation
+    document.querySelectorAll('.menu-item > a').forEach(item => {
+        item.addEventListener('click', function(e) {
+            e.preventDefault();
+            let submenu = this.nextElementSibling;
+            if (submenu) {
+                submenu.style.display = submenu.style.display === 'block' ? 'none' : 'block';
+            }
+        });
+    });
 
-// Handle form submission for adding/editing access points
-document.getElementById('accessPointForm').addEventListener('submit', function(event) {
-    event.preventDefault();
-    
-    const macAddress = document.getElementById('macAddress').value.trim();
-    const storeId = document.getElementById('storeId').value.trim();
-    const location = document.getElementById('location').value.trim();
-    const deviceType = document.getElementById('deviceType').value.trim();
-    
-    // Validation
-    if (!macAddress || !storeId || !location || !deviceType) {
-        alert('Please fill all fields.');
-        return;
+    // Show WiFi Devices Content
+    document.querySelector('#wifiDevicesMenu').addEventListener('click', function(e) {
+        e.preventDefault();
+        displaySection('wifiDevicesContent');
+        loadDevices(); // Load existing devices
+    });
+
+    // Handle WiFi Devices form submission
+    document.querySelector('#wifiDevicesForm').addEventListener('submit', function(e) {
+        e.preventDefault();
+        const macAddress = document.querySelector('#deviceMac').value;
+        const storeId = document.querySelector('#storeId').value;
+        const location = document.querySelector('#location').value;
+        const deviceType = document.querySelector('#deviceType').value;
+
+        // Save to Firebase
+        const deviceRef = firebase.database().ref('accessPoints/').push();
+        deviceRef.set({
+            macAddress,
+            storeId,
+            location,
+            deviceType
+        }).then(() => {
+            alert('Device added successfully');
+            loadDevices();
+        }).catch(error => {
+            console.error('Error adding device:', error);
+        });
+    });
+
+    // Function to display the correct content section
+    function displaySection(sectionId) {
+        document.querySelectorAll('.content-section').forEach(section => {
+            section.style.display = section.id === sectionId ? 'block' : 'none';
+        });
     }
 
-    // Create an object to store in Firebase
-    const accessPoint = {
-        macAddress,
-        storeId,
-        location,
-        deviceType
-    };
+    // Load existing devices from Firebase
+    function loadDevices() {
+        const devicesTable = document.querySelector('#devicesTable tbody');
+        devicesTable.innerHTML = ''; // Clear the table
 
-    // Save to Firebase under /accessPoints/{macAddress}
-    firebase.database().ref('accessPoints/' + macAddress).set(accessPoint)
-        .then(() => {
-            alert('Access Point saved successfully!');
-            document.getElementById('accessPointForm').reset();
-            fetchAccessPoints(); // Refresh the table
-        })
-        .catch(error => {
-            console.error('Error saving access point:', error);
-            alert('Error saving access point. Please try again.');
-        });
-});
+        // Fetch all unique MAC addresses from wifiLogins and accessPoints
+        const macAddresses = {};
 
-// Fetch existing access points from Firebase
-function fetchAccessPoints() {
-    const tableBody = document.querySelector('#accessPointsTable tbody');
-    tableBody.innerHTML = ''; // Clear existing rows
+        // Fetch accessPoints database
+        firebase.database().ref('accessPoints/').once('value').then(snapshot => {
+            const accessPoints = snapshot.val();
+            if (accessPoints) {
+                Object.keys(accessPoints).forEach(key => {
+                    const device = accessPoints[key];
+                    macAddresses[device.macAddress] = device; // Store in macAddresses
+                });
+            }
 
-    firebase.database().ref('accessPoints/').once('value')
-        .then(snapshot => {
-            const data = snapshot.val();
-            if (data) {
-                Object.keys(data).forEach(key => {
-                    const accessPoint = data[key];
+            // Fetch wifiLogins to get unique MAC addresses
+            firebase.database().ref('wifiLogins/').once('value').then(snapshot => {
+                const wifiLogins = snapshot.val();
+                if (wifiLogins) {
+                    Object.keys(wifiLogins).forEach(key => {
+                        const login = wifiLogins[key];
+                        const apMac = login.accessPointMAC; // Access Point MAC from wifiLogins
+
+                        if (!macAddresses[apMac]) {
+                            // Add a placeholder entry if not in accessPoints
+                            macAddresses[apMac] = {
+                                macAddress: apMac,
+                                storeId: "Unknown",
+                                location: "Unknown",
+                                deviceType: "Unknown"
+                            };
+                        }
+                    });
+                }
+
+                // Now display all unique MAC addresses in the table
+                Object.keys(macAddresses).forEach(mac => {
+                    const device = macAddresses[mac];
                     const row = document.createElement('tr');
                     row.innerHTML = `
-                        <td>${accessPoint.macAddress}</td>
-                        <td>${accessPoint.storeId}</td>
-                        <td>${accessPoint.location}</td>
-                        <td>${accessPoint.deviceType}</td>
-                        <td>
-                            <button class="btn btn-sm btn-info edit-button" data-key="${key}">Edit</button>
-                            <button class="btn btn-sm btn-danger delete-button" data-key="${key}">Delete</button>
-                        </td>
+                        <td>${device.macAddress}</td>
+                        <td>${device.storeId}</td>
+                        <td>${device.location}</td>
+                        <td>${device.deviceType}</td>
+                        <td><button class="btn btn-warning edit-button" data-mac="${device.macAddress}">Edit</button></td>
                     `;
-                    tableBody.appendChild(row);
+                    devicesTable.appendChild(row);
                 });
-                attachEditAndDeleteHandlers(); // Attach event listeners for edit/delete
-            } else {
-                tableBody.innerHTML = '<tr><td colspan="5">No access points found</td></tr>';
-            }
-        })
-        .catch(error => {
-            console.error('Error fetching access points:', error);
-        });
-}
 
-// Attach event listeners to edit and delete buttons
-function attachEditAndDeleteHandlers() {
-    document.querySelectorAll('.edit-button').forEach(button => {
-        button.addEventListener('click', function() {
-            const macAddress = this.getAttribute('data-key');
-            editAccessPoint(macAddress);
-        });
-    });
+                // Attach event listeners to the edit buttons
+                document.querySelectorAll('.edit-button').forEach(button => {
+                    button.addEventListener('click', function() {
+                        const macAddress = this.getAttribute('data-mac');
+                        editDevice(macAddress);
+                    });
+                });
 
-    document.querySelectorAll('.delete-button').forEach(button => {
-        button.addEventListener('click', function() {
-            const macAddress = this.getAttribute('data-key');
-            deleteAccessPoint(macAddress);
-        });
-    });
-}
-
-// Edit access point
-function editAccessPoint(macAddress) {
-    firebase.database().ref('accessPoints/' + macAddress).once('value')
-        .then(snapshot => {
-            const accessPoint = snapshot.val();
-            document.getElementById('macAddress').value = accessPoint.macAddress;
-            document.getElementById('storeId').value = accessPoint.storeId;
-            document.getElementById('location').value = accessPoint.location;
-            document.getElementById('deviceType').value = accessPoint.deviceType;
-        })
-        .catch(error => {
-            console.error('Error fetching access point:', error);
-        });
-}
-
-// Delete access point
-function deleteAccessPoint(macAddress) {
-    if (confirm('Are you sure you want to delete this access point?')) {
-        firebase.database().ref('accessPoints/' + macAddress).remove()
-            .then(() => {
-                alert('Access Point deleted successfully!');
-                fetchAccessPoints(); // Refresh the table
-            })
-            .catch(error => {
-                console.error('Error deleting access point:', error);
+            }).catch(error => {
+                console.error('Error fetching wifiLogins:', error);
             });
+        }).catch(error => {
+            console.error('Error fetching accessPoints:', error);
+        });
     }
-}
 
+    // Edit device function
+    function editDevice(macAddress) {
+        // Fetch device data from Firebase and populate the form for editing
+        firebase.database().ref('accessPoints/').orderByChild('macAddress').equalTo(macAddress).once('value').then(snapshot => {
+            const deviceData = snapshot.val();
+            if (deviceData) {
+                const key = Object.keys(deviceData)[0]; // Get the first result key
+                const device = deviceData[key];
+
+                // Populate the form fields
+                document.querySelector('#deviceMac').value = device.macAddress;
+                document.querySelector('#storeId').value = device.storeId;
+                document.querySelector('#location').value = device.location;
+                document.querySelector('#deviceType').value = device.deviceType;
+            }
+        }).catch(error => {
+            console.error('Error fetching device data for editing:', error);
+        });
+    }
+});
+
+// end of wifi devices
 
 
     // Event listener for the Live Data menu item
