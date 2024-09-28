@@ -1,8 +1,3 @@
-/*
-This script will collect the form data and parameters sent by Meraki, store the results
-in a Firebase database, then log the user into the Meraki WiFi network.
-*/
-
 // Initialize Firebase
 const config = {
     apiKey: "AIzaSyBf96GNLhtz6FDdbLxIW9efh98WG__eQmk",
@@ -15,24 +10,44 @@ const config = {
     measurementId: "G-476KXB93TV"
 };
 
-document.addEventListener('DOMContentLoaded', function() {
+// Error handling function
+function handleError(error, context) {
+    console.error(`Error in ${context}:`, error);
+    let userMessage = 'An unexpected error occurred. Please try again later.';
+    
+    if (error.code) {
+        switch (error.code) {
+            case 'PERMISSION_DENIED':
+                userMessage = 'You do not have permission to perform this action.';
+                break;
+            case 'NETWORK_ERROR':
+                userMessage = 'Network error. Please check your internet connection.';
+                break;
+            // Add more specific error codes as needed
+        }
+    }
+    
+    displayError(userMessage);
+}
 
-    //alert('Step 1: DOMContentLoaded event triggered. Press OK to initialize Firebase.');
+function displayError(message) {
+    const errorContainer = document.getElementById('error-container');
+    if (errorContainer) {
+        errorContainer.textContent = message;
+        errorContainer.style.display = 'block';
+    } else {
+        console.warn('Error container not found on the page.');
+        alert(message); // Fallback to alert if container is not found
+    }
+}
+
+document.addEventListener('DOMContentLoaded', function() {
     firebase.initializeApp(config);
     
-   // alert('Step 2: Firebase initialized. Press OK to proceed to analytics initialization.');
-    // Initialize Firebase Analytics
     const analytics = firebase.analytics();
-
-    // Log an event when the page loads
     analytics.logEvent('page_view', { page: 'captive_portal' });
 
-   // alert('Step 3: Firebase Analytics initialized. Press OK to proceed to database reference setup.');
-
-    // Get a reference to the database service
     const database = firebase.database();
-
-   // alert('Step 4: Database reference set up. Press OK to parse Meraki parameters.');
 
     // Parse Meraki supplied parameters
     const base_grant_url = decodeURIComponent(GetURLParameter("base_grant_url"));
@@ -42,78 +57,16 @@ document.addEventListener('DOMContentLoaded', function() {
     const client_mac = GetURLParameter("client_mac");
 
     // Apply customization settings from Firebase
-    // Updated Customization Settings
     firebase.database().ref('customization/').once('value')
      .then(snapshot => {
          const settings = snapshot.val();
          if (settings) {
              applySettings(settings);
          } else {
-             console.error('No customization settings found.');
-             displayError('No customization settings found. Default settings will be applied.');
+             handleError(new Error('No customization settings found'), 'retrieving settings');
          }
      })
-     .catch(error => {
-         console.error('Error retrieving settings:', error);
-         displayError('Error retrieving settings. Default settings will be applied.');
-     });
-     function applySettings(settings) {
-        document.body.style.backgroundColor = settings.bgColor || '#ffffff'; // Default to white if no bgColor
-        document.body.style.fontFamily = settings.font || 'Arial, sans-serif'; // Default to Arial if no font
-        document.body.style.fontSize = settings.fontSize ? settings.fontSize + 'px' : '14px'; // Default to 14px if no fontSize
-    
-        const logoElement = document.getElementById('logo');
-        if (settings.logoURL && logoElement) {
-            logoElement.src = settings.logoURL;
-        } else {
-            displayError('No logo URL found. Default logo will be displayed.');
-        }
-         // Display an alert with the loaded settings
-    /** alert(`Customization Settings Loaded:
-        Background Color: ${settings.bgColor}
-        Font: ${settings.font}
-        Font Size: ${settings.fontSize}
-        Logo URL: ${settings.logoURL ? settings.logoURL : 'No logo uploaded'}`);*/
-
-     }
-     function displayError(message) {
-        const errorContainer = document.getElementById('error-container');
-        if (errorContainer) {
-            errorContainer.textContent = message;
-            errorContainer.style.display = 'block';
-        } else {
-            console.warn('Error container not found on the page.');
-        }
-    }
-     /** 
-     firebase.database().ref('customization/').once('value').then(snapshot => {
-        
-        const settings = snapshot.val();
-        console.log('Retrieved settings:', settings); // Debugging: Output retrieved settings
-        if (settings) {
-            const styleSheet = document.styleSheets[0]; // Assuming it's the first stylesheet
-            styleSheet.insertRule(`body { background-color: ${settings.bgColor}; }`, styleSheet.cssRules.length);
-            //document.body.style.backgroundColor = settings.bgColor;
-            document.body.style.backgroundColor = `${settings.bgColor} !important`;
-            document.body.style.fontFamily = settings.font;
-            document.body.style.fontSize = settings.fontSize + 'px';
-  
-            if (settings.logoURL) {
-                document.getElementById('logo').src = settings.logoURL;
-            }
-        } else {
-            console.error('No customization settings found.');
-        }
-    }).catch(error => console.error('Error retrieving settings:', error));
-*/
-   // alert(`Step 5: Parameters parsed.\nBase Grant URL: ${base_grant_url}\nUser Continue URL: ${user_continue_url}\nClient IP: ${client_ip}\nPress OK to log these parameters to the console.`);
-
-    // Print Meraki provided parameters to console
-    console.log("base_grant_url:", base_grant_url);
-    console.log("client_ip:", client_ip);
-    console.log("user_continue_url:", user_continue_url);
-
-   // alert('Step 6: Parameters logged. Press OK to proceed to form submission setup.');
+     .catch(error => handleError(error, 'retrieving settings'));
 
     // Display Parameters for Demo (only if elements exist)
     const baseGrantElement = document.querySelector("div.baseGrantURL");
@@ -131,8 +84,83 @@ document.addEventListener('DOMContentLoaded', function() {
     const nodeMACElement = document.querySelector("div.nodeMAC");
     if (nodeMACElement) nodeMACElement.textContent = node_mac;
 
+    // Add event listener for page unload to log user disconnection
+    window.addEventListener('beforeunload', function() {
+        const sessionID = localStorage.getItem('sessionID');
+        if (sessionID) {
+            logUserDisconnection(sessionID);
+        }
+    });
 
-    // Function to show validation messages
+    // Improved form validation
+    const validationRules = {
+        username: {
+            test: (value) => {
+                const nameParts = value.trim().split(/\s+/);
+                return nameParts.length >= 2 && nameParts.every(part => /^[a-zA-Z'-]+$/.test(part));
+            },
+            message: "Please enter a valid full name (first name and surname)."
+        },
+        email: {
+            test: (value) => /^[a-zA-Z0-9._-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,6}$/.test(value),
+            message: "Please enter a valid email address."
+        },
+        company: {
+            test: (value) => value.trim() !== "",
+            message: "Please enter a valid company name."
+        },
+        terms: {
+            test: (value) => value === true,
+            message: "You must agree to the terms and conditions."
+        }
+    };
+
+    function validateForm(formData) {
+        let isValid = true;
+        const errors = {};
+
+        for (const [field, rule] of Object.entries(validationRules)) {
+            if (!rule.test(formData[field])) {
+                isValid = false;
+                errors[field] = rule.message;
+            }
+        }
+
+        return { isValid, errors };
+    }
+
+    // Handle Form Submission
+    document.querySelector('form').addEventListener('submit', function(event) {
+        event.preventDefault();
+        removeValidationMessages();
+        
+        const formData = {
+            username: document.querySelector("#username").value,
+            email: document.querySelector("#email").value,
+            company: document.querySelector("#company").value,
+            terms: document.querySelector("#terms").checked
+        };
+
+        const { isValid, errors } = validateForm(formData);
+
+        if (isValid) {
+            analytics.logEvent('form_submission', formData);
+            writeUserData(formData, client_mac, node_mac);
+
+            let duration = 3600;
+            let loginUrl = base_grant_url;
+            if(user_continue_url !== "undefined"){
+                loginUrl += "?continue_url=" + user_continue_url + "?duration=" + duration;
+            }
+            console.log("Logging in...", loginUrl);
+            window.location.href = loginUrl;
+        } else {
+            for (const [field, message] of Object.entries(errors)) {
+                showValidationMessage(document.querySelector(`#${field}`), message);
+            }
+        }
+    });
+
     function showValidationMessage(element, message) {
         const messageElement = document.createElement('div');
         messageElement.className = 'validation-message';
@@ -140,174 +168,69 @@ document.addEventListener('DOMContentLoaded', function() {
         element.parentNode.appendChild(messageElement);
     }
 
-    // Function to remove all validation messages
     function removeValidationMessages() {
-        const messages = document.querySelectorAll('.validation-message');
-        messages.forEach(message => message.remove());
-    }
-
-    // Handle Form Submission
-    document.querySelector('form').addEventListener('submit', function(event) {
-        //alert('Step 7: Form submission triggered. Press OK to start validation.');
-        console.log("Processing loginForm");
-        event.preventDefault();
-        removeValidationMessages();
-
-        let isValid = true;
-
-        // Get form values
-        const name = document.querySelector("input#username");
-        const email = document.querySelector("input#email");
-        const company = document.querySelector("input#company");
-
-        //alert('Step 8: Form values captured. Press OK to validate.');
-
-        //const phoneInputField = document.querySelector("input#phone");
-        /** const phoneInput = window.intlTelInput(phoneInputField, {
-            initialCountry: "auto",
-            geoIpLookup: function(callback) {
-                fetch('https://ipinfo.io/json')
-                        .then(response => response.json())
-                        .then(data => callback(data.country))
-                        .catch(() => callback('us'));
-                },
-            utilsScript: "https://cdnjs.cloudflare.com/ajax/libs/intl-tel-input/17.0.8/js/utils.js"
-        });
-        //const phoneInput = window.intlTelInput(phoneInputField, {
-        //    utilsScript:
-        //      "https://cdnjs.cloudflare.com/ajax/libs/intl-tel-input/17.0.8/js/utils.js",
-        //  });
-        const phoneNumber = phoneInput.getNumber(); // Get the complete number including country code
-        */
-        const termsChecked = document.querySelector("#terms").checked;
-
-        // Validate the inputs
-        if (!validateName(name.value)) {
-            showValidationMessage(name, "Please enter a valid full name (first name and surname).");
-            isValid = false;
-        }
-
-        if (!validateEmail(email.value)) {
-            showValidationMessage(email, "Please enter a valid email address.");
-            isValid = false;
-        }
-
-        if (!validateCompany(company.value)) {
-            showValidationMessage(company, "Please enter a valid company name.");
-            isValid = false;
-        }
-
-        if (!termsChecked) {
-            showValidationMessage(document.querySelector("#terms"), "You must agree to the terms and conditions.");
-            isValid = false;
-        }
-        // Validate Phone Number
-        //const phoneNumber = phoneInput.getNumber();
-        //if (!phoneNumber.isValidNumber()) {
-        //    showValidationMessage(phoneInputField, "Please enter a valid phone number.");
-        //    isValid = false;
-        //}
-
-        //alert(`Step 9: Validation complete. Is the data valid? ${isValid}. Press OK to proceed.`);
-
-        console.log("Is all DATA valid ?", isValid);
-        // If all validations pass, proceed with form submission
-        if (isValid) {
-            const formData = {
-                "name": name.value,
-                "email": email.value,
-                "company": company.value//,
-                //"phoneNumber": phoneNumber
-            };
-            //alert('Step 10: Data is valid. Press OK to log the form submission to Firebase Analytics.');
-             // Log the form submission event to Firebase Analytics
-            analytics.logEvent('form_submission', formData);
-
-            //alert('Step 11: Data logged to analytics. Press OK to save data to Firebase.');
-
-            // Save data to Firebase
-            console.log("Saving form data", formData);
-            writeUserData(formData, client_mac, node_mac);
-
-            /** Redirect to Meraki auth URL
-            let loginUrl = base_grant_url;
-            if (user_continue_url !== "undefined") {
-                loginUrl += "?continue_url=" + encodeURIComponent(user_continue_url);
-            }*/
-                let duration = 3600;
-                var loginUrl = base_grant_url;
-                if(user_continue_url !== "undefined"){
-                    // add the users intended website to the login parameters.
-                    // You could also re-write the user_continue_url if you wanted a custom 
-                    // landing page.
-                    loginUrl += "?continue_url="+user_continue_url + "?duration=" + duration;
-                }
-            //alert(`Step 12: Form data saved. Press OK to log in.\nRedirecting to: ${loginUrl}`);
-            console.log("Logging in...", loginUrl);
-            window.location.href = loginUrl;
-        }
-    });
-
-    function validateName(name) {
-        name = name.trim();
-        const nameParts = name.split(/\s+/);
-        return nameParts.length >= 2 && nameParts.every(part => /^[a-zA-Z'-]+$/.test(part));
-    }
-
-    function validateEmail(email) {
-        const emailPattern = /^[a-zA-Z0-9._-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,6}$/;
-        return emailPattern.test(email);
-    }
-
-    function validateCompany(company) {
-        return company.trim() !== "";
+        document.querySelectorAll('.validation-message').forEach(el => el.remove());
     }
 
     // Function to write user data to Firebase
     function writeUserData(data, client_mac, node_mac) {
         const date = new Date();
-        const localTimestamp = date.toLocaleString(); // User's local time
-        const timeZone = Intl.DateTimeFormat().resolvedOptions().timeZone; // User's time zone
-        const sessionID = localStorage.getItem('sessionID') || generateNewSessionID(); // Retrieve the session ID
+        const localTimestamp = date.toLocaleString();
+        const timeZone = Intl.DateTimeFormat().resolvedOptions().timeZone;
+        const sessionID = localStorage.getItem('sessionID') || generateNewSessionID();
         localStorage.setItem('sessionID', sessionID);
-        const deviceType = navigator.userAgent; // Captures the device's user agent string
-        //const timestamp = date.getTime(); // Get the exact time of connection in milliseconds since Unix Epoch
+        const deviceType = navigator.userAgent;
 
-        // Store user data in Firebase under the session ID
         database.ref('wifiLogins/' + sessionID).set({
-            name: data.name,
+            name: data.username,
             email: data.email,
             company: data.company,
-            //phoneNumber: data.phoneNumber,
             macAddress: client_mac,
             accessPointMAC: node_mac,
-            //timeStamp: timestamp,
-            localTimeStamp: localTimestamp, // User's local time
-            timeZone: timeZone, // User's time zone name
-            deviceType: deviceType, // Device type/user agent
+            localTimeStamp: localTimestamp,
+            timeZone: timeZone,
+            deviceType: deviceType,
+        }).catch(error => handleError(error, 'writing user data'));
 
+        // Log user connection
+        logUserConnection({
+            name: data.username,
+            email: data.email,
+            company: data.company,
+            macAddress: client_mac
         });
     }
-        // Function to store user preferences in Firebase using MAC address as the key
-        function storeUserPreferences(macAddress, preferences) {
-            firebase.database().ref('users/' + macAddress).set(preferences)
-                .then(() => console.log('Preferences saved for MAC:', macAddress)) // Log success
-                .catch(error => console.error('Error saving preferences:', error)); // Log any errors
-        }
 
-        // Example usage: Store preferences when the user selects them
-        var userPreferences = {
-            theme: 'dark', // User's preferred theme
-            language: 'en' // User's preferred language
-            // Additional preferences can be added here
-        };
-        storeUserPreferences(client_mac, userPreferences);
+    function applySettings(settings) {
+        document.body.style.backgroundColor = settings.bgColor || '#ffffff';
+        document.body.style.fontFamily = settings.font || 'Arial, sans-serif';
+        document.body.style.fontSize = settings.fontSize ? settings.fontSize + 'px' : '14px';
     
-    // Capturing Connection Data
+        const logoElement = document.getElementById('logo');
+        if (settings.logoURL && logoElement) {
+            logoElement.src = settings.logoURL;
+        } else {
+            displayError('No logo URL found. Default logo will be displayed.');
+        }
+    }
+
+    function generateNewSessionID() {
+        return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function(c) {
+            var r = Math.random() * 16 | 0, v = c == 'x' ? r : (r & 0x3 | 0x8);
+            return v.toString(16);
+        });
+    }
+
+    function storeUserPreferences(macAddress, preferences) {
+        firebase.database().ref('users/' + macAddress).set(preferences)
+            .then(() => console.log('Preferences saved for MAC:', macAddress))
+            .catch(error => handleError(error, 'saving user preferences'));
+    }
+
     function logUserConnection(data) {
         const date = new Date();
-        const localTimestamp = date.toLocaleString(); // User's local time
-        const sessionID = localStorage.getItem('sessionID') || generateNewSessionID(); // Retrieve or generate the session ID
+        const localTimestamp = date.toLocaleString();
+        const sessionID = localStorage.getItem('sessionID') || generateNewSessionID();
         localStorage.setItem('sessionID', sessionID);
     
         const connectionData = {
@@ -317,25 +240,29 @@ document.addEventListener('DOMContentLoaded', function() {
             company: data.company,
             macAddress: data.macAddress,
             connectionTime: localTimestamp,
-            status: 'connected' // Indicate the user is currently connected
+            status: 'connected'
         };
     
-        // Store the connection data in Firebase under the 'activeUsers' node
-        firebase.database().ref('activeUsers/' + sessionID).set(connectionData);
+        firebase.database().ref('activeUsers/' + sessionID).set(connectionData)
+            .catch(error => handleError(error, 'logging user connection'));
     }
-    function logUserDisconnection(sessionID) {
-        const disconnectionTime = new Date().toLocaleString(); // Get the current time
-    
-        // Update the status of the session to 'disconnected'
-        firebase.database().ref('activeUsers/' + sessionID).update({
-            status: 'disconnected',
-            disconnectionTime: disconnectionTime
-        });
-    }
-    
-    
 
-    // Helper function to parse URL parameters
+    function logUserDisconnection(sessionID) {
+        const disconnectionTime = new Date().toLocaleString();
+    
+        // Use a synchronous XMLHttpRequest to ensure the request is sent before the page unloads
+        const xhr = new XMLHttpRequest();
+        xhr.open('POST', '/log-disconnect', false);  // 'false' makes the request synchronous
+        xhr.setRequestHeader('Content-Type', 'application/json;charset=UTF-8');
+        xhr.send(JSON.stringify({
+            sessionID: sessionID,
+            disconnectionTime: disconnectionTime
+        }));
+
+        // Note: We're not using Firebase here because the page is unloading,
+        // and we can't guarantee an asynchronous request will complete
+    }
+
     function GetURLParameter(sParam) {
         const sPageURL = window.location.search.substring(1);
         const sURLVariables = sPageURL.split('&');
@@ -348,3 +275,22 @@ document.addEventListener('DOMContentLoaded', function() {
         return null;
     }
 });
+
+// Add this function outside the DOMContentLoaded event listener
+// to handle the disconnect logging on the server side
+function handleDisconnectLogging(req, res) {
+    const { sessionID, disconnectionTime } = req.body;
+    
+    firebase.database().ref('activeUsers/' + sessionID).update({
+        status: 'disconnected',
+        disconnectionTime: disconnectionTime
+    }).then(() => {
+        res.status(200).send('Disconnection logged successfully');
+    }).catch(error => {
+        console.error('Error logging disconnection:', error);
+        res.status(500).send('Error logging disconnection');
+    });
+}
+
+// You'll need to set up a route in your server to handle this request, e.g.:
+// app.post('/log-disconnect', handleDisconnectLogging);
