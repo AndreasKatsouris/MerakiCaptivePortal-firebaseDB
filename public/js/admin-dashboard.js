@@ -1,3 +1,5 @@
+const { url } = require("inspector");
+
 document.addEventListener('DOMContentLoaded', function () {
     // Ensure the user is authenticated before allowing access to the dashboard
     firebase.auth().onAuthStateChanged((user) => {
@@ -365,7 +367,7 @@ document.querySelectorAll("#wifiReportsTable th").forEach(header => {
         const bgImageRef = storageRef.child('backgrounds/' + bgImage.name);
         bgImageRef.put(bgImage).then(snapshot => {
             snapshot.ref.getDownloadURL().then(bgImageURL => {
-                saveCustomization({ bgColor, font, fontSize, logoURL: url, bgImageURL });
+                saveCustomization({ bgColor, font, fontSize, logoURL: url, bgImageURL: url });
             });
         });
          } else {
