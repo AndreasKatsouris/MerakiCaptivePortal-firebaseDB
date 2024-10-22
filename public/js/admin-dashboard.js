@@ -346,6 +346,7 @@ document.querySelectorAll("#wifiReportsTable th").forEach(header => {
         const font = document.getElementById('font').value;
         const fontSize = document.getElementById('fontSize').value;
         const logo = document.getElementById('logo').files[0];
+        const bgImage = document.getElementById('bgImage').files[0]; // New Background Image field
 
         // Store customization settings in Firebase
         const storageRef = firebase.storage().ref();
@@ -359,6 +360,17 @@ document.querySelectorAll("#wifiReportsTable th").forEach(header => {
         } else {
             saveCustomization({ bgColor, font, fontSize });
         }
+            // Handle background image upload
+        if (bgImage) {
+        const bgImageRef = storageRef.child('backgrounds/' + bgImage.name);
+        bgImageRef.put(bgImage).then(snapshot => {
+            snapshot.ref.getDownloadURL().then(bgImageURL => {
+                saveCustomization({ bgColor, font, fontSize, logoURL: url, bgImageURL });
+            });
+        });
+         } else {
+            saveCustomization({ bgColor, font, fontSize });
+    }
     });
 
     function saveCustomization(settings) {

@@ -68,12 +68,14 @@ document.addEventListener('DOMContentLoaded', function() {
         } else {
             displayError('No logo URL found. Default logo will be displayed.');
         }
-         // Display an alert with the loaded settings
-    /** alert(`Customization Settings Loaded:
-        Background Color: ${settings.bgColor}
-        Font: ${settings.font}
-        Font Size: ${settings.fontSize}
-        Logo URL: ${settings.logoURL ? settings.logoURL : 'No logo uploaded'}`);*/
+        // Apply background image if set
+        if (settings.bgImageURL) {
+            document.body.style.backgroundImage = `url(${settings.bgImageURL})`;
+            document.body.style.backgroundSize = 'cover'; // Ensure the image covers the whole background
+            document.body.style.backgroundPosition = 'center';
+            document.body.style.backgroundRepeat = 'no-repeat';
+            
+        }
 
      }
      function displayError(message) {
