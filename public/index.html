@@ -58,6 +58,10 @@
             } else {
                 console.error('No customization settings found in the database.');
             }
+            console.log("Settings: bg colour", settings.bgColor);
+            console.log("Settings: font", settings.font);
+            console.log("Settings: font size", settings.fontSize);
+            console.log("Settings: logo", settings.logoURL);
         })
         .catch(function(error) {
             console.error('Error fetching customization settings:', error);
