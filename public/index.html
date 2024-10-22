@@ -32,6 +32,38 @@
         }
     </script>
     
+ <script>
+    document.addEventListener('DOMContentLoaded', function () {
+        // Initialize Firebase
+        const db = firebase.database();
+
+        // Fetch customization settings from Firebase
+        db.ref('customization/').once('value')
+        .then(function(snapshot) {
+            const settings = snapshot.val();
+            if (settings) {
+                // Apply the background color
+                document.body.style.backgroundColor = settings.bgColor || '#ffffff'; // Default to white if not set
+
+                // Apply the font
+                document.body.style.fontFamily = settings.font || 'Arial, sans-serif'; // Default to Arial if not set
+
+                // Apply the font size
+                document.body.style.fontSize = settings.fontSize ? `${settings.fontSize}px` : '16px'; // Default to 16px if not set
+
+                // Apply the logo if it exists
+                if (settings.logoURL) {
+                    document.getElementById('logo').src = settings.logoURL;
+                }
+            } else {
+                console.error('No customization settings found in the database.');
+            }
+        })
+        .catch(function(error) {
+            console.error('Error fetching customization settings:', error);
+        });
+    });
+</script>  
 
   </head>
   <body>
