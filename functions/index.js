@@ -1,9 +1,10 @@
 const { onRequest } = require('firebase-functions/v2/https');
-const { getSecret } = require('firebase-functions/v2/secrets');
+//const { getSecret } = require('firebase-functions/v2/secrets');
 const admin = require('firebase-admin');
 const twilio = require('twilio');
-//const functions = require('firebase-functions'); // Import the functions module
-
+const functions = require('firebase-functions'); // Import the functions module
+const twilioSid = functions.config().twilio.sid;
+const twilioToken = functions.config().twilio.token;
 // Initialize Firebase Admin SDK
 if (!admin.apps.length) {
 admin.initializeApp({
