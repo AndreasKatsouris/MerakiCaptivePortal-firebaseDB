@@ -1,4 +1,5 @@
 const { onRequest } = require('firebase-functions/v2/https');
+const { getSecret } = require('firebase-functions/v2/secrets');
 const admin = require('firebase-admin');
 const twilio = require('twilio');
 const functions = require('firebase-functions'); // Import the functions module
@@ -12,9 +13,13 @@ admin.initializeApp({
 }
 
 // Twilio credentials - Replace with your own SID and Auth Token
-const accountSid = functions.config().twilio.sid;
-const authToken = functions.config().twilio.token;
-const client = twilio(accountSid, authToken);
+//const accountSid = functions.config().twilio.sid;
+//const authToken = functions.config().twilio.token;
+//const client = twilio(accountSid, authToken);
+
+// Access Twilio credentials
+const TWILIO_SID = getSecret('TWILIO_SID');
+const TWILIO_AUTH_TOKEN = getSecret('TWILIO_AUTH_TOKEN');
 
 // Create a Cloud Function to handle HTTP requests
 exports.merakiWebhook = onRequest((req, res) => {
@@ -62,14 +67,14 @@ exports.merakiWebhook = onRequest((req, res) => {
  * Cloud Function to handle incoming WhatsApp messages from Twilio
  */
 exports.receiveWhatsAppMessage = onRequest(async (req, res) => {
-    const { Body, From, MediaUrl0 } = req.body;
-    const phoneNumber = From.replace('whatsapp:', '');
-
     try {
+        // Use Twilio credentials
+        const client = twilio(TWILIO_SID, TWILIO_AUTH_TOKEN);
+        const { Body, From, MediaUrl0 } = req.body;
+        const phoneNumber = From.replace('whatsapp:', '');
+        
         if (MediaUrl0) {
             const imageUrl = MediaUrl0;
-
-            // Store receipt data in Firebase
             const newReceiptRef = admin.database().ref('receipts').push();
             await newReceiptRef.set({
                 phoneNumber,
@@ -78,10 +83,9 @@ exports.receiveWhatsAppMessage = onRequest(async (req, res) => {
                 timestamp: Date.now()
             });
 
-            // Send confirmation message to user
             await client.messages.create({
                 body: "Thank you for submitting your receipt! We are processing it.",
-                from: +14155238886, //'whatsapp:+your_twilio_number',
+                from: 'whatsapp:+14155238886',
                 to: `whatsapp:${phoneNumber}`
             });
 
