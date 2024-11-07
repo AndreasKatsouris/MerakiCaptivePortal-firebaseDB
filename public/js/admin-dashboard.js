@@ -1,4 +1,4 @@
-const { url } = require("inspector");
+//const { url } = require("inspector");
 
 document.addEventListener('DOMContentLoaded', function () {
     // Ensure the user is authenticated before allowing access to the dashboard
