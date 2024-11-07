@@ -81,7 +81,7 @@ exports.receiveWhatsAppMessage = onRequest(async (req, res) => {
             // Send confirmation message to user
             await client.messages.create({
                 body: "Thank you for submitting your receipt! We are processing it.",
-                from: 'whatsapp:+your_twilio_number',
+                from: +14155238886, //'whatsapp:+your_twilio_number',
                 to: `whatsapp:${phoneNumber}`
             });
 
