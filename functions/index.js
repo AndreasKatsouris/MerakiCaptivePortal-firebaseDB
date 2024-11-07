@@ -61,10 +61,10 @@ exports.merakiWebhook = onRequest((req, res) => {
 /**
  * Cloud Function to handle incoming WhatsApp messages from Twilio
  */
-exports.receiveWhatsAppMessage = functions.https.onRequest(async (req, res) => {
+exports.receiveWhatsAppMessage = onRequest(async (req, res) => {
     // Extract essential fields from the incoming request
     const { Body, From, MediaUrl0 } = req.body;
-    const phoneNumber = From.replace('whatsapp:', ''); // Extract sender's WhatsApp number
+    const phoneNumber = From.replace('whatsapp:', ''); // Extract sender’s WhatsApp number
     console.log(`Received message from ${phoneNumber}`);
 
     try {
