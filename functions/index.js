@@ -12,8 +12,8 @@ admin.initializeApp({
 }
 
 // Twilio credentials - Replace with your own SID and Auth Token
-const accountSid = 'AC36e9d2539f7fb1d2cc37dd093cb88ba4';
-const authToken = 'f9be2e35a33995a0de7b9f54d293684a';
+const accountSid = functions.config().twilio.sid;
+const authToken = functions.config().twilio.token;
 const client = twilio(accountSid, authToken);
 
 // Create a Cloud Function to handle HTTP requests
@@ -62,18 +62,14 @@ exports.merakiWebhook = onRequest((req, res) => {
  * Cloud Function to handle incoming WhatsApp messages from Twilio
  */
 exports.receiveWhatsAppMessage = onRequest(async (req, res) => {
-    // Extract essential fields from the incoming request
     const { Body, From, MediaUrl0 } = req.body;
-    const phoneNumber = From.replace('whatsapp:', ''); // Extract sender’s WhatsApp number
-    console.log(`Received message from ${phoneNumber}`);
+    const phoneNumber = From.replace('whatsapp:', '');
 
     try {
-        // Check if an image (receipt) was sent
         if (MediaUrl0) {
             const imageUrl = MediaUrl0;
-            console.log(`Image received: ${imageUrl}`);
 
-            // Store the receipt data in Firebase Realtime Database
+            // Store receipt data in Firebase
             const newReceiptRef = admin.database().ref('receipts').push();
             await newReceiptRef.set({
                 phoneNumber,
@@ -82,7 +78,7 @@ exports.receiveWhatsAppMessage = onRequest(async (req, res) => {
                 timestamp: Date.now()
             });
 
-            // Respond to the user confirming receipt of the image
+            // Send confirmation message to user
             await client.messages.create({
                 body: "Thank you for submitting your receipt! We are processing it.",
                 from: 'whatsapp:+your_twilio_number',
@@ -91,7 +87,6 @@ exports.receiveWhatsAppMessage = onRequest(async (req, res) => {
 
             return res.status(200).send('Receipt received and stored');
         } else {
-            // If no image is attached, prompt the user to attach one
             await client.messages.create({
                 body: "Please attach a picture of your receipt.",
                 from: 'whatsapp:+your_twilio_number',
@@ -101,7 +96,6 @@ exports.receiveWhatsAppMessage = onRequest(async (req, res) => {
             return res.status(400).send('No image attached');
         }
     } catch (error) {
-        // Error handling and logging
         console.error('Error processing WhatsApp message:', error);
         return res.status(500).send('Error processing the message');
     }
