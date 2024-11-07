@@ -3,8 +3,8 @@ const { onRequest } = require('firebase-functions/v2/https');
 const admin = require('firebase-admin');
 const twilio = require('twilio');
 const functions = require('firebase-functions'); // Import the functions module
-const twilioSid = functions.config().twilio.sid;
-const twilioToken = functions.config().twilio.token;
+//const twilioSid = functions.config().twilio.sid;
+//const twilioToken = functions.config().twilio.token;
 // Initialize Firebase Admin SDK
 if (!admin.apps.length) {
 admin.initializeApp({
@@ -14,13 +14,13 @@ admin.initializeApp({
 }
 
 // Twilio credentials - Replace with your own SID and Auth Token
-//const accountSid = functions.config().twilio.sid;
-//const authToken = functions.config().twilio.token;
+const twilioSid = functions.config().twilio.sid;
+const twilioToken = functions.config().twilio.token;
 //const client = twilio(accountSid, authToken);
 
 // Access Twilio credentials
-const TWILIO_SID = getSecret('TWILIO_SID');
-const TWILIO_AUTH_TOKEN = getSecret('TWILIO_AUTH_TOKEN');
+//const TWILIO_SID = getSecret('TWILIO_SID');
+//const TWILIO_AUTH_TOKEN = getSecret('TWILIO_AUTH_TOKEN');
 
 // Create a Cloud Function to handle HTTP requests
 exports.merakiWebhook = onRequest((req, res) => {
