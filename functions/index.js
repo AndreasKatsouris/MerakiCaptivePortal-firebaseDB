@@ -16,7 +16,7 @@ admin.initializeApp({
 // Twilio credentials - Replace with your own SID and Auth Token
 const twilioSid = functions.config().twilio.sid;
 const twilioToken = functions.config().twilio.token;
-//const client = twilio(accountSid, authToken);
+const client = twilio(twilioSid, twilioToken);
 
 // Access Twilio credentials
 //const TWILIO_SID = getSecret('TWILIO_SID');
@@ -69,9 +69,13 @@ exports.merakiWebhook = onRequest((req, res) => {
  */
 exports.receiveWhatsAppMessage = onRequest(async (req, res) => {
     try {
-        // Use Twilio credentials
-        const client = twilio(TWILIO_SID, TWILIO_AUTH_TOKEN);
         const { Body, From, MediaUrl0 } = req.body;
+        /**
+         * Extracts the phone number from a given string by removing the 'whatsapp:' prefix.
+         *
+         * @param {string} From - The string containing the phone number prefixed with 'whatsapp:'.
+         * @returns {string} The extracted phone number without the 'whatsapp:' prefix.
+         */
         const phoneNumber = From.replace('whatsapp:', '');
         
         if (MediaUrl0) {
@@ -94,7 +98,7 @@ exports.receiveWhatsAppMessage = onRequest(async (req, res) => {
         } else {
             await client.messages.create({
                 body: "Please attach a picture of your receipt.",
-                from: 'whatsapp:+your_twilio_number',
+                from: 'whatsapp:+14155238886',
                 to: `whatsapp:${phoneNumber}`
             });
 
