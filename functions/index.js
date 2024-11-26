@@ -55,8 +55,8 @@ exports.receiveWhatsAppMessage = onRequest(async (req, res) => {
             // Respond to user
             await twilioClient.messages.create({
                 body: "Thank you for submitting your receipt! We are processing it.",
-                from: `whatsapp:${twilioPhone}`,
-                to: `whatsapp:${phoneNumber}`
+                from: `${twilioPhone}`,
+                to: `${phoneNumber}`
             });
 
             return res.status(200).send('Receipt received and stored.');
