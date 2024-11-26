@@ -1,7 +1,6 @@
 const { onRequest } = require('firebase-functions/v2/https');
 const admin = require('firebase-admin');
 const twilio = require('twilio');
-const functions = require('firebase-functions');
 // Initialize Firebase Admin SDK
 if (!admin.apps.length) {
     admin.initializeApp({
