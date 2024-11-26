@@ -64,8 +64,8 @@ exports.receiveWhatsAppMessage = onRequest(async (req, res) => {
             // If no image is attached, prompt the user
             await twilioClient.messages.create({
                 body: "Please attach a picture of your receipt.",
-                from: `whatsapp:${twilioPhone}`,
-                to: `whatsapp:${phoneNumber}`
+                from: `${twilioPhone}`,
+                to: `${phoneNumber}`
             });
 
             return res.status(400).send('No image attached.');
