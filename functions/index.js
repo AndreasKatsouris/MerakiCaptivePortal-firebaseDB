@@ -55,8 +55,8 @@ exports.receiveWhatsAppMessage = onRequest(async (req, res) => {
             // Respond to user
             await twilioClient.messages.create({
                 body: "Thank you for submitting your receipt! We are processing it.",
-                from: `${twilioPhone}`,
-                to: `${phoneNumber}`
+                from: `whatsapp:${twilioPhone}`,
+                to: `whatsapp:${phoneNumber}`
             });
 
             return res.status(200).send('Receipt received and stored.');
@@ -64,8 +64,8 @@ exports.receiveWhatsAppMessage = onRequest(async (req, res) => {
             // If no image is attached, prompt the user
             await twilioClient.messages.create({
                 body: "Please attach a picture of your receipt.",
-                from: `${twilioPhone}`,
-                to: `${phoneNumber}`
+                from: `whatsapp:${twilioPhone}`,
+                to: `whatsapp:${phoneNumber}`
             });
 
             return res.status(400).send('No image attached.');
