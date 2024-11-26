@@ -1,6 +1,12 @@
 const { onRequest } = require('firebase-functions/v2/https');
 const admin = require('firebase-admin');
 const twilio = require('twilio');
+
+// Retrieve Twilio credentials from environment variables
+const accountSid = process.env.TWILIO_SID;
+const authToken = process.env.TWILIO_TOKEN;
+const twilioPhone = process.env.TWILIO_PHONE;
+
 // Initialize Firebase Admin SDK
 if (!admin.apps.length) {
     admin.initializeApp({
@@ -8,11 +14,9 @@ if (!admin.apps.length) {
         databaseURL: "https://merakicaptiveportal-firebasedb-default-rtdb.firebaseio.com",
     });
 }
+const twilioClient = twilio(accountSid, authToken);
 
-// Retrieve Twilio credentials from environment variables
-const accountSid = process.env.TWILIO_SID;
-const authToken = process.env.TWILIO_TOKEN;
-const twilioPhone = process.env.TWILIO_PHONE;
+
 
 if (!accountSid || !authToken) {
     console.error("Twilio credentials are not set. Acount SID" || accountSid);
@@ -25,7 +29,6 @@ if (!accountSid || !authToken) {
     console.log('Twilio credentials loaded successfully.');
 }
 
-const twilioClient = twilio(accountSid, authToken);
 
 /**
  * Cloud Function to handle incoming WhatsApp messages via Twilio
