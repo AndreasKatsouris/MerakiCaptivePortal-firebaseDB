@@ -70,12 +70,6 @@ exports.merakiWebhook = onRequest((req, res) => {
 exports.receiveWhatsAppMessage = onRequest(async (req, res) => {
     try {
         const { Body, From, MediaUrl0 } = req.body;
-        /**
-         * Extracts the phone number from a given string by removing the 'whatsapp:' prefix.
-         *
-         * @param {string} From - The string containing the phone number prefixed with 'whatsapp:'.
-         * @returns {string} The extracted phone number without the 'whatsapp:' prefix.
-         */
         const phoneNumber = From.replace('whatsapp:', '');
         
         if (MediaUrl0) {
