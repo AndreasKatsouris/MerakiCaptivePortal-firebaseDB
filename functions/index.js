@@ -14,7 +14,7 @@ if (!admin.apps.length) {
 const accountSid = process.env.TWILIO_SID;
 const authToken = process.env.TWILIO_TOKEN;
 const twilioPhone = process.env.TWILIO_PHONE;
-
+// twilio credentials
 if (!accountSid || !authToken || !twilioPhone) {
     console.error('Twilio credentials are not configured. Check environment variables.');
     throw new Error('Missing Twilio credentials.');
