@@ -10,53 +10,57 @@ if (!admin.apps.length) {
     });
 }
 
-const twilioSid = functions.config().twilio.sid;
-const twilioToken = functions.config().twilio.token;
-const client = twilio(twilioSid, twilioToken);
+// Twilio credentials (retrieved from Firebase Config)
+const accountSid = process.env.TWILIO_SID || functions.config().twilio.sid;
+const authToken = process.env.TWILIO_TOKEN || functions.config().twilio.token;
+const twilioClient = twilio(accountSid, authToken);
 
-const express = require('express');
-const app = express();
+//const twilioSid = functions.config().twilio.sid;
+//const twilioToken = functions.config().twilio.token;
+//const client = twilio(twilioSid, twilioToken);
 
-app.use(express.json());
+exports.receiveWhatsAppMessage = onRequest(async (req, res) => {
+    const { Body, From, MediaUrl0 } = req.body; // Extract data from Twilio webhook
+    const phoneNumber = From.replace('whatsapp:', ''); // Extract sender’s number
+    console.log(`Received message from ${phoneNumber}`);
 
-app.post('/receiveWhatsAppMessage', async (req, res) => {
     try {
-        const { Body, From, MediaUrl0 } = req.body;
-        const phoneNumber = From.replace('whatsapp:', '');
-        
+        // Handle receipt image upload
         if (MediaUrl0) {
-            const imageUrl = MediaUrl0;
-            const newReceiptRef = admin.database().ref('receipts').push();
-            await newReceiptRef.set({
+            console.log(`Image URL: ${MediaUrl0}`);
+
+            // Save receipt data to Firebase Realtime Database
+            const receiptRef = admin.database().ref('receipts').push();
+            await receiptRef.set({
                 phoneNumber,
-                imageUrl,
-                message: Body,
+                imageUrl: MediaUrl0,
+                message: Body || 'No message',
                 timestamp: Date.now()
             });
 
-            await client.messages.create({
+            // Respond to user
+            await twilioClient.messages.create({
                 body: "Thank you for submitting your receipt! We are processing it.",
-                from: 'whatsapp:+14155238886',
+                from: `whatsapp:${functions.config().twilio.phone}`,
                 to: `whatsapp:${phoneNumber}`
             });
 
-            return res.status(200).send('Receipt received and stored');
+            return res.status(200).send('Receipt received and stored.');
         } else {
-            await client.messages.create({
+            // If no image is attached, prompt the user
+            await twilioClient.messages.create({
                 body: "Please attach a picture of your receipt.",
-                from: 'whatsapp:+14155238886',
+                from: `whatsapp:${functions.config().twilio.phone}`,
                 to: `whatsapp:${phoneNumber}`
             });
 
-            return res.status(400).send('No image attached');
+            return res.status(400).send('No image attached.');
         }
     } catch (error) {
-        console.error('Error processing WhatsApp message:', error);
-        return res.status(500).send('Error processing the message');
+        console.error('Error handling WhatsApp message:', error);
+        return res.status(500).send('Internal Server Error');
     }
 });
-
-exports.receiveWhatsAppMessage = onRequest(app);
 
 exports.merakiWebhook = onRequest((req, res) => {
     // Check if it's a GET request for validation
