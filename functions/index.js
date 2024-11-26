@@ -19,6 +19,7 @@ if (!accountSid || !authToken) {
     console.error(`Twilio SID defined: ${!!accountSid}`);
     console.error(`Twilio Token defined: ${!!authToken}`);
     console.error(`Twilio Phone defined: ${!!twilioPhone}`);
+    console.log(process.env)
     throw new Error("Missing Twilio credentials.");
 } else {
     console.log('Twilio credentials loaded successfully.');
