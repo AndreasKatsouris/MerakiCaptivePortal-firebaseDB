@@ -3,9 +3,9 @@ const admin = require('firebase-admin');
 const twilio = require('twilio');
 
 // Retrieve Twilio credentials from environment variables
-const accountSid = process.env.TWILIO_SID;
-const authToken = process.env.TWILIO_TOKEN;
-const twilioPhone = process.env.TWILIO_PHONE;
+const accountSid = "ACe16ed0568c81a9febd64f304b0aedbaf"; //process.env.TWILIO_SID;
+const authToken = "d9e7d1bc05cf8e0070e40662e8ce8768"; //process.env.TWILIO_TOKEN;
+const twilioPhone = "+27600717304";//process.env.TWILIO_PHONE;
 
 // Initialize Firebase Admin SDK
 if (!admin.apps.length) {
