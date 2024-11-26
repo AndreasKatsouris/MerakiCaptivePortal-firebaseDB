@@ -16,7 +16,6 @@ const client = twilio(twilioSid, twilioToken);
 
 const express = require('express');
 const app = express();
-const port = process.env.PORT || 8080;
 
 app.use(express.json());
 
@@ -57,14 +56,9 @@ app.post('/receiveWhatsAppMessage', async (req, res) => {
     }
 });
 
-app.listen(port, () => {
-    console.log(`Server is running on port ${port}`);
-});
-
 exports.receiveWhatsAppMessage = onRequest(app);
 
 exports.merakiWebhook = onRequest((req, res) => {
-
     // Check if it's a GET request for validation
     if (req.method === 'GET') {
         const validator = "371de0de57b8741627daa5e30f25beb917614141"; // Replace with your validator string
@@ -89,9 +83,8 @@ exports.merakiWebhook = onRequest((req, res) => {
     const data = req.body;
     console.log('Data received:', JSON.stringify(data, null, 2));
     console.log('Storing data to Firebase:', JSON.stringify(data, null, 2));
-    //const ref = admin.database().ref('scanningData').push();
+
     const ref = admin.database().ref('scanningData').push();
-    //console.log('Database reference path:', ref.path.toString());
 
     ref.set(data)
         .then(() => {
