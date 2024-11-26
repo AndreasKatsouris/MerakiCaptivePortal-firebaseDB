@@ -1,7 +1,7 @@
 const { onRequest } = require('firebase-functions/v2/https');
 const admin = require('firebase-admin');
 const twilio = require('twilio');
-
+const functions = require('firebase-functions');
 // Initialize Firebase Admin SDK
 if (!admin.apps.length) {
     admin.initializeApp({
@@ -11,16 +11,15 @@ if (!admin.apps.length) {
 }
 
 // Retrieve Twilio credentials from environment variables
-const accountSid = process.env.TWILIO_SID; // Set this in Google Cloud's environment variables
-const authToken = process.env.TWILIO_TOKEN; // Set this in Google Cloud's environment variables
-const twilioPhone = process.env.TWILIO_PHONE; // Set this in Google Cloud's environment variables
+const accountSid = process.env.TWILIO_SID;
+const authToken = process.env.TWILIO_TOKEN;
+const twilioPhone = process.env.TWILIO_PHONE;
 
 if (!accountSid || !authToken || !twilioPhone) {
-    console.error('Twilio credentials are not set.');
-    throw new Error('Missing Twilio credentials.');
+    console.error("Twilio credentials are not set.");
+    throw new Error("Missing Twilio credentials.");
 }
 
-// Initialize Twilio client
 const twilioClient = twilio(accountSid, authToken);
 
 /**
