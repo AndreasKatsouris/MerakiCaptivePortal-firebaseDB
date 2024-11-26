@@ -15,7 +15,7 @@ const authToken = process.env.TWILIO_TOKEN;
 const twilioPhone = process.env.TWILIO_PHONE;
 
 if (!accountSid || !authToken) {
-    console.error("Twilio credentials are not set.");
+    console.error("Twilio credentials are not set. Acount SID" || accountSid);
     throw new Error("Missing Twilio credentials.");
 }
 
