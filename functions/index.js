@@ -10,13 +10,13 @@ if (!admin.apps.length) {
     });
 }
 
-// Twilio credentials (use environment variables or Firebase config)
-const accountSid = process.env.TWILIO_SID || functions.config().twilio.sid;
-const authToken = process.env.TWILIO_TOKEN || functions.config().twilio.token;
-const twilioPhone = process.env.TWILIO_PHONE || functions.config().twilio.phone;
+// Twilio credentials (use environment variables)
+const accountSid = process.env.TWILIO_SID;
+const authToken = process.env.TWILIO_TOKEN;
+const twilioPhone = process.env.TWILIO_PHONE;
 
 if (!accountSid || !authToken || !twilioPhone) {
-    console.error('Twilio credentials are not configured. Check environment variables or Firebase Config.');
+    console.error('Twilio credentials are not configured. Check environment variables.');
     throw new Error('Missing Twilio credentials.');
 }
 
