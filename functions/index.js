@@ -1,6 +1,8 @@
 const { onRequest } = require('firebase-functions/v2/https');
 const admin = require('firebase-admin');
 const twilio = require('twilio');
+const { receiveWhatsAppMessage } = require('./receiveWhatsappMessage');
+
 
 // Retrieve Twilio credentials from environment variables
 const accountSid = "ACe16ed0568c81a9febd64f304b0aedbaf"; //process.env.TWILIO_SID;
