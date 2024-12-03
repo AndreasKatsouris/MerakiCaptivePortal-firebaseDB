@@ -32,7 +32,7 @@ if (!accountSid || !authToken) {
 
 /**
  * Cloud Function to handle incoming WhatsApp messages via Twilio
- */
+
 exports.receiveWhatsAppMessage = onRequest(async (req, res) => {
     const { Body, From, MediaUrl0 } = req.body; // Extract data from Twilio webhook
     const phoneNumber = From.replace('whatsapp:', ''); // Extract sender’s number
@@ -75,6 +75,10 @@ exports.receiveWhatsAppMessage = onRequest(async (req, res) => {
         return res.status(500).send('Internal Server Error');
     }
 });
+ */
+// Export Twilio WhatsApp handler
+exports.receiveWhatsAppMessage = onRequest(receiveWhatsAppMessage);
+
 /**
  * Cloud Function to handle Meraki Webhook
  */
