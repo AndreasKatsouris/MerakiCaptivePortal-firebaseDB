@@ -1,13 +1,10 @@
 const { onRequest } = require('firebase-functions/v2/https');
 const admin = require('firebase-admin');
-const twilio = require('twilio');
+//const twilio = require('twilio');
 const { receiveWhatsAppMessage } = require('./receiveWhatsappMessage');
 
 
-// Retrieve Twilio credentials from environment variables
-const accountSid = "ACe16ed0568c81a9febd64f304b0aedbaf"; //process.env.TWILIO_SID;
-const authToken = "d9e7d1bc05cf8e0070e40662e8ce8768"; //process.env.TWILIO_TOKEN;
-const twilioPhone = "+27600717304";//process.env.TWILIO_PHONE;
+
 
 // Initialize Firebase Admin SDK
 if (!admin.apps.length) {
@@ -16,20 +13,8 @@ if (!admin.apps.length) {
         databaseURL: "https://merakicaptiveportal-firebasedb-default-rtdb.firebaseio.com",
     });
 }
-const twilioClient = twilio(accountSid, authToken);
+//const twilioClient = twilio(accountSid, authToken);
 
-
-
-if (!accountSid || !authToken) {
-    console.error("Twilio credentials are not set. Acount SID" || accountSid);
-    console.error(`Twilio SID defined: ${!!accountSid}`);
-    console.error(`Twilio Token defined: ${!!authToken}`);
-    console.error(`Twilio Phone defined: ${!!twilioPhone}`);
-    console.log(process.env)
-    throw new Error("Missing Twilio credentials.");
-} else {
-    console.log('Twilio credentials loaded successfully.');
-}
 
 
 /**

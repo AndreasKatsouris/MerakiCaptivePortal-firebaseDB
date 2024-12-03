@@ -2,9 +2,26 @@ const admin = require('firebase-admin');
 const twilio = require('twilio');
 
 // Initialize Twilio client
-const accountSid = process.env.TWILIO_SID;
-const authToken = process.env.TWILIO_TOKEN;
+//const accountSid = process.env.TWILIO_SID;
+//const authToken = process.env.TWILIO_TOKEN;
 const client = twilio(accountSid, authToken);
+
+// Retrieve Twilio credentials from environment variables
+const accountSid = "ACe16ed0568c81a9febd64f304b0aedbaf"; //process.env.TWILIO_SID;
+const authToken = "d9e7d1bc05cf8e0070e40662e8ce8768"; //process.env.TWILIO_TOKEN;
+const twilioPhone = "+27600717304";//process.env.TWILIO_PHONE;
+if (!accountSid || !authToken) {
+    console.error("Twilio credentials are not set. Acount SID" || accountSid);
+    console.error(`Twilio SID defined: ${!!accountSid}`);
+    console.error(`Twilio Token defined: ${!!authToken}`);
+    console.error(`Twilio Phone defined: ${!!twilioPhone}`);
+    console.log(process.env)
+    throw new Error("Missing Twilio credentials.");
+} else {
+    console.log('Twilio credentials loaded successfully.');
+}
+
+
 
 if (!admin.apps.length) {
     admin.initializeApp({
