@@ -1,6 +1,7 @@
-const twilio = require('twilio');
+import twilio from 'twilio';
 //const CustomHttpClient = require('./CustomHttpClient');
 require('dotenv').config();
+const functions = require('firebase-functions');
 
 const accountSid = process.env.sid;
 const authToken = process.env.token;
@@ -13,7 +14,7 @@ if (!accountSid || !authToken || !twilioPhone) {
 
 const client = twilio(accountSid, authToken);
 
-module.exports = {
+export default {
     client,
     twilioPhone,
 };
