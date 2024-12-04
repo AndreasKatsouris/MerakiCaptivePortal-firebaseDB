@@ -24,11 +24,18 @@ if (!admin.apps.length) {
 
 // Function to handle incoming WhatsApp messages
 const receiveWhatsAppMessage = async (req, res) => {
-    const { Body, From, MediaUrl0 } = req.body;
-    const phoneNumber = From.replace('whatsapp:', '');
-    console.log(`Received message from ${phoneNumber}`);
-
     try {
+        console.log('Incoming webhook payload:', JSON.stringify(req.body, null, 2));
+
+        const { Body, From, MediaUrl0 } = req.body;
+        if (!From) {
+                console.error('Missing "From" field in the incoming payload.');
+                return res.status(400).send('Invalid request: "From" field is missing.');
+            }
+            const phoneNumber = From.replace('whatsapp:', '');
+            console.log(`Received message from ${phoneNumber}`);
+
+   
         if (MediaUrl0) {
             console.log(`Image URL: ${MediaUrl0}`);
 
