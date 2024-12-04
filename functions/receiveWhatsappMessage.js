@@ -12,7 +12,7 @@
 
 const admin = require('firebase-admin');
 require('dotenv').config();
-const { client, twilioPhone } = require('./twilioClient').default;
+const { client, twilioPhone } = require('./twilioClient');
 
 
 

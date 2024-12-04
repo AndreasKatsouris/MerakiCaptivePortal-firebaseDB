@@ -14,7 +14,7 @@ if (!accountSid || !authToken || !twilioPhone) {
 
 const client = twilio(accountSid, authToken);
 
-export default {
+module.exports = {
     client,
     twilioPhone,
 };
