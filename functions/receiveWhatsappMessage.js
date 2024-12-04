@@ -34,8 +34,6 @@ const receiveWhatsAppMessage = async (req, res) => {
             }
             const phoneNumber = From.replace('whatsapp:', '');
             console.log(`Received message from ${phoneNumber}`);
-
-   
         if (MediaUrl0) {
             console.log(`Image URL: ${MediaUrl0}`);
 
