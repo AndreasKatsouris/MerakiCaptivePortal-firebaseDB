@@ -11,6 +11,7 @@
 //const client = twilio(accountSid, authToken);
 
 const admin = require('firebase-admin');
+require('dotenv').config();
 const { client, twilioPhone } = require('./twilioClient');
 
 

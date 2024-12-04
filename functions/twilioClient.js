@@ -1,5 +1,6 @@
 const twilio = require('twilio');
-const CustomHttpClient = require('./CustomHttpClient');
+//const CustomHttpClient = require('./CustomHttpClient');
+require('dotenv').config();
 
 const accountSid = process.env.TWILIO_SID;
 const authToken = process.env.TWILIO_TOKEN;
@@ -10,9 +11,7 @@ if (!accountSid || !authToken || !twilioPhone) {
     throw new Error("Missing Twilio credentials.");
 }
 
-const client = twilio(accountSid, authToken, {
-    httpClient: new CustomHttpClient(),
-});
+const client = twilio(accountSid, authToken);
 
 module.exports = {
     client,
