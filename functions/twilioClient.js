@@ -1,35 +1,20 @@
-const axios = require('axios');
-const { TwilioHttpClient } = require('twilio/lib/base/TwilioHttpClient');
+const twilio = require('twilio');
+const CustomHttpClient = require('./CustomHttpClient');
 
-class CustomHttpClient extends TwilioHttpClient {
-    constructor() {
-        super();
-        this.axiosInstance = axios.create({
-            timeout: 5000, // Set a timeout for all requests
-        });
-    }
+const accountSid = process.env.TWILIO_SID;
+const authToken = process.env.TWILIO_TOKEN;
+const twilioPhone = process.env.TWILIO_PHONE;
 
-    async request(opts) {
-        const options = {
-            method: opts.method,
-            url: opts.uri,
-            headers: opts.headers,
-            data: opts.data,
-        };
-
-        try {
-            const response = await this.axiosInstance(options);
-            console.log('Request Successful:', response.status, response.data); // Log successful requests
-            return {
-                statusCode: response.status,
-                body: response.data,
-                headers: response.headers,
-            };
-        } catch (error) {
-            console.error('HTTP Request Error:', error.message); // Log errors for debugging
-            throw error;
-        }
-    }
+if (!accountSid || !authToken || !twilioPhone) {
+    console.error("Twilio credentials are not set. Ensure TWILIO_SID, TWILIO_TOKEN, and TWILIO_PHONE are defined in environment variables.");
+    throw new Error("Missing Twilio credentials.");
 }
 
-module.exports = CustomHttpClient;
+const client = twilio(accountSid, authToken, {
+    httpClient: new CustomHttpClient(),
+});
+
+module.exports = {
+    client,
+    twilioPhone,
+};

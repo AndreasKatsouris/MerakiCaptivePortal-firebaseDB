@@ -1,14 +1,18 @@
-const admin = require('firebase-admin');
-const twilio = require('twilio');
+//const admin = require('firebase-admin');
+//const twilio = require('twilio');
 
 // Initialize Twilio client
 //const accountSid = process.env.TWILIO_SID;
 //const authToken = process.env.TWILIO_TOKEN;
 // Retrieve Twilio credentials from environment variables
-const accountSid = "ACe16ed0568c81a9febd64f304b0aedbaf"; //process.env.TWILIO_SID;
-const authToken = "d9e7d1bc05cf8e0070e40662e8ce8768"; //process.env.TWILIO_TOKEN;
-const twilioPhone = "+27600717304";//process.env.TWILIO_PHONE;
-const client = twilio(accountSid, authToken);
+//const accountSid = "ACe16ed0568c81a9febd64f304b0aedbaf"; //process.env.TWILIO_SID;
+//const authToken = "d9e7d1bc05cf8e0070e40662e8ce8768"; //process.env.TWILIO_TOKEN;
+//const twilioPhone = "+27600717304";//process.env.TWILIO_PHONE;
+//const client = twilio(accountSid, authToken);
+
+const admin = require('firebase-admin');
+const { client, twilioPhone } = require('./twilioClient');
+
 
 
 if (!accountSid || !authToken) {
@@ -22,8 +26,6 @@ if (!accountSid || !authToken) {
     console.log('Twilio credentials loaded successfully.');
 }
 
-
-
 if (!admin.apps.length) {
     admin.initializeApp({
         credential: admin.credential.applicationDefault(),
@@ -33,12 +35,11 @@ if (!admin.apps.length) {
 
 // Function to handle incoming WhatsApp messages
 const receiveWhatsAppMessage = async (req, res) => {
-    const { Body, From, MediaUrl0 } = req.body; // Extract data from Twilio webhook
-    const phoneNumber = From.replace('whatsapp:', ''); // Extract sender’s number
+    const { Body, From, MediaUrl0 } = req.body;
+    const phoneNumber = From.replace('whatsapp:', '');
     console.log(`Received message from ${phoneNumber}`);
 
     try {
-        // Handle receipt image upload
         if (MediaUrl0) {
             console.log(`Image URL: ${MediaUrl0}`);
 
@@ -54,16 +55,16 @@ const receiveWhatsAppMessage = async (req, res) => {
             // Respond to user
             await client.messages.create({
                 body: "Thank you for submitting your receipt! We are processing it.",
-                from: `whatsapp:${process.env.TWILIO_PHONE}`,
+                from: `whatsapp:${twilioPhone}`,
                 to: `whatsapp:${phoneNumber}`,
             });
 
             return res.status(200).send('Receipt received and stored.');
         } else {
-            // If no image is attached, prompt the user
+            // No image attached
             await client.messages.create({
                 body: "Please attach a picture of your receipt.",
-                from: `whatsapp:${process.env.TWILIO_PHONE}`,
+                from: `whatsapp:${twilioPhone}`,
                 to: `whatsapp:${phoneNumber}`,
             });
 
