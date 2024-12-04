@@ -1,4 +1,4 @@
-import twilio from 'twilio';
+const twilio = require('twilio');
 //const CustomHttpClient = require('./CustomHttpClient');
 require('dotenv').config();
 const functions = require('firebase-functions');
