@@ -1,11 +1,9 @@
 const twilio = require('twilio');
-//const CustomHttpClient = require('./CustomHttpClient');
 require('dotenv').config();
-const functions = require('firebase-functions');
 
-const accountSid = process.env.sid;
-const authToken = process.env.token;
-const twilioPhone = process.env.phone;
+const accountSid = process.env.TWILIO_SID;
+const authToken = process.env.TWILIO_TOKEN;
+const twilioPhone = process.env.TWILIO_PHONE;
 
 // Display environment variables for debugging
 console.log('TWILIO_SID:', process.env.TWILIO_SID || 'Not set');
