@@ -1,9 +1,9 @@
 const twilio = require('twilio');
 require('dotenv').config();
 
-const accountSid = process.env.TWILIO_SID || functions.config().twilio.sid;
-const authToken = process.env.TWILIO_TOKEN || functions.config().twilio.token;
-const twilioPhone = process.env.TWILIO_PHONE || functions.config().twilio.phone;
+const accountSid = process.env.TWILIO_SID;
+const authToken = process.env.TWILIO_TOKEN;
+const twilioPhone = process.env.TWILIO_PHONE;
 
 console.log('TWILIO_SID:', accountSid || 'Not set');
 console.log('TWILIO_TOKEN:', authToken ? 'Set' : 'Not set');
