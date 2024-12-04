@@ -15,6 +15,10 @@ require('dotenv').config();
 const { client, twilioPhone } = require('./twilioClient');
 
 
+// Display environment variables for debugging
+console.log('WA Function: TWILIO_SID:', process.env.TWILIO_SID || 'Not set');
+console.log('WA Function: TWILIO_TOKEN:', process.env.TWILIO_TOKEN ? 'Set (hidden)' : 'Not set');
+console.log('WA Function: TWILIO_PHONE:', process.env.TWILIO_PHONE || 'Not set');
 
 if (!accountSid || !authToken) {
     console.error("Twilio credentials are not set. Acount SID" || accountSid);
