@@ -23,17 +23,29 @@ if (!admin.apps.length) {
 }
 
 // Function to handle incoming WhatsApp messages
-const receiveWhatsAppMessage = async (req, res) => {
+async function receiveWhatsAppMessage(req, res){
     try {
         console.log('Incoming webhook payload:', JSON.stringify(req.body, null, 2));
-
+        // Validate request payload
+        if (!req.body || typeof req.body !== 'object') {
+            console.error('Invalid request payload:', req.body);
+            return res.status(400).send('Invalid request payload.');
+        }
         const { Body, From, MediaUrl0 } = req.body;
-        if (!From) {
-                console.error('Missing "From" field in the incoming payload.');
-                return res.status(400).send('Invalid request: "From" field is missing.');
-            }
+        // Validate essential fields
+        if (!From || !From.startsWith('whatsapp:')) {
+            console.error('Missing or invalid "From" field:', From);
+            return res.status(400).send('Invalid sender information.');
+        }
+        // extract phone number from sender ID
             const phoneNumber = From.replace('whatsapp:', '');
             console.log(`Received message from ${phoneNumber}`);
+        // Check if message contains a body or media URL
+        if (!Body && !MediaUrl0) {
+                console.error('Both message body and media URL are missing.');
+                return res.status(400).send('Please send a text message or attach a media file.');
+            }
+        // Check if message contains an image
         if (MediaUrl0) {
             console.log(`Image URL: ${MediaUrl0}`);
 
@@ -65,7 +77,13 @@ const receiveWhatsAppMessage = async (req, res) => {
             return res.status(400).send('No image attached.');
         }
     } catch (error) {
+        // Log and return detailed error information
         console.error('Error handling WhatsApp message:', error);
+
+        if (error.code && error.moreInfo) {
+            console.error(`Twilio error: ${error.code}, Info: ${error.moreInfo}`);
+        }
+
         return res.status(500).send('Internal Server Error');
     }
 };
