@@ -71,7 +71,32 @@ async function receiveWhatsAppMessage(req, res){
             console.log(`New guest added: ${phoneNumber}`);
         } else {
             console.log(`Returning guest: ${guestData.name || 'Guest'}`);
-        }    
+        }
+
+        // Handle name replies
+        if (!MediaUrl0 && Body && !guestData.name) {
+            // Update the guest's name in the database
+            const trimmedName = Body.trim();
+            await guestRef.update({ name: trimmedName });
+
+            await client.messages.create({
+                body: `Thank you, ${trimmedName}! Your profile has been updated.`,
+                from: `whatsapp:${twilioPhone}`,
+                to: `whatsapp:${phoneNumber}`
+            });
+
+            return res.status(200).send('Guest name updated.');
+        }        
+        // If the guest's name is missing, prompt for it
+        if (!guestData.name) {
+            await client.messages.create({
+                body: "Welcome! Please reply with your full name to complete your profile.",
+                from: `whatsapp:${twilioPhone}`,
+                to: `whatsapp:${phoneNumber}`
+            });
+            return res.status(200).send('Prompted guest for name.');
+        }
+     
         // Check if message contains an image
         if (MediaUrl0) {
             console.log(`Image URL: ${MediaUrl0}`);
@@ -90,7 +115,7 @@ async function receiveWhatsAppMessage(req, res){
 
             // Respond to user
             await client.messages.create({
-                body: 'Thank you, ${guestData.name || 'Guest'} for submitting your receipt! We are processing it.',
+                body: 'Thank you, ${guestData.name} for submitting your receipt! We are processing it.',
                 from: `whatsapp:${twilioPhone}`,
                 to: `whatsapp:${phoneNumber}`,
             });
