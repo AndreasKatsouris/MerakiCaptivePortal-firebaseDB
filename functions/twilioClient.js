@@ -6,7 +6,7 @@ const authToken = process.env.TWILIO_TOKEN;
 const twilioPhone = process.env.TWILIO_PHONE;
 
 console.log('TWILIO_SID:', accountSid || 'Not set');
-console.log('TWILIO_TOKEN:', authToken ? 'Set' : 'Not set');
+console.log('TWILIO_TOKEN:', authToken || 'Not set'); //'Set' : 'Not set');
 console.log('TWILIO_PHONE:', twilioPhone || 'Not set');
 
 if (!accountSid || !authToken || !twilioPhone) {
