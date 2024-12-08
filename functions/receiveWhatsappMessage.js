@@ -29,12 +29,19 @@ async function receiveWhatsAppMessage(req, res){
 
     try {
         console.log('Incoming webhook payload:', JSON.stringify(req.body, null, 2));
+        console.log('Processing WhatsApp message...');
+        console.log('Received payload:', req.body);
         // Validate request payload
         if (!req.body || typeof req.body !== 'object') {
             console.error('Invalid request payload:', req.body);
             return res.status(400).send('Invalid request payload.');
         }
         const { Body, From, MediaUrl0 } = req.body;
+                // Validate the presence of the "From" field
+                if (!From) {
+                    console.error('Missing "From" field in the request');
+                    return res.status(400).send('Invalid request: Missing sender information');
+                }
         // Validate essential fields
         if (!From || !From.startsWith('whatsapp:')) {
             console.error('Missing or invalid "From" field:', From);
@@ -51,6 +58,9 @@ async function receiveWhatsAppMessage(req, res){
         // Check if message contains an image
         if (MediaUrl0) {
             console.log(`Image URL: ${MediaUrl0}`);
+            console.log(`Media received from ${phoneNumber}: ${MediaUrl0}`);
+            // Simulate saving the receipt data
+            console.log('Simulating saving receipt data...');
 
             // Save receipt data to Firebase Realtime Database
             const receiptRef = admin.database().ref('receipts').push();
