@@ -24,6 +24,9 @@ if (!admin.apps.length) {
 
 // Function to handle incoming WhatsApp messages
 async function receiveWhatsAppMessage(req, res){
+    console.log('Processing WhatsApp message...');
+    console.log('Received payload:', req.body);
+
     try {
         console.log('Incoming webhook payload:', JSON.stringify(req.body, null, 2));
         // Validate request payload
