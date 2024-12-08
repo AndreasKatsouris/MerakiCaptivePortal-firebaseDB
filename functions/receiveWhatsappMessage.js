@@ -55,6 +55,23 @@ async function receiveWhatsAppMessage(req, res){
                 console.error('Both message body and media URL are missing.');
                 return res.status(400).send('Please send a text message or attach a media file.');
             }
+
+        // Retrieve guest data
+        const guestRef = admin.database().ref(`guests/${phoneNumber}`);
+        const guestSnapshot = await guestRef.once('value');
+        let guestData = guestSnapshot.val();
+
+        if (!guestData) {
+            // New guest: Initialize guest data
+            guestData = {
+                phoneNumber,
+                createdAt: Date.now()
+            };
+            await guestRef.set(guestData);
+            console.log(`New guest added: ${phoneNumber}`);
+        } else {
+            console.log(`Returning guest: ${guestData.name || 'Guest'}`);
+        }    
         // Check if message contains an image
         if (MediaUrl0) {
             console.log(`Image URL: ${MediaUrl0}`);
@@ -65,7 +82,7 @@ async function receiveWhatsAppMessage(req, res){
             // Save receipt data to Firebase Realtime Database
             const receiptRef = admin.database().ref('receipts').push();
             await receiptRef.set({
-                phoneNumber,
+                guestPhoneNumber: phoneNumber,
                 imageUrl: MediaUrl0,
                 message: Body || 'No message',
                 timestamp: Date.now(),
@@ -73,7 +90,7 @@ async function receiveWhatsAppMessage(req, res){
 
             // Respond to user
             await client.messages.create({
-                body: "Thank you for submitting your receipt! We are processing it.",
+                body: 'Thank you, ${guestData.name || 'Guest'} for submitting your receipt! We are processing it.',
                 from: `whatsapp:${twilioPhone}`,
                 to: `whatsapp:${phoneNumber}`,
             });
