@@ -107,6 +107,7 @@ async function receiveWhatsAppMessage(req, res){
                 // Process receipt data
                 const receiptData = await processReceipt(MediaUrl0, phoneNumber);
                 console.log('Receipt data processed successfully:', receiptData);
+                console.log(`Receipt processed for ${phoneNumber}`);
         
                 // Retrieve or define guest data
                 const guestRef = admin.database().ref(`guestData/${phoneNumber}`);
