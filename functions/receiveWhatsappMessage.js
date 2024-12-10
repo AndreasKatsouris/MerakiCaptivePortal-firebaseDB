@@ -13,6 +13,7 @@
 const admin = require('firebase-admin');
 require('dotenv').config();
 const { client, twilioPhone } = require('./twilioClient');
+const { processReceipt } = require('./receiptProcessor');
 
 
 if (!admin.apps.length) {
@@ -103,19 +104,12 @@ async function receiveWhatsAppMessage(req, res){
             console.log(`Media received from ${phoneNumber}: ${MediaUrl0}`);
             // Simulate saving the receipt data
             console.log('Simulating saving receipt data...');
+            const receiptData = await processReceipt(MediaUrl0, phoneNumber);
 
-            // Save receipt data to Firebase Realtime Database
-            const receiptRef = admin.database().ref('receipts').push();
-            await receiptRef.set({
-                guestPhoneNumber: phoneNumber,
-                imageUrl: MediaUrl0,
-                message: Body || 'No message',
-                timestamp: Date.now(),
-            });
 
             // Respond to user
             await client.messages.create({
-                body: 'Thank you, ${guestData.name} for submitting your receipt! We are processing it.',
+                body: `Thank you, ${guestData.name} for submitting your receipt! We are processing it.`,
                 from: `whatsapp:${twilioPhone}`,
                 to: `whatsapp:${phoneNumber}`,
             });
