@@ -102,27 +102,46 @@ async function receiveWhatsAppMessage(req, res){
         if (MediaUrl0) {
             console.log(`Image URL: ${MediaUrl0}`);
             console.log(`Media received from ${phoneNumber}: ${MediaUrl0}`);
-            // Simulate saving the receipt data
-            console.log('Simulating saving receipt data...');
-            const receiptData = await processReceipt(MediaUrl0, phoneNumber);
-
-
-            // Respond to user
-            await client.messages.create({
-                body: `Thank you, ${guestData.name} for submitting your receipt! We are processing it.`,
-                from: `whatsapp:${twilioPhone}`,
-                to: `whatsapp:${phoneNumber}`,
-            });
-
-            return res.status(200).send('Receipt received and stored.');
+        
+            try {
+                // Process receipt data
+                const receiptData = await processReceipt(MediaUrl0, phoneNumber);
+                console.log('Receipt data processed successfully:', receiptData);
+        
+                // Retrieve or define guest data
+                const guestRef = admin.database().ref(`guestData/${phoneNumber}`);
+                const guestSnapshot = await guestRef.once('value');
+                const guestData = guestSnapshot.val() || { name: 'Valued Guest' }; // Default name if guest not found
+        
+                // Respond to user
+                await client.messages.create({
+                    body: `Thank you, ${guestData.name}, for submitting your receipt! We are processing it.`,
+                    from: `whatsapp:${twilioPhone}`,
+                    to: `whatsapp:${phoneNumber}`,
+                });
+        
+                // Log successful response
+                console.log('Receipt successfully processed and stored for:', phoneNumber);
+                return res.status(200).send('Receipt received and stored.');
+            } catch (error) {
+                // Log and handle errors
+                console.error('Error processing receipt:', error);
+                await client.messages.create({
+                    body: "Sorry, we encountered an issue processing your receipt. Please try again later.",
+                    from: `whatsapp:${twilioPhone}`,
+                    to: `whatsapp:${phoneNumber}`,
+                });
+                return res.status(500).send('Error processing receipt.');
+            }
         } else {
-            // No image attached
+            // Handle no image attached
             await client.messages.create({
                 body: "Please attach a picture of your receipt.",
                 from: `whatsapp:${twilioPhone}`,
                 to: `whatsapp:${phoneNumber}`,
             });
-
+        
+            console.log(`No image attached by ${phoneNumber}`);
             return res.status(400).send('No image attached.');
         }
     } catch (error) {
