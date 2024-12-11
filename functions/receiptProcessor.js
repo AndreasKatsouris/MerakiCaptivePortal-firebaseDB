@@ -56,7 +56,7 @@ function parseReceiptData(text) {
     const receiptData = {};
 
     // Example parsing logic
-    receiptData.storeName = lines.find(line => line.match(/store|restaurant|shop/i)) || 'Unknown Store';
+    receiptData.storeName = lines.find(line => line.match(/store|restaurant|shop|ocean basket/i)) || 'Unknown Store';
     receiptData.totalAmount = lines.find(line => line.match(/\$?\d+\.\d{2}/)) || 'Unknown Total';
     receiptData.date = lines.find(line => line.match(/\d{2}\/\d{2}\/\d{4}/)) || 'Unknown Date';
 

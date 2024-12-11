@@ -160,7 +160,7 @@ document.addEventListener('DOMContentLoaded', function() {
         // Get form values
         const name = document.querySelector("input#username");
         const email = document.querySelector("input#email");
-        const company = document.querySelector("input#company");
+        const table = document.querySelector("input#table");
 
         //alert('Step 8: Form values captured. Press OK to validate.');
 
@@ -194,8 +194,8 @@ document.addEventListener('DOMContentLoaded', function() {
             isValid = false;
         }
 
-        if (!validateCompany(company.value)) {
-            showValidationMessage(company, "Please enter a valid company name.");
+        if (!validateTable(table.value)) {
+            showValidationMessage(table, "Please enter a valid table number.");
             isValid = false;
         }
 
@@ -218,7 +218,7 @@ document.addEventListener('DOMContentLoaded', function() {
             const formData = {
                 "name": name.value,
                 "email": email.value,
-                "company": company.value//,
+                "table": table.value//,
                 //"phoneNumber": phoneNumber
             };
             //alert('Step 10: Data is valid. Press OK to log the form submission to Firebase Analytics.');
@@ -261,8 +261,8 @@ document.addEventListener('DOMContentLoaded', function() {
         return emailPattern.test(email);
     }
 
-    function validateCompany(company) {
-        return company.trim() !== "";
+    function validateTable(table) {
+        return table.trim() !== "";
     }
 
     // Function to write user data to Firebase
@@ -279,7 +279,7 @@ document.addEventListener('DOMContentLoaded', function() {
         database.ref('wifiLogins/' + sessionID).set({
             name: data.name,
             email: data.email,
-            company: data.company,
+            table: data.table,
             //phoneNumber: data.phoneNumber,
             macAddress: client_mac,
             accessPointMAC: node_mac,
@@ -316,7 +316,7 @@ document.addEventListener('DOMContentLoaded', function() {
             sessionID: sessionID,
             name: data.name,
             email: data.email,
-            company: data.company,
+            table : data.table,
             macAddress: data.macAddress,
             connectionTime: localTimestamp,
             status: 'connected' // Indicate the user is currently connected
