@@ -3,7 +3,15 @@
     "default": "merakicaptiveportal-firebasedb",
     "staging": "merakicaptiveportal-firebasedb"
   },
-  "targets": {},
+  "targets": {
+    "merakicaptiveportal-firebasedb": {
+      "hosting": {
+        "production": [
+          "9c00572c7fec3a671e3598"
+        ]
+      }
+    }
+  },
   "etags": {
     "merakicaptiveportal-firebasedb": {
       "extensionInstances": {}
