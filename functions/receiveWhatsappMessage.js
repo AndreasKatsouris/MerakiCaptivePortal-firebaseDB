@@ -86,20 +86,23 @@ async function receiveWhatsAppMessage(req, res) {
             console.log(`Image received from ${phoneNumber}: ${MediaUrl0}`);
 
             try {
-                // Validate receipt against campaign criteria
-                /** const isValidReceipt = validateReceipt(MediaUrl0, guestData.name);
 
-                if (!isValidReceipt) {
-                    console.warn('Receipt validation failed.');
+                const receiptData = await processReceipt(MediaUrl0);
+                console.log('Raw Receipt data extracted successfully:', receiptData);
+                // Parse the receipt data
+                const parsedData = parseReceiptData(receiptData);
+                console.log('Parsed receipt data:', parsedData);
+
+                // Validate receipt against guardrails
+                const isValid = validateReceipt(parsedData, 'Ocean Basket'); // Replace with dynamic brand
+                if (!isValid) {
                     await client.messages.create({
-                        body: `Sorry, ${guestData.name}, this receipt does not meet the campaign requirements.`,
+                        body: "The receipt does not meet the campaign criteria.",
                         from: `whatsapp:${twilioPhone}`,
                         to: `whatsapp:${phoneNumber}`,
                     });
-                    return res.status(400).send('Invalid receipt.');
-                }   **/             
-                const receiptData = await processReceipt(MediaUrl0, phoneNumber, guestData.name);
-                console.log('Receipt processed successfully:', receiptData);
+                    return res.status(400).send('Receipt validation failed.');
+                }
 
                 await client.messages.create({
                     body: `Thank you, ${guestData.name}, for submitting your receipt! We are processing it.`,

@@ -12,7 +12,7 @@ const client = new vision.ImageAnnotatorClient();
  * @param {string} brandName - The brand associated with the receipt campaign
  * @returns {Promise<object>} - Parsed receipt data
  */
-async function processReceipt(imageUrl, guestPhoneNumber, brandName) {
+async function processReceipt(imageUrl) {
     try {
         console.log(`Processing receipt for: ${guestPhoneNumber}, Brand: ${brandName}, Image: ${imageUrl}`);
 
@@ -65,7 +65,7 @@ function parseReceiptData(text) {
     const receiptData = {};
 
     // Extracting specific fields from the receipt text
-    receiptData.storeName = lines.find(line => line.match(/store|restaurant|shop|ocean basket/i)) || 'Unknown Store';
+    receiptData.storeName = lines.find(line => line.match(/ocean basket|store|restaurant|shop|ocean basket/i)) || 'Unknown Store';
     receiptData.totalAmount = lines.find(line => line.match(/\$?\d+\.\d{2}/)) || 'Unknown Total';
     receiptData.date = lines.find(line => line.match(/\d{2}\/\d{2}\/\d{4}/)) || 'Unknown Date';
 
@@ -73,4 +73,4 @@ function parseReceiptData(text) {
     return receiptData;
 }
 
-module.exports = { processReceipt };
+module.exports = { processReceipt, parseReceiptData };

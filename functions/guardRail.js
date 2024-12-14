@@ -9,7 +9,7 @@ const brandCriteria = {
     // Add more brands here...
 };
 
-function validateReceipt(receiptData, brandName) {
+async function validateReceipt(receiptData, brandName) {
     const criteria = brandCriteria[brandName];
 
     if (!criteria) {
@@ -56,6 +56,4 @@ function validateReceipt(receiptData, brandName) {
     return { isValid: true, message: "Receipt is valid for this campaign." };
 }
 
-module.exports = {
-    validateReceipt,
-};
+module.exports = { validateReceipt };
