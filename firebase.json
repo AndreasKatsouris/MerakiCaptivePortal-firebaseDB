@@ -1,5 +1,5 @@
 {
-  "hosting": [
+  "hosting": 
     {
       "public": "public",
       "ignore": [
@@ -12,20 +12,8 @@
           "source": "**",
           "destination": "/index.html"
         }
-      ],
-      "headers": [
-        {
-          "source": "/service-worker.js",
-          "headers": [
-            {
-              "key": "Cache-Control",
-              "value": "no-cache"
-            }
-          ]
-        }
       ]
-    }
-  ],
+    },
   "database": {
     "rules": "database.rules.json"
   },
