@@ -2,6 +2,7 @@ const admin = require('firebase-admin');
 require('dotenv').config();
 const { client, twilioPhone } = require('./twilioClient');
 const { processReceipt } = require('./receiptProcessor');
+const { validateReceipt } = require('./guardRail');
 
 if (!admin.apps.length) {
     admin.initializeApp({
@@ -85,6 +86,18 @@ async function receiveWhatsAppMessage(req, res) {
             console.log(`Image received from ${phoneNumber}: ${MediaUrl0}`);
 
             try {
+                // Validate receipt against campaign criteria
+                const isValidReceipt = await validateReceipt(MediaUrl0, guestData.name);
+
+                if (!isValidReceipt) {
+                    console.warn('Receipt validation failed.');
+                    await client.messages.create({
+                        body: `Sorry, ${guestData.name}, this receipt does not meet the campaign requirements.`,
+                        from: `whatsapp:${twilioPhone}`,
+                        to: `whatsapp:${phoneNumber}`,
+                    });
+                    return res.status(400).send('Invalid receipt.');
+                }                
                 const receiptData = await processReceipt(MediaUrl0, phoneNumber, guestData.name);
                 console.log('Receipt processed successfully:', receiptData);
 
