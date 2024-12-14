@@ -1,6 +1,7 @@
 {
   "projects": {
-    "default": "merakicaptiveportal-firebasedb"
+    "default": "merakicaptiveportal-firebasedb",
+    "staging": "merakicaptiveportal-firebasedb"
   },
   "targets": {},
   "etags": {
