@@ -2,15 +2,6 @@
   "projects": {
     "default": "merakicaptiveportal-firebasedb"
   },
-  "targets": {
-    "merakicaptiveportal-firebasedb": {
-      "hosting": {
-        "production": [
-          "9c00572c7fec3a671e3598"
-        ]
-      }
-    }
-  },
   "etags": {
     "merakicaptiveportal-firebasedb": {
       "extensionInstances": {}
