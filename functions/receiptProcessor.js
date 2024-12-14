@@ -36,18 +36,6 @@ async function processReceipt(imageUrl) {
 
         // Parse receipt data (example: total amount, date, store name, etc.)
         const parsedData = parseReceiptData(fullText);
-
-        // Save processed receipt data to Firebase
-        const receiptRef = admin.database().ref('processedReceipts').push();
-        await receiptRef.set({
-            guestPhoneNumber,
-            imageUrl,
-            parsedData,
-            brandName,
-            processedAt: Date.now(),
-        });
-
-        console.log('Receipt successfully processed and stored.');
         return parsedData;
     } catch (error) {
         console.error('Error processing receipt:', error.message);

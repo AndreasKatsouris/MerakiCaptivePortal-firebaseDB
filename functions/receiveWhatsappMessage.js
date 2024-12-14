@@ -103,6 +103,18 @@ async function receiveWhatsAppMessage(req, res) {
                     });
                     return res.status(400).send('Receipt validation failed.');
                 }
+                
+                // Save processed receipt data to Firebase
+                const receiptRef = admin.database().ref('processedReceipts').push();
+                await receiptRef.set({
+                    guestPhoneNumber,
+                    imageUrl,
+                    parsedData,
+                    brandName,
+                    processedAt: Date.now(),
+                });
+
+                console.log('Receipt successfully processed and stored.');
 
                 await client.messages.create({
                     body: `Thank you, ${guestData.name}, for submitting your receipt! We are processing it.`,
