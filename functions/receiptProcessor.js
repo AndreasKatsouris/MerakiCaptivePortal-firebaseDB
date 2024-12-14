@@ -1,5 +1,6 @@
 const vision = require('@google-cloud/vision');
 const admin = require('firebase-admin');
+const { validateReceipt } = require('./guardRail');
 
 // Initialize the Google Cloud Vision API client
 const client = new vision.ImageAnnotatorClient();
@@ -8,11 +9,12 @@ const client = new vision.ImageAnnotatorClient();
  * Process a receipt using Google Cloud Vision OCR and save parsed data to Firebase
  * @param {string} imageUrl - URL of the receipt image
  * @param {string} guestPhoneNumber - Phone number of the guest who submitted the receipt
+ * @param {string} brandName - The brand associated with the receipt campaign
  * @returns {Promise<object>} - Parsed receipt data
  */
-async function processReceipt(imageUrl, guestPhoneNumber) {
+async function processReceipt(imageUrl, guestPhoneNumber, brandName) {
     try {
-        console.log(`Processing receipt for: ${guestPhoneNumber}, Image: ${imageUrl}`);
+        console.log(`Processing receipt for: ${guestPhoneNumber}, Brand: ${brandName}, Image: ${imageUrl}`);
 
         // Perform text detection on the receipt image
         const [result] = await client.textDetection(imageUrl);
@@ -22,9 +24,15 @@ async function processReceipt(imageUrl, guestPhoneNumber) {
             throw new Error('No text detected on the receipt.');
         }
 
-        // Extract relevant data (assuming the first result is the most accurate)
+        // Extract full text from the receipt (assuming the first result is the most accurate)
         const fullText = detections[0].description;
         console.log('Full text extracted:', fullText);
+
+        // Validate receipt data using guardRails
+        const validation = validateReceipt(fullText, brandName);
+        if (!validation.isValid) {
+            throw new Error(`Validation failed: ${validation.message}`);
+        }
 
         // Parse receipt data (example: total amount, date, store name, etc.)
         const parsedData = parseReceiptData(fullText);
@@ -35,14 +43,15 @@ async function processReceipt(imageUrl, guestPhoneNumber) {
             guestPhoneNumber,
             imageUrl,
             parsedData,
-            processedAt: Date.now()
+            brandName,
+            processedAt: Date.now(),
         });
 
         console.log('Receipt successfully processed and stored.');
         return parsedData;
     } catch (error) {
-        console.error('Error processing receipt:', error);
-        throw new Error('Failed to process receipt.');
+        console.error('Error processing receipt:', error.message);
+        throw new Error(`Failed to process receipt: ${error.message}`);
     }
 }
 
@@ -55,7 +64,7 @@ function parseReceiptData(text) {
     const lines = text.split('\n');
     const receiptData = {};
 
-    // Example parsing logic
+    // Extracting specific fields from the receipt text
     receiptData.storeName = lines.find(line => line.match(/store|restaurant|shop|ocean basket/i)) || 'Unknown Store';
     receiptData.totalAmount = lines.find(line => line.match(/\$?\d+\.\d{2}/)) || 'Unknown Total';
     receiptData.date = lines.find(line => line.match(/\d{2}\/\d{2}\/\d{4}/)) || 'Unknown Date';
