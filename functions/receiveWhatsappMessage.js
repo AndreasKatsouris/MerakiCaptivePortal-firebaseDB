@@ -107,7 +107,7 @@ async function receiveWhatsAppMessage(req, res) {
                 // Save processed receipt data to Firebase
                 const receiptRef = admin.database().ref('processedReceipts').push();
                 await receiptRef.set({
-                    guestPhoneNumber,
+                    phoneNumber,
                     imageUrl,
                     parsedData,
                     brandName,
