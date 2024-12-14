@@ -87,7 +87,7 @@ async function receiveWhatsAppMessage(req, res) {
 
             try {
                 // Validate receipt against campaign criteria
-                const isValidReceipt = await validateReceipt(MediaUrl0, guestData.name);
+                /** const isValidReceipt = validateReceipt(MediaUrl0, guestData.name);
 
                 if (!isValidReceipt) {
                     console.warn('Receipt validation failed.');
@@ -97,7 +97,7 @@ async function receiveWhatsAppMessage(req, res) {
                         to: `whatsapp:${phoneNumber}`,
                     });
                     return res.status(400).send('Invalid receipt.');
-                }                
+                }   **/             
                 const receiptData = await processReceipt(MediaUrl0, phoneNumber, guestData.name);
                 console.log('Receipt processed successfully:', receiptData);
 
