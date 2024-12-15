@@ -532,11 +532,12 @@ document.querySelectorAll("#wifiReportsTable th").forEach(header => {
         
             // Load existing campaigns on page load
             async function loadCampaigns() {
-                campaignsTable.innerHTML = ''; // Clear existing rows
                 try {
+                    campaignsTable.innerHTML = ''; // Clear existing rows
                     const campaignsSnapshot = await firebase.database().ref('campaigns').once('value');
                     const campaigns = campaignsSnapshot.val();
-        
+                    console.log('Campaigns fetched:', campaigns);
+            
                     if (campaigns) {
                         Object.keys(campaigns).forEach((key) => {
                             const campaign = campaigns[key];
@@ -552,7 +553,6 @@ document.querySelectorAll("#wifiReportsTable th").forEach(header => {
                             `;
                             campaignsTable.appendChild(row);
                         });
-        
                         attachCampaignListeners();
                     } else {
                         campaignsTable.innerHTML = '<tr><td colspan="4">No campaigns available.</td></tr>';
