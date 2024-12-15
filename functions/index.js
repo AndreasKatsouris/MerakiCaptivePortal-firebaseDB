@@ -1,10 +1,6 @@
 const { onRequest } = require('firebase-functions/v2/https');
 const admin = require('firebase-admin');
-//const twilio = require('twilio');
 const { receiveWhatsAppMessage } = require('./receiveWhatsappMessage');
-
-
-
 
 // Initialize Firebase Admin SDK
 if (!admin.apps.length) {
@@ -13,57 +9,6 @@ if (!admin.apps.length) {
         databaseURL: "https://merakicaptiveportal-firebasedb-default-rtdb.firebaseio.com",
     });
 }
-//const twilioClient = twilio(accountSid, authToken);
-
-
-
-/**
- * Cloud Function to handle incoming WhatsApp messages via Twilio
-
-exports.receiveWhatsAppMessage = onRequest(async (req, res) => {
-    const { Body, From, MediaUrl0 } = req.body; // Extract data from Twilio webhook
-    const phoneNumber = From.replace('whatsapp:', ''); // Extract sender’s number
-    console.log(`Received message from ${phoneNumber}`);
-
-    try {
-        // Handle receipt image upload
-        if (MediaUrl0) {
-            console.log(`Image URL: ${MediaUrl0}`);
-
-            // Save receipt data to Firebase Realtime Database
-            const receiptRef = admin.database().ref('receipts').push();
-            await receiptRef.set({
-                phoneNumber,
-                imageUrl: MediaUrl0,
-                message: Body || 'No message',
-                timestamp: Date.now()
-            });
-
-            // Respond to user
-            await twilioClient.messages.create({
-                body: "Thank you for submitting your receipt! We are processing it.",
-                from: `whatsapp:${twilioPhone}`,
-                to: `whatsapp:${phoneNumber}`
-            });
-
-            return res.status(200).send('Receipt received and stored.');
-        } else {
-            // If no image is attached, prompt the user
-            await twilioClient.messages.create({
-                body: "Please attach a picture of your receipt.",
-                from: `whatsapp:${twilioPhone}`,
-                to: `whatsapp:${phoneNumber}`
-            });
-
-            return res.status(400).send('No image attached.');
-        }
-    } catch (error) {
-        console.error('Error handling WhatsApp message:', error);
-        return res.status(500).send('Internal Server Error');
-    }
-});
- */
-// Export Twilio WhatsApp handler
 exports.receiveWhatsAppMessage = onRequest(receiveWhatsAppMessage);
 
 /**

@@ -150,7 +150,7 @@ document.addEventListener('DOMContentLoaded', function() {
 
     // Handle Form Submission
     document.querySelector('form').addEventListener('submit', function(event) {
-        alert('Step 7: Form submission triggered. Press OK to start validation.');
+        //alert('Step 7: Form submission triggered. Press OK to start validation.');
         console.log("Processing loginForm");
         event.preventDefault();
         removeValidationMessages();
@@ -162,7 +162,7 @@ document.addEventListener('DOMContentLoaded', function() {
         const email = document.querySelector("input#email");
         const table = document.querySelector("input#table");
 
-        alert('Step 8: Form values captured. Press OK to validate.');
+        //alert('Step 8: Form values captured. Press OK to validate.');
 
         //const phoneInputField = document.querySelector("input#phone");
         /** const phoneInput = window.intlTelInput(phoneInputField, {
@@ -210,7 +210,7 @@ document.addEventListener('DOMContentLoaded', function() {
         //    isValid = false;
         //}
 
-        alert(`Step 9: Validation complete. Is the data valid? ${isValid}. Press OK to proceed.`);
+        //alert(`Step 9: Validation complete. Is the data valid? ${isValid}. Press OK to proceed.`);
 
         console.log("Is all DATA valid ?", isValid);
         // If all validations pass, proceed with form submission
@@ -221,7 +221,7 @@ document.addEventListener('DOMContentLoaded', function() {
                 "table": table.value//,
                 //"phoneNumber": phoneNumber
             };
-            alert('Step 10: Data is valid. Press OK to log the form submission to Firebase Analytics.');
+            //alert('Step 10: Data is valid. Press OK to log the form submission to Firebase Analytics.');
              // Log the form submission event to Firebase Analytics
             analytics.logEvent('form_submission', formData);
 
@@ -244,7 +244,7 @@ document.addEventListener('DOMContentLoaded', function() {
                     // landing page.
                     loginUrl += "?continue_url="+user_continue_url + "?duration=" + duration;
                 }
-            alert(`Step 12: Form data saved. Press OK to log in.\nRedirecting to: ${loginUrl}`);
+            //alert(`Step 12: Form data saved. Press OK to log in.\nRedirecting to: ${loginUrl}`);
             console.log("Logging in...", loginUrl);
             window.location.href = loginUrl;
         }
