@@ -1,4 +1,4 @@
-const { getCampaignDetails } = require('./campaign');
+const { getCampaignDetails } = require('./campaigns');
 
 /**
  * Validate receipt against predefined campaign criteria
