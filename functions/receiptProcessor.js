@@ -15,7 +15,6 @@ const client = new vision.ImageAnnotatorClient();
 async function processReceipt(imageUrl) {
     try {
         console.log(`Processing receipt for: Brand: ${brandName}, Image: ${imageUrl}`);
-
         // Perform text detection on the receipt image
         const [result] = await client.textDetection(imageUrl);
         const detections = result.textAnnotations;

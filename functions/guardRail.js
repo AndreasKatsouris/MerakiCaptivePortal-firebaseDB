@@ -1,59 +1,24 @@
-// guardRail.js
+const { getCampaignDetails } = require('./campaign');
 
-const brandCriteria = {
-    "Ocean Basket": {
-        allowedKeywords: ["Ocean Basket"],
-        disallowedKeywords: ["Steers", "McDonald's", "KFC"],
-        minAmount: 50, // Minimum receipt amount in currency
-    },
-    // Add more brands here...
-};
-
-async function validateReceipt(receiptData, brandName) {
-    const criteria = brandCriteria[brandName];
-
-    if (!criteria) {
-        return {
-            isValid: false,
-            message: `No criteria defined for brand: ${brandName}`,
-        };
+/**
+ * Validate receipt against predefined campaign criteria
+ * @param {object} receiptData - Parsed receipt data
+ * @param {string} campaignName - Campaign name for validation
+ * @returns {Promise<boolean>} - Whether the receipt is valid
+ */
+async function validateReceipt(receiptData, campaignName) {
+    const campaign = await getCampaignDetails(campaignName);
+    if (!campaign) {
+        throw new Error(`Campaign "${campaignName}" not found.`);
     }
 
-    // Validate allowed keywords in receipt data
-    const containsAllowed = criteria.allowedKeywords.some(keyword =>
-        receiptData.includes(keyword)
-    );
-
-    if (!containsAllowed) {
-        return {
-            isValid: false,
-            message: `The receipt does not appear to be from ${brandName}.`,
-        };
+    if (!receiptData.storeName.toLowerCase().includes(campaign.brandName.toLowerCase())) {
+        console.error('Receipt validation failed: Incorrect store.');
+        return false;
     }
 
-    // Validate disallowed keywords
-    const containsDisallowed = criteria.disallowedKeywords.some(keyword =>
-        receiptData.includes(keyword)
-    );
-
-    if (containsDisallowed) {
-        return {
-            isValid: false,
-            message: "The receipt appears to be from a different retailer.",
-        };
-    }
-
-    // Add further checks (e.g., minimum amount)
-    // This is a placeholder if `receiptData` includes amount information.
-    // Assuming `receiptData` is parsed JSON with an "amount" key.
-    if (criteria.minAmount && receiptData.amount < criteria.minAmount) {
-        return {
-            isValid: false,
-            message: `The receipt amount is less than the minimum required for ${brandName}.`,
-        };
-    }
-
-    return { isValid: true, message: "Receipt is valid for this campaign." };
+    console.log('Receipt validation passed.');
+    return true;
 }
 
 module.exports = { validateReceipt };

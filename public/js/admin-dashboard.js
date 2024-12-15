@@ -514,4 +514,122 @@ document.querySelectorAll("#wifiReportsTable th").forEach(header => {
                 alert('Error deleting data. Please try again later.');
             });
         }
+
+        document.getElementById('campaignForm').addEventListener('submit', async function (e) {
+            e.preventDefault();
+            const campaignName = document.getElementById('campaignName').value;
+            const brandName = document.getElementById('brandName').value;
+            const criteria = document.getElementById('criteria').value;
+        
+            try {
+                // Save campaign to Firebase
+                const campaignRef = admin.database().ref('campaigns').push();
+                await campaignRef.set({
+                    name: campaignName,
+                    brandName,
+                    criteria,
+                    createdAt: Date.now(),
+                });
+        
+                alert('Campaign saved successfully.');
+                loadCampaigns();
+            } catch (error) {
+                console.error('Error saving campaign:', error);
+                alert('Failed to save campaign.');
+            }
+        });
+        
+        /**
+         * Load existing campaigns and display them in the table
+         */
+        async function loadCampaigns() {
+            const campaignsTable = document.querySelector('#campaignsTable tbody');
+            campaignsTable.innerHTML = ''; // Clear existing rows
+        
+            try {
+                const campaigns = await admin.database().ref('campaigns').once('value');
+                const campaignData = campaigns.val();
+        
+                if (campaignData) {
+                    Object.keys(campaignData).forEach(key => {
+                        const campaign = campaignData[key];
+                        const row = document.createElement('tr');
+                        row.innerHTML = `
+                            <td>${campaign.name}</td>
+                            <td>${campaign.brandName}</td>
+                            <td>
+                                <button class="btn btn-warning edit-campaign" data-key="${key}">Edit</button>
+                                <button class="btn btn-danger delete-campaign" data-key="${key}">Delete</button>
+                            </td>
+                        `;
+                        campaignsTable.appendChild(row);
+                    });
+        
+                    // Add event listeners for edit and delete
+                    document.querySelectorAll('.edit-campaign').forEach(button => {
+                        button.addEventListener('click', function () {
+                            editCampaign(this.getAttribute('data-key'));
+                        });
+                    });
+        
+                    document.querySelectorAll('.delete-campaign').forEach(button => {
+                        button.addEventListener('click', function () {
+                            deleteCampaign(this.getAttribute('data-key'));
+                        });
+                    });
+                } else {
+                    campaignsTable.innerHTML = '<tr><td colspan="3">No campaigns available.</td></tr>';
+                }
+            } catch (error) {
+                console.error('Error loading campaigns:', error);
+            }
+        }
+        
+        /**
+         * Edit a campaign
+         */
+        function editCampaign(campaignKey) {
+            // Fetch campaign data and populate the form for editing
+            admin.database().ref(`campaigns/${campaignKey}`).once('value').then(snapshot => {
+                const campaign = snapshot.val();
+                document.getElementById('campaignName').value = campaign.name;
+                document.getElementById('brandName').value = campaign.brandName;
+                document.getElementById('criteria').value = campaign.criteria;
+        
+                // Save changes
+                document.getElementById('campaignForm').addEventListener('submit', function (e) {
+                    e.preventDefault();
+                    admin.database().ref(`campaigns/${campaignKey}`).update({
+                        name: document.getElementById('campaignName').value,
+                        brandName: document.getElementById('brandName').value,
+                        criteria: document.getElementById('criteria').value,
+                    }).then(() => {
+                        alert('Campaign updated successfully.');
+                        loadCampaigns();
+                    }).catch(error => {
+                        console.error('Error updating campaign:', error);
+                    });
+                });
+            });
+        }
+        
+        /**
+         * Delete a campaign
+         */
+        function deleteCampaign(campaignKey) {
+            if (confirm('Are you sure you want to delete this campaign?')) {
+                admin.database().ref(`campaigns/${campaignKey}`).remove().then(() => {
+                    alert('Campaign deleted successfully.');
+                    loadCampaigns();
+                }).catch(error => {
+                    console.error('Error deleting campaign:', error);
+                });
+            }
+        }
+        function displaySection(sectionId) {
+            document.querySelectorAll('.content-section').forEach(section => {
+                section.style.display = section.id === sectionId ? 'block' : 'none';
+            });
+        }
+              
 });
