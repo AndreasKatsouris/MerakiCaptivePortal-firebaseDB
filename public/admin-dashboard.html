@@ -198,38 +198,45 @@
             </tbody>
         </table>
     </div>
-    <div id="campaignManagementContent" class="content-section" style="display: none;">
+    <div id="campaignManagementContent" class="content-section">
         <h2>Campaign Management</h2>
         <form id="campaignForm">
             <div class="form-group">
                 <label for="campaignName">Campaign Name:</label>
-                <input type="text" id="campaignName" class="form-control" required>
+                <input type="text" id="campaignName" name="campaignName" placeholder="Enter campaign name" required>
             </div>
             <div class="form-group">
                 <label for="brandName">Brand Name:</label>
-                <input type="text" id="brandName" class="form-control" required>
+                <input type="text" id="brandName" name="brandName" placeholder="Enter brand name" required>
             </div>
             <div class="form-group">
-                <label for="criteria">Validation Criteria:</label>
-                <textarea id="criteria" class="form-control" rows="3" required></textarea>
+                <label for="startDate">Start Date:</label>
+                <input type="date" id="startDate" name="startDate" required>
             </div>
-            <button type="submit" class="btn btn-primary">Save Campaign</button>
+            <div class="form-group">
+                <label for="endDate">End Date:</label>
+                <input type="date" id="endDate" name="endDate" required>
+            </div>
+            <div class="form-group">
+                <button type="submit" class="save-button">Save Campaign</button>
+            </div>
         </form>
-        <hr>
-        <h3>Existing Campaigns</h3>
-        <table id="campaignsTable" class="table">
+        <table id="campaignTable" class="table">
             <thead>
                 <tr>
                     <th>Campaign Name</th>
                     <th>Brand Name</th>
+                    <th>Start Date</th>
+                    <th>End Date</th>
                     <th>Actions</th>
                 </tr>
             </thead>
             <tbody>
-                <!-- Campaigns will be dynamically loaded here -->
+                <!-- Dynamically populated -->
             </tbody>
         </table>
     </div>
+    
     <div id="receiptScanningContent" class="content-section" style="display: none;">
         <h2>Receipt Scanning</h2>
         <form id="receiptForm">

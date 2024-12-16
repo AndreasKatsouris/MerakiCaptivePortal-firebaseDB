@@ -83,69 +83,49 @@ async function receiveWhatsAppMessage(req, res) {
 
         // Process receipt if an image is attached
         if (MediaUrl0) {
-            console.log(`Image received from ${phoneNumber}: ${MediaUrl0}`);
-
-            try {
-
-                const receiptData = await processReceipt(MediaUrl0);
-                console.log('Raw Receipt data extracted successfully:', receiptData);
-                // Parse the receipt data
-                const parsedData = parseReceiptData(receiptData);
-                console.log('Parsed receipt data:', parsedData);
-
-                // Validate receipt against guardrails
-                const isValid = validateReceipt(parsedData, 'Ocean Basket'); // Replace with dynamic brand
-                if (!isValid) {
+            console.log(`Processing receipt image for ${phoneNumber}`);
+                try {
+                    const campaignName = "Ocean Basket"; // Replace with the dynamic campaign name from the context
+                    const receiptData = await processReceipt(MediaUrl0, phoneNumber);
+    
+                    // Validate receipt against guardrails
+                    const isValid = validateReceipt(receiptData, campaignName);
+                    if (!isValid) {
+                        console.error('Receipt validation failed.');
+                        await client.messages.create({
+                            body: `Sorry, ${guestData.name}. Your receipt does not meet the campaign requirements.`,
+                            from: `whatsapp:${twilioPhone}`,
+                            to: `whatsapp:${phoneNumber}`,
+                        });
+                        return res.status(400).send('Invalid receipt.');
+                    }
+    
+                    // Respond to valid receipts
                     await client.messages.create({
-                        body: "The receipt does not meet the campaign criteria.",
+                        body: `Thank you, ${guestData.name}, for submitting your receipt! We are processing it.`,
                         from: `whatsapp:${twilioPhone}`,
                         to: `whatsapp:${phoneNumber}`,
                     });
-                    return res.status(400).send('Receipt validation failed.');
+                    return res.status(200).send('Receipt received and validated.');
+                } catch (error) {
+                    console.error('Error processing or validating receipt:', error);
+                    await client.messages.create({
+                        body: "Sorry, we encountered an issue processing your receipt. Please try again later.",
+                        from: `whatsapp:${twilioPhone}`,
+                        to: `whatsapp:${phoneNumber}`,
+                    });
+                    return res.status(500).send('Error processing receipt.');
                 }
-                
-                // Save processed receipt data to Firebase
-                const receiptRef = admin.database().ref('processedReceipts').push();
-                await receiptRef.set({
-                    phoneNumber,
-                    imageUrl,
-                    parsedData,
-                    brandName,
-                    processedAt: Date.now(),
-                });
-
-                console.log('Receipt successfully processed and stored.');
-
+            } else {
                 await client.messages.create({
-                    body: `Thank you, ${guestData.name}, for submitting your receipt! We are processing it.`,
+                    body: "Please attach a picture of your receipt.",
                     from: `whatsapp:${twilioPhone}`,
                     to: `whatsapp:${phoneNumber}`,
                 });
-
-                return res.status(200).send('Receipt received and stored.');
-            } catch (error) {
-                console.error('Error processing receipt:', error.message);
-
-                await client.messages.create({
-                    body: "Sorry, we encountered an issue processing your receipt. Please try again later.",
-                    from: `whatsapp:${twilioPhone}`,
-                    to: `whatsapp:${phoneNumber}`,
-                });
-
-                return res.status(500).send('Error processing receipt.');
+                return res.status(400).send('No image attached.');
             }
-        } else {
-            // Handle case with no image attached
-            await client.messages.create({
-                body: "Please attach a picture of your receipt.",
-                from: `whatsapp:${twilioPhone}`,
-                to: `whatsapp:${phoneNumber}`,
-            });
-
-            console.log(`No image attached by ${phoneNumber}`);
-            return res.status(400).send('No image attached.');
         }
-    } catch (error) {
+ catch (error) {
         console.error('Error handling WhatsApp message:', error.message);
 
         if (error.code && error.moreInfo) {
@@ -153,7 +133,6 @@ async function receiveWhatsAppMessage(req, res) {
         }
 
         return res.status(500).send('Internal Server Error');
-    }
-}
 
+     }    }
 module.exports = { receiveWhatsAppMessage };

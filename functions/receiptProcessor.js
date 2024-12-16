@@ -28,10 +28,10 @@ async function processReceipt(imageUrl) {
         console.log('Full text extracted:', fullText);
 
         // Validate receipt data using guardRails
-        const validation = validateReceipt(fullText, brandName);
-        if (!validation.isValid) {
-            throw new Error(`Validation failed: ${validation.message}`);
-        }
+        //const validation = validateReceipt(fullText, brandName);
+        //if (!validation.isValid) {
+        //    throw new Error(`Validation failed: ${validation.message}`);
+        //}
 
         // Parse receipt data (example: total amount, date, store name, etc.)
         const parsedData = parseReceiptData(fullText);
