@@ -1,3 +1,4 @@
+const { firebaseConfig } = require('firebase-functions/v1');
 const { getCampaignDetails } = require('./campaigns');
 
 /**
@@ -19,7 +20,7 @@ async function validateReceipt(receiptData, campaignName) {
 
         // Check for duplicate invoice
         if (receiptData.invoiceNumber) {
-            const processedReceiptsRef = admin.database().ref('processedReceipts');
+            const processedReceiptsRef = firebase.database().ref('processedReceipts');
             const snapshot = await processedReceiptsRef
                 .orderByChild('invoiceNumber')
                 .equalTo(receiptData.invoiceNumber)
