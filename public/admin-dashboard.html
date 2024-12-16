@@ -198,6 +198,48 @@
             </tbody>
         </table>
     </div>
+    <div id="campaignManagementContent" class="content-section" style="display: none;">
+        <h2>Campaign Management</h2>
+        <form id="campaignForm">
+            <div class="form-group">
+                <label for="campaignName">Campaign Name:</label>
+                <input type="text" id="campaignName" class="form-control" required>
+            </div>
+            <div class="form-group">
+                <label for="brandName">Brand Name:</label>
+                <input type="text" id="brandName" class="form-control" required>
+            </div>
+            <div class="form-group">
+                <label for="criteria">Validation Criteria:</label>
+                <textarea id="criteria" class="form-control" rows="3" required></textarea>
+            </div>
+            <button type="submit" class="btn btn-primary">Save Campaign</button>
+        </form>
+        <hr>
+        <h3>Existing Campaigns</h3>
+        <table id="campaignsTable" class="table">
+            <thead>
+                <tr>
+                    <th>Campaign Name</th>
+                    <th>Brand Name</th>
+                    <th>Actions</th>
+                </tr>
+            </thead>
+            <tbody>
+                <!-- Campaigns will be dynamically loaded here -->
+            </tbody>
+        </table>
+    </div>
+    <div id="receiptScanningContent" class="content-section" style="display: none;">
+        <h2>Receipt Scanning</h2>
+        <form id="receiptForm">
+            <div class="form-group">
+                <label for="receiptName">Receipt Name:</label>
+                <input type="text" id="receiptName" class="form-control" required>
+            </div>
+            <div class="form-group">
+                <label for="receiptBrand">Brand Name:</label>
+                <input type="text" id="receiptBrand" class="form-control" required>     
 </div>
     <!-- Link to the external JavaScript file -->
     <script src="js/admin-dashboard.js"></script>
