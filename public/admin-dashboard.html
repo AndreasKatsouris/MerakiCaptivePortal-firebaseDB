@@ -198,20 +198,33 @@
             </tbody>
         </table>
     </div>
+    <!-- Campaign Management System -->
     <div id="campaignManagementContent" class="content-section">
         <h2>Campaign Management</h2>
         <form id="campaignForm">
-            <!-- Notice to indicate editing mode -->
             <div id="editNotice" class="alert alert-info" style="display: none;">
                 Editing Campaign: <span id="editingCampaignName"></span>
             </div>
             <div class="form-group">
                 <label for="campaignName">Campaign Name:</label>
-                <input type="text" id="campaignName" name="campaignName" class="form-control" placeholder="Enter campaign name" required>
+                <input type="text" id="campaignName" name="campaignName" class="form-control" required>
             </div>
             <div class="form-group">
                 <label for="brandName">Brand Name:</label>
-                <input type="text" id="brandName" name="brandName" class="form-control" placeholder="Enter brand name" required>
+                <input type="text" id="brandName" name="brandName" class="form-control" required>
+            </div>
+            <!-- New Fields -->
+            <div class="form-group">
+                <label for="minPurchaseAmount">Minimum Purchase Amount:</label>
+                <input type="number" id="minPurchaseAmount" name="minPurchaseAmount" class="form-control" min="0" step="0.01">
+            </div>
+            <div class="form-group">
+                <label for="maxSubmissionsPerUser">Max Submissions Per User:</label>
+                <input type="number" id="maxSubmissionsPerUser" name="maxSubmissionsPerUser" class="form-control" min="1" value="1">
+            </div>
+            <div class="form-group">
+                <label for="validLocations">Valid Store Locations:</label>
+                <input type="text" id="validLocations" name="validLocations" class="form-control" placeholder="Enter comma-separated locations">
             </div>
             <div class="form-group">
                 <label for="startDate">Start Date:</label>
@@ -222,21 +235,30 @@
                 <input type="date" id="endDate" name="endDate" class="form-control" required>
             </div>
             <div class="form-group">
+                <label for="campaignStatus">Status:</label>
+                <select id="campaignStatus" name="campaignStatus" class="form-control" required>
+                    <option value="draft">Draft</option>
+                    <option value="active">Active</option>
+                    <option value="paused">Paused</option>
+                    <option value="completed">Completed</option>
+                </select>
+            </div>
+            <div class="form-group">
                 <button type="submit" class="btn btn-primary save-button">Save Campaign</button>
-                <button type="button" id="cancelEditButton" class="btn btn-secondary" style="display: none;">
-                    Cancel
-                </button>
+                <button type="button" id="cancelEditButton" class="btn btn-secondary" style="display: none;">Cancel</button>
             </div>
         </form>
-        
+        <!-- Update table headers -->
         <h3>Existing Campaigns</h3>
         <table id="campaignTable" class="table">
             <thead>
                 <tr>
                     <th>Campaign Name</th>
                     <th>Brand Name</th>
+                    <th>Min Purchase</th>
                     <th>Start Date</th>
                     <th>End Date</th>
+                    <th>Status</th>
                     <th>Actions</th>
                 </tr>
             </thead>

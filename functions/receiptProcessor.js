@@ -34,6 +34,7 @@ async function processReceipt(imageUrl, guestPhoneNumber) {
         await receiptRef.set({
             guestPhoneNumber,
             imageUrl,
+            invoiceNumber: parsedData.invoiceNumber, // Add this field
             parsedData,
             processedAt: Date.now(),
         });
@@ -55,10 +56,72 @@ function parseReceiptData(text) {
     const lines = text.split('\n');
     const receiptData = {};
 
-    // Extracting specific fields from the receipt text
-    receiptData.storeName = lines.find(line => line.match(/ocean basket|store|restaurant|shop|ocean basket/i)) || 'Unknown Store';
-    receiptData.totalAmount = lines.find(line => line.match(/\$?\d+\.\d{2}/)) || 'Unknown Total';
-    receiptData.date = lines.find(line => line.match(/\d{2}\/\d{2}\/\d{4}/)) || 'Unknown Date';
+    // Extract store details
+    // Look for lines containing store name, location, and address format
+    const storeDetails = lines.slice(0, 5).join(' '); // Usually at the top of receipt
+    receiptData.storeName = storeDetails.split('\n')[0] || 'Unknown Store';
+    receiptData.storeLocation = storeDetails.match(/(?:Shop|store)\s+.*?(?=Tel:|$)/i)?.[0] || '';
+
+    // Extract invoice/receipt number - multiple formats
+    const invoiceMatch = text.match(/(?:INVOICE|PRO-FORMA INVOICE|RECEIPT):\s*[#]?(\d+)/i);
+    receiptData.invoiceNumber = invoiceMatch ? invoiceMatch[1] : null;
+
+    // Extract date and time
+    const dateTimeMatch = text.match(/(\d{2}\/\d{2}\/\d{4})\s*(\d{2}:\d{2})/);
+    if (dateTimeMatch) {
+        receiptData.date = dateTimeMatch[1];
+        receiptData.time = dateTimeMatch[2];
+    }
+
+    // Extract table information
+    const tableMatch = text.match(/TABLE:\s*(\d+)/i);
+    const coversMatch = text.match(/COVERS:\s*(\d+)/i);
+    receiptData.tableNumber = tableMatch ? tableMatch[1] : null;
+    receiptData.numberOfGuests = coversMatch ? parseInt(coversMatch[1]) : null;
+
+    // Extract bill totals
+    const billExclMatch = text.match(/Bill\s*Excl\s*(\d+\.\d{2})/i);
+    const taxMatch = text.match(/Tax\s*(\d+\.\d{2})/i);
+    const totalMatch = text.match(/Bill\s*Total\s*(\d+\.\d{2})/i);
+
+    receiptData.billSubtotal = billExclMatch ? parseFloat(billExclMatch[1]) : null;
+    receiptData.tax = taxMatch ? parseFloat(taxMatch[1]) : null;
+    receiptData.totalAmount = totalMatch ? parseFloat(totalMatch[1]) : null;
+
+    // Extract line items
+    const items = [];
+    let inItemSection = false;
+    for (const line of lines) {
+        // Look for start of items section
+        if (line.includes('ITEM') && line.includes('QTY') && line.includes('PRICE')) {
+            inItemSection = true;
+            continue;
+        }
+
+        // Stop when we hit totals
+        if (line.includes('Bill Excl') || line.includes('VAT')) {
+            inItemSection = false;
+            break;
+        }
+
+        if (inItemSection) {
+            // Match line item pattern: Item name, quantity, price, value
+            const itemMatch = line.match(/^(.*?)\s+(\d+)\s+(\d+\.\d{2})\s+(\d+\.\d{2})/);
+            if (itemMatch) {
+                items.push({
+                    name: itemMatch[1].trim(),
+                    quantity: parseInt(itemMatch[2]),
+                    unitPrice: parseFloat(itemMatch[3]),
+                    totalPrice: parseFloat(itemMatch[4])
+                });
+            }
+        }
+    }
+    receiptData.items = items;
+
+    // Extract VAT details
+    const vatMatch = text.match(/VAT\s*\d+%\s*(?:\(.*?\))?\s*:?\s*(\d+\.\d{2})/i);
+    receiptData.vat = vatMatch ? parseFloat(vatMatch[1]) : null;
 
     console.log('Parsed receipt data:', receiptData);
     return receiptData;
