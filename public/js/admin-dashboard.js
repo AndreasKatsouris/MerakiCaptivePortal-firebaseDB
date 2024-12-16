@@ -516,99 +516,284 @@ document.querySelectorAll("#wifiReportsTable th").forEach(header => {
         }
 
     // Campaign Management
-    // Event listener for the Campaigns menu item        
-    document.addEventListener('DOMContentLoaded', () => {
-        const campaignForm = document.getElementById('campaignForm');
-        const campaignTable = document.getElementById('campaignTable').querySelector('tbody');
+    document.getElementById('campaignForm').addEventListener('submit', async function (e) {
+        e.preventDefault();
+        const campaignName = document.getElementById('campaignName').value.trim();
+        const brandName = document.getElementById('brandName').value.trim();
+        const criteria = document.getElementById('criteria').value.trim();
     
-        // Load campaigns from Firebase
-        function loadCampaigns() {
-            firebase.database().ref('campaigns').once('value')
-                .then(snapshot => {
-                    campaignTable.innerHTML = '';
-                    const campaigns = snapshot.val();
-                    if (campaigns) {
-                        Object.keys(campaigns).forEach(id => {
-                            const campaign = campaigns[id];
-                            const row = document.createElement('tr');
-                            row.innerHTML = `
-                                <td>${campaign.campaignName}</td>
-                                <td>${campaign.brandName}</td>
-                                <td>${campaign.startDate}</td>
-                                <td>${campaign.endDate}</td>
-                                <td>
-                                    <button class="edit-campaign" data-id="${id}">Edit</button>
-                                    <button class="delete-campaign" data-id="${id}">Delete</button>
-                                </td>
-                            `;
-                            campaignTable.appendChild(row);
-                        });
-                    }else{
-                        campaignTable.innerHTML = '<tr><td colspan="5">No campaigns available</td></tr>';
-                    }
-                    
-                });
+        try {
+            // Save campaign to Firebase
+            const campaignRef = firebase.database().ref('campaigns').push();
+            await campaignRef.set({
+                name: campaignName,
+                brandName,
+                criteria,
+                createdAt: Date.now(),
+            });
+            alert('Campaign saved successfully.');
+            loadCampaigns();
+        } catch (error) {
+            console.error('Error saving campaign:', error);
+            alert('Failed to save campaign.');
         }
+    });
     
-        // Save or update a campaign
-        campaignForm.addEventListener('submit', (e) => {
-            e.preventDefault();
-            const campaignData = {
-                campaignName: campaignForm.campaignName.value,
-                brandName: campaignForm.brandName.value,
-                startDate: campaignForm.startDate.value,
-                endDate: campaignForm.endDate.value,
-            };
-            if (!campaignData.campaignName || !campaignData.brandName || !campaignData.startDate || !campaignData.endDate) {
-                alert('Please fill in all fields.');
-                return;
-            }
-            
-            // Generate a unique ID if creating a new campaign
-            const campaignId = campaignForm.dataset.id || firebase.database().ref('campaigns').push().key;
+    /**
+     * Load and display campaigns in the table
+     */
+    async function loadCampaigns() {
+        const campaignsTable = document.querySelector('#campaignsTable tbody');
+        campaignsTable.innerHTML = ''; // Clear previous rows
     
-            firebase.database().ref(`campaigns/${campaignId}`).set(campaignData)
-                .then(() => {
-                    alert('Campaign saved successfully.');
-                    campaignForm.reset();
-                    delete campaignForm.dataset.id;
-                    loadCampaigns();
-                })
-                .catch(error => {
-                    console.error('Error saving campaign:', error);
+        try {
+            const snapshot = await firebase.database().ref('campaigns').once('value');
+            const campaigns = snapshot.val();
+    
+            if (campaigns) {
+                Object.keys(campaigns).forEach(key => {
+                    const campaign = campaigns[key];
+                    const row = document.createElement('tr');
+                    row.innerHTML = `
+                        <td>${campaign.name}</td>
+                        <td>${campaign.brandName}</td>
+                        <td>
+                            <button class="btn btn-warning" data-key="${key}">Edit</button>
+                            <button class="btn btn-danger" data-key="${key}">Delete</button>
+                        </td>
+                    `;
+                    campaignsTable.appendChild(row);
                 });
-        });
-    
-        // Edit a campaign
-        campaignTable.addEventListener('click', (e) => {
-            if (e.target.classList.contains('edit-campaign')) {
-                const campaignId = e.target.dataset.id;
-                firebase.database().ref(`campaigns/${campaignId}`).once('value')
-                    .then(snapshot => {
-                        const campaign = snapshot.val();
-                        campaignForm.campaignName.value = campaign.campaignName;
-                        campaignForm.brandName.value = campaign.brandName;
-                        campaignForm.startDate.value = campaign.startDate;
-                        campaignForm.endDate.value = campaign.endDate;
-                        campaignForm.dataset.id = campaignId;
-                    });
+            } else {
+                campaignsTable.innerHTML = '<tr><td colspan="3">No campaigns available.</td></tr>';
             }
-        });
+        } catch (error) {
+            console.error('Error loading campaigns:', error);
+        }
+    }
+    /**
+ * Edit a campaign
+ */
+    function editCampaign(campaignKey) {
+        // Fetch campaign data and populate the form for editing
+        admin.database().ref(`campaigns/${campaignKey}`).once('value').then(snapshot => {
+            const campaign = snapshot.val();
     
-        // Delete a campaign
-        campaignTable.addEventListener('click', (e) => {
-            if (e.target.classList.contains('delete-campaign')) {
-                const campaignId = e.target.dataset.id;
-                firebase.database().ref(`campaigns/${campaignId}`).remove()
-                    .then(() => {
-                        alert('Campaign deleted.');
-                        loadCampaigns();
-                    });
-            }
-        });
+            // Populate the form fields
+            document.getElementById('campaignName').value = campaign.name;
+            document.getElementById('brandName').value = campaign.brandName;
+            document.getElementById('criteria').value = campaign.criteria;
     
-        // Initial load
+            // Show editing notice
+            const editNotice = document.getElementById('editNotice');
+            const editingCampaignName = document.getElementById('editingCampaignName');
+            editNotice.style.display = 'block';
+            editingCampaignName.textContent = campaign.name;
+    
+            // Mark form as editing
+            document.getElementById('campaignForm').setAttribute('data-editing-key', campaignKey);
+    
+            // Show cancel button
+            document.getElementById('cancelEditButton').style.display = 'inline-block';
+        }).catch(error => {
+            console.error('Error fetching campaign data for editing:', error);
+        });
+    }
+    
+/**
+ * Handle campaign form submission
+ */
+document.getElementById('campaignForm').addEventListener('submit', async function (e) {
+    e.preventDefault();
+
+    const campaignName = document.getElementById('campaignName').value;
+    const brandName = document.getElementById('brandName').value;
+    const criteria = document.getElementById('criteria').value;
+    const campaignForm = document.getElementById('campaignForm');
+    const campaignKey = campaignForm.getAttribute('data-edit-key'); // Check if editing
+
+    try {
+        if (campaignKey) {
+            // Update existing campaign
+            await admin.database().ref(`campaigns/${campaignKey}`).update({
+                name: campaignName,
+                brandName,
+                criteria,
+            });
+            alert('Campaign updated successfully.');
+            campaignForm.removeAttribute('data-edit-key'); // Clear edit state
+        } else {
+            // Create new campaign
+            const campaignRef = admin.database().ref('campaigns').push();
+            await campaignRef.set({
+                name: campaignName,
+                brandName,
+                criteria,
+                createdAt: Date.now(),
+            });
+            alert('Campaign saved successfully.');
+        }
+
+        // Reset the form and reload campaigns
+        campaignForm.reset();
+        const submitButton = campaignForm.querySelector('button[type="submit"]');
+        submitButton.textContent = 'Save Campaign'; // Reset button text
         loadCampaigns();
+    } catch (error) {
+        console.error('Error saving campaign:', error);
+        alert('Failed to save campaign.');
+    }
+});
+/**
+ * Reset the form after editing or saving
+ */
+function resetCampaignForm() {
+    const campaignForm = document.getElementById('campaignForm');
+    campaignForm.reset();
+    campaignForm.removeAttribute('data-edit-key');
+    const submitButton = campaignForm.querySelector('button[type="submit"]');
+    submitButton.textContent = 'Save Campaign'; // Reset button text
+}
+// Event listener for cancel button
+document.getElementById('cancelEditButton').addEventListener('click', function () {
+    resetCampaignForm();
+});
+
+/**
+ * Reset the campaign form to default state
+ */
+function resetCampaignForm() {
+    // Clear form fields
+    document.getElementById('campaignName').value = '';
+    document.getElementById('brandName').value = '';
+    document.getElementById('criteria').value = '';
+
+    // Hide editing notice
+    const editNotice = document.getElementById('editNotice');
+    editNotice.style.display = 'none';
+
+    // Remove editing mode from the form
+    document.getElementById('campaignForm').removeAttribute('data-editing-key');
+
+    // Hide cancel button
+    document.getElementById('cancelEditButton').style.display = 'none';
+}
+
+function editCampaign(campaignKey) {
+    // Fetch campaign data and populate the form for editing
+    admin.database().ref(`campaigns/${campaignKey}`).once('value').then(snapshot => {
+        const campaign = snapshot.val();
+
+        // Populate the form fields
+        document.getElementById('campaignName').value = campaign.name;
+        document.getElementById('brandName').value = campaign.brandName;
+        document.getElementById('criteria').value = campaign.criteria;
+
+        // Show editing notice
+        const editNotice = document.getElementById('editNotice');
+        const editingCampaignName = document.getElementById('editingCampaignName');
+        editNotice.style.display = 'block';
+        editingCampaignName.textContent = campaign.name;
+
+        // Mark form as editing
+        document.getElementById('campaignForm').setAttribute('data-editing-key', campaignKey);
+
+        // Show cancel button
+        document.getElementById('cancelEditButton').style.display = 'inline-block';
+    }).catch(error => {
+        console.error('Error fetching campaign data for editing:', error);
+    });
+}
+
+// Update loadCampaigns to reset the form if a campaign is loaded after editing
+async function loadCampaigns() {
+    const campaignsTable = document.querySelector('#campaignsTable tbody');
+    campaignsTable.innerHTML = ''; // Clear existing rows
+
+    try {
+        const campaigns = await admin.database().ref('campaigns').once('value');
+        const campaignData = campaigns.val();
+
+        if (campaignData) {
+            Object.keys(campaignData).forEach(key => {
+                const campaign = campaignData[key];
+                const row = document.createElement('tr');
+                row.innerHTML = `
+                    <td>${campaign.name}</td>
+                    <td>${campaign.brandName}</td>
+                    <td>
+                        <button class="btn btn-warning edit-campaign" data-key="${key}">Edit</button>
+                        <button class="btn btn-danger delete-campaign" data-key="${key}">Delete</button>
+                    </td>
+                `;
+                campaignsTable.appendChild(row);
+            });
+
+            // Add event listeners for edit and delete
+            document.querySelectorAll('.edit-campaign').forEach(button => {
+                button.addEventListener('click', function () {
+                    editCampaign(this.getAttribute('data-key'));
+                });
+            });
+
+            document.querySelectorAll('.delete-campaign').forEach(button => {
+                button.addEventListener('click', function () {
+                    deleteCampaign(this.getAttribute('data-key'));
+                });
+            });
+        } else {
+            campaignsTable.innerHTML = '<tr><td colspan="3">No campaigns available.</td></tr>';
+        }
+
+        // Reset the form when campaigns are reloaded
+        resetCampaignForm();
+    } catch (error) {
+        console.error('Error loading campaigns:', error);
+    }
+}
+document.getElementById('campaignForm').addEventListener('submit', async function (e) {
+    e.preventDefault();
+
+    const campaignName = document.getElementById('campaignName').value;
+    const brandName = document.getElementById('brandName').value;
+    const criteria = document.getElementById('criteria').value;
+
+    // Check if we are in editing mode
+    const editingKey = this.getAttribute('data-editing-key');
+
+    try {
+        if (editingKey) {
+            // Update existing campaign
+            await admin.database().ref(`campaigns/${editingKey}`).update({
+                name: campaignName,
+                brandName,
+                criteria,
+            });
+
+            alert('Campaign updated successfully.');
+        } else {
+            // Create new campaign
+            const campaignRef = admin.database().ref('campaigns').push();
+            await campaignRef.set({
+                name: campaignName,
+                brandName,
+                criteria,
+                createdAt: Date.now(),
+            });
+
+            alert('Campaign created successfully.');
+        }
+
+        // Reload campaigns and reset form
+        loadCampaigns();
+    } catch (error) {
+        console.error('Error saving campaign:', error);
+        alert('Failed to save campaign.');
+    }
+});
+
+
+    
     });
         
-});
+
