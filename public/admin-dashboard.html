@@ -34,13 +34,13 @@
             <li class="menu-item">
                 <a href="#" id="loyaltyMenu">Loyalty</a>
                 <ul class="submenu">
-                    <li><a href="#" id="campaignManagementMenu">Campaign ----- Management</a></li>
+                    <li><a href="#" id="campaignManagementMenu">Campaign Management</a></li>
                     <li><a href="#" id="receiptScanningMenu">Receipt Scanning</a></li>
                     <li><a href="#" id="loyaltySettingsMenu">Loyalty Settings</a></li>
                     <li><a href="#" id="loyaltyReportsMenu">Reports</a></li>
                 </ul>
             </li>
-            <li class="menu-item menu-item-live-data">
+            <li class="menu-item">
                 <a href="#">Live Data</a>
                 <ul class="submenu">
                     <li><a href="#" id="dataDeletionMenu">Delete Selected Data</a></li>
@@ -198,37 +198,37 @@
             </tbody>
         </table>
     </div>
-    <div id="campaignManagementContent" class="content-section" >
+    <div id="campaignManagementContent" class="content-section">
         <h2>Campaign Management</h2>
         <form id="campaignForm">
-        <!-- Notice to indicate editing mode -->
-        <div id="editNotice" class="alert alert-info" style="display: none;">
-            Editing Campaign: <span id="editingCampaignName"></span>
-        </div>
+            <!-- Notice to indicate editing mode -->
+            <div id="editNotice" class="alert alert-info" style="display: none;">
+                Editing Campaign: <span id="editingCampaignName"></span>
+            </div>
             <div class="form-group">
                 <label for="campaignName">Campaign Name:</label>
                 <input type="text" id="campaignName" name="campaignName" class="form-control" placeholder="Enter campaign name" required>
             </div>
             <div class="form-group">
                 <label for="brandName">Brand Name:</label>
-                <input type="text" id="brandName" name="brandName" placeholder="Enter brand name" class="form-control" required>
+                <input type="text" id="brandName" name="brandName" class="form-control" placeholder="Enter brand name" required>
             </div>
             <div class="form-group">
                 <label for="startDate">Start Date:</label>
-                <input type="date" id="startDate" name="startDate" required>
+                <input type="date" id="startDate" name="startDate" class="form-control" required>
             </div>
             <div class="form-group">
                 <label for="endDate">End Date:</label>
-                <input type="date" id="endDate" name="endDate" required>
+                <input type="date" id="endDate" name="endDate" class="form-control" required>
             </div>
             <div class="form-group">
-                <button type="submit" class="save-button">Save Campaign</button>
+                <button type="submit" class="btn btn-primary save-button">Save Campaign</button>
+                <button type="button" id="cancelEditButton" class="btn btn-secondary" style="display: none;">
+                    Cancel
+                </button>
             </div>
-            <button type="button" id="cancelEditButton" class="btn btn-secondary" style="display: none;">
-                Cancel
-            </button>
-            
         </form>
+        
         <h3>Existing Campaigns</h3>
         <table id="campaignTable" class="table">
             <thead>

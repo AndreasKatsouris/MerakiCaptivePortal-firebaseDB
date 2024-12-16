@@ -34,15 +34,8 @@ document.addEventListener('DOMContentLoaded', function () {
             });
         });
     }
-    // Event listener for Campaign Management menu
-    document.querySelector('#campaignManagementMenu').addEventListener('click', function(e) {
-    e.preventDefault();
-    displaySection('campaignManagementContent');
-    loadCampaigns(); // Load existing campaigns
-    });
-
     // Event listener for WiFi Reports menu item
-document.querySelector('#wifiReportsMenu').addEventListener('click', function(e) {
+    document.querySelector('#wifiReportsMenu').addEventListener('click', function(e) {
     e.preventDefault();
     displaySection('wifiReportsContent'); // Display the WiFi Reports section
     fetchWiFiReports(); // Fetch and display the WiFi reports
