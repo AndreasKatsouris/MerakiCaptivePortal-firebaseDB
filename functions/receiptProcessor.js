@@ -1,6 +1,5 @@
 const vision = require('@google-cloud/vision');
 const admin = require('firebase-admin');
-const { validateReceipt } = require('./guardRail');
 
 // Initialize the Google Cloud Vision API client
 const client = new vision.ImageAnnotatorClient();
@@ -12,9 +11,9 @@ const client = new vision.ImageAnnotatorClient();
  * @param {string} brandName - The brand associated with the receipt campaign
  * @returns {Promise<object>} - Parsed receipt data
  */
-async function processReceipt(imageUrl) {
+async function processReceipt(imageUrl, guestPhoneNumber) {
     try {
-        console.log(`Processing receipt for: Brand: ${brandName}, Image: ${imageUrl}`);
+        console.log(`Processing receipt for: ${guestPhoneNumber}, Image: ${imageUrl}`);
         // Perform text detection on the receipt image
         const [result] = await client.textDetection(imageUrl);
         const detections = result.textAnnotations;
@@ -27,14 +26,19 @@ async function processReceipt(imageUrl) {
         const fullText = detections[0].description;
         console.log('Full text extracted:', fullText);
 
-        // Validate receipt data using guardRails
-        //const validation = validateReceipt(fullText, brandName);
-        //if (!validation.isValid) {
-        //    throw new Error(`Validation failed: ${validation.message}`);
-        //}
-
         // Parse receipt data (example: total amount, date, store name, etc.)
+
         const parsedData = parseReceiptData(fullText);
+        // Save processed receipt data to Firebase
+        const receiptRef = admin.database().ref('processedReceipts').push();
+        await receiptRef.set({
+            guestPhoneNumber,
+            imageUrl,
+            parsedData,
+            processedAt: Date.now(),
+        });
+
+        console.log('Receipt successfully processed and stored.');
         return parsedData;
     } catch (error) {
         console.error('Error processing receipt:', error.message);
