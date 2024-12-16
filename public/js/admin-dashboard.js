@@ -543,7 +543,10 @@ document.querySelectorAll("#wifiReportsTable th").forEach(header => {
                             `;
                             campaignTable.appendChild(row);
                         });
+                    }else{
+                        campaignTable.innerHTML = '<tr><td colspan="5">No campaigns available</td></tr>';
                     }
+                    
                 });
         }
     
@@ -556,7 +559,11 @@ document.querySelectorAll("#wifiReportsTable th").forEach(header => {
                 startDate: campaignForm.startDate.value,
                 endDate: campaignForm.endDate.value,
             };
-    
+            if (!campaignData.campaignName || !campaignData.brandName || !campaignData.startDate || !campaignData.endDate) {
+                alert('Please fill in all fields.');
+                return;
+            }
+            
             // Generate a unique ID if creating a new campaign
             const campaignId = campaignForm.dataset.id || firebase.database().ref('campaigns').push().key;
     
