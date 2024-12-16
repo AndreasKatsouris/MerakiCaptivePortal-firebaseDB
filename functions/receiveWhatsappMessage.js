@@ -138,7 +138,7 @@ async function receiveWhatsAppMessage(req, res) {
                 let validationResult = null;
 
                 for (const campaign of activeCampaigns) {
-                    const result = await validateReceipt(receiptData, campaign.name);
+                    const result = await validateReceipt(receiptData, campaign.brandName);
                     if (result.isValid) {
                         matchedCampaign = campaign;
                         validationResult = result;
