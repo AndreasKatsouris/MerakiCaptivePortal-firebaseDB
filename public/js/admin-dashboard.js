@@ -409,12 +409,15 @@ async function saveCampaignToFirebase(campaignData) {
 // Add loading state to section transitions
 function displaySection(sectionId) {
     showLoading();
+    console.log('Displaying section:', sectionId); // Debug
     document.querySelectorAll('.content-section').forEach(section => {
         if (section.id === sectionId) {
             section.style.display = 'block';
             section.classList.add('fade-in');
+            console.log(section.id, section.style.display); // Debug
         } else {
             section.style.display = 'none';
+            console.log(section.id, section.style.display); // Debug
         }
     });
     setTimeout(hideLoading, 300); // Short delay to show transition
@@ -433,20 +436,6 @@ function showTableLoading(tableId) {
     `;
 }
 
-// Update showReceiptModal
-async function showReceiptModal(receiptId) {
-    showLoading();
-    try {
-        const receipt = await fetchReceiptDetails(receiptId);
-        populateReceiptModal(receipt);
-        $('#receiptDetailsModal').modal('show');
-    } catch (error) {
-        console.error('Error showing receipt details:', error);
-        alert('Error loading receipt details');
-    } finally {
-        hideLoading();
-    }
-}
 
 // Update form submission
 document.getElementById('campaignForm').addEventListener('submit', async function(e) {
