@@ -38,6 +38,15 @@ function handleLogout() {
         });
 }
 
+function addEventListenerSafely(elementId, event, handler) {
+    const element = document.getElementById(elementId);
+    if (element) {
+        element.addEventListener(event, handler);
+    } else {
+        console.warn(`Element with id '${elementId}' not found`);
+    }
+}
+
 // ==================== Menu Section ====================
 function initializeMenuListeners() {
     document.querySelectorAll('.menu-item > a').forEach(item => {
@@ -53,18 +62,14 @@ function initializeMenuListeners() {
 
 // ==================== Campaign Management Section ====================
 function initializeCampaignListeners() {
-    // Campaign Menu Click
-    document.querySelector('#campaignManagementMenu').addEventListener('click', function(e) {
+    addEventListenerSafely('campaignManagementMenu', 'click', function(e) {
         e.preventDefault();
         displaySection('campaignManagementContent');
         loadCampaigns();
     });
 
-    // Save Campaign Button in Modal
-    document.getElementById('saveCampaignBtn').addEventListener('click', handleSaveCampaign);
-
-    // Cancel Button
-    document.getElementById('cancelEditButton').addEventListener('click', resetCampaignForm);
+    addEventListenerSafely('saveCampaignBtn', 'click', handleSaveCampaign);
+    addEventListenerSafely('cancelEditButton', 'click', resetCampaignForm);
 }
 
 function showCreateCampaignModal() {
@@ -271,11 +276,66 @@ function initializeWiFiListeners() {
         displaySection('wifiSettingsContent');
     });
 
+    function handleWiFiDeviceSubmit(e) {
+        e.preventDefault();
+        const macAddress = document.querySelector('#deviceMac').value;
+        const storeId = document.querySelector('#storeId').value;
+        const location = document.querySelector('#location').value;
+        const deviceType = document.querySelector('#deviceType').value;
+
+        // Save to Firebase
+        const deviceRef = firebase.database().ref('accessPoints/').push();
+        deviceRef.set({
+            macAddress,
+            storeId,
+            location,
+            deviceType
+        }).then(() => {
+            alert('Device added successfully');
+            loadDevices();
+        }).catch(error => {
+            console.error('Error adding device:', error);
+        });
+    }
+
     // WiFi Devices Form
     document.querySelector('#wifiDevicesForm').addEventListener('submit', handleWiFiDeviceSubmit);
 }
 
 // [Your existing WiFi-related functions here]
+
+async function fetchWiFiReports() {
+    showLoading();
+    const tableBody = document.querySelector('#wifiReportsTable tbody');
+    tableBody.innerHTML = '';
+
+    try {
+        const snapshot = await firebase.database().ref('wifiLogins/').once('value');
+        const data = snapshot.val();
+        
+        if (data) {
+            Object.keys(data).forEach(key => {
+                const record = data[key];
+                const row = document.createElement('tr');
+                row.innerHTML = `
+                    <td>${record.name || 'N/A'}</td>
+                    <td>${record.email || 'N/A'}</td>
+                    <td>${record.localTimeStamp || 'N/A'}</td>
+                    <td>${record.accessPointMAC || 'N/A'}</td>
+                    <td>${key}</td>
+                `;
+                tableBody.appendChild(row);
+            });
+        } else {
+            tableBody.innerHTML = '<tr><td colspan="5">No data available</td></tr>';
+        }
+    } catch (error) {
+        console.error('Error fetching WiFi login data:', error);
+        tableBody.innerHTML = '<tr><td colspan="5">Error loading data</td></tr>';
+    } finally {
+        hideLoading();
+    }
+}
 
 // ==================== Live Data Section ====================
 function initializeLiveDataListeners() {
@@ -322,9 +382,15 @@ function displaySection(sectionId) {
     });
 }
 
-function loadInitialData() {
-    loadCampaigns();
-    fetchWiFiReports();
+async function loadInitialData() {
+    try {
+        await Promise.all([
+            loadCampaigns(),
+            fetchWiFiReports()
+        ]);
+    } catch (error) {
+        console.error('Error loading initial data:', error);
+    }
 }
 
 // Add error handling wrapper for async functions
@@ -487,3 +553,4 @@ document.getElementById('campaignForm').addEventListener('submit', async functio
         submitButton.disabled = false;
     }
 });
+
