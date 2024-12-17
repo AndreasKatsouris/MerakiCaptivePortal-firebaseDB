@@ -15,23 +15,51 @@ if (!admin.apps.length) {
 /**
  * Process rewards for validated receipts
  */
+// In receiveWhatsappMessage.js
+
 async function processReward(guest, campaign, receiptData) {
     try {
         const rewardRef = admin.database().ref('rewards').push();
         const rewardData = {
+            // Guest Information
             guestPhone: guest.phoneNumber,
             guestName: guest.name,
+            
+            // Campaign Information
             campaignId: campaign.id,
             campaignName: campaign.name,
+            
+            // Receipt Information
+            receiptId: receiptData.receiptId,
             receiptAmount: receiptData.totalAmount,
             receiptNumber: receiptData.invoiceNumber,
+            
+            // Reward Status
             status: 'pending',
-            createdAt: Date.now()
+            createdAt: admin.database.ServerValue.TIMESTAMP,
+            updatedAt: admin.database.ServerValue.TIMESTAMP
         };
 
-        await rewardRef.set(rewardData);
-        console.log(`Reward created for guest ${guest.name} under campaign ${campaign.name}`);
+        // Structure the database updates
+        const updates = {};
+        
+        // Store reward data
+        updates[`rewards/${rewardRef.key}`] = rewardData;
+        
+        // Create indexes for quick lookups
+        updates[`guest-rewards/${guest.phoneNumber}/${rewardRef.key}`] = true;
+        updates[`campaign-rewards/${campaign.id}/${rewardRef.key}`] = true;
+        updates[`receipt-rewards/${receiptData.receiptId}`] = rewardRef.key;
 
+        // Update receipt status
+        updates[`receipts/${receiptData.receiptId}/status`] = 'validated';
+        updates[`receipts/${receiptData.receiptId}/validatedAt`] = admin.database.ServerValue.TIMESTAMP;
+        updates[`receipts/${receiptData.receiptId}/campaignId`] = campaign.id;
+
+        // Perform all updates atomically
+        await admin.database().ref().update(updates);
+
+        console.log(`Reward created for guest ${guest.name} under campaign ${campaign.name}`);
         return rewardData;
     } catch (error) {
         console.error('Error processing reward:', error);

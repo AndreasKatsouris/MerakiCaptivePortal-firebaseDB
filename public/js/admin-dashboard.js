@@ -697,6 +697,94 @@ function resetCampaignForm() {
 document.getElementById('cancelEditButton').addEventListener('click', function() {
     resetCampaignForm();
 });
+
+// Function to show receipt details in modal
+async function showReceiptModal(receiptId) {
+    try {
+        // Fetch receipt details from Firebase
+        const snapshot = await firebase.database().ref(`receipts/${receiptId}`).once('value');
+        const receipt = snapshot.val();
+
+        if (!receipt) {
+            alert('Receipt not found');
+            return;
+        }
+
+        // Populate modal fields
+        document.getElementById('modalStoreName').textContent = receipt.storeName;
+        document.getElementById('modalStoreLocation').textContent = receipt.storeLocation;
+        document.getElementById('modalInvoiceNumber').textContent = receipt.invoiceNumber;
+        document.getElementById('modalDate').textContent = new Date(receipt.date).toLocaleDateString();
+        document.getElementById('modalTime').textContent = receipt.time;
+        document.getElementById('modalTableNumber').textContent = receipt.tableNumber;
+        document.getElementById('modalGuestPhone').textContent = receipt.guestPhoneNumber;
+        
+        // Fetch and display guest name
+        const guestSnapshot = await firebase.database().ref(`guests/${receipt.guestPhoneNumber}`).once('value');
+        const guest = guestSnapshot.val();
+        document.getElementById('modalGuestName').textContent = guest ? guest.name : 'N/A';
+
+        // Populate items table
+        const itemsTableBody = document.getElementById('modalItemsTable');
+        itemsTableBody.innerHTML = '';
+        receipt.items.forEach(item => {
+            const row = document.createElement('tr');
+            row.innerHTML = `
+                <td>${item.name}</td>
+                <td>${item.quantity}</td>
+                <td>R${item.unitPrice.toFixed(2)}</td>
+                <td>R${item.totalPrice.toFixed(2)}</td>
+            `;
+            itemsTableBody.appendChild(row);
+        });
+
+        // Populate totals
+        document.getElementById('modalSubtotal').textContent = `R${receipt.subtotal.toFixed(2)}`;
+        document.getElementById('modalTax').textContent = `R${receipt.tax.toFixed(2)}`;
+        document.getElementById('modalTotal').textContent = `R${receipt.totalAmount.toFixed(2)}`;
+
+        // Show receipt image
+        document.getElementById('modalReceiptImage').src = receipt.imageUrl;
+
+        // Show/hide validation buttons based on status
+        const validateBtn = document.getElementById('modalValidateBtn');
+        const rejectBtn = document.getElementById('modalRejectBtn');
+        if (receipt.status === 'pending_validation') {
+            validateBtn.style.display = 'block';
+            rejectBtn.style.display = 'block';
+        } else {
+            validateBtn.style.display = 'none';
+            rejectBtn.style.display = 'none';
+        }
+
+        // Add event listeners for validate/reject buttons
+        validateBtn.onclick = () => validateReceipt(receiptId);
+        rejectBtn.onclick = () => rejectReceipt(receiptId);
+
+        // Show the modal
+        $('#receiptDetailsModal').modal('show');
+
+    } catch (error) {
+        console.error('Error showing receipt details:', error);
+        alert('Error loading receipt details');
+    }
+}
+
+async function validateReceipt(receiptId) {
+    if (confirm('Are you sure you want to validate this receipt?')) {
+        await updateReceiptStatus(receiptId, 'validated');
+        $('#receiptDetailsModal').modal('hide');
+        loadReceipts(); // Reload the table
+    }
+}
+
+async function rejectReceipt(receiptId) {
+    if (confirm('Are you sure you want to reject this receipt?')) {
+        await updateReceiptStatus(receiptId, 'rejected');
+        $('#receiptDetailsModal').modal('hide');
+        loadReceipts(); // Reload the table
+    }
+}
     
 });
         

@@ -11,9 +11,12 @@ const client = new vision.ImageAnnotatorClient();
  * @param {string} brandName - The brand associated with the receipt campaign
  * @returns {Promise<object>} - Parsed receipt data
  */
-async function processReceipt(imageUrl, guestPhoneNumber) {
+// In receiptProcessor.js
+
+async function processReceipt(imageUrl, phoneNumber) {
     try {
-        console.log(`Processing receipt for: ${guestPhoneNumber}, Image: ${imageUrl}`);
+        console.log(`Processing receipt for: ${phoneNumber}, Image: ${imageUrl}`);
+        
         // Perform text detection on the receipt image
         const [result] = await client.textDetection(imageUrl);
         const detections = result.textAnnotations;
@@ -22,27 +25,65 @@ async function processReceipt(imageUrl, guestPhoneNumber) {
             throw new Error('No text detected on the receipt.');
         }
 
-        // Extract full text from the receipt (assuming the first result is the most accurate)
+        // Extract full text and parse receipt data
         const fullText = detections[0].description;
-        console.log('Full text extracted:', fullText);
-
-        // Parse receipt data (example: total amount, date, store name, etc.)
-
         const parsedData = parseReceiptData(fullText);
-        // Save processed receipt data to Firebase
-        const receiptRef = admin.database().ref('processedReceipts').push();
-        await receiptRef.set({
-            guestPhoneNumber,
-            imageUrl,
-            invoiceNumber: parsedData.invoiceNumber, // Add this field
-            parsedData,
-            processedAt: Date.now(),
-        });
 
-        console.log('Receipt successfully processed and stored.');
-        return parsedData;
+        // Save full receipt data with relationships
+        const receiptData = {
+            // Receipt Details
+            invoiceNumber: parsedData.invoiceNumber,
+            storeName: parsedData.storeName,
+            storeLocation: parsedData.storeLocation,
+            date: parsedData.date,
+            time: parsedData.time,
+            
+            // Line Items
+            items: parsedData.items,
+            
+            // Totals
+            subtotal: parsedData.billSubtotal,
+            tax: parsedData.tax,
+            totalAmount: parsedData.totalAmount,
+            
+            // Additional Info
+            tableNumber: parsedData.tableNumber,
+            numberOfGuests: parsedData.numberOfGuests,
+            
+            // Metadata
+            imageUrl: imageUrl,
+            processedAt: admin.database.ServerValue.TIMESTAMP,
+            
+            // Relationships
+            guestPhoneNumber: phoneNumber, // Link to guest
+            status: 'pending_validation', // Receipt status
+            
+            // Original Data (for reference)
+            rawText: fullText
+        };
+
+        // Create a unique ID for the receipt using invoice number if available
+        const receiptId = parsedData.invoiceNumber || admin.database().ref().push().key;
+        
+        // Structure the database updates
+        const updates = {};
+        
+        // Store receipt data
+        updates[`receipts/${receiptId}`] = receiptData;
+        
+        // Create index by phone number for quick guest receipt lookup
+        updates[`guest-receipts/${phoneNumber}/${receiptId}`] = true;
+
+        // Perform all updates atomically
+        await admin.database().ref().update(updates);
+
+        console.log('Receipt data saved with ID:', receiptId);
+        return {
+            receiptId,
+            ...receiptData
+        };
     } catch (error) {
-        console.error('Error processing receipt:', error.message);
+        console.error('Error processing receipt:', error);
         throw new Error(`Failed to process receipt: ${error.message}`);
     }
 }
