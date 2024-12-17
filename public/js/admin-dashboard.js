@@ -57,6 +57,12 @@ function initializeMenuListeners() {
     document.querySelectorAll('.menu-item > a').forEach(item => {
         item.addEventListener('click', function(e) {
             e.preventDefault();
+            document.querySelectorAll('.submenu').forEach(menu => {
+                // Skip the current submenu
+                if (menu !== this.nextElementSibling) {
+                    menu.style.display = 'none';
+                }
+            });
             const submenu = this.nextElementSibling;
             if (submenu) {
                 submenu.style.display = submenu.style.display === 'block' ? 'none' : 'block';
