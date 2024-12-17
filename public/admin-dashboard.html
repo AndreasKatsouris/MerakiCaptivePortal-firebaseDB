@@ -19,48 +19,75 @@
     <link rel="stylesheet" href="css/admin-style.css">
 </head>
 <body>
-
+    <!-- Header -->
+    <div class="main-header">
+        <div class="header-search">
+            <i class="fas fa-search"></i>
+            <input type="text" placeholder="Search...">
+        </div>
+        <div class="header-actions">
+            <div class="notifications">
+                <i class="fas fa-bell"></i>
+                <span class="badge">3</span>
+            </div>
+            <div class="user-profile">
+                <img src="/images/avatar.png" alt="User Avatar">
+                <span>Admin User</span>
+            </div>
+        </div>
+    </div>
+    <!-- End of Header-->
     <!-- Sidebar -->
     <div class="sidebar">
-        <ul>
-               <li class="menu-item">
-                <a href="#" id="wifiMenu">Wifi</a>
-                <ul class="submenu">
-                    <li><a href="#" id="wifiSettingsMenu">Wifi Settings</a></li>
-                    <li><a href="#" id="wifiDevicesMenu">WiFi Devices</a></li>
-                    <li><a href="#" id="wifiReportsMenu">Wifi Reports</a></li>
-                </ul>
-            </li>
-            <li class="menu-item">
-                <a href="#" id="loyaltyMenu">Loyalty</a>
-                <ul class="submenu">
-                    <li><a href="#" id="campaignManagementMenu">Campaign Management</a></li>
-                    <li><a href="#" id="receiptScanningMenu">Receipt Scanning</a></li>
-                    <li><a href="#" id="loyaltySettingsMenu">Loyalty Settings</a></li>
-                    <li><a href="#" id="loyaltyReportsMenu">Reports</a></li>
-                </ul>
-            </li>
-            <li class="menu-item">
-                <a href="#" id="rewardsMenu">Rewards & Receipts</a>
-                <ul class="submenu">
-                    <li><a href="#" id="receiptManagementMenu">Receipt Management</a></li>
-                    <li><a href="#" id="rewardsManagementMenu">Rewards Management</a></li>
-                    <li><a href="#" id="rewardsReportsMenu">Reports</a></li>
-                </ul>
-            </li>
-            <li class="menu-item">
-                <a href="#">Live Data</a>
-                <ul class="submenu">
-                    <li><a href="#" id="dataDeletionMenu">Delete Selected Data</a></li>
-                    <li><a href="#" id="deleteAllDataMenu">Delete All Data</a></li>
-                </ul>
-            </li>            
-        <!-- Logout Button -->
-        <li class="menu-item">
-            <a href="#" id="logoutButton" class="logout-button">Logout</a>
-        </li>
-            
-        </ul>
+        <div class="sidebar-header">
+            <img src="/images/logo.png" alt="RDP Logo" class="logo">
+            <h3>RDP Admin</h3>
+        </div>
+        <nav class="sidebar-nav">
+            <ul>
+                <li class="nav-item">
+                    <a href="#" class="nav-link" data-toggle="collapse" data-target="#wifiSubmenu">
+                        <i class="fas fa-wifi"></i>
+                        <span>WiFi Management</span>
+                        <i class="fas fa-chevron-down"></i>
+                    </a>
+                    <ul class="collapse submenu" id="wifiSubmenu">
+                        <li><a href="#" id="wifiSettingsMenu">Settings</a></li>
+                        <li><a href="#" id="wifiDevicesMenu">Devices</a></li>
+                        <li><a href="#" id="wifiReportsMenu">Reports</a></li>
+                    </ul>
+                </li>
+                <li class="nav-item">
+                    <a href="#" class="nav-link" data-toggle="collapse" data-target="#loyaltySubmenu">
+                        <i class="fas fa-gift"></i>
+                        <span>Loyalty Programs</span>
+                        <i class="fas fa-chevron-down"></i>
+                    </a>
+                    <ul class="collapse submenu" id="loyaltySubmenu">
+                        <li><a href="#" id="campaignManagementMenu">Campaigns</a></li>
+                        <li><a href="#" id="receiptScanningMenu">Receipts</a></li>
+                        <li><a href="#" id="loyaltySettingsMenu">Settings</a></li>
+                    </ul>
+                </li>
+                <li class="nav-item">
+                    <a href="#" class="nav-link" data-toggle="collapse" data-target="#dataSubmenu">
+                        <i class="fas fa-chart-line"></i>
+                        <span>Analytics</span>
+                        <i class="fas fa-chevron-down"></i>
+                    </a>
+                    <ul class="collapse submenu" id="dataSubmenu">
+                        <li><a href="#" id="liveDataMenu">Live Data</a></li>
+                        <li><a href="#" id="dataDeletionMenu">Data Management</a></li>
+                    </ul>
+                </li>
+            </ul>
+        </nav>
+        <div class="sidebar-footer">
+            <a href="#" id="logoutButton">
+                <i class="fas fa-sign-out-alt"></i>
+                <span>Logout</span>
+            </a>
+        </div>
     </div>
 
 <!-- Main Content -->
@@ -208,72 +235,62 @@
     </div>
     <!-- Campaign Management System -->
     <div id="campaignManagementContent" class="content-section">
-        <h2>Campaign Management</h2>
-        <form id="campaignForm">
-            <div id="editNotice" class="alert alert-info" style="display: none;">
-                Editing Campaign: <span id="editingCampaignName"></span>
+        <div class="page-header">
+            <h1>Campaign Management</h1>
+            <button class="btn btn-primary" onclick="showCreateCampaignModal()">
+                <i class="fas fa-plus"></i> New Campaign
+            </button>
+        </div>
+    
+        <div class="row">
+            <div class="col-md-3">
+                <div class="stats-card">
+                    <div class="stats-value">12</div>
+                    <div class="stats-label">Active Campaigns</div>
+                </div>
             </div>
-            <div class="form-group">
-                <label for="campaignName">Campaign Name:</label>
-                <input type="text" id="campaignName" name="campaignName" class="form-control" required>
+            <div class="col-md-3">
+                <div class="stats-card">
+                    <div class="stats-value">458</div>
+                    <div class="stats-label">Total Receipts</div>
+                </div>
             </div>
-            <div class="form-group">
-                <label for="brandName">Brand Name:</label>
-                <input type="text" id="brandName" name="brandName" class="form-control" required>
+            <div class="col-md-3">
+                <div class="stats-card">
+                    <div class="stats-value">R24,567</div>
+                    <div class="stats-label">Total Rewards</div>
+                </div>
             </div>
-            <!-- New Fields -->
-            <div class="form-group">
-                <label for="minPurchaseAmount">Minimum Purchase Amount:</label>
-                <input type="number" id="minPurchaseAmount" name="minPurchaseAmount" class="form-control" min="0" step="0.01">
+            <div class="col-md-3">
+                <div class="stats-card">
+                    <div class="stats-value">89%</div>
+                    <div class="stats-label">Success Rate</div>
+                </div>
             </div>
-            <div class="form-group">
-                <label for="maxSubmissionsPerUser">Max Submissions Per User:</label>
-                <input type="number" id="maxSubmissionsPerUser" name="maxSubmissionsPerUser" class="form-control" min="1" value="1">
+        </div>
+    
+        <div class="card">
+            <div class="card-header">
+                <h2>Active Campaigns</h2>
+                <div class="header-actions">
+                    <div class="dropdown">
+                        <button class="btn btn-light">
+                            <i class="fas fa-filter"></i> Filter
+                        </button>
+                    </div>
+                    <div class="dropdown">
+                        <button class="btn btn-light">
+                            <i class="fas fa-sort"></i> Sort
+                        </button>
+                    </div>
+                </div>
             </div>
-            <div class="form-group">
-                <label for="validLocations">Valid Store Locations:</label>
-                <input type="text" id="validLocations" name="validLocations" class="form-control" placeholder="Enter comma-separated locations">
+            <div class="card-body">
+                <table class="table">
+                    <!-- Table content -->
+                </table>
             </div>
-            <div class="form-group">
-                <label for="startDate">Start Date:</label>
-                <input type="date" id="startDate" name="startDate" class="form-control" required>
-            </div>
-            <div class="form-group">
-                <label for="endDate">End Date:</label>
-                <input type="date" id="endDate" name="endDate" class="form-control" required>
-            </div>
-            <div class="form-group">
-                <label for="campaignStatus">Status:</label>
-                <select id="campaignStatus" name="campaignStatus" class="form-control" required>
-                    <option value="draft">Draft</option>
-                    <option value="active">Active</option>
-                    <option value="paused">Paused</option>
-                    <option value="completed">Completed</option>
-                </select>
-            </div>
-            <div class="form-group">
-                <button type="submit" class="btn btn-primary save-button">Save Campaign</button>
-                <button type="button" id="cancelEditButton" class="btn btn-secondary" style="display: none;">Cancel</button>
-            </div>
-        </form>
-        <!-- Update table headers -->
-        <h3>Existing Campaigns</h3>
-        <table id="campaignTable" class="table">
-            <thead>
-                <tr>
-                    <th>Campaign Name</th>
-                    <th>Brand Name</th>
-                    <th>Min Purchase</th>
-                    <th>Start Date</th>
-                    <th>End Date</th>
-                    <th>Status</th>
-                    <th>Actions</th>
-                </tr>
-            </thead>
-            <tbody>
-                <!-- Dynamically populated -->
-            </tbody>
-        </table>
+        </div>
     </div>
     
     <div id="receiptScanningContent" class="content-section" style="display: none;">
