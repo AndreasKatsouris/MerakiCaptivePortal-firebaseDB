@@ -12,6 +12,9 @@
     <script src="/__/firebase/10.12.5/firebase-storage-compat.js"></script>
     <script src="/__/firebase/init.js?useEmulator=false"></script>
 
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/moment.js/2.29.1/moment.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
     <!-- Link to Bootstrap and FontAwesome -->
     <link rel="stylesheet" href="css/bootstrap.min.css">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
@@ -562,6 +565,115 @@
         </div>
     </div>
 </div>
+
+<!-- Add this as a new content section in your admin-dashboard.html -->
+<div id="dashboardContent" class="content-section">
+    <div class="dashboard-header">
+        <h1>Dashboard Overview</h1>
+        <div class="date-filter">
+            <select id="dashboardDateRange" class="form-control">
+                <option value="today">Today</option>
+                <option value="week">This Week</option>
+                <option value="month" selected>This Month</option>
+                <option value="year">This Year</option>
+            </select>
+        </div>
+    </div>
+
+    <!-- Quick Stats Section -->
+    <div class="row mb-4">
+        <div class="col-md-3">
+            <div class="stats-card">
+                <i class="fas fa-bullhorn stats-icon"></i>
+                <div class="stats-value" id="activeCampaignsCount">0</div>
+                <div class="stats-label">Active Campaigns</div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="stats-card">
+                <i class="fas fa-receipt stats-icon"></i>
+                <div class="stats-value" id="totalReceiptsCount">0</div>
+                <div class="stats-label">Total Receipts</div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="stats-card">
+                <i class="fas fa-users stats-icon"></i>
+                <div class="stats-value" id="activeUsersCount">0</div>
+                <div class="stats-label">Active Users</div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="stats-card">
+                <i class="fas fa-chart-line stats-icon"></i>
+                <div class="stats-value" id="conversionRate">0%</div>
+                <div class="stats-label">Conversion Rate</div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Charts Row -->
+    <div class="row mb-4">
+        <div class="col-md-8">
+            <div class="card">
+                <div class="card-header">
+                    <h5>Campaign Performance</h5>
+                </div>
+                <div class="card-body">
+                    <canvas id="campaignPerformanceChart"></canvas>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-4">
+            <div class="card">
+                <div class="card-header">
+                    <h5>Receipt Status Distribution</h5>
+                </div>
+                <div class="card-body">
+                    <canvas id="receiptStatusChart"></canvas>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Recent Activity Section -->
+    <div class="row">
+        <div class="col-md-6">
+            <div class="card">
+                <div class="card-header">
+                    <h5>Recent Receipts</h5>
+                </div>
+                <div class="card-body">
+                    <div class="table-responsive">
+                        <table class="table table-sm" id="recentReceiptsTable">
+                            <thead>
+                                <tr>
+                                    <th>Date</th>
+                                    <th>Customer</th>
+                                    <th>Amount</th>
+                                    <th>Status</th>
+                                </tr>
+                            </thead>
+                            <tbody></tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-6">
+            <div class="card">
+                <div class="card-header">
+                    <h5>Campaign Activity</h5>
+                </div>
+                <div class="card-body">
+                    <div id="campaignActivityFeed"></div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+
 <div id="globalLoadingOverlay" class="loading-overlay" style="display: none;">
     <div class="loading-spinner"></div>
 </div>
