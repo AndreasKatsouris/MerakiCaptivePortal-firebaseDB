@@ -70,6 +70,23 @@ function initializeCampaignListeners() {
 
     addEventListenerSafely('saveCampaignBtn', 'click', handleSaveCampaign);
     addEventListenerSafely('cancelEditButton', 'click', resetCampaignForm);
+
+    addEventListenerSafely('campaignForm', 'submit', async function(e) {
+        e.preventDefault();
+        const submitButton = this.querySelector('button[type="submit"]');
+        if (submitButton) {
+            const originalText = submitButton.innerHTML;
+            try {
+                submitButton.innerHTML = '<span class="spinner-border spinner-border-sm"></span> Saving...';
+                submitButton.disabled = true;
+                await handleSaveCampaign();
+            } finally {
+                submitButton.innerHTML = originalText;
+                submitButton.disabled = false;
+            }
+        }
+    });
+
 }
 
 function showCreateCampaignModal() {
@@ -83,43 +100,47 @@ function showCreateCampaignModal() {
 }
 
 async function handleSaveCampaign() {
-    const form = document.getElementById('campaignForm');
-    if (form.checkValidity()) {
-        const campaignData = {
-            name: document.getElementById('campaignName').value.trim(),
-            brandName: document.getElementById('brandName').value.trim(),
-            startDate: document.getElementById('startDate').value,
-            endDate: document.getElementById('endDate').value,
-            status: 'active',
-            createdAt: Date.now()
-        };
-
-        // Validate dates
-        if (new Date(campaignData.endDate) < new Date(campaignData.startDate)) {
-            alert('End date cannot be before start date');
-            return;
+    showLoading();
+    try {
+        const form = document.getElementById('campaignForm');
+        if (!form) {
+            throw new Error('Campaign form not found');
         }
 
-        // Check if we are in editing mode
-        const editingKey = form.getAttribute('data-editing-key');
-        try {
+        if (form.checkValidity()) {
+            const campaignData = {
+                name: document.getElementById('campaignName').value.trim(),
+                brandName: document.getElementById('brandName').value.trim(),
+                startDate: document.getElementById('startDate').value,
+                endDate: document.getElementById('endDate').value,
+                status: 'active',
+                createdAt: Date.now()
+            };
+
+            if (new Date(campaignData.endDate) < new Date(campaignData.startDate)) {
+                throw new Error('End date cannot be before start date');
+            }
+
+            const editingKey = form.getAttribute('data-editing-key');
             if (editingKey) {
                 await updateCampaign(editingKey, campaignData);
             } else {
                 await createNewCampaign(campaignData);
             }
+            
             $('#campaignFormModal').modal('hide');
             resetCampaignForm();
-            loadCampaigns();
-        } catch (error) {
-            console.error('Error saving campaign:', error);
-            alert('Failed to save campaign');
+            await loadCampaigns();
+        } else {
+            form.reportValidity();
         }
-    } else {
-        form.reportValidity();
+    } catch (error) {
+        console.error('Error saving campaign:', error);
+        alert(error.message || 'Failed to save campaign');
+    } finally {
+        hideLoading();
     }
 }
-
 async function createNewCampaign(campaignData) {
     const campaignRef = firebase.database().ref('campaigns').push();
     await campaignRef.set(campaignData);
@@ -503,24 +524,6 @@ function showTableLoading(tableId) {
 }
 
 
-// Update form submission
-document.getElementById('campaignForm').addEventListener('submit', async function(e) {
-    e.preventDefault();
-    const submitButton = this.querySelector('button[type="submit"]');
-    const originalText = submitButton.innerHTML;
-    
-    try {
-        submitButton.innerHTML = '<span class="spinner-border spinner-border-sm"></span> Saving...';
-        submitButton.disabled = true;
-        
-        // Your existing save logic here
-        
-    } finally {
-        submitButton.innerHTML = originalText;
-        submitButton.disabled = false;
-    }
-});
-
 // Update showReceiptModal
 async function showReceiptModal(receiptId) {
     showLoading();
@@ -535,22 +538,4 @@ async function showReceiptModal(receiptId) {
         hideLoading();
     }
 }
-
-// Update form submission
-document.getElementById('campaignForm').addEventListener('submit', async function(e) {
-    e.preventDefault();
-    const submitButton = this.querySelector('button[type="submit"]');
-    const originalText = submitButton.innerHTML;
-    
-    try {
-        submitButton.innerHTML = '<span class="spinner-border spinner-border-sm"></span> Saving...';
-        submitButton.disabled = true;
-        
-        // Your existing save logic here
-        
-    } finally {
-        submitButton.innerHTML = originalText;
-        submitButton.disabled = false;
-    }
-});
 
