@@ -53,7 +53,7 @@ function initializeMenuListeners() {
         e.preventDefault();
         displaySection('dashboardContent');
     });
-    
+
     document.querySelectorAll('.menu-item > a').forEach(item => {
         item.addEventListener('click', function(e) {
             e.preventDefault();
@@ -402,14 +402,15 @@ function initializeDataDeletionListeners() {
 // [Your existing data deletion functions here]
 
 // ==================== Utility Functions ====================
-function displaySection(sectionId) {
-    document.querySelectorAll('.content-section').forEach(section => {
-        section.style.display = section.id === sectionId ? 'block' : 'none';
-    });
-}
+//function displaySection(sectionId) {
+//    document.querySelectorAll('.content-section').forEach(section => {
+//        section.style.display = section.id === sectionId ? 'block' : 'none';
+//    });
+//}
 
 async function loadInitialData() {
     try {
+        displaySection('dashboardContent');
         await Promise.all([
             loadCampaigns(),
             fetchWiFiReports(),
