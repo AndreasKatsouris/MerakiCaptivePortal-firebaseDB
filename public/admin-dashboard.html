@@ -53,6 +53,12 @@
         <nav class="sidebar-nav">
             <ul>
                 <li class="nav-item">
+                    <a href="#" id="dashboardMenu" class="nav-link">
+                        <i class="fas fa-home"></i>
+                        <span>Dashboard</span>
+                    </a>
+                </li>
+                <li class="nav-item">
                     <a href="#" class="nav-link" data-toggle="collapse" data-target="#wifiSubmenu">
                         <i class="fas fa-wifi"></i>
                         <span>WiFi Management</span>
@@ -99,7 +105,7 @@
 
 <!-- Main Content -->
 <div class="content">
-    <div id="wifiSettingsContent" class="content-section">
+    <div id="wifiSettingsContent" class="content-section" style="display: none;">
         <h2>Customize Captive Portal</h2>
         <form id="customizationForm">
             <div class="form-group">
@@ -170,7 +176,7 @@
         </table>
     </div>
     <!-- start of wifi devices form-->
-    <div id="wifiDevicesContent" class="content-section">
+    <div id="wifiDevicesContent" class="content-section" style="display: none;">
         <h2>Manage Wifi Devices</h2>
         <form id="wifiDevicesForm">
             <div class="form-group">
@@ -209,7 +215,7 @@
         </table>
     </div>
     
-    <div id="liveDataContent" class="content-section">
+    <div id="liveDataContent" class="content-section" style="display: none;">
         <h2>Live Data</h2>
         <div id="liveDataDisplay">
             <div id="liveDataContainer">
@@ -221,7 +227,7 @@
         </div>
     </div>
 
-    <div id="dataDeletionContent" class="content-section">
+    <div id="dataDeletionContent" class="content-section" tyle="display: none;">
         <h2>Delete Scanning Data</h2>
         <button id="delete-selected" class="btn btn-danger">Delete Selected</button>
         <table id="data-table" class="table">
@@ -242,7 +248,7 @@
     </div>
     
 <!-- Receipt Management Section -->
-<div id="receiptManagementContent" class="content-section">
+<div id="receiptManagementContent" class="content-section" style="display: none;">
     <h2>Receipt Management</h2>
     
     <!-- Search and Filter -->
@@ -288,7 +294,7 @@
 </div>
 
 <!-- Rewards Management Section -->
-<div id="rewardsManagementContent" class="content-section">
+<div id="rewardsManagementContent" class="content-section" style="display: none;">
     <h2>Rewards Management</h2>
     
     <!-- Search and Filter -->
@@ -466,7 +472,7 @@
 </div>
 
 <!-- Add this as a new content section in your admin-dashboard.html -->
-<div id="dashboardContent" class="content-section">
+<div id="dashboardContent" class="content-section" style="display: none;">
     <div class="dashboard-header">
         <h1>Dashboard Overview</h1>
         <div class="date-filter">

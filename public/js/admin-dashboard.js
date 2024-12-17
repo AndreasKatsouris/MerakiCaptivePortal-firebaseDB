@@ -49,6 +49,11 @@ function addEventListenerSafely(elementId, event, handler) {
 
 // ==================== Menu Section ====================
 function initializeMenuListeners() {
+    addEventListenerSafely('dashboardMenu', 'click', function(e) {
+        e.preventDefault();
+        displaySection('dashboardContent');
+    });
+    
     document.querySelectorAll('.menu-item > a').forEach(item => {
         item.addEventListener('click', function(e) {
             e.preventDefault();
@@ -407,7 +412,8 @@ async function loadInitialData() {
     try {
         await Promise.all([
             loadCampaigns(),
-            fetchWiFiReports()
+            fetchWiFiReports(),
+            updateDashboardStats()
         ]);
     } catch (error) {
         console.error('Error loading initial data:', error);
@@ -497,6 +503,9 @@ async function saveCampaignToFirebase(campaignData) {
 function displaySection(sectionId) {
     showLoading();
     console.log('Displaying section:', sectionId); // Debug
+    document.querySelectorAll('.content-section').forEach(section => {
+        section.style.display = 'none';
+    });
     document.querySelectorAll('.content-section').forEach(section => {
         if (section.id === sectionId) {
             section.style.display = 'block';
