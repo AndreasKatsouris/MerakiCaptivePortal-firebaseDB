@@ -338,3 +338,163 @@ function asyncErrorHandler(fn) {
         }
     };
 }
+
+// Loading state management
+function showLoading() {
+    document.getElementById('globalLoadingOverlay').style.display = 'flex';
+}
+
+function hideLoading() {
+    document.getElementById('globalLoadingOverlay').style.display = 'none';
+}
+
+// Update your loadCampaigns function to use loading states
+async function loadCampaigns() {
+    showLoading();
+    const campaignTable = document.querySelector('#campaignTable tbody');
+    campaignTable.innerHTML = '';
+
+    try {
+        const snapshot = await firebase.database().ref('campaigns').once('value');
+        const campaigns = snapshot.val();
+
+        if (campaigns) {
+            Object.keys(campaigns).forEach(key => {
+                const campaign = campaigns[key];
+                const row = document.createElement('tr');
+                row.classList.add('fade-in');  // Add animation
+                
+                // ... rest of your row creation code ...
+                
+                campaignTable.appendChild(row);
+            });
+        } else {
+            campaignTable.innerHTML = `
+                <tr class="fade-in">
+                    <td colspan="5" class="text-center">No campaigns available</td>
+                </tr>
+            `;
+        }
+    } catch (error) {
+        console.error('Error loading campaigns:', error);
+        campaignTable.innerHTML = `
+            <tr class="fade-in">
+                <td colspan="5" class="text-center text-danger">Error loading campaigns</td>
+            </tr>
+        `;
+    } finally {
+        hideLoading();
+    }
+}
+
+// Update saveCampaignToFirebase to show loading
+async function saveCampaignToFirebase(campaignData) {
+    showLoading();
+    try {
+        const campaignRef = firebase.database().ref('campaigns').push();
+        await campaignRef.set(campaignData);
+        
+        $('#campaignFormModal').modal('hide');
+        resetCampaignForm();
+        await loadCampaigns();
+        alert('Campaign created successfully');
+    } catch (error) {
+        console.error('Error saving campaign:', error);
+        alert('Failed to save campaign');
+    } finally {
+        hideLoading();
+    }
+}
+
+// Add loading state to section transitions
+function displaySection(sectionId) {
+    showLoading();
+    document.querySelectorAll('.content-section').forEach(section => {
+        if (section.id === sectionId) {
+            section.style.display = 'block';
+            section.classList.add('fade-in');
+        } else {
+            section.style.display = 'none';
+        }
+    });
+    setTimeout(hideLoading, 300); // Short delay to show transition
+}
+
+function showTableLoading(tableId) {
+    const table = document.getElementById(tableId);
+    const tbody = table.querySelector('tbody');
+    tbody.innerHTML = `
+        <tr>
+            <td colspan="100%" class="text-center p-5">
+                <div class="loading-spinner"></div>
+                <p class="mt-3">Loading data...</p>
+            </td>
+        </tr>
+    `;
+}
+
+// Update showReceiptModal
+async function showReceiptModal(receiptId) {
+    showLoading();
+    try {
+        const receipt = await fetchReceiptDetails(receiptId);
+        populateReceiptModal(receipt);
+        $('#receiptDetailsModal').modal('show');
+    } catch (error) {
+        console.error('Error showing receipt details:', error);
+        alert('Error loading receipt details');
+    } finally {
+        hideLoading();
+    }
+}
+
+// Update form submission
+document.getElementById('campaignForm').addEventListener('submit', async function(e) {
+    e.preventDefault();
+    const submitButton = this.querySelector('button[type="submit"]');
+    const originalText = submitButton.innerHTML;
+    
+    try {
+        submitButton.innerHTML = '<span class="spinner-border spinner-border-sm"></span> Saving...';
+        submitButton.disabled = true;
+        
+        // Your existing save logic here
+        
+    } finally {
+        submitButton.innerHTML = originalText;
+        submitButton.disabled = false;
+    }
+});
+
+// Update showReceiptModal
+async function showReceiptModal(receiptId) {
+    showLoading();
+    try {
+        const receipt = await fetchReceiptDetails(receiptId);
+        populateReceiptModal(receipt);
+        $('#receiptDetailsModal').modal('show');
+    } catch (error) {
+        console.error('Error showing receipt details:', error);
+        alert('Error loading receipt details');
+    } finally {
+        hideLoading();
+    }
+}
+
+// Update form submission
+document.getElementById('campaignForm').addEventListener('submit', async function(e) {
+    e.preventDefault();
+    const submitButton = this.querySelector('button[type="submit"]');
+    const originalText = submitButton.innerHTML;
+    
+    try {
+        submitButton.innerHTML = '<span class="spinner-border spinner-border-sm"></span> Saving...';
+        submitButton.disabled = true;
+        
+        // Your existing save logic here
+        
+    } finally {
+        submitButton.innerHTML = originalText;
+        submitButton.disabled = false;
+    }
+});
