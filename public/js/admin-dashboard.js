@@ -234,57 +234,112 @@ async function updateCampaign(campaignKey, campaignData) {
 }
 //function to view campaign details
 async function viewCampaignDetails(campaignId) {
-    console.log('Viewing campaign details for:', campaignId);
+    console.log('Attempting to view campaign:', campaignId);
     try {
+        // Get campaign data
         const snapshot = await firebase.database().ref(`campaigns/${campaignId}`).once('value');
         const campaign = snapshot.val();
+        console.log('Retrieved campaign data:', campaign);
         
         if (!campaign) {
-            throw new Error('Campaign not found');
+            throw new Error('Campaign not found in database');
         }
 
-        console.log('Retrieved campaign data:', campaign);
+        // Format dates
+        const startDate = new Date(campaign.startDate).toLocaleDateString();
+        const endDate = new Date(campaign.endDate).toLocaleDateString();
+        const createdDate = new Date(campaign.createdAt).toLocaleString();
 
-        // Show details in a modal
         const detailsHtml = `
             <div class="campaign-details">
-                <h3>${campaign.name}</h3>
                 <div class="row">
-                    <div class="col-md-6">
-                        <p><strong>Brand:</strong> ${campaign.brandName}</p>
-                        <p><strong>Start Date:</strong> ${new Date(campaign.startDate).toLocaleDateString()}</p>
-                        <p><strong>End Date:</strong> ${new Date(campaign.endDate).toLocaleDateString()}</p>
-                        <p><strong>Status:</strong> <span class="badge badge-${campaign.status === 'active' ? 'success' : 'secondary'}">${campaign.status}</span></p>
+                    <div class="col-12">
+                        <table class="table table-bordered">
+                            <tr>
+                                <th>Campaign Name</th>
+                                <td>${campaign.name}</td>
+                            </tr>
+                            <tr>
+                                <th>Brand Name</th>
+                                <td>${campaign.brandName}</td>
+                            </tr>
+                            <tr>
+                                <th>Start Date</th>
+                                <td>${startDate}</td>
+                            </tr>
+                            <tr>
+                                <th>End Date</th>
+                                <td>${endDate}</td>
+                            </tr>
+                            <tr>
+                                <th>Status</th>
+                                <td><span class="badge badge-${campaign.status === 'active' ? 'success' : 'secondary'}">${campaign.status}</span></td>
+                            </tr>
+                            <tr>
+                                <th>Created</th>
+                                <td>${createdDate}</td>
+                            </tr>
+                            ${campaign.minPurchaseAmount ? `
+                            <tr>
+                                <th>Minimum Purchase</th>
+                                <td>R${campaign.minPurchaseAmount}</td>
+                            </tr>
+                            ` : ''}
+                        </table>
                     </div>
                 </div>
             </div>
         `;
 
-        // Check if the modal exists
-        const modalElement = document.getElementById('campaignDetailsModal');
+        // Check if modal exists, if not create it
+        let modalElement = document.getElementById('campaignDetailsModal');
         if (!modalElement) {
-            console.error('Campaign details modal not found');
-            return;
+            console.log('Modal not found, creating it');
+            const modalHtml = `
+                <div class="modal fade" id="campaignDetailsModal" tabindex="-1" role="dialog">
+                    <div class="modal-dialog" role="document">
+                        <div class="modal-content">
+                            <div class="modal-header">
+                                <h5 class="modal-title">Campaign Details</h5>
+                                <button type="button" class="close" data-dismiss="modal" aria-label="Close">
+                                    <span aria-hidden="true">&times;</span>
+                                </button>
+                            </div>
+                            <div class="modal-body">
+                            </div>
+                            <div class="modal-footer">
+                                <button type="button" class="btn btn-primary edit-from-view" data-campaign-id="${campaignId}">Edit Campaign</button>
+                                <button type="button" class="btn btn-secondary" data-dismiss="modal">Close</button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            `;
+            document.body.insertAdjacentHTML('beforeend', modalHtml);
+            modalElement = document.getElementById('campaignDetailsModal');
         }
 
+        // Update modal content
         const modalBody = modalElement.querySelector('.modal-body');
-        if (!modalBody) {
-            console.error('Modal body not found');
-            return;
+        modalBody.innerHTML = detailsHtml;
+
+        // Add edit button functionality
+        const editButton = modalElement.querySelector('.edit-from-view');
+        if (editButton) {
+            editButton.addEventListener('click', () => {
+                $('#campaignDetailsModal').modal('hide');
+                editCampaign(campaignId);
+            });
         }
 
-        modalBody.innerHTML = detailsHtml;
-        
         // Show the modal
-        const modal = new bootstrap.Modal(modalElement);
-        modal.show();
+        $('#campaignDetailsModal').modal('show');
 
     } catch (error) {
-        console.error('Error viewing campaign details:', error);
-        alert('Failed to load campaign details: ' + error.message);
+        console.error('Error in viewCampaignDetails:', error);
+        alert(`Error viewing campaign details: ${error.message}`);
     }
 }
-
 async function editCampaign(campaignId) {
     console.log('Editing campaign:', campaignId);
     try {
@@ -369,27 +424,27 @@ async function loadCampaigns() {
                 }
 
                 row.innerHTML = `
-                    <td>${campaign.name || 'Unnamed Campaign'}</td>
-                    <td>${campaign.brandName || 'No Brand'}</td>
-                    <td>${formattedStartDate}</td>
-                    <td>${formattedEndDate}</td>
-                    <td>
-                        <span class="badge badge-${campaign.status === 'active' ? 'success' : 'secondary'}">
-                            ${campaign.status || 'unknown'}
-                        </span>
-                    </td>
-                    <td>
-                        <button class="btn btn-sm btn-info view-campaign mr-1" data-key="${key}">
-                            <i class="fas fa-eye"></i>
-                        </button>
-                        <button class="btn btn-sm btn-warning edit-campaign mr-1" data-key="${key}">
-                            <i class="fas fa-edit"></i>
-                        </button>
-                        <button class="btn btn-sm btn-danger delete-campaign" data-key="${key}">
-                            <i class="fas fa-trash"></i>
-                        </button>
-                    </td>
-                `;
+                <td>${campaign.name || 'Unnamed Campaign'}</td>
+                <td>${campaign.brandName || 'No Brand'}</td>
+                <td>${formattedStartDate}</td>
+                <td>${formattedEndDate}</td>
+                <td>
+                    <span class="badge badge-${campaign.status === 'active' ? 'success' : 'secondary'}">
+                        ${campaign.status || 'unknown'}
+                    </span>
+                </td>
+                <td>
+                    <button class="btn btn-sm btn-info view-campaign mr-1" data-key="${key}">
+                        <i class="fas fa-eye"></i> View
+                    </button>
+                    <button class="btn btn-sm btn-warning edit-campaign mr-1" data-key="${key}">
+                        <i class="fas fa-edit"></i> Edit
+                    </button>
+                    <button class="btn btn-sm btn-danger delete-campaign" data-key="${key}">
+                        <i class="fas fa-trash"></i> Delete
+                    </button>
+                </td>
+            `;
                 
                 campaignTable.appendChild(row);
             });
@@ -431,8 +486,10 @@ function attachCampaignEventListeners() {
     
     // View campaign details
     document.querySelectorAll('.view-campaign').forEach(button => {
-        button.addEventListener('click', (e) => {
-            const campaignId = e.currentTarget.getAttribute('data-key');
+        button.addEventListener('click', function(e) {
+            console.log('View button clicked');
+            const campaignId = this.getAttribute('data-key');
+            console.log('Campaign ID:', campaignId);
             viewCampaignDetails(campaignId);
         });
     });
