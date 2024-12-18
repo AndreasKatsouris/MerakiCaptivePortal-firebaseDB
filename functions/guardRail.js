@@ -62,16 +62,11 @@ async function validateReceipt(receiptData, campaignName) {
             };
         }
 
-        // Validate store location if specified
-        if (campaign.validLocations && campaign.validLocations.length > 0) {
-            const locationMatch = campaign.validLocations.some(location => 
-                receiptData.storeLocation.toLowerCase().includes(location.toLowerCase())
-            );
-            if (!locationMatch) {
-                return {
-                    isValid: false,
-                    error: 'Store location is not participating in this campaign'
-                };
+        // Validate required items
+        if (campaign.requiredItems && campaign.requiredItems.length > 0) {
+            const validationResult = validateRequiredItems(receiptData.items, campaign.requiredItems);
+            if (!validationResult.isValid) {
+                return validationResult;
             }
         }
 
@@ -80,6 +75,7 @@ async function validateReceipt(receiptData, campaignName) {
             receiptData: receiptData
         };
 
+        
     } catch (error) {
         console.error('Error validating receipt:', error);
         return {
@@ -87,5 +83,25 @@ async function validateReceipt(receiptData, campaignName) {
             error: 'Error validating receipt'
         };
     }
+}
+function validateRequiredItems(receiptItems, requiredItems) {
+    for (const requiredItem of requiredItems) {
+        // Find matching items on receipt (case insensitive, partial match)
+        const matchingItems = receiptItems.filter(item => 
+            item.name.toLowerCase().includes(requiredItem.name.toLowerCase())
+        );
+
+        // Sum quantities of matching items
+        const totalQuantity = matchingItems.reduce((sum, item) => sum + item.quantity, 0);
+
+        if (totalQuantity < requiredItem.quantity) {
+            return {
+                isValid: false,
+                error: `Receipt does not contain required item: ${requiredItem.name} (quantity: ${requiredItem.quantity})`
+            };
+        }
+    }
+
+    return { isValid: true };
 }
 module.exports = { validateReceipt };

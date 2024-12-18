@@ -379,3 +379,25 @@ body {
     height: 300px;
     margin-bottom: 1.5rem;
 }
+
+.required-items-container {
+    border: 1px solid #dee2e6;
+    border-radius: 4px;
+    padding: 1rem;
+    margin-bottom: 1rem;
+}
+
+.required-item {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 0.5rem 1rem;
+    margin-bottom: 0.5rem;
+    background-color: #f8f9fa;
+    border: 1px solid #dee2e6;
+    border-radius: 4px;
+}
+
+#itemQuantity {
+    max-width: 100px;
+}

@@ -120,9 +120,49 @@ function initializeCampaignListeners() {
             }
         }
     });
+    const addItemBtn = document.getElementById('addItemBtn');
+    if (addItemBtn) {
+        addItemBtn.addEventListener('click', function() {
+            const nameInput = document.getElementById('itemName');
+            const quantityInput = document.getElementById('itemQuantity');
+            
+            if (nameInput.value.trim()) {
+                addRequiredItem(nameInput.value.trim(), quantityInput.value);
+                nameInput.value = '';
+                quantityInput.value = '1';
+            }
+        });
+    }
 
 }
+function addRequiredItem(name, quantity) {
+    const itemsList = document.getElementById('requiredItemsList');
+    const itemElement = document.createElement('div');
+    itemElement.className = 'list-group-item required-item d-flex justify-content-between align-items-center';
+    itemElement.dataset.name = name;
+    itemElement.dataset.quantity = quantity;
+    
+    itemElement.innerHTML = `
+        <span>${name} (Qty: ${quantity})</span>
+        <button type="button" class="btn btn-sm btn-danger remove-item">Remove</button>
+    `;
+    
+    itemElement.querySelector('.remove-item').addEventListener('click', () => {
+        itemElement.remove();
+    });
+    
+    itemsList.appendChild(itemElement);
+}
 
+// function to get the required items when saving
+function getRequiredItems() {
+    const itemsList = document.querySelectorAll('#requiredItemsList .required-item');
+    return Array.from(itemsList).map(item => ({
+        name: item.dataset.name,
+        quantity: parseInt(item.dataset.quantity),
+        isRequired: true
+    }));
+}
 
 
 function validateCampaignData(campaignData) {
@@ -174,9 +214,10 @@ async function handleSaveCampaign() {
             brandName: document.getElementById('brandName').value.trim(),
             startDate: document.getElementById('startDate').value,
             endDate: document.getElementById('endDate').value,
-            status: 'active',
+            status: document.getElementById('campaignStatus').value,
             createdAt: Date.now(),
-            minPurchaseAmount: document.getElementById('minPurchaseAmount').value || null
+            minPurchaseAmount: document.getElementById('minPurchaseAmount').value || null,
+            requiredItems: getRequiredItems()
         };
 
         // Validate dates
@@ -205,6 +246,14 @@ async function handleSaveCampaign() {
     } finally {
         hideLoading();
     }
+}
+function getRequiredItems() {
+    const itemsList = document.querySelectorAll('#requiredItemsList .required-item');
+    return Array.from(itemsList).map(item => ({
+        name: item.dataset.name,
+        quantity: parseInt(item.dataset.quantity),
+        isRequired: true
+    }));
 }
 async function createNewCampaign(campaignData) {
     console.log('Creating new campaign with data:', campaignData);
@@ -279,6 +328,18 @@ async function viewCampaignDetails(campaignId) {
                                 <th>Created</th>
                                 <td>${createdDate}</td>
                             </tr>
+                            ${campaign.requiredItems && campaign.requiredItems.length > 0 ? `
+                                <tr>
+                                    <th>Required Items</th>
+                                    <td>
+                                        <ul class="list-unstyled mb-0">
+                                            ${campaign.requiredItems.map(item => 
+                                                `<li>${item.name} (Qty: ${item.quantity})</li>`
+                                            ).join('')}
+                                        </ul>
+                                    </td>
+                                </tr>
+                            ` : ''}
                             ${campaign.minPurchaseAmount ? `
                             <tr>
                                 <th>Minimum Purchase</th>
@@ -429,9 +490,17 @@ async function loadCampaigns() {
                 <td>${formattedStartDate}</td>
                 <td>${formattedEndDate}</td>
                 <td>
-                    <span class="badge badge-${campaign.status === 'active' ? 'success' : 'secondary'}">
-                        ${campaign.status || 'unknown'}
-                    </span>
+                    <div class="custom-control custom-switch">
+                        <input type="checkbox" class="custom-control-input status-toggle" 
+                            id="statusToggle_${key}" 
+                            data-key="${key}" 
+                            ${campaign.status === 'active' ? 'checked' : ''}>
+                        <label class="custom-control-label" for="statusToggle_${key}">
+                            <span class="badge badge-${campaign.status === 'active' ? 'success' : 'secondary'}">
+                                ${campaign.status === 'active' ? 'Active' : 'Inactive'}
+                            </span>
+                        </label>
+                    </div>
                 </td>
                 <td>
                     <button class="btn btn-sm btn-info view-campaign mr-1" data-key="${key}">
@@ -480,6 +549,60 @@ async function loadCampaigns() {
     }
 }
 
+async function toggleCampaignStatus(campaignId, isActive) {
+    console.log('Toggling campaign status:', campaignId, isActive);
+    try {
+        showLoading();
+        
+        // Update campaign status in Firebase
+        await firebase.database().ref(`campaigns/${campaignId}`).update({
+            status: isActive ? 'active' : 'inactive',
+            updatedAt: Date.now()
+        });
+
+        // Update UI without reloading the entire table
+        const label = document.querySelector(`label[for="statusToggle_${campaignId}"]`);
+        if (label) {
+            const badge = label.querySelector('.badge');
+            badge.className = `badge badge-${isActive ? 'success' : 'secondary'}`;
+            badge.textContent = isActive ? 'Active' : 'Inactive';
+        }
+
+        // Show success message
+        Swal.fire({
+            icon: 'success',
+            title: 'Status Updated',
+            text: `Campaign is now ${isActive ? 'active' : 'inactive'}`,
+            toast: true,
+            position: 'top-end',
+            showConfirmButton: false,
+            timer: 3000
+        });
+
+    } catch (error) {
+        console.error('Error toggling campaign status:', error);
+        
+        // Revert toggle if update failed
+        const toggle = document.getElementById(`statusToggle_${campaignId}`);
+        if (toggle) {
+            toggle.checked = !isActive;
+        }
+
+        // Show error message
+        Swal.fire({
+            icon: 'error',
+            title: 'Error',
+            text: 'Failed to update campaign status',
+            toast: true,
+            position: 'top-end',
+            showConfirmButton: false,
+            timer: 3000
+        });
+    } finally {
+        hideLoading();
+    }
+}
+
 // Make sure event listeners are properly attached
 function attachCampaignEventListeners() {
     console.log('Attaching campaign event listeners...');
@@ -508,6 +631,32 @@ function attachCampaignEventListeners() {
             const campaignId = e.currentTarget.getAttribute('data-key');
             if (await confirmDeleteCampaign(campaignId)) {
                 deleteCampaign(campaignId);
+            }
+        });
+    });
+
+    // Status toggle listeners
+    document.querySelectorAll('.status-toggle').forEach(toggle => {
+        toggle.addEventListener('change', async function(e) {
+            const campaignId = this.getAttribute('data-key');
+            const isActive = this.checked;
+            
+            // Confirm status change
+            const result = await Swal.fire({
+                title: 'Confirm Status Change',
+                text: `Are you sure you want to set this campaign to ${isActive ? 'active' : 'inactive'}?`,
+                icon: 'question',
+                showCancelButton: true,
+                confirmButtonColor: '#3085d6',
+                cancelButtonColor: '#d33',
+                confirmButtonText: 'Yes, update it!'
+            });
+
+            if (result.isConfirmed) {
+                await toggleCampaignStatus(campaignId, isActive);
+            } else {
+                // Reset toggle if user cancels
+                this.checked = !isActive;
             }
         });
     });
@@ -551,6 +700,11 @@ function resetCampaignForm() {
     // Reset the form
     form.reset();
     
+    // Clear required items list
+    const itemsList = document.getElementById('requiredItemsList');
+    if (itemsList) {
+        itemsList.innerHTML = '';
+    }    
     // Remove editing key if it exists
     form.removeAttribute('data-editing-key');
     
