@@ -161,36 +161,35 @@ async function receiveWhatsAppMessage(req, res) {
                     return res.status(400).send('No active campaigns.');
                 }
 
-                // Validate receipt against active campaigns
-                let validResult = null;
-                for (const campaign of activeCampaigns) {
-                    const result = await validateReceipt(receiptData, campaign.brandName);
-                    if (result.isValid) {
-                        validResult = result;
-                        break;
-                    }
-                }
+    // Try to match receipt with any active campaign
+let validResult = null;
+for (const campaign of activeCampaigns) {
+    const result = await validateReceipt(receiptData, campaign.brandName);
+    if (result.isValid) {
+        validResult = result;
+        break;
+    }
+}
 
-                if (validResult) {
-                    // Receipt matches a campaign - process reward
-                    await processReward(guestData, validResult, receiptData);
-                    
-                    await client.messages.create({
-                        body: `Congratulations ${guestData.name}! Your receipt for ${validResult.brandName} has been validated. Your reward will be processed shortly.`,
-                        from: `whatsapp:${twilioPhone}`,
-                        to: `whatsapp:${phoneNumber}`,
-                    });
-                    return res.status(200).send('Receipt validated and reward processed.');
-                } else {
-                    // No matching campaign found
-                    await client.messages.create({
-                        body: `Sorry ${guestData.name}, your receipt doesn't match any active campaign requirements.`,
-                        from: `whatsapp:${twilioPhone}`,
-                        to: `whatsapp:${phoneNumber}`,
-                    });
-                    return res.status(400).send('Receipt validation failed.');
-                }
-            } catch (error) {
+if (validResult) {
+    // Receipt matches a campaign - process reward
+    await processReward(guestData, validResult.campaign, receiptData);
+    
+    await client.messages.create({
+        body: `Congratulations ${guestData.name}! Your receipt for ${validResult.campaign.brandName} has been validated. Your reward will be processed shortly.`,
+        from: `whatsapp:${twilioPhone}`,
+        to: `whatsapp:${phoneNumber}`,
+    });
+    return res.status(200).send('Receipt validated and reward processed.');
+} else {
+    // No matching campaign found
+    await client.messages.create({
+        body: `Sorry ${guestData.name}, your receipt doesn't match any active campaign requirements.`,
+        from: `whatsapp:${twilioPhone}`,
+        to: `whatsapp:${phoneNumber}`,
+    });
+    return res.status(400).send('Receipt validation failed.');
+}            } catch (error) {
                 console.error('Error processing or validating receipt:', error);
                 await client.messages.create({
                     body: "Sorry, we encountered an issue processing your receipt. Please try again later.",
