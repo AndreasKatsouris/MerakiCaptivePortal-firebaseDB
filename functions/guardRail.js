@@ -9,8 +9,13 @@ const { getCampaignDetails } = require('./campaigns');
  */
 async function validateReceipt(receiptData, campaignName) {
     try {
+        console.log('Starting receipt validation for campaign:', campaignName);
+        console.log('Receipt data:', receiptData);
+
         // Get campaign details
         const campaign = await getCampaignDetails(campaignName);
+        console.log('Campaign details:', campaign);
+
         if (!campaign) {
             return {
                 isValid: false,
@@ -35,7 +40,12 @@ async function validateReceipt(receiptData, campaignName) {
         }
 
         // Validate brand name
-        if (!receiptData.storeName.toLowerCase().includes(campaign.brandName.toLowerCase())) {
+        const receiptStoreName = receiptData.storeName.toLowerCase().replace(/\s+/g, '');
+        const campaignBrandName = campaign.brandName.toLowerCase().replace(/\s+/g, '');
+        
+        console.log('Comparing store names:', { receipt: receiptStoreName, campaign: campaignBrandName });
+        
+        if (!receiptStoreName.includes(campaignBrandName)) {
             return {
                 isValid: false,
                 error: 'Receipt is not from the correct store'
@@ -64,9 +74,42 @@ async function validateReceipt(receiptData, campaignName) {
 
         // Validate required items
         if (campaign.requiredItems && campaign.requiredItems.length > 0) {
-            const validationResult = validateRequiredItems(receiptData.items, campaign.requiredItems);
-            if (!validationResult.isValid) {
-                return validationResult;
+            // Check if receipt has items
+            if (!receiptData.items || receiptData.items.length === 0) {
+                return {
+                    isValid: false,
+                    error: 'Receipt has no items to check against requirements'
+                };
+            }
+
+            console.log('Checking required items:', campaign.requiredItems);
+            console.log('Receipt items:', receiptData.items);
+
+            for (const requiredItem of campaign.requiredItems) {
+                // Find matching items in receipt (case insensitive and more flexible matching)
+                const matchingItems = receiptData.items.filter(item => {
+                    const receiptItemName = item.name.toLowerCase().replace(/\s+/g, '');
+                    const requiredItemName = requiredItem.name.toLowerCase().replace(/\s+/g, '');
+                    console.log('Comparing items:', {
+                        receiptItem: receiptItemName,
+                        requiredItem: requiredItemName
+                    });
+                    return receiptItemName.includes(requiredItemName) || 
+                           requiredItemName.includes(receiptItemName);
+                });
+
+                console.log('Matching items found:', matchingItems);
+
+                // Sum up quantities of matching items
+                const totalQuantity = matchingItems.reduce((sum, item) => sum + (item.quantity || 1), 0);
+                console.log('Total quantity found:', totalQuantity, 'Required:', requiredItem.quantity);
+
+                if (totalQuantity < requiredItem.quantity) {
+                    return {
+                        isValid: false,
+                        error: `Receipt does not contain required item: ${requiredItem.name} (need ${requiredItem.quantity}, found ${totalQuantity})`
+                    };
+                }
             }
         }
 
@@ -75,7 +118,6 @@ async function validateReceipt(receiptData, campaignName) {
             receiptData: receiptData
         };
 
-        
     } catch (error) {
         console.error('Error validating receipt:', error);
         return {
@@ -84,35 +126,5 @@ async function validateReceipt(receiptData, campaignName) {
         };
     }
 }
-function validateRequiredItems(receiptItems, requiredItems) {
-        // Validate required items if specified in campaign
-        if (campaign.requiredItems && campaign.requiredItems.length > 0) {
-            // Check if receipt has items
-            if (!receiptData.items || receiptData.items.length === 0) {
-                return {
-                    isValid: false,
-                    error: 'Receipt has no items to check against requirements'
-                };
-            }    
-    for (const requiredItem of requiredItems) {
-        // Find matching items on receipt (case insensitive, partial match)
-        const matchingItems = receiptItems.filter(item => 
-            item.name.toLowerCase().includes(requiredItem.name.toLowerCase())
-        );
 
-        // Sum quantities of matching items
-        const totalQuantity = matchingItems.reduce((sum, item) => sum + item.quantity, 0);
-
-        if (totalQuantity < requiredItem.quantity) {
-            return {
-                isValid: false,
-                error: `Receipt does not contain required item: ${requiredItem.name} (quantity: ${requiredItem.quantity})`
-            };
-        }
-    }
-
-    return { isValid: true };
-}
-
-}
 module.exports = { validateReceipt };
