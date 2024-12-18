@@ -161,25 +161,22 @@ async function receiveWhatsAppMessage(req, res) {
                     return res.status(400).send('No active campaigns.');
                 }
 
-                // Try to match receipt with any active campaign
-                let matchedCampaign = null;
-                let validationResult = null;
-
+                // Validate receipt against active campaigns
+                let validResult = null;
                 for (const campaign of activeCampaigns) {
                     const result = await validateReceipt(receiptData, campaign.brandName);
                     if (result.isValid) {
-                        matchedCampaign = campaign;
-                        validationResult = result;
+                        validResult = result;
                         break;
                     }
                 }
 
-                if (matchedCampaign) {
+                if (validResult) {
                     // Receipt matches a campaign - process reward
-                    await processReward(guestData, matchedCampaign, receiptData);
+                    await processReward(guestData, validResult, receiptData);
                     
                     await client.messages.create({
-                        body: `Congratulations ${guestData.name}! Your receipt for ${matchedCampaign.brandName} has been validated. Your reward will be processed shortly.`,
+                        body: `Congratulations ${guestData.name}! Your receipt for ${validResult.brandName} has been validated. Your reward will be processed shortly.`,
                         from: `whatsapp:${twilioPhone}`,
                         to: `whatsapp:${phoneNumber}`,
                     });

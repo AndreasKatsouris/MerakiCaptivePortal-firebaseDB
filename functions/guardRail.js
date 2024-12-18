@@ -1,121 +1,99 @@
 const { firebaseConfig } = require('firebase-functions/v1');
-const { getCampaignDetails } = require('./campaigns');
+const admin = require('firebase-admin');
+const { fetchCampaigns } = require('./campaigns');
 
 /**
  * Validate receipt against campaign criteria
  * @param {object} receiptData - Parsed receipt data
- * @param {string} campaignName - Campaign name for validation
- * @returns {boolean} - Whether the receipt is valid
+ * @param {string} brandName - Brand name for validation
+ * @returns {object} - Validation result
  */
-async function validateReceipt(receiptData, campaignName) {
+async function validateReceipt(receiptData, brandName) {
     try {
-        console.log('Starting receipt validation for campaign:', campaignName);
+        console.log('Starting receipt validation for brand:', brandName);
         console.log('Receipt data:', receiptData);
 
-        // Get campaign details
-        const campaign = await getCampaignDetails(campaignName);
-        console.log('Campaign details:', campaign);
+        // Get all active campaigns
+        const campaigns = await fetchCampaigns();
+        console.log('All campaigns:', campaigns);
 
-        if (!campaign) {
+        // Filter active campaigns for matching brand
+        const matchingCampaigns = campaigns.filter(campaign => {
+            const campaignBrandName = campaign.brandName.toLowerCase().replace(/\s+/g, '');
+            const receiptStoreName = receiptData.storeName.toLowerCase().replace(/\s+/g, '');
+            return receiptStoreName.includes(campaignBrandName);
+        });
+
+        console.log('Matching campaigns found:', matchingCampaigns);
+
+        if (!matchingCampaigns.length) {
             return {
                 isValid: false,
-                error: 'Campaign not found'
+                error: 'No matching campaigns found for this store'
             };
         }
 
-        // Check for duplicate invoice
-        if (receiptData.invoiceNumber) {
-            const processedReceiptsRef = firebase.database().ref('processedReceipts');
-            const snapshot = await processedReceiptsRef
-                .orderByChild('invoiceNumber')
-                .equalTo(receiptData.invoiceNumber)
-                .once('value');
-            
-            if (snapshot.exists()) {
-                return {
-                    isValid: false,
-                    error: 'This receipt has already been submitted'
-                };
-            }
-        }
+        // Try to validate against each matching campaign
+        for (const campaign of matchingCampaigns) {
+            console.log('Checking campaign:', campaign.name);
 
-        // Validate brand name
-        const receiptStoreName = receiptData.storeName.toLowerCase().replace(/\s+/g, '');
-        const campaignBrandName = campaign.brandName.toLowerCase().replace(/\s+/g, '');
-        
-        console.log('Comparing store names:', { receipt: receiptStoreName, campaign: campaignBrandName });
-        
-        if (!receiptStoreName.includes(campaignBrandName)) {
-            return {
-                isValid: false,
-                error: 'Receipt is not from the correct store'
-            };
-        }
-
-        // Validate receipt date is within campaign period
-        const receiptDate = new Date(receiptData.date);
-        const campaignStart = new Date(campaign.startDate);
-        const campaignEnd = new Date(campaign.endDate);
-
-        if (receiptDate < campaignStart || receiptDate > campaignEnd) {
-            return {
-                isValid: false,
-                error: 'Receipt date is outside campaign period'
-            };
-        }
-
-        // Validate minimum purchase amount if specified
-        if (campaign.minPurchaseAmount && receiptData.totalAmount < campaign.minPurchaseAmount) {
-            return {
-                isValid: false,
-                error: `Purchase amount does not meet minimum requirement of R${campaign.minPurchaseAmount}`
-            };
-        }
-
-        // Validate required items
-        if (campaign.requiredItems && campaign.requiredItems.length > 0) {
-            // Check if receipt has items
-            if (!receiptData.items || receiptData.items.length === 0) {
-                return {
-                    isValid: false,
-                    error: 'Receipt has no items to check against requirements'
-                };
+            // Check campaign status
+            if (campaign.status !== 'active') {
+                console.log('Campaign not active, skipping');
+                continue;
             }
 
-            console.log('Checking required items:', campaign.requiredItems);
-            console.log('Receipt items:', receiptData.items);
+            // Check date range
+            const receiptDate = new Date(receiptData.date);
+            const campaignStart = new Date(campaign.startDate);
+            const campaignEnd = new Date(campaign.endDate);
 
-            for (const requiredItem of campaign.requiredItems) {
-                // Find matching items in receipt (case insensitive and more flexible matching)
-                const matchingItems = receiptData.items.filter(item => {
-                    const receiptItemName = item.name.toLowerCase().replace(/\s+/g, '');
-                    const requiredItemName = requiredItem.name.toLowerCase().replace(/\s+/g, '');
-                    console.log('Comparing items:', {
-                        receiptItem: receiptItemName,
-                        requiredItem: requiredItemName
+            if (receiptDate < campaignStart || receiptDate > campaignEnd) {
+                console.log('Receipt date outside campaign period, skipping');
+                continue;
+            }
+
+            // Check required items
+            if (campaign.requiredItems && campaign.requiredItems.length > 0) {
+                let allItemsFound = true;
+                
+                for (const requiredItem of campaign.requiredItems) {
+                    const matchingItems = receiptData.items.filter(item => {
+                        const receiptItemName = item.name.toLowerCase().replace(/\s+/g, '');
+                        const requiredItemName = requiredItem.name.toLowerCase().replace(/\s+/g, '');
+                        console.log('Comparing items:', {
+                            receiptItem: receiptItemName,
+                            requiredItem: requiredItemName
+                        });
+                        return receiptItemName.includes(requiredItemName) || 
+                               requiredItemName.includes(receiptItemName);
                     });
-                    return receiptItemName.includes(requiredItemName) || 
-                           requiredItemName.includes(receiptItemName);
-                });
 
-                console.log('Matching items found:', matchingItems);
+                    console.log('Matching items for', requiredItem.name, ':', matchingItems);
 
-                // Sum up quantities of matching items
-                const totalQuantity = matchingItems.reduce((sum, item) => sum + (item.quantity || 1), 0);
-                console.log('Total quantity found:', totalQuantity, 'Required:', requiredItem.quantity);
+                    const totalQuantity = matchingItems.reduce((sum, item) => sum + (item.quantity || 1), 0);
+                    console.log('Total quantity found:', totalQuantity, 'Required:', requiredItem.quantity);
 
-                if (totalQuantity < requiredItem.quantity) {
+                    if (totalQuantity < requiredItem.quantity) {
+                        allItemsFound = false;
+                        break;
+                    }
+                }
+
+                if (allItemsFound) {
+                    console.log('Found valid campaign match:', campaign.name);
                     return {
-                        isValid: false,
-                        error: `Receipt does not contain required item: ${requiredItem.name} (need ${requiredItem.quantity}, found ${totalQuantity})`
+                        isValid: true,
+                        campaign: campaign,
+                        receiptData: receiptData
                     };
                 }
             }
         }
 
         return {
-            isValid: true,
-            receiptData: receiptData
+            isValid: false,
+            error: 'No matching campaign requirements found'
         };
 
     } catch (error) {
