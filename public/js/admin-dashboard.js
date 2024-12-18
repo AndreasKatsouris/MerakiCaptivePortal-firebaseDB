@@ -134,6 +134,36 @@ function showCreateCampaignModal() {
     $('#campaignFormModal').modal('show');
 }
 
+function validateCampaignData(campaignData) {
+    const errors = [];
+    
+    // Name validation
+    if (!campaignData.name || campaignData.name.length < 3) {
+        errors.push('Campaign name must be at least 3 characters');
+    }
+    
+    // Brand validation
+    if (!campaignData.brandName || campaignData.brandName.length < 2) {
+        errors.push('Brand name must be at least 2 characters');
+    }
+    
+    // Date validation
+    const startDate = new Date(campaignData.startDate);
+    const endDate = new Date(campaignData.endDate);
+    const today = new Date();
+    
+    if (startDate < today) {
+        errors.push('Start date cannot be in the past');
+    }
+    
+    if (endDate <= startDate) {
+        errors.push('End date must be after start date');
+    }
+    
+    return errors;
+}
+
+
 async function handleSaveCampaign() {
     showLoading();
     try {
@@ -151,6 +181,13 @@ async function handleSaveCampaign() {
                 status: 'active',
                 createdAt: Date.now()
             };
+
+            const validationErrors = validateCampaignData(campaignData);
+            if (validationErrors.length > 0) {
+                const errorMessage = validationErrors.join('\n');
+                alert(errorMessage);
+                return;
+            }    
 
             if (new Date(campaignData.endDate) < new Date(campaignData.startDate)) {
                 throw new Error('End date cannot be before start date');
@@ -188,6 +225,55 @@ async function updateCampaign(campaignKey, campaignData) {
         updatedAt: Date.now()
     });
     alert('Campaign updated successfully');
+}
+
+//function to view campaign details
+async function viewCampaignDetails(campaignId) {
+    try {
+        const snapshot = await firebase.database().ref(`campaigns/${campaignId}`).once('value');
+        const campaign = snapshot.val();
+        
+        if (!campaign) {
+            throw new Error('Campaign not found');
+        }
+
+        // Calculate campaign metrics
+        const metricsRef = firebase.database().ref(`campaignMetrics/${campaignId}`);
+        const metricsSnapshot = await metricsRef.once('value');
+        const metrics = metricsSnapshot.val() || {
+            totalReceipts: 0,
+            totalRewards: 0,
+            conversionRate: 0
+        };
+
+        // Show details in a modal
+        const detailsHtml = `
+            <div class="campaign-details">
+                <h3>${campaign.name}</h3>
+                <div class="row">
+                    <div class="col-md-6">
+                        <p><strong>Brand:</strong> ${campaign.brandName}</p>
+                        <p><strong>Start Date:</strong> ${new Date(campaign.startDate).toLocaleDateString()}</p>
+                        <p><strong>End Date:</strong> ${new Date(campaign.endDate).toLocaleDateString()}</p>
+                        <p><strong>Status:</strong> <span class="badge badge-${campaign.status === 'active' ? 'success' : 'secondary'}">${campaign.status}</span></p>
+                    </div>
+                    <div class="col-md-6">
+                        <p><strong>Total Receipts:</strong> ${metrics.totalReceipts}</p>
+                        <p><strong>Total Rewards:</strong> ${metrics.totalRewards}</p>
+                        <p><strong>Conversion Rate:</strong> ${metrics.conversionRate}%</p>
+                    </div>
+                </div>
+            </div>
+        `;
+
+        // Show in modal
+        const modal = new bootstrap.Modal(document.getElementById('campaignDetailsModal'));
+        document.querySelector('#campaignDetailsModal .modal-body').innerHTML = detailsHtml;
+        modal.show();
+    } catch (error) {
+        console.error('Error viewing campaign details:', error);
+        alert('Failed to load campaign details');
+    }
 }
 
 async function loadCampaigns() {
