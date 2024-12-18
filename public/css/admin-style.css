@@ -380,36 +380,32 @@ body {
     margin-bottom: 1.5rem;
 }
 
+
+.badge[title="Has required items"] {
+    cursor: help;
+}
+
 .required-items-container {
     border: 1px solid #dee2e6;
     border-radius: 4px;
     padding: 1rem;
-    margin-bottom: 1rem;
+    margin-top: 0.5rem;
+    background-color: #f8f9fa;
+}
+
+#itemQuantity {
+    max-width: 100px;
+    border-left: none;
+}
+
+#requiredItemsList {
+    margin-top: 1rem;
 }
 
 .required-item {
     display: flex;
     justify-content: space-between;
     align-items: center;
-    padding: 0.5rem 1rem;
-    margin-bottom: 0.5rem;
-    background-color: #f8f9fa;
-    border: 1px solid #dee2e6;
-    border-radius: 4px;
-}
-
-#itemQuantity {
-    max-width: 100px;
-}
-
-.required-items-container {
-    border: 1px solid #dee2e6;
-    border-radius: 4px;
-    padding: 1rem;
-    background-color: #f8f9fa;
-}
-
-.required-item {
     background-color: #ffffff;
     border: 1px solid #dee2e6;
     border-radius: 4px;
@@ -419,10 +415,6 @@ body {
 
 .required-item:last-child {
     margin-bottom: 0;
-}
-
-.badge[title="Has required items"] {
-    cursor: help;
 }
 
 .required-items-list {
