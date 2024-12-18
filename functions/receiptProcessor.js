@@ -8,9 +8,6 @@ const { parseText } = require('./textParsingStrategies');
  * @param {string} phoneNumber - Phone number of the guest
  * @returns {Promise<object>} - Parsed and validated receipt data
  */
-const vision = require('@google-cloud/vision');
-const admin = require('firebase-admin');
-const { parseText } = require('./textParsingStrategies');
 
 async function processReceipt(imageUrl, phoneNumber) {
     try {
