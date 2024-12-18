@@ -8,7 +8,6 @@ const { parseText } = require('./textParsingStrategies');
  * @param {string} phoneNumber - Phone number of the guest
  * @returns {Promise<object>} - Parsed and validated receipt data
  */
-
 async function processReceipt(imageUrl, phoneNumber) {
     try {
         console.log('Starting receipt processing for:', { imageUrl, phoneNumber });
@@ -19,7 +18,6 @@ async function processReceipt(imageUrl, phoneNumber) {
             throw new Error('No text could be detected on the receipt');
         }
 
-        // Extract full text and parse receipt data
         const fullText = result.textAnnotations[0].description;
         console.log('Extracted full text:', fullText);
 
@@ -28,37 +26,72 @@ async function processReceipt(imageUrl, phoneNumber) {
         const lines = fullText.split('\n');
         let inItemsSection = false;
 
-        for (const line of lines) {
-            // Look for the items section start
-            if (line.includes('ITEM') && line.includes('QTY') && line.includes('PRICE')) {
+        console.log('Parsing items from lines:', lines);
+
+        for (let i = 0; i < lines.length; i++) {
+            const line = lines[i];
+            console.log('Processing line:', line);
+
+            // Mark the start of items section after "ITEM" header
+            if (line.match(/ITEM\s+QTY\s+PRICE\s+VALUE/i)) {
+                console.log('Found items section start');
                 inItemsSection = true;
                 continue;
             }
 
-            // Stop when we hit totals
-            if (line.includes('Bill Total') || line.includes('VAT')) {
+            // Stop when we hit the bill total section
+            if (line.match(/Bill\s+Excl|Bill\s+Total|VAT/i)) {
+                console.log('Found items section end');
                 inItemsSection = false;
                 continue;
             }
 
             if (inItemsSection) {
-                const itemMatch = line.match(/^(.*?)\s+(\d+)\s+(\d+\.\d{2})\s+(\d+\.\d{2})/);
+                // Match pattern: Item name followed by quantity, price, and value
+                // Example: "Calamari Surge    1    92.00    92.00"
+                const itemMatch = line.match(/^(.*?)\s+(\d+)\s+(\d+\.?\d*)\s+(\d+\.?\d*)/);
                 if (itemMatch) {
+                    const [_, name, qty, price, value] = itemMatch;
+                    console.log('Found item:', {
+                        name: name.trim(),
+                        quantity: parseInt(qty),
+                        unitPrice: parseFloat(price),
+                        totalPrice: parseFloat(value)
+                    });
                     items.push({
-                        name: itemMatch[1].trim(),
-                        quantity: parseInt(itemMatch[2]),
-                        unitPrice: parseFloat(itemMatch[3]),
-                        totalPrice: parseFloat(itemMatch[4])
+                        name: name.trim(),
+                        quantity: parseInt(qty),
+                        unitPrice: parseFloat(price),
+                        totalPrice: parseFloat(value)
                     });
                 }
             }
         }
 
+        console.log('Parsed items:', items);
+
         // Extract other receipt details
         const invoiceMatch = fullText.match(/PRO-FORMA INVOICE:\s*(\d+)/i);
         const dateMatch = fullText.match(/(\d{2}\/\d{2}\/\d{4})/);
-        const totalMatch = fullText.match(/Bill Total\s*(\d+\.\d{2})/i);
+        const totalMatch = fullText.match(/Bill\s+Total\s+(\d+\.\d{2})/i);
         const storeNameMatch = fullText.match(/OCEAN BASKET\s*(.*?)(?=\n)/);
+
+        // Find total amount - try different patterns
+        let totalAmount = 0;
+        if (totalMatch) {
+            totalAmount = parseFloat(totalMatch[1]);
+        } else {
+            // Try to find it by looking for "Bill Total" line
+            for (const line of lines) {
+                if (line.includes('Bill Total')) {
+                    const amount = line.match(/(\d+\.\d{2})/);
+                    if (amount) {
+                        totalAmount = parseFloat(amount[1]);
+                        break;
+                    }
+                }
+            }
+        }
 
         const receiptData = {
             invoiceNumber: invoiceMatch ? invoiceMatch[1] : null,
@@ -66,7 +99,7 @@ async function processReceipt(imageUrl, phoneNumber) {
             storeLocation: storeNameMatch ? storeNameMatch[1].trim() : '',
             date: dateMatch ? dateMatch[1] : null,
             items: items,
-            totalAmount: totalMatch ? parseFloat(totalMatch[1]) : 0,
+            totalAmount: totalAmount,
             imageUrl: imageUrl,
             processedAt: Date.now(),
             guestPhoneNumber: phoneNumber,
@@ -74,7 +107,7 @@ async function processReceipt(imageUrl, phoneNumber) {
             rawText: fullText
         };
 
-        console.log('Parsed receipt data:', JSON.stringify(receiptData, null, 2));
+        console.log('Final parsed receipt data:', JSON.stringify(receiptData, null, 2));
 
         return receiptData;
 
