@@ -277,60 +277,146 @@ async function viewCampaignDetails(campaignId) {
 }
 
 async function loadCampaigns() {
+    console.log('Loading campaigns...');
+    
     const campaignTable = document.querySelector('#campaignTable tbody');
-    campaignTable.innerHTML = '<tr><td colspan="5">Loading...</td></tr>';
+    if (!campaignTable) {
+        console.error('Campaign table not found in DOM');
+        return;
+    }
 
     try {
-        const snapshot = await firebase.database().ref('campaigns').once('value');
-        const campaigns = snapshot.val();
+        showLoading();
+        campaignTable.innerHTML = '<tr><td colspan="6" class="text-center">Loading campaigns...</td></tr>';
 
-        if (campaigns) {
+        const snapshot = await firebase.database().ref('campaigns').once('value');
+        console.log('Campaigns data:', snapshot.val());
+
+        const campaigns = snapshot.val();
+        
+        if (campaigns && Object.keys(campaigns).length > 0) {
             campaignTable.innerHTML = '';
+            
             Object.keys(campaigns).forEach(key => {
                 const campaign = campaigns[key];
+                console.log('Processing campaign:', campaign);
+                
                 const row = document.createElement('tr');
                 
-                const formattedStartDate = campaign.startDate ? new Date(campaign.startDate).toLocaleDateString() : 'N/A';
-                const formattedEndDate = campaign.endDate ? new Date(campaign.endDate).toLocaleDateString() : 'N/A';
+                // Format dates with error handling
+                let formattedStartDate = 'N/A';
+                let formattedEndDate = 'N/A';
                 
+                try {
+                    if (campaign.startDate) {
+                        formattedStartDate = new Date(campaign.startDate).toLocaleDateString();
+                    }
+                    if (campaign.endDate) {
+                        formattedEndDate = new Date(campaign.endDate).toLocaleDateString();
+                    }
+                } catch (dateError) {
+                    console.error('Error formatting dates:', dateError);
+                }
+
                 row.innerHTML = `
-                    <td>${campaign.name}</td>
-                    <td>${campaign.brandName}</td>
+                    <td>${campaign.name || 'Unnamed Campaign'}</td>
+                    <td>${campaign.brandName || 'No Brand'}</td>
                     <td>${formattedStartDate}</td>
                     <td>${formattedEndDate}</td>
-                    <td><span class="badge badge-${campaign.status === 'active' ? 'success' : 'secondary'}">${campaign.status}</span></td>
                     <td>
-                        <button class="btn btn-sm btn-warning edit-campaign" data-key="${key}">Edit</button>
-                        <button class="btn btn-sm btn-danger delete-campaign" data-key="${key}">Delete</button>
+                        <span class="badge badge-${campaign.status === 'active' ? 'success' : 'secondary'}">
+                            ${campaign.status || 'unknown'}
+                        </span>
+                    </td>
+                    <td>
+                        <button class="btn btn-sm btn-info view-campaign mr-1" data-key="${key}">
+                            <i class="fas fa-eye"></i>
+                        </button>
+                        <button class="btn btn-sm btn-warning edit-campaign mr-1" data-key="${key}">
+                            <i class="fas fa-edit"></i>
+                        </button>
+                        <button class="btn btn-sm btn-danger delete-campaign" data-key="${key}">
+                            <i class="fas fa-trash"></i>
+                        </button>
                     </td>
                 `;
+                
                 campaignTable.appendChild(row);
             });
 
+            // Attach event listeners after adding rows
             attachCampaignEventListeners();
         } else {
-            campaignTable.innerHTML = '<tr><td colspan="6">No campaigns available</td></tr>';
+            campaignTable.innerHTML = `
+                <tr>
+                    <td colspan="6" class="text-center">
+                        <p class="mb-0">No campaigns available.</p>
+                        <button class="btn btn-link" onclick="showCreateCampaignModal()">
+                            Create your first campaign
+                        </button>
+                    </td>
+                </tr>
+            `;
         }
     } catch (error) {
         console.error('Error loading campaigns:', error);
-        campaignTable.innerHTML = '<tr><td colspan="6">Error loading campaigns. Please try again.</td></tr>';
+        campaignTable.innerHTML = `
+            <tr>
+                <td colspan="6" class="text-center text-danger">
+                    <p>Error loading campaigns: ${error.message}</p>
+                    <button class="btn btn-link" onclick="loadCampaigns()">
+                        Try again
+                    </button>
+                </td>
+            </tr>
+        `;
+    } finally {
+        hideLoading();
     }
 }
 
+// Make sure event listeners are properly attached
 function attachCampaignEventListeners() {
-    // Edit button listeners
-    document.querySelectorAll('.edit-campaign').forEach(button => {
-        button.addEventListener('click', function() {
-            editCampaign(this.getAttribute('data-key'));
+    console.log('Attaching campaign event listeners...');
+    
+    // View campaign details
+    document.querySelectorAll('.view-campaign').forEach(button => {
+        button.addEventListener('click', (e) => {
+            const campaignId = e.currentTarget.getAttribute('data-key');
+            viewCampaignDetails(campaignId);
         });
     });
 
-    // Delete button listeners
-    document.querySelectorAll('.delete-campaign').forEach(button => {
-        button.addEventListener('click', function() {
-            deleteCampaign(this.getAttribute('data-key'));
+    // Edit campaign
+    document.querySelectorAll('.edit-campaign').forEach(button => {
+        button.addEventListener('click', (e) => {
+            const campaignId = e.currentTarget.getAttribute('data-key');
+            editCampaign(campaignId);
         });
     });
+
+    // Delete campaign
+    document.querySelectorAll('.delete-campaign').forEach(button => {
+        button.addEventListener('click', async (e) => {
+            const campaignId = e.currentTarget.getAttribute('data-key');
+            if (await confirmDeleteCampaign(campaignId)) {
+                deleteCampaign(campaignId);
+            }
+        });
+    });
+}
+
+// Add confirmation for delete
+async function confirmDeleteCampaign(campaignId) {
+    return await Swal.fire({
+        title: 'Delete Campaign?',
+        text: 'This action cannot be undone.',
+        icon: 'warning',
+        showCancelButton: true,
+        confirmButtonColor: '#dc3545',
+        cancelButtonColor: '#6c757d',
+        confirmButtonText: 'Yes, delete it!'
+    }).then((result) => result.isConfirmed);
 }
 
 async function editCampaign(campaignKey) {
