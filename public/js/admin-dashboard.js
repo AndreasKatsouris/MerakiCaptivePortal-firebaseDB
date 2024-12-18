@@ -3,6 +3,7 @@ document.addEventListener('DOMContentLoaded', function () {
     // Initialize all event listeners after DOM is loaded
     initializeAuthentication();
     initializeMenuListeners();
+    initializeLoyaltyListeners();
     initializeCampaignListeners();
     initializeWiFiListeners();
     initializeLiveDataListeners();
@@ -45,6 +46,29 @@ function addEventListenerSafely(elementId, event, handler) {
     } else {
         console.warn(`Element with id '${elementId}' not found`);
     }
+}
+
+// ==================== Loyalty Program Section ====================
+function initializeLoyaltyListeners() {
+    // Campaign Management
+    addEventListenerSafely('campaignManagementMenu', 'click', function(e) {
+        e.preventDefault();
+        displaySection('campaignManagementContent');
+        loadCampaigns();
+    });
+
+    // Receipt Management
+    addEventListenerSafely('receiptScanningMenu', 'click', function(e) {
+        e.preventDefault();
+        displaySection('receiptManagementContent');
+        loadReceipts();
+    });
+
+    // Loyalty Settings
+    addEventListenerSafely('loyaltySettingsMenu', 'click', function(e) {
+        e.preventDefault();
+        displaySection('loyaltySettingsContent');
+    });
 }
 
 // ==================== Menu Section ====================
@@ -405,14 +429,89 @@ function initializeDataDeletionListeners() {
     }
 }
 
-// [Your existing data deletion functions here]
+// ==================== Receipt Management Section ====================
+function initializeReceiptManagement() {
+    // Event listeners for receipt filters
+    addEventListenerSafely('receiptSearchBtn', 'click', handleReceiptSearch);
+    addEventListenerSafely('receiptStatusFilter', 'change', handleReceiptSearch);
+    addEventListenerSafely('receiptSearchGuest', 'input', handleReceiptSearch);
+    addEventListenerSafely('receiptSearchInvoice', 'input', handleReceiptSearch);
+}
 
-// ==================== Utility Functions ====================
-//function displaySection(sectionId) {
-//    document.querySelectorAll('.content-section').forEach(section => {
-//        section.style.display = section.id === sectionId ? 'block' : 'none';
-//    });
-//}
+async function loadReceipts(filters = {}) {
+    showLoading();
+    const tableBody = document.querySelector('#receiptsTable tbody');
+    tableBody.innerHTML = '';
+
+    try {
+        const snapshot = await firebase.database().ref('processedReceipts').once('value');
+        const receipts = snapshot.val();
+
+        if (receipts) {
+            Object.keys(receipts).forEach(key => {
+                const receipt = receipts[key];
+                
+                // Apply filters
+                if (!matchesReceiptFilters(receipt, filters)) return;
+
+                const row = document.createElement('tr');
+                row.innerHTML = `
+                    <td>${formatDate(receipt.processedAt)}</td>
+                    <td>${receipt.guestName || 'N/A'}</td>
+                    <td>${receipt.invoiceNumber || 'N/A'}</td>
+                    <td>${receipt.parsedData.storeName || 'N/A'}</td>
+                    <td>R${receipt.parsedData.totalAmount.toFixed(2)}</td>
+                    <td><span class="badge badge-${getStatusBadgeClass(receipt.status)}">${receipt.status}</span></td>
+                    <td>
+                        <button class="btn btn-sm btn-info view-receipt" data-receipt-id="${key}">
+                            View
+                        </button>
+                    </td>
+                `;
+                tableBody.appendChild(row);
+            });
+
+            // Attach event listeners to view buttons
+            attachReceiptViewListeners();
+        } else {
+            tableBody.innerHTML = '<tr><td colspan="7" class="text-center">No receipts found</td></tr>';
+        }
+    } catch (error) {
+        console.error('Error loading receipts:', error);
+        tableBody.innerHTML = '<tr><td colspan="7" class="text-center text-danger">Error loading receipts</td></tr>';
+    } finally {
+        hideLoading();
+    }
+}
+
+function matchesReceiptFilters(receipt, filters) {
+    if (filters.guest && !receipt.guestName?.toLowerCase().includes(filters.guest.toLowerCase())) return false;
+    if (filters.invoice && !receipt.invoiceNumber?.toLowerCase().includes(filters.invoice.toLowerCase())) return false;
+    if (filters.status && receipt.status !== filters.status) return false;
+    return true;
+}
+
+function handleReceiptSearch() {
+    const filters = {
+        guest: document.getElementById('receiptSearchGuest').value,
+        invoice: document.getElementById('receiptSearchInvoice').value,
+        status: document.getElementById('receiptStatusFilter').value
+    };
+    loadReceipts(filters);
+}
+
+function attachReceiptViewListeners() {
+    document.querySelectorAll('.view-receipt').forEach(button => {
+        button.addEventListener('click', function() {
+            const receiptId = this.getAttribute('data-receipt-id');
+            showReceiptModal(receiptId);
+        });
+    });
+}
+
+function formatDate(timestamp) {
+    return new Date(timestamp).toLocaleString();
+}
 
 async function loadInitialData() {
     try {
@@ -446,64 +545,6 @@ function showLoading() {
 
 function hideLoading() {
     document.getElementById('globalLoadingOverlay').style.display = 'none';
-}
-
-// Update your loadCampaigns function to use loading states
-async function loadCampaigns() {
-    showLoading();
-    const campaignTable = document.querySelector('#campaignTable tbody');
-    campaignTable.innerHTML = '';
-
-    try {
-        const snapshot = await firebase.database().ref('campaigns').once('value');
-        const campaigns = snapshot.val();
-
-        if (campaigns) {
-            Object.keys(campaigns).forEach(key => {
-                const campaign = campaigns[key];
-                const row = document.createElement('tr');
-                row.classList.add('fade-in');  // Add animation
-                
-                // ... rest of your row creation code ...
-                
-                campaignTable.appendChild(row);
-            });
-        } else {
-            campaignTable.innerHTML = `
-                <tr class="fade-in">
-                    <td colspan="5" class="text-center">No campaigns available</td>
-                </tr>
-            `;
-        }
-    } catch (error) {
-        console.error('Error loading campaigns:', error);
-        campaignTable.innerHTML = `
-            <tr class="fade-in">
-                <td colspan="5" class="text-center text-danger">Error loading campaigns</td>
-            </tr>
-        `;
-    } finally {
-        hideLoading();
-    }
-}
-
-// Update saveCampaignToFirebase to show loading
-async function saveCampaignToFirebase(campaignData) {
-    showLoading();
-    try {
-        const campaignRef = firebase.database().ref('campaigns').push();
-        await campaignRef.set(campaignData);
-        
-        $('#campaignFormModal').modal('hide');
-        resetCampaignForm();
-        await loadCampaigns();
-        alert('Campaign created successfully');
-    } catch (error) {
-        console.error('Error saving campaign:', error);
-        alert('Failed to save campaign');
-    } finally {
-        hideLoading();
-    }
 }
 
 // Add loading state to section transitions

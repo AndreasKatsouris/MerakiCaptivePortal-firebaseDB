@@ -1,171 +1,178 @@
 const vision = require('@google-cloud/vision');
 const admin = require('firebase-admin');
+const { parseText } = require('./textParsingStrategies');
+const logger = require('./logger');
 
-// Initialize the Google Cloud Vision API client
-const client = new vision.ImageAnnotatorClient();
-
-/**
- * Process a receipt using Google Cloud Vision OCR and save parsed data to Firebase
- * @param {string} imageUrl - URL of the receipt image
- * @param {string} guestPhoneNumber - Phone number of the guest who submitted the receipt
- * @param {string} brandName - The brand associated with the receipt campaign
- * @returns {Promise<object>} - Parsed receipt data
- */
-// In receiptProcessor.js
-
-async function processReceipt(imageUrl, phoneNumber) {
-    try {
-        console.log(`Processing receipt for: ${phoneNumber}, Image: ${imageUrl}`);
-        
-        // Perform text detection on the receipt image
-        const [result] = await client.textDetection(imageUrl);
-        const detections = result.textAnnotations;
-
-        if (!detections || detections.length === 0) {
-            throw new Error('No text detected on the receipt.');
-        }
-
-        // Extract full text and parse receipt data
-        const fullText = detections[0].description;
-        const parsedData = parseReceiptData(fullText);
-
-        // Save full receipt data with relationships
-        const receiptData = {
-            // Receipt Details
-            invoiceNumber: parsedData.invoiceNumber,
-            storeName: parsedData.storeName,
-            storeLocation: parsedData.storeLocation,
-            date: parsedData.date,
-            time: parsedData.time,
-            
-            // Line Items
-            items: parsedData.items,
-            
-            // Totals
-            subtotal: parsedData.billSubtotal,
-            tax: parsedData.tax,
-            totalAmount: parsedData.totalAmount,
-            
-            // Additional Info
-            tableNumber: parsedData.tableNumber,
-            numberOfGuests: parsedData.numberOfGuests,
-            
-            // Metadata
-            imageUrl: imageUrl,
-            processedAt: admin.database.ServerValue.TIMESTAMP,
-            
-            // Relationships
-            guestPhoneNumber: phoneNumber, // Link to guest
-            status: 'pending_validation', // Receipt status
-            
-            // Original Data (for reference)
-            rawText: fullText
-        };
-
-        // Create a unique ID for the receipt using invoice number if available
-        const receiptId = parsedData.invoiceNumber || admin.database().ref().push().key;
-        
-        // Structure the database updates
-        const updates = {};
-        
-        // Store receipt data
-        updates[`receipts/${receiptId}`] = receiptData;
-        
-        // Create index by phone number for quick guest receipt lookup
-        updates[`guest-receipts/${phoneNumber}/${receiptId}`] = true;
-
-        // Perform all updates atomically
-        await admin.database().ref().update(updates);
-
-        console.log('Receipt data saved with ID:', receiptId);
-        return {
-            receiptId,
-            ...receiptData
-        };
-    } catch (error) {
-        console.error('Error processing receipt:', error);
-        throw new Error(`Failed to process receipt: ${error.message}`);
-    }
-}
-
-/**
- * Parse receipt text to extract structured data
- * @param {string} text - Full OCR text from the receipt
- * @returns {object} - Parsed receipt data
- */
-function parseReceiptData(text) {
-    const lines = text.split('\n');
-    const receiptData = {};
-
-    // Extract store details
-    // Look for lines containing store name, location, and address format
-    const storeDetails = lines.slice(0, 5).join(' '); // Usually at the top of receipt
-    receiptData.storeName = storeDetails.split('\n')[0] || 'Unknown Store';
-    receiptData.storeLocation = storeDetails.match(/(?:Shop|store)\s+.*?(?=Tel:|$)/i)?.[0] || '';
-
-    // Extract invoice/receipt number - multiple formats
-    const invoiceMatch = text.match(/(?:INVOICE|PRO-FORMA INVOICE|RECEIPT):\s*[#]?(\d+)/i);
-    receiptData.invoiceNumber = invoiceMatch ? invoiceMatch[1] : null;
-
-    // Extract date and time
-    const dateTimeMatch = text.match(/(\d{2}\/\d{2}\/\d{4})\s*(\d{2}:\d{2})/);
-    if (dateTimeMatch) {
-        receiptData.date = dateTimeMatch[1];
-        receiptData.time = dateTimeMatch[2];
+class ReceiptProcessor {
+    constructor() {
+        this.visionClient = new vision.ImageAnnotatorClient();
     }
 
-    // Extract table information
-    const tableMatch = text.match(/TABLE:\s*(\d+)/i);
-    const coversMatch = text.match(/COVERS:\s*(\d+)/i);
-    receiptData.tableNumber = tableMatch ? tableMatch[1] : null;
-    receiptData.numberOfGuests = coversMatch ? parseInt(coversMatch[1]) : null;
+    /**
+     * Process a receipt image with multiple parsing strategies
+     * @param {string} imageUrl - URL of the receipt image
+     * @param {string} phoneNumber - Phone number of the guest
+     * @returns {Promise<object>} - Parsed and validated receipt data
+     */
+    async processReceipt(imageUrl, phoneNumber) {
+        try {
+            logger.info(`Processing receipt for phone: ${phoneNumber}, Image: ${imageUrl}`);
+            
+            // Detect text with multiple confidence levels
+            const [result] = await this.detectReceiptText(imageUrl);
+            
+            if (!result || !result.textAnnotations || result.textAnnotations.length === 0) {
+                throw new Error('No text could be detected on the receipt');
+            }
 
-    // Extract bill totals
-    const billExclMatch = text.match(/Bill\s*Excl\s*(\d+\.\d{2})/i);
-    const taxMatch = text.match(/Tax\s*(\d+\.\d{2})/i);
-    const totalMatch = text.match(/Bill\s*Total\s*(\d+\.\d{2})/i);
+            // Extract full text
+            const fullText = result.textAnnotations[0].description;
+            
+            // Try multiple parsing strategies
+            const parsedData = await this.parseReceiptData(fullText);
+            
+            // Validate parsed data
+            this.validateParsedData(parsedData);
 
-    receiptData.billSubtotal = billExclMatch ? parseFloat(billExclMatch[1]) : null;
-    receiptData.tax = taxMatch ? parseFloat(taxMatch[1]) : null;
-    receiptData.totalAmount = totalMatch ? parseFloat(totalMatch[1]) : null;
+            // Prepare receipt data for storage
+            const receiptData = this.formatReceiptData(parsedData, imageUrl, phoneNumber);
+            
+            // Save receipt to Firebase
+            const receiptId = await this.saveReceiptData(receiptData);
 
-    // Extract line items
-    const items = [];
-    let inItemSection = false;
-    for (const line of lines) {
-        // Look for start of items section
-        if (line.includes('ITEM') && line.includes('QTY') && line.includes('PRICE')) {
-            inItemSection = true;
-            continue;
+            return {
+                receiptId,
+                ...receiptData
+            };
+        } catch (error) {
+            logger.error('Receipt processing error', { 
+                imageUrl, 
+                phoneNumber, 
+                errorMessage: error.message 
+            });
+            throw error;
         }
+    }
 
-        // Stop when we hit totals
-        if (line.includes('Bill Excl') || line.includes('VAT')) {
-            inItemSection = false;
-            break;
+    /**
+     * Detect text in receipt image with multiple vision techniques
+     * @param {string} imageUrl - URL of the receipt image
+     * @returns {Promise<Array>} - Vision API detection result
+     */
+    async detectReceiptText(imageUrl) {
+        try {
+            // Use multiple detection types for robustness
+            return await Promise.all([
+                this.visionClient.textDetection(imageUrl),
+                this.visionClient.documentTextDetection(imageUrl)
+            ]);
+        } catch (error) {
+            logger.error('Text detection failed', { imageUrl, error });
+            throw new Error('Unable to detect text in receipt image');
         }
+    }
 
-        if (inItemSection) {
-            // Match line item pattern: Item name, quantity, price, value
-            const itemMatch = line.match(/^(.*?)\s+(\d+)\s+(\d+\.\d{2})\s+(\d+\.\d{2})/);
-            if (itemMatch) {
-                items.push({
-                    name: itemMatch[1].trim(),
-                    quantity: parseInt(itemMatch[2]),
-                    unitPrice: parseFloat(itemMatch[3]),
-                    totalPrice: parseFloat(itemMatch[4])
-                });
+    /**
+     * Parse receipt data using multiple strategies
+     * @param {string} fullText - Detected text from receipt
+     * @returns {Promise<object>} - Parsed receipt data
+     */
+    async parseReceiptData(fullText) {
+        const parsingStrategies = [
+            this.parseStandardFormat,
+            this.parseAlternativeFormat,
+            this.parseGenericFormat
+        ];
+
+        for (const strategy of parsingStrategies) {
+            try {
+                const parsedData = await strategy(fullText);
+                if (this.isValidParsedData(parsedData)) {
+                    return parsedData;
+                }
+            } catch (error) {
+                logger.warn('Parsing strategy failed', { strategy: strategy.name });
             }
         }
+
+        throw new Error('Could not parse receipt using any available strategy');
     }
-    receiptData.items = items;
 
-    // Extract VAT details
-    const vatMatch = text.match(/VAT\s*\d+%\s*(?:\(.*?\))?\s*:?\s*(\d+\.\d{2})/i);
-    receiptData.vat = vatMatch ? parseFloat(vatMatch[1]) : null;
+    /**
+     * Validate parsed receipt data
+     * @param {object} parsedData - Parsed receipt data
+     * @throws {Error} If data is invalid
+     */
+    validateParsedData(parsedData) {
+        const requiredFields = [
+            'storeName', 
+            'totalAmount', 
+            'date', 
+            'invoiceNumber'
+        ];
 
-    console.log('Parsed receipt data:', receiptData);
-    return receiptData;
+        for (const field of requiredFields) {
+            if (!parsedData[field]) {
+                throw new Error(`Missing required field: ${field}`);
+            }
+        }
+
+        // Additional validation logic
+        if (parsedData.totalAmount <= 0) {
+            throw new Error('Invalid total amount');
+        }
+    }
+
+    /**
+     * Format receipt data for storage
+     * @param {object} parsedData - Parsed receipt data
+     * @param {string} imageUrl - Receipt image URL
+     * @param {string} phoneNumber - Guest phone number
+     * @returns {object} Formatted receipt data
+     */
+    formatReceiptData(parsedData, imageUrl, phoneNumber) {
+        return {
+            storeName: parsedData.storeName,
+            invoiceNumber: parsedData.invoiceNumber,
+            totalAmount: parsedData.totalAmount,
+            date: parsedData.date,
+            items: parsedData.items || [],
+            imageUrl,
+            processedAt: admin.database.ServerValue.TIMESTAMP,
+            guestPhoneNumber: phoneNumber,
+            status: 'pending_validation',
+            rawText: parsedData.rawText
+        };
+    }
+
+    /**
+     * Save receipt data to Firebase
+     * @param {object} receiptData - Formatted receipt data
+     * @returns {string} Generated receipt ID
+     */
+    async saveReceiptData(receiptData) {
+        const receiptRef = admin.database().ref('receipts').push();
+        await receiptRef.set(receiptData);
+        return receiptRef.key;
+    }
+
+    // Placeholder parsing methods (to be implemented with specific logic)
+    async parseStandardFormat(text) { /* Implementation */ }
+    async parseAlternativeFormat(text) { /* Implementation */ }
+    async parseGenericFormat(text) { /* Implementation */ }
+
+    /**
+     * Check if parsed data meets basic validation
+     * @param {object} parsedData - Parsed receipt data
+     * @returns {boolean} Validity of parsed data
+     */
+    isValidParsedData(parsedData) {
+        return !!(
+            parsedData.storeName && 
+            parsedData.totalAmount && 
+            parsedData.date
+        );
+    }
 }
 
-module.exports = { processReceipt, parseReceiptData };
+module.exports = new ReceiptProcessor();
