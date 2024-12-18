@@ -458,8 +458,8 @@
     </div>
 </div>
 <!-- Campaign Form Modal -->
- <!--
-<div class="modal fade" id="campaignFormModal" tabindex="-1" role="dialog" aria-labelledby="campaignFormModalLabel" aria-hidden="true">
+<!-- Campaign Form Modal -->
+<div class="modal fade" id="campaignFormModal" tabindex="-1" role="dialog" aria-hidden="true">
     <div class="modal-dialog" role="document">
         <div class="modal-content">
             <div class="modal-header">
@@ -475,19 +475,23 @@
                     </div>
                     <div class="form-group">
                         <label for="campaignName">Campaign Name</label>
-                        <input type="text" class="form-control" id="campaignName" required>
+                        <input type="text" class="form-control" id="campaignName" name="campaignName" required>
                     </div>
                     <div class="form-group">
                         <label for="brandName">Brand Name</label>
-                        <input type="text" class="form-control" id="brandName" required>
+                        <input type="text" class="form-control" id="brandName" name="brandName" required>
                     </div>
                     <div class="form-group">
                         <label for="startDate">Start Date</label>
-                        <input type="date" class="form-control" id="startDate" required>
+                        <input type="date" class="form-control" id="startDate" name="startDate" required>
                     </div>
                     <div class="form-group">
                         <label for="endDate">End Date</label>
-                        <input type="date" class="form-control" id="endDate" required>
+                        <input type="date" class="form-control" id="endDate" name="endDate" required>
+                    </div>
+                    <div class="form-group">
+                        <label for="minPurchaseAmount">Minimum Purchase Amount (Optional)</label>
+                        <input type="number" class="form-control" id="minPurchaseAmount" name="minPurchaseAmount" min="0" step="0.01">
                     </div>
                 </form>
             </div>
@@ -498,26 +502,7 @@
         </div>
     </div>
 </div>
--->
-<!-- Add this to admin-dashboard.html if not present -->
-<div class="modal fade" id="campaignDetailsModal" tabindex="-1" role="dialog">
-    <div class="modal-dialog" role="document">
-        <div class="modal-content">
-            <div class="modal-header">
-                <h5 class="modal-title">Campaign Details</h5>
-                <button type="button" class="close" data-dismiss="modal" aria-label="Close">
-                    <span aria-hidden="true">&times;</span>
-                </button>
-            </div>
-            <div class="modal-body">
-                <!-- Content will be dynamically inserted -->
-            </div>
-            <div class="modal-footer">
-                <button type="button" class="btn btn-secondary" data-dismiss="modal">Close</button>
-            </div>
-        </div>
-    </div>
-</div>
+
 <!-- Add this as a new content section in your admin-dashboard.html -->
 <div id="dashboardContent" class="content-section" style="display: none;">
     <div class="dashboard-header">

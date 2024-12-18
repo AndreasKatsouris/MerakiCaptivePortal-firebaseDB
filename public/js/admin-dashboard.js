@@ -105,7 +105,6 @@ function initializeCampaignListeners() {
 
     addEventListenerSafely('saveCampaignBtn', 'click', handleSaveCampaign);
     addEventListenerSafely('cancelEditButton', 'click', resetCampaignForm);
-
     addEventListenerSafely('campaignForm', 'submit', async function(e) {
         e.preventDefault();
         const submitButton = this.querySelector('button[type="submit"]');
@@ -124,15 +123,7 @@ function initializeCampaignListeners() {
 
 }
 
-function showCreateCampaignModal() {
-    resetCampaignForm();
-    const editNotice = document.getElementById('editNotice');
-    if (editNotice) {
-        editNotice.style.display = 'none';
-    }
-    document.getElementById('campaignFormModalLabel').textContent = 'Create New Campaign';
-    $('#campaignFormModal').modal('show');
-}
+
 
 function validateCampaignData(campaignData) {
     const errors = [];
@@ -165,47 +156,49 @@ function validateCampaignData(campaignData) {
 
 
 async function handleSaveCampaign() {
+    const form = document.getElementById('campaignForm');
+    if (!form) {
+        console.error('Campaign form not found');
+        return;
+    }
+
     showLoading();
     try {
-        const form = document.getElementById('campaignForm');
-        if (!form) {
-            throw new Error('Campaign form not found');
-        }
-
-        if (form.checkValidity()) {
-            const campaignData = {
-                name: document.getElementById('campaignName').value.trim(),
-                brandName: document.getElementById('brandName').value.trim(),
-                startDate: document.getElementById('startDate').value,
-                endDate: document.getElementById('endDate').value,
-                status: 'active',
-                createdAt: Date.now()
-            };
-
-            const validationErrors = validateCampaignData(campaignData);
-            if (validationErrors.length > 0) {
-                const errorMessage = validationErrors.join('\n');
-                alert(errorMessage);
-                return;
-            }    
-
-            if (new Date(campaignData.endDate) < new Date(campaignData.startDate)) {
-                throw new Error('End date cannot be before start date');
-            }
-
-            const editingKey = form.getAttribute('data-editing-key');
-            if (editingKey) {
-                await updateCampaign(editingKey, campaignData);
-            } else {
-                await createNewCampaign(campaignData);
-            }
-            
-            $('#campaignFormModal').modal('hide');
-            resetCampaignForm();
-            await loadCampaigns();
-        } else {
+        if (!form.checkValidity()) {
             form.reportValidity();
+            return;
         }
+
+        const campaignData = {
+            name: document.getElementById('campaignName').value.trim(),
+            brandName: document.getElementById('brandName').value.trim(),
+            startDate: document.getElementById('startDate').value,
+            endDate: document.getElementById('endDate').value,
+            status: 'active',
+            createdAt: Date.now(),
+            minPurchaseAmount: document.getElementById('minPurchaseAmount').value || null
+        };
+
+        // Validate dates
+        if (new Date(campaignData.endDate) < new Date(campaignData.startDate)) {
+            throw new Error('End date cannot be before start date');
+        }
+
+        // Check if we're editing or creating
+        const editingKey = form.getAttribute('data-editing-key');
+        
+        if (editingKey) {
+            await updateCampaign(editingKey, campaignData);
+            console.log('Campaign updated successfully');
+        } else {
+            await createNewCampaign(campaignData);
+            console.log('Campaign created successfully');
+        }
+
+        // Hide modal and refresh list
+        $('#campaignFormModal').modal('hide');
+        await loadCampaigns();
+
     } catch (error) {
         console.error('Error saving campaign:', error);
         alert(error.message || 'Failed to save campaign');
@@ -477,7 +470,6 @@ async function confirmDeleteCampaign(campaignId) {
 }
 
 
-
 function deleteCampaign(campaignKey) {
     if (confirm('Are you sure you want to delete this campaign?')) {
         firebase.database().ref(`campaigns/${campaignKey}`).remove()
@@ -494,16 +486,80 @@ function deleteCampaign(campaignKey) {
 
 function resetCampaignForm() {
     const form = document.getElementById('campaignForm');
+    if (!form) {
+        console.error('Campaign form not found');
+        return;
+    }
+
+    // Reset the form
     form.reset();
+    
+    // Remove editing key if it exists
     form.removeAttribute('data-editing-key');
     
+    // Reset the edit notice
     const editNotice = document.getElementById('editNotice');
     if (editNotice) {
         editNotice.style.display = 'none';
     }
     
-    document.getElementById('cancelEditButton').style.display = 'none';
+    // Reset modal title
+    const modalTitle = document.getElementById('campaignFormModalLabel');
+    if (modalTitle) {
+        modalTitle.textContent = 'Create New Campaign';
+    }
+    
+    // Clear any validation messages or error states
+    const inputs = form.querySelectorAll('input');
+    inputs.forEach(input => {
+        input.classList.remove('is-invalid');
+        const feedback = input.nextElementSibling;
+        if (feedback && feedback.classList.contains('invalid-feedback')) {
+            feedback.remove();
+        }
+    });
 }
+
+function showCreateCampaignModal() {
+    const modal = document.getElementById('campaignFormModal');
+    if (!modal) {
+        console.error('Campaign form modal not found');
+        return;
+    }
+
+    try {
+        resetCampaignForm();
+    } catch (error) {
+        console.error('Error resetting form:', error);
+    }
+
+    // Show the modal
+    $('#campaignFormModal').modal('show');
+}
+
+// Initialize all event listeners when the document is ready
+document.addEventListener('DOMContentLoaded', function() {
+    // Campaign form event listeners
+    const saveCampaignBtn = document.getElementById('saveCampaignBtn');
+    if (saveCampaignBtn) {
+        saveCampaignBtn.addEventListener('click', handleSaveCampaign);
+    }
+
+    const campaignForm = document.getElementById('campaignForm');
+    if (campaignForm) {
+        campaignForm.addEventListener('submit', function(e) {
+            e.preventDefault();
+            handleSaveCampaign();
+        });
+    }
+
+    // Create campaign button in the table view
+    const createCampaignBtn = document.querySelector('.btn-create-campaign');
+    if (createCampaignBtn) {
+        createCampaignBtn.addEventListener('click', showCreateCampaignModal);
+    }
+});
+
 
 // ==================== WiFi Management Section ====================
 function initializeWiFiListeners() {
