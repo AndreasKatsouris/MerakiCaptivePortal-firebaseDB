@@ -85,6 +85,15 @@ async function validateReceipt(receiptData, campaignName) {
     }
 }
 function validateRequiredItems(receiptItems, requiredItems) {
+        // Validate required items if specified in campaign
+        if (campaign.requiredItems && campaign.requiredItems.length > 0) {
+            // Check if receipt has items
+            if (!receiptData.items || receiptData.items.length === 0) {
+                return {
+                    isValid: false,
+                    error: 'Receipt has no items to check against requirements'
+                };
+            }    
     for (const requiredItem of requiredItems) {
         // Find matching items on receipt (case insensitive, partial match)
         const matchingItems = receiptItems.filter(item => 
@@ -103,5 +112,7 @@ function validateRequiredItems(receiptItems, requiredItems) {
     }
 
     return { isValid: true };
+}
+
 }
 module.exports = { validateReceipt };
