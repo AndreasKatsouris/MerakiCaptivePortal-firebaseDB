@@ -458,6 +458,7 @@
     </div>
 </div>
 <!-- Campaign Form Modal -->
+ <!--
 <div class="modal fade" id="campaignFormModal" tabindex="-1" role="dialog" aria-labelledby="campaignFormModalLabel" aria-hidden="true">
     <div class="modal-dialog" role="document">
         <div class="modal-content">
@@ -497,7 +498,26 @@
         </div>
     </div>
 </div>
-
+-->
+<!-- Add this to admin-dashboard.html if not present -->
+<div class="modal fade" id="campaignDetailsModal" tabindex="-1" role="dialog">
+    <div class="modal-dialog" role="document">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Campaign Details</h5>
+                <button type="button" class="close" data-dismiss="modal" aria-label="Close">
+                    <span aria-hidden="true">&times;</span>
+                </button>
+            </div>
+            <div class="modal-body">
+                <!-- Content will be dynamically inserted -->
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-dismiss="modal">Close</button>
+            </div>
+        </div>
+    </div>
+</div>
 <!-- Add this as a new content section in your admin-dashboard.html -->
 <div id="dashboardContent" class="content-section" style="display: none;">
     <div class="dashboard-header">

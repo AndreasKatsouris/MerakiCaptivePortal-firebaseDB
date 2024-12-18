@@ -214,21 +214,34 @@ async function handleSaveCampaign() {
     }
 }
 async function createNewCampaign(campaignData) {
-    const campaignRef = firebase.database().ref('campaigns').push();
-    await campaignRef.set(campaignData);
-    alert('Campaign created successfully');
+    console.log('Creating new campaign with data:', campaignData);
+    try {
+        const campaignRef = firebase.database().ref('campaigns').push();
+        await campaignRef.set(campaignData);
+        console.log('Campaign created successfully with ID:', campaignRef.key);
+        return campaignRef.key;
+    } catch (error) {
+        console.error('Error in createNewCampaign:', error);
+        throw error;
+    }
 }
 
 async function updateCampaign(campaignKey, campaignData) {
-    await firebase.database().ref(`campaigns/${campaignKey}`).update({
-        ...campaignData,
-        updatedAt: Date.now()
-    });
-    alert('Campaign updated successfully');
+    console.log('Updating campaign:', campaignKey, 'with data:', campaignData);
+    try {
+        await firebase.database().ref(`campaigns/${campaignKey}`).update({
+            ...campaignData,
+            updatedAt: Date.now()
+        });
+        console.log('Campaign updated successfully');
+    } catch (error) {
+        console.error('Error in updateCampaign:', error);
+        throw error;
+    }
 }
-
 //function to view campaign details
 async function viewCampaignDetails(campaignId) {
+    console.log('Viewing campaign details for:', campaignId);
     try {
         const snapshot = await firebase.database().ref(`campaigns/${campaignId}`).once('value');
         const campaign = snapshot.val();
@@ -237,14 +250,7 @@ async function viewCampaignDetails(campaignId) {
             throw new Error('Campaign not found');
         }
 
-        // Calculate campaign metrics
-        const metricsRef = firebase.database().ref(`campaignMetrics/${campaignId}`);
-        const metricsSnapshot = await metricsRef.once('value');
-        const metrics = metricsSnapshot.val() || {
-            totalReceipts: 0,
-            totalRewards: 0,
-            conversionRate: 0
-        };
+        console.log('Retrieved campaign data:', campaign);
 
         // Show details in a modal
         const detailsHtml = `
@@ -257,22 +263,73 @@ async function viewCampaignDetails(campaignId) {
                         <p><strong>End Date:</strong> ${new Date(campaign.endDate).toLocaleDateString()}</p>
                         <p><strong>Status:</strong> <span class="badge badge-${campaign.status === 'active' ? 'success' : 'secondary'}">${campaign.status}</span></p>
                     </div>
-                    <div class="col-md-6">
-                        <p><strong>Total Receipts:</strong> ${metrics.totalReceipts}</p>
-                        <p><strong>Total Rewards:</strong> ${metrics.totalRewards}</p>
-                        <p><strong>Conversion Rate:</strong> ${metrics.conversionRate}%</p>
-                    </div>
                 </div>
             </div>
         `;
 
-        // Show in modal
-        const modal = new bootstrap.Modal(document.getElementById('campaignDetailsModal'));
-        document.querySelector('#campaignDetailsModal .modal-body').innerHTML = detailsHtml;
+        // Check if the modal exists
+        const modalElement = document.getElementById('campaignDetailsModal');
+        if (!modalElement) {
+            console.error('Campaign details modal not found');
+            return;
+        }
+
+        const modalBody = modalElement.querySelector('.modal-body');
+        if (!modalBody) {
+            console.error('Modal body not found');
+            return;
+        }
+
+        modalBody.innerHTML = detailsHtml;
+        
+        // Show the modal
+        const modal = new bootstrap.Modal(modalElement);
         modal.show();
+
     } catch (error) {
         console.error('Error viewing campaign details:', error);
-        alert('Failed to load campaign details');
+        alert('Failed to load campaign details: ' + error.message);
+    }
+}
+
+async function editCampaign(campaignId) {
+    console.log('Editing campaign:', campaignId);
+    try {
+        const snapshot = await firebase.database().ref(`campaigns/${campaignId}`).once('value');
+        const campaign = snapshot.val();
+        
+        if (!campaign) {
+            throw new Error('Campaign not found');
+        }
+
+        console.log('Retrieved campaign data for editing:', campaign);
+
+        // Populate form fields
+        document.getElementById('campaignName').value = campaign.name || '';
+        document.getElementById('brandName').value = campaign.brandName || '';
+        document.getElementById('startDate').value = campaign.startDate || '';
+        document.getElementById('endDate').value = campaign.endDate || '';
+
+        // Show editing notice
+        const editNotice = document.getElementById('editNotice');
+        const editingCampaignName = document.getElementById('editingCampaignName');
+        if (editNotice) editNotice.style.display = 'block';
+        if (editingCampaignName) editingCampaignName.textContent = campaign.name;
+
+        // Mark form as editing
+        const form = document.getElementById('campaignForm');
+        if (form) form.setAttribute('data-editing-key', campaignId);
+
+        // Update modal title
+        const modalTitle = document.getElementById('campaignFormModalLabel');
+        if (modalTitle) modalTitle.textContent = 'Edit Campaign';
+
+        // Show modal
+        $('#campaignFormModal').modal('show');
+
+    } catch (error) {
+        console.error('Error in editCampaign:', error);
+        alert('Failed to load campaign for editing: ' + error.message);
     }
 }
 
@@ -419,41 +476,7 @@ async function confirmDeleteCampaign(campaignId) {
     }).then((result) => result.isConfirmed);
 }
 
-async function editCampaign(campaignKey) {
-    try {
-        const snapshot = await firebase.database().ref(`campaigns/${campaignKey}`).once('value');
-        const campaign = snapshot.val();
-        
-        if (!campaign) {
-            alert('Campaign not found');
-            return;
-        }
 
-        // Populate form fields
-        document.getElementById('campaignName').value = campaign.name;
-        document.getElementById('brandName').value = campaign.brandName;
-        document.getElementById('startDate').value = campaign.startDate;
-        document.getElementById('endDate').value = campaign.endDate;
-
-        // Show editing notice
-        const editNotice = document.getElementById('editNotice');
-        const editingCampaignName = document.getElementById('editingCampaignName');
-        editNotice.style.display = 'block';
-        editingCampaignName.textContent = campaign.name;
-
-        // Mark form as editing
-        document.getElementById('campaignForm').setAttribute('data-editing-key', campaignKey);
-
-        // Show cancel button
-        document.getElementById('cancelEditButton').style.display = 'inline-block';
-
-        // Show modal
-        $('#campaignFormModal').modal('show');
-    } catch (error) {
-        console.error('Error fetching campaign:', error);
-        alert('Error loading campaign data');
-    }
-}
 
 function deleteCampaign(campaignKey) {
     if (confirm('Are you sure you want to delete this campaign?')) {
