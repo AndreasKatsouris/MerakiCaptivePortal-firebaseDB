@@ -299,6 +299,30 @@ async function viewCampaignDetails(campaignId) {
         const endDate = new Date(campaign.endDate).toLocaleDateString();
         const createdDate = new Date(campaign.createdAt).toLocaleString();
 
+        // Prepare required items HTML if they exist
+        const requiredItemsHtml = campaign.requiredItems && campaign.requiredItems.length > 0 
+            ? `
+                <tr>
+                    <th>Required Items</th>
+                    <td>
+                        <div class="required-items-list">
+                            ${campaign.requiredItems.map(item => `
+                                <div class="required-item-detail">
+                                    <span class="item-name">
+                                        <i class="fas fa-check-circle text-success mr-2"></i>
+                                        ${item.name}
+                                    </span>
+                                    <span class="item-quantity badge badge-info">
+                                        Quantity: ${item.quantity}
+                                    </span>
+                                </div>
+                            `).join('')}
+                        </div>
+                    </td>
+                </tr>
+            ` 
+            : '';
+
         const detailsHtml = `
             <div class="campaign-details">
                 <div class="row">
@@ -322,24 +346,17 @@ async function viewCampaignDetails(campaignId) {
                             </tr>
                             <tr>
                                 <th>Status</th>
-                                <td><span class="badge badge-${campaign.status === 'active' ? 'success' : 'secondary'}">${campaign.status}</span></td>
+                                <td>
+                                    <span class="badge badge-${campaign.status === 'active' ? 'success' : 'secondary'} px-3 py-2">
+                                        ${campaign.status === 'active' ? 'Active' : 'Inactive'}
+                                    </span>
+                                </td>
                             </tr>
                             <tr>
                                 <th>Created</th>
                                 <td>${createdDate}</td>
                             </tr>
-                            ${campaign.requiredItems && campaign.requiredItems.length > 0 ? `
-                                <tr>
-                                    <th>Required Items</th>
-                                    <td>
-                                        <ul class="list-unstyled mb-0">
-                                            ${campaign.requiredItems.map(item => 
-                                                `<li>${item.name} (Qty: ${item.quantity})</li>`
-                                            ).join('')}
-                                        </ul>
-                                    </td>
-                                </tr>
-                            ` : ''}
+                            ${requiredItemsHtml}
                             ${campaign.minPurchaseAmount ? `
                             <tr>
                                 <th>Minimum Purchase</th>
@@ -352,7 +369,7 @@ async function viewCampaignDetails(campaignId) {
             </div>
         `;
 
-        // Check if modal exists, if not create it
+        // Rest of your modal code remains the same
         let modalElement = document.getElementById('campaignDetailsModal');
         if (!modalElement) {
             console.log('Modal not found, creating it');
@@ -419,6 +436,16 @@ async function editCampaign(campaignId) {
         document.getElementById('startDate').value = campaign.startDate || '';
         document.getElementById('endDate').value = campaign.endDate || '';
 
+        // Clear and populate required items
+        const itemsList = document.getElementById('requiredItemsList');
+        itemsList.innerHTML = '';
+        
+        if (campaign.requiredItems && campaign.requiredItems.length > 0) {
+            campaign.requiredItems.forEach(item => {
+                addRequiredItem(item.name, item.quantity);
+            });
+        }
+       
         // Show editing notice
         const editNotice = document.getElementById('editNotice');
         const editingCampaignName = document.getElementById('editingCampaignName');
@@ -485,35 +512,40 @@ async function loadCampaigns() {
                 }
 
                 row.innerHTML = `
-                <td>${campaign.name || 'Unnamed Campaign'}</td>
-                <td>${campaign.brandName || 'No Brand'}</td>
-                <td>${formattedStartDate}</td>
-                <td>${formattedEndDate}</td>
-                <td>
-                    <div class="custom-control custom-switch">
-                        <input type="checkbox" class="custom-control-input status-toggle" 
-                            id="statusToggle_${key}" 
-                            data-key="${key}" 
-                            ${campaign.status === 'active' ? 'checked' : ''}>
-                        <label class="custom-control-label" for="statusToggle_${key}">
-                            <span class="badge badge-${campaign.status === 'active' ? 'success' : 'secondary'}">
-                                ${campaign.status === 'active' ? 'Active' : 'Inactive'}
-                            </span>
-                        </label>
-                    </div>
-                </td>
-                <td>
-                    <button class="btn btn-sm btn-info view-campaign mr-1" data-key="${key}">
-                        <i class="fas fa-eye"></i> View
-                    </button>
-                    <button class="btn btn-sm btn-warning edit-campaign mr-1" data-key="${key}">
-                        <i class="fas fa-edit"></i> Edit
-                    </button>
-                    <button class="btn btn-sm btn-danger delete-campaign" data-key="${key}">
-                        <i class="fas fa-trash"></i> Delete
-                    </button>
-                </td>
-            `;
+            <td>${campaign.name || 'Unnamed Campaign'}</td>
+            <td>${campaign.brandName || 'No Brand'}</td>
+            <td>${formattedStartDate}</td>
+            <td>${formattedEndDate}</td>
+            <td>
+                <div class="custom-control custom-switch">
+                    <input type="checkbox" class="custom-control-input status-toggle" 
+                        id="statusToggle_${key}" 
+                        data-key="${key}" 
+                        ${campaign.status === 'active' ? 'checked' : ''}>
+                    <label class="custom-control-label" for="statusToggle_${key}">
+                        <span class="badge badge-${campaign.status === 'active' ? 'success' : 'secondary'}">
+                            ${campaign.status === 'active' ? 'Active' : 'Inactive'}
+                        </span>
+                    </label>
+                </div>
+                ${campaign.requiredItems && campaign.requiredItems.length > 0 ? 
+                    `<span class="badge badge-info ml-2" title="Has required items">
+                        <i class="fas fa-list"></i> ${campaign.requiredItems.length} items
+                    </span>` : ''
+                }
+            </td>
+            <td>
+                <button class="btn btn-sm btn-info view-campaign mr-1" data-key="${key}">
+                    <i class="fas fa-eye"></i> View
+                </button>
+                <button class="btn btn-sm btn-warning edit-campaign mr-1" data-key="${key}">
+                    <i class="fas fa-edit"></i> Edit
+                </button>
+                <button class="btn btn-sm btn-danger delete-campaign" data-key="${key}">
+                    <i class="fas fa-trash"></i> Delete
+                </button>
+            </td>
+        `;  
                 
                 campaignTable.appendChild(row);
             });
