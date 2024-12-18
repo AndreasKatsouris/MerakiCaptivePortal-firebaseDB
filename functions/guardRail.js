@@ -11,11 +11,11 @@ const { fetchCampaigns } = require('./campaigns');
 async function validateReceipt(receiptData, brandName) {
     try {
         console.log('Starting receipt validation for brand:', brandName);
-        console.log('Receipt data:', receiptData);
+        console.log('Receipt data:', JSON.stringify(receiptData, null, 2));
 
         // Get all active campaigns
         const campaigns = await fetchCampaigns();
-        console.log('All campaigns:', campaigns);
+        console.log('All campaigns:', JSON.stringify(campaigns, null, 2));
 
         // Filter active campaigns for matching brand
         const matchingCampaigns = campaigns.filter(campaign => {

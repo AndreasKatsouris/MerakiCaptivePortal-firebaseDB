@@ -441,3 +441,50 @@ body {
     font-size: 0.85em;
     padding: 0.5em 0.7em;
 }
+
+.console-panel {
+    position: fixed;
+    bottom: 0;
+    right: 0;
+    width: 400px;
+    height: 300px;
+    background: rgba(0, 0, 0, 0.9);
+    color: #00ff00;
+    font-family: monospace;
+    z-index: 1000;
+    border-top-left-radius: 8px;
+    display: none;
+}
+
+.console-header {
+    padding: 8px;
+    background: rgba(0, 0, 0, 0.8);
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    border-bottom: 1px solid #333;
+}
+
+.console-content {
+    padding: 8px;
+    height: calc(100% - 40px);
+    overflow-y: auto;
+    font-size: 12px;
+}
+
+.log-entry {
+    margin-bottom: 4px;
+    word-wrap: break-word;
+}
+
+.log-error {
+    color: #ff4444;
+}
+
+.log-warning {
+    color: #ffbb33;
+}
+
+.log-success {
+    color: #00C851;
+}

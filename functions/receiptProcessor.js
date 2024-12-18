@@ -8,11 +8,14 @@ const { parseText } = require('./textParsingStrategies');
  * @param {string} phoneNumber - Phone number of the guest
  * @returns {Promise<object>} - Parsed and validated receipt data
  */
+const vision = require('@google-cloud/vision');
+const admin = require('firebase-admin');
+const { parseText } = require('./textParsingStrategies');
+
 async function processReceipt(imageUrl, phoneNumber) {
     try {
-        console.log(`Processing receipt for phone: ${phoneNumber}, Image: ${imageUrl}`);
+        console.log('Starting receipt processing for:', { imageUrl, phoneNumber });
         
-        // Detect text with Vision API
         const [result] = await detectReceiptText(imageUrl);
         
         if (!result || !result.textAnnotations || result.textAnnotations.length === 0) {
@@ -21,15 +24,66 @@ async function processReceipt(imageUrl, phoneNumber) {
 
         // Extract full text and parse receipt data
         const fullText = result.textAnnotations[0].description;
-        const parsedData = await parseReceiptData(fullText);
-        
-        // Save receipt to Firebase
-        const receiptData = await saveReceiptData(parsedData, imageUrl, phoneNumber);
+        console.log('Extracted full text:', fullText);
+
+        // Parse items section
+        const items = [];
+        const lines = fullText.split('\n');
+        let inItemsSection = false;
+
+        for (const line of lines) {
+            // Look for the items section start
+            if (line.includes('ITEM') && line.includes('QTY') && line.includes('PRICE')) {
+                inItemsSection = true;
+                continue;
+            }
+
+            // Stop when we hit totals
+            if (line.includes('Bill Total') || line.includes('VAT')) {
+                inItemsSection = false;
+                continue;
+            }
+
+            if (inItemsSection) {
+                const itemMatch = line.match(/^(.*?)\s+(\d+)\s+(\d+\.\d{2})\s+(\d+\.\d{2})/);
+                if (itemMatch) {
+                    items.push({
+                        name: itemMatch[1].trim(),
+                        quantity: parseInt(itemMatch[2]),
+                        unitPrice: parseFloat(itemMatch[3]),
+                        totalPrice: parseFloat(itemMatch[4])
+                    });
+                }
+            }
+        }
+
+        // Extract other receipt details
+        const invoiceMatch = fullText.match(/PRO-FORMA INVOICE:\s*(\d+)/i);
+        const dateMatch = fullText.match(/(\d{2}\/\d{2}\/\d{4})/);
+        const totalMatch = fullText.match(/Bill Total\s*(\d+\.\d{2})/i);
+        const storeNameMatch = fullText.match(/OCEAN BASKET\s*(.*?)(?=\n)/);
+
+        const receiptData = {
+            invoiceNumber: invoiceMatch ? invoiceMatch[1] : null,
+            storeName: storeNameMatch ? storeNameMatch[0].trim() : 'OCEAN BASKET',
+            storeLocation: storeNameMatch ? storeNameMatch[1].trim() : '',
+            date: dateMatch ? dateMatch[1] : null,
+            items: items,
+            totalAmount: totalMatch ? parseFloat(totalMatch[1]) : 0,
+            imageUrl: imageUrl,
+            processedAt: Date.now(),
+            guestPhoneNumber: phoneNumber,
+            status: 'pending_validation',
+            rawText: fullText
+        };
+
+        console.log('Parsed receipt data:', JSON.stringify(receiptData, null, 2));
 
         return receiptData;
+
     } catch (error) {
-        console.error('Receipt processing error:', error);
-        throw new Error(`Failed to process receipt: ${error.message}`);
+        console.error('Error processing receipt:', error);
+        throw error;
     }
 }
 

@@ -1090,3 +1090,70 @@ async function showReceiptModal(receiptId) {
     }
 }
 
+//======================================================= Console Log =================================================
+// Add logging functions
+function initializeLogging() {
+    // Override console.log
+    const originalLog = console.log;
+    const originalError = console.error;
+    const originalWarn = console.warn;
+
+    console.log = function() {
+        addLogEntry(arguments, 'log');
+        originalLog.apply(console, arguments);
+    };
+
+    console.error = function() {
+        addLogEntry(arguments, 'error');
+        originalError.apply(console, arguments);
+    };
+
+    console.warn = function() {
+        addLogEntry(arguments, 'warning');
+        originalWarn.apply(console, arguments);
+    };
+}
+
+function addLogEntry(args, type) {
+    const logContainer = document.getElementById('logContainer');
+    if (!logContainer) return;
+
+    const entry = document.createElement('div');
+    entry.className = `log-entry log-${type}`;
+    
+    const timestamp = new Date().toLocaleTimeString();
+    const message = Array.from(args).map(arg => 
+        typeof arg === 'object' ? JSON.stringify(arg, null, 2) : arg
+    ).join(' ');
+
+    entry.textContent = `[${timestamp}] ${message}`;
+    logContainer.appendChild(entry);
+    logContainer.scrollTop = logContainer.scrollHeight;
+}
+
+function clearLogs() {
+    const logContainer = document.getElementById('logContainer');
+    if (logContainer) {
+        logContainer.innerHTML = '';
+    }
+}
+
+function toggleConsole() {
+    const consolePanel = document.querySelector('.console-panel');
+    if (consolePanel) {
+        consolePanel.style.display = consolePanel.style.display === 'none' ? 'block' : 'none';
+    }
+}
+
+// Add keyboard shortcut to toggle console (Ctrl+`)
+document.addEventListener('keydown', function(e) {
+    if (e.ctrlKey && e.key === '`') {
+        toggleConsole();
+    }
+});
+
+// Initialize logging when the document is ready
+document.addEventListener('DOMContentLoaded', function() {
+    initializeLogging();
+    // ... rest of your initialization code
+});
