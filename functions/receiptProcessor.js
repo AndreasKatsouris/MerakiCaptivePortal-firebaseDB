@@ -25,6 +25,7 @@ async function processReceipt(imageUrl, phoneNumber) {
 const items = [];
 const lines = fullText.split('\n');
 let inItemsSection = false;
+let currentItem = {};
 
 console.log('Starting to parse lines for items');
 
@@ -32,50 +33,64 @@ for (let i = 0; i < lines.length; i++) {
     const line = lines[i].trim();
     console.log('Processing line:', line);
 
-    // Look for the items section start
-    // Match exactly how it appears in your receipt
-    if (line.includes('ITEM') && line.includes('QTY') && line.includes('PRICE') && line.includes('VALUE')) {
-        console.log('Found start of items section');
+    // Look for section markers
+    if (line === 'ITEM') {
+        console.log('Found items section start');
         inItemsSection = true;
         continue;
     }
 
-    // Look for the end of items section
     if (line.startsWith('Bill Excl')) {
-        console.log('Found end of items section');
+        console.log('Found items section end');
         inItemsSection = false;
+        // Save last item if pending
+        if (currentItem.name) {
+            items.push({...currentItem});
+            currentItem = {};
+        }
+        continue;
+    }
+
+    // Skip header lines
+    if (['QTY', 'PRICE', 'VALUE'].includes(line)) {
         continue;
     }
 
     if (inItemsSection && line.length > 0) {
-        // Match the exact format from your receipt
-        // Looking for patterns like: "Calamari Surge    1    92.00    92.00"
-        const itemParts = line.split(/\s+/);
-        
-        // Check if we have enough parts and last three are numbers
-        if (itemParts.length >= 4) {
-            // Get the last three parts for qty, price, and value
-            const value = parseFloat(itemParts.pop());
-            const price = parseFloat(itemParts.pop());
-            const qty = parseInt(itemParts.pop());
-            // Remaining parts are the item name
-            const name = itemParts.join(' ');
-
-            if (!isNaN(qty) && !isNaN(price) && !isNaN(value)) {
-                const item = {
-                    name: name,
-                    quantity: qty,
-                    unitPrice: price,
-                    totalPrice: value
-                };
-                console.log('Found item:', item);
-                items.push(item);
+        // Check if line is a price (contains only numbers and possibly decimal point)
+        if (/^\d+\.?\d*$/.test(line)) {
+            const number = parseFloat(line);
+            if (!currentItem.name) {
+                continue; // Skip if we don't have an item name yet
             }
+            // Determine which number this is based on what we already have
+            if (!currentItem.quantity) {
+                currentItem.quantity = parseInt(number);
+            } else if (!currentItem.unitPrice) {
+                currentItem.unitPrice = number;
+            } else if (!currentItem.totalPrice) {
+                currentItem.totalPrice = number;
+                // Item is complete, add it to items array
+                items.push({...currentItem});
+                console.log('Added complete item:', currentItem);
+                currentItem = {};
+            }
+        } else if (!/^\d+\.?\d*$/.test(line) && line !== 'VALUE') {
+            // This must be an item name
+            if (currentItem.name) {
+                // If we already have an item name, save the current item
+                if (Object.keys(currentItem).length > 1) {
+                    items.push({...currentItem});
+                }
+                currentItem = {};
+            }
+            currentItem.name = line;
         }
     }
 }
 
-console.log('All parsed items:', items);
+console.log('All parsed items:', JSON.stringify(items, null, 2));
+
         // Extract other receipt details
         const invoiceMatch = fullText.match(/PRO-FORMA INVOICE:\s*(\d+)/i);
         const dateMatch = fullText.match(/(\d{2}\/\d{2}\/\d{4})/);
