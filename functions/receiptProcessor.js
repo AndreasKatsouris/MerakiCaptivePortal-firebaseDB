@@ -21,55 +21,61 @@ async function processReceipt(imageUrl, phoneNumber) {
         const fullText = result.textAnnotations[0].description;
         console.log('Extracted full text:', fullText);
 
-        // Parse items section
-        const items = [];
-        const lines = fullText.split('\n');
-        let inItemsSection = false;
+ // Parse items section
+const items = [];
+const lines = fullText.split('\n');
+let inItemsSection = false;
 
-        console.log('Parsing items from lines:', lines);
+console.log('Starting to parse lines for items');
 
-        for (let i = 0; i < lines.length; i++) {
-            const line = lines[i];
-            console.log('Processing line:', line);
+for (let i = 0; i < lines.length; i++) {
+    const line = lines[i].trim();
+    console.log('Processing line:', line);
 
-            // Mark the start of items section after "ITEM" header
-            if (line.match(/ITEM\s+QTY\s+PRICE\s+VALUE/i)) {
-                console.log('Found items section start');
-                inItemsSection = true;
-                continue;
-            }
+    // Look for the items section start
+    // Match exactly how it appears in your receipt
+    if (line.includes('ITEM') && line.includes('QTY') && line.includes('PRICE') && line.includes('VALUE')) {
+        console.log('Found start of items section');
+        inItemsSection = true;
+        continue;
+    }
 
-            // Stop when we hit the bill total section
-            if (line.match(/Bill\s+Excl|Bill\s+Total|VAT/i)) {
-                console.log('Found items section end');
-                inItemsSection = false;
-                continue;
-            }
+    // Look for the end of items section
+    if (line.startsWith('Bill Excl')) {
+        console.log('Found end of items section');
+        inItemsSection = false;
+        continue;
+    }
 
-            if (inItemsSection) {
-                // Match pattern: Item name followed by quantity, price, and value
-                // Example: "Calamari Surge    1    92.00    92.00"
-                const itemMatch = line.match(/^(.*?)\s+(\d+)\s+(\d+\.?\d*)\s+(\d+\.?\d*)/);
-                if (itemMatch) {
-                    const [_, name, qty, price, value] = itemMatch;
-                    console.log('Found item:', {
-                        name: name.trim(),
-                        quantity: parseInt(qty),
-                        unitPrice: parseFloat(price),
-                        totalPrice: parseFloat(value)
-                    });
-                    items.push({
-                        name: name.trim(),
-                        quantity: parseInt(qty),
-                        unitPrice: parseFloat(price),
-                        totalPrice: parseFloat(value)
-                    });
-                }
+    if (inItemsSection && line.length > 0) {
+        // Match the exact format from your receipt
+        // Looking for patterns like: "Calamari Surge    1    92.00    92.00"
+        const itemParts = line.split(/\s+/);
+        
+        // Check if we have enough parts and last three are numbers
+        if (itemParts.length >= 4) {
+            // Get the last three parts for qty, price, and value
+            const value = parseFloat(itemParts.pop());
+            const price = parseFloat(itemParts.pop());
+            const qty = parseInt(itemParts.pop());
+            // Remaining parts are the item name
+            const name = itemParts.join(' ');
+
+            if (!isNaN(qty) && !isNaN(price) && !isNaN(value)) {
+                const item = {
+                    name: name,
+                    quantity: qty,
+                    unitPrice: price,
+                    totalPrice: value
+                };
+                console.log('Found item:', item);
+                items.push(item);
             }
         }
+    }
+}
 
-        console.log('Parsed items:', items);
-
+console.log('All parsed items:', items);
         // Extract other receipt details
         const invoiceMatch = fullText.match(/PRO-FORMA INVOICE:\s*(\d+)/i);
         const dateMatch = fullText.match(/(\d{2}\/\d{2}\/\d{4})/);
