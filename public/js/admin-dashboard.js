@@ -938,12 +938,18 @@ async function loadReceipts(filters = {}) {
     tableBody.innerHTML = '<tr><td colspan="7" class="text-center">Loading...</td></tr>';
 
     try {
-        const snapshot = await firebase.database().ref('receipts').once('value');
+        let query = firebase.database().ref('receipts');
+        
+        // Apply status filter if specified
+        if (filters.status) {
+            query = query.orderByChild('status').equalTo(filters.status);
+        }
+        const snapshot = await query.once('value');
         const receipts = snapshot.val();
 
         if (receipts) {
             tableBody.innerHTML = '';
-            Object.entries(receipts).reverse().forEach(([key, receipt]) => {
+            Object.entries(receipts).reverse().forEach(([receiptId, receipt]) => {
                 // Apply filters if any
                 if (filters.guest && !receipt.guestPhoneNumber?.includes(filters.guest)) return;
                 if (filters.invoice && !receipt.invoiceNumber?.includes(filters.invoice)) return;
@@ -962,7 +968,7 @@ async function loadReceipts(filters = {}) {
                         </span>
                     </td>
                     <td>
-                        <button class="btn btn-sm btn-info view-receipt" data-id="${key}">
+                        <button class="btn btn-sm btn-info view-receipt" data-id="${receiptId}">
                             <i class="fas fa-eye"></i> View
                         </button>
                     </td>
