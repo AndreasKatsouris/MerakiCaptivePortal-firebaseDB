@@ -488,3 +488,15 @@ body {
 .log-success {
     color: #00C851;
 }
+
+.receipt-status {
+    display: inline-block;
+    padding: 0.25em 0.6em;
+    border-radius: 3px;
+    font-size: 0.85em;
+}
+
+.receipt-view-btn {
+    padding: 0.25rem 0.5rem;
+    font-size: 0.875rem;
+}

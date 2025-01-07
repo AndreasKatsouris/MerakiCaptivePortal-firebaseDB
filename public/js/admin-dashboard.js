@@ -935,37 +935,42 @@ function initializeReceiptManagement() {
 async function loadReceipts(filters = {}) {
     showLoading();
     const tableBody = document.querySelector('#receiptsTable tbody');
-    tableBody.innerHTML = '';
+    tableBody.innerHTML = '<tr><td colspan="7" class="text-center">Loading...</td></tr>';
 
     try {
-        const snapshot = await firebase.database().ref('processedReceipts').once('value');
+        const snapshot = await firebase.database().ref('receipts').once('value');
         const receipts = snapshot.val();
 
         if (receipts) {
-            Object.keys(receipts).forEach(key => {
-                const receipt = receipts[key];
-                
-                // Apply filters
-                if (!matchesReceiptFilters(receipt, filters)) return;
+            tableBody.innerHTML = '';
+            Object.entries(receipts).reverse().forEach(([key, receipt]) => {
+                // Apply filters if any
+                if (filters.guest && !receipt.guestPhoneNumber?.includes(filters.guest)) return;
+                if (filters.invoice && !receipt.invoiceNumber?.includes(filters.invoice)) return;
+                if (filters.status && receipt.status !== filters.status) return;
 
                 const row = document.createElement('tr');
                 row.innerHTML = `
                     <td>${formatDate(receipt.processedAt)}</td>
-                    <td>${receipt.guestName || 'N/A'}</td>
+                    <td>${receipt.guestPhoneNumber || 'N/A'}</td>
                     <td>${receipt.invoiceNumber || 'N/A'}</td>
-                    <td>${receipt.parsedData.storeName || 'N/A'}</td>
-                    <td>R${receipt.parsedData.totalAmount.toFixed(2)}</td>
-                    <td><span class="badge badge-${getStatusBadgeClass(receipt.status)}">${receipt.status}</span></td>
+                    <td>${receipt.storeName || 'N/A'}</td>
+                    <td>R${receipt.totalAmount?.toFixed(2) || '0.00'}</td>
                     <td>
-                        <button class="btn btn-sm btn-info view-receipt" data-receipt-id="${key}">
-                            View
+                        <span class="badge badge-${getStatusBadgeClass(receipt.status)}">
+                            ${receipt.status || 'pending'}
+                        </span>
+                    </td>
+                    <td>
+                        <button class="btn btn-sm btn-info view-receipt" data-id="${key}">
+                            <i class="fas fa-eye"></i> View
                         </button>
                     </td>
                 `;
                 tableBody.appendChild(row);
             });
 
-            // Attach event listeners to view buttons
+            // Attach event listeners
             attachReceiptViewListeners();
         } else {
             tableBody.innerHTML = '<tr><td colspan="7" class="text-center">No receipts found</td></tr>';
@@ -975,6 +980,41 @@ async function loadReceipts(filters = {}) {
         tableBody.innerHTML = '<tr><td colspan="7" class="text-center text-danger">Error loading receipts</td></tr>';
     } finally {
         hideLoading();
+    }
+}
+
+async function showReceiptModal(receiptId) {
+    try {
+        const snapshot = await firebase.database().ref(`receipts/${receiptId}`).once('value');
+        const receipt = snapshot.val();
+        
+        if (!receipt) throw new Error('Receipt not found');
+
+        // Populate modal fields
+        document.getElementById('modalStoreName').textContent = receipt.storeName || 'N/A';
+        document.getElementById('modalInvoiceNumber').textContent = receipt.invoiceNumber || 'N/A';
+        document.getElementById('modalDate').textContent = formatDate(receipt.processedAt);
+        document.getElementById('modalGuestPhone').textContent = receipt.guestPhoneNumber || 'N/A';
+        
+        // Handle items table
+        const itemsTable = document.getElementById('modalItemsTable');
+        itemsTable.innerHTML = '';
+        receipt.items?.forEach(item => {
+            const row = document.createElement('tr');
+            row.innerHTML = `
+                <td>${item.name}</td>
+                <td>${item.quantity}</td>
+                <td>R${item.unitPrice?.toFixed(2)}</td>
+                <td>R${item.totalPrice?.toFixed(2)}</td>
+            `;
+            itemsTable.appendChild(row);
+        });
+
+        // Show the modal
+        $('#receiptDetailsModal').modal('show');
+    } catch (error) {
+        console.error('Error showing receipt details:', error);
+        alert('Error loading receipt details');
     }
 }
 

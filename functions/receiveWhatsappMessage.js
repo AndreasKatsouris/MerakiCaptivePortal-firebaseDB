@@ -19,51 +19,111 @@ if (!admin.apps.length) {
 
 async function processReward(guest, campaign, receiptData) {
     try {
+        // Input validation
+        if (!guest || !guest.phoneNumber) {
+            console.error('Invalid guest data:', guest);
+            throw new Error('Guest data is missing or invalid');
+        }
+
+        if (!campaign || !campaign.name) {
+            console.error('Invalid campaign data:', campaign);
+            throw new Error('Campaign data is missing or invalid');
+        }
+
+        if (!receiptData || !receiptData.receiptId) {
+            console.error('Invalid receipt data:', receiptData);
+            throw new Error('Receipt data is missing or invalid');
+        }
+
+        console.log('Starting reward processing with:', {
+            guest: guest,
+            campaign: campaign,
+            receiptData: receiptData
+        });
+
+        // Create reward reference
         const rewardRef = admin.database().ref('rewards').push();
+        console.log('Created reward reference:', rewardRef.key);
+
+        // Prepare reward data
         const rewardData = {
             // Guest Information
             guestPhone: guest.phoneNumber,
-            guestName: guest.name,
+            guestName: guest.name || 'Unknown Guest',
             
             // Campaign Information
-            campaignId: campaign.id,
+            campaignId: campaign.id || rewardRef.key,
             campaignName: campaign.name,
             
             // Receipt Information
-            receiptId: receiptData.receiptId,
-            receiptAmount: receiptData.totalAmount,
-            receiptNumber: receiptData.invoiceNumber,
+            receiptId: receiptData.receiptId || rewardRef.key,
+            receiptAmount: receiptData.totalAmount || 0,
+            receiptNumber: receiptData.invoiceNumber || 'Unknown',
             
             // Reward Status
             status: 'pending',
             createdAt: admin.database.ServerValue.TIMESTAMP,
-            updatedAt: admin.database.ServerValue.TIMESTAMP
+            updatedAt: admin.database.ServerValue.TIMESTAMP,
+            
+            // Additional tracking
+            processedAt: Date.now(),
+            processedBy: 'system'
         };
 
-        // Structure the database updates
+        console.log('Prepared reward data:', rewardData);
+
+        // Prepare database updates
         const updates = {};
         
-        // Store reward data
-        updates[`rewards/${rewardRef.key}`] = rewardData;
-        
-        // Create indexes for quick lookups
-        updates[`guest-rewards/${guest.phoneNumber}/${rewardRef.key}`] = true;
-        updates[`campaign-rewards/${campaign.id}/${rewardRef.key}`] = true;
-        updates[`receipt-rewards/${receiptData.receiptId}`] = rewardRef.key;
+        try {
+            // Store reward data
+            updates[`rewards/${rewardRef.key}`] = rewardData;
+            console.log('Added reward data to updates');
+            
+            // Create guest index
+            updates[`guest-rewards/${guest.phoneNumber}/${rewardRef.key}`] = true;
+            console.log('Added guest index to updates');
+            
+            // Create campaign index
+            const campaignId = campaign.id || rewardRef.key;
+            if (campaignId) {
+                updates[`campaign-rewards/${campaignId}/${rewardRef.key}`] = true;
+                updates[`receipts/${receiptData.receiptId}/campaignId`] = campaignId;
+            }
+            console.log('Added campaign index to updates');
+            
+            // Create receipt index
+            updates[`receipt-rewards/${receiptData.receiptId}`] = rewardRef.key;
+            console.log('Added receipt index to updates');
 
-        // Update receipt status
-        updates[`receipts/${receiptData.receiptId}/status`] = 'validated';
-        updates[`receipts/${receiptData.receiptId}/validatedAt`] = admin.database.ServerValue.TIMESTAMP;
-        updates[`receipts/${receiptData.receiptId}/campaignId`] = campaign.id;
+            // Update receipt status
+            updates[`receipts/${receiptData.receiptId}/status`] = 'validated';
+            updates[`receipts/${receiptData.receiptId}/validatedAt`] = admin.database.ServerValue.TIMESTAMP;
+            updates[`receipts/${receiptData.receiptId}/campaignId`] = campaignId;
+            console.log('Added receipt status updates');
 
-        // Perform all updates atomically
-        await admin.database().ref().update(updates);
+            console.log('Attempting to save all updates to database...');
+            await admin.database().ref().update(updates);
+            console.log('Successfully saved all updates to database');
 
-        console.log(`Reward created for guest ${guest.name} under campaign ${campaign.name}`);
-        return rewardData;
+            return rewardData;
+
+        } catch (dbError) {
+            console.error('Database error while saving updates:', dbError);
+            console.error('Updates that failed:', updates);
+            throw new Error(`Database error: ${dbError.message}`);
+        }
+
     } catch (error) {
-        console.error('Error processing reward:', error);
-        throw new Error('Failed to process reward');
+        console.error('Error in processReward:', error);
+        console.error('Error details:', {
+            error: error,
+            stack: error.stack,
+            guest: guest ? 'present' : 'missing',
+            campaign: campaign ? 'present' : 'missing',
+            receiptData: receiptData ? 'present' : 'missing'
+        });
+        throw new Error(`Failed to process reward: ${error.message}`);
     }
 }
 
@@ -165,6 +225,7 @@ async function receiveWhatsAppMessage(req, res) {
 let validResult = null;
 for (const campaign of activeCampaigns) {
     const result = await validateReceipt(receiptData, campaign.brandName);
+    console.log('Validation result:', result);
     if (result.isValid) {
         validResult = result;
         break;
@@ -172,6 +233,13 @@ for (const campaign of activeCampaigns) {
 }
 
 if (validResult) {
+
+    try {
+        console.log('Processing reward with:', {
+            guestData,
+            campaign: validResult.campaign,
+            receiptData
+        });
     // Receipt matches a campaign - process reward
     await processReward(guestData, validResult.campaign, receiptData);
     
@@ -181,6 +249,10 @@ if (validResult) {
         to: `whatsapp:${phoneNumber}`,
     });
     return res.status(200).send('Receipt validated and reward processed.');
+} catch (error) {
+    console.error('Error during reward processing:', error);
+    throw error;
+}
 } else {
     // No matching campaign found
     await client.messages.create({

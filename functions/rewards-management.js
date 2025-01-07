@@ -1,5 +1,3 @@
-// Add to your admin-dashboard.js or create a new rewards-management.js file
-
 // Event Listeners for Menu Items
 document.querySelector('#receiptManagementMenu').addEventListener('click', function(e) {
     e.preventDefault();
