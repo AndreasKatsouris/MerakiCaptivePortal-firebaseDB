@@ -4,7 +4,6 @@ const { client, twilioPhone } = require('./twilioClient');
 const { processReceipt } = require('./receiptProcessor');
 const { validateReceipt } = require('./guardRail');
 const { fetchCampaigns } = require('./campaigns');
-const { saveReceiptData } = require('./receiptProcessor');
 
 if (!admin.apps.length) {
     admin.initializeApp({
@@ -204,7 +203,7 @@ async function receiveWhatsAppMessage(req, res) {
             try {
                 // Process the receipt first
                 const receiptData = await processReceipt(MediaUrl0, phoneNumber);
-                await saveReceiptData(receiptData, MediaUrl0, phoneNumber);                // Fetch all active campaigns
+                //await saveReceiptData(receiptData, MediaUrl0, phoneNumber);                // Fetch all active campaigns
                 const campaigns = await fetchCampaigns();
                 const activeCampaigns = campaigns.filter(campaign => 
                     campaign.status === 'active' && 

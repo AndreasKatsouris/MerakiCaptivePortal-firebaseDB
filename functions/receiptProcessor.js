@@ -130,8 +130,9 @@ console.log('All parsed items:', JSON.stringify(items, null, 2));
 
         console.log('Final parsed receipt data:', JSON.stringify(receiptData, null, 2));
 
-        return receiptData;
-
+        const savedReceipt = await saveReceiptData(receiptData, imageUrl, phoneNumber);
+        return savedReceipt;
+        
     } catch (error) {
         console.error('Error processing receipt:', error);
         throw error;
