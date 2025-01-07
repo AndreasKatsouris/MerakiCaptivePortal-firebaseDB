@@ -939,21 +939,19 @@ async function loadReceipts(filters = {}) {
 
     try {
         let query = firebase.database().ref('receipts');
-        
-        // Apply status filter if specified
         if (filters.status) {
             query = query.orderByChild('status').equalTo(filters.status);
         }
+        
         const snapshot = await query.once('value');
         const receipts = snapshot.val();
 
         if (receipts) {
             tableBody.innerHTML = '';
             Object.entries(receipts).reverse().forEach(([receiptId, receipt]) => {
-                // Apply filters if any
+                // Apply filters
                 if (filters.guest && !receipt.guestPhoneNumber?.includes(filters.guest)) return;
                 if (filters.invoice && !receipt.invoiceNumber?.includes(filters.invoice)) return;
-                if (filters.status && receipt.status !== filters.status) return;
 
                 const row = document.createElement('tr');
                 row.innerHTML = `
@@ -968,7 +966,7 @@ async function loadReceipts(filters = {}) {
                         </span>
                     </td>
                     <td>
-                        <button class="btn btn-sm btn-info view-receipt" data-id="${receiptId}">
+                        <button class="btn btn-sm btn-info view-receipt" data-receipt-id="${receiptId}">
                             <i class="fas fa-eye"></i> View
                         </button>
                     </td>
@@ -976,7 +974,6 @@ async function loadReceipts(filters = {}) {
                 tableBody.appendChild(row);
             });
 
-            // Attach event listeners
             attachReceiptViewListeners();
         } else {
             tableBody.innerHTML = '<tr><td colspan="7" class="text-center">No receipts found</td></tr>';
@@ -990,6 +987,7 @@ async function loadReceipts(filters = {}) {
 }
 
 async function showReceiptModal(receiptId) {
+    showLoading();
     try {
         const snapshot = await firebase.database().ref(`receipts/${receiptId}`).once('value');
         const receipt = snapshot.val();
@@ -998,6 +996,7 @@ async function showReceiptModal(receiptId) {
 
         // Populate modal fields
         document.getElementById('modalStoreName').textContent = receipt.storeName || 'N/A';
+        document.getElementById('modalStoreLocation').textContent = receipt.storeLocation || 'N/A';
         document.getElementById('modalInvoiceNumber').textContent = receipt.invoiceNumber || 'N/A';
         document.getElementById('modalDate').textContent = formatDate(receipt.processedAt);
         document.getElementById('modalGuestPhone').textContent = receipt.guestPhoneNumber || 'N/A';
@@ -1005,25 +1004,30 @@ async function showReceiptModal(receiptId) {
         // Handle items table
         const itemsTable = document.getElementById('modalItemsTable');
         itemsTable.innerHTML = '';
-        receipt.items?.forEach(item => {
-            const row = document.createElement('tr');
-            row.innerHTML = `
-                <td>${item.name}</td>
-                <td>${item.quantity}</td>
-                <td>R${item.unitPrice?.toFixed(2)}</td>
-                <td>R${item.totalPrice?.toFixed(2)}</td>
-            `;
-            itemsTable.appendChild(row);
-        });
+        
+        if (receipt.items && receipt.items.length > 0) {
+            receipt.items.forEach(item => {
+                const row = document.createElement('tr');
+                row.innerHTML = `
+                    <td>${item.name || 'N/A'}</td>
+                    <td>${item.quantity || '0'}</td>
+                    <td>R${item.unitPrice?.toFixed(2) || '0.00'}</td>
+                    <td>R${item.totalPrice?.toFixed(2) || '0.00'}</td>
+                `;
+                itemsTable.appendChild(row);
+            });
+        } else {
+            itemsTable.innerHTML = '<tr><td colspan="4" class="text-center">No items found</td></tr>';
+        }
 
-        // Show the modal
         $('#receiptDetailsModal').modal('show');
     } catch (error) {
         console.error('Error showing receipt details:', error);
         alert('Error loading receipt details');
+    } finally {
+        hideLoading();
     }
 }
-
 function matchesReceiptFilters(receipt, filters) {
     if (filters.guest && !receipt.guestName?.toLowerCase().includes(filters.guest.toLowerCase())) return false;
     if (filters.invoice && !receipt.invoiceNumber?.toLowerCase().includes(filters.invoice.toLowerCase())) return false;
@@ -1118,22 +1122,6 @@ function showTableLoading(tableId) {
             </td>
         </tr>
     `;
-}
-
-
-// Update showReceiptModal
-async function showReceiptModal(receiptId) {
-    showLoading();
-    try {
-        const receipt = await fetchReceiptDetails(receiptId);
-        populateReceiptModal(receipt);
-        $('#receiptDetailsModal').modal('show');
-    } catch (error) {
-        console.error('Error showing receipt details:', error);
-        alert('Error loading receipt details');
-    } finally {
-        hideLoading();
-    }
 }
 
 //======================================================= Console Log =================================================
