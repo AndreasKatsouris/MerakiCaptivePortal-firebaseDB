@@ -201,6 +201,12 @@ function isValidParsedData(parsedData) {
  * @returns {Promise<object>} - Saved receipt data with ID
  */
 async function saveReceiptData(parsedData, imageUrl, phoneNumber) {
+    
+    console.log('Attempting to save receipt:', {
+        parsedData,
+        imageUrl,
+        phoneNumber
+    });
     try {
         const receiptData = {
             // Receipt Details
