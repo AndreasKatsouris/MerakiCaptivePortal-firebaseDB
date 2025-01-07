@@ -4,6 +4,7 @@ const { client, twilioPhone } = require('./twilioClient');
 const { processReceipt } = require('./receiptProcessor');
 const { validateReceipt } = require('./guardRail');
 const { fetchCampaigns } = require('./campaigns');
+const { saveReceiptData } = require('./receiptProcessor');
 
 if (!admin.apps.length) {
     admin.initializeApp({
