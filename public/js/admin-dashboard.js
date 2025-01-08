@@ -1109,6 +1109,340 @@ function attachReceiptViewListeners() {
     });
 }
 
+// Receipt Management State
+const receiptManagement = {
+    currentFilters: {
+        guest: '',
+        invoice: '',
+        status: ''
+    },
+    isLoading: false
+};
+
+// Show/Hide loading indicator
+function toggleReceiptLoading(show) {
+    const loadingIndicator = document.getElementById('receiptLoadingIndicator');
+    const table = document.getElementById('receiptsTable');
+    if (loadingIndicator) {
+        loadingIndicator.style.display = show ? 'block' : 'none';
+    }
+    if (table) {
+        table.style.opacity = show ? '0.5' : '1';
+    }
+    receiptManagement.isLoading = show;
+}
+
+// Show/Hide error message
+function showReceiptError(message) {
+    const errorAlert = document.getElementById('receiptErrorAlert');
+    const errorMessage = document.getElementById('receiptErrorMessage');
+    if (errorAlert && errorMessage) {
+        errorMessage.textContent = message;
+        errorAlert.style.display = 'block';
+    }
+}
+
+// Clear error message
+function clearReceiptError() {
+    const errorAlert = document.getElementById('receiptErrorAlert');
+    if (errorAlert) {
+        errorAlert.style.display = 'none';
+    }
+}
+
+// Format currency
+function formatCurrency(amount) {
+    return new Intl.NumberFormat('en-ZA', {
+        style: 'currency',
+        currency: 'ZAR'
+    }).format(amount);
+}
+
+// Enhanced loadReceipts function
+async function loadReceipts(filters = {}) {
+    clearReceiptError();
+    toggleReceiptLoading(true);
+    
+    const tableBody = document.querySelector('#receiptsTable tbody');
+    const noResultsMessage = document.getElementById('noReceiptsMessage');
+    
+    try {
+        // Update current filters
+        receiptManagement.currentFilters = { ...receiptManagement.currentFilters, ...filters };
+        
+        let query = firebase.database().ref('receipts');
+        
+        if (receiptManagement.currentFilters.status) {
+            query = query.orderByChild('status').equalTo(receiptManagement.currentFilters.status);
+        }
+
+        const snapshot = await query.once('value');
+        const receipts = snapshot.val();
+        
+        if (tableBody) tableBody.innerHTML = '';
+        
+        if (receipts) {
+            const filteredReceipts = Object.entries(receipts)
+                .filter(([_, receipt]) => {
+                    const matchesGuest = !receiptManagement.currentFilters.guest || 
+                        (receipt.guestPhoneNumber && 
+                         receipt.guestPhoneNumber.includes(receiptManagement.currentFilters.guest));
+                    const matchesInvoice = !receiptManagement.currentFilters.invoice || 
+                        (receipt.invoiceNumber && 
+                         receipt.invoiceNumber.includes(receiptManagement.currentFilters.invoice));
+                    return matchesGuest && matchesInvoice;
+                });
+
+            filteredReceipts.forEach(([receiptId, receipt]) => {
+                const row = document.createElement('tr');
+                const processedDate = receipt.processedAt ? 
+                    new Date(receipt.processedAt).toLocaleDateString() : 'N/A';
+                
+                row.innerHTML = `
+                    <td>${processedDate}</td>
+                    <td>
+                        <span class="d-block">${receipt.guestPhoneNumber || 'N/A'}</span>
+                        ${receipt.guestName ? `<small class="text-muted">${receipt.guestName}</small>` : ''}
+                    </td>
+                    <td>${receipt.invoiceNumber || 'N/A'}</td>
+                    <td>${receipt.storeName || 'N/A'}</td>
+                    <td>${formatCurrency(receipt.totalAmount || 0)}</td>
+                    <td>
+                        <span class="badge badge-${getStatusBadgeClass(receipt.status)}">
+                            ${receipt.status || 'unknown'}
+                        </span>
+                    </td>
+                    <td>
+                        <div class="btn-group btn-group-sm">
+                            <button class="btn btn-info view-receipt" data-receipt-id="${receiptId}">
+                                <i class="fas fa-eye"></i>
+                            </button>
+                            ${receipt.status === 'pending_validation' ? `
+                                <button class="btn btn-success validate-receipt" data-receipt-id="${receiptId}">
+                                    <i class="fas fa-check"></i>
+                                </button>
+                                <button class="btn btn-danger reject-receipt" data-receipt-id="${receiptId}">
+                                    <i class="fas fa-times"></i>
+                                </button>
+                            ` : ''}
+                        </div>
+                    </td>
+                `;
+                
+                if (tableBody) tableBody.appendChild(row);
+            });
+
+            if (filteredReceipts.length === 0) {
+                if (noResultsMessage) noResultsMessage.style.display = 'block';
+                if (tableBody) tableBody.innerHTML = ''; 
+            } else {
+                if (noResultsMessage) noResultsMessage.style.display = 'none';
+            }
+        } else {
+            if (noResultsMessage) noResultsMessage.style.display = 'block';
+            if (tableBody) tableBody.innerHTML = '';
+        }
+
+        // Reattach event listeners
+        attachReceiptActionListeners();
+        
+    } catch (error) {
+        console.error('Error loading receipts:', error);
+        showReceiptError('Failed to load receipts. Please try again.');
+    } finally {
+        toggleReceiptLoading(false);
+    }
+}
+
+// Receipt Actions Handler
+const receiptActions = {
+    currentReceiptId: null,
+
+    async showReceiptDetails(receiptId) {
+        try {
+            const receipt = await this.fetchReceiptDetails(receiptId);
+            if (!receipt) {
+                throw new Error('Receipt not found');
+            }
+
+            this.currentReceiptId = receiptId;
+            this.populateModalWithReceipt(receipt);
+            
+            // Show the modal
+            $('#receiptDetailsModal').modal('show');
+        } catch (error) {
+            console.error('Error showing receipt details:', error);
+            showReceiptError('Failed to load receipt details');
+        }
+    },
+
+    async fetchReceiptDetails(receiptId) {
+        const snapshot = await firebase.database().ref(`receipts/${receiptId}`).once('value');
+        return snapshot.val();
+    },
+
+    populateModalWithReceipt(receipt) {
+        // Populate store information
+        document.getElementById('modalStoreName').textContent = receipt.storeName || 'N/A';
+        document.getElementById('modalStoreLocation').textContent = receipt.storeLocation || 'N/A';
+        document.getElementById('modalInvoiceNumber').textContent = receipt.invoiceNumber || 'N/A';
+
+        // Populate transaction details
+        const processedDate = new Date(receipt.processedAt);
+        document.getElementById('modalDate').textContent = processedDate.toLocaleDateString();
+        document.getElementById('modalTime').textContent = processedDate.toLocaleTimeString();
+        
+        // Populate status with badge
+        const statusSpan = document.getElementById('modalStatus');
+        statusSpan.innerHTML = `
+            <span class="badge badge-${getStatusBadgeClass(receipt.status)}">
+                ${receipt.status || 'unknown'}
+            </span>
+        `;
+
+        // Populate guest information
+        document.getElementById('modalGuestPhone').textContent = receipt.guestPhoneNumber || 'N/A';
+        document.getElementById('modalGuestName').textContent = receipt.guestName || 'N/A';
+
+        // Populate items table
+        const itemsTableBody = document.getElementById('modalItemsTable');
+        itemsTableBody.innerHTML = '';
+        
+        if (receipt.items && receipt.items.length > 0) {
+            receipt.items.forEach(item => {
+                const row = document.createElement('tr');
+                row.innerHTML = `
+                    <td>${item.name}</td>
+                    <td class="text-center">${item.quantity}</td>
+                    <td class="text-right">${formatCurrency(item.unitPrice || 0)}</td>
+                    <td class="text-right">${formatCurrency((item.quantity || 0) * (item.unitPrice || 0))}</td>
+                `;
+                itemsTableBody.appendChild(row);
+            });
+        } else {
+            itemsTableBody.innerHTML = '<tr><td colspan="4" class="text-center">No items found</td></tr>';
+        }
+
+        // Set total amount
+        document.getElementById('modalTotal').textContent = formatCurrency(receipt.totalAmount || 0);
+
+        // Set receipt image
+        const receiptImage = document.getElementById('modalReceiptImage');
+        if (receipt.imageUrl) {
+            receiptImage.src = receipt.imageUrl;
+            receiptImage.style.display = 'block';
+        } else {
+            receiptImage.style.display = 'none';
+        }
+
+        // Processing notes
+        const processingDetails = document.getElementById('modalProcessingDetails');
+        processingDetails.innerHTML = `
+            Processed: ${new Date(receipt.processedAt).toLocaleString()}<br>
+            Status: ${receipt.status}<br>
+            ${receipt.validatedAt ? `Validated: ${new Date(receipt.validatedAt).toLocaleString()}<br>` : ''}
+            ${receipt.rejectedAt ? `Rejected: ${new Date(receipt.rejectedAt).toLocaleString()}<br>` : ''}
+        `;
+
+        // Setup action buttons
+        const actionButtonsContainer = document.getElementById('modalActionButtons');
+        if (receipt.status === 'pending_validation') {
+            actionButtonsContainer.innerHTML = `
+                <button type="button" class="btn btn-success btn-block mb-2" onclick="receiptActions.validateReceipt('${this.currentReceiptId}')">
+                    <i class="fas fa-check"></i> Validate Receipt
+                </button>
+                <button type="button" class="btn btn-danger btn-block" onclick="receiptActions.rejectReceipt('${this.currentReceiptId}')">
+                    <i class="fas fa-times"></i> Reject Receipt
+                </button>
+            `;
+        } else {
+            actionButtonsContainer.innerHTML = '';
+        }
+    },
+
+    async validateReceipt(receiptId) {
+        if (!confirm('Are you sure you want to validate this receipt?')) {
+            return;
+        }
+
+        try {
+            await firebase.database().ref(`receipts/${receiptId}`).update({
+                status: 'validated',
+                validatedAt: firebase.database.ServerValue.TIMESTAMP
+            });
+
+            // Close modal and refresh table
+            $('#receiptDetailsModal').modal('hide');
+            loadReceipts(receiptManagement.currentFilters);
+            
+            // Show success message
+            showToast('Receipt validated successfully', 'success');
+        } catch (error) {
+            console.error('Error validating receipt:', error);
+            showToast('Failed to validate receipt', 'error');
+        }
+    },
+
+    async rejectReceipt(receiptId) {
+        const reason = prompt('Please enter a reason for rejection:');
+        if (reason === null) return; // User cancelled
+
+        try {
+            await firebase.database().ref(`receipts/${receiptId}`).update({
+                status: 'rejected',
+                rejectedAt: firebase.database.ServerValue.TIMESTAMP,
+                rejectionReason: reason
+            });
+
+            // Close modal and refresh table
+            $('#receiptDetailsModal').modal('hide');
+            loadReceipts(receiptManagement.currentFilters);
+            
+            // Show success message
+            showToast('Receipt rejected successfully', 'success');
+        } catch (error) {
+            console.error('Error rejecting receipt:', error);
+            showToast('Failed to reject receipt', 'error');
+        }
+    }
+};
+
+// Toast notification helper
+function showToast(message, type = 'info') {
+    // You can implement this using your preferred toast library
+    // For now, we'll use a simple alert
+    alert(message);
+}
+
+// Attach receipt action listeners
+function attachReceiptActionListeners() {
+    // View receipt buttons
+    document.querySelectorAll('.view-receipt').forEach(button => {
+        button.addEventListener('click', () => {
+            const receiptId = button.getAttribute('data-receipt-id');
+            receiptActions.showReceiptDetails(receiptId);
+        });
+    });
+
+    // Validate receipt buttons (outside modal)
+    document.querySelectorAll('.validate-receipt').forEach(button => {
+        button.addEventListener('click', () => {
+            const receiptId = button.getAttribute('data-receipt-id');
+            receiptActions.validateReceipt(receiptId);
+        });
+    });
+
+    // Reject receipt buttons (outside modal)
+    document.querySelectorAll('.reject-receipt').forEach(button => {
+        button.addEventListener('click', () => {
+            const receiptId = button.getAttribute('data-receipt-id');
+            receiptActions.rejectReceipt(receiptId);
+        });
+    });
+}
+
+// End of Receipt Management Section
+
 function formatDate(timestamp) {
     return new Date(timestamp).toLocaleString();
 }

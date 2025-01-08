@@ -249,48 +249,88 @@
     
 <!-- Receipt Management Section -->
 <div id="receiptManagementContent" class="content-section" style="display: none;">
-    <h2>Receipt Management</h2>
-    
-    <!-- Search and Filter -->
-    <div class="filter-section mb-4">
-        <div class="row">
-            <div class="col-md-3">
-                <input type="text" id="receiptSearchGuest" class="form-control" placeholder="Search by Guest">
+    <div class="card">
+        <div class="card-header d-flex justify-content-between align-items-center">
+            <h2>Receipt Management</h2>
+            <div class="btn-group">
+                <button id="refreshReceipts" class="btn btn-outline-primary">
+                    <i class="fas fa-sync-alt"></i> Refresh
+                </button>
             </div>
-            <div class="col-md-3">
-                <input type="text" id="receiptSearchInvoice" class="form-control" placeholder="Search Invoice Number">
+        </div>
+        <div class="card-body">
+            <!-- Filters Section -->
+            <div class="row mb-4">
+                <div class="col-md-3">
+                    <div class="form-group">
+                        <label for="receiptSearchGuest">Guest Phone</label>
+                        <input type="text" id="receiptSearchGuest" class="form-control" placeholder="Search by phone number">
+                    </div>
+                </div>
+                <div class="col-md-3">
+                    <div class="form-group">
+                        <label for="receiptSearchInvoice">Invoice Number</label>
+                        <input type="text" id="receiptSearchInvoice" class="form-control" placeholder="Search by invoice">
+                    </div>
+                </div>
+                <div class="col-md-3">
+                    <div class="form-group">
+                        <label for="receiptStatusFilter">Status</label>
+                        <select id="receiptStatusFilter" class="form-control">
+                            <option value="">All Statuses</option>
+                            <option value="pending_validation">Pending Validation</option>
+                            <option value="validated">Validated</option>
+                            <option value="rejected">Rejected</option>
+                        </select>
+                    </div>
+                </div>
+                <div class="col-md-3 d-flex align-items-end">
+                    <button id="receiptSearchBtn" class="btn btn-primary btn-block">
+                        <i class="fas fa-search"></i> Search
+                    </button>
+                </div>
             </div>
-            <div class="col-md-3">
-                <select id="receiptStatusFilter" class="form-control">
-                    <option value="">All Statuses</option>
-                    <option value="pending_validation">Pending Validation</option>
-                    <option value="validated">Validated</option>
-                    <option value="rejected">Rejected</option>
-                </select>
+
+            <!-- Loading Indicator -->
+            <div id="receiptLoadingIndicator" class="text-center py-4" style="display: none;">
+                <div class="spinner-border text-primary" role="status">
+                    <span class="sr-only">Loading...</span>
+                </div>
             </div>
-            <div class="col-md-3">
-                <button id="receiptSearchBtn" class="btn btn-primary">Search</button>
+
+            <!-- Error Alert -->
+            <div id="receiptErrorAlert" class="alert alert-danger" style="display: none;" role="alert">
+                <i class="fas fa-exclamation-triangle"></i>
+                <span id="receiptErrorMessage"></span>
+            </div>
+
+            <!-- Receipts Table -->
+            <div class="table-responsive">
+                <table id="receiptsTable" class="table table-hover">
+                    <thead class="thead-light">
+                        <tr>
+                            <th>Date</th>
+                            <th>Guest</th>
+                            <th>Invoice #</th>
+                            <th>Store</th>
+                            <th>Amount</th>
+                            <th>Status</th>
+                            <th>Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <!-- Table content will be dynamically populated -->
+                    </tbody>
+                </table>
+            </div>
+
+            <!-- No Results Message -->
+            <div id="noReceiptsMessage" class="text-center py-4" style="display: none;">
+                <i class="fas fa-receipt fa-2x mb-2"></i>
+                <p>No receipts found matching your criteria</p>
             </div>
         </div>
     </div>
-
-    <!-- Receipts Table -->
-    <table id="receiptsTable" class="table">
-        <thead>
-            <tr>
-                <th>Date</th>
-                <th>Guest</th>
-                <th>Invoice #</th>
-                <th>Store</th>
-                <th>Amount</th>
-                <th>Status</th>
-                <th>Actions</th>
-            </tr>
-        </thead>
-        <tbody>
-            <!-- Dynamically populated -->
-        </tbody>
-    </table>
 </div>
 
 <!-- Rewards Management Section -->
@@ -343,6 +383,7 @@
     </table>
 </div>
 <!-- Receipt Details Modal -->
+
 <div class="modal fade" id="receiptDetailsModal" tabindex="-1" role="dialog" aria-hidden="true">
     <div class="modal-dialog modal-lg" role="document">
         <div class="modal-content">
@@ -365,7 +406,7 @@
                         <h6>Transaction Details</h6>
                         <p class="mb-1"><strong>Date:</strong> <span id="modalDate"></span></p>
                         <p class="mb-1"><strong>Time:</strong> <span id="modalTime"></span></p>
-                        <p class="mb-1"><strong>Table:</strong> <span id="modalTableNumber"></span></p>
+                        <p class="mb-1"><strong>Status:</strong> <span id="modalStatus"></span></p>
                     </div>
                 </div>
 
@@ -385,51 +426,56 @@
                         <thead>
                             <tr>
                                 <th>Item</th>
-                                <th>Quantity</th>
-                                <th>Unit Price</th>
-                                <th>Total</th>
+                                <th class="text-center">Quantity</th>
+                                <th class="text-right">Unit Price</th>
+                                <th class="text-right">Total</th>
                             </tr>
                         </thead>
                         <tbody id="modalItemsTable">
                             <!-- Items will be inserted here -->
                         </tbody>
+                        <tfoot>
+                            <tr>
+                                <td colspan="3" class="text-right"><strong>Total:</strong></td>
+                                <td class="text-right" id="modalTotal"></td>
+                            </tr>
+                        </tfoot>
                     </table>
-                </div>
-
-                <!-- Totals -->
-                <div class="row mt-3">
-                    <div class="col-md-6 offset-md-6">
-                        <table class="table table-sm">
-                            <tr>
-                                <td><strong>Subtotal:</strong></td>
-                                <td id="modalSubtotal" class="text-right"></td>
-                            </tr>
-                            <tr>
-                                <td><strong>VAT:</strong></td>
-                                <td id="modalTax" class="text-right"></td>
-                            </tr>
-                            <tr>
-                                <td><strong>Total:</strong></td>
-                                <td id="modalTotal" class="text-right"></td>
-                            </tr>
-                        </table>
-                    </div>
                 </div>
 
                 <!-- Receipt Image -->
                 <div class="mt-3">
                     <h6>Receipt Image</h6>
-                    <img id="modalReceiptImage" class="img-fluid" alt="Receipt Image">
+                    <div class="text-center">
+                        <img id="modalReceiptImage" class="img-fluid" alt="Receipt Image">
+                    </div>
+                </div>
+
+                <!-- Processing Notes -->
+                <div class="mt-3" id="modalProcessingNotes">
+                    <h6>Processing Notes</h6>
+                    <div class="alert alert-info">
+                        <small id="modalProcessingDetails"></small>
+                    </div>
                 </div>
             </div>
             <div class="modal-footer">
-                <button type="button" class="btn btn-secondary" data-dismiss="modal">Close</button>
-                <button type="button" class="btn btn-success" id="modalValidateBtn">Validate</button>
-                <button type="button" class="btn btn-danger" id="modalRejectBtn">Reject</button>
+                <div class="w-100">
+                    <div class="row">
+                        <div class="col-md-6">
+                            <button type="button" class="btn btn-secondary btn-block" data-dismiss="modal">Close</button>
+                        </div>
+                        <div class="col-md-6" id="modalActionButtons">
+                            <!-- Action buttons will be inserted here -->
+                        </div>
+                    </div>
+                </div>
             </div>
         </div>
     </div>
 </div>
+
+
 <!-- Campaign Management Content -->
  <div id="campaignManagementContent" class="content-section" style="display: none;">
     <div class="d-flex justify-content-between align-items-center mb-4">

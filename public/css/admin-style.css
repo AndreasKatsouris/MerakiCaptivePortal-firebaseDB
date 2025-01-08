@@ -500,3 +500,29 @@ body {
     padding: 0.25rem 0.5rem;
     font-size: 0.875rem;
 }
+
+.modal-lg {
+    max-width: 900px;
+}
+
+.badge {
+    padding: 0.5em 1em;
+}
+
+#modalReceiptImage {
+    max-height: 400px;
+    object-fit: contain;
+}
+
+.validation-message {
+    margin-top: 0.25rem;
+    font-size: 80%;
+}
+
+.btn-group-sm > .btn {
+    padding: 0.25rem 0.5rem;
+}
+
+.table td {
+    vertical-align: middle;
+}
