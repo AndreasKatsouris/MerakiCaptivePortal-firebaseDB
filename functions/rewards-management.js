@@ -23,8 +23,15 @@ document.querySelector('#rewardsManagementMenu').addEventListener('click', funct
 
 // Load and Display Receipts
 async function loadReceipts(filters = {}) {
+    console.log('Loading receipts with filters:', filters);
     const tableBody = document.querySelector('#receiptsTable tbody');
-    tableBody.innerHTML = '<tr><td colspan="7">Loading...</td></tr>';
+    
+    if (!tableBody) {
+        console.error('Receipt table body not found');
+        return;
+    }
+    
+    tableBody.innerHTML = '<tr><td colspan="7" class="text-center">Loading...</td></tr>';
 
     try {
         let query = firebase.database().ref('receipts');
@@ -40,21 +47,24 @@ async function loadReceipts(filters = {}) {
         if (receipts) {
             tableBody.innerHTML = '';
             
-            for (const [receiptId, receipt] of Object.entries(receipts)) {
+            Object.entries(receipts).forEach(([receiptId, receipt]) => {
                 // Apply client-side filters
-                if (filters.guest && !receipt.guestPhoneNumber.includes(filters.guest)) continue;
-                if (filters.invoice && !receipt.invoiceNumber.includes(filters.invoice)) continue;
+                if (filters.guest && !receipt.guestPhoneNumber?.includes(filters.guest)) return;
+                if (filters.invoice && !receipt.invoiceNumber?.includes(filters.invoice)) return;
 
                 const row = document.createElement('tr');
+                const processedDate = receipt.processedAt ? new Date(receipt.processedAt).toLocaleDateString() : 'N/A';
+                const amount = receipt.totalAmount ? `R${receipt.totalAmount.toFixed(2)}` : 'N/A';
+                
                 row.innerHTML = `
-                    <td>${new Date(receipt.processedAt).toLocaleDateString()}</td>
-                    <td>${receipt.guestPhoneNumber}</td>
-                    <td>${receipt.invoiceNumber}</td>
-                    <td>${receipt.storeName}</td>
-                    <td>R${receipt.totalAmount.toFixed(2)}</td>
+                    <td>${processedDate}</td>
+                    <td>${receipt.guestPhoneNumber || 'N/A'}</td>
+                    <td>${receipt.invoiceNumber || 'N/A'}</td>
+                    <td>${receipt.storeName || 'N/A'}</td>
+                    <td>${amount}</td>
                     <td>
                         <span class="badge badge-${getStatusBadgeClass(receipt.status)}">
-                            ${receipt.status}
+                            ${receipt.status || 'unknown'}
                         </span>
                     </td>
                     <td>
@@ -72,16 +82,23 @@ async function loadReceipts(filters = {}) {
                     </td>
                 `;
                 tableBody.appendChild(row);
+            });
+
+            // If no receipts were added to the table after filtering
+            if (tableBody.children.length === 0) {
+                tableBody.innerHTML = '<tr><td colspan="7" class="text-center">No receipts found</td></tr>';
             }
             
-            // Attach event listeners to action buttons
-            attachReceiptActionListeners();
         } else {
-            tableBody.innerHTML = '<tr><td colspan="7">No receipts found</td></tr>';
+            tableBody.innerHTML = '<tr><td colspan="7" class="text-center">No receipts found</td></tr>';
         }
+        
+        // Reattach event listeners
+        attachReceiptActionListeners();
+        
     } catch (error) {
         console.error('Error loading receipts:', error);
-        tableBody.innerHTML = '<tr><td colspan="7">Error loading receipts</td></tr>';
+        tableBody.innerHTML = '<tr><td colspan="7" class="text-center text-danger">Error loading receipts</td></tr>';
     }
 }
 

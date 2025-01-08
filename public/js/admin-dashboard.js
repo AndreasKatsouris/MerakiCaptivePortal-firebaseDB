@@ -48,6 +48,49 @@ function addEventListenerSafely(elementId, event, handler) {
     }
 }
 
+function addEventListenerSafely(elementId, eventType, handler) {
+    const element = document.getElementById(elementId);
+    if (element) {
+        element.addEventListener(eventType, handler);
+    } else {
+        console.warn(`Element with id '${elementId}' not found`);
+    }
+}
+
+function handleSelectAll(event) {
+    const checkboxes = document.querySelectorAll('#data-table tbody input[type="checkbox"]');
+    checkboxes.forEach(checkbox => {
+        checkbox.checked = event.target.checked;
+    });
+}
+
+// Update the initializeDataDeletionListeners function
+function initializeDataDeletionListeners() {
+    const selectAllCheckbox = document.querySelector('#select-all');
+    if (selectAllCheckbox) {
+        selectAllCheckbox.addEventListener('change', handleSelectAll);
+    }
+    
+    const deleteSelectedButton = document.querySelector('#delete-selected');
+    if (deleteSelectedButton) {
+        deleteSelectedButton.addEventListener('click', handleDeleteSelected);
+    }
+}
+
+// Add this helper function
+function handleDeleteSelected() {
+    const selectedRows = document.querySelectorAll('#data-table tbody input[type="checkbox"]:checked');
+    if (selectedRows.length === 0) {
+        alert('Please select items to delete');
+        return;
+    }
+    
+    if (confirm(`Are you sure you want to delete ${selectedRows.length} selected items?`)) {
+        // Implement deletion logic here
+        console.log('Deleting selected items:', selectedRows.length);
+    }
+}
+
 // ==================== Loyalty Program Section ====================
 function initializeLoyaltyListeners() {
     // Campaign Management
@@ -69,6 +112,19 @@ function initializeLoyaltyListeners() {
         e.preventDefault();
         displaySection('loyaltySettingsContent');
     });
+}
+
+// Status Badge Colors
+function getStatusBadgeClass(status) {
+    const statusClasses = {
+        pending: 'warning',
+        pending_validation: 'warning',
+        validated: 'success',
+        approved: 'success',
+        rejected: 'danger',
+        completed: 'info'
+    };
+    return statusClasses[status] || 'secondary';
 }
 
 // ==================== Menu Section ====================
@@ -1191,3 +1247,42 @@ document.addEventListener('DOMContentLoaded', function() {
     initializeLogging();
     // ... rest of your initialization code
 });
+
+// Document ready handler
+document.addEventListener('DOMContentLoaded', function() {
+    try {
+        // Initialize all event listeners
+        initializeDataDeletionListeners();
+        
+        // Load initial data
+        const receiptManagementMenu = document.querySelector('#receiptManagementMenu');
+        if (receiptManagementMenu) {
+            receiptManagementMenu.addEventListener('click', function(e) {
+                e.preventDefault();
+                displaySection('receiptManagementContent');
+                loadReceipts();
+            });
+        }
+        
+        // Initialize other necessary components
+        initializeFilterListeners();
+        
+    } catch (error) {
+        console.error('Error during initialization:', error);
+    }
+});
+
+// Add filter listeners
+function initializeFilterListeners() {
+    const receiptSearchBtn = document.getElementById('receiptSearchBtn');
+    if (receiptSearchBtn) {
+        receiptSearchBtn.addEventListener('click', function() {
+            const filters = {
+                guest: document.getElementById('receiptSearchGuest')?.value || '',
+                invoice: document.getElementById('receiptSearchInvoice')?.value || '',
+                status: document.getElementById('receiptStatusFilter')?.value || ''
+            };
+            loadReceipts(filters);
+        });
+    }
+}
