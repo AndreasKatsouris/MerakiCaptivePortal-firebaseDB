@@ -397,16 +397,35 @@
                 <!-- Receipt Header Info -->
                 <div class="row mb-3">
                     <div class="col-md-6">
-                        <h6>Store Information</h6>
-                        <p class="mb-1"><strong>Store:</strong> <span id="modalStoreName"></span></p>
-                        <p class="mb-1"><strong>Location:</strong> <span id="modalStoreLocation"></span></p>
-                        <p class="mb-1"><strong>Invoice #:</strong> <span id="modalInvoiceNumber"></span></p>
+                        <div class="card">
+                            <div class="card-header">
+                                <h6 class="mb-0">Brand & Store Information</h6>
+                            </div>
+                            <div class="card-body">
+                                <div class="brand-info">
+                                    <strong>Brand:</strong> <span id="modalBrandName"></span>
+                                </div>
+                                <div class="store-info">
+                                    <strong>Store:</strong> <span id="modalStoreName"></span>
+                                </div>
+                                <div class="address-info">
+                                    <strong>Address:</strong> <span id="modalStoreAddress"></span>
+                                </div>
+                            </div>
+                        </div>
                     </div>
                     <div class="col-md-6">
-                        <h6>Transaction Details</h6>
-                        <p class="mb-1"><strong>Date:</strong> <span id="modalDate"></span></p>
-                        <p class="mb-1"><strong>Time:</strong> <span id="modalTime"></span></p>
-                        <p class="mb-1"><strong>Status:</strong> <span id="modalStatus"></span></p>
+                        <div class="card">
+                            <div class="card-header">
+                                <h6 class="mb-0">Receipt Details</h6>
+                            </div>
+                            <div class="card-body">
+                                <p class="mb-1"><strong>Invoice #:</strong> <span id="modalInvoiceNumber"></span></p>
+                                <p class="mb-1"><strong>Date:</strong> <span id="modalDate"></span></p>
+                                <p class="mb-1"><strong>Time:</strong> <span id="modalTime"></span></p>
+                                <p class="mb-1"><strong>Status:</strong> <span id="modalStatus"></span></p>
+                            </div>
+                        </div>
                     </div>
                 </div>
 
