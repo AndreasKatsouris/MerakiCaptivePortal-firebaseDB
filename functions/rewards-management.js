@@ -1,3 +1,13 @@
+console.log('Testing Firebase connection...');
+const dbRef = firebase.database().ref();
+dbRef.child('receipts').once('value')
+  .then((snapshot) => {
+    console.log('Successfully connected to Firebase. Data:', snapshot.val());
+  })
+  .catch((error) => {
+    console.error('Firebase connection error:', error);
+  });
+
 // Event Listeners for Menu Items
 document.querySelector('#receiptManagementMenu').addEventListener('click', function(e) {
     e.preventDefault();
