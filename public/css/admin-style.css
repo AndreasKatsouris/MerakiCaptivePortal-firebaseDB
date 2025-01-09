@@ -526,3 +526,40 @@ body {
 .table td {
     vertical-align: middle;
 }
+/* Add to your admin-style.css */
+.stats-card {
+    background: white;
+    border-radius: 8px;
+    padding: 20px;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+    text-align: center;
+    margin-bottom: 20px;
+}
+
+.stats-icon {
+    font-size: 24px;
+    color: #007bff;
+    margin-bottom: 10px;
+}
+
+.stats-value {
+    font-size: 32px;
+    font-weight: bold;
+    color: #333;
+    margin: 10px 0;
+}
+
+.stats-label {
+    color: #666;
+    font-size: 14px;
+}
+
+.card {
+    height: 100%;
+    margin-bottom: 20px;
+}
+
+.chart-container {
+    position: relative;
+    height: 300px;
+}

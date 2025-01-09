@@ -1,3 +1,5 @@
+import { updateDashboardStats, initializeDashboardListeners } from './dashboard.js';
+
 document.addEventListener('DOMContentLoaded', function () {
     // Initialize all event listeners after DOM is loaded
     initializeAuthentication();
@@ -1540,6 +1542,7 @@ async function loadInitialData() {
             fetchWiFiReports(),
             updateDashboardStats()
         ]);
+        initializeDashboardListeners();
     } catch (error) {
         console.error('Error loading initial data:', error);
     }

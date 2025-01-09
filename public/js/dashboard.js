@@ -1,241 +1,170 @@
-// Create a new file: dashboard.js
+// dashboard.js
 
-class DashboardManager {
-    constructor() {
-        this.charts = {};
-        this.dateRange = 'month';
-        this.initializeListeners();
+// Dashboard State Management
+const dashboardState = {
+    dateRange: 'month',
+    charts: {
+        campaignPerformance: null,
+        receiptStatus: null
     }
+};
 
-    initializeListeners() {
-        // Date range selector
-        document.getElementById('dashboardDateRange').addEventListener('change', (e) => {
-            this.dateRange = e.target.value;
-            this.refreshDashboard();
-        });
+// Dashboard Stats Functions
+async function updateDashboardStats() {
+    try {
+        // Get stats from Firebase
+        const [campaignsSnapshot, receiptsSnapshot, usersSnapshot] = await Promise.all([
+            firebase.database().ref('campaigns').once('value'),
+            firebase.database().ref('receipts').once('value'),
+            firebase.database().ref('guests').once('value')
+        ]);
 
-        // Add dashboard menu listener
-        document.getElementById('dashboardMenu').addEventListener('click', (e) => {
-            e.preventDefault();
-            displaySection('dashboardContent');
-            this.refreshDashboard();
-        });
-    }
-
-    async refreshDashboard() {
-        showLoading();
-        try {
-            await Promise.all([
-                this.updateStats(),
-                this.updateCharts(),
-                this.updateRecentReceipts(),
-                this.updateCampaignActivity()
-            ]);
-        } catch (error) {
-            console.error('Error refreshing dashboard:', error);
-            alert('Error updating dashboard');
-        } finally {
-            hideLoading();
-        }
-    }
-
-    async updateStats() {
-        const startDate = this.getDateRangeStart();
-        
-        // Fetch data from Firebase
-        const stats = await this.fetchStats(startDate);
-        
-        // Update DOM
-        document.getElementById('activeCampaignsCount').textContent = stats.activeCampaigns;
-        document.getElementById('totalReceiptsCount').textContent = stats.totalReceipts;
-        document.getElementById('activeUsersCount').textContent = stats.activeUsers;
-        document.getElementById('conversionRate').textContent = `${stats.conversionRate}%`;
-    }
-
-    async fetchStats(startDate) {
-        const campaignsSnapshot = await firebase.database()
-            .ref('campaigns')
-            .orderByChild('status')
-            .equalTo('active')
-            .once('value');
-
-        const receiptsSnapshot = await firebase.database()
-            .ref('receipts')
-            .orderByChild('timestamp')
-            .startAt(startDate.valueOf())
-            .once('value');
-
-        const usersSnapshot = await firebase.database()
-            .ref('guests')
-            .once('value');
-
+        // Calculate active campaigns
         const campaigns = campaignsSnapshot.val() || {};
+        const activeCampaigns = Object.values(campaigns).filter(c => c.status === 'active').length;
+        document.getElementById('activeCampaignsCount').textContent = activeCampaigns;
+
+        // Calculate total receipts
         const receipts = receiptsSnapshot.val() || {};
-        const users = usersSnapshot.val() || {};
-
         const totalReceipts = Object.keys(receipts).length;
-        const totalUsers = Object.keys(users).length;
+        document.getElementById('totalReceiptsCount').textContent = totalReceipts;
 
-        return {
-            activeCampaigns: Object.keys(campaigns).length,
-            totalReceipts,
-            activeUsers: totalUsers,
-            conversionRate: totalUsers > 0 ? 
-                Math.round((totalReceipts / totalUsers) * 100) : 0
-        };
-    }
+        // Calculate active users
+        const users = usersSnapshot.val() || {};
+        const activeUsers = Object.keys(users).length;
+        document.getElementById('activeUsersCount').textContent = activeUsers;
 
-    async updateCharts() {
-        await this.updateCampaignPerformanceChart();
-        await this.updateReceiptStatusChart();
-    }
+        // Calculate conversion rate
+        const conversionRate = totalReceipts > 0 && activeUsers > 0 
+            ? ((totalReceipts / activeUsers) * 100).toFixed(1)
+            : 0;
+        document.getElementById('conversionRate').textContent = `${conversionRate}%`;
 
-    async updateCampaignPerformanceChart() {
-        const data = await this.fetchCampaignPerformanceData();
-        
-        if (!this.charts.campaignPerformance) {
-            const ctx = document.getElementById('campaignPerformanceChart').getContext('2d');
-            this.charts.campaignPerformance = new Chart(ctx, {
-                type: 'line',
-                data: {
-                    labels: data.labels,
-                    datasets: [{
-                        label: 'Receipts Submitted',
-                        data: data.receipts,
-                        borderColor: '#4a90e2',
-                        tension: 0.1
-                    }]
-                },
-                options: {
-                    responsive: true,
-                    maintainAspectRatio: false
-                }
-            });
-        } else {
-            this.charts.campaignPerformance.data.labels = data.labels;
-            this.charts.campaignPerformance.data.datasets[0].data = data.receipts;
-            this.charts.campaignPerformance.update();
-        }
-    }
+        // Update charts
+        updateDashboardCharts(campaigns, receipts, users);
 
-    async updateReceiptStatusChart() {
-        const data = await this.fetchReceiptStatusData();
-        
-        if (!this.charts.receiptStatus) {
-            const ctx = document.getElementById('receiptStatusChart').getContext('2d');
-            this.charts.receiptStatus = new Chart(ctx, {
-                type: 'doughnut',
-                data: {
-                    labels: ['Validated', 'Pending', 'Rejected'],
-                    datasets: [{
-                        data: [
-                            data.validated || 0,
-                            data.pending || 0,
-                            data.rejected || 0
-                        ],
-                        backgroundColor: ['#28a745', '#ffc107', '#dc3545']
-                    }]
-                },
-                options: {
-                    responsive: true,
-                    maintainAspectRatio: false
-                }
-            });
-        } else {
-            this.charts.receiptStatus.data.datasets[0].data = [
-                data.validated || 0,
-                data.pending || 0,
-                data.rejected || 0
-            ];
-            this.charts.receiptStatus.update();
-        }
-    }
-
-    async updateRecentReceipts() {
-        const receipts = await this.fetchRecentReceipts();
-        const tbody = document.querySelector('#recentReceiptsTable tbody');
-        tbody.innerHTML = '';
-
-        receipts.forEach(receipt => {
-            const row = document.createElement('tr');
-            row.innerHTML = `
-                <td>${moment(receipt.timestamp).format('MMM D, HH:mm')}</td>
-                <td>${receipt.customerName}</td>
-                <td>R${receipt.amount.toFixed(2)}</td>
-                <td><span class="badge badge-${this.getStatusBadgeClass(receipt.status)}">
-                    ${receipt.status}
-                </span></td>
-            `;
-            tbody.appendChild(row);
-        });
-    }
-
-    async updateCampaignActivity() {
-        const activities = await this.fetchCampaignActivity();
-        const feed = document.getElementById('campaignActivityFeed');
-        feed.innerHTML = '';
-
-        activities.forEach(activity => {
-            const item = document.createElement('div');
-            item.className = 'activity-item';
-            item.innerHTML = `
-                <div class="activity-icon ${this.getActivityIconClass(activity.type)}">
-                    <i class="fas ${this.getActivityIcon(activity.type)}"></i>
-                </div>
-                <div class="activity-content">
-                    <div class="activity-title">${activity.title}</div>
-                    <div class="activity-time">${moment(activity.timestamp).fromNow()}</div>
-                </div>
-            `;
-            feed.appendChild(item);
-        });
-    }
-
-    // Helper methods
-    getDateRangeStart() {
-        const now = moment();
-        switch (this.dateRange) {
-            case 'today':
-                return now.startOf('day');
-            case 'week':
-                return now.startOf('week');
-            case 'month':
-                return now.startOf('month');
-            case 'year':
-                return now.startOf('year');
-            default:
-                return now.startOf('month');
-        }
-    }
-
-    getStatusBadgeClass(status) {
-        switch (status.toLowerCase()) {
-            case 'validated':
-                return 'success';
-            case 'pending':
-                return 'warning';
-            case 'rejected':
-                return 'danger';
-            default:
-                return 'secondary';
-        }
-    }
-
-    getActivityIcon(type) {
-        switch (type) {
-            case 'campaign_created':
-                return 'fa-plus';
-            case 'receipt_submitted':
-                return 'fa-receipt';
-            case 'receipt_validated':
-                return 'fa-check';
-            default:
-                return 'fa-info';
-        }
+    } catch (error) {
+        console.error('Error updating dashboard stats:', error);
     }
 }
 
-// Initialize dashboard
-document.addEventListener('DOMContentLoaded', () => {
-    window.dashboardManager = new DashboardManager();
-});
+// Chart Functions
+function updateDashboardCharts(campaigns, receipts, users) {
+    updateCampaignPerformanceChart(campaigns, receipts);
+    updateReceiptStatusChart(receipts);
+}
+
+function updateCampaignPerformanceChart(campaigns, receipts) {
+    const ctx = document.getElementById('campaignPerformanceChart');
+    if (!ctx) return;
+
+    // Destroy existing chart if it exists
+    if (dashboardState.charts.campaignPerformance) {
+        dashboardState.charts.campaignPerformance.destroy();
+    }
+
+    dashboardState.charts.campaignPerformance = new Chart(ctx, {
+        type: 'bar',
+        data: {
+            labels: Object.values(campaigns).map(c => c.name),
+            datasets: [{
+                label: 'Receipts',
+                data: Object.values(campaigns).map(c => {
+                    return Object.values(receipts)
+                        .filter(r => r.campaignId === c.id).length;
+                }),
+                backgroundColor: 'rgba(54, 162, 235, 0.5)'
+            }]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            scales: {
+                y: {
+                    beginAtZero: true
+                }
+            }
+        }
+    });
+}
+
+function updateReceiptStatusChart(receipts) {
+    const ctx = document.getElementById('receiptStatusChart');
+    if (!ctx) return;
+
+    // Destroy existing chart if it exists
+    if (dashboardState.charts.receiptStatus) {
+        dashboardState.charts.receiptStatus.destroy();
+    }
+
+    const statusCounts = {
+        pending_validation: 0,
+        validated: 0,
+        rejected: 0
+    };
+
+    Object.values(receipts).forEach(receipt => {
+        if (statusCounts.hasOwnProperty(receipt.status)) {
+            statusCounts[receipt.status]++;
+        }
+    });
+
+    dashboardState.charts.receiptStatus = new Chart(ctx, {
+        type: 'doughnut',
+        data: {
+            labels: ['Pending', 'Validated', 'Rejected'],
+            datasets: [{
+                data: Object.values(statusCounts),
+                backgroundColor: [
+                    'rgba(255, 206, 86, 0.5)',
+                    'rgba(75, 192, 192, 0.5)',
+                    'rgba(255, 99, 132, 0.5)'
+                ]
+            }]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false
+        }
+    });
+}
+
+// Recent Activity Functions
+function updateRecentReceipts(receipts) {
+    const tableBody = document.querySelector('#recentReceiptsTable tbody');
+    if (!tableBody) return;
+
+    const recentReceipts = Object.entries(receipts)
+        .sort(([, a], [, b]) => b.processedAt - a.processedAt)
+        .slice(0, 5);
+
+    tableBody.innerHTML = recentReceipts.map(([id, receipt]) => `
+        <tr>
+            <td>${new Date(receipt.processedAt).toLocaleDateString()}</td>
+            <td>${receipt.guestPhoneNumber || 'Unknown'}</td>
+            <td>R${receipt.totalAmount?.toFixed(2) || '0.00'}</td>
+            <td>
+                <span class="badge badge-${getStatusBadgeClass(receipt.status)}">
+                    ${receipt.status}
+                </span>
+            </td>
+        </tr>
+    `).join('');
+}
+
+// Dashboard Event Listeners
+function initializeDashboardListeners() {
+    const dateRangeSelect = document.getElementById('dashboardDateRange');
+    if (dateRangeSelect) {
+        dateRangeSelect.addEventListener('change', (e) => {
+            dashboardState.dateRange = e.target.value;
+            updateDashboardStats();
+        });
+    }
+}
+
+// Export functions for use in admin-dashboard.js
+export {
+    updateDashboardStats,
+    initializeDashboardListeners
+};
