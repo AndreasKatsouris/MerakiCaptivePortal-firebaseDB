@@ -1048,7 +1048,60 @@ function initializeDataDeletionListeners() {
             loadDataForDeletion();
         });
     }
+
+    const deleteAllDataMenu = document.getElementById('deleteAllDataMenu');
+    if (deleteAllDataMenu) {
+        deleteAllDataMenu.addEventListener('click', handleDeleteAllData);
+    }
 }
+
+async function handleDeleteAllData(e) {
+    e.preventDefault();
+
+    // Show confirmation dialog with SweetAlert2
+    const result = await Swal.fire({
+        title: 'Delete All Scanning Data?',
+        text: 'This action cannot be undone. All scanning data will be permanently deleted.',
+        icon: 'warning',
+        showCancelButton: true,
+        confirmButtonColor: '#dc3545',
+        cancelButtonColor: '#6c757d',
+        confirmButtonText: 'Yes, delete all',
+        cancelButtonText: 'Cancel'
+    });
+
+    if (result.isConfirmed) {
+        try {
+            showLoading();
+            
+            // Delete all scanning data
+            await firebase.database().ref('scanningData').remove();
+            
+            // Show success message
+            Swal.fire({
+                title: 'Deleted!',
+                text: 'All scanning data has been deleted successfully.',
+                icon: 'success',
+                timer: 2000,
+                showConfirmButton: false
+            });
+
+        } catch (error) {
+            console.error('Error deleting scanning data:', error);
+            
+            // Show error message
+            Swal.fire({
+                title: 'Error',
+                text: 'Failed to delete scanning data. Please try again.',
+                icon: 'error'
+            });
+        } finally {
+            hideLoading();
+        }
+    }
+}
+
+
 
 // Helper function to show toast notifications
 function showToast(message, type = 'info') {
