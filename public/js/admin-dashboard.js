@@ -1255,6 +1255,7 @@ async function loadReceipts(filters = {}) {
 }
 
 // Receipt Actions Handler
+
 const receiptActions = {
     currentReceiptId: null,
 
@@ -1272,7 +1273,7 @@ const receiptActions = {
             $('#receiptDetailsModal').modal('show');
         } catch (error) {
             console.error('Error showing receipt details:', error);
-            showReceiptError('Failed to load receipt details');
+            showToast('Failed to load receipt details', 'error');
         }
     },
 
@@ -1282,81 +1283,149 @@ const receiptActions = {
     },
 
     populateModalWithReceipt(receipt) {
-        // Populate store information
-        document.getElementById('modalStoreName').textContent = receipt.storeName || 'N/A';
-        document.getElementById('modalStoreLocation').textContent = receipt.storeLocation || 'N/A';
-        document.getElementById('modalInvoiceNumber').textContent = receipt.invoiceNumber || 'N/A';
+        // Helper function to safely set content
+        const setContent = (id, content) => {
+            const element = document.getElementById(id);
+            if (element) {
+                element.textContent = content || '-';
+            } else {
+                console.warn(`Element with id '${id}' not found`);
+            }
+        };
 
-        // Populate transaction details
-        const processedDate = new Date(receipt.processedAt);
-        document.getElementById('modalDate').textContent = processedDate.toLocaleDateString();
-        document.getElementById('modalTime').textContent = processedDate.toLocaleTimeString();
-        
-        // Populate status with badge
-        const statusSpan = document.getElementById('modalStatus');
-        statusSpan.innerHTML = `
-            <span class="badge badge-${getStatusBadgeClass(receipt.status)}">
-                ${receipt.status || 'unknown'}
-            </span>
-        `;
+        try {
+            // Set brand and store information
+            setContent('modalBrandName', receipt.brandName);
+            setContent('modalStoreName', receipt.storeName);
+            setContent('modalStoreAddress', receipt.storeAddress);
 
-        // Populate guest information
-        document.getElementById('modalGuestPhone').textContent = receipt.guestPhoneNumber || 'N/A';
-        document.getElementById('modalGuestName').textContent = receipt.guestName || 'N/A';
+            // Set receipt details
+            setContent('modalInvoiceNumber', receipt.invoiceNumber);
+            
+            // Format and set date/time
+            if (receipt.processedAt) {
+                const processedDate = new Date(receipt.processedAt);
+                setContent('modalDate', processedDate.toLocaleDateString());
+                setContent('modalTime', processedDate.toLocaleTimeString());
+            } else {
+                setContent('modalDate', '-');
+                setContent('modalTime', '-');
+            }
 
-        // Populate items table
-        const itemsTableBody = document.getElementById('modalItemsTable');
-        itemsTableBody.innerHTML = '';
-        
-        if (receipt.items && receipt.items.length > 0) {
-            receipt.items.forEach(item => {
-                const row = document.createElement('tr');
-                row.innerHTML = `
-                    <td>${item.name}</td>
-                    <td class="text-center">${item.quantity}</td>
-                    <td class="text-right">${formatCurrency(item.unitPrice || 0)}</td>
-                    <td class="text-right">${formatCurrency((item.quantity || 0) * (item.unitPrice || 0))}</td>
+            // Set status with badge
+            const statusElement = document.getElementById('modalStatus');
+            if (statusElement) {
+                statusElement.innerHTML = `
+                    <span class="badge badge-${this.getStatusBadgeClass(receipt.status)}">
+                        ${receipt.status || 'unknown'}
+                    </span>
                 `;
-                itemsTableBody.appendChild(row);
-            });
-        } else {
-            itemsTableBody.innerHTML = '<tr><td colspan="4" class="text-center">No items found</td></tr>';
-        }
+            }
 
-        // Set total amount
-        document.getElementById('modalTotal').textContent = formatCurrency(receipt.totalAmount || 0);
+            // Set guest information
+            setContent('modalGuestPhone', receipt.guestPhoneNumber);
+            setContent('modalGuestName', receipt.guestName);
 
-        // Set receipt image
-        const receiptImage = document.getElementById('modalReceiptImage');
-        if (receipt.imageUrl) {
-            receiptImage.src = receipt.imageUrl;
-            receiptImage.style.display = 'block';
-        } else {
-            receiptImage.style.display = 'none';
-        }
+            // Populate items table
+            const itemsTableBody = document.getElementById('modalItemsTable');
+            if (itemsTableBody) {
+                itemsTableBody.innerHTML = '';
+                
+                if (receipt.items && receipt.items.length > 0) {
+                    receipt.items.forEach(item => {
+                        const row = document.createElement('tr');
+                        row.innerHTML = `
+                            <td>${item.name || '-'}</td>
+                            <td class="text-center">${item.quantity || '-'}</td>
+                            <td class="text-right">${this.formatCurrency(item.unitPrice)}</td>
+                            <td class="text-right">${this.formatCurrency(item.quantity * item.unitPrice)}</td>
+                        `;
+                        itemsTableBody.appendChild(row);
+                    });
+                } else {
+                    itemsTableBody.innerHTML = '<tr><td colspan="4" class="text-center">No items found</td></tr>';
+                }
+            }
 
-        // Processing notes
-        const processingDetails = document.getElementById('modalProcessingDetails');
-        processingDetails.innerHTML = `
-            Processed: ${new Date(receipt.processedAt).toLocaleString()}<br>
-            Status: ${receipt.status}<br>
-            ${receipt.validatedAt ? `Validated: ${new Date(receipt.validatedAt).toLocaleString()}<br>` : ''}
-            ${receipt.rejectedAt ? `Rejected: ${new Date(receipt.rejectedAt).toLocaleString()}<br>` : ''}
-        `;
+            // Set total amount
+            setContent('modalTotal', this.formatCurrency(receipt.totalAmount));
 
-        // Setup action buttons
-        const actionButtonsContainer = document.getElementById('modalActionButtons');
-        if (receipt.status === 'pending_validation') {
-            actionButtonsContainer.innerHTML = `
-                <button type="button" class="btn btn-success btn-block mb-2" onclick="receiptActions.validateReceipt('${this.currentReceiptId}')">
-                    <i class="fas fa-check"></i> Validate Receipt
-                </button>
-                <button type="button" class="btn btn-danger btn-block" onclick="receiptActions.rejectReceipt('${this.currentReceiptId}')">
-                    <i class="fas fa-times"></i> Reject Receipt
-                </button>
-            `;
-        } else {
-            actionButtonsContainer.innerHTML = '';
+            // Set receipt image
+            const receiptImage = document.getElementById('modalReceiptImage');
+            if (receiptImage) {
+                if (receipt.imageUrl) {
+                    receiptImage.src = receipt.imageUrl;
+                    receiptImage.style.display = 'block';
+                } else {
+                    receiptImage.style.display = 'none';
+                }
+            }
+
+            // Processing notes
+            const processingNotesBody = document.getElementById('modalProcessingNotes');
+            if (processingNotesBody) {
+                const processedDate = receipt.processedAt ? new Date(receipt.processedAt).toLocaleString() : 'N/A';
+                const validatedDate = receipt.validatedAt ? new Date(receipt.validatedAt).toLocaleString() : 'N/A';
+                const rejectedDate = receipt.rejectedAt ? new Date(receipt.rejectedAt).toLocaleString() : 'N/A';
+
+                processingNotesBody.innerHTML = `
+                    <tr>
+                        <td><strong>Processed Date:</strong></td>
+                        <td>${processedDate}</td>
+                    </tr>
+                    <tr>
+                        <td><strong>Current Status:</strong></td>
+                        <td>
+                            <span class="badge badge-${this.getStatusBadgeClass(receipt.status)}">
+                                ${receipt.status || 'unknown'}
+                            </span>
+                        </td>
+                    </tr>
+                    ${receipt.validatedAt ? `
+                    <tr>
+                        <td><strong>Validated Date:</strong></td>
+                        <td>${validatedDate}</td>
+                    </tr>
+                    ` : ''}
+                    ${receipt.rejectedAt ? `
+                    <tr>
+                        <td><strong>Rejected Date:</strong></td>
+                        <td>${rejectedDate}</td>
+                    </tr>
+                    <tr>
+                        <td><strong>Rejection Reason:</strong></td>
+                        <td>${receipt.rejectionReason || 'No reason provided'}</td>
+                    </tr>
+                    ` : ''}
+                    ${receipt.campaignId ? `
+                    <tr>
+                        <td><strong>Campaign ID:</strong></td>
+                        <td>${receipt.campaignId}</td>
+                    </tr>
+                    ` : ''}
+                `;
+            }
+
+            // Setup action buttons
+            const actionButtonsContainer = document.getElementById('modalActionButtons');
+            if (actionButtonsContainer) {
+                if (receipt.status === 'pending_validation') {
+                    actionButtonsContainer.innerHTML = `
+                        <button type="button" class="btn btn-success" onclick="receiptActions.validateReceipt('${this.currentReceiptId}')">
+                            <i class="fas fa-check"></i> Validate Receipt
+                        </button>
+                        <button type="button" class="btn btn-danger ml-2" onclick="receiptActions.rejectReceipt('${this.currentReceiptId}')">
+                            <i class="fas fa-times"></i> Reject Receipt
+                        </button>
+                    `;
+                } else {
+                    actionButtonsContainer.innerHTML = '';
+                }
+            }
+
+        } catch (error) {
+            console.error('Error populating modal:', error);
+            showToast('Error displaying receipt details', 'error');
         }
     },
 
@@ -1375,7 +1444,6 @@ const receiptActions = {
             $('#receiptDetailsModal').modal('hide');
             loadReceipts(receiptManagement.currentFilters);
             
-            // Show success message
             showToast('Receipt validated successfully', 'success');
         } catch (error) {
             console.error('Error validating receipt:', error);
@@ -1398,16 +1466,34 @@ const receiptActions = {
             $('#receiptDetailsModal').modal('hide');
             loadReceipts(receiptManagement.currentFilters);
             
-            // Show success message
             showToast('Receipt rejected successfully', 'success');
         } catch (error) {
             console.error('Error rejecting receipt:', error);
             showToast('Failed to reject receipt', 'error');
         }
+    },
+
+    formatCurrency(amount) {
+        return new Intl.NumberFormat('en-ZA', {
+            style: 'currency',
+            currency: 'ZAR'
+        }).format(amount || 0);
+    },
+
+    getStatusBadgeClass(status) {
+        const statusClasses = {
+            pending: 'warning',
+            pending_validation: 'warning',
+            validated: 'success',
+            approved: 'success',
+            rejected: 'danger',
+            completed: 'info'
+        };
+        return statusClasses[status] || 'secondary';
     }
 };
 
-// Toast notification helper
+// Add this helper function for toast notifications
 function showToast(message, type = 'info') {
     // You can implement this using your preferred toast library
     // For now, we'll use a simple alert

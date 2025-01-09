@@ -394,7 +394,7 @@
                 </button>
             </div>
             <div class="modal-body">
-                <!-- Receipt Header Info -->
+                <!-- Store Information -->
                 <div class="row mb-3">
                     <div class="col-md-6">
                         <div class="card">
@@ -402,15 +402,9 @@
                                 <h6 class="mb-0">Brand & Store Information</h6>
                             </div>
                             <div class="card-body">
-                                <div class="brand-info">
-                                    <strong>Brand:</strong> <span id="modalBrandName"></span>
-                                </div>
-                                <div class="store-info">
-                                    <strong>Store:</strong> <span id="modalStoreName"></span>
-                                </div>
-                                <div class="address-info">
-                                    <strong>Address:</strong> <span id="modalStoreAddress"></span>
-                                </div>
+                                <p class="mb-1"><strong>Brand:</strong> <span id="modalBrandName">-</span></p>
+                                <p class="mb-1"><strong>Store:</strong> <span id="modalStoreName">-</span></p>
+                                <p class="mb-1"><strong>Address:</strong> <span id="modalStoreAddress">-</span></p>
                             </div>
                         </div>
                     </div>
@@ -420,80 +414,86 @@
                                 <h6 class="mb-0">Receipt Details</h6>
                             </div>
                             <div class="card-body">
-                                <p class="mb-1"><strong>Invoice #:</strong> <span id="modalInvoiceNumber"></span></p>
-                                <p class="mb-1"><strong>Date:</strong> <span id="modalDate"></span></p>
-                                <p class="mb-1"><strong>Time:</strong> <span id="modalTime"></span></p>
-                                <p class="mb-1"><strong>Status:</strong> <span id="modalStatus"></span></p>
+                                <p class="mb-1"><strong>Invoice #:</strong> <span id="modalInvoiceNumber">-</span></p>
+                                <p class="mb-1"><strong>Date:</strong> <span id="modalDate">-</span></p>
+                                <p class="mb-1"><strong>Time:</strong> <span id="modalTime">-</span></p>
+                                <p class="mb-1"><strong>Status:</strong> <span id="modalStatus">-</span></p>
                             </div>
                         </div>
                     </div>
                 </div>
 
-                <!-- Guest Info -->
+                <!-- Guest Information -->
                 <div class="row mb-3">
                     <div class="col-md-12">
-                        <h6>Guest Information</h6>
-                        <p class="mb-1"><strong>Phone:</strong> <span id="modalGuestPhone"></span></p>
-                        <p class="mb-1"><strong>Name:</strong> <span id="modalGuestName"></span></p>
+                        <div class="card">
+                            <div class="card-header">
+                                <h6 class="mb-0">Guest Information</h6>
+                            </div>
+                            <div class="card-body">
+                                <p class="mb-1"><strong>Phone:</strong> <span id="modalGuestPhone">-</span></p>
+                                <p class="mb-1"><strong>Name:</strong> <span id="modalGuestName">-</span></p>
+                            </div>
+                        </div>
                     </div>
                 </div>
 
                 <!-- Items Table -->
-                <h6>Items Purchased</h6>
-                <div class="table-responsive">
-                    <table class="table table-sm">
-                        <thead>
-                            <tr>
-                                <th>Item</th>
-                                <th class="text-center">Quantity</th>
-                                <th class="text-right">Unit Price</th>
-                                <th class="text-right">Total</th>
-                            </tr>
-                        </thead>
-                        <tbody id="modalItemsTable">
-                            <!-- Items will be inserted here -->
-                        </tbody>
-                        <tfoot>
-                            <tr>
-                                <td colspan="3" class="text-right"><strong>Total:</strong></td>
-                                <td class="text-right" id="modalTotal"></td>
-                            </tr>
-                        </tfoot>
-                    </table>
-                </div>
-
-                <!-- Receipt Image -->
-                <div class="mt-3">
-                    <h6>Receipt Image</h6>
-                    <div class="text-center">
-                        <img id="modalReceiptImage" class="img-fluid" alt="Receipt Image">
+                <div class="card mb-3">
+                    <div class="card-header">
+                        <h6 class="mb-0">Items Purchased</h6>
+                    </div>
+                    <div class="card-body">
+                        <div class="table-responsive">
+                            <table class="table table-sm">
+                                <thead>
+                                    <tr>
+                                        <th>Item</th>
+                                        <th class="text-center">Quantity</th>
+                                        <th class="text-right">Unit Price</th>
+                                        <th class="text-right">Total</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="modalItemsTable">
+                                </tbody>
+                                <tfoot>
+                                    <tr>
+                                        <td colspan="3" class="text-right"><strong>Total:</strong></td>
+                                        <td class="text-right" id="modalTotal">-</td>
+                                    </tr>
+                                </tfoot>
+                            </table>
+                        </div>
                     </div>
                 </div>
 
-                <!-- Processing Notes -->
-                <div class="mt-3" id="modalProcessingNotes">
-                    <h6>Processing Notes</h6>
-                    <div class="alert alert-info">
-                        <small id="modalProcessingDetails"></small>
+                <!-- Receipt Image -->
+                <div class="card">
+                    <div class="card-header">
+                        <h6 class="mb-0">Receipt Image</h6>
+                    </div>
+                    <div class="card-body text-center">
+                        <img id="modalReceiptImage" class="img-fluid" alt="Receipt Image">
                     </div>
                 </div>
             </div>
             <div class="modal-footer">
-                <div class="w-100">
-                    <div class="row">
-                        <div class="col-md-6">
-                            <button type="button" class="btn btn-secondary btn-block" data-dismiss="modal">Close</button>
-                        </div>
-                        <div class="col-md-6" id="modalActionButtons">
-                            <!-- Action buttons will be inserted here -->
-                        </div>
-                    </div>
+                <button type="button" class="btn btn-secondary" data-dismiss="modal">Close</button>
+                <div id="modalActionButtons">
+                    <!-- Action buttons will be inserted here -->
                 </div>
             </div>
+                            <!-- Processing Notes -->
+                            <div class="mt-3" id="modalProcessingNotes">
+                                <h6>Processing Notes</h6>
+                                <div class="alert alert-info">
+                                    <small id="modalProcessingDetails"></small>
+                                </div>
+                            </div>
+                        </div>
         </div>
     </div>
 </div>
-
 
 <!-- Campaign Management Content -->
  <div id="campaignManagementContent" class="content-section" style="display: none;">
