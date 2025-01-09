@@ -21,12 +21,12 @@
   
   .content {
     margin-left: var(--sidebar-width);
-    padding: calc(var(--header-height) + 20px) 20px 20px;
-    min-height: 100vh;
+    margin-top: var(--header-height);
+    padding: 2rem;
+    min-height: calc(100vh - var(--header-height));
     position: relative;
-    z-index: 1;
-    background: var(--secondary);
-  }
+    overflow-y: auto;
+}
   
   /* Header */
   .main-header {
@@ -63,7 +63,6 @@
     gap: 2rem;
   }
   
-  /* Sidebar */
   .sidebar {
     width: var(--sidebar-width);
     height: 100vh;
@@ -74,8 +73,8 @@
     box-shadow: 2px 0 4px rgba(0,0,0,0.1);
     display: flex;
     flex-direction: column;
-    z-index: 1000;
-  }
+    z-index: 99;
+}
   
   .sidebar-header {
     padding: 1.5rem;
@@ -122,6 +121,11 @@
     align-items: center;
     margin-bottom: 2rem;
   }
+
+  #dashboardContent {
+    height: 100%;
+    overflow-y: auto;
+}
   
   .stats-card {
     background: white;
