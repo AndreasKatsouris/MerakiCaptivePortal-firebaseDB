@@ -1574,12 +1574,6 @@ const receiptActions = {
     }
 };
 
-// Add this helper function for toast notifications
-function showToast(message, type = 'info') {
-    // You can implement this using your preferred toast library
-    // For now, we'll use a simple alert
-    alert(message);
-}
 
 // Attach receipt action listeners
 function attachReceiptActionListeners() {
