@@ -168,17 +168,6 @@ function addRequiredItem(name, quantity) {
     itemsList.appendChild(itemElement);
 }
 
-// function to get the required items when saving
-function getRequiredItems() {
-    const itemsList = document.querySelectorAll('#requiredItemsList .required-item');
-    return Array.from(itemsList).map(item => ({
-        name: item.dataset.name,
-        quantity: parseInt(item.dataset.quantity),
-        isRequired: true
-    }));
-}
-
-
 function validateCampaignData(campaignData) {
     const errors = [];
     
