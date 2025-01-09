@@ -1,4 +1,10 @@
 import { updateDashboardStats, initializeDashboardListeners } from './dashboard.js';
+
+window.addEventListener('error', function(e) {
+    console.error('Global error:', e.error);
+});
+
+
 document.addEventListener('DOMContentLoaded', function () {
     // Initialize all event listeners after DOM is loaded
     initializeAuthentication();
@@ -87,23 +93,25 @@ function getStatusBadgeClass(status) {
 
 // ==================== Menu Section ====================
 function initializeMenuListeners() {
-    addEventListenerSafely('dashboardMenu', 'click', function(e) {
-        e.preventDefault();
-        displaySection('dashboardContent');
-    });
+    // Dashboard menu
+    const dashboardMenu = document.getElementById('dashboardMenu');
+    if (dashboardMenu) {
+        dashboardMenu.addEventListener('click', async function(e) {
+            e.preventDefault();
+            displaySection('dashboardContent');
+            await updateDashboardStats();
+        });
+    }
 
-    document.querySelectorAll('.menu-item > a').forEach(item => {
+    // Submenu toggles
+    document.querySelectorAll('.nav-link[data-toggle="collapse"]').forEach(item => {
         item.addEventListener('click', function(e) {
             e.preventDefault();
-            document.querySelectorAll('.submenu').forEach(menu => {
-                // Skip the current submenu
-                if (menu !== this.nextElementSibling) {
-                    menu.style.display = 'none';
-                }
-            });
-            const submenu = this.nextElementSibling;
+            const target = this.getAttribute('data-target');
+            const submenu = document.querySelector(target);
             if (submenu) {
-                submenu.style.display = submenu.style.display === 'block' ? 'none' : 'block';
+                $('.submenu').not(submenu).collapse('hide');
+                $(submenu).collapse('toggle');
             }
         });
     });
@@ -1114,59 +1122,6 @@ function initializeReceiptManagement() {
     addEventListenerSafely('receiptSearchInvoice', 'input', handleReceiptSearch);
 }
 
-async function loadReceipts(filters = {}) {
-    showLoading();
-    const tableBody = document.querySelector('#receiptsTable tbody');
-    tableBody.innerHTML = '<tr><td colspan="7" class="text-center">Loading...</td></tr>';
-
-    try {
-        let query = firebase.database().ref('receipts');
-        if (filters.status) {
-            query = query.orderByChild('status').equalTo(filters.status);
-        }
-        
-        const snapshot = await query.once('value');
-        const receipts = snapshot.val();
-
-        if (receipts) {
-            tableBody.innerHTML = '';
-            Object.entries(receipts).reverse().forEach(([receiptId, receipt]) => {
-                // Apply filters
-                if (filters.guest && !receipt.guestPhoneNumber?.includes(filters.guest)) return;
-                if (filters.invoice && !receipt.invoiceNumber?.includes(filters.invoice)) return;
-
-                const row = document.createElement('tr');
-                row.innerHTML = `
-                    <td>${formatDate(receipt.processedAt)}</td>
-                    <td>${receipt.guestPhoneNumber || 'N/A'}</td>
-                    <td>${receipt.invoiceNumber || 'N/A'}</td>
-                    <td>${receipt.storeName || 'N/A'}</td>
-                    <td>R${receipt.totalAmount?.toFixed(2) || '0.00'}</td>
-                    <td>
-                        <span class="badge badge-${getStatusBadgeClass(receipt.status)}">
-                            ${receipt.status || 'pending'}
-                        </span>
-                    </td>
-                    <td>
-                        <button class="btn btn-sm btn-info view-receipt" data-receipt-id="${receiptId}">
-                            <i class="fas fa-eye"></i> View
-                        </button>
-                    </td>
-                `;
-                tableBody.appendChild(row);
-            });
-
-            attachReceiptViewListeners();
-        } else {
-            tableBody.innerHTML = '<tr><td colspan="7" class="text-center">No receipts found</td></tr>';
-        }
-    } catch (error) {
-        console.error('Error loading receipts:', error);
-        tableBody.innerHTML = '<tr><td colspan="7" class="text-center text-danger">Error loading receipts</td></tr>';
-    } finally {
-        hideLoading();
-    }
-}
 
 async function showReceiptModal(receiptId) {
     showLoading();
@@ -1663,9 +1618,9 @@ async function loadInitialData() {
     try {
         displaySection('dashboardContent');
         await Promise.all([
+            updateDashboardStats(),
             loadCampaigns(),
-            fetchWiFiReports(),
-            updateDashboardStats()
+            fetchWiFiReports()
         ]);
         initializeDashboardListeners();
     } catch (error) {
@@ -1694,24 +1649,29 @@ function hideLoading() {
     document.getElementById('globalLoadingOverlay').style.display = 'none';
 }
 
-// Add loading state to section transitions
+// Update displaySection function with better error handling
 function displaySection(sectionId) {
-    showLoading();
-    console.log('Displaying section:', sectionId); // Debug
-    document.querySelectorAll('.content-section').forEach(section => {
-        section.style.display = 'none';
-    });
-    document.querySelectorAll('.content-section').forEach(section => {
-        if (section.id === sectionId) {
-            section.style.display = 'block';
-            section.classList.add('fade-in');
-            console.log(section.id, section.style.display); // Debug
-        } else {
-            section.style.display = 'none';
-            console.log(section.id, section.style.display); // Debug
+    try {
+        showLoading();
+        console.log('Displaying section:', sectionId);
+        
+        const section = document.getElementById(sectionId);
+        if (!section) {
+            throw new Error(`Section ${sectionId} not found`);
         }
-    });
-    setTimeout(hideLoading, 300); // Short delay to show transition
+
+        document.querySelectorAll('.content-section').forEach(s => {
+            s.style.display = 'none';
+        });
+
+        section.style.display = 'block';
+        section.classList.add('fade-in');
+        
+    } catch (error) {
+        console.error('Error displaying section:', error);
+    } finally {
+        setTimeout(hideLoading, 300);
+    }
 }
 
 function showTableLoading(tableId) {

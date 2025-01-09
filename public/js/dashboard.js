@@ -152,6 +152,18 @@ function updateRecentReceipts(receipts) {
     `).join('');
 }
 
+function getStatusBadgeClass(status) {
+    const statusClasses = {
+        pending: 'warning',
+        pending_validation: 'warning',
+        validated: 'success',
+        approved: 'success',
+        rejected: 'danger',
+        completed: 'info'
+    };
+    return statusClasses[status] || 'secondary';
+}
+
 // Dashboard Event Listeners
 function initializeDashboardListeners() {
     const dateRangeSelect = document.getElementById('dashboardDateRange');
