@@ -49,41 +49,6 @@ function addEventListenerSafely(elementId, event, handler) {
 }
 
 
-
-function handleSelectAll(event) {
-    const checkboxes = document.querySelectorAll('#data-table tbody input[type="checkbox"]');
-    checkboxes.forEach(checkbox => {
-        checkbox.checked = event.target.checked;
-    });
-}
-
-// Update the initializeDataDeletionListeners function
-function initializeDataDeletionListeners() {
-    const selectAllCheckbox = document.querySelector('#select-all');
-    if (selectAllCheckbox) {
-        selectAllCheckbox.addEventListener('change', handleSelectAll);
-    }
-    
-    const deleteSelectedButton = document.querySelector('#delete-selected');
-    if (deleteSelectedButton) {
-        deleteSelectedButton.addEventListener('click', handleDeleteSelected);
-    }
-}
-
-// Add this helper function
-function handleDeleteSelected() {
-    const selectedRows = document.querySelectorAll('#data-table tbody input[type="checkbox"]:checked');
-    if (selectedRows.length === 0) {
-        alert('Please select items to delete');
-        return;
-    }
-    
-    if (confirm(`Are you sure you want to delete ${selectedRows.length} selected items?`)) {
-        // Implement deletion logic here
-        console.log('Deleting selected items:', selectedRows.length);
-    }
-}
-
 // ==================== Loyalty Program Section ====================
 function initializeLoyaltyListeners() {
     // Campaign Management
@@ -948,10 +913,133 @@ function initializeLiveDataListeners() {
     }
 }
 
-// [Your existing live data functions here]
 
 // ==================== Data Deletion Section ====================
+
+// Function to load scanning data
+async function loadDataForDeletion() {
+    const tableBody = document.querySelector('#data-table tbody');
+    if (!tableBody) return;
+
+    try {
+        showLoading();
+        const snapshot = await firebase.database().ref('scanningData').once('value');
+        const scanningData = snapshot.val();
+
+        if (scanningData) {
+            tableBody.innerHTML = '';
+            Object.entries(scanningData).forEach(([key, data]) => {
+                const row = document.createElement('tr');
+                row.innerHTML = `
+                    <td>
+                        <input type="checkbox" class="row-checkbox" data-key="${key}">
+                    </td>
+                    <td>${data.clientMac || 'N/A'}</td>
+                    <td>${data.apMac || 'N/A'}</td>
+                    <td>${data.rssi || 'N/A'}</td>
+                    <td>${data.manufacturer || 'N/A'}</td>
+                    <td>
+                        <button class="btn btn-danger btn-sm delete-single" data-key="${key}">
+                            <i class="fas fa-trash"></i>
+                        </button>
+                    </td>
+                `;
+                tableBody.appendChild(row);
+            });
+
+            // Attach event listeners for single delete buttons
+            attachSingleDeleteListeners();
+        } else {
+            tableBody.innerHTML = `
+                <tr>
+                    <td colspan="6" class="text-center">No scanning data available</td>
+                </tr>
+            `;
+        }
+    } catch (error) {
+        console.error('Error loading scanning data:', error);
+        tableBody.innerHTML = `
+            <tr>
+                <td colspan="6" class="text-center text-danger">
+                    Error loading data. Please try again.
+                </td>
+            </tr>
+        `;
+    } finally {
+        hideLoading();
+    }
+}
+
+// Function to handle single row deletion
+async function handleSingleDelete(key) {
+    if (confirm('Are you sure you want to delete this item?')) {
+        try {
+            showLoading();
+            await firebase.database().ref(`scanningData/${key}`).remove();
+            await loadDataForDeletion(); // Reload the table
+            showToast('Item deleted successfully', 'success');
+        } catch (error) {
+            console.error('Error deleting item:', error);
+            showToast('Failed to delete item', 'error');
+        } finally {
+            hideLoading();
+        }
+    }
+}
+
+// Function to handle bulk deletion
+async function handleDeleteSelected() {
+    const selectedRows = document.querySelectorAll('#data-table tbody input[type="checkbox"]:checked');
+    if (selectedRows.length === 0) {
+        showToast('Please select items to delete', 'warning');
+        return;
+    }
+    
+    if (confirm(`Are you sure you want to delete ${selectedRows.length} selected items?`)) {
+        try {
+            showLoading();
+            const deletePromises = Array.from(selectedRows).map(checkbox => {
+                const key = checkbox.getAttribute('data-key');
+                return firebase.database().ref(`scanningData/${key}`).remove();
+            });
+
+            await Promise.all(deletePromises);
+            await loadDataForDeletion(); // Reload the table
+            showToast(`Successfully deleted ${selectedRows.length} items`, 'success');
+        } catch (error) {
+            console.error('Error deleting items:', error);
+            showToast('Failed to delete some items', 'error');
+        } finally {
+            hideLoading();
+        }
+    }
+}
+
+// Function to attach single delete button listeners
+function attachSingleDeleteListeners() {
+    document.querySelectorAll('.delete-single').forEach(button => {
+        button.addEventListener('click', () => {
+            const key = button.getAttribute('data-key');
+            handleSingleDelete(key);
+        });
+    });
+}
+
+// Update the initialization function
 function initializeDataDeletionListeners() {
+    // Select all checkbox
+    const selectAllCheckbox = document.querySelector('#select-all');
+    if (selectAllCheckbox) {
+        selectAllCheckbox.addEventListener('change', handleSelectAll);
+    }
+    
+    // Delete selected button
+    const deleteSelectedButton = document.querySelector('#delete-selected');
+    if (deleteSelectedButton) {
+        deleteSelectedButton.addEventListener('click', handleDeleteSelected);
+    }
+
+    // Load initial data when section is displayed
     const dataDeletionMenu = document.getElementById('dataDeletionMenu');
     if (dataDeletionMenu) {
         dataDeletionMenu.addEventListener('click', function(e) {
@@ -960,17 +1048,20 @@ function initializeDataDeletionListeners() {
             loadDataForDeletion();
         });
     }
-
-    const deleteAllDataMenu = document.getElementById('deleteAllDataMenu');
-    if (deleteAllDataMenu) {
-        deleteAllDataMenu.addEventListener('click', handleDeleteAllData);
-    }
-
-    const selectAllCheckbox = document.getElementById('select-all');
-    if (selectAllCheckbox) {
-        selectAllCheckbox.addEventListener('change', handleSelectAll);
-    }
 }
+
+// Helper function to show toast notifications
+function showToast(message, type = 'info') {
+    Swal.fire({
+        toast: true,
+        position: 'top-end',
+        showConfirmButton: false,
+        timer: 3000,
+        icon: type,
+        title: message
+    });
+}
+
 
 // ==================== Receipt Management Section ====================
 function initializeReceiptManagement() {
