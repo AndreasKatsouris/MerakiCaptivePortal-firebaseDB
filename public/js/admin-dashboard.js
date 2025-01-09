@@ -1,4 +1,3 @@
-// admin-dashboard.js
 document.addEventListener('DOMContentLoaded', function () {
     // Initialize all event listeners after DOM is loaded
     initializeAuthentication();
