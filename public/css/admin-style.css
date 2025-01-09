@@ -123,8 +123,16 @@
   }
 
   #dashboardContent {
-    height: 100%;
-    overflow-y: auto;
+    display: block;
+}
+
+.content-section {
+    padding: 20px;
+}
+.content {
+    margin-left: var(--sidebar-width);
+    padding-top: var(--header-height);
+    min-height: 100vh;
 }
   
   .stats-card {
