@@ -48,14 +48,7 @@ function addEventListenerSafely(elementId, event, handler) {
     }
 }
 
-function addEventListenerSafely(elementId, eventType, handler) {
-    const element = document.getElementById(elementId);
-    if (element) {
-        element.addEventListener(eventType, handler);
-    } else {
-        console.warn(`Element with id '${elementId}' not found`);
-    }
-}
+
 
 function handleSelectAll(event) {
     const checkboxes = document.querySelectorAll('#data-table tbody input[type="checkbox"]');
