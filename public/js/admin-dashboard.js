@@ -155,6 +155,16 @@ function initializeCampaignListeners() {
             }
         });
     }
+    const createCampaignBtn = document.querySelector('#createCampaignBtn');
+    if (createCampaignBtn) {
+        createCampaignBtn.addEventListener('click', () => {
+            const modal = document.getElementById('campaignFormModal');
+            if (!modal) return;
+
+            resetCampaignForm();
+            $('#campaignFormModal').modal('show');
+        });
+    }
 
 }
 function addRequiredItem(name, quantity) {
