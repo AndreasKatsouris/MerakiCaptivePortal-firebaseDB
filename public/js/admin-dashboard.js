@@ -222,23 +222,6 @@ function showCreateRewardModal() {
     // Show modal
     $('#createRewardModal').modal('show');
 }
-function attachRewardEventListeners(rewards) {
-    if (!rewards) return;
-    
-    rewards.forEach(reward => {
-        // Approve button listener
-        const approveBtn = document.querySelector(`[data-approve-reward="${reward.id}"]`);
-        if (approveBtn) {
-            approveBtn.addEventListener('click', () => handleRewardAction(reward.id, 'approved'));
-        }
-
-        // Reject button listener
-        const rejectBtn = document.querySelector(`[data-reject-reward="${reward.id}"]`);
-        if (rejectBtn) {
-            rejectBtn.addEventListener('click', () => handleRewardAction(reward.id, 'rejected'));
-        }
-    });
-}
 
 
 /**
@@ -452,21 +435,48 @@ function handleRewardSearch() {
     loadRewards(filters);
 }
 
-function attachRewardEventListeners() {
-    document.querySelectorAll('.view-reward').forEach(button => {
-        button.addEventListener('click', () => {
-            const rewardId = button.getAttribute('data-id');
-            viewRewardDetails(rewardId);
+/**
+ * Attaches event listeners to reward elements
+ * @param {Array} [rewards] - Optional array of reward objects for specific targeting
+ */
+function attachRewardEventListeners(rewards) {
+    if (rewards) {
+        // Attach listeners to specific rewards
+        rewards.forEach(reward => {
+            const approveBtn = document.querySelector(`[data-approve-reward="${reward.id}"]`);
+            const rejectBtn = document.querySelector(`[data-reject-reward="${reward.id}"]`);
+            
+            if (approveBtn) {
+                approveBtn.addEventListener('click', () => handleRewardApproval(reward.id));
+            }
+            if (rejectBtn) {
+                rejectBtn.addEventListener('click', () => handleRewardRejection(reward.id));
+            }
         });
-    });
-
-    document.querySelectorAll('.approve-reward').forEach(button => {
-        button.addEventListener('click', async () => {
-            const rewardId = button.getAttribute('data-id');
-            await handleRewardApproval(rewardId);
+    } else {
+        // Attach listeners to all reward buttons
+        document.querySelectorAll('.view-reward').forEach(button => {
+            button.addEventListener('click', () => {
+                const rewardId = button.getAttribute('data-id');
+                viewRewardDetails(rewardId);
+            });
         });
-    });
 
+        document.querySelectorAll('.approve-reward').forEach(button => {
+            button.addEventListener('click', async () => {
+                const rewardId = button.getAttribute('data-id');
+                await handleRewardApproval(rewardId);
+            });
+        });
+
+        document.querySelectorAll('.reject-reward').forEach(button => {
+            button.addEventListener('click', async () => {
+                const rewardId = button.getAttribute('data-id');
+                await handleRewardRejection(rewardId);
+            });
+        });
+    }
+}
     document.querySelectorAll('.reject-reward').forEach(button => {
         button.addEventListener('click', async () => {
             const rewardId = button.getAttribute('data-id');
