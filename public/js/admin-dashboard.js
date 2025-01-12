@@ -233,6 +233,7 @@ async function handleSaveCampaign() {
         const campaignData = {
             name: document.getElementById('campaignName').value.trim(),
             brandName: document.getElementById('brandName').value.trim(),
+            storeName: document.getElementById('storeName').value || null,
             startDate: document.getElementById('startDate').value,
             endDate: document.getElementById('endDate').value,
             status: document.getElementById('campaignStatus').value,
