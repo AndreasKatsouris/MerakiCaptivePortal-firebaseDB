@@ -12,6 +12,7 @@ document.addEventListener('DOMContentLoaded', function () {
     initializeLoyaltyListeners();
     initializeCampaignListeners();
     initializeRewardsListeners();
+    initializeRewardsManagement();
     initializeWiFiListeners();
     initializeLiveDataListeners();
     initializeDataDeletionListeners();
@@ -127,6 +128,11 @@ function initializeMenuListeners() {
 }
 
 // ==================== Rewards Management Section ====================
+
+/**
+ * Attaches event listeners to reward elements
+ * @param {Array} rewards - Array of reward objects
+ */
 function initializeRewardsListeners() {
     addEventListenerSafely('rewardsManagementMenu', 'click', function(e) {
         e.preventDefault();
@@ -146,6 +152,8 @@ function initializeRewardsListeners() {
     createRewardBtn.className = 'btn btn-primary mb-3';
     createRewardBtn.innerHTML = '<i class="fas fa-plus"></i> Create Reward';
     createRewardBtn.addEventListener('click', showCreateRewardModal);
+
+    document.getElementById('createRewardBtn')?.addEventListener('click', showCreateRewardModal);
 
     // event listener for create reward button
     const filterSection = document.querySelector('.filter-section');
@@ -214,6 +222,24 @@ function showCreateRewardModal() {
     // Show modal
     $('#createRewardModal').modal('show');
 }
+function attachRewardEventListeners(rewards) {
+    if (!rewards) return;
+    
+    rewards.forEach(reward => {
+        // Approve button listener
+        const approveBtn = document.querySelector(`[data-approve-reward="${reward.id}"]`);
+        if (approveBtn) {
+            approveBtn.addEventListener('click', () => handleRewardAction(reward.id, 'approved'));
+        }
+
+        // Reject button listener
+        const rejectBtn = document.querySelector(`[data-reject-reward="${reward.id}"]`);
+        if (rejectBtn) {
+            rejectBtn.addEventListener('click', () => handleRewardAction(reward.id, 'rejected'));
+        }
+    });
+}
+
 
 /**
  * Loads active campaigns for the reward creation form
@@ -363,6 +389,73 @@ async function loadRewards(filters = {}) {
         hideLoading();
     }
 }
+
+function initializeRewardsManagement() {
+    // Add event listeners for filters
+    document.getElementById('rewardSearchBtn')?.addEventListener('click', loadRewards);
+    document.getElementById('rewardSearchGuest')?.addEventListener('keyup', e => {
+        if (e.key === 'Enter') loadRewards();
+    });
+    
+    // Load initial data
+    loadRewards();
+}
+
+/**
+ * Creates a table row for a reward
+ * @param {Object} reward - Reward object
+ * @returns {HTMLTableRowElement}
+ */
+function createRewardTableRow(reward) {
+    const tr = document.createElement('tr');
+    tr.innerHTML = `
+        <td>${moment(reward.createdAt).format('DD/MM/YYYY')}</td>
+        <td>${reward.guestName}<br><small>${reward.guestPhone}</small></td>
+        <td>${reward.campaignName}</td>
+        <td>${reward.receiptNumber || 'N/A'}</td>
+        <td>R${reward.receiptAmount.toFixed(2)}</td>
+        <td><span class="badge badge-${getStatusBadgeClass(reward.status)}">${reward.status}</span></td>
+        <td>
+            ${getActionButtons(reward)}
+        </td>
+    `;
+    return tr;
+}
+
+/**
+ * Returns appropriate badge class for status
+ * @param {string} status - Reward status
+ * @returns {string} Badge class
+ */
+function getStatusBadgeClass(status) {
+    const classes = {
+        pending: 'warning',
+        approved: 'success',
+        rejected: 'danger',
+        completed: 'info'
+    };
+    return classes[status] || 'secondary';
+}
+
+/**
+ * Returns HTML for action buttons based on reward status
+ * @param {Object} reward - Reward object
+ * @returns {string} HTML string
+ */
+function getActionButtons(reward) {
+    if (reward.status === 'pending') {
+        return `
+            <button class="btn btn-sm btn-success" data-approve-reward="${reward.id}">
+                <i class="fas fa-check"></i>
+            </button>
+            <button class="btn btn-sm btn-danger" data-reject-reward="${reward.id}">
+                <i class="fas fa-times"></i>
+            </button>
+        `;
+    }
+    return '<i class="fas fa-check-circle text-muted"></i>';
+}
+
 
 function handleRewardSearch() {
     const filters = {
