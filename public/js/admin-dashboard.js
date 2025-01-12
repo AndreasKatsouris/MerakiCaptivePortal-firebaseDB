@@ -422,20 +422,6 @@ function createRewardTableRow(reward) {
     return tr;
 }
 
-/**
- * Returns appropriate badge class for status
- * @param {string} status - Reward status
- * @returns {string} Badge class
- */
-function getStatusBadgeClass(status) {
-    const classes = {
-        pending: 'warning',
-        approved: 'success',
-        rejected: 'danger',
-        completed: 'info'
-    };
-    return classes[status] || 'secondary';
-}
 
 /**
  * Returns HTML for action buttons based on reward status
