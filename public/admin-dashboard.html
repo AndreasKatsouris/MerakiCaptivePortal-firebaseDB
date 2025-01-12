@@ -388,6 +388,61 @@
         </div>
     </div>
 </div>   
+<!-- end of loyalty settings section-->
+
+<!-- Rewards Management Section -->
+<div id="rewardsManagementContent" class="content-section" style="display: none;">
+    <h2>Rewards Management</h2>
+    
+    <!-- Search and Filter -->
+    <div class="filter-section mb-4">
+        <div class="row">
+            <div class="col-md-3">
+                <input type="text" id="rewardSearchGuest" class="form-control" placeholder="Search by Guest">
+            </div>
+            <div class="col-md-3">
+                <select id="rewardCampaignFilter" class="form-control">
+                    <option value="">All Campaigns</option>
+                    <!-- Dynamically populated -->
+                </select>
+            </div>
+            <div class="col-md-3">
+                <select id="rewardStatusFilter" class="form-control">
+                    <option value="">All Statuses</option>
+                    <option value="pending">Pending</option>
+                    <option value="approved">Approved</option>
+                    <option value="rejected">Rejected</option>
+                    <option value="completed">Completed</option>
+                </select>
+            </div>
+            <div class="col-md-3">
+                <button id="rewardSearchBtn" class="btn btn-primary">Search</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Rewards Table -->
+    <table id="rewardsTable" class="table">
+        <thead>
+            <tr>
+                <th>Date</th>
+                <th>Guest</th>
+                <th>Campaign</th>
+                <th>Receipt #</th>
+                <th>Amount</th>
+                <th>Status</th>
+                <th>Actions</th>
+            </tr>
+        </thead>
+        <tbody>
+            <!-- Dynamically populated -->
+        </tbody>
+    </table>
+</div>
+
+  <!-- End of Rewards Management Section -->
+
+  
 <!-- Receipt Management Section -->
 <div id="receiptManagementContent" class="content-section" style="display: none;">
     <div class="card">
@@ -473,57 +528,6 @@
         </div>
     </div>
 </div>
-
-<!-- Rewards Management Section -->
-<div id="rewardsManagementContent" class="content-section" style="display: none;">
-    <h2>Rewards Management</h2>
-    
-    <!-- Search and Filter -->
-    <div class="filter-section mb-4">
-        <div class="row">
-            <div class="col-md-3">
-                <input type="text" id="rewardSearchGuest" class="form-control" placeholder="Search by Guest">
-            </div>
-            <div class="col-md-3">
-                <select id="rewardCampaignFilter" class="form-control">
-                    <option value="">All Campaigns</option>
-                    <!-- Dynamically populated -->
-                </select>
-            </div>
-            <div class="col-md-3">
-                <select id="rewardStatusFilter" class="form-control">
-                    <option value="">All Statuses</option>
-                    <option value="pending">Pending</option>
-                    <option value="approved">Approved</option>
-                    <option value="rejected">Rejected</option>
-                    <option value="completed">Completed</option>
-                </select>
-            </div>
-            <div class="col-md-3">
-                <button id="rewardSearchBtn" class="btn btn-primary">Search</button>
-            </div>
-        </div>
-    </div>
-
-    <!-- Rewards Table -->
-    <table id="rewardsTable" class="table">
-        <thead>
-            <tr>
-                <th>Date</th>
-                <th>Guest</th>
-                <th>Campaign</th>
-                <th>Receipt #</th>
-                <th>Amount</th>
-                <th>Status</th>
-                <th>Actions</th>
-            </tr>
-        </thead>
-        <tbody>
-            <!-- Dynamically populated -->
-        </tbody>
-    </table>
-</div>
-
 
 <!-- Receipt Details Modal -->
 

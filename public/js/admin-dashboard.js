@@ -11,6 +11,7 @@ document.addEventListener('DOMContentLoaded', function () {
     initializeMenuListeners();
     initializeLoyaltyListeners();
     initializeCampaignListeners();
+    initializeRewardsListeners();
     initializeWiFiListeners();
     initializeLiveDataListeners();
     initializeDataDeletionListeners();
@@ -125,55 +126,188 @@ function initializeMenuListeners() {
     });
 }
 
-//========= Rewards Management Section =========
+// ==================== Rewards Management Section ====================
+function initializeRewardsListeners() {
+    addEventListenerSafely('rewardsManagementMenu', 'click', function(e) {
+        e.preventDefault();
+        displaySection('rewardsManagementContent');
+        loadRewards();
+    });
+
+    // Add to existing initializeLoyaltyListeners
+    addEventListenerSafely('rewardSearchBtn', 'click', handleRewardSearch);
+    addEventListenerSafely('rewardStatusFilter', 'change', handleRewardSearch);
+}
+
 async function loadRewards(filters = {}) {
-    const tableBody = document.querySelector('#rewardsTable tbody');
-    if (!tableBody) return;
+    console.log('Loading rewards...');
+    
+    const rewardsTable = document.querySelector('#rewardsTable tbody');
+    if (!rewardsTable) {
+        console.error('Rewards table not found in DOM');
+        return;
+    }
 
     try {
         showLoading();
+        rewardsTable.innerHTML = '<tr><td colspan="6" class="text-center">Loading rewards...</td></tr>';
+
         const snapshot = await firebase.database().ref('rewards').once('value');
         const rewards = snapshot.val();
+        
+        if (rewards && Object.keys(rewards).length > 0) {
+            rewardsTable.innerHTML = '';
+            
+            Object.entries(rewards)
+                .filter(([_, reward]) => {
+                    if (filters.guest && !reward.guestPhone?.includes(filters.guest)) return false;
+                    if (filters.campaign && reward.campaignId !== filters.campaign) return false;
+                    if (filters.status && reward.status !== filters.status) return false;
+                    return true;
+                })
+                .forEach(([rewardId, reward]) => {
+                    const row = document.createElement('tr');
+                    row.innerHTML = `
+                        <td>${new Date(reward.createdAt).toLocaleDateString()}</td>
+                        <td>${reward.guestName}<br><small>${reward.guestPhone}</small></td>
+                        <td>${reward.campaignName}</td>
+                        <td>R${reward.receiptAmount?.toFixed(2) || '0.00'}</td>
+                        <td>
+                            <span class="badge badge-${getStatusBadgeClass(reward.status)}">
+                                ${reward.status || 'pending'}
+                            </span>
+                        </td>
+                        <td>
+                            <div class="btn-group btn-group-sm">
+                                <button class="btn btn-info view-reward" data-id="${rewardId}">
+                                    <i class="fas fa-eye"></i>
+                                </button>
+                                ${reward.status === 'pending' ? `
+                                    <button class="btn btn-success approve-reward" data-id="${rewardId}">
+                                        <i class="fas fa-check"></i>
+                                    </button>
+                                    <button class="btn btn-danger reject-reward" data-id="${rewardId}">
+                                        <i class="fas fa-times"></i>
+                                    </button>
+                                ` : ''}
+                            </div>
+                        </td>
+                    `;
+                    rewardsTable.appendChild(row);
+                });
 
-        if (rewards) {
-            tableBody.innerHTML = '';
-            Object.entries(rewards).forEach(([id, reward]) => {
-                const row = document.createElement('tr');
-                row.innerHTML = `
-                    <td>${new Date(reward.createdAt).toLocaleDateString()}</td>
-                    <td>${reward.guestPhone || 'N/A'}</td>
-                    <td>${reward.campaignName || 'N/A'}</td>
-                    <td>R${reward.receiptAmount?.toFixed(2) || '0.00'}</td>
-                    <td>
-                        <span class="badge badge-${getStatusBadgeClass(reward.status)}">
-                            ${reward.status || 'pending'}
-                        </span>
-                    </td>
-                    <td>
-                        <button class="btn btn-sm btn-info view-reward" data-id="${id}">
-                            <i class="fas fa-eye"></i>
-                        </button>
-                        ${reward.status === 'pending' ? `
-                            <button class="btn btn-sm btn-success approve-reward" data-id="${id}">
-                                <i class="fas fa-check"></i>
-                            </button>
-                            <button class="btn btn-sm btn-danger reject-reward" data-id="${id}">
-                                <i class="fas fa-times"></i>
-                            </button>
-                        ` : ''}
-                    </td>
-                `;
-                tableBody.appendChild(row);
-            });
             attachRewardEventListeners();
         } else {
-            tableBody.innerHTML = '<tr><td colspan="6" class="text-center">No rewards found</td></tr>';
+            rewardsTable.innerHTML = '<tr><td colspan="6" class="text-center">No rewards found</td></tr>';
         }
     } catch (error) {
         console.error('Error loading rewards:', error);
-        tableBody.innerHTML = '<tr><td colspan="6" class="text-center text-danger">Error loading rewards</td></tr>';
+        rewardsTable.innerHTML = '<tr><td colspan="6" class="text-center text-danger">Error loading rewards</td></tr>';
     } finally {
         hideLoading();
+    }
+}
+
+function handleRewardSearch() {
+    const filters = {
+        guest: document.getElementById('rewardSearchGuest')?.value || '',
+        campaign: document.getElementById('rewardSearchCampaign')?.value || '',
+        status: document.getElementById('rewardStatusFilter')?.value || ''
+    };
+    loadRewards(filters);
+}
+
+function attachRewardEventListeners() {
+    document.querySelectorAll('.view-reward').forEach(button => {
+        button.addEventListener('click', () => {
+            const rewardId = button.getAttribute('data-id');
+            viewRewardDetails(rewardId);
+        });
+    });
+
+    document.querySelectorAll('.approve-reward').forEach(button => {
+        button.addEventListener('click', async () => {
+            const rewardId = button.getAttribute('data-id');
+            await handleRewardApproval(rewardId);
+        });
+    });
+
+    document.querySelectorAll('.reject-reward').forEach(button => {
+        button.addEventListener('click', async () => {
+            const rewardId = button.getAttribute('data-id');
+            await handleRewardRejection(rewardId);
+        });
+    });
+}
+
+async function viewRewardDetails(rewardId) {
+    try {
+        const snapshot = await firebase.database().ref(`rewards/${rewardId}`).once('value');
+        const reward = snapshot.val();
+        
+        if (!reward) throw new Error('Reward not found');
+        
+        // Show reward details in modal
+        showRewardModal(reward);
+    } catch (error) {
+        console.error('Error viewing reward:', error);
+        Swal.fire('Error', 'Failed to load reward details', 'error');
+    }
+}
+
+async function handleRewardApproval(rewardId) {
+    const result = await Swal.fire({
+        title: 'Approve Reward?',
+        text: 'This will mark the reward as approved',
+        icon: 'warning',
+        showCancelButton: true,
+        confirmButtonColor: '#28a745',
+        cancelButtonColor: '#6c757d',
+        confirmButtonText: 'Yes, approve it!'
+    });
+
+    if (result.isConfirmed) {
+        try {
+            await firebase.database().ref(`rewards/${rewardId}`).update({
+                status: 'approved',
+                approvedAt: Date.now()
+            });
+            loadRewards();
+            Swal.fire('Approved!', 'The reward has been approved.', 'success');
+        } catch (error) {
+            console.error('Error approving reward:', error);
+            Swal.fire('Error', 'Failed to approve reward', 'error');
+        }
+    }
+}
+
+async function handleRewardRejection(rewardId) {
+    const { value: reason } = await Swal.fire({
+        title: 'Reject Reward',
+        input: 'text',
+        inputLabel: 'Rejection Reason',
+        inputPlaceholder: 'Enter reason for rejection',
+        showCancelButton: true,
+        inputValidator: (value) => {
+            if (!value) {
+                return 'Please enter a reason for rejection';
+            }
+        }
+    });
+
+    if (reason) {
+        try {
+            await firebase.database().ref(`rewards/${rewardId}`).update({
+                status: 'rejected',
+                rejectedAt: Date.now(),
+                rejectionReason: reason
+            });
+            loadRewards();
+            Swal.fire('Rejected', 'The reward has been rejected', 'success');
+        } catch (error) {
+            console.error('Error rejecting reward:', error);
+            Swal.fire('Error', 'Failed to reject reward', 'error');
+        }
     }
 }
 
