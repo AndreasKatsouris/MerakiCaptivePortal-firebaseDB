@@ -477,13 +477,8 @@ function attachRewardEventListeners(rewards) {
         });
     }
 }
-    document.querySelectorAll('.reject-reward').forEach(button => {
-        button.addEventListener('click', async () => {
-            const rewardId = button.getAttribute('data-id');
-            await handleRewardRejection(rewardId);
-        });
-    });
-}
+
+
 
 async function viewRewardDetails(rewardId) {
     try {
