@@ -137,6 +137,162 @@ function initializeRewardsListeners() {
     // Add to existing initializeLoyaltyListeners
     addEventListenerSafely('rewardSearchBtn', 'click', handleRewardSearch);
     addEventListenerSafely('rewardStatusFilter', 'change', handleRewardSearch);
+
+    // event listener for save button
+    document.getElementById('saveRewardBtn').addEventListener('click', handleCreateReward); 
+    
+    // event listener for create reward button
+    const createRewardBtn = document.createElement('button');
+    createRewardBtn.className = 'btn btn-primary mb-3';
+    createRewardBtn.innerHTML = '<i class="fas fa-plus"></i> Create Reward';
+    createRewardBtn.addEventListener('click', showCreateRewardModal);
+
+    // event listener for create reward button
+    const filterSection = document.querySelector('.filter-section');
+    if (filterSection) {
+        filterSection.parentNode.insertBefore(createRewardBtn, filterSection);
+    }
+}
+/**
+ * Shows modal for creating a new reward
+ */
+function showCreateRewardModal() {
+    // Create modal if it doesn't exist
+    let modalElement = document.getElementById('createRewardModal');
+    if (!modalElement) {
+        const modalHtml = `
+            <div class="modal fade" id="createRewardModal" tabindex="-1">
+                <div class="modal-dialog">
+                    <div class="modal-content">
+                        <div class="modal-header">
+                            <h5 class="modal-title">Create New Reward</h5>
+                            <button type="button" class="close" data-dismiss="modal">
+                                <span>&times;</span>
+                            </button>
+                        </div>
+                        <div class="modal-body">
+                            <form id="createRewardForm">
+                                <div class="form-group">
+                                    <label>Guest Phone Number</label>
+                                    <input type="tel" class="form-control" id="rewardGuestPhone" required>
+                                </div>
+                                <div class="form-group">
+                                    <label>Guest Name</label>
+                                    <input type="text" class="form-control" id="rewardGuestName" required>
+                                </div>
+                                <div class="form-group">
+                                    <label>Campaign</label>
+                                    <select class="form-control" id="rewardCampaign" required>
+                                        <option value="">Select Campaign</option>
+                                    </select>
+                                </div>
+                                <div class="form-group">
+                                    <label>Receipt Amount</label>
+                                    <input type="number" class="form-control" id="rewardReceiptAmount" 
+                                        min="0" step="0.01" required>
+                                </div>
+                            </form>
+                        </div>
+                        <div class="modal-footer">
+                            <button type="button" class="btn btn-secondary" data-dismiss="modal">Cancel</button>
+                            <button type="button" class="btn btn-primary" id="saveRewardBtn">Create Reward</button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        `;
+        document.body.insertAdjacentHTML('beforeend', modalHtml);
+        modalElement = document.getElementById('createRewardModal');
+        
+        // Add event listener for save button
+        document.getElementById('saveRewardBtn').addEventListener('click', handleCreateReward);
+    }
+
+    // Load active campaigns into select
+    loadActiveCampaigns();
+    
+    // Show modal
+    $('#createRewardModal').modal('show');
+}
+
+/**
+ * Loads active campaigns for the reward creation form
+ */
+async function loadActiveCampaigns() {
+    try {
+        const snapshot = await firebase.database().ref('campaigns')
+            .orderByChild('status')
+            .equalTo('active')
+            .once('value');
+        
+        const campaigns = snapshot.val();
+        const select = document.getElementById('rewardCampaign');
+        select.innerHTML = '<option value="">Select Campaign</option>';
+        
+        if (campaigns) {
+            Object.entries(campaigns).forEach(([id, campaign]) => {
+                const option = document.createElement('option');
+                option.value = id;
+                option.textContent = campaign.name;
+                select.appendChild(option);
+            });
+        }
+    } catch (error) {
+        console.error('Error loading campaigns:', error);
+        Swal.fire('Error', 'Failed to load campaigns', 'error');
+    }
+}
+
+/**
+ * Handles the creation of a new reward
+ */
+async function handleCreateReward() {
+    try {
+        const form = document.getElementById('createRewardForm');
+        if (!form.checkValidity()) {
+            form.reportValidity();
+            return;
+        }
+
+        showLoading();
+
+        // Get form values
+        const guestPhone = document.getElementById('rewardGuestPhone').value;
+        const guestName = document.getElementById('rewardGuestName').value;
+        const campaignId = document.getElementById('rewardCampaign').value;
+        const receiptAmount = parseFloat(document.getElementById('rewardReceiptAmount').value);
+
+        // Get campaign details
+        const campaignSnapshot = await firebase.database().ref(`campaigns/${campaignId}`).once('value');
+        const campaign = campaignSnapshot.val();
+
+        // Create reward object
+        const reward = {
+            guestPhone,
+            guestName,
+            campaignId,
+            campaignName: campaign.name,
+            receiptAmount,
+            status: 'pending',
+            createdAt: Date.now()
+        };
+
+        // Save to Firebase
+        await firebase.database().ref('rewards').push(reward);
+
+        // Close modal and refresh list
+        $('#createRewardModal').modal('hide');
+        await loadRewards();
+
+        // Show success message
+        Swal.fire('Success', 'Reward created successfully', 'success');
+
+    } catch (error) {
+        console.error('Error creating reward:', error);
+        Swal.fire('Error', 'Failed to create reward', 'error');
+    } finally {
+        hideLoading();
+    }
 }
 
 async function loadRewards(filters = {}) {
