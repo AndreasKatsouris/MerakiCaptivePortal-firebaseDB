@@ -165,17 +165,16 @@ function initializeRewardsListeners() {
  * Shows modal for creating a new reward
  */
 function showCreateRewardModal() {
-    // Create modal if it doesn't exist
     let modalElement = document.getElementById('createRewardModal');
     if (!modalElement) {
         const modalHtml = `
-            <div class="modal fade" id="createRewardModal" tabindex="-1">
-                <div class="modal-dialog">
+            <div class="modal fade" id="createRewardModal" tabindex="-1" role="dialog">
+                <div class="modal-dialog" role="document">
                     <div class="modal-content">
                         <div class="modal-header">
                             <h5 class="modal-title">Create New Reward</h5>
-                            <button type="button" class="close" data-dismiss="modal">
-                                <span>&times;</span>
+                            <button type="button" class="close" data-dismiss="modal" aria-label="Close">
+                                <span aria-hidden="true">&times;</span>
                             </button>
                         </div>
                         <div class="modal-body">
@@ -211,16 +210,14 @@ function showCreateRewardModal() {
         `;
         document.body.insertAdjacentHTML('beforeend', modalHtml);
         modalElement = document.getElementById('createRewardModal');
-        
-        // Add event listener for save button
-        document.getElementById('saveRewardBtn').addEventListener('click', handleCreateReward);
     }
-
+    
     // Load active campaigns into select
     loadActiveCampaigns();
     
-    // Show modal
-    $('#createRewardModal').modal('show');
+    // Show modal with proper Bootstrap initialization
+    const modal = new bootstrap.Modal(modalElement);
+    modal.show();
 }
 
 
@@ -487,7 +484,7 @@ async function viewRewardDetails(rewardId) {
         
         if (!reward) throw new Error('Reward not found');
         
-        // Show reward details in modal
+        reward.id = rewardId; 
         showRewardModal(reward);
     } catch (error) {
         console.error('Error viewing reward:', error);
@@ -1940,7 +1937,7 @@ const receiptActions = {
             }
 
             // Setup action buttons
-            const actionButtonsContainer = document.getElementById('modalActionButtons');
+            const actionButtonsContainer = document.getElementById('modalActions');
             if (actionButtonsContainer) {
                 if (receipt.status === 'pending_validation') {
                     actionButtonsContainer.innerHTML = `
@@ -2238,4 +2235,72 @@ function initializeFilterListeners() {
             loadReceipts(filters);
         });
     }
+}
+
+/**
+ * Shows modal with reward details
+ * @param {Object} reward - Reward object to display
+ */
+function showRewardModal(reward) {
+    // Create modal if it doesn't exist
+    let modalElement = document.getElementById('rewardDetailsModal');
+    if (!modalElement) {
+        const modalHtml = `
+            <div class="modal fade" id="rewardDetailsModal" tabindex="-1" role="dialog">
+                <div class="modal-dialog" role="document">
+                    <div class="modal-content">
+                        <div class="modal-header">
+                            <h5 class="modal-title">Reward Details</h5>
+                            <button type="button" class="close" data-dismiss="modal" aria-label="Close">
+                                <span aria-hidden="true">&times;</span>
+                            </button>
+                        </div>
+                        <div class="modal-body">
+                            <div class="reward-details">
+                                <p><strong>Guest Name:</strong> <span id="modalGuestName"></span></p>
+                                <p><strong>Guest Phone:</strong> <span id="modalGuestPhone"></span></p>
+                                <p><strong>Campaign:</strong> <span id="modalCampaign"></span></p>
+                                <p><strong>Receipt Amount:</strong> R<span id="modalAmount"></span></p>
+                                <p><strong>Status:</strong> <span id="modalStatus"></span></p>
+                                <p><strong>Created:</strong> <span id="modalCreated"></span></p>
+                            </div>
+                        </div>
+                        <div class="modal-footer">
+                            <button type="button" class="btn btn-secondary" data-dismiss="modal">Close</button>
+                            <div id="modalActions"></div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        `;
+        document.body.insertAdjacentHTML('beforeend', modalHtml);
+        modalElement = document.getElementById('rewardDetailsModal');
+    }
+
+    // Populate modal with reward details
+    document.getElementById('modalGuestName').textContent = reward.guestName;
+    document.getElementById('modalGuestPhone').textContent = reward.guestPhone;
+    document.getElementById('modalCampaign').textContent = reward.campaignName;
+    document.getElementById('modalAmount').textContent = reward.receiptAmount.toFixed(2);
+    document.getElementById('modalStatus').textContent = reward.status;
+    document.getElementById('modalCreated').textContent = new Date(reward.createdAt).toLocaleString();
+
+    // Add action buttons if status is pending
+    const actionsContainer = document.getElementById('modalActions');
+    if (reward.status === 'pending') {
+        actionsContainer.innerHTML = `
+            <button type="button" class="btn btn-success" onclick="handleRewardApproval('${reward.id}')">
+                Approve
+            </button>
+            <button type="button" class="btn btn-danger" onclick="handleRewardRejection('${reward.id}')">
+                Reject
+            </button>
+        `;
+    } else {
+        actionsContainer.innerHTML = '';
+    }
+
+    // Show modal
+    const modal = new bootstrap.Modal(modalElement);
+    modal.show();
 }
