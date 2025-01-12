@@ -492,60 +492,166 @@ async function viewRewardDetails(rewardId) {
     }
 }
 
+/**
+ * Handles reward approval
+ * @param {string} rewardId - ID of the reward to approve
+ */
 async function handleRewardApproval(rewardId) {
-    const result = await Swal.fire({
-        title: 'Approve Reward?',
-        text: 'This will mark the reward as approved',
-        icon: 'warning',
-        showCancelButton: true,
-        confirmButtonColor: '#28a745',
-        cancelButtonColor: '#6c757d',
-        confirmButtonText: 'Yes, approve it!'
-    });
+    try {
+        const result = await Swal.fire({
+            title: 'Approve Reward?',
+            text: 'This will mark the reward as approved',
+            icon: 'question',
+            showCancelButton: true,
+            confirmButtonColor: '#28a745',
+            cancelButtonColor: '#6c757d',
+            confirmButtonText: 'Yes, approve it!'
+        });
 
-    if (result.isConfirmed) {
-        try {
+        if (result.isConfirmed) {
+            showLoading();
+            
+            // Update reward status in Firebase
             await firebase.database().ref(`rewards/${rewardId}`).update({
                 status: 'approved',
-                approvedAt: Date.now()
+                approvedAt: Date.now(),
+                approvedBy: firebase.auth().currentUser.uid
             });
-            loadRewards();
+
+            // Close any open modals
+            $('.modal').modal('hide');
+            
+            // Refresh rewards list
+            await loadRewards();
+            
             Swal.fire('Approved!', 'The reward has been approved.', 'success');
-        } catch (error) {
-            console.error('Error approving reward:', error);
-            Swal.fire('Error', 'Failed to approve reward', 'error');
         }
+    } catch (error) {
+        console.error('Error approving reward:', error);
+        Swal.fire('Error', 'Failed to approve reward', 'error');
+    } finally {
+        hideLoading();
     }
 }
 
+/**
+ * Handles reward rejection
+ * @param {string} rewardId - ID of the reward to reject
+ */
 async function handleRewardRejection(rewardId) {
-    const { value: reason } = await Swal.fire({
-        title: 'Reject Reward',
-        input: 'text',
-        inputLabel: 'Rejection Reason',
-        inputPlaceholder: 'Enter reason for rejection',
-        showCancelButton: true,
-        inputValidator: (value) => {
-            if (!value) {
-                return 'Please enter a reason for rejection';
+    try {
+        const result = await Swal.fire({
+            title: 'Reject Reward?',
+            text: 'Please provide a reason for rejection',
+            input: 'text',
+            icon: 'warning',
+            showCancelButton: true,
+            confirmButtonColor: '#dc3545',
+            cancelButtonColor: '#6c757d',
+            confirmButtonText: 'Yes, reject it!',
+            inputValidator: (value) => {
+                if (!value) {
+                    return 'You need to provide a reason!';
+                }
             }
-        }
-    });
+        });
 
-    if (reason) {
-        try {
+        if (result.isConfirmed) {
+            showLoading();
+            
+            // Update reward status in Firebase
             await firebase.database().ref(`rewards/${rewardId}`).update({
                 status: 'rejected',
                 rejectedAt: Date.now(),
-                rejectionReason: reason
+                rejectedBy: firebase.auth().currentUser.uid,
+                rejectionReason: result.value
             });
-            loadRewards();
-            Swal.fire('Rejected', 'The reward has been rejected', 'success');
-        } catch (error) {
-            console.error('Error rejecting reward:', error);
-            Swal.fire('Error', 'Failed to reject reward', 'error');
+
+            // Close any open modals
+            $('.modal').modal('hide');
+            
+            // Refresh rewards list
+            await loadRewards();
+            
+            Swal.fire('Rejected!', 'The reward has been rejected.', 'success');
         }
+    } catch (error) {
+        console.error('Error rejecting reward:', error);
+        Swal.fire('Error', 'Failed to reject reward', 'error');
+    } finally {
+        hideLoading();
     }
+}
+
+/**
+ * Shows modal with reward details - Updated for accessibility
+ * @param {Object} reward - Reward object to display
+ */
+function showRewardModal(reward) {
+    let modalElement = document.getElementById('rewardDetailsModal');
+    if (!modalElement) {
+        const modalHtml = `
+            <div class="modal fade" id="rewardDetailsModal" tabindex="-1" role="dialog" aria-labelledby="rewardDetailsModalLabel">
+                <div class="modal-dialog" role="document">
+                    <div class="modal-content">
+                        <div class="modal-header">
+                            <h5 class="modal-title" id="rewardDetailsModalLabel">Reward Details</h5>
+                            <button type="button" class="close" data-dismiss="modal" aria-label="Close">
+                                <span aria-hidden="true">&times;</span>
+                            </button>
+                        </div>
+                        <div class="modal-body">
+                            <div class="reward-details">
+                                <p><strong>Guest Name:</strong> <span id="modalGuestName"></span></p>
+                                <p><strong>Guest Phone:</strong> <span id="modalGuestPhone"></span></p>
+                                <p><strong>Campaign:</strong> <span id="modalCampaign"></span></p>
+                                <p><strong>Receipt Amount:</strong> R<span id="modalAmount"></span></p>
+                                <p><strong>Status:</strong> <span id="modalStatus"></span></p>
+                                <p><strong>Created:</strong> <span id="modalCreated"></span></p>
+                            </div>
+                        </div>
+                        <div class="modal-footer">
+                            <button type="button" class="btn btn-secondary" data-dismiss="modal">Close</button>
+                            <div id="modalActions"></div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        `;
+        document.body.insertAdjacentHTML('beforeend', modalHtml);
+        modalElement = document.getElementById('rewardDetailsModal');
+    }
+
+    // Populate modal with reward details
+    document.getElementById('modalGuestName').textContent = reward.guestName;
+    document.getElementById('modalGuestPhone').textContent = reward.guestPhone;
+    document.getElementById('modalCampaign').textContent = reward.campaignName;
+    document.getElementById('modalAmount').textContent = reward.receiptAmount.toFixed(2);
+    document.getElementById('modalStatus').textContent = reward.status;
+    document.getElementById('modalCreated').textContent = new Date(reward.createdAt).toLocaleString();
+
+    // Add action buttons if status is pending - Using event listeners instead of onclick
+    const actionsContainer = document.getElementById('modalActions');
+    if (reward.status === 'pending') {
+        actionsContainer.innerHTML = `
+            <button type="button" class="btn btn-success" id="approveRewardBtn">Approve</button>
+            <button type="button" class="btn btn-danger" id="rejectRewardBtn">Reject</button>
+        `;
+        
+        // Add event listeners
+        document.getElementById('approveRewardBtn')?.addEventListener('click', () => handleRewardApproval(reward.id));
+        document.getElementById('rejectRewardBtn')?.addEventListener('click', () => handleRewardRejection(reward.id));
+    } else {
+        actionsContainer.innerHTML = '';
+    }
+
+    // Show modal using Bootstrap's API
+    const modal = new bootstrap.Modal(modalElement, {
+        keyboard: true,
+        backdrop: true,
+        focus: true
+    });
+    modal.show();
 }
 
 // ==================== Campaign Management Section ====================
@@ -2235,72 +2341,4 @@ function initializeFilterListeners() {
             loadReceipts(filters);
         });
     }
-}
-
-/**
- * Shows modal with reward details
- * @param {Object} reward - Reward object to display
- */
-function showRewardModal(reward) {
-    // Create modal if it doesn't exist
-    let modalElement = document.getElementById('rewardDetailsModal');
-    if (!modalElement) {
-        const modalHtml = `
-            <div class="modal fade" id="rewardDetailsModal" tabindex="-1" role="dialog">
-                <div class="modal-dialog" role="document">
-                    <div class="modal-content">
-                        <div class="modal-header">
-                            <h5 class="modal-title">Reward Details</h5>
-                            <button type="button" class="close" data-dismiss="modal" aria-label="Close">
-                                <span aria-hidden="true">&times;</span>
-                            </button>
-                        </div>
-                        <div class="modal-body">
-                            <div class="reward-details">
-                                <p><strong>Guest Name:</strong> <span id="modalGuestName"></span></p>
-                                <p><strong>Guest Phone:</strong> <span id="modalGuestPhone"></span></p>
-                                <p><strong>Campaign:</strong> <span id="modalCampaign"></span></p>
-                                <p><strong>Receipt Amount:</strong> R<span id="modalAmount"></span></p>
-                                <p><strong>Status:</strong> <span id="modalStatus"></span></p>
-                                <p><strong>Created:</strong> <span id="modalCreated"></span></p>
-                            </div>
-                        </div>
-                        <div class="modal-footer">
-                            <button type="button" class="btn btn-secondary" data-dismiss="modal">Close</button>
-                            <div id="modalActions"></div>
-                        </div>
-                    </div>
-                </div>
-            </div>
-        `;
-        document.body.insertAdjacentHTML('beforeend', modalHtml);
-        modalElement = document.getElementById('rewardDetailsModal');
-    }
-
-    // Populate modal with reward details
-    document.getElementById('modalGuestName').textContent = reward.guestName;
-    document.getElementById('modalGuestPhone').textContent = reward.guestPhone;
-    document.getElementById('modalCampaign').textContent = reward.campaignName;
-    document.getElementById('modalAmount').textContent = reward.receiptAmount.toFixed(2);
-    document.getElementById('modalStatus').textContent = reward.status;
-    document.getElementById('modalCreated').textContent = new Date(reward.createdAt).toLocaleString();
-
-    // Add action buttons if status is pending
-    const actionsContainer = document.getElementById('modalActions');
-    if (reward.status === 'pending') {
-        actionsContainer.innerHTML = `
-            <button type="button" class="btn btn-success" onclick="handleRewardApproval('${reward.id}')">
-                Approve
-            </button>
-            <button type="button" class="btn btn-danger" onclick="handleRewardRejection('${reward.id}')">
-                Reject
-            </button>
-        `;
-    } else {
-        actionsContainer.innerHTML = '';
-    }
-
-    // Show modal
-    const modal = new bootstrap.Modal(modalElement);
-    modal.show();
 }
