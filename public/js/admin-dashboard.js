@@ -76,6 +76,14 @@ function initializeLoyaltyListeners() {
         e.preventDefault();
         displaySection('loyaltySettingsContent');
     });
+
+    // Rewards Management
+    addEventListenerSafely('rewardsManagementMenu', 'click', function(e) {
+        e.preventDefault();
+        displaySection('rewardsManagementContent');
+        loadRewards();
+    });
+
 }
 
 // Status Badge Colors
@@ -115,6 +123,58 @@ function initializeMenuListeners() {
             }
         });
     });
+}
+
+//========= Rewards Management Section =========
+async function loadRewards(filters = {}) {
+    const tableBody = document.querySelector('#rewardsTable tbody');
+    if (!tableBody) return;
+
+    try {
+        showLoading();
+        const snapshot = await firebase.database().ref('rewards').once('value');
+        const rewards = snapshot.val();
+
+        if (rewards) {
+            tableBody.innerHTML = '';
+            Object.entries(rewards).forEach(([id, reward]) => {
+                const row = document.createElement('tr');
+                row.innerHTML = `
+                    <td>${new Date(reward.createdAt).toLocaleDateString()}</td>
+                    <td>${reward.guestPhone || 'N/A'}</td>
+                    <td>${reward.campaignName || 'N/A'}</td>
+                    <td>R${reward.receiptAmount?.toFixed(2) || '0.00'}</td>
+                    <td>
+                        <span class="badge badge-${getStatusBadgeClass(reward.status)}">
+                            ${reward.status || 'pending'}
+                        </span>
+                    </td>
+                    <td>
+                        <button class="btn btn-sm btn-info view-reward" data-id="${id}">
+                            <i class="fas fa-eye"></i>
+                        </button>
+                        ${reward.status === 'pending' ? `
+                            <button class="btn btn-sm btn-success approve-reward" data-id="${id}">
+                                <i class="fas fa-check"></i>
+                            </button>
+                            <button class="btn btn-sm btn-danger reject-reward" data-id="${id}">
+                                <i class="fas fa-times"></i>
+                            </button>
+                        ` : ''}
+                    </td>
+                `;
+                tableBody.appendChild(row);
+            });
+            attachRewardEventListeners();
+        } else {
+            tableBody.innerHTML = '<tr><td colspan="6" class="text-center">No rewards found</td></tr>';
+        }
+    } catch (error) {
+        console.error('Error loading rewards:', error);
+        tableBody.innerHTML = '<tr><td colspan="6" class="text-center text-danger">Error loading rewards</td></tr>';
+    } finally {
+        hideLoading();
+    }
 }
 
 // ==================== Campaign Management Section ====================
@@ -359,6 +419,10 @@ async function viewCampaignDetails(campaignId) {
                                 <td>${campaign.brandName}</td>
                             </tr>
                             <tr>
+                                <th>Store</th>
+                                <td>${campaign.storeName || 'All Stores'}</td>
+                            </tr>
+                            <tr>
                                 <th>Start Date</th>
                                 <td>${startDate}</td>
                             </tr>
@@ -455,6 +519,7 @@ async function editCampaign(campaignId) {
         // Populate form fields
         document.getElementById('campaignName').value = campaign.name || '';
         document.getElementById('brandName').value = campaign.brandName || '';
+        document.getElementById('storeName').value = campaign.storeName || '';
         document.getElementById('startDate').value = campaign.startDate || '';
         document.getElementById('endDate').value = campaign.endDate || '';
 
@@ -536,8 +601,10 @@ async function loadCampaigns() {
                 row.innerHTML = `
             <td>${campaign.name || 'Unnamed Campaign'}</td>
             <td>${campaign.brandName || 'No Brand'}</td>
+            <td>${campaign.storeName || 'All Stores'}</td>
             <td>${formattedStartDate}</td>
             <td>${formattedEndDate}</td>
+
             <td>
                 <div class="custom-control custom-switch">
                     <input type="checkbox" class="custom-control-input status-toggle" 
