@@ -145,7 +145,7 @@ function initializeRewardsListeners() {
     addEventListenerSafely('rewardStatusFilter', 'change', handleRewardSearch);
 
     // event listener for save button
-    document.getElementById('saveRewardBtn').addEventListener('click', handleCreateReward); 
+    //document.getElementById('saveRewardBtn').addEventListener('click', handleCreateReward); 
     
     // event listener for create reward button
     const createRewardBtn = document.createElement('button');
