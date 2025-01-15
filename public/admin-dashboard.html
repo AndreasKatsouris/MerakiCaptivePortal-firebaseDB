@@ -38,10 +38,15 @@
     </button>
     <!-- Header -->
     <div class="main-header">
+        <button id="mobileSidebarToggle" class="d-md-none mobile-menu-toggle">
+            <i class="fas fa-bars"></i>
+        </button>
+        
         <div class="header-search">
             <i class="fas fa-search"></i>
             <input type="text" placeholder="Search...">
         </div>
+        
         <div class="header-actions">
             <div class="notifications">
                 <i class="fas fa-bell"></i>
@@ -49,7 +54,7 @@
             </div>
             <div class="user-profile">
                 <img src="/images/avatar.png" alt="User Avatar">
-                <span>Admin User</span>
+                <span class="d-none d-md-inline">Admin User</span>
             </div>
         </div>
     </div>
