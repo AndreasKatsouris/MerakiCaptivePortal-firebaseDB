@@ -32,6 +32,10 @@
 
 </head>
 <body>
+    <div class="sidebar-overlay" id="sidebarOverlay"></div>
+    <button id="mobileSidebarToggle" class="d-md-none mobile-menu-toggle">
+        <i class="fas fa-bars"></i>
+    </button>
     <!-- Header -->
     <div class="main-header">
         <div class="header-search">
@@ -51,10 +55,12 @@
     </div>
     <!-- End of Header-->
     <!-- Sidebar -->
-    <div class="sidebar">
+    <div class="sidebar" id="sidebar">
         <div class="sidebar-header">
-            <img src="/images/logo.png" alt="RDP Logo" class="logo">
             <h3>RDP Admin</h3>
+            <button class="d-md-none close-sidebar">
+                <i class="fas fa-times"></i>
+            </button>
         </div>
         <nav class="sidebar-nav">
             <ul>

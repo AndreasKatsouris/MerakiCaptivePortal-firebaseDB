@@ -284,3 +284,154 @@
       left: 0;
     }
   }
+  /* Mobile Menu Toggle Button */
+.mobile-menu-toggle {
+  position: fixed;
+  top: 1rem;
+  left: 1rem;
+  z-index: 1040;
+  background: var(--primary);
+  color: white;
+  border: none;
+  padding: 0.5rem;
+  border-radius: 4px;
+  width: 40px;
+  height: 40px;
+  display: none;
+}
+
+/* Mobile Responsive Adjustments */
+@media (max-width: 768px) {
+  .mobile-menu-toggle {
+      display: block;
+  }
+
+  .sidebar {
+      position: fixed;
+      left: -100%;
+      top: 0;
+      bottom: 0;
+      width: 80%;
+      max-width: 300px;
+      z-index: 1050;
+      transition: left 0.3s ease;
+      background: white;
+      box-shadow: 2px 0 5px rgba(0,0,0,0.1);
+  }
+
+  .sidebar.active {
+      left: 0;
+  }
+
+  .content {
+      margin-left: 0;
+      padding: 1rem;
+      margin-top: 70px;
+  }
+
+  .main-header {
+      left: 0;
+      padding: 0.5rem;
+  }
+
+  /* Dashboard Cards */
+  .dashboard-stats .card {
+      margin-bottom: 1rem;
+  }
+
+  /* Tables */
+  .table-responsive {
+      overflow-x: auto;
+  }
+
+  /* Charts */
+  .chart-container {
+      height: 300px !important;
+      margin-bottom: 2rem;
+  }
+
+  /* Modals */
+  .modal-dialog {
+      margin: 0.5rem;
+      max-width: calc(100% - 1rem);
+  }
+
+  /* Form Groups */
+  .form-group {
+      margin-bottom: 1rem;
+  }
+
+  /* Buttons */
+  .btn-group {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.5rem;
+  }
+
+  /* Filter sections */
+  .filter-section {
+      flex-direction: column;
+  }
+
+  .filter-section .form-group {
+      width: 100%;
+      margin-right: 0;
+      margin-bottom: 1rem;
+  }
+}
+
+/* Sidebar Header for Mobile */
+.sidebar-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 1rem;
+  border-bottom: 1px solid var(--border);
+}
+
+.close-sidebar {
+  display: none;
+  background: none;
+  border: none;
+  color: var(--text);
+  font-size: 1.5rem;
+  padding: 0.5rem;
+}
+
+@media (max-width: 768px) {
+  .close-sidebar {
+      display: block;
+  }
+}
+
+/* Improved Table Responsiveness */
+@media (max-width: 576px) {
+  .table-responsive-sm {
+      display: block;
+      width: 100%;
+      overflow-x: auto;
+      -webkit-overflow-scrolling: touch;
+  }
+
+  .table td, .table th {
+      min-width: 100px;
+  }
+}
+/* Sidebar Overlay */
+.sidebar-overlay {
+  display: none;
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0,0,0,0.5);
+  z-index: 1040;
+}
+
+/* Show overlay when sidebar is active on mobile */
+@media (max-width: 768px) {
+  .sidebar-overlay.active {
+      display: block;
+  }
+}

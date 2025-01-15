@@ -16,6 +16,7 @@ document.addEventListener('DOMContentLoaded', function () {
     initializeWiFiListeners();
     initializeLiveDataListeners();
     initializeDataDeletionListeners();
+    initializeMobileMenu();
 });
 
 // ==================== Authentication Section ====================
@@ -703,6 +704,8 @@ function initializeCampaignListeners() {
         });
     }
 
+    // Add cancel edit button listener
+    addEventListenerSafely('cancelEditButton', 'click', handleCancelEdit);
 }
 function addRequiredItem(name, quantity) {
     const itemsList = document.getElementById('requiredItemsList');
@@ -2298,11 +2301,7 @@ document.addEventListener('keydown', function(e) {
     }
 });
 
-// Initialize logging when the document is ready
-document.addEventListener('DOMContentLoaded', function() {
-    initializeLogging();
-    // ... rest of your initialization code
-});
+
 
 // Document ready handler
 document.addEventListener('DOMContentLoaded', function() {
@@ -2341,4 +2340,44 @@ function initializeFilterListeners() {
             loadReceipts(filters);
         });
     }
+}
+
+// Add this function to handle cancel edit action
+function handleCancelEdit() {
+    resetCampaignForm();
+    $('#campaignFormModal').modal('hide');
+}
+function initializeMobileMenu() {
+    const sidebar = document.getElementById('sidebar');
+    const toggleButton = document.getElementById('mobileSidebarToggle');
+    const closeButton = document.querySelector('.close-sidebar');
+    const overlay = document.querySelector('.sidebar-overlay');
+
+    // Toggle menu
+    toggleButton?.addEventListener('click', () => {
+        sidebar.classList.add('active');
+        overlay.classList.add('active');
+    });
+
+    // Close menu
+    closeButton?.addEventListener('click', () => {
+        sidebar.classList.remove('active');
+        overlay.classList.remove('active');
+    });
+
+    // Close menu when clicking overlay
+    overlay?.addEventListener('click', () => {
+        sidebar.classList.remove('active');
+        overlay.classList.remove('active');
+    });
+
+    // Close menu when clicking menu items on mobile
+    document.querySelectorAll('.sidebar .nav-link').forEach(link => {
+        link.addEventListener('click', () => {
+            if (window.innerWidth <= 768) {
+                sidebar.classList.remove('active');
+                overlay.classList.remove('active');
+            }
+        });
+    });
 }
