@@ -29,6 +29,7 @@
     <!-- Application scripts (after all dependencies) -->
     <script type="module" src="js/dashboard.js"></script>
     <script type="module" src="js/admin-dashboard.js"></script>
+    <script type="module" src="js/project-management.js"></script>
 
 </head>
 <body>
@@ -145,9 +146,19 @@
             </div>
         </div>
 <!-- Project Management Section-->        
-        <div id="projectManagementContent" class="content-section" style="display: none;">
-            <div id="projectManagementRoot"></div>
+<div id="projectManagementContent" class="content-section" style="display: none;">
+    <div class="container-fluid">
+        <div class="d-flex justify-content-between align-items-center mb-4">
+            <h2>Project Management</h2>
+            <button class="btn btn-primary" onclick="showAddProjectModal()">
+                <i class="fas fa-plus"></i> New Project
+            </button>
         </div>
+        <div id="projectsList">
+            <!-- Projects will be rendered here -->
+        </div>
+    </div>
+</div>
         <!-- Quick Stats Section -->
         <div class="row mb-4">
             <div class="col-md-3">
