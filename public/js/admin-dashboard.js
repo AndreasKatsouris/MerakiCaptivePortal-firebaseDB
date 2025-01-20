@@ -1,4 +1,5 @@
 import { updateDashboardStats, initializeDashboardListeners } from './dashboard.js';
+import { initializeProjectManagement } from './project-management.js';
 
 window.addEventListener('error', function(e) {
     console.error('Global error:', e.error);
