@@ -17,6 +17,7 @@ document.addEventListener('DOMContentLoaded', function () {
     initializeLiveDataListeners();
     initializeDataDeletionListeners();
     initializeMobileMenu();
+    initializeProjectManagement();
 });
 
 // ==================== Authentication Section ====================

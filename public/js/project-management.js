@@ -278,6 +278,3 @@ function hideLoading() {
     // This function is just a placeholder since the loading
     // will be hidden when content is rendered
 }
-
-// Initialize when document is ready
-document.addEventListener('DOMContentLoaded', initializeProjectManagement);
