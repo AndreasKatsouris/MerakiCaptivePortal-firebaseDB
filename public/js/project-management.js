@@ -1,5 +1,11 @@
-// Export the initialization function
+// Export necessary functions
+export {
+    initializeProjectManagement,
+    createProject,
+    createTask
+};
 export function initializeProjectManagement() {
+    // Project menu click handler
     const projectManagementMenu = document.getElementById('projectManagementMenu');
     if (projectManagementMenu) {
         projectManagementMenu.addEventListener('click', function(e) {
@@ -16,6 +22,15 @@ export function initializeProjectManagement() {
             loadProjects();
         });
     }
+
+    // Add project button click handler
+    const addProjectBtn = document.getElementById('addProjectBtn');
+    if (addProjectBtn) {
+        addProjectBtn.addEventListener('click', showAddProjectModal);
+    }
+
+    // Initialize other project management listeners
+    initializeProjectListeners();
 }
 
 // Helper functions for UI feedback
@@ -131,7 +146,7 @@ function renderProjects() {
                     ${renderProjectTasks(project.id)}
                 </div>
                 <div class="mt-3">
-                    <button class="btn btn-sm btn-primary" onclick="showAddTaskModal('${project.id}')">
+                    <button class="btn btn-sm btn-primary add-task-btn" data-project-id="${project.id}">
                         <i class="fas fa-plus"></i> Add Task
                     </button>
                 </div>
@@ -237,6 +252,26 @@ function showAddProjectModal() {
             createProject(result.value);
         }
     });
+}
+
+function initializeProjectListeners() {
+    // Add event delegation for dynamically added elements
+    document.addEventListener('click', function(e) {
+        // Handle add task button clicks
+        if (e.target.closest('.add-task-btn')) {
+            const button = e.target.closest('.add-task-btn');
+            const projectId = button.getAttribute('data-project-id');
+            if (projectId) {
+                showAddTaskModal(projectId);
+            }
+        }
+    });
+
+    // Initialize add project button
+    const addProjectBtn = document.getElementById('addProjectBtn');
+    if (addProjectBtn) {
+        addProjectBtn.addEventListener('click', showAddProjectModal);
+    }
 }
 
 function showAddTaskModal(projectId) {
