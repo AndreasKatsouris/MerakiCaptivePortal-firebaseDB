@@ -4,7 +4,7 @@ export {
     createProject,
     createTask
 };
-export function initializeProjectManagement() {
+function initializeProjectManagement() {
     // Project menu click handler
     const projectManagementMenu = document.getElementById('projectManagementMenu');
     if (projectManagementMenu) {
