@@ -1,13 +1,5 @@
 // Reward Types Module
 
-// Export necessary functions
-export {
-    initializeRewardTypes,
-    createRewardType,
-    updateRewardType,
-    deleteRewardType
-};
-
 // Rewards Type Management State
 const rewardTypesState = {
     types: [],
@@ -253,6 +245,17 @@ async function updateRewardType(typeId, typeData) {
     }
 }
 
+async function deleteRewardType(typeId) {
+    try {
+        await firebase.database().ref(`rewardTypes/${typeId}`).remove();
+        return true;
+    } catch (error) {
+        console.error('Error deleting reward type:', error);
+        showError('Failed to delete reward type');
+        return false;
+    }
+}
+
 // Helper functions
 function formatRewardValue(type) {
     switch (type.category) {
@@ -309,3 +312,11 @@ function showLoading() {
 function hideLoading() {
     // Loading will be hidden when content is rendered
 }
+
+// Export the functions after they are defined
+export {
+    initializeRewardTypes,
+    createRewardType,
+    updateRewardType,
+    deleteRewardType
+};
