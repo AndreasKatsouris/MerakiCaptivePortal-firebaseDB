@@ -1,3 +1,35 @@
+// Add these missing functions for project and task creation
+async function createProject(projectData) {
+    try {
+        const projectRef = firebase.database().ref('projects').push();
+        await projectRef.set({
+            ...projectData,
+            createdAt: Date.now()
+        });
+        await loadProjects();
+        return true;
+    } catch (error) {
+        console.error('Error creating project:', error);
+        return false;
+    }
+}
+
+async function createTask(taskData) {
+    try {
+        const taskRef = firebase.database().ref(`tasks/${taskData.projectId}`).push();
+        await taskRef.set({
+            ...taskData,
+            createdAt: Date.now()
+        });
+        await loadProjectTasks();
+        renderProjects();
+        return true;
+    } catch (error) {
+        console.error('Error creating task:', error);
+        return false;
+    }
+}
+
 // Export necessary functions
 export {
     initializeProjectManagement,
