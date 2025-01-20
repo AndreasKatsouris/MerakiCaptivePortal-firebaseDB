@@ -75,27 +75,6 @@ export {
     createProject,
     createTask
 };
-
-// Main initialization function
-function initializeProjectManagement() {
-    // Project menu click handler
-    const projectManagementMenu = document.getElementById('projectManagementMenu');
-    if (projectManagementMenu) {
-        projectManagementMenu.addEventListener('click', function(e) {
-            e.preventDefault();
-            document.querySelectorAll('.content-section').forEach(section => {
-                section.style.display = 'none';
-            });
-            const projectSection = document.getElementById('projectManagementContent');
-            if (projectSection) {
-                projectSection.style.display = 'block';
-            }
-            loadProjects();
-        });
-    }
-
-    initializeProjectListeners();
-}
 async function loadProjectTasks() {
     try {
         const tasksData = [];
@@ -118,6 +97,27 @@ async function loadProjectTasks() {
         showError('Failed to load project tasks');
     }
 }
+// Main initialization function
+function initializeProjectManagement() {
+    // Project menu click handler
+    const projectManagementMenu = document.getElementById('projectManagementMenu');
+    if (projectManagementMenu) {
+        projectManagementMenu.addEventListener('click', function(e) {
+            e.preventDefault();
+            document.querySelectorAll('.content-section').forEach(section => {
+                section.style.display = 'none';
+            });
+            const projectSection = document.getElementById('projectManagementContent');
+            if (projectSection) {
+                projectSection.style.display = 'block';
+            }
+            loadProjects();
+        });
+    }
+
+    initializeProjectListeners();
+}
+
 
 // Initialize project-related event listeners
 function initializeProjectListeners() {
