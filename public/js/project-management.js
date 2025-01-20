@@ -37,6 +37,34 @@ function showAddProjectModal() {
     });
 }
 
+function showAddTaskModal(projectId) {
+    Swal.fire({
+        title: 'Add New Task',
+        html: `
+            <input id="taskDescription" class="swal2-input" placeholder="Task Description">
+            <select id="taskPriority" class="swal2-select">
+                <option value="low">Low Priority</option>
+                <option value="medium">Medium Priority</option>
+                <option value="high">High Priority</option>
+            </select>
+        `,
+        showCancelButton: true,
+        confirmButtonText: 'Add Task',
+        preConfirm: () => {
+            return {
+                projectId: projectId,
+                description: document.getElementById('taskDescription').value,
+                priority: document.getElementById('taskPriority').value,
+                status: 'todo'
+            };
+        }
+    }).then((result) => {
+        if (result.isConfirmed) {
+            createTask(result.value);
+        }
+    });
+}
+
 // Add these missing functions for project and task creation
 async function createProject(projectData) {
     try {
