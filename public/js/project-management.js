@@ -12,11 +12,22 @@ function addEventListenerSafely(elementId, event, handler) {
 
 function initializeProjectManagement() {
     // Add event listener for the menu item
-    addEventListenerSafely('projectManagementMenu', 'click', function(e) {
-        e.preventDefault();
-        displaySection('projectManagementContent');
-        loadProjects();
-    });
+    const projectManagementMenu = document.getElementById('projectManagementMenu');
+    if (projectManagementMenu) {
+        projectManagementMenu.addEventListener('click', function(e) {
+            e.preventDefault();
+            // Hide all content sections
+            document.querySelectorAll('.content-section').forEach(section => {
+                section.style.display = 'none';
+            });
+            // Show project management section
+            const projectSection = document.getElementById('projectManagementContent');
+            if (projectSection) {
+                projectSection.style.display = 'block';
+            }
+            loadProjects();
+        });
+    }
 }
 
 // Project Management State
