@@ -1,5 +1,15 @@
 // project-management.js
 
+// Helper function to safely add event listeners
+function addEventListenerSafely(elementId, event, handler) {
+    const element = document.getElementById(elementId);
+    if (element) {
+        element.addEventListener(event, handler);
+    } else {
+        console.warn(`Element with id '${elementId}' not found`);
+    }
+}
+
 function initializeProjectManagement() {
     // Add event listener for the menu item
     addEventListenerSafely('projectManagementMenu', 'click', function(e) {
@@ -217,6 +227,45 @@ function showAddTaskModal(projectId) {
             createTask(result.value);
         }
     });
+}
+
+// Helper functions for UI feedback
+function showError(message) {
+    Swal.fire({
+        icon: 'error',
+        title: 'Error',
+        text: message
+    });
+}
+
+function showNoProjectsMessage() {
+    const container = document.getElementById('projectsList');
+    if (container) {
+        container.innerHTML = `
+            <div class="alert alert-info">
+                <i class="fas fa-info-circle"></i>
+                No projects found. Click the "New Project" button to create one.
+            </div>
+        `;
+    }
+}
+
+function showLoading() {
+    const container = document.getElementById('projectsList');
+    if (container) {
+        container.innerHTML = `
+            <div class="text-center">
+                <div class="spinner-border" role="status">
+                    <span class="sr-only">Loading...</span>
+                </div>
+            </div>
+        `;
+    }
+}
+
+function hideLoading() {
+    // This function is just a placeholder since the loading
+    // will be hidden when content is rendered
 }
 
 // Initialize when document is ready
