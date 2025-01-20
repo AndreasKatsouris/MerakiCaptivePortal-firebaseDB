@@ -1,3 +1,42 @@
+// Project Management State
+const projectManagement = {
+    projects: [],
+    tasks: [],
+    currentFilters: {
+        status: '',
+        priority: ''
+    }
+};
+
+// Project Modal Functions
+function showAddProjectModal() {
+    Swal.fire({
+        title: 'Create New Project',
+        html: `
+            <input id="projectName" class="swal2-input" placeholder="Project Name">
+            <textarea id="projectDescription" class="swal2-textarea" placeholder="Project Description"></textarea>
+            <select id="projectStatus" class="swal2-select">
+                <option value="planned">Planned</option>
+                <option value="in_progress">In Progress</option>
+                <option value="completed">Completed</option>
+            </select>
+        `,
+        showCancelButton: true,
+        confirmButtonText: 'Create',
+        preConfirm: () => {
+            return {
+                name: document.getElementById('projectName').value,
+                description: document.getElementById('projectDescription').value,
+                status: document.getElementById('projectStatus').value
+            };
+        }
+    }).then((result) => {
+        if (result.isConfirmed) {
+            createProject(result.value);
+        }
+    });
+}
+
 // Add these missing functions for project and task creation
 async function createProject(projectData) {
     try {
