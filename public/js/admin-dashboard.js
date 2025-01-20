@@ -1,5 +1,6 @@
 import { updateDashboardStats, initializeDashboardListeners } from './dashboard.js';
 import { initializeProjectManagement } from './project-management.js';
+import { initializeRewardTypes } from './reward-types.js';
 
 window.addEventListener('error', function(e) {
     console.error('Global error:', e.error);
@@ -19,6 +20,7 @@ document.addEventListener('DOMContentLoaded', function () {
     initializeDataDeletionListeners();
     initializeMobileMenu();
     initializeProjectManagement();
+    initializeRewardTypes();
 });
 
 // ==================== Authentication Section ====================

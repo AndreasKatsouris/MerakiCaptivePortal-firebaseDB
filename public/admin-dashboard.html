@@ -103,7 +103,18 @@
                     <ul class="collapse submenu" id="loyaltySubmenu">
                         <li><a href="#" id="campaignManagementMenu">Campaigns</a></li>
                         <li><a href="#" id="receiptScanningMenu">Receipts</a></li>
-                        <li><a href="#" id="rewardsManagementMenu">Rewards</a></li>
+                        <!-- <li><a href="#" id="rewardsManagementMenu">Rewards</a></li> -->
+                        <li class="nav-item">
+                            <a href="#" class="nav-link" data-toggle="collapse" data-target="#rewardsSubmenu">
+                                <i class="fas fa-gift"></i>
+                                <span>Rewards</span>
+                                <i class="fas fa-chevron-down"></i>
+                            </a>
+                            <ul class="collapse submenu" id="rewardsSubmenu">
+                                <li><a href="#" id="rewardsManagementMenu">Manage Rewards</a></li>
+                                <li><a href="#" id="rewardTypesMenu">Reward Types</a></li>
+                            </ul>
+                        </li>
                         <li><a href="#" id="loyaltySettingsMenu">Settings</a></li>
                     </ul>
                 </li>
@@ -475,6 +486,19 @@
             <!-- Dynamically populated -->
         </tbody>
     </table>
+</div>
+<div id="rewardTypesContent" class="content-section" style="display: none;"></div>
+    <div class="container-fluid">
+        <div class="d-flex justify-content-between align-items-center mb-4">
+            <h2>Reward Types</h2>
+            <button id="addRewardTypeBtn" class="btn btn-primary">
+                <i class="fas fa-plus"></i> New Reward Type
+            </button>
+        </div>
+        <div id="rewardTypesList">
+            <!-- Reward types will be rendered here -->
+        </div>
+    </div>
 </div>
 
   <!-- End of Rewards Management Section -->
