@@ -96,6 +96,28 @@ function initializeProjectManagement() {
 
     initializeProjectListeners();
 }
+async function loadProjectTasks() {
+    try {
+        const tasksData = [];
+        for (const project of projectManagement.projects) {
+            const snapshot = await firebase.database().ref(`tasks/${project.id}`).once('value');
+            const projectTasks = snapshot.val();
+            if (projectTasks) {
+                Object.entries(projectTasks).forEach(([taskId, taskData]) => {
+                    tasksData.push({
+                        id: taskId,
+                        projectId: project.id,
+                        ...taskData
+                    });
+                });
+            }
+        }
+        projectManagement.tasks = tasksData;
+    } catch (error) {
+        console.error('Error loading tasks:', error);
+        showError('Failed to load project tasks');
+    }
+}
 
 // Initialize project-related event listeners
 function initializeProjectListeners() {
