@@ -175,7 +175,7 @@ async function receiveWhatsAppMessage(req, res) {
             } catch (error) {
                 console.error('Error processing or validating receipt:', error);
                 await client.messages.create({
-                    body: "Sorry, we encountered an issue processing your receipt. Please try again later.",
+                    body: "Sorry, we encountered an issue processing your receipt. \n" + error + "\nPlease try again later.",
                     from: `whatsapp:${twilioPhone}`,
                     to: `whatsapp:${phoneNumber}`,
                 });
