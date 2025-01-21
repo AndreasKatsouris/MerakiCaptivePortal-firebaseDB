@@ -14,24 +14,72 @@ async function processReceipt(imageUrl, phoneNumber) {
         // Detect text in image
         const [result] = await detectReceiptText(imageUrl);
         
-        if (!result?.textAnnotations?.length) {
-            throw new Error('No text could be detected on the receipt');
+        // Enhanced validation for OCR results
+        if (!result) {
+            throw new Error(
+                'Failed to process the receipt image. Please try taking another photo with:\n' +
+                '• Good lighting\n' +
+                '• No glare\n' +
+                '• The receipt lying flat\n' +
+                '• All text clearly visible'
+            );
+        }
+
+        if (!result.textAnnotations || result.textAnnotations.length === 0) {
+            throw new Error(
+                'No text could be detected in the image. This might be because:\n' +
+                '• The image is too blurry\n' +
+                '• The lighting is too dark or there is glare\n' +
+                '• The receipt text is not clearly visible\n' +
+                'Please try taking another photo making sure the receipt is well-lit and clearly visible.'
+            );
         }
 
         const fullText = result.textAnnotations[0].description;
+        if (!fullText || fullText.trim().length === 0) {
+            throw new Error('The receipt appears to be blank or the text is not readable. Please try taking another photo.');
+        }
+
         console.log('Extracted full text:', fullText);
 
         // Extract store details
         const storeDetails = await extractStoreDetails(fullText);
         console.log('Extracted store details:', storeDetails);
 
+        if (storeDetails.brandName === 'Unknown Brand') {
+            throw new Error(
+                'Could not identify the restaurant brand on this receipt. Please ensure:\n' +
+                '• The restaurant name is clearly visible at the top\n' +
+                '• There is no glare or damage covering the header\n' +
+                '• The image captures the entire receipt'
+            );
+        }
+
         // Parse items section
         const { items, subtotal } = await extractItems(fullText);
         console.log('Extracted items:', items);
 
+        if (items.length === 0) {
+            throw new Error(
+                'Could not find any items on this receipt. Please ensure:\n' +
+                '• The items list is clearly visible\n' +
+                '• There is no damage or folding in the middle of the receipt\n' +
+                '• All item names and prices are readable'
+            );
+        }
+
         // Extract receipt details
         const details = extractReceiptDetails(fullText);
         console.log('Extracted receipt details:', details);
+
+        if (!details.totalAmount) {
+            throw new Error(
+                'Could not find the total amount on this receipt. Please ensure:\n' +
+                '• The bottom portion of the receipt is included\n' +
+                '• The total amount is clearly visible\n' +
+                '• There is no damage or folding at the bottom'
+            );
+        }
 
         // Construct receipt data
         const receiptData = {
@@ -57,12 +105,32 @@ async function processReceipt(imageUrl, phoneNumber) {
 
         console.log('Final parsed receipt data:', receiptData);
 
+        // Validate essential fields
+        const missingFields = [];
+        if (!receiptData.date) missingFields.push('receipt date');
+        if (!receiptData.invoiceNumber) missingFields.push('invoice/receipt number');
+        if (!receiptData.totalAmount) missingFields.push('total amount');
+
+        if (missingFields.length > 0) {
+            console.warn('Missing receipt fields:', missingFields);
+        }
+
         // Save receipt data
         const savedReceipt = await saveReceiptData(receiptData);
         return savedReceipt;
 
     } catch (error) {
         console.error('Error processing receipt:', error);
+        
+        // Enhance error message if it's not already user-friendly
+        if (!error.message.includes('Please') && !error.message.includes('This might be')) {
+            error.message = 'We had trouble processing your receipt. Please take another photo ensuring:\n' +
+                           '• Good lighting with no glare\n' +
+                           '• Receipt is flat and not folded\n' +
+                           '• All text is clear and readable\n' +
+                           '• The entire receipt is captured';
+        }
+        
         throw error;
     }
 }
