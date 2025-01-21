@@ -1,6 +1,5 @@
 const vision = require('@google-cloud/vision');
 const admin = require('firebase-admin');
-const { parseText } = require('./textParsingStrategies');
 
 /**
  * Process a receipt image with Google Cloud Vision OCR and parse the text
@@ -12,9 +11,10 @@ async function processReceipt(imageUrl, phoneNumber) {
     try {
         console.log('Starting receipt processing for:', { imageUrl, phoneNumber });
         
+        // Detect text in image
         const [result] = await detectReceiptText(imageUrl);
         
-        if (!result || !result.textAnnotations || result.textAnnotations.length === 0) {
+        if (!result?.textAnnotations?.length) {
             throw new Error('No text could be detected on the receipt');
         }
 
@@ -23,112 +23,31 @@ async function processReceipt(imageUrl, phoneNumber) {
 
         // Extract store details
         const storeDetails = await extractStoreDetails(fullText);
-        console.log('Extracted store details:', storeDetails);        
+        console.log('Extracted store details:', storeDetails);
 
         // Parse items section
-        const items = [];
-        const lines = fullText.split('\n');
-        let inItemsSection = false;
-        let currentItem = {};
+        const { items, subtotal } = await extractItems(fullText);
+        console.log('Extracted items:', items);
 
-        console.log('Starting to parse lines for items');
+        // Extract receipt details
+        const details = extractReceiptDetails(fullText);
+        console.log('Extracted receipt details:', details);
 
-        for (let i = 0; i < lines.length; i++) {
-            const line = lines[i].trim();
-            console.log('Processing line:', line);
-
-            // Look for section markers
-            if (line === 'ITEM') {
-                console.log('Found items section start');
-                inItemsSection = true;
-                continue;
-            }
-
-            if (line.startsWith('Bill Excl')) {
-                console.log('Found items section end');
-                inItemsSection = false;
-                // Save last item if pending
-                if (currentItem.name) {
-                    items.push({...currentItem});
-                    currentItem = {};
-                }
-                continue;
-            }
-
-            // Skip header lines
-            if (['QTY', 'PRICE', 'VALUE'].includes(line)) {
-                continue;
-            }
-
-            if (inItemsSection && line.length > 0) {
-                // Check if line is a price (contains only numbers and possibly decimal point)
-                if (/^\d+\.?\d*$/.test(line)) {
-                    const number = parseFloat(line);
-                    if (!currentItem.name) {
-                        continue; // Skip if we don't have an item name yet
-                    }
-                    // Determine which number this is based on what we already have
-                    if (!currentItem.quantity) {
-                        currentItem.quantity = parseInt(number);
-                    } else if (!currentItem.unitPrice) {
-                        currentItem.unitPrice = number;
-                    } else if (!currentItem.totalPrice) {
-                        currentItem.totalPrice = number;
-                        // Item is complete, add it to items array
-                        items.push({...currentItem});
-                        console.log('Added complete item:', currentItem);
-                        currentItem = {};
-                    }
-                } else if (!/^\d+\.?\d*$/.test(line) && line !== 'VALUE') {
-                    // This must be an item name
-                    if (currentItem.name) {
-                        // If we already have an item name, save the current item
-                        if (Object.keys(currentItem).length > 1) {
-                            items.push({...currentItem});
-                        }
-                        currentItem = {};
-                    }
-                    currentItem.name = line;
-                }
-            }
-        }
-
-        console.log('All parsed items:', JSON.stringify(items, null, 2));
-
-        // Extract other receipt details
-        // Find invoice number
-        const invoiceMatch = fullText.match(/(?:PRO-FORMA\s+)?INVOICE:?\s*#?\s*(\d+)/i) ||
-                           fullText.match(/RECEIPT\s*#?\s*(\d+)/i);
-        const dateMatch = fullText.match(/(\d{2}\/\d{2}\/\d{4})/);
-        const totalMatch = fullText.match(/Bill\s+Total\s+(\d+\.\d{2})/i);
-        //const storeNameMatch = fullText.match(/OCEAN BASKET\s*(.*?)(?=\n)/);
-
-        // Find total amount - try different patterns
-        let totalAmount = 0;
-        if (totalMatch) {
-            totalAmount = parseFloat(totalMatch[1]);
-        } else {
-            // Try to find it by looking for "Bill Total" line
-            for (const line of lines) {
-                if (line.includes('Bill Total')) {
-                    const amount = line.match(/(\d+\.\d{2})/);
-                    if (amount) {
-                        totalAmount = parseFloat(amount[1]);
-                        break;
-                    }
-                }
-            }
-        }
-
+        // Construct receipt data
         const receiptData = {
-            invoiceNumber: invoiceMatch ? invoiceMatch[1] : null,
+            invoiceNumber: details.invoiceNumber,
             brandName: storeDetails.brandName,
             storeName: storeDetails.storeName,
             storeAddress: storeDetails.storeAddress,
             fullStoreName: storeDetails.fullStoreName,
-            date: dateMatch ? dateMatch[1] : null,
+            date: details.date,
+            time: details.time,
+            waiterName: details.waiterName,
+            tableNumber: details.tableNumber,
             items: items,
-            totalAmount: totalMatch ? parseFloat(totalMatch[1]) : 0,
+            subtotal: subtotal,
+            vatAmount: details.vatAmount,
+            totalAmount: details.totalAmount,
             imageUrl: imageUrl,
             processedAt: Date.now(),
             guestPhoneNumber: phoneNumber,
@@ -136,11 +55,12 @@ async function processReceipt(imageUrl, phoneNumber) {
             rawText: fullText
         };
 
-        console.log('Final parsed receipt data:', JSON.stringify(receiptData, null, 2));
+        console.log('Final parsed receipt data:', receiptData);
 
-        const savedReceipt = await saveReceiptData(receiptData, imageUrl, phoneNumber);
+        // Save receipt data
+        const savedReceipt = await saveReceiptData(receiptData);
         return savedReceipt;
-        
+
     } catch (error) {
         console.error('Error processing receipt:', error);
         throw error;
@@ -163,52 +83,189 @@ async function detectReceiptText(imageUrl) {
 }
 
 /**
- * Parse receipt text using multiple strategies
- * @param {string} fullText - Detected text from receipt
- * @returns {Promise<object>} - Parsed receipt data
+ * Extract store details from receipt text
+ * @param {string} fullText - Full text from receipt
+ * @returns {Promise<object>} - Store details
  */
-async function parseReceiptData(fullText) {
-    const strategies = [
-        parseText.standardFormat,
-        parseText.alternativeFormat,
-        parseText.genericFormat
-    ];
+async function extractStoreDetails(fullText) {
+    const lines = fullText.split('\n').map(line => line.trim());
+    const activeBrands = await fetchActiveBrands();
+    let brandName = '';
+    let storeName = '';
+    let storeAddress = '';
 
-    for (const strategy of strategies) {
-        try {
-            const parsedData = strategy(fullText);
-            if (isValidParsedData(parsedData)) {
-                return parsedData;
+    // Look for brand name in first few lines
+    for (let i = 0; i < Math.min(5, lines.length); i++) {
+        const line = lines[i].toLowerCase();
+        for (const brand of activeBrands) {
+            if (line.includes(brand.toLowerCase())) {
+                brandName = brand;
+                const fullStoreLine = lines[i];
+                const brandRegex = new RegExp(brand, 'i');
+                storeName = fullStoreLine.replace(brandRegex, '').trim();
+                break;
             }
-        } catch (error) {
-            console.warn(`Parsing strategy ${strategy.name} failed:`, error.message);
+        }
+        if (brandName) break;
+    }
+
+    // Look for store address
+    for (let i = 1; i < Math.min(10, lines.length); i++) {
+        const line = lines[i];
+        if (line.match(/SHOP|MALL|CENTRE|CENTER|STREET|RD|ROAD|AVE|AVENUE|Tel/i)) {
+            storeAddress = line.trim();
+            break;
         }
     }
 
-    throw new Error('Could not parse receipt using any available strategy');
+    return {
+        brandName: brandName || 'Unknown Brand',
+        storeName: storeName || 'Unknown Location',
+        storeAddress: storeAddress || '',
+        fullStoreName: `${brandName} ${storeName}`.trim()
+    };
 }
 
 /**
- * Validate parsed receipt data
- * @param {object} parsedData - Parsed receipt data
- * @returns {boolean} - Whether the data is valid
+ * Extract items from receipt text
+ * @param {string} fullText - Full text from receipt
+ * @returns {Promise<object>} - Items and subtotal
  */
-function isValidParsedData(parsedData) {
-    return !!(
-        parsedData.storeName && 
-        parsedData.totalAmount && 
-        parsedData.date &&
-        parsedData.invoiceNumber
-    );
+async function extractItems(fullText) {
+    const lines = fullText.split('\n');
+    const items = [];
+    let inItemsSection = false;
+    let subtotal = 0;
+
+    const itemPattern = /^(.+?)\s+(\d+)\s+(\d+\.\d{2})\s+(\d+\.\d{2})$/;
+    const alternativePattern = /^(.+?)\s+(\d+)\s+(\d+\.\d{2})/;
+
+    for (let i = 0; i < lines.length; i++) {
+        const line = lines[i].trim();
+
+        // Detect items section
+        if (line === 'ITEM' || (line.includes('ITEM') && line.includes('QTY') && line.includes('PRICE'))) {
+            inItemsSection = true;
+            continue;
+        }
+
+        // Detect end of items section
+        if (line.includes('Bill Excl') || line.includes('Bill Total')) {
+            inItemsSection = false;
+            continue;
+        }
+
+        if (inItemsSection && line.length > 0) {
+            // Try exact format first
+            const itemMatch = line.match(itemPattern);
+            if (itemMatch) {
+                const [, name, qty, price, total] = itemMatch;
+                items.push({
+                    name: name.trim(),
+                    quantity: parseInt(qty),
+                    unitPrice: parseFloat(price),
+                    totalPrice: parseFloat(total)
+                });
+                subtotal += parseFloat(total);
+            } else {
+                // Try alternative format
+                const alternativeMatch = line.match(alternativePattern);
+                if (alternativeMatch) {
+                    const [, name, qty, price] = alternativeMatch;
+                    const total = parseFloat(qty) * parseFloat(price);
+                    items.push({
+                        name: name.trim(),
+                        quantity: parseInt(qty),
+                        unitPrice: parseFloat(price),
+                        totalPrice: total
+                    });
+                    subtotal += total;
+                }
+            }
+        }
+    }
+
+    return { items, subtotal };
 }
 
+/**
+ * Extract receipt details from text
+ * @param {string} fullText - Full text from receipt
+ * @returns {object} - Receipt details
+ */
+function extractReceiptDetails(fullText) {
+    const details = {};
+
+    // Extract invoice number
+    const invoiceMatch = fullText.match(/(?:PRO-FORMA\s+)?INVOICE:?\s*#?\s*(\d+)/i) ||
+                        fullText.match(/RECEIPT\s*#?\s*(\d+)/i) ||
+                        fullText.match(/PRO-FORMA INVOICE:\s*(\d+)/i);
+    details.invoiceNumber = invoiceMatch ? invoiceMatch[1] : null;
+
+    // Extract date and time
+    const dateMatch = fullText.match(/(\d{2}\/\d{2}\/\d{4})/);
+    const timeMatch = fullText.match(/TIME\s*:\s*(.+?)(?:\n|$)/i);
+    details.date = dateMatch ? dateMatch[1] : null;
+    details.time = timeMatch ? timeMatch[1].trim() : null;
+
+    // Extract waiter and table info
+    const waiterMatch = fullText.match(/WAITER:?\s*(.+?)(?:\(|\n|$)/i);
+    const tableMatch = fullText.match(/TABLE:?\s*(\d+)/i);
+    details.waiterName = waiterMatch ? waiterMatch[1].trim() : null;
+    details.tableNumber = tableMatch ? tableMatch[1] : null;
+
+    // Extract amounts
+    const vatMatch = fullText.match(/VAT\s+\d+%\s+\(already included\)\s+(\d+\.\d{2})/i);
+    const totalMatch = fullText.match(/Bill\s+Total\s+(\d+\.\d{2})/i) || 
+                      fullText.match(/Bill Total\s*(\d+\.\d{2})/i);
+    
+    details.vatAmount = vatMatch ? parseFloat(vatMatch[1]) : 0;
+    details.totalAmount = totalMatch ? parseFloat(totalMatch[1]) : 0;
+
+    return details;
+}
+
+/**
+ * Save receipt data to Firebase
+ * @param {object} receiptData - Processed receipt data
+ * @returns {Promise<object>} - Saved receipt data with ID
+ */
+async function saveReceiptData(receiptData) {
+    try {
+        // Create a unique ID using invoice number if available
+        const receiptId = receiptData.invoiceNumber || admin.database().ref().push().key;
+        
+        // Save to Firebase
+        await admin.database().ref(`receipts/${receiptId}`).set({
+            ...receiptData,
+            createdAt: admin.database.ServerValue.TIMESTAMP
+        });
+        
+        // Create guest receipt index
+        await admin.database().ref(`guest-receipts/${receiptData.guestPhoneNumber}/${receiptId}`).set(true);
+
+        console.log('Receipt data saved with ID:', receiptId);
+        
+        return {
+            receiptId,
+            ...receiptData
+        };
+    } catch (error) {
+        console.error('Error saving receipt:', error);
+        throw new Error('Failed to save receipt data');
+    }
+}
+
+/**
+ * Fetch active brands from Firebase
+ * @returns {Promise<Set>} - Set of active brand names
+ */
 async function fetchActiveBrands() {
     try {
         const snapshot = await admin.database().ref('campaigns').once('value');
         const campaigns = snapshot.val();
         if (!campaigns) return new Set();
 
-        // Extract unique brand names from all campaigns
         const brands = new Set();
         Object.values(campaigns).forEach(campaign => {
             if (campaign.brandName) {
@@ -223,135 +280,36 @@ async function fetchActiveBrands() {
     }
 }
 
-async function extractStoreDetails(fullText) {
-    const lines = fullText.split('\n').map(line => line.trim());
-    const activeBrands = await fetchActiveBrands();
-    let brandName = '';
-    let storeName = '';
-    let storeAddress = '';
-
-    console.log('Active brands:', activeBrands);
-    console.log('Processing lines:', lines.slice(0, 5));
-
-    // Look for brand name in first few lines
-    for (let i = 0; i < Math.min(5, lines.length); i++) {
-        const line = lines[i].toLowerCase();
-        // Check each brand name against the line
-        for (const brand of activeBrands) {
-            if (line.includes(brand.toLowerCase())) {
-                brandName = brand;
-                // Extract store location by removing brand name
-                const fullStoreLine = lines[i];
-                const brandRegex = new RegExp(brand, 'i');
-                storeName = fullStoreLine.replace(brandRegex, '').trim();
-                console.log('Found brand:', brandName, 'Store:', storeName);
-                break;
-            }
-        }
-        if (brandName) break;
-    }
-
-    // Look for address in subsequent lines
-    for (let i = 1; i < Math.min(5, lines.length); i++) {
-        const line = lines[i];
-        if (line.match(/SHOP|MALL|CENTRE|CENTER|STREET|RD|ROAD|AVE|AVENUE/i)) {
-            storeAddress = line.trim();
-            console.log('Found address:', storeAddress);
-            break;
-        }
-    }
-
-    const storeDetails = {
-        brandName: brandName || 'Unknown Brand',
-        storeName: storeName || 'Unknown Location',
-        storeAddress: storeAddress || '',
-        fullStoreName: `${brandName} ${storeName}`.trim()
-    };
-
-    console.log('Final store details:', storeDetails);
-    return storeDetails;
-}
-
 /**
- * Save receipt data to Firebase
- * @param {object} parsedData - Parsed receipt data
- * @param {string} imageUrl - Receipt image URL
+ * Test receipt processing functionality
+ * @param {string} imageUrl - URL of the receipt image
  * @param {string} phoneNumber - Guest phone number
- * @returns {Promise<object>} - Saved receipt data with ID
+ * @returns {Promise<object>} - Test results
  */
-async function saveReceiptData(parsedData, imageUrl, phoneNumber) {
-    
-    console.log('Attempting to save receipt:', {
-        parsedData,
-        imageUrl,
-        phoneNumber
-    });
-    try {
-        const receiptData = {
-            // Receipt Details
-            invoiceNumber: parsedData.invoiceNumber,
-            storeName: parsedData.storeName,
-            storeLocation: parsedData.storeLocation || '',
-            date: parsedData.date,
-            
-            // Items and Totals
-            items: parsedData.items || [],
-            totalAmount: parsedData.totalAmount,
-            
-            // Metadata
-            imageUrl: imageUrl,
-            processedAt: admin.database.ServerValue.TIMESTAMP,
-            guestPhoneNumber: phoneNumber,
-            status: 'pending_validation',
-            rawText: parsedData.rawText
-        };
-
-        // Create a unique ID using invoice number if available
-        const receiptId = parsedData.invoiceNumber || admin.database().ref().push().key;
-        
-        // Save to Firebase
-        await admin.database().ref(`receipts/${receiptId}`).set(receiptData);
-        
-        // Create guest receipt index
-        await admin.database().ref(`guest-receipts/${phoneNumber}/${receiptId}`).set(true);
-
-        console.log('Receipt data saved with ID:', receiptId);
-        
-        return {
-            receiptId,
-            ...receiptData
-        };
-    } catch (error) {
-        console.error('Error saving receipt:', error);
-        throw new Error('Failed to save receipt data');
-    }
-}
-
-// Add this to receiptProcessor.js
 async function testReceiptProcessing(imageUrl, phoneNumber) {
     try {
         console.log('=== Starting Receipt Processing Test ===');
         
-        // Test 1: Brand Fetching
+        // Test brand fetching
         console.log('\nTesting Brand Fetching:');
         const brands = await fetchActiveBrands();
         console.log('Active Brands:', brands);
 
-        // Test 2: Text Detection
+        // Test text detection
         console.log('\nTesting Text Detection:');
         const [result] = await detectReceiptText(imageUrl);
         const fullText = result.textAnnotations[0].description;
         console.log('Detected Text Sample:', fullText.slice(0, 200) + '...');
 
-        // Test 3: Store Details Extraction
+        // Test store details extraction
         console.log('\nTesting Store Details Extraction:');
         const storeDetails = await extractStoreDetails(fullText);
-        console.log('Extracted Store Details:', JSON.stringify(storeDetails, null, 2));
+        console.log('Extracted Store Details:', storeDetails);
 
-        // Test 4: Full Receipt Processing
+        // Test full receipt processing
         console.log('\nTesting Full Receipt Processing:');
         const processedReceipt = await processReceipt(imageUrl, phoneNumber);
-        console.log('Processed Receipt:', JSON.stringify(processedReceipt, null, 2));
+        console.log('Processed Receipt:', processedReceipt);
 
         return {
             success: true,
@@ -368,10 +326,7 @@ async function testReceiptProcessing(imageUrl, phoneNumber) {
     }
 }
 
-// Export the test function
 module.exports = {
     processReceipt,
-    testReceiptProcessing // Add this to exports
+    testReceiptProcessing
 };
-
-module.exports = { processReceipt };

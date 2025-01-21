@@ -4,127 +4,15 @@ const { client, twilioPhone } = require('./twilioClient');
 const { processReceipt } = require('./receiptProcessor');
 const { validateReceipt } = require('./guardRail');
 const { fetchCampaigns } = require('./campaigns');
+const { processReward } = require('./rewardsProcessor');
+const { processMessage } = require('./menuLogic');
 
+// Initialize Firebase Admin if not already initialized
 if (!admin.apps.length) {
     admin.initializeApp({
         credential: admin.credential.applicationDefault(),
         databaseURL: "https://merakicaptiveportal-firebasedb-default-rtdb.firebaseio.com",
     });
-}
-
-/**
- * Process rewards for validated receipts
- */
-// In receiveWhatsappMessage.js
-
-async function processReward(guest, campaign, receiptData) {
-    try {
-        // Input validation
-        if (!guest || !guest.phoneNumber) {
-            console.error('Invalid guest data:', guest);
-            throw new Error('Guest data is missing or invalid');
-        }
-
-        if (!campaign || !campaign.name) {
-            console.error('Invalid campaign data:', campaign);
-            throw new Error('Campaign data is missing or invalid');
-        }
-
-        if (!receiptData || !receiptData.receiptId) {
-            console.error('Invalid receipt data:', receiptData);
-            throw new Error('Receipt data is missing or invalid');
-        }
-
-        console.log('Starting reward processing with:', {
-            guest: guest,
-            campaign: campaign,
-            receiptData: receiptData
-        });
-
-        // Create reward reference
-        const rewardRef = admin.database().ref('rewards').push();
-        console.log('Created reward reference:', rewardRef.key);
-
-        // Prepare reward data
-        const rewardData = {
-            // Guest Information
-            guestPhone: guest.phoneNumber,
-            guestName: guest.name || 'Unknown Guest',
-            
-            // Campaign Information
-            campaignId: campaign.id || rewardRef.key,
-            campaignName: campaign.name,
-            
-            // Receipt Information
-            receiptId: receiptData.receiptId || rewardRef.key,
-            receiptAmount: receiptData.totalAmount || 0,
-            receiptNumber: receiptData.invoiceNumber || 'Unknown',
-            
-            // Reward Status
-            status: 'pending',
-            createdAt: admin.database.ServerValue.TIMESTAMP,
-            updatedAt: admin.database.ServerValue.TIMESTAMP,
-            
-            // Additional tracking
-            processedAt: Date.now(),
-            processedBy: 'system'
-        };
-
-        console.log('Prepared reward data:', rewardData);
-
-        // Prepare database updates
-        const updates = {};
-        
-        try {
-            // Store reward data
-            updates[`rewards/${rewardRef.key}`] = rewardData;
-            console.log('Added reward data to updates');
-            
-            // Create guest index
-            updates[`guest-rewards/${guest.phoneNumber}/${rewardRef.key}`] = true;
-            console.log('Added guest index to updates');
-            
-            // Create campaign index
-            const campaignId = campaign.id || rewardRef.key;
-            if (campaignId) {
-                updates[`campaign-rewards/${campaignId}/${rewardRef.key}`] = true;
-                updates[`receipts/${receiptData.receiptId}/campaignId`] = campaignId;
-            }
-            console.log('Added campaign index to updates');
-            
-            // Create receipt index
-            updates[`receipt-rewards/${receiptData.receiptId}`] = rewardRef.key;
-            console.log('Added receipt index to updates');
-
-            // Update receipt status
-            updates[`receipts/${receiptData.receiptId}/status`] = 'validated';
-            updates[`receipts/${receiptData.receiptId}/validatedAt`] = admin.database.ServerValue.TIMESTAMP;
-            updates[`receipts/${receiptData.receiptId}/campaignId`] = campaignId;
-            console.log('Added receipt status updates');
-
-            console.log('Attempting to save all updates to database...');
-            await admin.database().ref().update(updates);
-            console.log('Successfully saved all updates to database');
-
-            return rewardData;
-
-        } catch (dbError) {
-            console.error('Database error while saving updates:', dbError);
-            console.error('Updates that failed:', updates);
-            throw new Error(`Database error: ${dbError.message}`);
-        }
-
-    } catch (error) {
-        console.error('Error in processReward:', error);
-        console.error('Error details:', {
-            error: error,
-            stack: error.stack,
-            guest: guest ? 'present' : 'missing',
-            campaign: campaign ? 'present' : 'missing',
-            receiptData: receiptData ? 'present' : 'missing'
-        });
-        throw new Error(`Failed to process reward: ${error.message}`);
-    }
 }
 
 /**
@@ -154,12 +42,6 @@ async function receiveWhatsAppMessage(req, res) {
         const phoneNumber = From.replace('whatsapp:', '');
         console.log(`Received message from ${phoneNumber}`);
 
-        // Check if the message contains a body or media URL
-        if (!Body && !MediaUrl0) {
-            console.error('Both message body and media URL are missing.');
-            return res.status(400).send('Please send a text message or attach a media file.');
-        }
-
         // Retrieve or initialize guest data
         const guestRef = admin.database().ref(`guests/${phoneNumber}`);
         const guestSnapshot = await guestRef.once('value');
@@ -173,13 +55,13 @@ async function receiveWhatsAppMessage(req, res) {
             console.log(`Returning guest: ${guestData.name || 'Guest'}`);
         }
 
-        // Handle name replies
-        if (!MediaUrl0 && Body && !guestData.name) {
+        // Handle name collection for new guests
+        if (!guestData.name && Body && !MediaUrl0) {
             const trimmedName = Body.trim();
             await guestRef.update({ name: trimmedName });
 
             await client.messages.create({
-                body: `Thank you, ${trimmedName}! Your profile has been updated.`,
+                body: `Thank you, ${trimmedName}! Your profile has been updated. Here's what you can do:\n\n${getHelpMessage()}`,
                 from: `whatsapp:${twilioPhone}`,
                 to: `whatsapp:${phoneNumber}`,
             });
@@ -197,13 +79,14 @@ async function receiveWhatsAppMessage(req, res) {
             return res.status(200).send('Prompted guest for name.');
         }
 
-        // Process receipt if an image is attached
+        // If image is attached, process receipt
         if (MediaUrl0) {
             console.log(`Processing receipt image for ${phoneNumber}`);
             try {
-                // Process the receipt first
+                // Process the receipt
                 const receiptData = await processReceipt(MediaUrl0, phoneNumber);
-                //await saveReceiptData(receiptData, MediaUrl0, phoneNumber);                // Fetch all active campaigns
+                
+                // Fetch all active campaigns
                 const campaigns = await fetchCampaigns();
                 const activeCampaigns = campaigns.filter(campaign => 
                     campaign.status === 'active' && 
@@ -220,47 +103,76 @@ async function receiveWhatsAppMessage(req, res) {
                     return res.status(400).send('No active campaigns.');
                 }
 
-    // Try to match receipt with any active campaign
-let validResult = null;
-for (const campaign of activeCampaigns) {
-    const result = await validateReceipt(receiptData, campaign.brandName);
-    console.log('Validation result:', result);
-    if (result.isValid) {
-        validResult = result;
-        break;
-    }
-}
+                // Try to match receipt with any active campaign
+                let validResult = null;
+                for (const campaign of activeCampaigns) {
+                    const result = await validateReceipt(receiptData, campaign.brandName);
+                    console.log('Validation result:', result);
+                    if (result.isValid) {
+                        validResult = result;
+                        break;
+                    }
+                }
 
-if (validResult) {
+                if (validResult) {
+                    try {
+                        console.log('Processing reward with:', {
+                            guestData,
+                            campaign: validResult.campaign,
+                            receiptData
+                        });
 
-    try {
-        console.log('Processing reward with:', {
-            guestData,
-            campaign: validResult.campaign,
-            receiptData
-        });
-    // Receipt matches a campaign - process reward
-    await processReward(guestData, validResult.campaign, receiptData);
-    
-    await client.messages.create({
-        body: `Congratulations ${guestData.name}! Your receipt for ${validResult.campaign.brandName} has been validated. Your reward will be processed shortly.`,
-        from: `whatsapp:${twilioPhone}`,
-        to: `whatsapp:${phoneNumber}`,
-    });
-    return res.status(200).send('Receipt validated and reward processed.');
-} catch (error) {
-    console.error('Error during reward processing:', error);
-    throw error;
-}
-} else {
-    // No matching campaign found
-    await client.messages.create({
-        body: `Sorry ${guestData.name}, your receipt doesn't match any active campaign requirements.`,
-        from: `whatsapp:${twilioPhone}`,
-        to: `whatsapp:${phoneNumber}`,
-    });
-    return res.status(400).send('Receipt validation failed.');
-}            } catch (error) {
+                        // Process the reward
+                        await processReward(guestData, validResult.campaign, receiptData);
+
+                        await client.messages.create({
+                            body: `Congratulations ${guestData.name}! Your receipt for ${validResult.campaign.brandName} has been validated. Your reward will be processed shortly.`,
+                            from: `whatsapp:${twilioPhone}`,
+                            to: `whatsapp:${phoneNumber}`,
+                        });
+
+                        return res.status(200).send('Receipt validated and reward processed.');
+                    } catch (error) {
+                        console.error('Error during reward processing:', error);
+                        throw error;
+                    }
+                } else {
+                    // Analyze what's missing from the receipt
+                    let missingDetails = [];
+                    
+                    if (!receiptData.brandName || receiptData.brandName === 'Unknown Brand') {
+                        missingDetails.push("- The brand/restaurant name isn't clearly visible");
+                    }
+                    if (!receiptData.storeName || receiptData.storeName === 'Unknown Location') {
+                        missingDetails.push("- The store location isn't visible");
+                    }
+                    if (!receiptData.date) {
+                        missingDetails.push("- The receipt date isn't visible");
+                    }
+                    if (!receiptData.totalAmount || receiptData.totalAmount === 0) {
+                        missingDetails.push("- The total amount isn't clear");
+                    }
+                    if (!receiptData.items || receiptData.items.length === 0) {
+                        missingDetails.push("- The list of purchased items isn't visible");
+                    }
+
+                    let responseMessage = `Sorry ${guestData.name}, we couldn't validate your receipt.`;
+                    
+                    if (missingDetails.length > 0) {
+                        responseMessage += "\n\nThe following details are missing or unclear:\n" + missingDetails.join("\n");
+                        responseMessage += "\n\nPlease send a new photo making sure all these details are clearly visible.";
+                    } else {
+                        responseMessage += "\n\nWhile all receipt details are visible, they don't match our active campaign requirements. Please check our current promotions and try again.";
+                    }
+
+                    await client.messages.create({
+                        body: responseMessage,
+                        from: `whatsapp:${twilioPhone}`,
+                        to: `whatsapp:${phoneNumber}`,
+                    });
+                    return res.status(400).send('Receipt validation failed.');
+                }
+            } catch (error) {
                 console.error('Error processing or validating receipt:', error);
                 await client.messages.create({
                     body: "Sorry, we encountered an issue processing your receipt. Please try again later.",
@@ -269,13 +181,27 @@ if (validResult) {
                 });
                 return res.status(500).send('Error processing receipt.');
             }
-        } else {
+        } 
+        // If text message, process commands
+        else if (Body) {
+            const result = await processMessage(Body, phoneNumber);
+            
             await client.messages.create({
-                body: "Please attach a picture of your receipt.",
+                body: result.message,
                 from: `whatsapp:${twilioPhone}`,
                 to: `whatsapp:${phoneNumber}`,
             });
-            return res.status(400).send('No image attached.');
+
+            return res.status(result.success ? 200 : 400).send(result.message);
+        }
+        // No valid input
+        else {
+            await client.messages.create({
+                body: `Hi ${guestData.name}! ${getHelpMessage()}`,
+                from: `whatsapp:${twilioPhone}`,
+                to: `whatsapp:${phoneNumber}`,
+            });
+            return res.status(400).send('No valid input provided.');
         }
     } catch (error) {
         console.error('Error handling WhatsApp message:', error.message);
@@ -284,8 +210,31 @@ if (validResult) {
             console.error(`Twilio error: ${error.code}, Info: ${error.moreInfo}`);
         }
 
+        try {
+            await client.messages.create({
+                body: "Sorry, we encountered an unexpected error. Please try again later.",
+                from: `whatsapp:${twilioPhone}`,
+                to: From,
+            });
+        } catch (sendError) {
+            console.error('Error sending error message:', sendError);
+        }
+
         return res.status(500).send('Internal Server Error');
     }
+}
+
+/**
+ * Get help message listing available commands
+ * @returns {string} Formatted help message
+ */
+function getHelpMessage() {
+    return `Here's what you can do:\n
+• Send a photo of your receipt to earn rewards
+• "Check my points" to see your point balance
+• "View my rewards" to see your available rewards
+• "Delete my data" to remove your information
+• "Help" to see this menu again`;
 }
 
 module.exports = { receiveWhatsAppMessage };
