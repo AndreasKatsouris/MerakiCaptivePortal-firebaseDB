@@ -199,7 +199,7 @@ async function extractStoreDetails(fullText) {
         fullStoreName: `${brandName} ${storeName}`.trim()
     };
 
-    console.log('Extracted store details:', storeDetails);
+    //console.log('Extracted store details:', storeDetails);
     return storeDetails;
 }
 
@@ -222,10 +222,16 @@ async function extractItems(fullText) {
         console.log(`\nProcessing line ${i}:`, line);
         console.log('Line with visible whitespace:', debugWhitespace(line));
 
-        // Look for section markers
-        if (line.match(/^ITEM\s+QTY\s+PRICE\s+VALUE/i)) {
-            console.log('Found items section header');
+        // Look for section markers and skip header lines
+        if (line.match(/^ITEM$/i)) {
+            console.log('Found start of items section, skipping header rows');
             inItemsSection = true;
+            // Skip the next lines that contain QTY, PRICE, VALUE headers
+            while (i < lines.length - 1 && 
+                   (lines[i + 1].match(/^(QTY|PRICE|VALUE)$/i) || lines[i + 1].match(/^-+$/))) {
+                console.log('Skipping header line:', lines[i + 1]);
+                i++;
+            }
             continue;
         }
 
