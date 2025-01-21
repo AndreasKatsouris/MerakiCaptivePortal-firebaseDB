@@ -1,6 +1,24 @@
 const { fetchCampaigns } = require('./campaigns');
 
 /**
+ * Brand-specific validation rules
+ */
+const brandValidationRules = {
+    'Ocean Basket': {
+        validateItems: (items) => {
+            return items && items.every(item => item.name && item.quantity && item.price);
+        },
+        validateTotal: (total) => total > 0 && total < 10000,
+        validateStore: (storeName) => storeName.toLowerCase().includes('ocean basket')
+    },
+    'DEFAULT': {
+        validateItems: (items) => true,
+        validateTotal: (total) => total > 0,
+        validateStore: (storeName) => true
+    }
+};
+
+/**
  * Main function to match a receipt to available campaigns
  * @param {object} receiptData - Processed receipt data
  * @returns {Promise<object>} Matching result with campaign if found
@@ -13,13 +31,10 @@ async function matchReceiptToCampaign(receiptData) {
             totalAmount: receiptData.totalAmount
         });
 
-        // Validate receipt data first
-        const validationError = validateReceiptData(receiptData);
-        if (validationError) {
-            return {
-                isValid: false,
-                error: validationError
-            };
+        // Basic validation first
+        const validationResult = await validateReceipt(receiptData, receiptData.brandName);
+        if (!validationResult.isValid) {
+            return validationResult;
         }
 
         // Get active campaigns
@@ -58,7 +73,7 @@ async function matchReceiptToCampaign(receiptData) {
             }
         }
 
-        // If we get here, no campaigns matched
+        // No campaigns matched
         return {
             isValid: false,
             error: 'Receipt does not meet any campaign requirements',
@@ -82,32 +97,37 @@ async function matchReceiptToCampaign(receiptData) {
  * @returns {Promise<Array>} List of active campaigns
  */
 async function getActiveCampaigns() {
-    const campaigns = await fetchCampaigns();
-    const now = new Date();
-    
-    return campaigns.filter(campaign => {
-        const startDate = new Date(campaign.startDate);
-        const endDate = new Date(campaign.endDate);
-        return campaign.status === 'active' && 
-               startDate <= now && 
-               endDate >= now;
-    });
+    try {
+        const campaigns = await fetchCampaigns();
+        const now = new Date();
+        
+        return campaigns.filter(campaign => {
+            const startDate = new Date(campaign.startDate);
+            const endDate = new Date(campaign.endDate);
+            return campaign.status === 'active' && 
+                   startDate <= now && 
+                   endDate >= now;
+        });
+    } catch (error) {
+        console.error('Error fetching active campaigns:', error);
+        return [];
+    }
 }
 
 /**
- * Validate basic receipt data structure
+ * Validate receipt data against brand rules and basic requirements
  * @param {object} receiptData - Receipt data to validate
- * @returns {string|null} Error message if invalid, null if valid
+ * @param {string} brandName - Brand name for validation rules
+ * @returns {Promise<object>} Validation result
  */
 async function validateReceipt(receiptData, brandName) {
     try {
         console.log('Starting receipt validation for brand:', brandName);
-        console.log('Receipt data:', JSON.stringify(receiptData, null, 2));
-
+        
         // Get brand-specific validation rules
         const rules = brandValidationRules[brandName] || brandValidationRules['DEFAULT'];
 
-        // Basic validation checks
+        // Check required fields
         if (!receiptData.brandName || !receiptData.storeName) {
             return {
                 isValid: false,
@@ -124,76 +144,26 @@ async function validateReceipt(receiptData, brandName) {
         }
 
         // Parse and validate the receipt date
-        let receiptDate;
-        try {
-            // Handle DD/MM/YYYY format
-            if (receiptData.date?.includes('/')) {
-                const [day, month, year] = receiptData.date.split('/');
-                receiptDate = new Date(year, month - 1, day);
-            } else {
-                receiptDate = new Date(receiptData.date);
-            }
-
-            if (isNaN(receiptDate)) {
-                throw new Error('Invalid date format');
-            }
-        } catch (error) {
+        const receiptDate = parseReceiptDate(receiptData.date);
+        if (!receiptDate.isValid) {
             return {
                 isValid: false,
-                error: 'Invalid receipt date format'
+                error: receiptDate.error
             };
         }
 
-        // Get active campaigns
-        const campaigns = await fetchCampaigns();
-        console.log('Found campaigns:', campaigns.length);
-
-        // Filter active campaigns for matching brand
-        const matchingCampaigns = campaigns.filter(campaign => {
-            return campaign.brandName.toLowerCase() === brandName.toLowerCase() &&
-                   campaign.status === 'active';
-        });
-
-        if (!matchingCampaigns.length) {
+        // Validate total amount
+        if (!rules.validateTotal(receiptData.totalAmount)) {
             return {
                 isValid: false,
-                error: 'No active campaigns found for this brand'
+                error: 'Invalid total amount'
             };
         }
 
-        // Campaign-specific validation
-        for (const campaign of matchingCampaigns) {
-            // Validate date range
-            const campaignStart = new Date(campaign.startDate);
-            const campaignEnd = new Date(campaign.endDate);
-
-            if (receiptDate >= campaignStart && receiptDate <= campaignEnd) {
-                // Validate required items if specified
-                if (campaign.requiredItems && campaign.requiredItems.length > 0) {
-                    const hasRequiredItems = validateRequiredItems(receiptData.items, campaign.requiredItems);
-                    if (hasRequiredItems) {
-                        return {
-                            isValid: true,
-                            campaign: campaign,
-                            receiptData: receiptData
-                        };
-                    }
-                } else {
-                    // If no specific items required, validate total amount
-                    if (rules.validateTotal(receiptData.totalAmount)) {
-                        return {
-                            isValid: true,
-                            campaign: campaign,
-                            receiptData: receiptData
-                        };
-                    }
-                }
-            }
-        }
-
+        // If we get here, basic validation passed
         return {
-            isValid: false,
-            error: 'Receipt does not meet campaign requirements'
+            isValid: true,
+            receiptDate: receiptDate.date
         };
 
     } catch (error) {
@@ -201,6 +171,42 @@ async function validateReceipt(receiptData, brandName) {
         return {
             isValid: false,
             error: 'Error validating receipt'
+        };
+    }
+}
+
+/**
+ * Parse receipt date handling multiple formats
+ * @param {string} dateStr - Date string from receipt
+ * @returns {object} Parsing result with date object if successful
+ */
+function parseReceiptDate(dateStr) {
+    try {
+        let date;
+        
+        // Handle DD/MM/YYYY format
+        if (dateStr?.includes('/')) {
+            const [day, month, year] = dateStr.split('/');
+            date = new Date(year, month - 1, day);
+        } else {
+            date = new Date(dateStr);
+        }
+
+        if (isNaN(date)) {
+            return {
+                isValid: false,
+                error: 'Invalid date format'
+            };
+        }
+
+        return {
+            isValid: true,
+            date: date
+        };
+    } catch (error) {
+        return {
+            isValid: false,
+            error: 'Error parsing date'
         };
     }
 }
@@ -217,7 +223,7 @@ async function validateAgainstCampaign(receiptData, campaign) {
     const matchedCriteria = [];
     campaign.lastFailureReason = null;
 
-    // Check store specificity if campaign is store-specific
+    // Check store specificity
     if (campaign.storeName && 
         campaign.storeName.toLowerCase() !== receiptData.storeName.toLowerCase()) {
         campaign.lastFailureReason = 'Store mismatch';
@@ -231,8 +237,8 @@ async function validateAgainstCampaign(receiptData, campaign) {
         return { isValid: false };
     }
 
-    // Check required items if specified
-    if (campaign.requiredItems && campaign.requiredItems.length > 0) {
+    // Check required items
+    if (campaign.requiredItems?.length > 0) {
         const hasAllRequired = validateRequiredItems(receiptData.items, campaign.requiredItems);
         if (!hasAllRequired) {
             campaign.lastFailureReason = 'Missing required items';
@@ -242,7 +248,7 @@ async function validateAgainstCampaign(receiptData, campaign) {
     }
 
     // Check date range
-    const receiptDate = new Date(receiptData.date);
+    const receiptDate = parseReceiptDate(receiptData.date).date;
     const campaignStart = new Date(campaign.startDate);
     const campaignEnd = new Date(campaign.endDate);
     
@@ -264,27 +270,27 @@ async function validateAgainstCampaign(receiptData, campaign) {
  * @param {Array} requiredItems - Required items from campaign
  * @returns {boolean} Whether all required items are present
  */
-function validateRequiredItems(receiptItems, requiredItems) {
+function validateRequiredItems(receiptItems = [], requiredItems = []) {
+    if (!Array.isArray(receiptItems) || !Array.isArray(requiredItems)) {
+        return false;
+    }
+
     return requiredItems.every(required => {
-        // Convert both to lowercase for case-insensitive matching
         const requiredName = required.name.toLowerCase();
-        
-        // Find all matching items in receipt
         const matches = receiptItems.filter(item => 
             item.name.toLowerCase().includes(requiredName)
         );
-
-        // Calculate total quantity of matching items
-        const totalQuantity = matches.reduce((sum, item) => sum + (item.quantity || 0), 0);
-        
-        // Check if total quantity meets requirement
+        const totalQuantity = matches.reduce((sum, item) => sum + (Number(item.quantity) || 0), 0);
         return totalQuantity >= required.quantity;
     });
 }
 
+// Export all necessary functions
 module.exports = {
     matchReceiptToCampaign,
-    validateReceiptData,
+    validateReceipt,
     validateAgainstCampaign,
-    validateRequiredItems
+    validateRequiredItems,
+    parseReceiptDate,
+    getActiveCampaigns
 };
