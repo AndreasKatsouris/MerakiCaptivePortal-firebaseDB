@@ -161,6 +161,9 @@ async function extractStoreDetails(fullText) {
     let brandName = '';
     let storeName = '';
     let storeAddress = '';
+    let brandLineIndex = -1;
+
+    console.log('Processing lines for store details:', lines.slice(0, 5));
 
     // Look for brand name in first few lines
     for (let i = 0; i < Math.min(5, lines.length); i++) {
@@ -168,30 +171,36 @@ async function extractStoreDetails(fullText) {
         for (const brand of activeBrands) {
             if (line.includes(brand.toLowerCase())) {
                 brandName = brand;
-                const fullStoreLine = lines[i];
-                const brandRegex = new RegExp(brand, 'i');
-                storeName = fullStoreLine.replace(brandRegex, '').trim();
+                brandLineIndex = i;
                 break;
             }
         }
         if (brandName) break;
     }
 
-    // Look for store address
-    for (let i = 1; i < Math.min(10, lines.length); i++) {
+    // If we found the brand name, look at the next line for store name
+    if (brandLineIndex !== -1 && brandLineIndex + 1 < lines.length) {
+        storeName = lines[brandLineIndex + 1].trim();
+    }
+
+    // Look for address in subsequent lines
+    for (let i = brandLineIndex + 2; i < Math.min(brandLineIndex + 5, lines.length); i++) {
         const line = lines[i];
-        if (line.match(/SHOP|MALL|CENTRE|CENTER|STREET|RD|ROAD|AVE|AVENUE|Tel/i)) {
+        if (line.match(/SHOP|MALL|CENTRE|CENTER|STREET|RD|ROAD|AVE|AVENUE/i)) {
             storeAddress = line.trim();
             break;
         }
     }
 
-    return {
+    const storeDetails = {
         brandName: brandName || 'Unknown Brand',
         storeName: storeName || 'Unknown Location',
         storeAddress: storeAddress || '',
         fullStoreName: `${brandName} ${storeName}`.trim()
     };
+
+    console.log('Extracted store details:', storeDetails);
+    return storeDetails;
 }
 
 /**
@@ -204,156 +213,76 @@ async function extractItems(fullText) {
     const items = [];
     let inItemsSection = false;
     let subtotal = 0;
-    let currentItem = null;
 
-    // Common section markers
-    const sectionStartMarkers = [
-        /items?/i,
-        /description/i,
-        /qty.*price/i,
-        /ordered items?/i
-    ];
-
-    const sectionEndMarkers = [
-        /subtotal/i,
-        /bill\s+excl/i,
-        /total/i,
-        /vat/i,
-        /tax/i
-    ];
-
-    // Multiple item patterns to try
-    const itemPatterns = [
-        // Pattern 1: Name Qty Price Total
-        /^(.+?)\s+(\d+)\s+(\d+\.?\d*)\s+(\d+\.?\d*)$/,
-        // Pattern 2: Name Qty Price
-        /^(.+?)\s+(\d+)\s+R?\s*(\d+\.?\d*)$/,
-        // Pattern 3: Name Price
-        /^(.+?)\s+R?\s*(\d+\.?\d*)$/,
-        // Pattern 4: Qty x Price Name
-        /^(\d+)\s*x\s*R?\s*(\d+\.?\d*)\s+(.+)$/
-    ];
-
-    // Price pattern to find standalone prices
-    const pricePattern = /R?\s*(\d+\.?\d*)/;
-
+    // Find the items section
     for (let i = 0; i < lines.length; i++) {
-        const line = lines[i].trim();
-        if (!line) continue;
+        const line = lines[i];
 
-        // Check for section start
-        if (sectionStartMarkers.some(marker => marker.test(line))) {
+        // Look for section markers
+        if (line.match(/^ITEM\s+QTY\s+PRICE\s+VALUE/i)) {
             inItemsSection = true;
             continue;
         }
 
-        // Check for section end
-        if (sectionEndMarkers.some(marker => marker.test(line))) {
-            if (currentItem) {
-                items.push(currentItem);
-                currentItem = null;
-            }
+        if (line.match(/^Bill Excl/i)) {
             inItemsSection = false;
             continue;
         }
 
-        if (!inItemsSection) continue;
+        // Process items
+        if (inItemsSection && line) {
+            // Match pattern: ItemName Qty Price Value
+            // Use a more precise regex that handles numbers with decimals
+            const itemMatch = line.match(/^(.+?)\s+(\d+)\s+(\d+\.\d{2})\s+(\d+\.\d{2})$/);
+            
+            if (itemMatch) {
+                const [, name, qty, price, total] = itemMatch;
+                const item = {
+                    name: name.trim(),
+                    quantity: parseInt(qty, 10),
+                    unitPrice: parseFloat(price),
+                    totalPrice: parseFloat(total)
+                };
 
-        // Try each item pattern
-        let matched = false;
-        for (const pattern of itemPatterns) {
-            const match = line.match(pattern);
-            if (match) {
-                matched = true;
-                let item;
-
-                if (pattern === itemPatterns[0]) {
-                    // Pattern 1: Name Qty Price Total
-                    item = {
-                        name: match[1].trim(),
-                        quantity: parseInt(match[2]),
-                        unitPrice: parseFloat(match[3]),
-                        totalPrice: parseFloat(match[4])
-                    };
-                } else if (pattern === itemPatterns[1]) {
-                    // Pattern 2: Name Qty Price
-                    const qty = parseInt(match[2]);
-                    const price = parseFloat(match[3]);
-                    item = {
-                        name: match[1].trim(),
-                        quantity: qty,
-                        unitPrice: price,
-                        totalPrice: qty * price
-                    };
-                } else if (pattern === itemPatterns[2]) {
-                    // Pattern 3: Name Price
-                    item = {
-                        name: match[1].trim(),
-                        quantity: 1,
-                        unitPrice: parseFloat(match[2]),
-                        totalPrice: parseFloat(match[2])
-                    };
-                } else if (pattern === itemPatterns[3]) {
-                    // Pattern 4: Qty x Price Name
-                    const qty = parseInt(match[1]);
-                    const price = parseFloat(match[2]);
-                    item = {
-                        name: match[3].trim(),
-                        quantity: qty,
-                        unitPrice: price,
-                        totalPrice: qty * price
-                    };
-                }
-
-                if (item && !isNaN(item.totalPrice)) {
+                // Validate the item
+                if (!isNaN(item.quantity) && 
+                    !isNaN(item.unitPrice) && 
+                    !isNaN(item.totalPrice) &&
+                    item.name.length > 0) {
                     items.push(item);
                     subtotal += item.totalPrice;
                 }
-                break;
-            }
-        }
+            } else {
+                // Try alternative pattern for cases where value might be missing
+                const altMatch = line.match(/^(.+?)\s+(\d+)\s+(\d+\.\d{2})/);
+                if (altMatch) {
+                    const [, name, qty, price] = altMatch;
+                    const quantity = parseInt(qty, 10);
+                    const unitPrice = parseFloat(price);
+                    const total = quantity * unitPrice;
+                    
+                    const item = {
+                        name: name.trim(),
+                        quantity: quantity,
+                        unitPrice: unitPrice,
+                        totalPrice: total
+                    };
 
-        // Handle multiline items
-        if (!matched) {
-            // Check if line contains only a price
-            const priceMatch = line.match(pricePattern);
-            if (priceMatch && currentItem) {
-                const price = parseFloat(priceMatch[1]);
-                currentItem.unitPrice = price;
-                currentItem.totalPrice = price * currentItem.quantity;
-                items.push(currentItem);
-                subtotal += currentItem.totalPrice;
-                currentItem = null;
-            } else if (!priceMatch && !line.match(/^\d+$/)) {
-                // Line might be an item name
-                currentItem = {
-                    name: line.trim(),
-                    quantity: 1,
-                    unitPrice: 0,
-                    totalPrice: 0
-                };
+                    if (!isNaN(item.quantity) && 
+                        !isNaN(item.unitPrice) && 
+                        item.name.length > 0) {
+                        items.push(item);
+                        subtotal += item.totalPrice;
+                    }
+                }
             }
         }
     }
 
-    // Clean up any remaining items
-    if (currentItem && currentItem.unitPrice > 0) {
-        items.push(currentItem);
-        subtotal += currentItem.totalPrice;
-    }
-
-    // Post-process items to clean up names and remove duplicates
-    const cleanedItems = items
-        .filter(item => item.name && item.totalPrice > 0)
-        .map(item => ({
-            ...item,
-            name: cleanItemName(item.name)
-        }))
-        .filter((item, index, self) => 
-            index === self.findIndex(t => t.name === item.name && t.totalPrice === item.totalPrice)
-        );
-
-    return { items: cleanedItems, subtotal };
+    // Log the extracted items for debugging
+    console.log('Extracted items:', JSON.stringify(items, null, 2));
+    
+    return { items, subtotal };
 }
 
 function cleanItemName(name) {
