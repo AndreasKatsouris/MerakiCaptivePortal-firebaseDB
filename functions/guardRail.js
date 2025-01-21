@@ -99,39 +99,110 @@ async function getActiveCampaigns() {
  * @param {object} receiptData - Receipt data to validate
  * @returns {string|null} Error message if invalid, null if valid
  */
-function validateReceiptData(receiptData) {
-    if (!receiptData) return 'No receipt data provided';
-    
-    const requiredFields = {
-        brandName: 'Brand name',
-        storeName: 'Store name',
-        date: 'Receipt date',
-        totalAmount: 'Total amount',
-        items: 'Item list'
-    };
+async function validateReceipt(receiptData, brandName) {
+    try {
+        console.log('Starting receipt validation for brand:', brandName);
+        console.log('Receipt data:', JSON.stringify(receiptData, null, 2));
 
-    for (const [field, label] of Object.entries(requiredFields)) {
-        if (!receiptData[field]) {
-            return `${label} is missing`;
+        // Get brand-specific validation rules
+        const rules = brandValidationRules[brandName] || brandValidationRules['DEFAULT'];
+
+        // Basic validation checks
+        if (!receiptData.brandName || !receiptData.storeName) {
+            return {
+                isValid: false,
+                error: 'Missing brand or store information'
+            };
         }
-    }
 
-    if (!Array.isArray(receiptData.items) || receiptData.items.length === 0) {
-        return 'Receipt must contain at least one item';
-    }
+        // Validate store name
+        if (!rules.validateStore(receiptData.storeName)) {
+            return {
+                isValid: false,
+                error: 'Invalid store name for brand'
+            };
+        }
 
-    // Validate receipt date
-    const receiptDate = new Date(receiptData.date);
-    if (isNaN(receiptDate.getTime())) {
-        return 'Invalid receipt date';
-    }
+        // Parse and validate the receipt date
+        let receiptDate;
+        try {
+            // Handle DD/MM/YYYY format
+            if (receiptData.date?.includes('/')) {
+                const [day, month, year] = receiptData.date.split('/');
+                receiptDate = new Date(year, month - 1, day);
+            } else {
+                receiptDate = new Date(receiptData.date);
+            }
 
-    // Don't accept future dates
-    if (receiptDate > new Date()) {
-        return 'Receipt date cannot be in the future';
-    }
+            if (isNaN(receiptDate)) {
+                throw new Error('Invalid date format');
+            }
+        } catch (error) {
+            return {
+                isValid: false,
+                error: 'Invalid receipt date format'
+            };
+        }
 
-    return null;
+        // Get active campaigns
+        const campaigns = await fetchCampaigns();
+        console.log('Found campaigns:', campaigns.length);
+
+        // Filter active campaigns for matching brand
+        const matchingCampaigns = campaigns.filter(campaign => {
+            return campaign.brandName.toLowerCase() === brandName.toLowerCase() &&
+                   campaign.status === 'active';
+        });
+
+        if (!matchingCampaigns.length) {
+            return {
+                isValid: false,
+                error: 'No active campaigns found for this brand'
+            };
+        }
+
+        // Campaign-specific validation
+        for (const campaign of matchingCampaigns) {
+            // Validate date range
+            const campaignStart = new Date(campaign.startDate);
+            const campaignEnd = new Date(campaign.endDate);
+
+            if (receiptDate >= campaignStart && receiptDate <= campaignEnd) {
+                // Validate required items if specified
+                if (campaign.requiredItems && campaign.requiredItems.length > 0) {
+                    const hasRequiredItems = validateRequiredItems(receiptData.items, campaign.requiredItems);
+                    if (hasRequiredItems) {
+                        return {
+                            isValid: true,
+                            campaign: campaign,
+                            receiptData: receiptData
+                        };
+                    }
+                } else {
+                    // If no specific items required, validate total amount
+                    if (rules.validateTotal(receiptData.totalAmount)) {
+                        return {
+                            isValid: true,
+                            campaign: campaign,
+                            receiptData: receiptData
+                        };
+                    }
+                }
+            }
+        }
+
+        return {
+            isValid: false,
+            error: 'Receipt does not meet campaign requirements'
+        };
+
+    } catch (error) {
+        console.error('Error in validateReceipt:', error);
+        return {
+            isValid: false,
+            error: 'Error validating receipt'
+        };
+    }
 }
 
 /**
