@@ -214,83 +214,140 @@ async function extractItems(fullText) {
     let inItemsSection = false;
     let subtotal = 0;
 
+    console.log('Starting item extraction. Total lines:', lines.length);
+
     // Find the items section
     for (let i = 0; i < lines.length; i++) {
         const line = lines[i];
+        console.log(`\nProcessing line ${i}:`, line);
+        console.log('Line with visible whitespace:', debugWhitespace(line));
 
         // Look for section markers
         if (line.match(/^ITEM\s+QTY\s+PRICE\s+VALUE/i)) {
+            console.log('Found items section header');
             inItemsSection = true;
             continue;
         }
 
         if (line.match(/^Bill Excl/i)) {
+            console.log('Found end of items section');
             inItemsSection = false;
             continue;
         }
 
         // Process items
         if (inItemsSection && line) {
+            console.log('Attempting to parse item line:', line);
+
             // Match pattern: ItemName Qty Price Value
-            // Use a more precise regex that handles numbers with decimals
             const itemMatch = line.match(/^(.+?)\s+(\d+)\s+(\d+\.\d{2})\s+(\d+\.\d{2})$/);
             
             if (itemMatch) {
+                console.log('Matched primary pattern. Groups:', itemMatch.slice(1));
                 const [, name, qty, price, total] = itemMatch;
-                const item = {
+                
+                console.log('Parsing values:', {
                     name: name.trim(),
+                    qty,
+                    price,
+                    total
+                });
+
+                const item = {
+                    name: cleanItemName(name),
                     quantity: parseInt(qty, 10),
                     unitPrice: parseFloat(price),
                     totalPrice: parseFloat(total)
                 };
+
+                console.log('Created item object:', item);
 
                 // Validate the item
                 if (!isNaN(item.quantity) && 
                     !isNaN(item.unitPrice) && 
                     !isNaN(item.totalPrice) &&
                     item.name.length > 0) {
+                    console.log('Item validation passed, adding to list');
                     items.push(item);
                     subtotal += item.totalPrice;
+                } else {
+                    console.warn('Item validation failed:', {
+                        hasValidQuantity: !isNaN(item.quantity),
+                        hasValidUnitPrice: !isNaN(item.unitPrice),
+                        hasValidTotalPrice: !isNaN(item.totalPrice),
+                        hasValidName: item.name.length > 0
+                    });
                 }
             } else {
+                console.log('Primary pattern match failed, trying alternative pattern');
                 // Try alternative pattern for cases where value might be missing
                 const altMatch = line.match(/^(.+?)\s+(\d+)\s+(\d+\.\d{2})/);
                 if (altMatch) {
+                    console.log('Matched alternative pattern. Groups:', altMatch.slice(1));
                     const [, name, qty, price] = altMatch;
                     const quantity = parseInt(qty, 10);
                     const unitPrice = parseFloat(price);
                     const total = quantity * unitPrice;
                     
-                    const item = {
+                    console.log('Parsing alternative values:', {
                         name: name.trim(),
+                        quantity,
+                        unitPrice,
+                        total
+                    });
+
+                    const item = {
+                        name: cleanItemName(name),
                         quantity: quantity,
                         unitPrice: unitPrice,
                         totalPrice: total
                     };
 
+                    console.log('Created alternative item object:', item);
+
                     if (!isNaN(item.quantity) && 
                         !isNaN(item.unitPrice) && 
                         item.name.length > 0) {
+                        console.log('Alternative item validation passed, adding to list');
                         items.push(item);
                         subtotal += item.totalPrice;
+                    } else {
+                        console.warn('Alternative item validation failed:', {
+                            hasValidQuantity: !isNaN(item.quantity),
+                            hasValidUnitPrice: !isNaN(item.unitPrice),
+                            hasValidName: item.name.length > 0
+                        });
                     }
+                } else {
+                    console.log('Failed to match any item patterns');
                 }
             }
+        } else if (inItemsSection) {
+            console.log('Skipping empty line in items section');
         }
     }
 
-    // Log the extracted items for debugging
-    console.log('Extracted items:', JSON.stringify(items, null, 2));
+    console.log('\nExtraction complete. Results:', {
+        itemCount: items.length,
+        subtotal: subtotal,
+        items: JSON.stringify(items, null, 2)
+    });
     
     return { items, subtotal };
 }
 
+// Helper function to clean and standardize item names
 function cleanItemName(name) {
     return name
         .replace(/\s+/g, ' ')  // Replace multiple spaces with single space
         .replace(/[^\w\s()-]/g, '')  // Remove special characters except parentheses and hyphen
         .replace(/\s*\(\d+\)\s*$/, '')  // Remove trailing parenthetical numbers
         .trim();
+}
+
+// Helper function to visualize exact whitespace in a string
+function debugWhitespace(str) {
+    return str.replace(/ /g, '·').replace(/\t/g, '→');
 }
 
 /**
