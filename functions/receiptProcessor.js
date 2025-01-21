@@ -213,7 +213,12 @@ async function extractItems(fullText) {
     const items = [];
     let inItemsSection = false;
     let subtotal = 0;
-    let currentItem = null;
+    let currentItem = {
+        name: null,
+        quantity: null,
+        unitPrice: null,
+        totalPrice: null
+    };
 
     console.log('Starting item extraction. Total lines:', lines.length);
 
@@ -238,6 +243,10 @@ async function extractItems(fullText) {
         if (line.match(/^Bill Excl/i)) {
             console.log('Found end of items section');
             inItemsSection = false;
+            // Save any pending item
+            if (currentItem.name && currentItem.quantity && currentItem.unitPrice) {
+                saveCurrentItem();
+            }
             continue;
         }
 
@@ -245,52 +254,76 @@ async function extractItems(fullText) {
         if (inItemsSection && line) {
             console.log('Processing potential item line:', line);
 
-            // If the line contains digits and decimals, it might be the quantity/price line
-            if (line.match(/\d+\.\d{2}/)) {
-                console.log('Found price line:', line);
-                // Split the line by whitespace to get quantity, price, and value
-                const parts = line.split(/\s+/).filter(Boolean);
-                console.log('Price line parts:', parts);
-
-                // If we have a current item name and numeric values, create the item
-                if (currentItem && parts.length >= 3) {
-                    try {
-                        const item = {
-                            name: cleanItemName(currentItem),
-                            quantity: parseInt(parts[0], 10),
-                            unitPrice: parseFloat(parts[1]),
-                            totalPrice: parseFloat(parts[2])
-                        };
-
-                        console.log('Created item:', item);
-
-                        // Validate the item
-                        if (!isNaN(item.quantity) && 
-                            !isNaN(item.unitPrice) && 
-                            !isNaN(item.totalPrice) &&
-                            item.name.length > 0) {
-                            console.log('Item validation passed, adding to list');
-                            items.push(item);
-                            subtotal += item.totalPrice;
-                        } else {
-                            console.warn('Item validation failed:', {
-                                hasValidQuantity: !isNaN(item.quantity),
-                                hasValidUnitPrice: !isNaN(item.unitPrice),
-                                hasValidTotalPrice: !isNaN(item.totalPrice),
-                                hasValidName: item.name.length > 0
-                            });
-                        }
-                    } catch (error) {
-                        console.error('Error parsing item:', error);
-                    }
-                    currentItem = null;
+            // Check if line is a simple integer (quantity)
+            if (/^\d+$/.test(line)) {
+                console.log('Found quantity:', line);
+                if (currentItem.name && !currentItem.quantity) {
+                    currentItem.quantity = parseInt(line, 10);
                 }
-            } else if (line.length > 0 && !line.match(/^-+$/)) {
-                // If it's not a price line and not a separator, it's probably an item name
+            }
+            // Check if line is a price (number with decimal)
+            else if (/^\d+\.\d{2}$/.test(line)) {
+                console.log('Found price:', line);
+                const price = parseFloat(line);
+                if (currentItem.name) {
+                    if (!currentItem.unitPrice) {
+                        currentItem.unitPrice = price;
+                    } else if (!currentItem.totalPrice) {
+                        currentItem.totalPrice = price;
+                        saveCurrentItem();
+                    }
+                }
+            }
+            // If not a number, must be an item name
+            else if (line.length > 0 && !line.match(/^-+$/)) {
                 console.log('Found item name:', line);
-                currentItem = line;
+                // Save any previous item if complete
+                if (currentItem.name && currentItem.quantity && currentItem.unitPrice) {
+                    saveCurrentItem();
+                }
+                // Start new item
+                currentItem = {
+                    name: cleanItemName(line),
+                    quantity: null,
+                    unitPrice: null,
+                    totalPrice: null
+                };
             }
         }
+    }
+
+    function saveCurrentItem() {
+        console.log('Saving current item:', currentItem);
+        if (currentItem.name && currentItem.quantity && currentItem.unitPrice) {
+            // If we don't have a total price, calculate it
+            if (!currentItem.totalPrice) {
+                currentItem.totalPrice = currentItem.quantity * currentItem.unitPrice;
+            }
+            
+            // Validate the item
+            if (!isNaN(currentItem.quantity) && 
+                !isNaN(currentItem.unitPrice) && 
+                !isNaN(currentItem.totalPrice) &&
+                currentItem.name.length > 0) {
+                console.log('Item validation passed, adding to list');
+                items.push({...currentItem});
+                subtotal += currentItem.totalPrice;
+            } else {
+                console.warn('Item validation failed:', {
+                    hasValidQuantity: !isNaN(currentItem.quantity),
+                    hasValidUnitPrice: !isNaN(currentItem.unitPrice),
+                    hasValidTotalPrice: !isNaN(currentItem.totalPrice),
+                    hasValidName: currentItem.name.length > 0
+                });
+            }
+        }
+        // Reset current item
+        currentItem = {
+            name: null,
+            quantity: null,
+            unitPrice: null,
+            totalPrice: null
+        };
     }
 
     console.log('\nExtraction complete. Results:', {
