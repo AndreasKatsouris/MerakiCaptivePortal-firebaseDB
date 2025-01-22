@@ -167,7 +167,7 @@ const guestManagement = {
                 const receipts = guestData.receipts || {};
                 
                 const totalSpend = visits.reduce((sum, visit) => sum + (visit.amount || 0), 0) +
-                                 Object.values(receipts).reduce((sum, receipt) => sum + (receipt.totalAmount || 0), 0);
+                                    Object.values(receipts).reduce((sum, receipt) => sum + (receipt.totalAmount || 0), 0);
                 
                 const frequency = visits.length + Object.keys(receipts).length;
                 
