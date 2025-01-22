@@ -148,11 +148,17 @@ const guestManagement = {
                     const guests = snapshot.val();
                     
                     if (guests) {
-                        this.guests = Object.entries(guests).map(([phoneNumber, data]) => ({
-                            phoneNumber,
-                            ...data,
-                            metrics: this.calculateGuestMetrics(data)
-                        }));
+                        console.log('Raw guest data:', guests); // Debugging
+                        this.guests = Object.entries(guests).map(([phoneNumber, data]) => {
+                            console.log('Processing guest:', phoneNumber, data); // Debugging
+                            const metrics = this.calculateGuestMetrics(data);
+                            console.log('Calculated metrics:', metrics); // Debugging
+                            return {
+                                phoneNumber,
+                                ...data,
+                                metrics
+                            };
+                        });
                     }
                 } catch (error) {
                     console.error('Error loading guests:', error);
