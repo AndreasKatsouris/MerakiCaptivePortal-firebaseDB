@@ -1,10 +1,10 @@
 const admin = require('firebase-admin');
 require('dotenv').config();
-const { client, twilioPhone } = require('./twilioClient');
-const { processReceipt } = require('./receiptProcessor');
-const { matchReceiptToCampaign } = require('./guardRail');
-const { processReward } = require('./rewardsProcessor');
-const { processMessage } = require('./menuLogic');
+const { client, twilioPhone } = require('../public/js/twilioClient');
+const { processReceipt } = require('../public/js/receiptProcessor');
+const { matchReceiptToCampaign } = require('../public/js/guardRail');
+const { processReward } = require('../public/js/rewardsProcessor');
+const { processMessage } = require('../public/js/menuLogic');
 
 // Initialize Firebase Admin if not already initialized
 if (!admin.apps.length) {

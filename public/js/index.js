@@ -1,6 +1,6 @@
 const { onRequest } = require('firebase-functions/v2/https');
 const admin = require('firebase-admin');
-const { receiveWhatsAppMessage } = require('./receiveWhatsappMessage');
+const { receiveWhatsAppMessage } = require('../../functions/receiveWhatsappMessage');
 
 // Initialize Firebase Admin SDK
 if (!admin.apps.length) {
