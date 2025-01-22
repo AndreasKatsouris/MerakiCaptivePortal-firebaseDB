@@ -32,6 +32,10 @@
     <script type="module" src="js/project-management.js"></script>
     <script type="module" src="js/reward-types.js"></script>
 
+    <!-- Vue.js -->
+    <script src="https://unpkg.com/vue@3/dist/vue.global.js"></script>
+
+
 </head>
 <body>
     <div class="sidebar-overlay" id="sidebarOverlay"></div>
@@ -106,6 +110,7 @@
                         <li><a href="#" id="receiptScanningMenu">Receipts</a></li>
                          <li><a href="#" id="rewardsManagementMenu">Rewards</a></li> 
                          <li><a href="#" id="rewardTypesMenu">Reward Types</a></li>
+                         <li><a href="#" id="guestManagementMenu">Guest Management</a></li>
                         <!--<li class="nav-item">
                             <a href="#" class="nav-link" data-toggle="collapse" data-target="#rewardsSubmenu">
                                 <i class="fas fa-gift"></i>
@@ -544,6 +549,12 @@
     </div>
 </div>
 <!-- End of Reward Types Section -->
+ <!-- Guest Management Section -->
+ <div id="guestManagementContent" class="content-section" style="display: none;">
+    <div id="guestManagementRoot"></div>
+</div>
+
+  <!-- End of Guest Management Section -->
 
 <!-- Receipt Management Section -->
 <div id="receiptManagementContent" class="content-section" style="display: none;">

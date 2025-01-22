@@ -1,9 +1,16 @@
 import { updateDashboardStats, initializeDashboardListeners } from './dashboard.js';
 import { initializeProjectManagement } from './project-management.js';
 import { initializeRewardTypes } from './reward-types.js';
+import { initializeGuestManagement } from './guest-management.js';
 
 window.addEventListener('error', function(e) {
     console.error('Global error:', e.error);
+
+    // Add specific handling for guest management errors
+    if (e.error?.message?.includes('guest')) {
+        console.error('Guest Management Error:', e.error);
+        showError('An error occurred in guest management. Please try again.');
+    }
 });
 
 
@@ -21,6 +28,7 @@ document.addEventListener('DOMContentLoaded', function () {
     initializeMobileMenu();
     initializeProjectManagement();
     initializeRewardTypes();
+    initializeGuestManagement();
 });
 
 // ==================== Authentication Section ====================
