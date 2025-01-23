@@ -288,9 +288,7 @@ const campaignManagement = {
     }
 };
 
-module.exports = {
-    initializeCampaignManagement() {
-        const app = Vue.createApp(campaignManagement.component);
-        campaignManagement.app = app.mount('#campaignManagementRoot');
-    }
-};
+export function initializeCampaignManagement() {
+    const app = Vue.createApp(campaignManagement.component);
+    campaignManagement.app = app.mount('#campaignManagementRoot');
+}

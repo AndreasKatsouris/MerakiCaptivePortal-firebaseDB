@@ -1,4 +1,4 @@
-const { fetchCampaigns } = require('./campaigns');
+const { fetchCampaigns } = require('../public/js/campaigns');
 
 /**
  * Brand-specific validation rules
