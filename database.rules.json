@@ -24,6 +24,9 @@
       ".indexOn": ["status", "category"],
       ".read": true,
       ".write": true
+    },
+    "receipts": {
+      ".indexOn": ["guestPhoneNumber"]
     }
   }
 }
