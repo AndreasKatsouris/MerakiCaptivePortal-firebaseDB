@@ -1469,7 +1469,7 @@ async function loadInitialData() {
         displaySection('dashboardContent');
         await Promise.all([
             updateDashboardStats(),
-            loadCampaigns(),
+            initializeCampaignManagement(),
             fetchWiFiReports()
         ]);
         initializeDashboardListeners();
