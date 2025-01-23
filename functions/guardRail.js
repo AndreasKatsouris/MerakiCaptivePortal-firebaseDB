@@ -1,5 +1,4 @@
-const { fetchCampaigns } = require('../public/js/campaigns');
-
+const admin = require('firebase-admin');
 /**
  * Brand-specific validation rules
  */
@@ -98,10 +97,11 @@ async function matchReceiptToCampaign(receiptData) {
  */
 async function getActiveCampaigns() {
     try {
-        const campaigns = await fetchCampaigns();
+        const snapshot = await admin.database().ref('campaigns').once('value');
+        const campaigns = snapshot.val() || {};
         const now = new Date();
         
-        return campaigns.filter(campaign => {
+        return Object.values(campaigns).filter(campaign => {
             const startDate = new Date(campaign.startDate);
             const endDate = new Date(campaign.endDate);
             return campaign.status === 'active' && 
@@ -341,5 +341,5 @@ module.exports = {
     validateRequiredItems,
     parseReceiptDate,
     getActiveCampaigns,
-    validateCampaignData,
+    validateCampaignData
 };
