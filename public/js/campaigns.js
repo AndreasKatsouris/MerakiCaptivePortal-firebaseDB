@@ -331,7 +331,7 @@ const campaignManagement = {
 };
 
 export function initializeCampaignManagement() {
-    managementApp = Vue.createApp(campaignComponent);
+    managementApp = Vue.createApp(campaignManagement.component);
     return managementApp.mount('#campaignManagementRoot');
 }
 
