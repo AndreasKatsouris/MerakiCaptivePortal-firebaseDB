@@ -1,5 +1,3 @@
-//import { showLoading, hideLoading } from './admin-dashboard.js';
-let managementApp = null;
 const campaignManagement = {
     app: null,
     component: {
@@ -330,13 +328,21 @@ const campaignManagement = {
     }
 };
 
+const managementApp = {
+    app: null,
+    init() {
+        this.app = Vue.createApp(campaignManagement.component);
+        return this.app.mount('#campaignManagementRoot');
+    }
+};
+
 export function initializeCampaignManagement() {
-    managementApp = Vue.createApp(campaignManagement.component);
-    return managementApp.mount('#campaignManagementRoot');
+    return managementApp.init();
 }
 
 export function loadCampaigns() {
-    if (managementApp) {
-        return managementApp.$refs.component.loadCampaigns();
+    if (managementApp.app) {
+        const instance = managementApp.app._instance;
+        return instance?.proxy?.loadCampaigns();
     }
 }
