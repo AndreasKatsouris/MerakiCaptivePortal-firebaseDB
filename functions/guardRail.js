@@ -247,15 +247,27 @@ async function validateAgainstCampaign(receiptData, campaign) {
         matchedCriteria.push('Required items found');
     }
 
-    // Check date range
+    // Check date range and active days
     const receiptDate = parseReceiptDate(receiptData.date).date;
     const campaignStart = new Date(campaign.startDate);
     const campaignEnd = new Date(campaign.endDate);
     
+    // Check if receipt date is within campaign period
     if (receiptDate < campaignStart || receiptDate > campaignEnd) {
         campaign.lastFailureReason = 'Receipt date outside campaign period';
         return { isValid: false };
     }
+
+    // Check if receipt day matches campaign active days
+    const receiptDay = receiptDate.getDay(); // 0-6, where 0 is Sunday
+    if (campaign.activeDays && campaign.activeDays.length > 0) {
+        if (!campaign.activeDays.includes(receiptDay)) {
+            campaign.lastFailureReason = 'Receipt day not in campaign active days';
+            return { isValid: false };
+        }
+        matchedCriteria.push('Receipt day matches campaign active days');
+    }
+    
     matchedCriteria.push('Date within campaign period');
 
     return {
@@ -285,6 +297,42 @@ function validateRequiredItems(receiptItems = [], requiredItems = []) {
     });
 }
 
+/**
+ * Validate campaign data
+ * @param {object} campaignData - Campaign data to validate
+ * @returns {string[]} Array of validation errors
+ */
+function validateCampaignData(campaignData) {
+    const errors = [];
+    
+    if (!campaignData.name?.trim()) errors.push('Campaign name is required');
+    if (!campaignData.brandName?.trim()) errors.push('Brand name is required');
+    if (!campaignData.startDate) errors.push('Start date is required');
+    if (!campaignData.endDate) errors.push('End date is required');
+    
+    // Validate dates
+    const startDate = new Date(campaignData.startDate);
+    const endDate = new Date(campaignData.endDate);
+    if (endDate < startDate) errors.push('End date must be after start date');
+    
+    // Validate minimum purchase amount if provided
+    if (campaignData.minPurchaseAmount !== null && 
+        (isNaN(parseFloat(campaignData.minPurchaseAmount)) || 
+         parseFloat(campaignData.minPurchaseAmount) < 0)) {
+        errors.push('Minimum purchase amount must be a positive number');
+    }
+    
+    // Validate active days if provided
+    if (campaignData.activeDays && Array.isArray(campaignData.activeDays)) {
+        const validDays = campaignData.activeDays.every(day => 
+            Number.isInteger(day) && day >= 0 && day <= 6
+        );
+        if (!validDays) errors.push('Invalid active days selected');
+    }
+
+    return errors;
+}
+
 // Export all necessary functions
 module.exports = {
     matchReceiptToCampaign,
@@ -292,5 +340,6 @@ module.exports = {
     validateAgainstCampaign,
     validateRequiredItems,
     parseReceiptDate,
-    getActiveCampaigns
+    getActiveCampaigns,
+    validateCampaignData,
 };
