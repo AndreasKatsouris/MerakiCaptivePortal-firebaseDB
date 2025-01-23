@@ -328,30 +328,81 @@ const campaignManagement = {
     }
 };
 
+window.addEventListener('error', (event) => {
+    console.error('Campaign Management Global Error:', {
+        message: event.error?.message,
+        filename: event.filename,
+        lineno: event.lineno
+    });
+});
 
-let app = null;
+firebase.database().ref('.info/connected').on('value', (snapshot) => {
+    const connected = snapshot.val();
+    console.log(`Firebase Connection Status: ${connected ? 'Connected' : 'Disconnected'}`);
+});
+async function testFirebaseConnection() {
+    try {
+        const snapshot = await firebase.database().ref('campaigns').once('value');
+        console.log('Campaign Data Test:', snapshot.val());
+    } catch (error) {
+        console.error('Firebase Connection Test Failed:', error);
+    }
+}
+
+// Call during initialization
+testFirebaseConnection();
 
 export function initializeCampaignManagement() {
-    if (app) return app;
-    
-    const mountPoint = document.getElementById('campaignManagementRoot');
-    if (!mountPoint) {
-        console.error('Campaign management mount point not found');
+    try {
+        const campaignApp = Vue.createApp({
+            data() {
+                return {
+                    campaigns: {},
+                    loading: false
+                }
+            },
+            methods: {
+                async loadCampaigns() {
+                    this.loading = true;
+                    try {
+                        const snapshot = await firebase.database().ref('campaigns').once('value');
+                        this.campaigns = snapshot.val() || {};
+                        console.log('Campaigns loaded:', Object.keys(this.campaigns).length);
+                    } catch (error) {
+                        console.error('Campaign load error:', error);
+                    } finally {
+                        this.loading = false;
+                    }
+                }
+            }
+        });
+
+        const instance = campaignApp.mount('#campaignManagementRoot');
+        console.log('Campaign management instance:', instance);
+        return instance;
+    } catch (error) {
+        console.error('Campaign management initialization failed:', error);
         return null;
     }
-
-    app = Vue.createApp(campaignManagement.component);
-    return app.mount('#campaignManagementRoot');
 }
 
 export function loadCampaigns() {
-    if (!app) {
-        console.error('Campaign management not initialized');
+    const root = document.getElementById('campaignManagementRoot');
+    if (!root) {
+        console.error('Campaign management root element not found');
         return;
     }
 
-    const instance = app._instance;
-    if (instance?.proxy?.loadCampaigns) {
-        return instance.proxy.loadCampaigns();
+    const vueInstance = root.__vue_app__;
+    if (vueInstance) {
+        const component = vueInstance._instance.proxy;
+        if (component && component.loadCampaigns) {
+            console.log('Manually triggering campaign load');
+            component.loadCampaigns();
+        } else {
+            console.error('Campaign load method not found');
+        }
+    } else {
+        console.error('Vue application instance not found');
     }
 }
