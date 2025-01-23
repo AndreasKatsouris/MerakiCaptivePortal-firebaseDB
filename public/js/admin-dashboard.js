@@ -1492,11 +1492,12 @@ function asyncErrorHandler(fn) {
 }
 
 // Loading state management
-function showLoading() {
+// In admin-dashboard.js
+export function showLoading() {
     document.getElementById('globalLoadingOverlay').style.display = 'flex';
 }
 
-function hideLoading() {
+export function hideLoading() {
     document.getElementById('globalLoadingOverlay').style.display = 'none';
 }
 
