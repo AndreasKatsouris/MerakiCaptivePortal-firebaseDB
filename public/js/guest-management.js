@@ -148,17 +148,16 @@ const guestManagement = {
                     const guests = snapshot.val();
                     
                     if (guests) {
-                        console.log('Raw guest data:', guests); // Debugging
-                        this.guests = Object.entries(guests).map(([phoneNumber, data]) => {
-                            console.log('Processing guest:', phoneNumber, data); // Debugging
-                            const metrics = this.calculateGuestMetrics(data);
-                            console.log('Calculated metrics:', metrics); // Debugging
+                        this.guests = await Promise.all(Object.entries(guests).map(async ([phoneNumber, data]) => {
+                            // Get receipts for this guest
+                            const receipts = await getGuestReceipts(phoneNumber);
                             return {
                                 phoneNumber,
                                 ...data,
-                                metrics
+                                receipts,
+                                metrics: this.calculateGuestMetrics({ ...data, receipts })
                             };
-                        });
+                        }));
                     }
                 } catch (error) {
                     console.error('Error loading guests:', error);
@@ -326,6 +325,34 @@ function showGuestManagement() {
         const app = Vue.createApp(guestManagement.component);
         guestManagement.app = app.mount('#guestManagementRoot');
     }
+}
+
+async function getGuestReceipts(phoneNumber) {
+    try {
+        const snapshot = await firebase.database()
+            .ref('receipts')
+            .orderByChild('phoneNumber')
+            .equalTo(phoneNumber)
+            .once('value');
+        
+        const receipts = snapshot.val();
+        return receipts ? Object.entries(receipts).map(([id, data]) => ({ id, ...data })) : [];
+    } catch (error) {
+        console.error('Error retrieving receipts:', error);
+        return [];
+    }
+}
+
+function logReceiptProcessing(receiptId, status, message) {
+    const logEntry = {
+        receiptId,
+        status,
+        message,
+        timestamp: Date.now()
+    };
+    
+    firebase.database().ref(`receiptLogs/${receiptId}`).set(logEntry)
+        .catch(error => console.error('Error logging receipt processing:', error));
 }
 
 export { initializeGuestManagement };
