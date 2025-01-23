@@ -2,7 +2,7 @@ import { updateDashboardStats, initializeDashboardListeners } from './dashboard.
 import { initializeProjectManagement } from './project-management.js';
 import { initializeRewardTypes } from './reward-types.js';
 import { initializeGuestManagement } from './guest-management.js';
-import { loadCampaigns, initializeCampaignManagement } from './campaigns.js';
+import { initializeCampaignManagement } from './campaigns.js';
 
 
 window.addEventListener('error', function(e) {
@@ -78,7 +78,7 @@ function initializeLoyaltyListeners() {
     addEventListenerSafely('campaignManagementMenu', 'click', function(e) {
         e.preventDefault();
         displaySection('campaignManagementContent');
-        loadCampaigns();
+        campaignManagement.app.loadCampaigns();
     });
 
     // Receipt Management

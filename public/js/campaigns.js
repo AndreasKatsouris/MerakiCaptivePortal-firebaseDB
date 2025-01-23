@@ -1,6 +1,6 @@
 import { showLoading, hideLoading } from './admin-dashboard.js';
 
-const campaignManagement = {
+export const campaignManagement = {
     app: null,
     component: {
         data() {
