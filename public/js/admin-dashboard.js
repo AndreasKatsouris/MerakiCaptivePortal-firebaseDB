@@ -2,7 +2,8 @@ import { updateDashboardStats, initializeDashboardListeners } from './dashboard.
 import { initializeProjectManagement } from './project-management.js';
 import { initializeRewardTypes } from './reward-types.js';
 import { initializeGuestManagement } from './guest-management.js';
-import { initializeCampaignManagement } from './campaigns.js';
+import { loadCampaigns, initializeCampaignManagement } from './campaigns.js';
+
 
 window.addEventListener('error', function(e) {
     console.error('Global error:', e.error);

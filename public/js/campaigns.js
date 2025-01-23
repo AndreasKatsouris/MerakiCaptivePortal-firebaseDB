@@ -287,6 +287,49 @@ const campaignManagement = {
         }
     }
 };
+export async function loadCampaigns() {
+    const campaignTable = document.querySelector('#campaignTable tbody');
+    if (!campaignTable) return;
+
+    try {
+        showLoading();
+        const snapshot = await firebase.database().ref('campaigns').once('value');
+        const campaigns = snapshot.val();
+        
+        if (!campaigns) {
+            campaignTable.innerHTML = '<tr><td colspan="6" class="text-center">No campaigns found</td></tr>';
+            return;
+        }
+
+        campaignTable.innerHTML = Object.entries(campaigns)
+            .map(([key, campaign]) => `
+                <tr>
+                    <td>${campaign.name}</td>
+                    <td>${campaign.brandName}</td>
+                    <td>${campaign.storeName || 'All Stores'}</td>
+                    <td>${new Date(campaign.startDate).toLocaleDateString()}</td>
+                    <td>${new Date(campaign.endDate).toLocaleDateString()}</td>
+                    <td>
+                        <span class="badge badge-${campaign.status === 'active' ? 'success' : 'secondary'}">
+                            ${campaign.status}
+                        </span>
+                    </td>
+                    <td>
+                        <div class="btn-group btn-group-sm">
+                            <button class="btn btn-info view-campaign" data-key="${key}">View</button>
+                            <button class="btn btn-warning edit-campaign" data-key="${key}">Edit</button>
+                            <button class="btn btn-danger delete-campaign" data-key="${key}">Delete</button>
+                        </div>
+                    </td>
+                </tr>
+            `).join('');
+
+    } catch (error) {
+        console.error('Error loading campaigns:', error);
+    } finally {
+        hideLoading();
+    }
+}
 
 export function initializeCampaignManagement() {
     const app = Vue.createApp(campaignManagement.component);
