@@ -357,12 +357,20 @@ export function initializeCampaignManagement() {
     
     const root = document.getElementById('campaignManagementRoot');
     if (!root) {
-        console.error('Campaign management root element not found');
+        console.error('FATAL: Campaign management root element not found');
         return null;
     }
 
     try {
         const app = Vue.createApp({
+            template: `
+                <div>
+                    <div v-if="loading">Loading...</div>
+                    <div v-else>
+                        Campaigns Loaded: {{ Object.keys(campaigns).length }}
+                    </div>
+                </div>
+            `,
             data() {
                 return {
                     campaigns: {},
@@ -382,14 +390,22 @@ export function initializeCampaignManagement() {
                         this.loading = false;
                     }
                 }
+            },
+            mounted() {
+                console.log('Campaign management component mounted');
+                this.loadCampaigns();
             }
         });
 
         const instance = app.mount('#campaignManagementRoot');
         console.log('Campaign management instance:', instance);
+        
+        // Attach instance to the root element for easier access
+        root.__vue_instance__ = instance;
+        
         return instance;
     } catch (error) {
-        console.error('Campaign management initialization failed:', error);
+        console.error('Campaign management initialization FAILED:', error);
         return null;
     }
 }
@@ -401,23 +417,29 @@ export function loadCampaigns() {
         return;
     }
 
-    // Use Vue 3's method to get the component instance
-    const vueInstance = root.__vue_app__;
+    // Try multiple ways to access the Vue instance
+    const vueInstance = 
+        root.__vue_instance__ || 
+        root.__vue_app__ || 
+        document.querySelector('#campaignManagementRoot')?.__vue_instance__;
+
     if (!vueInstance) {
-        console.error('Vue application instance not found');
+        console.error('CRITICAL: Cannot find Vue instance by any method');
         return;
     }
 
-    const component = vueInstance._instance?.proxy;
-    if (!component) {
-        console.error('Vue component proxy not found');
-        return;
-    }
-
-    if (typeof component.loadCampaigns === 'function') {
-        console.log('Manually triggering campaign load');
-        component.loadCampaigns();
-    } else {
-        console.error('loadCampaigns method not found on component');
+    try {
+        // Different strategies to call loadCampaigns
+        if (typeof vueInstance.loadCampaigns === 'function') {
+            vueInstance.loadCampaigns();
+        } else if (vueInstance.$refs && typeof vueInstance.$refs.loadCampaigns === 'function') {
+            vueInstance.$refs.loadCampaigns();
+        } else if (vueInstance._instance?.proxy?.loadCampaigns) {
+            vueInstance._instance.proxy.loadCampaigns();
+        } else {
+            console.error('NO METHOD FOUND to call loadCampaigns');
+        }
+    } catch (error) {
+        console.error('Error calling loadCampaigns:', error);
     }
 }
