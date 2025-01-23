@@ -759,77 +759,9 @@
 
 <!-- Campaign Management Content -->
 
-<!-- Campaign Form Modal -->
-<div class="modal fade" id="campaignFormModal" tabindex="-1" role="dialog" aria-hidden="true">
-    <div class="modal-dialog" role="document">
-        <div class="modal-content">
-            <div class="modal-header">
-                <h5 class="modal-title" id="campaignFormModalLabel">Create New Campaign</h5>
-                <button type="button" class="close" data-dismiss="modal" aria-label="Close">
-                    <span aria-hidden="true">&times;</span>
-                </button>
-            </div>
-            <div class="modal-body">
-                <form id="campaignForm">
-                    <div id="editNotice" class="alert alert-info" style="display: none;">
-                        Editing Campaign: <span id="editingCampaignName"></span>
-                    </div>
-                    <div class="form-group">
-                        <label for="campaignName">Campaign Name</label>
-                        <input type="text" class="form-control" id="campaignName" name="campaignName" required>
-                    </div>
-                    <div class="form-group">
-                        <label for="brandName">Brand Name</label>
-                        <input type="text" class="form-control" id="brandName" name="brandName" required>
-                    </div>
-                    <div class="form-group">
-                        <label for="storeName">Store Name (Optional)</label>
-                        <input type="text" class="form-control" id="storeName" name="storeName" placeholder="Leave blank for brand-wide campaign">
-                    </div>
-                    <div class="form-group">
-                        <label for="startDate">Start Date</label>
-                        <input type="date" class="form-control" id="startDate" name="startDate" required>
-                    </div>
-                    <div class="form-group">
-                        <label for="endDate">End Date</label>
-                        <input type="date" class="form-control" id="endDate" name="endDate" required>
-                    </div>
-                    <div class="form-group">
-                        <label for="minPurchaseAmount">Minimum Purchase Amount (Optional)</label>
-                        <input type="number" class="form-control" id="minPurchaseAmount" name="minPurchaseAmount" min="0" step="0.01">
-                    </div>
-                    <div class="form-group">
-                        <label>Required Items</label>
-                        <div class="required-items-container">
-                            <div class="input-group mb-2">
-                                <input type="text" class="form-control" id="itemName" placeholder="Item name (e.g., Platter for 2)">
-                                <input type="number" class="form-control" id="itemQuantity" placeholder="Quantity" min="1" value="1" style="max-width: 100px;">
-                                <div class="input-group-append">
-                                    <button type="button" class="btn btn-success" id="addItemBtn">
-                                        <i class="fas fa-plus"></i> Add
-                                    </button>
-                                </div>
-                            </div>
-                            <div id="requiredItemsList" class="list-group">
-                                <!-- Items will be added here -->
-                            </div>
-                        </div>
-                    </div>
-                    <div class="form-group">
-                        <label for="campaignStatus">Status</label>
-                        <select class="form-control" id="campaignStatus" name="campaignStatus">
-                            <option value="active">Active</option>
-                            <option value="inactive">Inactive</option>
-                        </select>
-                    </div>
-                </form>
-            </div>
-            <div class="modal-footer">
-                <button type="button" class="btn btn-secondary" data-dismiss="modal">Close</button>
-                <button type="button" class="btn btn-primary" id="saveCampaignBtn">Save Campaign</button>
-            </div>
-        </div>
-    </div>
+<!-- Campaign Management Section-->        
+<div id="campaignManagementContent" class="content-section" style="display: none;">
+    <div id="campaignManagementRoot"></div>
 </div>
 
 
