@@ -328,21 +328,30 @@ const campaignManagement = {
     }
 };
 
-const managementApp = {
-    app: null,
-    init() {
-        this.app = Vue.createApp(campaignManagement.component);
-        return this.app.mount('#campaignManagementRoot');
-    }
-};
+
+let app = null;
 
 export function initializeCampaignManagement() {
-    return managementApp.init();
+    if (app) return app;
+    
+    const mountPoint = document.getElementById('campaignManagementRoot');
+    if (!mountPoint) {
+        console.error('Campaign management mount point not found');
+        return null;
+    }
+
+    app = Vue.createApp(campaignManagement.component);
+    return app.mount('#campaignManagementRoot');
 }
 
 export function loadCampaigns() {
-    if (managementApp.app) {
-        const instance = managementApp.app._instance;
-        return instance?.proxy?.loadCampaigns();
+    if (!app) {
+        console.error('Campaign management not initialized');
+        return;
+    }
+
+    const instance = app._instance;
+    if (instance?.proxy?.loadCampaigns) {
+        return instance.proxy.loadCampaigns();
     }
 }
