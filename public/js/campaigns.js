@@ -353,8 +353,16 @@ async function testFirebaseConnection() {
 testFirebaseConnection();
 
 export function initializeCampaignManagement() {
+    console.log('Initializing campaign management');
+    
+    const root = document.getElementById('campaignManagementRoot');
+    if (!root) {
+        console.error('Campaign management root element not found');
+        return null;
+    }
+
     try {
-        const campaignApp = Vue.createApp({
+        const app = Vue.createApp({
             data() {
                 return {
                     campaigns: {},
@@ -377,7 +385,7 @@ export function initializeCampaignManagement() {
             }
         });
 
-        const instance = campaignApp.mount('#campaignManagementRoot');
+        const instance = app.mount('#campaignManagementRoot');
         console.log('Campaign management instance:', instance);
         return instance;
     } catch (error) {
@@ -393,16 +401,23 @@ export function loadCampaigns() {
         return;
     }
 
+    // Use Vue 3's method to get the component instance
     const vueInstance = root.__vue_app__;
-    if (vueInstance) {
-        const component = vueInstance._instance.proxy;
-        if (component && component.loadCampaigns) {
-            console.log('Manually triggering campaign load');
-            component.loadCampaigns();
-        } else {
-            console.error('Campaign load method not found');
-        }
-    } else {
+    if (!vueInstance) {
         console.error('Vue application instance not found');
+        return;
+    }
+
+    const component = vueInstance._instance?.proxy;
+    if (!component) {
+        console.error('Vue component proxy not found');
+        return;
+    }
+
+    if (typeof component.loadCampaigns === 'function') {
+        console.log('Manually triggering campaign load');
+        component.loadCampaigns();
+    } else {
+        console.error('loadCampaigns method not found on component');
     }
 }
