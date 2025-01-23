@@ -1,6 +1,6 @@
-import { showLoading, hideLoading } from './admin-dashboard.js';
-
-export const campaignManagement = {
+//import { showLoading, hideLoading } from './admin-dashboard.js';
+let managementApp = null;
+const campaignManagement = {
     app: null,
     component: {
         data() {
@@ -331,6 +331,12 @@ export const campaignManagement = {
 };
 
 export function initializeCampaignManagement() {
-    const app = Vue.createApp(campaignManagement.component);
-    campaignManagement.app = app.mount('#campaignManagementRoot');
+    managementApp = Vue.createApp(campaignComponent);
+    return managementApp.mount('#campaignManagementRoot');
+}
+
+export function loadCampaigns() {
+    if (managementApp) {
+        return managementApp.$refs.component.loadCampaigns();
+    }
 }
