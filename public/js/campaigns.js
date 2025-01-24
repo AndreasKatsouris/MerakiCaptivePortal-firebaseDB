@@ -270,8 +270,7 @@ export function initializeCampaignManagement() {
     }
 }
 
-// Export necessary functions
+// Export the component
 export {
-    initializeCampaignManagement,
     campaignManagement
 };
