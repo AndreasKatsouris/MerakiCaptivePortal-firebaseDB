@@ -1,5 +1,6 @@
 // Campaign Management Module
 let app = null;
+// campaigns.js
 export function initializeCampaignManagement() {
     const app = Vue.createApp({
         data() {
@@ -8,6 +9,7 @@ export function initializeCampaignManagement() {
                 loading: false,
                 showModal: false,
                 currentCampaign: null,
+                searchQuery: '',
                 formData: {
                     name: '',
                     brandName: '',
@@ -19,6 +21,16 @@ export function initializeCampaignManagement() {
                     requiredItems: []
                 }
             };
+        },
+        computed: {
+            filteredCampaigns() {
+                if (!this.searchQuery) return this.campaigns;
+                const query = this.searchQuery.toLowerCase();
+                return this.campaigns.filter(campaign => 
+                    campaign.name.toLowerCase().includes(query) ||
+                    campaign.brandName.toLowerCase().includes(query)
+                );
+            }
         },
         methods: {
             async loadCampaigns() {
@@ -38,7 +50,7 @@ export function initializeCampaignManagement() {
                 }
             },
             
-            openCreateModal() {
+            openAddModal() {
                 this.currentCampaign = null;
                 this.resetForm();
                 this.showModal = true;
@@ -66,11 +78,39 @@ export function initializeCampaignManagement() {
 
                     this.showModal = false;
                     await this.loadCampaigns();
-                    this.showSuccess('Campaign saved successfully');
+                    this.showSuccess(this.currentCampaign ? 'Campaign updated successfully' : 'Campaign added successfully');
                 } catch (error) {
                     console.error('Error saving campaign:', error);
                     this.showError('Failed to save campaign');
                 }
+            },
+
+            async deleteCampaign(campaign) {
+                try {
+                    const result = await Swal.fire({
+                        title: 'Delete Campaign?',
+                        text: 'This action cannot be undone.',
+                        icon: 'warning',
+                        showCancelButton: true,
+                        confirmButtonColor: '#dc3545',
+                        confirmButtonText: 'Yes, delete it'
+                    });
+
+                    if (result.isConfirmed) {
+                        await firebase.database().ref(`campaigns/${campaign.id}`).remove();
+                        await this.loadCampaigns();
+                        this.showSuccess('Campaign deleted successfully');
+                    }
+                } catch (error) {
+                    console.error('Error deleting campaign:', error);
+                    this.showError('Failed to delete campaign');
+                }
+            },
+
+            editCampaign(campaign) {
+                this.currentCampaign = campaign;
+                this.formData = { ...campaign };
+                this.showModal = true;
             },
 
             validateForm() {
@@ -102,6 +142,14 @@ export function initializeCampaignManagement() {
                 };
             },
 
+            formatDate(timestamp) {
+                return new Date(timestamp).toLocaleDateString();
+            },
+
+            formatCurrency(amount) {
+                return `R${Number(amount).toFixed(2)}`;
+            },
+
             showError(message) {
                 Swal.fire('Error', message, 'error');
             },
@@ -115,41 +163,43 @@ export function initializeCampaignManagement() {
         },
         template: `
             <div class="campaign-management">
+                <!-- Header with search and add button -->
                 <div class="d-flex justify-content-between align-items-center mb-4">
                     <h2>Campaign Management</h2>
-                    <button class="btn btn-primary" @click="openCreateModal">
-                        <i class="fas fa-plus"></i> Create Campaign
-                    </button>
-                </div>
-
-                <!-- Loading State -->
-                <div v-if="loading" class="text-center py-4">
-                    <div class="spinner-border text-primary" role="status">
-                        <span class="sr-only">Loading...</span>
+                    <div class="d-flex gap-2">
+                        <input 
+                            type="text" 
+                            class="form-control" 
+                            v-model="searchQuery" 
+                            placeholder="Search campaigns..."
+                        >
+                        <button class="btn btn-primary" @click="openAddModal">
+                            + Add Campaign
+                        </button>
                     </div>
                 </div>
 
-                <!-- Campaigns Table -->
-                <div v-else class="table-responsive">
+                <!-- Table -->
+                <div class="table-responsive">
                     <table class="table table-hover">
                         <thead>
                             <tr>
-                                <th>Campaign Name</th>
+                                <th>Name</th>
                                 <th>Brand</th>
                                 <th>Store</th>
-                                <th>Start Date</th>
-                                <th>End Date</th>
+                                <th>Duration</th>
+                                <th>Min. Amount</th>
                                 <th>Status</th>
                                 <th>Actions</th>
                             </tr>
                         </thead>
-                        <tbody>
-                            <tr v-for="campaign in campaigns" :key="campaign.id">
+                        <tbody v-if="!loading">
+                            <tr v-for="campaign in filteredCampaigns" :key="campaign.id">
                                 <td>{{ campaign.name }}</td>
                                 <td>{{ campaign.brandName }}</td>
                                 <td>{{ campaign.storeName || 'All Stores' }}</td>
-                                <td>{{ new Date(campaign.startDate).toLocaleDateString() }}</td>
-                                <td>{{ new Date(campaign.endDate).toLocaleDateString() }}</td>
+                                <td>{{ formatDate(campaign.startDate) }} - {{ formatDate(campaign.endDate) }}</td>
+                                <td>{{ formatCurrency(campaign.minPurchaseAmount) }}</td>
                                 <td>
                                     <span :class="'badge badge-' + campaign.status">
                                         {{ campaign.status }}
@@ -157,12 +207,27 @@ export function initializeCampaignManagement() {
                                 </td>
                                 <td>
                                     <div class="btn-group btn-group-sm">
-                                        <button class="btn btn-warning" @click="editCampaign(campaign)">
+                                        <button class="btn btn-info" @click="editCampaign(campaign)" title="View Campaign">
+                                            <i class="fas fa-eye"></i>
+                                        </button>
+                                        <button class="btn btn-warning" @click="editCampaign(campaign)" title="Edit Campaign">
                                             <i class="fas fa-edit"></i>
                                         </button>
-                                        <button class="btn btn-danger" @click="deleteCampaign(campaign)">
+                                        <button class="btn btn-danger" @click="deleteCampaign(campaign)" title="Delete Campaign">
                                             <i class="fas fa-trash"></i>
                                         </button>
+                                    </div>
+                                </td>
+                            </tr>
+                            <tr v-if="filteredCampaigns.length === 0">
+                                <td colspan="7" class="text-center">No campaigns found</td>
+                            </tr>
+                        </tbody>
+                        <tbody v-else>
+                            <tr>
+                                <td colspan="7" class="text-center">
+                                    <div class="spinner-border text-primary" role="status">
+                                        <span class="sr-only">Loading...</span>
                                     </div>
                                 </td>
                             </tr>
@@ -170,12 +235,12 @@ export function initializeCampaignManagement() {
                     </table>
                 </div>
 
-                <!-- Campaign Modal -->
+                <!-- Add/Edit Campaign Modal -->
                 <div class="modal fade" :class="{ show: showModal }" tabindex="-1" v-if="showModal">
                     <div class="modal-dialog">
                         <div class="modal-content">
                             <div class="modal-header">
-                                <h5 class="modal-title">{{ currentCampaign ? 'Edit' : 'Create' }} Campaign</h5>
+                                <h5 class="modal-title">{{ currentCampaign ? 'Edit' : 'Add' }} Campaign</h5>
                                 <button type="button" class="btn-close" @click="showModal = false"></button>
                             </div>
                             <div class="modal-body">
@@ -211,8 +276,7 @@ export function initializeCampaignManagement() {
                                                    class="form-control" 
                                                    id="store_name" 
                                                    name="store_name" 
-                                                   v-model="formData.storeName"
-                                                   aria-required="false">
+                                                   v-model="formData.storeName">
                                         </label>
                                     </div>
                                     <div class="mb-3">
@@ -223,8 +287,7 @@ export function initializeCampaignManagement() {
                                                    id="start_date" 
                                                    name="start_date" 
                                                    v-model="formData.startDate" 
-                                                   required
-                                                   aria-required="true">
+                                                   required>
                                         </label>
                                     </div>
                                     <div class="mb-3">
@@ -235,29 +298,26 @@ export function initializeCampaignManagement() {
                                                    id="end_date" 
                                                    name="end_date" 
                                                    v-model="formData.endDate" 
-                                                   required
-                                                   aria-required="true">
+                                                   required>
                                         </label>
                                     </div>
                                     <div class="mb-3">
-                                        <label class="form-label" for="min_purchase_amount">
+                                        <label class="form-label" for="min_amount">
                                             Minimum Purchase Amount
                                             <input type="number" 
                                                    class="form-control" 
-                                                   id="min_purchase_amount" 
-                                                   name="min_purchase_amount" 
-                                                   v-model="formData.minPurchaseAmount"
-                                                   aria-required="false">
+                                                   id="min_amount" 
+                                                   name="min_amount" 
+                                                   v-model="formData.minPurchaseAmount">
                                         </label>
                                     </div>
                                     <div class="mb-3">
-                                        <label class="form-label" for="campaign_status">
+                                        <label class="form-label" for="status">
                                             Status
                                             <select class="form-control" 
-                                                    id="campaign_status" 
-                                                    name="campaign_status" 
-                                                    v-model="formData.status"
-                                                    aria-required="true">
+                                                    id="status" 
+                                                    name="status" 
+                                                    v-model="formData.status">
                                                 <option value="active">Active</option>
                                                 <option value="inactive">Inactive</option>
                                             </select>
@@ -267,7 +327,9 @@ export function initializeCampaignManagement() {
                             </div>
                             <div class="modal-footer">
                                 <button type="button" class="btn btn-secondary" @click="showModal = false">Cancel</button>
-                                <button type="button" class="btn btn-primary" @click="saveCampaign">Save Campaign</button>
+                                <button type="button" class="btn btn-primary" @click="saveCampaign">
+                                    {{ currentCampaign ? 'Update' : 'Add' }} Campaign
+                                </button>
                             </div>
                         </div>
                     </div>
