@@ -592,3 +592,110 @@
   border-radius: 8px;
   box-shadow: 0 2px 4px rgba(0,0,0,0.1);
 }
+/* Add these CSS rules to admin-style.css */
+.campaign-container {
+  padding: 1.5rem;
+  background: #fff;
+  border-radius: 8px;
+  box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+  margin-bottom: 2rem;
+  min-height: calc(100vh - var(--header-height) - 3rem);
+}
+
+#campaignManagementRoot {
+  height: 100%;
+}
+
+#campaignManagementContent {
+  display: none;
+  padding: 20px;
+  height: calc(100vh - var(--header-height));
+  overflow-y: auto;
+}
+
+#campaignManagementContent.active {
+  display: block;
+}
+
+/* Table styles */
+.campaign-management .table {
+  background: white;
+  border-radius: 8px;
+  overflow: hidden;
+}
+
+.campaign-management .table th {
+  background: #f8f9fa;
+  padding: 1rem;
+  font-weight: 600;
+  color: #495057;
+  border-bottom: 2px solid #dee2e6;
+}
+
+.campaign-management .table td {
+  padding: 1rem;
+  vertical-align: middle;
+  border-top: 1px solid #dee2e6;
+}
+
+/* Button styles */
+.campaign-management .btn-group {
+  display: flex;
+  gap: 0.25rem;
+}
+
+/* Status badge styles */
+.campaign-management .badge {
+  padding: 0.5em 1em;
+  border-radius: 4px;
+  font-weight: 500;
+}
+
+.campaign-management .badge-active {
+  background-color: #28a745;
+  color: white;
+}
+
+.campaign-management .badge-inactive {
+  background-color: #6c757d;
+  color: white;
+}
+
+/* Search and add button container */
+.campaign-management .d-flex {
+  margin-bottom: 1.5rem;
+}
+
+.campaign-management input[type="text"] {
+  min-width: 250px;
+}
+
+/* Modal styles */
+.campaign-management .modal {
+  display: none;
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.5);
+  z-index: 1050;
+}
+
+.campaign-management .modal.show {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.campaign-management .modal-dialog {
+  width: 100%;
+  max-width: 500px;
+  margin: 1.75rem auto;
+}
+
+.campaign-management .modal-content {
+  background: white;
+  border-radius: 8px;
+  box-shadow: 0 2px 15px rgba(0, 0, 0, 0.1);
+}
