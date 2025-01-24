@@ -567,3 +567,28 @@
   background-color: var(--secondary);
   color: white;
 }
+/* Update the content area layout */
+.content {
+  margin-left: var(--sidebar-width);
+  padding-top: var(--header-height);
+  min-height: 100vh;
+  overflow-y: auto;
+}
+
+#campaignManagementContent {
+  padding: 20px;
+  height: calc(100vh - var(--header-height));
+  overflow-y: auto;
+}
+
+.table-responsive {
+  margin-top: 20px;
+}
+
+/* Ensure proper spacing for campaign management content */
+#campaignManagementRoot {
+  padding: 1rem;
+  background: #fff;
+  border-radius: 8px;
+  box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+}
