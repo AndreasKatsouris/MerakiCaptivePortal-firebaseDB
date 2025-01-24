@@ -31,6 +31,7 @@ document.addEventListener('DOMContentLoaded', function () {
     initializeRewardTypes();
     initializeGuestManagement();
     initializeCampaignManagement();
+    initializeCampaignMenuListener();
 });
 
 // ==================== Authentication Section ====================
@@ -1515,7 +1516,6 @@ export function hideLoading() {
     document.getElementById('globalLoadingOverlay').style.display = 'none';
 }
 
-// Update displaySection function with better error handling
 function displaySection(sectionId) {
     try {
         showLoading();
@@ -1526,17 +1526,25 @@ function displaySection(sectionId) {
             throw new Error(`Section ${sectionId} not found`);
         }
 
+        // Hide all sections first
         document.querySelectorAll('.content-section').forEach(s => {
             s.style.display = 'none';
         });
 
+        // Show the requested section
         section.style.display = 'block';
-        section.classList.add('fade-in');
+
+        // Special handling for campaign management
+        if (sectionId === 'campaignManagementContent') {
+            section.style.marginTop = '0';
+            section.classList.add('active');
+        }
         
     } catch (error) {
         console.error('Error displaying section:', error);
+        showError('Failed to display section. Please try again.');
     } finally {
-        setTimeout(hideLoading, 300);
+        hideLoading();
     }
 }
 
@@ -1695,3 +1703,25 @@ function initializeMobileMenu() {
         });
     });
 }
+function initializeCampaignMenuListener() {
+    const campaignManagementMenu = document.getElementById('campaignManagementMenu');
+    if (campaignManagementMenu) {
+        campaignManagementMenu.addEventListener('click', async function(e) {
+            e.preventDefault();
+            console.log('Campaign menu clicked');
+            
+            try {
+                // First display the section
+                displaySection('campaignManagementContent');
+                
+                // Then initialize the campaign management
+                await initializeCampaignManagement();
+                console.log('Campaign management initialized successfully');
+            } catch (error) {
+                console.error('Error initializing campaign management:', error);
+                showError('Failed to initialize campaign management. Please try again.');
+            }
+        });
+    }
+}
+
