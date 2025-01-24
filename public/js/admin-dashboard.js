@@ -78,7 +78,7 @@ function initializeLoyaltyListeners() {
     addEventListenerSafely('campaignManagementMenu', 'click', function(e) {
         e.preventDefault();
         displaySection('campaignManagementContent');
-        loadCampaigns();
+        //loadCampaigns();
     });
 
     // Receipt Management
