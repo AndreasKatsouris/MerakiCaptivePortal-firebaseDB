@@ -147,6 +147,32 @@ export function initializeCampaignManagement() {
     }
 }
 
+export function loadCampaigns() {
+    console.group('Manual Campaign Load Trigger');
+    const root = document.getElementById('campaignManagementRoot');
+    
+    if (!root) {
+        console.error('Campaign management root element not found');
+        console.groupEnd();
+        return;
+    }
+
+    const instance = window.__campaignApp;
+    if (!instance) {
+        console.error('Vue instance not found');
+        console.groupEnd();
+        return;
+    }
+
+    try {
+        instance.loadCampaigns();
+    } catch (error) {
+        console.error('Error triggering campaign load:', error);
+    } finally {
+        console.groupEnd();
+    }
+}
+
 // Add CSS to ensure visibility
 const style = document.createElement('style');
 style.textContent = `
