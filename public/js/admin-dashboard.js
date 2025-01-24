@@ -94,6 +94,15 @@ function initializeLoyaltyListeners() {
         displaySection('rewardsManagementContent');
         loadRewards();
     });
+    //Campaign Management
+document.addEventListener('DOMContentLoaded', async function() {
+    try {
+        const instance = await initializeCampaignManagement();
+        console.log('Testing instance:', instance);
+    } catch (error) {
+        console.error('Error initializing campaigns:', error);
+    }
+});
 
 }
 
