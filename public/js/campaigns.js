@@ -5,320 +5,43 @@ const campaignManagement = {
             return {
                 campaigns: {},
                 loading: false,
-                editingCampaign: null,
-                campaignForm: {
-                    name: '',
-                    brandName: '',
-                    storeName: '',
-                    startDate: '',
-                    endDate: '',
-                    status: 'active',
-                    minPurchaseAmount: null,
-                    requiredItems: []
-                },
-                newItem: {
-                    name: '',
-                    quantity: 1
-                }
+                error: null
             };
         },
-
-        mounted() {
-            this.loadCampaigns();
-        },
-
         methods: {
             async loadCampaigns() {
+                console.log('Starting campaign load');
                 this.loading = true;
                 try {
                     const snapshot = await firebase.database().ref('campaigns').once('value');
                     this.campaigns = snapshot.val() || {};
+                    console.log('Loaded campaigns:', this.campaigns);
                 } catch (error) {
                     console.error('Error loading campaigns:', error);
-                    this.showError('Failed to load campaigns');
+                    this.error = error.message;
                 } finally {
                     this.loading = false;
                 }
-            },
-
-            showCreateCampaignModal() {
-                this.editingCampaign = null;
-                this.resetForm();
-                $('#campaignFormModal').modal('show');
-            },
-
-            resetForm() {
-                this.campaignForm = {
-                    name: '',
-                    brandName: '',
-                    storeName: '',
-                    startDate: '',
-                    endDate: '',
-                    status: 'active',
-                    minPurchaseAmount: null,
-                    requiredItems: []
-                };
-                this.newItem = { name: '', quantity: 1 };
-            },
-
-            addRequiredItem() {
-                if (!this.newItem.name.trim()) return;
-                this.campaignForm.requiredItems.push({...this.newItem});
-                this.newItem = { name: '', quantity: 1 };
-            },
-
-            removeRequiredItem(index) {
-                this.campaignForm.requiredItems.splice(index, 1);
-            },
-
-            async saveCampaign() {
-                try {
-                    if (!this.validateForm()) return;
-
-                    const campaignData = {
-                        ...this.campaignForm,
-                        createdAt: Date.now()
-                    };
-
-                    if (this.editingCampaign) {
-                        await firebase.database()
-                            .ref(`campaigns/${this.editingCampaign}`)
-                            .update(campaignData);
-                    } else {
-                        await firebase.database().ref('campaigns').push(campaignData);
-                    }
-
-                    $('#campaignFormModal').modal('hide');
-                    await this.loadCampaigns();
-                    this.showSuccess('Campaign saved successfully');
-                } catch (error) {
-                    console.error('Error saving campaign:', error);
-                    this.showError('Failed to save campaign');
-                }
-            },
-
-            validateForm() {
-                if (!this.campaignForm.name || !this.campaignForm.brandName) {
-                    this.showError('Campaign name and brand are required');
-                    return false;
-                }
-
-                const startDate = new Date(this.campaignForm.startDate);
-                const endDate = new Date(this.campaignForm.endDate);
-
-                if (endDate < startDate) {
-                    this.showError('End date must be after start date');
-                    return false;
-                }
-
-                return true;
-            },
-
-            handleView(key) {
-                const campaign = this.campaigns[key];
-                if (!campaign) return;
-
-                Swal.fire({
-                    title: campaign.name,
-                    html: this.generateCampaignDetails(campaign),
-                    width: 600
-                });
-            },
-
-            generateCampaignDetails(campaign) {
-                return `
-                    <div class="text-left">
-                        <p><strong>Brand:</strong> ${campaign.brandName}</p>
-                        <p><strong>Store:</strong> ${campaign.storeName || 'All Stores'}</p>
-                        <p><strong>Duration:</strong> ${this.formatDate(campaign.startDate)} - ${this.formatDate(campaign.endDate)}</p>
-                        <p><strong>Status:</strong> ${campaign.status}</p>
-                        ${campaign.minPurchaseAmount ? `<p><strong>Minimum Purchase:</strong> R${campaign.minPurchaseAmount}</p>` : ''}
-                        ${this.generateRequiredItemsHtml(campaign.requiredItems)}
-                    </div>
-                `;
-            },
-
-            generateRequiredItemsHtml(items) {
-                if (!items?.length) return '';
-                return `
-                    <p><strong>Required Items:</strong></p>
-                    <ul>
-                        ${items.map(item => `<li>${item.name} (Qty: ${item.quantity})</li>`).join('')}
-                    </ul>
-                `;
-            },
-
-            handleEdit(key) {
-                const campaign = this.campaigns[key];
-                if (!campaign) return;
-
-                this.editingCampaign = key;
-                this.campaignForm = {...campaign};
-                $('#campaignFormModal').modal('show');
-            },
-
-            async handleDelete(key) {
-                const result = await Swal.fire({
-                    title: 'Delete Campaign?',
-                    text: 'This action cannot be undone.',
-                    icon: 'warning',
-                    showCancelButton: true,
-                    confirmButtonColor: '#dc3545',
-                    confirmButtonText: 'Yes, delete it!'
-                });
-
-                if (result.isConfirmed) {
-                    try {
-                        await firebase.database().ref(`campaigns/${key}`).remove();
-                        await this.loadCampaigns();
-                        this.showSuccess('Campaign deleted successfully');
-                    } catch (error) {
-                        console.error('Error deleting campaign:', error);
-                        this.showError('Failed to delete campaign');
-                    }
-                }
-            },
-
-            formatDate(date) {
-                return new Date(date).toLocaleDateString();
-            },
-
-            showError(message) {
-                Swal.fire('Error', message, 'error');
-            },
-
-            showSuccess(message) {
-                Swal.fire('Success', message, 'success');
             }
         },
-
+        mounted() {
+            console.log('Campaign component mounted');
+            this.loadCampaigns();
+        },
         template: `
-            <div class="container-fluid">
-                <div class="d-flex justify-content-between align-items-center mb-4">
-                    <h2>Campaign Management</h2>
-                    <button class="btn btn-primary" @click="showCreateCampaignModal">
-                        <i class="fas fa-plus"></i> Create Campaign
-                    </button>
-                </div>
-
-                <div v-if="loading" class="text-center py-4">
-                    <div class="spinner-border text-primary"></div>
-                </div>
-
-                <div v-else class="table-responsive">
-                    <table class="table">
-                        <thead>
-                            <tr>
-                                <th>Campaign Name</th>
-                                <th>Brand</th>
-                                <th>Store</th>
-                                <th>Start Date</th>
-                                <th>End Date</th>
-                                <th>Status</th>
-                                <th>Actions</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            <tr v-for="(campaign, key) in campaigns" :key="key">
-                                <td>{{ campaign.name }}</td>
-                                <td>{{ campaign.brandName }}</td>
-                                <td>{{ campaign.storeName || 'All Stores' }}</td>
-                                <td>{{ formatDate(campaign.startDate) }}</td>
-                                <td>{{ formatDate(campaign.endDate) }}</td>
-                                <td>
-                                    <span :class="'badge badge-' + (campaign.status === 'active' ? 'success' : 'secondary')">
-                                        {{ campaign.status }}
-                                    </span>
-                                </td>
-                                <td>
-                                    <div class="btn-group btn-group-sm">
-                                        <button class="btn btn-info" @click="handleView(key)">
-                                            <i class="fas fa-eye"></i>
-                                        </button>
-                                        <button class="btn btn-warning" @click="handleEdit(key)">
-                                            <i class="fas fa-edit"></i>
-                                        </button>
-                                        <button class="btn btn-danger" @click="handleDelete(key)">
-                                            <i class="fas fa-trash"></i>
-                                        </button>
-                                    </div>
-                                </td>
-                            </tr>
-                        </tbody>
-                    </table>
-                </div>
-
-                <!-- Campaign Form Modal -->
-                <div class="modal fade" id="campaignFormModal" tabindex="-1">
-                    <div class="modal-dialog">
-                        <div class="modal-content">
-                            <div class="modal-header">
-                                <h5 class="modal-title">{{ editingCampaign ? 'Edit' : 'Create' }} Campaign</h5>
-                                <button type="button" class="close" data-dismiss="modal">×</button>
-                            </div>
-                            <div class="modal-body">
-                                <form @submit.prevent="saveCampaign">
-                                    <div class="form-group">
-                                        <label>Campaign Name</label>
-                                        <input type="text" class="form-control" v-model="campaignForm.name" required>
-                                    </div>
-                                    <div class="form-group">
-                                        <label>Brand Name</label>
-                                        <input type="text" class="form-control" v-model="campaignForm.brandName" required>
-                                    </div>
-                                    <div class="form-group">
-                                        <label>Store (Optional)</label>
-                                        <input type="text" class="form-control" v-model="campaignForm.storeName">
-                                    </div>
-                                    <div class="form-group">
-                                        <label>Start Date</label>
-                                        <input type="date" class="form-control" v-model="campaignForm.startDate" required>
-                                    </div>
-                                    <div class="form-group">
-                                        <label>End Date</label>
-                                        <input type="date" class="form-control" v-model="campaignForm.endDate" required>
-                                    </div>
-                                    <div class="form-group">
-                                        <label>Minimum Purchase Amount</label>
-                                        <input type="number" class="form-control" v-model="campaignForm.minPurchaseAmount">
-                                    </div>
-                                    <div class="form-group">
-                                        <label>Status</label>
-                                        <select class="form-control" v-model="campaignForm.status">
-                                            <option value="active">Active</option>
-                                            <option value="inactive">Inactive</option>
-                                        </select>
-                                    </div>
-                                    <div class="form-group">
-                                        <label>Required Items</label>
-                                        <div class="input-group mb-2">
-                                            <input type="text" class="form-control" v-model="newItem.name" 
-                                                   placeholder="Item name">
-                                            <input type="number" class="form-control" v-model="newItem.quantity" 
-                                                   min="1" style="max-width: 100px;">
-                                            <div class="input-group-append">
-                                                <button type="button" class="btn btn-success" @click="addRequiredItem">
-                                                    <i class="fas fa-plus"></i>
-                                                </button>
-                                            </div>
-                                        </div>
-                                        <div v-if="campaignForm.requiredItems.length" class="list-group">
-                                            <div v-for="(item, index) in campaignForm.requiredItems" 
-                                                 :key="index" 
-                                                 class="list-group-item d-flex justify-content-between align-items-center">
-                                                {{ item.name }} (Qty: {{ item.quantity }})
-                                                <button type="button" class="btn btn-sm btn-danger" 
-                                                        @click="removeRequiredItem(index)">
-                                                    <i class="fas fa-times"></i>
-                                                </button>
-                                            </div>
-                                        </div>
-                                    </div>
-                                </form>
-                            </div>
-                            <div class="modal-footer">
-                                <button type="button" class="btn btn-secondary" data-dismiss="modal">Cancel</button>
-                                <button type="button" class="btn btn-primary" @click="saveCampaign">Save Campaign</button>
+            <div class="campaign-container">
+                <div v-if="loading" class="loading-spinner">Loading...</div>
+                <div v-else-if="error" class="error-message">{{ error }}</div>
+                <div v-else>
+                    <div v-if="Object.keys(campaigns).length === 0" class="no-data">
+                        No campaigns found
+                    </div>
+                    <div v-else class="campaigns-list">
+                        <div v-for="(campaign, id) in campaigns" :key="id" class="campaign-card">
+                            <h3>{{ campaign.name }}</h3>
+                            <p>{{ campaign.description }}</p>
+                            <div class="campaign-status">
+                                Status: {{ campaign.status }}
                             </div>
                         </div>
                     </div>
@@ -327,6 +50,7 @@ const campaignManagement = {
         `
     }
 };
+
 
 window.addEventListener('error', (event) => {
     console.error('Campaign Management Global Error:', {
@@ -357,35 +81,39 @@ export function initializeCampaignManagement() {
     
     const root = document.getElementById('campaignManagementRoot');
     if (!root) {
-        console.error('FATAL: Campaign management root element not found');
+        console.error('CRITICAL: Campaign management root element not found');
         return null;
     }
 
     try {
         const app = Vue.createApp({
-            template: `
-                <div>
-                    <div v-if="loading">Loading...</div>
-                    <div v-else>
-                        Campaigns Loaded: {{ Object.keys(campaigns).length }}
-                    </div>
-                </div>
-            `,
             data() {
                 return {
                     campaigns: {},
-                    loading: false
-                }
+                    loading: false,
+                    error: null
+                };
             },
             methods: {
                 async loadCampaigns() {
+                    console.log('Starting campaign load');
                     this.loading = true;
+                    this.error = null;
+                    
                     try {
                         const snapshot = await firebase.database().ref('campaigns').once('value');
-                        this.campaigns = snapshot.val() || {};
-                        console.log('Campaigns loaded:', Object.keys(this.campaigns).length);
+                        const campaignData = snapshot.val();
+                        console.log('Raw campaign data:', campaignData);
+                        
+                        if (campaignData) {
+                            this.campaigns = campaignData;
+                            console.log('Processed campaigns:', this.campaigns);
+                        } else {
+                            console.warn('No campaign data found');
+                        }
                     } catch (error) {
                         console.error('Campaign load error:', error);
+                        this.error = error.message;
                     } finally {
                         this.loading = false;
                     }
@@ -394,13 +122,33 @@ export function initializeCampaignManagement() {
             mounted() {
                 console.log('Campaign management component mounted');
                 this.loadCampaigns();
-            }
+            },
+            template: `
+                <div class="campaign-container">
+                    <div v-if="loading" class="loading-spinner">Loading...</div>
+                    <div v-else-if="error" class="error-message">{{ error }}</div>
+                    <div v-else>
+                        <div v-if="Object.keys(campaigns).length === 0" class="no-data">
+                            No campaigns found
+                        </div>
+                        <div v-else class="campaigns-list">
+                            <div v-for="(campaign, id) in campaigns" :key="id" class="campaign-card">
+                                <h3>{{ campaign.name }}</h3>
+                                <p>{{ campaign.description }}</p>
+                                <div class="campaign-status">
+                                    Status: {{ campaign.status }}
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            `
         });
 
         const instance = app.mount('#campaignManagementRoot');
         console.log('Campaign management instance:', instance);
         
-        // Attach instance to the root element for easier access
+        // Store instance for debugging
         root.__vue_instance__ = instance;
         
         return instance;
@@ -410,37 +158,26 @@ export function initializeCampaignManagement() {
     }
 }
 
+// Enhanced loadCampaigns with improved error handling
 export function loadCampaigns() {
+    console.log('Triggering campaign load');
     const root = document.getElementById('campaignManagementRoot');
+    
     if (!root) {
         console.error('Campaign management root element not found');
         return;
     }
 
-    // Try multiple ways to access the Vue instance
-    const vueInstance = 
-        root.__vue_instance__ || 
-        root.__vue_app__ || 
-        document.querySelector('#campaignManagementRoot')?.__vue_instance__;
-
+    const vueInstance = root.__vue_instance__;
     if (!vueInstance) {
-        console.error('CRITICAL: Cannot find Vue instance by any method');
+        console.error('Vue instance not found');
         return;
     }
 
     try {
-        // Different strategies to call loadCampaigns
-        if (typeof vueInstance.loadCampaigns === 'function') {
-            vueInstance.loadCampaigns();
-        } else if (vueInstance.$refs && typeof vueInstance.$refs.loadCampaigns === 'function') {
-            vueInstance.$refs.loadCampaigns();
-        } else if (vueInstance._instance?.proxy?.loadCampaigns) {
-            vueInstance._instance.proxy.loadCampaigns();
-        } else {
-            console.error('NO METHOD FOUND to call loadCampaigns');
-        }
+        vueInstance.loadCampaigns();
     } catch (error) {
-        console.error('Error calling loadCampaigns:', error);
+        console.error('Error loading campaigns:', error);
     }
 }
 // Comprehensive Campaign Management Diagnostic Script

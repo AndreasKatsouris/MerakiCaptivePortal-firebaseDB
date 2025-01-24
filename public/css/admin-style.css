@@ -533,3 +533,8 @@
         margin-left: auto;
     }
 }
+.campaign-container {
+  display: block !important;
+  min-height: 200px;
+  padding: 20px;
+}
