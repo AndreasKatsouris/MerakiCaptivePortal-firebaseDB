@@ -1,7 +1,5 @@
 // Campaign Management Module
 let app = null;
-
-// campaigns.js
 export function initializeCampaignManagement() {
     const app = Vue.createApp({
         data() {
@@ -183,35 +181,87 @@ export function initializeCampaignManagement() {
                             <div class="modal-body">
                                 <form @submit.prevent="saveCampaign">
                                     <div class="mb-3">
-                                        <label class="form-label">Campaign Name</label>
-                                        <input type="text" class="form-control" v-model="formData.name" required>
+                                        <label class="form-label" for="campaign_name">
+                                            Campaign Name
+                                            <input type="text" 
+                                                   class="form-control" 
+                                                   id="campaign_name" 
+                                                   name="campaign_name" 
+                                                   v-model="formData.name" 
+                                                   required
+                                                   aria-required="true">
+                                        </label>
                                     </div>
                                     <div class="mb-3">
-                                        <label class="form-label">Brand Name</label>
-                                        <input type="text" class="form-control" v-model="formData.brandName" required>
+                                        <label class="form-label" for="brand_name">
+                                            Brand Name
+                                            <input type="text" 
+                                                   class="form-control" 
+                                                   id="brand_name" 
+                                                   name="brand_name" 
+                                                   v-model="formData.brandName" 
+                                                   required
+                                                   aria-required="true">
+                                        </label>
                                     </div>
                                     <div class="mb-3">
-                                        <label class="form-label">Store Name (Optional)</label>
-                                        <input type="text" class="form-control" v-model="formData.storeName">
+                                        <label class="form-label" for="store_name">
+                                            Store Name (Optional)
+                                            <input type="text" 
+                                                   class="form-control" 
+                                                   id="store_name" 
+                                                   name="store_name" 
+                                                   v-model="formData.storeName"
+                                                   aria-required="false">
+                                        </label>
                                     </div>
                                     <div class="mb-3">
-                                        <label class="form-label">Start Date</label>
-                                        <input type="date" class="form-control" v-model="formData.startDate" required>
+                                        <label class="form-label" for="start_date">
+                                            Start Date
+                                            <input type="date" 
+                                                   class="form-control" 
+                                                   id="start_date" 
+                                                   name="start_date" 
+                                                   v-model="formData.startDate" 
+                                                   required
+                                                   aria-required="true">
+                                        </label>
                                     </div>
                                     <div class="mb-3">
-                                        <label class="form-label">End Date</label>
-                                        <input type="date" class="form-control" v-model="formData.endDate" required>
+                                        <label class="form-label" for="end_date">
+                                            End Date
+                                            <input type="date" 
+                                                   class="form-control" 
+                                                   id="end_date" 
+                                                   name="end_date" 
+                                                   v-model="formData.endDate" 
+                                                   required
+                                                   aria-required="true">
+                                        </label>
                                     </div>
                                     <div class="mb-3">
-                                        <label class="form-label">Minimum Purchase Amount</label>
-                                        <input type="number" class="form-control" v-model="formData.minPurchaseAmount">
+                                        <label class="form-label" for="min_purchase_amount">
+                                            Minimum Purchase Amount
+                                            <input type="number" 
+                                                   class="form-control" 
+                                                   id="min_purchase_amount" 
+                                                   name="min_purchase_amount" 
+                                                   v-model="formData.minPurchaseAmount"
+                                                   aria-required="false">
+                                        </label>
                                     </div>
                                     <div class="mb-3">
-                                        <label class="form-label">Status</label>
-                                        <select class="form-control" v-model="formData.status">
-                                            <option value="active">Active</option>
-                                            <option value="inactive">Inactive</option>
-                                        </select>
+                                        <label class="form-label" for="campaign_status">
+                                            Status
+                                            <select class="form-control" 
+                                                    id="campaign_status" 
+                                                    name="campaign_status" 
+                                                    v-model="formData.status"
+                                                    aria-required="true">
+                                                <option value="active">Active</option>
+                                                <option value="inactive">Inactive</option>
+                                            </select>
+                                        </label>
                                     </div>
                                 </form>
                             </div>
