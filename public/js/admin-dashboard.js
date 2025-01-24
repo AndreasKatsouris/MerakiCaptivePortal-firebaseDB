@@ -74,12 +74,6 @@ function addEventListenerSafely(elementId, event, handler) {
 
 // ==================== Loyalty Program Section ====================
 function initializeLoyaltyListeners() {
-    // Campaign Management
-    addEventListenerSafely('campaignManagementMenu', 'click', function(e) {
-        e.preventDefault();
-        displaySection('campaignManagementContent');
-        //loadCampaigns();
-    });
 
     // Receipt Management
     addEventListenerSafely('receiptScanningMenu', 'click', function(e) {
