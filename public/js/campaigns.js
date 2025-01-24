@@ -45,6 +45,24 @@ const campaignManagement = {
 
     // Methods
     methods: {
+        formatDate(dateString) {
+            if (!dateString) return 'N/A';
+            return new Date(dateString).toLocaleDateString('en-GB', {
+                day: '2-digit',
+                month: '2-digit',
+                year: 'numeric'
+            });
+        },
+
+        getStatusBadgeClass(status) {
+            const statusClasses = {
+                active: 'success',
+                inactive: 'secondary',
+                draft: 'warning'
+            };
+            return statusClasses[status] || 'secondary';
+        },
+
         async loadCampaigns() {
             console.log('Loading campaigns...');
             this.loading = true;
