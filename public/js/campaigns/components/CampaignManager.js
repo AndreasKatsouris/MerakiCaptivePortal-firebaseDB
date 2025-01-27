@@ -1,220 +1,214 @@
 // components/CampaignManager.js
 (function() {
-  // Define the component
-  const CampaignManager = {
+    // Define the component
+    const CampaignManager = {
       name: 'CampaignManager',
-  data() {
-      return {
+      data() {
+        return {
           campaigns: [],
           loading: false,
           error: null,
           filters: {
-              status: null,
-              brandName: null,
-              dateRange: null
-          }
-      };
-  },
-
-  computed: {
-      filteredCampaigns() {
+            status: null,
+            brandName: null,
+            dateRange: null
+          },
+          showModal: false,
+          selectedCampaign: null
+        };
+      },
+  
+      computed: {
+        filteredCampaigns() {
           let filtered = [...this.campaigns];
-
+  
           if (this.filters.status) {
-              filtered = filtered.filter(campaign => 
-                  campaign.status === this.filters.status
-              );
+            filtered = filtered.filter(campaign => 
+              campaign.status === this.filters.status
+            );
           }
-
+  
           if (this.filters.brandName) {
-              filtered = filtered.filter(campaign => 
-                  campaign.brandName.toLowerCase().includes(this.filters.brandName.toLowerCase())
-              );
+            const searchTerm = this.filters.brandName.toLowerCase();
+            filtered = filtered.filter(campaign => 
+              campaign.brandName.toLowerCase().includes(searchTerm)
+            );
           }
-
+  
           return filtered;
-      }
-  },
-
-  methods: {
-      async fetchCampaigns() {
-          this.loading = true;
-          try {
-              const snapshot = await firebase.database()
-                  .ref('campaigns')
-                  .once('value');
-              
-              const campaignsData = snapshot.val() || {};
-              this.campaigns = Object.entries(campaignsData)
-                  .map(([id, data]) => ({
-                      id,
-                      ...data
-                  }));
-          } catch (error) {
-              console.error('Error fetching campaigns:', error);
-              this.error = 'Failed to fetch campaigns';
-          } finally {
-              this.loading = false;
-          }
+        }
       },
-
-      updateFilters(newFilters) {
-          this.filters = {
-              ...this.filters,
-              ...newFilters
+  
+      methods: {
+        // Add the missing viewCampaign method
+        async viewCampaign(campaign) {
+          this.selectedCampaign = campaign;
+          
+          // Use Swal for better performance than Bootstrap modal
+          await Swal.fire({
+            title: campaign.name || 'Campaign Details',
+            html: `
+              <div class="campaign-details">
+                <p><strong>Brand:</strong> ${campaign.brandName}</p>
+                <p><strong>Store:</strong> ${campaign.storeName || 'All Stores'}</p>
+                <p><strong>Start Date:</strong> ${campaign.startDate}</p>
+                <p><strong>End Date:</strong> ${campaign.endDate}</p>
+                <p><strong>Status:</strong> ${campaign.status}</p>
+                <p><strong>Minimum Purchase:</strong> R${campaign.minPurchaseAmount || 0}</p>
+                ${this.formatRequiredItems(campaign.requiredItems)}
+              </div>
+            `,
+            width: '600px'
+          });
+        },
+  
+        formatRequiredItems(items) {
+          if (!items || !items.length) return '<p>No required items</p>';
+          
+          return `
+            <div class="required-items mt-3">
+              <h6>Required Items:</h6>
+              <ul>
+                ${items.map(item => `
+                  <li>${item.quantity}x ${item.name}</li>
+                `).join('')}
+              </ul>
+            </div>
+          `;
+        },
+  
+        // Debounced search handler for better performance
+        debounce(func, wait) {
+          let timeout;
+          return function executedFunction(...args) {
+            const later = () => {
+              clearTimeout(timeout);
+              func(...args);
+            };
+            clearTimeout(timeout);
+            timeout = setTimeout(later, wait);
           };
-      },
-
-      async handleCreateCampaign(campaignData) {
+        },
+  
+        // Improved fetch with better error handling
+        async fetchCampaigns() {
+          if (this.loading) return;
+          
           this.loading = true;
           try {
+            const snapshot = await firebase.database()
+              .ref('campaigns')
+              .once('value');
+            
+            const campaignsData = snapshot.val() || {};
+            this.campaigns = Object.entries(campaignsData)
+              .map(([id, data]) => ({
+                id,
+                ...data
+              }))
+              .sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0));
+  
+          } catch (error) {
+            console.error('Error fetching campaigns:', error);
+            this.error = 'Failed to fetch campaigns. Please try again.';
+            throw error;
+          } finally {
+            this.loading = false;
+          }
+        },
+  
+        // Optimized create campaign handler
+        async handleCreateCampaign() {
+          try {
+            const result = await Swal.fire({
+              title: 'Create New Campaign',
+              html: `
+                <input id="campaignName" class="swal2-input" placeholder="Campaign Name">
+                <input id="brandName" class="swal2-input" placeholder="Brand Name">
+                <input id="minPurchase" class="swal2-input" type="number" placeholder="Minimum Purchase Amount">
+                <input id="startDate" class="swal2-input" type="date">
+                <input id="endDate" class="swal2-input" type="date">
+              `,
+              showCancelButton: true,
+              confirmButtonText: 'Create',
+              preConfirm: () => ({
+                name: document.getElementById('campaignName').value,
+                brandName: document.getElementById('brandName').value,
+                minPurchaseAmount: parseFloat(document.getElementById('minPurchase').value),
+                startDate: document.getElementById('startDate').value,
+                endDate: document.getElementById('endDate').value,
+                status: 'active'
+              })
+            });
+  
+            if (result.isConfirmed) {
+              this.loading = true;
               const campaignRef = firebase.database().ref('campaigns').push();
               await campaignRef.set({
-                  ...campaignData,
-                  createdAt: firebase.database.ServerValue.TIMESTAMP,
-                  updatedAt: firebase.database.ServerValue.TIMESTAMP
+                ...result.value,
+                createdAt: firebase.database.ServerValue.TIMESTAMP,
+                updatedAt: firebase.database.ServerValue.TIMESTAMP
               });
               await this.fetchCampaigns();
               this.showSuccess('Campaign created successfully');
+            }
           } catch (error) {
-              console.error('Error creating campaign:', error);
-              this.showError('Failed to create campaign');
+            console.error('Error creating campaign:', error);
+            this.showError('Failed to create campaign');
           } finally {
-              this.loading = false;
+            this.loading = false;
           }
+        },
+  
+        // Improved notifications
+        showSuccess(message) {
+          Swal.mixin({
+            toast: true,
+            position: 'top-end',
+            showConfirmButton: false,
+            timer: 3000
+          }).fire({
+            icon: 'success',
+            title: message
+          });
+        },
+  
+        showError(message) {
+          Swal.mixin({
+            toast: true,
+            position: 'top-end',
+            showConfirmButton: false,
+            timer: 5000
+          }).fire({
+            icon: 'error',
+            title: message
+          });
+        }
       },
-
-      async handleUpdateCampaign(campaignId, updateData) {
-          this.loading = true;
-          try {
-              await firebase.database()
-                  .ref(`campaigns/${campaignId}`)
-                  .update({
-                      ...updateData,
-                      updatedAt: firebase.database.ServerValue.TIMESTAMP
-                  });
-              await this.fetchCampaigns();
-              this.showSuccess('Campaign updated successfully');
-          } catch (error) {
-              console.error('Error updating campaign:', error);
-              this.showError('Failed to update campaign');
-          } finally {
-              this.loading = false;
-          }
+  
+      mounted() {
+        // Initialize with error boundary
+        try {
+          this.fetchCampaigns();
+          // Debounced search
+          this.debouncedSearch = this.debounce(
+            (value) => this.updateFilters({ brandName: value }), 
+            300
+          );
+        } catch (error) {
+          console.error('Error mounting campaign manager:', error);
+          this.showError('Failed to initialize campaign management');
+        }
       },
-
-      async handleDeleteCampaign(campaignId) {
-          if (!confirm('Are you sure you want to delete this campaign?')) {
-              return;
-          }
-
-          this.loading = true;
-          try {
-              await firebase.database()
-                  .ref(`campaigns/${campaignId}`)
-                  .remove();
-              await this.fetchCampaigns();
-              this.showSuccess('Campaign deleted successfully');
-          } catch (error) {
-              console.error('Error deleting campaign:', error);
-              this.showError('Failed to delete campaign');
-          } finally {
-              this.loading = false;
-          }
-      },
-
-      showSuccess(message) {
-          Swal.fire('Success', message, 'success');
-      },
-
-      showError(message) {
-          Swal.fire('Error', message, 'error');
+  
+      beforeUnmount() {
+        // Cleanup
+        if (this.debouncedSearch) {
+          this.debouncedSearch.cancel;
+        }
       }
-  },
-
-  mounted() {
-      this.fetchCampaigns();
-  },
-
-  template: `
-      <div class="campaign-management">
-          <div class="header">
-              <h2>Campaign Management</h2>
-              <div class="d-flex align-items-center">
-                  <input 
-                      type="text" 
-                      class="form-control search-box me-2" 
-                      v-model="filters.brandName" 
-                      @input="updateFilters({ brandName: $event.target.value })"
-                      placeholder="Search campaigns..."
-                  >
-                  <button class="btn btn-primary" @click="handleCreateCampaign">
-                      <i class="fas fa-plus"></i> Add Campaign
-                  </button>
-              </div>
-          </div>
-
-          <div v-if="loading" class="text-center py-4">
-              <div class="spinner-border text-primary" role="status">
-                  <span class="sr-only">Loading...</span>
-              </div>
-          </div>
-
-          <div v-else-if="error" class="alert alert-danger" role="alert">
-              {{ error }}
-          </div>
-
-          <div v-else class="table-responsive">
-              <table class="table">
-                  <thead>
-                      <tr>
-                          <th>Brand</th>
-                          <th>Store</th>
-                          <th>Duration</th>
-                          <th>Status</th>
-                          <th>Actions</th>
-                      </tr>
-                  </thead>
-                  <tbody>
-                      <tr v-for="campaign in filteredCampaigns" :key="campaign.id">
-                          <td>{{ campaign.brandName }}</td>
-                          <td>{{ campaign.storeName || 'All Stores' }}</td>
-                          <td>{{ campaign.startDate }} - {{ campaign.endDate }}</td>
-                          <td>
-                              <span :class="'badge badge-' + campaign.status">
-                                  {{ campaign.status }}
-                              </span>
-                          </td>
-                          <td>
-                              <div class="btn-group">
-                                  <button 
-                                      class="btn btn-info btn-sm" 
-                                      @click="viewCampaign(campaign)"
-                                      title="View">
-                                      <i class="fas fa-eye"></i>
-                                  </button>
-                                  <button 
-                                      class="btn btn-warning btn-sm" 
-                                      @click="handleUpdateCampaign(campaign.id)"
-                                      title="Edit">
-                                      <i class="fas fa-edit"></i>
-                                  </button>
-                                  <button 
-                                      class="btn btn-danger btn-sm" 
-                                      @click="handleDeleteCampaign(campaign.id)"
-                                      title="Delete">
-                                      <i class="fas fa-trash"></i>
-                                  </button>
-                              </div>
-                          </td>
-                      </tr>
-                  </tbody>
-              </table>
-          </div>
-      </div>
-  `
-};
-
-// Make it globally available
-window.CampaignManager = CampaignManager;
-})();
+    };
+  
+    // Make it globally available
+    window.CampaignManager = CampaignManager;
+  })();
