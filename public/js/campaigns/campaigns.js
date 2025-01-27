@@ -17,3 +17,4 @@ function initializeCampaignManagement() {
         throw error;
     }
 }
+export { initializeCampaignManagement};
