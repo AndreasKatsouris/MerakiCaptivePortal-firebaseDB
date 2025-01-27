@@ -1506,8 +1506,6 @@ function asyncErrorHandler(fn) {
     };
 }
 
-// Loading state management
-// In admin-dashboard.js
 export function showLoading() {
     document.getElementById('globalLoadingOverlay').style.display = 'flex';
 }
@@ -1546,6 +1544,13 @@ function displaySection(sectionId) {
     } finally {
         hideLoading();
     }
+}
+function showError(message) {
+    Swal.fire({
+        icon: 'error',
+        title: 'Error',
+        text: message
+    });
 }
 
 function showTableLoading(tableId) {
@@ -1722,6 +1727,7 @@ function initializeCampaignMenuListener() {
                 showError('Failed to initialize campaign management. Please try again.');
             }
         });
+    } else {
+        console.error('Campaign management menu element not found');
     }
 }
-
