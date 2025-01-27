@@ -101,7 +101,25 @@ export function initializeCampaignManagement() {
                 console.log('Show modal set to:', this.showModal);
             },
 
-            // ... other existing methods ...
+            // Data loading methods
+            async loadCampaigns() {
+                console.log('Loading campaigns...');
+                this.loading = true;
+                try {
+                    const snapshot = await firebase.database().ref('campaigns').once('value');
+                    const data = snapshot.val() || {};
+                    this.campaigns = Object.entries(data).map(([id, campaign]) => ({
+                        id,
+                        ...campaign
+                    }));
+                    console.log('Campaigns loaded:', this.campaigns.length);
+                } catch (error) {
+                    console.error('Error loading campaigns:', error);
+                    this.showError('Failed to load campaigns');
+                } finally {
+                    this.loading = false;
+                }
+            },
         },
 
         // 4. Added lifecycle hooks
