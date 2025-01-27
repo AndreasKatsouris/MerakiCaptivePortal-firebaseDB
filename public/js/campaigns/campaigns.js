@@ -1,5 +1,5 @@
 // campaigns.js
-function initializeCampaignManagement() {
+window.initializeCampaignManagement = function() {
     console.log('Starting campaign management initialization');
     try {
         // Create Vue app with CampaignManager
@@ -17,4 +17,3 @@ function initializeCampaignManagement() {
         throw error;
     }
 }
-export { initializeCampaignManagement};

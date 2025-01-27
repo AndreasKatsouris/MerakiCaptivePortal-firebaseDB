@@ -696,6 +696,7 @@ function showRewardModal(reward) {
 }
 
 // ==================== Campaign Management Section ====================
+// Update the campaign initialization part in admin-dashboard.js
 function initializeCampaignMenuListener() {
     const campaignManagementMenu = document.getElementById('campaignManagementMenu');
     if (campaignManagementMenu) {
@@ -720,8 +721,12 @@ function initializeCampaignMenuListener() {
                 section.style.display = 'block';
                 section.classList.add('active');
                 
-                // Initialize campaign management
-                await initializeCampaignManagement();
+                // Initialize campaign management using global function
+                if (typeof window.initializeCampaignManagement !== 'function') {
+                    throw new Error('Campaign management initialization function not found');
+                }
+                
+                await window.initializeCampaignManagement();
                 console.log('Campaign management initialized successfully');
             } catch (error) {
                 console.error('Error initializing campaign management:', error);
