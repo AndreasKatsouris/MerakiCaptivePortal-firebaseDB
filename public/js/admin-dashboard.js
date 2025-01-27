@@ -2,7 +2,7 @@ import { updateDashboardStats, initializeDashboardListeners } from './dashboard.
 import { initializeProjectManagement } from './project-management.js';
 import { initializeRewardTypes } from './reward-types.js';
 import { initializeGuestManagement } from './guest-management.js';
-import { initializeCampaignManagement } from './campaigns.js';
+import { initializeCampaignManagement } from './campaigns/campaigns.js';
 
 
 window.addEventListener('error', function(e) {
@@ -719,12 +719,6 @@ function initializeCampaignMenuListener() {
                 // Show campaign section
                 section.style.display = 'block';
                 section.classList.add('active');
-                
-                // Clear existing content
-                const root = document.getElementById('campaignManagementRoot');
-                if (root) {
-                    root.innerHTML = '';
-                }
                 
                 // Initialize campaign management
                 await initializeCampaignManagement();

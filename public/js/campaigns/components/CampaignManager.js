@@ -1,7 +1,8 @@
 // components/CampaignManager.js
 import { defineComponent } from 'vue';
-import { useCampaignStore } from '../stores/campaign.store';
+import { useCampaignStore } from '../stores/campaign.store.js';
 import { storeToRefs } from 'pinia';
+
 
 export default defineComponent({
   name: 'CampaignManager',
