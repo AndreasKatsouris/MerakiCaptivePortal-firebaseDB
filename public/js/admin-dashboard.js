@@ -685,6 +685,46 @@ function showRewardModal(reward) {
 }
 
 // ==================== Campaign Management Section ====================
+function initializeCampaignMenuListener() {
+    const campaignManagementMenu = document.getElementById('campaignManagementMenu');
+    if (campaignManagementMenu) {
+        campaignManagementMenu.addEventListener('click', async function(e) {
+            e.preventDefault();
+            console.log('Campaign menu clicked');
+            
+            try {
+                // First display the section
+                const section = document.getElementById('campaignManagementContent');
+                if (!section) {
+                    throw new Error('Campaign management section not found');
+                }
+                
+                // Hide all sections
+                document.querySelectorAll('.content-section').forEach(s => {
+                    s.style.display = 'none';
+                    s.classList.remove('active');
+                });
+                
+                // Show campaign section
+                section.style.display = 'block';
+                section.classList.add('active');
+                
+                // Clear existing content
+                const root = document.getElementById('campaignManagementRoot');
+                if (root) {
+                    root.innerHTML = '';
+                }
+                
+                // Initialize campaign management
+                await initializeCampaignManagement();
+                console.log('Campaign management initialized successfully');
+            } catch (error) {
+                console.error('Error initializing campaign management:', error);
+                showError('Failed to initialize campaign management');
+            }
+        });
+    }
+}
 
 
 // ==================== WiFi Management Section ====================
@@ -1708,43 +1748,4 @@ function initializeMobileMenu() {
         });
     });
 }
-function initializeCampaignMenuListener() {
-    const campaignManagementMenu = document.getElementById('campaignManagementMenu');
-    if (campaignManagementMenu) {
-        campaignManagementMenu.addEventListener('click', async function(e) {
-            e.preventDefault();
-            console.log('Campaign menu clicked');
-            
-            try {
-                // First display the section
-                const section = document.getElementById('campaignManagementContent');
-                if (!section) {
-                    throw new Error('Campaign management section not found');
-                }
-                
-                // Hide all sections
-                document.querySelectorAll('.content-section').forEach(s => {
-                    s.style.display = 'none';
-                    s.classList.remove('active');
-                });
-                
-                // Show campaign section
-                section.style.display = 'block';
-                section.classList.add('active');
-                
-                // Clear existing content
-                const root = document.getElementById('campaignManagementRoot');
-                if (root) {
-                    root.innerHTML = '';
-                }
-                
-                // Initialize campaign management
-                await initializeCampaignManagement();
-                console.log('Campaign management initialized successfully');
-            } catch (error) {
-                console.error('Error initializing campaign management:', error);
-                showError('Failed to initialize campaign management');
-            }
-        });
-    }
-}
+
