@@ -30,7 +30,7 @@ document.addEventListener('DOMContentLoaded', function () {
     initializeProjectManagement();
     initializeRewardTypes();
     initializeGuestManagement();
-    initializeCampaignManagement();
+    //initializeCampaignManagement();
     initializeCampaignMenuListener();
 
         // Global error handler
