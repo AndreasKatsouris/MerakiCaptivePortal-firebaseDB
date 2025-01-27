@@ -1,6 +1,6 @@
 // Campaign Management Module
-
-export function initializeCampaignManagement() {
+let app = null;
+function initializeCampaignManagement() {
     console.log('Starting campaign management initialization');
     console.log('Checking for mount point:', document.getElementById('campaignManagementRoot'));
     const app = Vue.createApp({
@@ -434,8 +434,10 @@ export function initializeCampaignManagement() {
     }
 }
 
-export function loadCampaigns() {
+function loadCampaigns() {
     if (app && app._instance) {
         app._instance.proxy.loadCampaigns();
     }
 }
+
+export { initializeCampaignManagement, loadCampaigns };

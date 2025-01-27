@@ -32,6 +32,17 @@ document.addEventListener('DOMContentLoaded', function () {
     initializeGuestManagement();
     initializeCampaignManagement();
     initializeCampaignMenuListener();
+
+        // Global error handler
+        window.addEventListener('error', function(e) {
+            console.error('Global error:', e.error);
+    
+            // Add specific handling for campaign management errors
+            if (e.error?.message?.includes('campaign')) {
+                console.error('Campaign Management Error:', e.error);
+                showError('An error occurred in campaign management. Please try again.');
+            }
+        });
 });
 
 // ==================== Authentication Section ====================
