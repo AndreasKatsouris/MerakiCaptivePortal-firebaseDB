@@ -98,10 +98,14 @@ async function createTask(taskData) {
 }
 
 // Export necessary functions
-export {
-    initializeProjectManagement,
-    createProject,
-    createTask
+//export {
+//    initializeProjectManagement,
+//    createProject,
+//    createTask
+//};
+// Change from export to window global
+window.initializeProjectManagement = function() {
+    // existing function code
 };
 async function loadProjectTasks() {
     try {

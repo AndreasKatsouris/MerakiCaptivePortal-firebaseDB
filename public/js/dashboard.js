@@ -152,7 +152,11 @@ function initializeDashboardListeners() {
     }
 }
 
-export {
-    updateDashboardStats,
-    initializeDashboardListeners
+// Change from export to window global
+window.updateDashboardStats = async function() {
+    // existing function code
+};
+
+window.initializeDashboardListeners = function() {
+    // existing function code
 };
