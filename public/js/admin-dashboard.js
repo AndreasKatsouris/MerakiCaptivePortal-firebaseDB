@@ -2,7 +2,7 @@ import { updateDashboardStats, initializeDashboardListeners } from './dashboard.
 import { initializeProjectManagement } from './project-management.js';
 import { initializeRewardTypes } from './reward-types.js';
 import { initializeGuestManagement } from './guest-management.js';
-import { initializeCampaignManagement } from './campaigns/campaigns.js';
+//import { initializeCampaignManagement } from './campaigns/campaigns.js';
 
 
 window.addEventListener('error', function(e) {
