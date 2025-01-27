@@ -154,6 +154,15 @@ body {
   margin-right: 1rem;
 }
 
+#campaignManagementRoot {
+  border: 1px solid #eee;
+  min-height: 200px;
+}
+
+#campaignManagementContent.active {
+  display: block !important;
+}
+
 /* Table Styles */
 .table-responsive {
   margin-top: 20px;

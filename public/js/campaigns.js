@@ -1,6 +1,8 @@
 // Campaign Management Module
 
 export function initializeCampaignManagement() {
+    console.log('Starting campaign management initialization');
+    console.log('Checking for mount point:', document.getElementById('campaignManagementRoot'));
     const app = Vue.createApp({
         data() {
             return {
@@ -228,6 +230,8 @@ export function initializeCampaignManagement() {
 
         mounted() {
             console.log('Campaign Management component mounted');
+            console.log('Component element:', this.$el);
+            console.log('Current campaigns:', this.campaigns);
             this.loadCampaigns();
             
             const modalElement = document.querySelector('#campaignModal');

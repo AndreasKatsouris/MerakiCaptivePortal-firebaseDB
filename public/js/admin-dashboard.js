@@ -1717,17 +1717,34 @@ function initializeCampaignMenuListener() {
             
             try {
                 // First display the section
-                displaySection('campaignManagementContent');
+                const section = document.getElementById('campaignManagementContent');
+                if (!section) {
+                    throw new Error('Campaign management section not found');
+                }
                 
-                // Then initialize the campaign management
+                // Hide all sections
+                document.querySelectorAll('.content-section').forEach(s => {
+                    s.style.display = 'none';
+                    s.classList.remove('active');
+                });
+                
+                // Show campaign section
+                section.style.display = 'block';
+                section.classList.add('active');
+                
+                // Clear existing content
+                const root = document.getElementById('campaignManagementRoot');
+                if (root) {
+                    root.innerHTML = '';
+                }
+                
+                // Initialize campaign management
                 await initializeCampaignManagement();
                 console.log('Campaign management initialized successfully');
             } catch (error) {
                 console.error('Error initializing campaign management:', error);
-                showError('Failed to initialize campaign management. Please try again.');
+                showError('Failed to initialize campaign management');
             }
         });
-    } else {
-        console.error('Campaign management menu element not found');
     }
 }
