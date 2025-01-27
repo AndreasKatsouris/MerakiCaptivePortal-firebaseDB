@@ -1,7 +1,8 @@
 // components/CampaignManager.js
-const CampaignManager = {
-  name: 'CampaignManager',
-  
+(function() {
+  // Define the component
+  const CampaignManager = {
+      name: 'CampaignManager',
   data() {
       return {
           campaigns: [],
@@ -216,3 +217,4 @@ const CampaignManager = {
 
 // Make it globally available
 window.CampaignManager = CampaignManager;
+})();

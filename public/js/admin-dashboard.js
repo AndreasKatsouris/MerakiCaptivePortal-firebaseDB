@@ -721,7 +721,7 @@ function initializeCampaignMenuListener() {
                 section.style.display = 'block';
                 section.classList.add('active');
                 
-                // Initialize campaign management using global function
+                // Use the global window function
                 if (typeof window.initializeCampaignManagement !== 'function') {
                     throw new Error('Campaign management initialization function not found');
                 }
@@ -735,7 +735,6 @@ function initializeCampaignMenuListener() {
         });
     }
 }
-
 
 // ==================== WiFi Management Section ====================
 function initializeWiFiListeners() {
