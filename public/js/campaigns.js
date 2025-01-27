@@ -1,6 +1,5 @@
 // Campaign Management Module
-let app = null;
-// campaigns.js
+
 export function initializeCampaignManagement() {
     const app = Vue.createApp({
         data() {
@@ -19,7 +18,9 @@ export function initializeCampaignManagement() {
                     status: 'active',
                     minPurchaseAmount: 0,
                     requiredItems: []
-                }
+                },
+                errorMessage: '',
+                successMessage: ''
             };
         },
         computed: {
@@ -186,7 +187,7 @@ export function initializeCampaignManagement() {
                 </div>
 
                 <!-- Table -->
-                <div v-else class="table-container">
+                <div v-else class="table-responsive">
                     <table class="table">
                         <thead>
                             <tr>
@@ -227,7 +228,64 @@ export function initializeCampaignManagement() {
                     </table>
                 </div>
 
-                <!-- Modal component remains the same -->
+                <!-- Campaign Modal -->
+                <div class="modal fade" v-if="showModal" tabindex="-1" role="dialog">
+                    <div class="modal-dialog" role="document">
+                        <div class="modal-content">
+                            <div class="modal-header">
+                                <h5 class="modal-title">{{ currentCampaign ? 'Edit Campaign' : 'Add Campaign' }}</h5>
+                                <button type="button" class="close" @click="showModal = false">
+                                    <span>&times;</span>
+                                </button>
+                            </div>
+                            <div class="modal-body">
+                                <form @submit.prevent="saveCampaign">
+                                    <div class="form-group">
+                                        <label>Campaign Name</label>
+                                        <input type="text" class="form-control" v-model="formData.name" required>
+                                    </div>
+                                    <div class="form-group">
+                                        <label>Brand Name</label>
+                                        <input type="text" class="form-control" v-model="formData.brandName" required>
+                                    </div>
+                                    <div class="form-group">
+                                        <label>Store Name</label>
+                                        <input type="text" class="form-control" v-model="formData.storeName">
+                                    </div>
+                                    <div class="row">
+                                        <div class="col-md-6">
+                                            <div class="form-group">
+                                                <label>Start Date</label>
+                                                <input type="date" class="form-control" v-model="formData.startDate" required>
+                                            </div>
+                                        </div>
+                                        <div class="col-md-6">
+                                            <div class="form-group">
+                                                <label>End Date</label>
+                                                <input type="date" class="form-control" v-model="formData.endDate" required>
+                                            </div>
+                                        </div>
+                                    </div>
+                                    <div class="form-group">
+                                        <label>Minimum Purchase Amount</label>
+                                        <input type="number" class="form-control" v-model="formData.minPurchaseAmount" min="0" step="0.01">
+                                    </div>
+                                    <div class="form-group">
+                                        <label>Status</label>
+                                        <select class="form-control" v-model="formData.status">
+                                            <option value="active">Active</option>
+                                            <option value="inactive">Inactive</option>
+                                        </select>
+                                    </div>
+                                    <div class="modal-footer">
+                                        <button type="button" class="btn btn-secondary" @click="showModal = false">Cancel</button>
+                                        <button type="submit" class="btn btn-primary">Save</button>
+                                    </div>
+                                </form>
+                            </div>
+                        </div>
+                    </div>
+                </div>
             </div>
         `
     });
@@ -241,10 +299,7 @@ export function initializeCampaignManagement() {
 }
 
 export function loadCampaigns() {
-    if (app) {
-        const instance = app._instance;
-        if (instance && instance.proxy) {
-            instance.proxy.loadCampaigns();
-        }
+    if (app && app._instance) {
+        app._instance.proxy.loadCampaigns();
     }
 }
