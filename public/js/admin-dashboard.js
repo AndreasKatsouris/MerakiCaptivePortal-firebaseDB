@@ -1554,15 +1554,15 @@ function asyncErrorHandler(fn) {
         }
     };
 }
-/**
-export function showLoading() {
+
+function showLoading() {
     document.getElementById('globalLoadingOverlay').style.display = 'flex';
 }
 
-export function hideLoading() {
+function hideLoading() {
     document.getElementById('globalLoadingOverlay').style.display = 'none';
 }
- */
+
 function displaySection(sectionId) {
     try {
         showLoading();
