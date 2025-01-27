@@ -314,9 +314,7 @@ function hideLoading() {
 }
 
 // Export the functions after they are defined
-export {
-    initializeRewardTypes,
-    createRewardType,
-    updateRewardType,
-    deleteRewardType
-};
+window.initializeRewardTypes = initializeRewardTypes;
+window.createRewardType = createRewardType;
+window.updateRewardType = updateRewardType;
+window.deleteRewardType = deleteRewardType;

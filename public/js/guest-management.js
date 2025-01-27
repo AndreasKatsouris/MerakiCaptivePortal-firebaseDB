@@ -355,4 +355,4 @@ function logReceiptProcessing(receiptId, status, message) {
         .catch(error => console.error('Error logging receipt processing:', error));
 }
 
-export { initializeGuestManagement };
+window.initializeGuestManagement = initializeGuestManagement;

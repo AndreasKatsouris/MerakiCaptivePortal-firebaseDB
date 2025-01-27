@@ -104,9 +104,11 @@ async function createTask(taskData) {
 //    createTask
 //};
 // Change from export to window global
-window.initializeProjectManagement = function() {
-    // existing function code
-};
+window.initializeProjectManagement = initializeProjectManagement;
+window.createProject = createProject;
+window.createTask = createTask;
+
+
 async function loadProjectTasks() {
     try {
         const tasksData = [];
