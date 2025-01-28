@@ -1512,14 +1512,20 @@ function formatDate(timestamp) {
 async function loadInitialData() {
     try {
         displaySection('dashboardContent');
-        await Promise.all([
-            updateDashboardStats(),
-            initializeCampaignManagement(),
-            fetchWiFiReports()
-        ]);
+        await updateDashboardStats();
+        
+        // Add check for campaign initialization
+        if (typeof window.initializeCampaignManagement === 'function') {
+            await window.initializeCampaignManagement();
+        } else {
+            console.warn('Campaign management initialization function not available');
+        }
+        
+        await fetchWiFiReports();
         initializeDashboardListeners();
     } catch (error) {
         console.error('Error loading initial data:', error);
+        // Continue loading dashboard even if campaign initialization fails
     }
 }
 
