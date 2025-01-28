@@ -1,6 +1,3 @@
-// campaigns.js
-// campaigns.js
-// Make sure CampaignManager is available globally
 (function() {
     // Define the initialization function
     window.initializeCampaignManagement = function() {
