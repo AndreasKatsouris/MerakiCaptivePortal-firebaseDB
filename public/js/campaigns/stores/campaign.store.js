@@ -1,4 +1,4 @@
-import { defineStore } from 'pinia'
+const { defineStore } = Pinia
 import { 
   validateCampaign, 
   calculateCampaignStatus,

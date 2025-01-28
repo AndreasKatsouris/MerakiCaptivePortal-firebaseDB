@@ -1,5 +1,5 @@
-import { createApp } from 'vue'
-import { createPinia } from 'pinia'
+const { createApp } = Vue
+const { createPinia } = Pinia
 import CampaignManager from './components/CampaignManager.vue'
 
 // Export for external use
