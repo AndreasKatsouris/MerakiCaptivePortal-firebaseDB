@@ -2,7 +2,8 @@ import { createApp } from 'vue'
 import { createPinia } from 'pinia'
 import CampaignManager from './components/CampaignManager.vue'
 
-window.initializeCampaignManagement = function() {
+// Export for external use
+export function initializeCampaignManagement() {
     console.log('Starting campaign management initialization')
     try {
         const app = createApp(CampaignManager)
@@ -23,3 +24,6 @@ window.initializeCampaignManagement = function() {
         throw error
     }
 }
+
+// Also expose to window for existing code
+window.initializeCampaignManagement = initializeCampaignManagement
