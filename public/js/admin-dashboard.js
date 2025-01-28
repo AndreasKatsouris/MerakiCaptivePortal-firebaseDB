@@ -106,26 +106,6 @@ function initializeLoyaltyListeners() {
         displaySection('rewardsManagementContent');
         loadRewards();
     });
-        // Campaign Management Menu
-        const campaignManagementMenu = document.getElementById('campaignManagementMenu');
-        if (campaignManagementMenu) {
-            campaignManagementMenu.addEventListener('click', async function(e) {
-                e.preventDefault();
-                console.log('Campaign menu clicked');
-                
-                // Display the campaign section
-                displaySection('campaignManagementContent');
-                
-                try {
-                    // Initialize campaign management if not already initialized
-                    initializeCampaignManagement();
-                    console.log('Campaign management initialized');
-                } catch (error) {
-                    console.error('Error initializing campaign management:', error);
-                    showError('Failed to initialize campaign management');
-                }
-            });
-        }
 
 }
 
