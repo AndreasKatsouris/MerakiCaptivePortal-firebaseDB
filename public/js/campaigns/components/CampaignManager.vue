@@ -1,7 +1,7 @@
 <!-- CampaignManager.vue -->
 <script setup>
 import { ref, onMounted } from 'vue'
-import { useCampaignStore } from '../store/campaign.store'
+import { useCampaignStore } from '../stores/campaign.store'
 import { storeToRefs } from 'pinia'
 
 // Store setup
