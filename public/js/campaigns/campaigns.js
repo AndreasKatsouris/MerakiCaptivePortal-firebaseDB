@@ -22,17 +22,6 @@
                 ]
             }
         },
-        const itemRowTemplate = `
-        <div class="required-item-row mb-2">
-            <div class="input-group">
-                <input type="number" class="form-control item-quantity" placeholder="Qty" min="1">
-                <input type="text" class="form-control item-name" placeholder="Item Name">
-                <button type="button" class="btn btn-danger remove-item">-</button>
-                <button type="button" class="btn btn-success add-item">+</button>
-            </div>
-        </div>
-    `;
-
         template: `
             <div class="campaign-management">
                 <div class="header d-flex justify-content-between align-items-center mb-4">
