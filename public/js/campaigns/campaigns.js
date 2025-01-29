@@ -257,7 +257,7 @@
                             </div>
                         </div>
                     `,
-                    didMount: () => {
+                    didOpen: () => {
                         // Add event listener for adding new item rows
                         document.querySelector('.add-item').addEventListener('click', () => {
                             const newRow = document.createElement('div');
@@ -431,7 +431,7 @@
                                 </div>
                             </div>
                     `,
-                    didMount: () => {
+                    didOpen: () => {
                         // Add event listener for adding new item rows
                         document.querySelector('.add-item')?.addEventListener('click', () => {
                             const newRow = document.createElement('div');
