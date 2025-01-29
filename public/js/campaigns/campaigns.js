@@ -22,6 +22,16 @@
                 ]
             }
         },
+        const itemRowTemplate = `
+        <div class="required-item-row mb-2">
+            <div class="input-group">
+                <input type="number" class="form-control item-quantity" placeholder="Qty" min="1">
+                <input type="text" class="form-control item-name" placeholder="Item Name">
+                <button type="button" class="btn btn-danger remove-item">-</button>
+                <button type="button" class="btn btn-success add-item">+</button>
+            </div>
+        </div>
+    `;
 
         template: `
             <div class="campaign-management">
@@ -194,6 +204,17 @@
             },
 
             async showAddCampaignModal() {
+                const itemRowTemplate = `
+                    <div class="required-item-row mb-2">
+                        <div class="input-group">
+                            <input type="number" class="form-control item-quantity" placeholder="Qty" min="1">
+                            <input type="text" class="form-control item-name" placeholder="Item Name">
+                            <button type="button" class="btn btn-danger remove-item">-</button>
+                            <button type="button" class="btn btn-success add-item">+</button>
+                        </div>
+                    </div>
+                `;
+            
                 const { value: formValues } = await Swal.fire({
                     title: 'Create New Campaign',
                     width: 800,
@@ -229,25 +250,27 @@
                                 <div class="col">
                                     <h6>Required Items</h6>
                                     <div id="requiredItems">
-                                        <div class="required-item-row mb-2">
-                                            <div class="input-group">
-                                                <input type="number" class="form-control item-quantity" placeholder="Qty" min="1">
-                                                <input type="text" class="form-control item-name" placeholder="Item Name">
-                                                <button type="button" class="btn btn-success add-item">+</button>
-                                            </div>
-                                        </div>
+                                        ${itemRowTemplate}
                                     </div>
                                 </div>
                             </div>
                             <div class="row">
                                 <div class="col">
                                     <h6>Active Days</h6>
-                                    <div id="activeDays" class="d-flex flex-wrap gap-2">
+                                    <div id="activeDays" class="weekday-selector-grid">
                                         ${this.daysOfWeek.map(day => `
-                                            <div class="form-check">
-                                                <input class="form-check-input day-checkbox" type="checkbox" 
-                                                       id="day${day.value}" value="${day.value}">
-                                                <label class="form-check-label" for="day${day.value}">
+                                            <div class="weekday-item">
+                                                <input 
+                                                    type="checkbox" 
+                                                    class="form-check-input day-checkbox" 
+                                                    id="day${day.value}" 
+                                                    value="${day.value}"
+                                                    checked
+                                                >
+                                                <label 
+                                                    class="form-check-label" 
+                                                    for="day${day.value}"
+                                                >
                                                     ${day.label}
                                                 </label>
                                             </div>
@@ -259,21 +282,21 @@
                     `,
                     didOpen: () => {
                         // Add event listener for adding new item rows
-                        document.querySelector('.add-item').addEventListener('click', () => {
-                            const newRow = document.createElement('div');
-                            newRow.className = 'required-item-row mb-2';
-                            newRow.innerHTML = `
-                                <div class="input-group">
-                                    <input type="number" class="form-control item-quantity" placeholder="Qty" min="1">
-                                    <input type="text" class="form-control item-name" placeholder="Item Name">
-                                    <button type="button" class="btn btn-danger remove-item">-</button>
-                                </div>
-                            `;
-                            document.getElementById('requiredItems').appendChild(newRow);
-
-                            // Add remove functionality to new row
-                            newRow.querySelector('.remove-item').addEventListener('click', () => {
-                                newRow.remove();
+                        document.querySelectorAll('.add-item').forEach(button => {
+                            button.addEventListener('click', (e) => {
+                                const newRow = document.createElement('div');
+                                newRow.innerHTML = itemRowTemplate;
+                                e.target.closest('.required-item-row').insertAdjacentElement('afterend', newRow.firstElementChild);
+                            });
+                        });
+            
+                        // Add event listener for removing item rows
+                        document.querySelectorAll('.remove-item').forEach(button => {
+                            button.addEventListener('click', (e) => {
+                                const rows = document.querySelectorAll('.required-item-row');
+                                if (rows.length > 1) {
+                                    e.target.closest('.required-item-row').remove();
+                                }
                             });
                         });
                     },
@@ -303,12 +326,13 @@
                             status: 'active'
                         };
                     }
-                }).then((result) => {
-                    if (result.isConfirmed) {
-                        this.createCampaign(result.value);
-                    }
                 });
+            
+                if (formValues) {
+                    this.createCampaign(formValues);
+                }
             },
+            
 
             async createCampaign(campaignData) {
                 try {
@@ -344,6 +368,17 @@
             },
 
             editCampaign(campaign) {
+                const itemRowTemplate = `
+                    <div class="required-item-row mb-2">
+                        <div class="input-group">
+                            <input type="number" class="form-control item-quantity" placeholder="Qty" min="1">
+                            <input type="text" class="form-control item-name" placeholder="Item Name">
+                            <button type="button" class="btn btn-danger remove-item">-</button>
+                            <button type="button" class="btn btn-success add-item">+</button>
+                        </div>
+                    </div>
+                `;
+            
                 Swal.fire({
                     title: 'Edit Campaign',
                     width: 800,
@@ -386,30 +421,26 @@
                                 <div class="col">
                                     <h6>Required Items</h6>
                                     <div id="requiredItems">
-                                        ${campaign.requiredItems && campaign.requiredItems.map(item => `
-                                            <div class="required-item-row mb-2">
-                                                <div class="input-group">
-                                                    <input type="number" class="form-control item-quantity" placeholder="Qty" min="1" value="${item.quantity}">
-                                                    <input type="text" class="form-control item-name" placeholder="Item Name" value="${item.name}">
-                                                    <button type="button" class="btn btn-danger remove-item">-</button>
+                                        ${campaign.requiredItems && campaign.requiredItems.length ? 
+                                            campaign.requiredItems.map(item => `
+                                                <div class="required-item-row mb-2">
+                                                    <div class="input-group">
+                                                        <input type="number" class="form-control item-quantity" placeholder="Qty" min="1" value="${item.quantity}">
+                                                        <input type="text" class="form-control item-name" placeholder="Item Name" value="${item.name}">
+                                                        <button type="button" class="btn btn-danger remove-item">-</button>
+                                                        <button type="button" class="btn btn-success add-item">+</button>
+                                                    </div>
                                                 </div>
-                                            </div>
-                                        `).join('') || `
-                                            <div class="required-item-row mb-2">
-                                                <div class="input-group">
-                                                    <input type="number" class="form-control item-quantity" placeholder="Qty" min="1">
-                                                    <input type="text" class="form-control item-name" placeholder="Item Name">
-                                                    <button type="button" class="btn btn-success add-item">+</button>
-                                                </div>
-                                            </div>
-                                        `}
+                                            `).join('') 
+                                            : itemRowTemplate
+                                        }
                                     </div>
                                 </div>
                             </div>
                             <div class="row">
                                 <div class="col">
                                     <h6>Active Days</h6>
-                                    <div class="weekday-selector-grid">
+                                    <div id="activeDays" class="weekday-selector-grid">
                                         ${this.daysOfWeek.map(day => `
                                             <div class="weekday-item">
                                                 <input 
@@ -430,31 +461,25 @@
                                     </div>
                                 </div>
                             </div>
+                        </div>
                     `,
                     didOpen: () => {
                         // Add event listener for adding new item rows
-                        document.querySelector('.add-item')?.addEventListener('click', () => {
-                            const newRow = document.createElement('div');
-                            newRow.className = 'required-item-row mb-2';
-                            newRow.innerHTML = `
-                                <div class="input-group">
-                                    <input type="number" class="form-control item-quantity" placeholder="Qty" min="1">
-                                    <input type="text" class="form-control item-name" placeholder="Item Name">
-                                    <button type="button" class="btn btn-danger remove-item">-</button>
-                                </div>
-                            `;
-                            document.getElementById('requiredItems').appendChild(newRow);
-
-                            // Add remove functionality to new row
-                            newRow.querySelector('.remove-item').addEventListener('click', () => {
-                                newRow.remove();
+                        document.querySelectorAll('.add-item').forEach(button => {
+                            button.addEventListener('click', (e) => {
+                                const newRow = document.createElement('div');
+                                newRow.innerHTML = itemRowTemplate;
+                                e.target.closest('.required-item-row').insertAdjacentElement('afterend', newRow.firstElementChild);
                             });
                         });
-
-                        // Add remove functionality to existing item rows
+            
+                        // Add event listener for removing item rows
                         document.querySelectorAll('.remove-item').forEach(button => {
-                            button.addEventListener('click', () => {
-                                button.closest('.required-item-row').remove();
+                            button.addEventListener('click', (e) => {
+                                const rows = document.querySelectorAll('.required-item-row');
+                                if (rows.length > 1) {
+                                    e.target.closest('.required-item-row').remove();
+                                }
                             });
                         });
                     },
