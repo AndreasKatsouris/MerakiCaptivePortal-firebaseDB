@@ -676,7 +676,6 @@ function showRewardModal(reward) {
 }
 
 // ==================== Campaign Management Section ====================
-// Update the campaign initialization part in admin-dashboard.js
 function initializeCampaignMenuListener() {
     const campaignManagementMenu = document.getElementById('campaignManagementMenu');
     if (campaignManagementMenu) {
@@ -701,12 +700,13 @@ function initializeCampaignMenuListener() {
                 section.style.display = 'block';
                 section.classList.add('active');
                 
-                // Use the global window function
-                if (typeof window.initializeCampaignManagement !== 'function') {
-                    throw new Error('Campaign management initialization function not found');
+                // Initialize Vue campaign manager
+                if (window.CampaignManager) {
+                    window.CampaignManager.init('campaignManagementRoot');
+                } else {
+                    throw new Error('Campaign manager not loaded');
                 }
                 
-                await window.initializeCampaignManagement();
                 console.log('Campaign management initialized successfully');
             } catch (error) {
                 console.error('Error initializing campaign management:', error);

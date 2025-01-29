@@ -12,16 +12,20 @@ export default defineConfig({
         campaigns: resolve(__dirname, 'campaigns/campaigns.js'),
       },
       output: {
+        format: 'iife',  // Use IIFE for better compatibility
         entryFileNames: '[name].js',
-        chunkFileNames: '[name]-[hash].js',
-        assetFileNames: '[name]-[hash][extname]'
+        chunkFileNames: 'chunks/[name]-[hash].js',
+        assetFileNames: 'assets/[name]-[hash][extname]',
+        // Global variable name for your campaign manager
+        name: 'CampaignManager',
+        // Make Vue available globally
+        globals: {
+          vue: 'Vue'
+        }
       }
-    }
-  },
-
-  server: {
-    port: 3000,
-    open: true
+    },
+    // Generate sourcemaps for debugging
+    sourcemap: true
   },
 
   resolve: {
@@ -31,7 +35,6 @@ export default defineConfig({
     }
   },
 
-  // Add this to handle Firebase and other external dependencies
   optimizeDeps: {
     include: ['firebase/app', 'firebase/database', 'firebase/auth']
   }
