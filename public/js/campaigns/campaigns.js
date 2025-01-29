@@ -204,8 +204,47 @@
             },
 
             editCampaign(campaign) {
-                // Implementation for edit campaign
-                console.log('Edit campaign:', campaign);
+                Swal.fire({
+                    title: 'Edit Campaign',
+                    html: `
+                        <input id="campaignName" class="swal2-input" placeholder="Campaign Name" value="${campaign.name}">
+                        <input id="brandName" class="swal2-input" placeholder="Brand Name" value="${campaign.brandName}">
+                        <input id="storeName" class="swal2-input" placeholder="Store Name (optional)" value="${campaign.storeName || ''}">
+                        <input id="minPurchase" class="swal2-input" type="number" placeholder="Minimum Purchase Amount" value="${campaign.minPurchaseAmount || 0}">
+                        <input id="startDate" class="swal2-input" type="date" value="${campaign.startDate || ''}">
+                        <input id="endDate" class="swal2-input" type="date" value="${campaign.endDate || ''}">
+                        <select id="campaignStatus" class="swal2-select">
+                            <option value="active" ${campaign.status === 'active' ? 'selected' : ''}>Active</option>
+                            <option value="inactive" ${campaign.status === 'inactive' ? 'selected' : ''}>Inactive</option>
+                            <option value="draft" ${campaign.status === 'draft' ? 'selected' : ''}>Draft</option>
+                        </select>
+                    `,
+                    showCancelButton: true,
+                    confirmButtonText: 'Update',
+                    preConfirm: () => ({
+                        name: document.getElementById('campaignName').value,
+                        brandName: document.getElementById('brandName').value,
+                        storeName: document.getElementById('storeName').value,
+                        minPurchaseAmount: parseFloat(document.getElementById('minPurchase').value),
+                        startDate: document.getElementById('startDate').value,
+                        endDate: document.getElementById('endDate').value,
+                        status: document.getElementById('campaignStatus').value
+                    })
+                }).then(async (result) => {
+                    if (result.isConfirmed) {
+                        try {
+                            await firebase.database().ref(`campaigns/${campaign.id}`).update({
+                                ...result.value,
+                                updatedAt: Date.now()
+                            });
+                            await this.loadCampaigns();
+                            Swal.fire('Updated!', 'Campaign has been updated successfully.', 'success');
+                        } catch (error) {
+                            console.error('Error updating campaign:', error);
+                            Swal.fire('Error', 'Failed to update campaign', 'error');
+                        }
+                    }
+                });
             },
 
             async deleteCampaign(campaign) {
