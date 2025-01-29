@@ -12,30 +12,19 @@ export default defineConfig({
         campaigns: resolve(__dirname, 'campaigns/campaigns.js'),
       },
       output: {
-        format: 'iife',  // Use IIFE for better compatibility
+        format: 'iife',
         entryFileNames: '[name].js',
         chunkFileNames: 'chunks/[name]-[hash].js',
         assetFileNames: 'assets/[name]-[hash][extname]',
-        // Global variable name for your campaign manager
-        name: 'CampaignManager',
-        // Make Vue available globally
+        // Make sure external dependencies are handled properly
         globals: {
-          vue: 'Vue'
+          vue: 'Vue',
+          firebase: 'firebase'
         }
       }
     },
-    // Generate sourcemaps for debugging
+    // Don't minimize for easier debugging during development
+    minify: false,
     sourcemap: true
-  },
-
-  resolve: {
-    alias: {
-      '@': resolve(__dirname, 'campaigns'),
-      'vue': 'vue/dist/vue.esm-bundler.js'
-    }
-  },
-
-  optimizeDeps: {
-    include: ['firebase/app', 'firebase/database', 'firebase/auth']
   }
 })
