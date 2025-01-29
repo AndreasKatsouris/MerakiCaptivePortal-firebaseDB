@@ -359,3 +359,48 @@ body {
 .d-flex { display: flex !important; }
 .align-items-center { align-items: center !important; }
 .justify-content-between { justify-content: space-between !important; }
+
+// Add this CSS to your existing styles
+
+.weekday-selector {
+    margin-top: 1rem;
+}
+
+#activeDays {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 1rem !important;
+    margin-top: 0.5rem;
+}
+
+#activeDays .form-check {
+    min-width: 100px;
+    margin: 0;
+    padding: 0.25rem 0;
+}
+
+.form-check-input {
+    margin-right: 0.5rem;
+}
+
+.form-check-label {
+    user-select: none;
+    cursor: pointer;
+}
+
+/* Responsive adjustments */
+@media (max-width: 768px) {
+    #activeDays {
+        gap: 0.5rem !important;
+    }
+
+    #activeDays .form-check {
+        min-width: 80px;
+    }
+}
+
+/* Optional: Hover effect for better UX */
+.form-check:hover {
+    background-color: rgba(0, 0, 0, 0.03);
+    border-radius: 4px;
+}
