@@ -4,6 +4,20 @@ import { ref, onMounted } from 'vue'
 import { useCampaignStore } from '../stores/campaign.store'
 import { storeToRefs } from 'pinia'
 
+import { useCampaignStore } from '../stores/campaign.store';
+
+export default {
+  setup() {
+    const store = useCampaignStore();
+    console.log('Campaign store initialized:', store.$state);
+    
+    return { store };
+  },
+  mounted() {
+    console.log('CampaignManager mounted');
+  }
+}
+
 // Store setup
 const campaignStore = useCampaignStore()
 const { campaigns, loading, error } = storeToRefs(campaignStore)
