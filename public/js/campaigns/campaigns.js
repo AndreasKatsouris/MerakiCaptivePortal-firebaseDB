@@ -409,13 +409,20 @@
                             <div class="row">
                                 <div class="col">
                                     <h6>Active Days</h6>
-                                    <div id="activeDays" class="d-flex flex-wrap gap-2">
+                                    <div class="weekday-selector-grid">
                                         ${this.daysOfWeek.map(day => `
-                                            <div class="form-check">
-                                                <input class="form-check-input day-checkbox" type="checkbox" 
-                                                       id="day${day.value}" value="${day.value}"
-                                                       ${campaign.activeDays && campaign.activeDays.includes(day.value) ? 'checked' : ''}>
-                                                <label class="form-check-label" for="day${day.value}">
+                                            <div class="weekday-item">
+                                                <input 
+                                                    type="checkbox" 
+                                                    class="form-check-input day-checkbox" 
+                                                    id="day${day.value}" 
+                                                    value="${day.value}"
+                                                    ${campaign.activeDays && campaign.activeDays.includes(day.value) ? 'checked' : ''}
+                                                >
+                                                <label 
+                                                    class="form-check-label" 
+                                                    for="day${day.value}"
+                                                >
                                                     ${day.label}
                                                 </label>
                                             </div>
@@ -423,7 +430,6 @@
                                     </div>
                                 </div>
                             </div>
-                        </div>
                     `,
                     didMount: () => {
                         // Add event listener for adding new item rows
