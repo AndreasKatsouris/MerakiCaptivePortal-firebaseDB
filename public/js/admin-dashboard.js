@@ -1506,15 +1506,8 @@ async function loadInitialData() {
         displaySection('dashboardContent');
         await updateDashboardStats();
         
-        // Add check for campaign initialization
-        if (typeof window.initializeCampaignManagement === 'function') {
-            await window.initializeCampaignManagement();
-        } else {
-            console.warn('Campaign management initialization function not available');
-        }
-        
         await fetchWiFiReports();
-        initializeDashboardListeners();
+        //initializeDashboardListeners();
     } catch (error) {
         console.error('Error loading initial data:', error);
         // Continue loading dashboard even if campaign initialization fails
