@@ -25,8 +25,10 @@
       ".read": true,
       ".write": true
     },
-    "receipts": {
-      ".indexOn": ["guestPhoneNumber"]
-    }
+"receipts": {
+  ".indexOn": ["phoneNumber", "guestPhoneNumber"],
+  ".read": true,
+  ".write": true
   }
+}
 }
