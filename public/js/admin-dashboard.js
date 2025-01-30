@@ -681,36 +681,28 @@ function initializeCampaignMenuListener() {
     if (campaignManagementMenu) {
         campaignManagementMenu.addEventListener('click', async function(e) {
             e.preventDefault();
-            console.log('Campaign menu clicked');
             
-            try {
-                // First display the section
-                const section = document.getElementById('campaignManagementContent');
-                if (!section) {
-                    throw new Error('Campaign management section not found');
+            // Hide all content sections first
+            document.querySelectorAll('.content-section').forEach(section => {
+                section.style.display = 'none';
+                section.classList.remove('active');
+            });
+            
+            // Show campaign section
+            const campaignSection = document.getElementById('campaignManagementContent');
+            if (campaignSection) {
+                campaignSection.style.display = 'block';
+                campaignSection.classList.add('active');
+                
+                // Initialize campaign manager if not already done
+                if (!window.campaignManagerInstance) {
+                    try {
+                        window.campaignManagerInstance = window.CampaignManager.init('campaignManagementRoot');
+                    } catch (error) {
+                        console.error('Error initializing campaign management:', error);
+                        showError('Failed to initialize campaign management');
+                    }
                 }
-                
-                // Hide all sections
-                document.querySelectorAll('.content-section').forEach(s => {
-                    s.style.display = 'none';
-                    s.classList.remove('active');
-                });
-                
-                // Show campaign section
-                section.style.display = 'block';
-                section.classList.add('active');
-                
-                // Initialize Vue campaign manager
-                if (window.CampaignManager) {
-                    window.CampaignManager.init('campaignManagementRoot');
-                } else {
-                    throw new Error('Campaign manager not loaded');
-                }
-                
-                console.log('Campaign management initialized successfully');
-            } catch (error) {
-                console.error('Error initializing campaign management:', error);
-                showError('Failed to initialize campaign management');
             }
         });
     }
@@ -1552,30 +1544,24 @@ function hideLoading() {
 function displaySection(sectionId) {
     try {
         showLoading();
-        console.log('Displaying section:', sectionId);
         
-        const section = document.getElementById(sectionId);
-        if (!section) {
-            throw new Error(`Section ${sectionId} not found`);
-        }
-
-        // Hide all sections first
-        document.querySelectorAll('.content-section').forEach(s => {
-            s.style.display = 'none';
+        // Hide all sections
+        document.querySelectorAll('.content-section').forEach(section => {
+            section.style.display = 'none';
+            section.classList.remove('active');
         });
 
         // Show the requested section
-        section.style.display = 'block';
-
-        // Special handling for campaign management
-        if (sectionId === 'campaignManagementContent') {
-            section.style.marginTop = '0';
-            section.classList.add('active');
+        const section = document.getElementById(sectionId);
+        if (section) {
+            section.style.display = 'block';
+            section.classList.add('active');  // Add active class to any shown section
+        } else {
+            console.error(`Section ${sectionId} not found`);
         }
-        
     } catch (error) {
         console.error('Error displaying section:', error);
-        showError('Failed to display section. Please try again.');
+        showError('Failed to display section');
     } finally {
         hideLoading();
     }
