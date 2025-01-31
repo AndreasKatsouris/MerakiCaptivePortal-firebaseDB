@@ -1,13 +1,156 @@
-# RDP Feature Implementation Checklist
+# RDP Platform Documentation and Development Guide
 
-## 1. Module Structure
+## Overview
+The RDP (Receipt Data Processing) platform consists of a WhatsApp-based receipt processing system with an administrative dashboard. The system is built on Firebase with both server-side (Cloud Functions) and client-side components.
+
+## System Architecture
+
+### Server-Side Components (Cloud Functions)
+
+#### Data Management (`dataManagement.js`)
+- **Purpose**: User data CRUD operations and privacy compliance
+- **Key Functions**:
+  - `deleteUserData()`: Handles GDPR-compliant data deletion
+  - `exportUserData()`: Creates portable user data exports
+  - `anonymizeInactiveUsers()`: Manages inactive user privacy
+- **Dependencies**: Firebase Admin, Database Integration
+- **Connected to**: `receiveWhatsappMessage.js`, `menuLogic.js`
+
+#### Campaign Validation (`guardRail.js`)
+- **Purpose**: Receipt validation and campaign matching
+- **Key Functions**:
+  - `matchReceiptToCampaign()`: Core validation logic
+  - `validateReceipt()`: Receipt data validation
+  - `validateAgainstCampaign()`: Campaign criteria matching
+- **Dependencies**: Firebase Admin
+- **Connected to**: `receiptProcessor.js`, `rewardsProcessor.js`
+
+#### Menu Logic (`menuLogic.js`)
+- **Purpose**: WhatsApp bot command processing
+- **Key Functions**:
+  - `processMessage()`: Command routing and handling
+  - `getGuestPoints()`: Points balance queries
+  - `getGuestRewards()`: Rewards status queries
+- **Dependencies**: Firebase Admin, Command Definitions
+- **Connected to**: `receiveWhatsappMessage.js`, `dataManagement.js`
+
+#### Receipt Processing (`receiptProcessor.js`)
+- **Purpose**: OCR and receipt data extraction
+- **Key Functions**:
+  - `processReceipt()`: Main receipt processing pipeline
+  - `detectReceiptText()`: Google Cloud Vision integration
+  - `extractStoreDetails()`, `extractItems()`: Data parsing
+- **Dependencies**: Google Cloud Vision, Firebase Admin
+- **Connected to**: `guardRail.js`, `textParsingStrategies.js`
+
+#### WhatsApp Handler (`receiveWhatsappMessage.js`)
+- **Purpose**: Main WhatsApp interaction handler
+- **Key Functions**:
+  - `receiveWhatsAppMessage()`: Message entry point
+  - `handleReceiptProcessing()`: Receipt workflow
+  - `handleTextCommand()`: Command workflow
+- **Dependencies**: Twilio, Firebase Admin
+- **Connected to**: `twilioClient.js`, `menuLogic.js`, `receiptProcessor.js`
+
+#### Rewards Processing (`rewardsProcessor.js`)
+- **Purpose**: Reward generation and distribution
+- **Key Functions**:
+  - `processReward()`: Reward creation and assignment
+  - Firebase reward data structure management
+- **Dependencies**: Firebase Admin
+- **Connected to**: `guardRail.js`, `receiveWhatsappMessage.js`
+
+#### Twilio Configuration (`twilioClient.js`)
+- **Purpose**: WhatsApp messaging setup
+- **Key Functions**:
+  - Twilio client initialization
+  - Environment configuration
+- **Dependencies**: Twilio SDK
+- **Connected to**: `receiveWhatsappMessage.js`
+
+### Client-Side Components (Public)
+
+#### Admin Dashboard Core (`admin-dashboard.js`)
+- **Purpose**: Admin panel core functionality
+- **Key Features**:
+  - Route management
+  - Component initialization
+  - Authentication handling
+- **Dependencies**: Vue.js, Firebase Client SDK
+- **Connected to**: Most client-side components
+
+#### Analytics Dashboard (`dashboard.js`)
+- **Purpose**: Analytics and metrics visualization
+- **Key Features**:
+  - Real-time statistics
+  - Chart rendering
+  - Data visualization
+- **Dependencies**: Chart.js, Firebase Realtime Database
+- **Connected to**: `admin-dashboard.js`
+
+#### Guest Management (`guest-management.js`)
+- **Purpose**: Guest data management interface
+- **Key Features**:
+  - Guest profile management
+  - Activity tracking
+  - Data management interface
+- **Dependencies**: Vue.js, Firebase Client SDK
+- **Connected to**: `admin-dashboard.js`, `dataManagement.js`
+
+#### Campaign Management Suite
+```
+campaigns/
+  ├── campaign.utils.js      # Utility functions
+  ├── campaign.types.js      # TypeScript definitions
+  ├── campaign.store.js      # State management (Pinia)
+  ├── campaign.constants.js  # Configuration
+  ├── campaigns.api.js       # API integration
+  └── campaigns.js           # Main functionality
+```
+- **Purpose**: Campaign management and configuration
+- **Dependencies**: Vue.js, Pinia, Firebase Client SDK
+- **Connected to**: `admin-dashboard.js`, `guardRail.js`
+
+#### Project Management (`project-management.js`)
+- **Purpose**: Project tracking interface
+- **Key Features**:
+  - Project CRUD operations
+  - Task management
+  - Progress tracking
+- **Dependencies**: Vue.js, Firebase Client SDK
+- **Connected to**: `admin-dashboard.js`
+
+#### Reward Types (`reward-types.js`)
+- **Purpose**: Reward configuration interface
+- **Key Features**:
+  - Reward type definitions
+  - Validation rules
+  - Distribution logic
+- **Dependencies**: Vue.js, Firebase Client SDK
+- **Connected to**: `rewardsProcessor.js`, `admin-dashboard.js`
+
+#### Text Parsing (`textParsingStrategies.js`)
+- **Purpose**: Receipt parsing algorithms
+- **Key Features**:
+  - Multiple parsing strategies
+  - Format detection
+  - Data extraction
+- **Dependencies**: None (pure JavaScript)
+- **Connected to**: `receiptProcessor.js`
+
+## Development Guidelines
+
+### New Feature Implementation Checklist
+
+#### 1. Module Structure
 - [ ] Create dedicated module file in appropriate directory
 - [ ] Add exports declaration at top of module
 - [ ] Verify no duplicate exports exist
 - [ ] Export only necessary functions/components
 - [ ] Add module import to admin-dashboard.js if needed
+- [ ] All new features must use Vue.js
 
-## 2. Function Implementation
+#### 2. Function Implementation
 - [ ] Define clear function scope and purpose
 - [ ] Implement error handling
 - [ ] Add logging for important operations
@@ -15,7 +158,7 @@
 - [ ] Document function parameters and return values
 - [ ] Verify function naming follows project conventions
 
-## 3. UI Integration
+#### 3. UI Integration
 - [ ] Add menu item to sidebar if needed
 - [ ] Create content section in admin-dashboard.html
 - [ ] Implement proper HTML structure
@@ -23,28 +166,21 @@
 - [ ] Follow existing CSS/styling patterns
 - [ ] Ensure mobile responsiveness
 
-## 4. Event Handling
+#### 4. Event Handling
 - [ ] Use event delegation for dynamic elements
-- [ ] Avoid inline event handlers (no onclick in HTML)
+- [ ] Avoid inline event handlers
 - [ ] Properly scope event listeners
 - [ ] Clean up event listeners when needed
 - [ ] Implement proper error boundaries
 
-## 5. Firebase Integration
+#### 5. Firebase Integration
 - [ ] Plan data structure
 - [ ] Implement proper security rules
 - [ ] Use appropriate Firebase methods
 - [ ] Handle offline scenarios
-- [ ] Implement proper error handling for Firebase operations
+- [ ] Implement proper error handling
 
-## 6. Initialization
-- [ ] Add initialization function to module
-- [ ] Export initialization function
-- [ ] Add to admin-dashboard.js initialization list
-- [ ] Verify initialization order
-- [ ] Test initialization with console logging
-
-## 7. Testing & Validation
+#### 6. Testing & Validation
 - [ ] Test in development environment
 - [ ] Check browser console for errors
 - [ ] Verify TypeScript/lint warnings
@@ -52,30 +188,31 @@
 - [ ] Verify mobile functionality
 - [ ] Check performance impact
 
-## 8. Documentation
+#### 7. Documentation
 - [ ] Add JSDoc comments for functions
-- [ ] Document any complex logic
+- [ ] Document complex logic
 - [ ] Update README if needed
-- [ ] Document any new Firebase schema
+- [ ] Document Firebase schema changes
 - [ ] Add usage examples if needed
 
-## 9. Security Considerations
+#### 8. Security Considerations
 - [ ] Implement input validation
 - [ ] Add proper access controls
 - [ ] Sanitize user input
 - [ ] Verify Firebase security rules
-- [ ] Check for potential XSS vulnerabilities
+- [ ] Check for XSS vulnerabilities
 
-## 10. Final Verification
+#### 9. Final Verification
 - [ ] No console errors
 - [ ] No TypeScript warnings
 - [ ] All features functional
 - [ ] Mobile responsive
-- [ ] Follows project coding standards
-- [ ] Properly integrated with existing features
+- [ ] Follows project standards
+- [ ] Properly integrated
 
-## Notes:
-- Run through this checklist for each new feature
-- Document any deviations from standard patterns
-- Update this checklist as new requirements emerge
-- Share any issues or improvements with the team
+## Notes
+- Run through checklist for each new feature
+- Document any deviations from standards
+- Update checklist as requirements evolve
+- Share issues/improvements with team
+- Follow Vue.js best practices
