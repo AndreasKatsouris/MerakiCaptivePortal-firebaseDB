@@ -2,7 +2,6 @@
 import _ from 'lodash';
 import React from 'react';
 import ReactDOM from 'react-dom';
-import { GuestAnalytics } from './GuestAnalytics';
 
 // Guest Management State
 const guestManagement = {
@@ -471,13 +470,16 @@ const guestManagement = {
                 const modal = new bootstrap.Modal(document.getElementById('analyticsModal'));
                 modal.show();
                 
-                // Initialize the analytics component
+                // Initialize the analytics component using the global reference
                 const analyticsRoot = document.getElementById('guestAnalyticsRoot');
-                if (analyticsRoot) {
+                if (analyticsRoot && window.GuestAnalytics) {
                     ReactDOM.render(
-                        React.createElement(GuestAnalytics, { phoneNumber: guest.phoneNumber }),
+                        React.createElement(window.GuestAnalytics, { phoneNumber: guest.phoneNumber }),
                         analyticsRoot
                     );
+                } else {
+                    console.error('GuestAnalytics component not found');
+                    Swal.fire('Error', 'Analytics component failed to load', 'error');
                 }
             },
 
