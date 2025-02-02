@@ -1,7 +1,7 @@
 //import { updateDashboardStats, initializeDashboardListeners } from './dashboard.js';
 //import { initializeProjectManagement } from './project-management.js';
 //import { initializeRewardTypes } from './reward-types.js';
-//import { initializeGuestManagement } from './guest-management.js';
+import { initializeGuestManagement } from './guest-management.js';
 //import { initializeCampaignManagement } from './campaigns/campaigns.js';
 
 
