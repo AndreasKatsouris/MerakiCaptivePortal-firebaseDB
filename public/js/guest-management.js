@@ -606,4 +606,4 @@ function showGuestManagement() {
 }
 
 // Export the initialization function for use in admin-dashboard.js
-window.initializeGuestManagement = initializeGuestManagement;
+export { initializeGuestManagement };
