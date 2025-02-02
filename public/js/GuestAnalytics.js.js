@@ -296,4 +296,6 @@ async function loadSpendingHistory(phoneNumber) {
 }
 
 // Make the component globally available
-window.GuestAnalytics = GuestAnalytics;
+export { 
+    GuestAnalytics
+ };
