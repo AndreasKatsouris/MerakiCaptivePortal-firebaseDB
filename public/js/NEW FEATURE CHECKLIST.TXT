@@ -3,6 +3,130 @@
 ## Overview
 The RDP (Receipt Data Processing) platform consists of a WhatsApp-based receipt processing system with an administrative dashboard. The system is built on Firebase with both server-side (Cloud Functions) and client-side components.
 
+## Loyalty System Workflow
+
+### 1. Guest Entry & Management
+- Initial WhatsApp interaction creates guest profile
+- Profile tracks:
+  - Contact details
+  - Visit history
+  - Spending patterns
+  - Points balance
+  - Reward redemptions
+  - Preferred stores/items
+- Segmentation based on:
+  - Visit frequency
+  - Average spend
+  - Lifetime value
+  - Engagement level
+
+### 2. Receipt Processing Details
+- Image Processing:
+  - OCR scans receipt image
+  - Extracts text using Google Cloud Vision
+  - Parses store details, items, amounts
+  - Validates receipt authenticity
+  - Checks for duplicates
+
+- Campaign Matching:
+  - Checks receipt against active campaigns
+  - Validates:
+    - Store eligibility
+    - Purchase amount requirements
+    - Required items
+    - Time/day restrictions
+    - Campaign validity period
+
+### 3. Campaign Types & Rules
+- Standard Campaigns:
+  - Points multiplier days
+  - Spend thresholds for rewards
+  - Buy-one-get-one offers
+  - Category-specific promotions
+
+- Targeted Campaigns:
+  - New guest offers
+  - Win-back campaigns for inactive guests
+  - VIP guest exclusive offers
+  - Birthday/anniversary specials
+
+- Campaign Rules Engine:
+  - Multiple conditions support
+  - Stackable/non-stackable rules
+  - Time-based activation
+  - Store-specific variations
+
+### 4. Reward Mechanics
+- Points System:
+  - Base earning rate
+  - Bonus point opportunities
+  - Points expiry rules
+  - Redemption thresholds
+
+- Tier System:
+  - Bronze, Silver, Gold, Platinum levels
+  - Tier-based benefits:
+    - Higher earning rates
+    - Exclusive rewards
+    - Priority service
+    - Special perks
+
+- Reward Types:
+  - Instant discounts
+  - Point redemptions
+  - Free items
+  - Exclusive experiences
+  - Birthday rewards
+  - Milestone rewards
+
+### 5. Guest Communication
+- Automated Messages:
+  - Welcome messages
+  - Points balance updates
+  - Reward notifications
+  - Campaign announcements
+  - Redemption confirmations
+
+- Guest Commands:
+  - Check points balance
+  - View available rewards
+  - See active campaigns
+  - Request account info
+  - Get help/support
+
+### 6. Analytics & Reporting
+- Guest Metrics:
+  - Acquisition source
+  - Visit frequency
+  - Average transaction value
+  - Redemption rate
+  - Engagement score
+
+- Campaign Analytics:
+  - Participation rate
+  - Redemption rate
+  - ROI calculation
+  - Guest segment performance
+  - Store performance
+
+- Business Intelligence:
+  - Customer lifetime value
+  - Churn prediction
+  - Campaign effectiveness
+  - Store performance comparison
+  - Trend analysis
+
+### 7. Integration Points
+- POS Systems:
+  - Receipt validation
+  - Real-time transaction processing
+  - Reward redemption
+
+- Store Systems:
+  - Inventory management
+  - Staff training modules
+  - Campaign execution
+
 ## System Architecture
 
 ### Server-Side Components (Cloud Functions)

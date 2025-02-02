@@ -1,0 +1,102 @@
+Create New Module: visitTracking.js
+
+Implement core visit tracking functionality
+Add visit metrics calculations
+Add visit history retrieval
+Connect with existing receipt processing flow
+
+Task: Enhance Guest Management System with Receipt-Based Analytics
+
+Context:
+- System has existing guest profiles in Firebase
+- Guests submit receipts via WhatsApp
+- Receipts are stored in Firebase
+- Guest-receipt index exists
+- Need to add comprehensive guest metrics and analytics
+
+Required Enhancements to guest-management.js:
+
+1. Guest Metrics Calculation
+- Total spend calculation
+- Average transaction value
+- Receipt submission frequency
+- Store preferences analysis
+- Receipt submission patterns
+- Last submission date
+- First submission date
+
+2. Data Structure Updates
+- Add metrics object to guest profile
+- Add analysis timestamps
+- Add preference tracking
+- Add engagement metrics
+
+3. Required Functions
+- calculateGuestMetrics(guestPhone)
+- analyzeSpendingPatterns(guestPhone)
+- updateGuestProfile(guestPhone, metrics)
+- getGuestAnalytics(guestPhone)
+- calculateEngagementScore(guestPhone)
+
+4. Integration Points
+- Automatic metric updates on receipt submission
+- Admin dashboard display
+- Guest profile updates
+- Analytics reporting
+
+Existing Files to Reference:
+- guest-management.js (main file we're enhancing)
+- admin-dashboard.js (for displaying metrics in admin panel)
+
+Firebase Structure:
+- guests/{phoneNumber}
+- receipts/{receiptId}
+- guest-receipts/{phoneNumber}/{receiptId}
+
+Goals:
+1. Enhance guest profiles with receipt-based analytics
+2. Provide insights for loyalty campaigns
+3. Track guest engagement through receipt submissions
+4. Enable data-driven loyalty rewards
+
+
+Enhance Firebase Data Structure
+
+Add visits collection
+Add spending patterns tracking
+Add preferences storage
+Add metrics collection
+
+
+Enhance Guest Profile Management
+
+Add visit frequency calculations
+Implement average spend tracking
+Add lifetime value computation
+Create engagement scoring system
+Add store preferences analysis
+Add item preferences analysis
+
+
+Analytics & Metrics Implementation
+
+Visit pattern analysis
+Spending pattern analysis
+Store preference tracking
+Category preference tracking
+Engagement level scoring
+
+
+Guest Segmentation System
+
+Define segmentation criteria
+Implement automatic segmentation
+Add segment-based targeting
+Create segment analytics
+
+
+Enhanced Reward Tracking
+
+Add detailed redemption history
+Track expired/unused rewards
+Implement redemption patterns analysis

@@ -1,10 +1,16 @@
+// Import dependencies
+import _ from 'lodash';
+import React from 'react';
+import ReactDOM from 'react-dom';
+import { GuestAnalytics } from './GuestAnalytics';
+
 // Guest Management State
 const guestManagement = {
     app: null,
     component: {
         template: `
             <div class="container-fluid">
-                <!-- Header Section -->
+                <!-- Header Section (keep existing) -->
                 <div class="d-flex justify-content-between align-items-center mb-4">
                     <h2>Guest Management</h2>
                     <div class="d-flex gap-2">
@@ -23,15 +29,44 @@ const guestManagement = {
                     </div>
                 </div>
 
-                <!-- Loading State -->
-                <div v-if="loading" class="text-center py-4">
-                    <div class="spinner-border text-primary" role="status">
-                        <span class="sr-only">Loading...</span>
+                <!-- Add Analytics Summary -->
+                <div class="row mb-4">
+                    <div class="col-md-3">
+                        <div class="card">
+                            <div class="card-body">
+                                <h6 class="card-subtitle mb-2 text-muted">Total Guests</h6>
+                                <h3 class="card-title mb-0">{{ guests.length }}</h3>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-md-3">
+                        <div class="card">
+                            <div class="card-body">
+                                <h6 class="card-subtitle mb-2 text-muted">Active This Month</h6>
+                                <h3 class="card-title mb-0">{{ activeGuestsCount }}</h3>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-md-3">
+                        <div class="card">
+                            <div class="card-body">
+                                <h6 class="card-subtitle mb-2 text-muted">Avg Engagement</h6>
+                                <h3 class="card-title mb-0">{{ averageEngagement }}%</h3>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-md-3">
+                        <div class="card">
+                            <div class="card-body">
+                                <h6 class="card-subtitle mb-2 text-muted">Total Revenue</h6>
+                                <h3 class="card-title mb-0">R{{ totalRevenue.toFixed(2) }}</h3>
+                            </div>
+                        </div>
                     </div>
                 </div>
 
-                <!-- Main Table -->
-                <div v-else class="card">
+                <!-- Main Table (Enhanced) -->
+                <div class="card">
                     <div class="card-body">
                         <div class="table-responsive">
                             <table class="table">
@@ -45,18 +80,24 @@ const guestManagement = {
                                             Phone 
                                             <i :class="getSortIcon('phoneNumber')"></i>
                                         </th>
-                                        <th @click="sort('visitCount')">
+                                        <th @click="sort('metrics.visitCount')">
                                             Visit Frequency 
-                                            <i :class="getSortIcon('visitCount')"></i>
+                                            <i :class="getSortIcon('metrics.visitCount')"></i>
                                         </th>
-                                        <th @click="sort('averageSpend')">
+                                        <th @click="sort('metrics.averageSpend')">
                                             Avg. Spend 
-                                            <i :class="getSortIcon('averageSpend')"></i>
+                                            <i :class="getSortIcon('metrics.averageSpend')"></i>
                                         </th>
-                                        <th @click="sort('lifetimeValue')">
+                                        <th @click="sort('metrics.lifetimeValue')">
                                             Lifetime Value 
-                                            <i :class="getSortIcon('lifetimeValue')"></i>
+                                            <i :class="getSortIcon('metrics.lifetimeValue')"></i>
                                         </th>
+                                        <th @click="sort('metrics.engagementScore')">
+                                            Engagement 
+                                            <i :class="getSortIcon('metrics.engagementScore')"></i>
+                                        </th>
+                                        <th>Favorite Store</th>
+                                        <th>Last Visit</th>
                                         <th>Actions</th>
                                     </tr>
                                 </thead>
@@ -68,6 +109,20 @@ const guestManagement = {
                                         <td>R{{ guest.metrics.averageSpend.toFixed(2) }}</td>
                                         <td>R{{ guest.metrics.lifetimeValue.toFixed(2) }}</td>
                                         <td>
+                                            <div class="d-flex align-items-center">
+                                                <div class="progress flex-grow-1" style="height: 8px;">
+                                                    <div 
+                                                        class="progress-bar" 
+                                                        :class="getEngagementClass(guest.metrics.engagementScore)"
+                                                        :style="{ width: guest.metrics.engagementScore + '%' }"
+                                                    ></div>
+                                                </div>
+                                                <span class="ms-2">{{ guest.metrics.engagementScore }}%</span>
+                                            </div>
+                                        </td>
+                                        <td>{{ guest.metrics.favoriteStore }}</td>
+                                        <td>{{ formatDate(guest.metrics.lastVisitDate) }}</td>
+                                        <td>
                                             <div class="btn-group btn-group-sm">
                                                 <button 
                                                     @click="viewGuest(guest)" 
@@ -75,6 +130,13 @@ const guestManagement = {
                                                     title="View Guest"
                                                 >
                                                     <i class="fas fa-eye"></i>
+                                                </button>
+                                                <button 
+                                                    @click="viewAnalytics(guest)" 
+                                                    class="btn btn-primary"
+                                                    title="View Analytics"
+                                                >
+                                                    <i class="fas fa-chart-line"></i>
                                                 </button>
                                                 <button 
                                                     @click="editGuest(guest)" 
@@ -98,6 +160,21 @@ const guestManagement = {
                         </div>
                     </div>
                 </div>
+
+                <!-- Analytics Modal -->
+                <div class="modal fade" id="analyticsModal" tabindex="-1">
+                    <div class="modal-dialog modal-xl">
+                        <div class="modal-content">
+                            <div class="modal-header">
+                                <h5 class="modal-title">Guest Analytics</h5>
+                                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                            </div>
+                            <div class="modal-body">
+                                <div id="guestAnalyticsRoot"></div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
             </div>
         `,
 
@@ -109,15 +186,16 @@ const guestManagement = {
                     key: 'name',
                     direction: 'asc'
                 },
-                loading: false
+                loading: false,
+                currentAnalyticsGuest: null
             }
         },
 
         computed: {
             filteredGuests() {
+                // Keep existing filtered guests logic
                 let result = this.guests;
 
-                // Apply search filter
                 if (this.searchQuery) {
                     const query = this.searchQuery.toLowerCase();
                     result = result.filter(guest => 
@@ -126,7 +204,6 @@ const guestManagement = {
                     );
                 }
 
-                // Apply sorting
                 result = [...result].sort((a, b) => {
                     let aVal = this.getSortValue(a, this.sortConfig.key);
                     let bVal = this.getSortValue(b, this.sortConfig.key);
@@ -137,6 +214,28 @@ const guestManagement = {
                 });
 
                 return result;
+            },
+
+            // New computed properties for analytics summary
+            activeGuestsCount() {
+                const thirtyDaysAgo = Date.now() - (30 * 24 * 60 * 60 * 1000);
+                return this.guests.filter(guest => 
+                    guest.metrics.lastVisitDate > thirtyDaysAgo
+                ).length;
+            },
+
+            averageEngagement() {
+                if (this.guests.length === 0) return 0;
+                const totalEngagement = this.guests.reduce((sum, guest) => 
+                    sum + guest.metrics.engagementScore, 0
+                );
+                return Math.round(totalEngagement / this.guests.length);
+            },
+
+            totalRevenue() {
+                return this.guests.reduce((sum, guest) => 
+                    sum + guest.metrics.lifetimeValue, 0
+                );
             }
         },
 
@@ -149,13 +248,18 @@ const guestManagement = {
                     
                     if (guests) {
                         this.guests = await Promise.all(Object.entries(guests).map(async ([phoneNumber, data]) => {
-                            // Get receipts for this guest
-                            const receipts = await getGuestReceipts(phoneNumber);
+                            const receipts = await this.getGuestReceipts(phoneNumber);
+                            const metrics = await this.calculateGuestMetrics({
+                                ...data,
+                                receipts,
+                                phoneNumber
+                            });
+
                             return {
                                 phoneNumber,
                                 ...data,
                                 receipts,
-                                metrics: this.calculateGuestMetrics({ ...data, receipts })
+                                metrics
                             };
                         }));
                     }
@@ -167,43 +271,114 @@ const guestManagement = {
                 }
             },
 
-            calculateGuestMetrics(guestData) {
-                const visits = guestData.visits || [];
-                const receipts = guestData.receipts || {};
+            async getGuestReceipts(phoneNumber) {
+                try {
+                    // First check guest-receipts index
+                    const receiptIndexSnapshot = await firebase.database()
+                        .ref('guest-receipts')
+                        .child(phoneNumber)
+                        .once('value');
+                    
+                    const receiptIds = Object.keys(receiptIndexSnapshot.val() || {});
+                    
+                    // Fetch full receipt details
+                    const receiptsData = await Promise.all(
+                        receiptIds.map(async id => {
+                            const receiptSnapshot = await firebase.database()
+                                .ref('receipts')
+                                .child(id)
+                                .once('value');
+                            return { id, ...receiptSnapshot.val() };
+                        })
+                    );
+
+                    return receiptsData;
+                } catch (error) {
+                    console.error('Error retrieving receipts:', error);
+                    return [];
+                }
+            },
+
+            async calculateGuestMetrics(guestData) {
+                const receipts = guestData.receipts || [];
+                const now = Date.now();
                 
-                const totalSpend = visits.reduce((sum, visit) => sum + (visit.amount || 0), 0) +
-                                    Object.values(receipts).reduce((sum, receipt) => sum + (receipt.totalAmount || 0), 0);
+                // Calculate basic metrics
+                const totalSpend = receipts.reduce((sum, receipt) => 
+                    sum + (receipt.totalAmount || 0), 0
+                );
                 
-                const frequency = visits.length + Object.keys(receipts).length;
+                const visitCount = receipts.length;
+                const averageSpend = visitCount > 0 ? totalSpend / visitCount : 0;
+
+                // Calculate time-based metrics
+                const receiptDates = receipts
+                    .map(r => new Date(r.processedAt).getTime())
+                    .sort();
                 
+                const firstVisit = receiptDates[0];
+                const lastVisit = receiptDates[receiptDates.length - 1];
+
+                // Calculate visit frequency
+                const visitFrequency = visitCount > 1 ? 
+                    Math.round((lastVisit - firstVisit) / (1000 * 60 * 60 * 24 * (visitCount - 1))) : 
+                    0;
+
+                // Analyze store preferences
+                const storeVisits = _.groupBy(receipts, 'storeName');
+                const storeStats = Object.entries(storeVisits)
+                    .map(([store, visits]) => ({
+                        store,
+                        visits: visits.length,
+                        totalSpend: visits.reduce((sum, visit) => 
+                            sum + (visit.totalAmount || 0), 0
+                        )
+                    }))
+                    .sort((a, b) => b.visits - a.visits);
+
+                // Calculate engagement score
+                const daysSinceLastVisit = lastVisit ? 
+                    Math.floor((now - lastVisit) / (1000 * 60 * 60 * 24)) : 
+                    Infinity;
+
+                const recencyScore = Math.max(0, 100 - (daysSinceLastVisit * 2));
+                const frequencyScore = Math.min(100, visitFrequency ? (30 / visitFrequency) * 100 : 0);
+                const monetaryScore = Math.min(100, (totalSpend / 10000) * 100);
+
+                const engagementScore = Math.round(
+                    (recencyScore * 0.4) + (frequencyScore * 0.3) + (monetaryScore * 0.3)
+                );
+
                 return {
-                    visitCount: frequency,
-                    averageSpend: frequency > 0 ? totalSpend / frequency : 0,
+                    visitCount,
+                    totalSpend,
+                    averageSpend,
                     lifetimeValue: totalSpend,
-                    lastVisit: visits.length > 0 ? Math.max(...visits.map(v => v.date)) : null,
-                    points: guestData.points || 0,
-                    tier: this.calculateLoyaltyTier(totalSpend, frequency)
+                    firstVisitDate: firstVisit,
+                    lastVisitDate: lastVisit,
+                    visitFrequency,
+                    daysSinceLastVisit,
+                    favoriteStore: storeStats[0]?.store || 'N/A',
+                    storePreferences: storeStats,
+                    engagementScore,
+                    tier: this.calculateLoyaltyTier(totalSpend, visitCount)
                 };
             },
 
-            calculateLoyaltyTier(totalSpend, frequency) {
-                if (totalSpend > 10000 && frequency > 20) return 'PLATINUM';
-                if (totalSpend > 5000 && frequency > 10) return 'GOLD';
-                if (totalSpend > 2000 && frequency > 5) return 'SILVER';
-                return 'BRONZE';
+            getEngagementClass(score) {
+                if (score >= 80) return 'bg-success';
+                if (score >= 60) return 'bg-info';
+                if (score >= 40) return 'bg-warning';
+                return 'bg-danger';
+            },
+
+            formatDate(timestamp) {
+                if (!timestamp) return 'Never';
+                return new Date(timestamp).toLocaleDateString();
             },
 
             getSortValue(guest, key) {
-                switch (key) {
-                    case 'visitCount':
-                        return guest.metrics.visitCount;
-                    case 'averageSpend':
-                        return guest.metrics.averageSpend;
-                    case 'lifetimeValue':
-                        return guest.metrics.lifetimeValue;
-                    default:
-                        return guest[key];
-                }
+                return _.get(guest, key);
             },
 
             sort(key) {
@@ -221,21 +396,89 @@ const guestManagement = {
             },
 
             async viewGuest(guest) {
-                Swal.fire({
-                    title: guest.name || 'Guest Details',
-                    html: `
-                        <div class="guest-details">
-                            <p><strong>Phone:</strong> ${guest.phoneNumber}</p>
-                            <p><strong>Visit Count:</strong> ${guest.metrics.visitCount}</p>
-                            <p><strong>Average Spend:</strong> R${guest.metrics.averageSpend.toFixed(2)}</p>
-                            <p><strong>Lifetime Value:</strong> R${guest.metrics.lifetimeValue.toFixed(2)}</p>
-                            <p><strong>Last Visit:</strong> ${guest.metrics.lastVisit ? new Date(guest.metrics.lastVisit).toLocaleDateString() : 'Never'}</p>
-                            <p><strong>Loyalty Tier:</strong> ${guest.metrics.tier}</p>
-                            <p><strong>Points:</strong> ${guest.metrics.points}</p>
-                        </div>
-                    `,
-                    width: '600px'
+                const { metrics, receipts } = guest;
+                
+                // Calculate receipt patterns
+                const dayOfWeekCount = _.countBy(receipts, r => 
+                    new Date(r.processedAt).getDay()
+                );
+                
+                const timeOfDayCount = _.countBy(receipts, r => {
+                    const hour = new Date(r.processedAt).getHours();
+                    if (hour < 12) return 'morning';
+                    if (hour < 17) return 'afternoon';
+                    return 'evening';
                 });
+
+                const html = `
+                    <div class="guest-details">
+                        <div class="row mb-4">
+                            <div class="col-md-6">
+                                <h6 class="text-muted">Basic Information</h6>
+                                <p><strong>Name:</strong> ${guest.name || 'N/A'}</p>
+                                <p><strong>Phone:</strong> ${guest.phoneNumber}</p>
+                                <p><strong>Loyalty Tier:</strong> ${metrics.tier}</p>
+                                <p><strong>Joined:</strong> ${this.formatDate(metrics.firstVisitDate)}</p>
+                            </div>
+                            <div class="col-md-6">
+                                <h6 class="text-muted">Visit Statistics</h6>
+                                <p><strong>Total Visits:</strong> ${metrics.visitCount}</p>
+                                <p><strong>Average Spend:</strong> R${metrics.averageSpend.toFixed(2)}</p>
+                                <p><strong>Total Spend:</strong> R${metrics.totalSpend.toFixed(2)}</p>
+                                <p><strong>Last Visit:</strong> ${this.formatDate(metrics.lastVisitDate)}</p>
+                            </div>
+                        </div>
+                        <div class="row mb-4">
+                            <div class="col-md-6">
+                                <h6 class="text-muted">Store Preferences</h6>
+                                ${metrics.storePreferences.map(store => `
+                                    <div class="d-flex justify-content-between mb-2">
+                                        <span>${store.store}</span>
+                                        <span>${store.visits} visits</span>
+                                    </div>
+                                `).join('')}
+                            </div>
+                            <div class="col-md-6">
+                                <h6 class="text-muted">Visit Patterns</h6>
+                                <p><strong>Preferred Days:</strong></p>
+                                ${Object.entries(dayOfWeekCount)
+                                    .map(([day, count]) => 
+                                        `${['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'][day]}: ${count}`
+                                    )
+                                    .join(', ')}
+                                <p class="mt-2"><strong>Time of Day:</strong></p>
+                                ${Object.entries(timeOfDayCount)
+                                    .map(([time, count]) => 
+                                        `${_.capitalize(time)}: ${count}`
+                                    )
+                                    .join(', ')}
+                            </div>
+                        </div>
+                    </div>
+                `;
+
+                Swal.fire({
+                    title: 'Guest Details',
+                    html,
+                    width: '800px',
+                    showConfirmButton: false,
+                    showCloseButton: true
+                });
+            },
+
+            async viewAnalytics(guest) {
+                this.currentAnalyticsGuest = guest;
+                const modal = new bootstrap.Modal(document.getElementById('analyticsModal'));
+                modal.show();
+                
+                // Initialize the analytics component
+                const analyticsRoot = document.getElementById('guestAnalyticsRoot');
+                if (analyticsRoot) {
+                    ReactDOM.render(
+                        React.createElement(GuestAnalytics, { phoneNumber: guest.phoneNumber }),
+                        analyticsRoot
+                    );
+                }
             },
 
             async editGuest(guest) {
@@ -244,22 +487,35 @@ const guestManagement = {
                     html: `
                         <input id="editName" class="swal2-input" value="${guest.name || ''}" placeholder="Guest Name">
                         <input id="editPhone" class="swal2-input" value="${guest.phoneNumber}" readonly>
+                        <select id="editTier" class="swal2-select">
+                            <option value="BRONZE" ${guest.metrics.tier === 'BRONZE' ? 'selected' : ''}>Bronze</option>
+                            <option value="SILVER" ${guest.metrics.tier === 'SILVER' ? 'selected' : ''}>Silver</option>
+                            <option value="GOLD" ${guest.metrics.tier === 'GOLD' ? 'selected' : ''}>Gold</option>
+                            <option value="PLATINUM" ${guest.metrics.tier === 'PLATINUM' ? 'selected' : ''}>Platinum</option>
+                        </select>
                     `,
                     focusConfirm: false,
                     showCancelButton: true,
+                    confirmButtonText: 'Update',
                     preConfirm: () => ({
                         name: document.getElementById('editName').value,
-                        phoneNumber: guest.phoneNumber
+                        phoneNumber: guest.phoneNumber,
+                        tier: document.getElementById('editTier').value
                     })
                 });
 
                 if (formValues) {
                     try {
+                        // Update guest data
                         await firebase.database().ref(`guests/${guest.phoneNumber}`).update({
                             name: formValues.name,
+                            tier: formValues.tier,
                             updatedAt: Date.now()
                         });
+
+                        // Reload guests data
                         await this.loadGuests();
+                        
                         Swal.fire('Success', 'Guest updated successfully', 'success');
                     } catch (error) {
                         console.error('Error updating guest:', error);
@@ -271,7 +527,7 @@ const guestManagement = {
             async deleteGuest(guest) {
                 const result = await Swal.fire({
                     title: 'Delete Guest?',
-                    text: 'This action cannot be undone.',
+                    text: 'This will permanently remove all guest data and history. This action cannot be undone.',
                     icon: 'warning',
                     showCancelButton: true,
                     confirmButtonColor: '#dc3545',
@@ -280,19 +536,39 @@ const guestManagement = {
 
                 if (result.isConfirmed) {
                     try {
-                        await firebase.database().ref(`guests/${guest.phoneNumber}`).remove();
+                        // Delete guest data and related records
+                        const updates = {
+                            [`guests/${guest.phoneNumber}`]: null,
+                            [`guest-receipts/${guest.phoneNumber}`]: null
+                        };
+
+                        await firebase.database().ref().update(updates);
                         await this.loadGuests();
+                        
                         Swal.fire('Deleted!', 'Guest has been deleted.', 'success');
                     } catch (error) {
                         console.error('Error deleting guest:', error);
                         Swal.fire('Error', 'Failed to delete guest', 'error');
                     }
                 }
+            },
+
+            calculateLoyaltyTier(totalSpend, visitCount) {
+                if (totalSpend > 10000 && visitCount > 20) return 'PLATINUM';
+                if (totalSpend > 5000 && visitCount > 10) return 'GOLD';
+                if (totalSpend > 2000 && visitCount > 5) return 'SILVER';
+                return 'BRONZE';
             }
         },
 
         mounted() {
             this.loadGuests();
+            
+            // Initialize tooltips
+            const tooltipTriggerList = [].slice.call(document.querySelectorAll('[data-bs-toggle="tooltip"]'));
+            tooltipTriggerList.map(tooltipTriggerEl => 
+                new bootstrap.Tooltip(tooltipTriggerEl)
+            );
         }
     }
 };
@@ -327,32 +603,5 @@ function showGuestManagement() {
     }
 }
 
-async function getGuestReceipts(phoneNumber) {
-    try {
-        const snapshot = await firebase.database()
-            .ref('receipts')
-            .orderByChild('phoneNumber')
-            .equalTo(phoneNumber)
-            .once('value');
-        
-        const receipts = snapshot.val();
-        return receipts ? Object.entries(receipts).map(([id, data]) => ({ id, ...data })) : [];
-    } catch (error) {
-        console.error('Error retrieving receipts:', error);
-        return [];
-    }
-}
-
-function logReceiptProcessing(receiptId, status, message) {
-    const logEntry = {
-        receiptId,
-        status,
-        message,
-        timestamp: Date.now()
-    };
-    
-    firebase.database().ref(`receiptLogs/${receiptId}`).set(logEntry)
-        .catch(error => console.error('Error logging receipt processing:', error));
-}
-
+// Export the initialization function for use in admin-dashboard.js
 window.initializeGuestManagement = initializeGuestManagement;
