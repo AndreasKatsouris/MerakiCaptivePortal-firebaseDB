@@ -20,6 +20,11 @@ class GuestAnalytics extends React.Component {
         this.processAnalytics = this.processAnalytics.bind(this);
         this.calculateVisitFrequency = this.calculateVisitFrequency.bind(this);
         this.calculateItemFrequency = this.calculateItemFrequency.bind(this);
+        this.renderStatItem = this.renderStatItem.bind(this);
+        this.renderCard = this.renderCard.bind(this);
+        this.renderAnalytics = this.renderAnalytics.bind(this);
+        this.renderLoading = this.renderLoading.bind(this);
+        this.renderError = this.renderError.bind(this);
     }
 
     static defaultProps = {
@@ -36,6 +41,13 @@ class GuestAnalytics extends React.Component {
             this.setState({ error: 'No phone number provided', loading: false });
         }
     }
+    // Add proper error boundary
+        componentDidCatch(error, errorInfo) {
+            console.error('Error in GuestAnalytics:', error, errorInfo);
+            this.setState({
+                error: 'Failed to load analytics'
+            });
+        }  
 
     async loadGuestAnalytics(phoneNumber) {
         try {
@@ -107,6 +119,20 @@ class GuestAnalytics extends React.Component {
             .value();
     }
 
+    renderStatItem(label, value) {
+        return React.createElement('div', { 
+            className: 'stat-item mb-2',
+            key: label 
+        }, [
+            React.createElement('span', { 
+                className: 'stat-label font-weight-bold me-2'
+            }, `${label}:`),
+            React.createElement('span', { 
+                className: 'stat-value'
+            }, value.toString())
+        ]);
+    }    
+
     // Separate render methods for better organization
     renderLoading() {
         return React.createElement('div', { className: 'text-center p-4' }, 'Loading analytics...');
@@ -150,13 +176,7 @@ class GuestAnalytics extends React.Component {
             ])
         );
     }
-// Add proper error boundary
-componentDidCatch(error, errorInfo) {
-    console.error('Error in GuestAnalytics:', error, errorInfo);
-    this.setState({
-        error: 'Failed to load analytics'
-    });
-}    
+  
 
     render() {
         const { loading, error, analytics } = this.state;
