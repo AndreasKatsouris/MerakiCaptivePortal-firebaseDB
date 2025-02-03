@@ -1,6 +1,6 @@
-import config from './googleAPIclient.js';
-
 // Google Reviews Management Module
+import { config, REQUIRED_FIELDS } from './googleAPIclient.js';
+
 const googleReviewsManager = {
     // State management
     state: {

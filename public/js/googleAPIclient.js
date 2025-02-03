@@ -1,10 +1,6 @@
-require('dotenv').config();
+// googleAPIclient.js
 
-const config = {
-    apiKey: process.env.GOOGLE_PLACES_API_KEY,
-    placeId: process.env.GOOGLE_PLACE_ID
-};
-
+// Define required fields
 const REQUIRED_FIELDS = [
     'reviews',
     'rating',
@@ -16,15 +12,21 @@ const REQUIRED_FIELDS = [
     'formatted_phone_number'
 ];
 
-console.log('GOOGLE_PLACES_API_KEY:', placesAPI || 'Not set');
-console.log('GOOGLE_PLACE_ID:', placesID || 'Not set'); //'Set' : 'Not set');
+// Create config object
+const config = {
+    apiKey: import.meta.env.GOOGLE_PLACES_API_KEY,
+    placeId: import.meta.env.GOOGLE_PLACE_ID
+};
 
-if (!placesAPI || !placesID) {
+// Validate configuration
+if (!config.apiKey || !config.placeId) {
     console.error("Google Places credentials are not set. Ensure API KEY & ID are defined.");
     throw new Error("Missing GOOGLE PLACES credentials.");
 }
 
-module.exports = {
-    config
-};
+// Log configuration status
+console.log('GOOGLE_PLACES_API_KEY:', config.apiKey ? 'Set' : 'Not set');
+console.log('GOOGLE_PLACE_ID:', config.placeId ? 'Set' : 'Not set');
 
+// Export both config and REQUIRED_FIELDS
+export { config, REQUIRED_FIELDS };
