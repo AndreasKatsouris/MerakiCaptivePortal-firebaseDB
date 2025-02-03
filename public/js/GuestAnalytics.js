@@ -2,7 +2,7 @@
 const _ = window._;
 
 // Create the GuestAnalytics React component
-window.GuestAnalytics = class GuestAnalytics extends React.Component {
+class GuestAnalytics extends React.Component {
     constructor(props) {
         super(props);
         this.state = {
@@ -104,60 +104,61 @@ window.GuestAnalytics = class GuestAnalytics extends React.Component {
         const { loading, error, analytics } = this.state;
 
         if (loading) {
-            return <div className="text-center p-4">Loading analytics...</div>;
+            return React.createElement('div', { className: 'text-center p-4' }, 'Loading analytics...');
         }
 
         if (error) {
-            return <div className="alert alert-danger">{error}</div>;
+            return React.createElement('div', { className: 'alert alert-danger' }, error);
         }
 
         if (!analytics) {
-            return <div className="alert alert-warning">No data available</div>;
+            return React.createElement('div', { className: 'alert alert-warning' }, 'No data available');
         }
 
-        return (
-            <div className="guest-analytics">
-                <div className="row">
-                    <div className="col-md-6 mb-4">
-                        <div className="card">
-                            <div className="card-header">
-                                <h6 className="mb-0">Visit Statistics</h6>
-                            </div>
-                            <div className="card-body">
-                                <p><strong>Total Visits:</strong> {analytics.visitCount}</p>
-                                <p><strong>Average Visit Frequency:</strong> {analytics.visitFrequency}</p>
-                                <p><strong>Last Visit:</strong> {analytics.lastVisit ? new Date(analytics.lastVisit).toLocaleDateString() : 'Never'}</p>
-                            </div>
-                        </div>
-                    </div>
-                    <div className="col-md-6 mb-4">
-                        <div className="card">
-                            <div className="card-header">
-                                <h6 className="mb-0">Spending Analysis</h6>
-                            </div>
-                            <div className="card-body">
-                                <p><strong>Total Spent:</strong> R{analytics.totalSpent.toFixed(2)}</p>
-                                <p><strong>Average Spend per Visit:</strong> R{analytics.averageSpend.toFixed(2)}</p>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-                
-                <div className="card mb-4">
-                    <div className="card-header">
-                        <h6 className="mb-0">Most Purchased Items</h6>
-                    </div>
-                    <div className="card-body">
-                        <ul className="list-unstyled mb-0">
-                            {analytics.popularItems.map((item, index) => (
-                                <li key={index} className="mb-2">
-                                    {item.name} - {item.count} times
-                                </li>
-                            ))}
-                        </ul>
-                    </div>
-                </div>
-            </div>
+        return React.createElement('div', { className: 'guest-analytics' },
+            React.createElement('div', { className: 'row' }, [
+                React.createElement('div', { className: 'col-md-6 mb-4', key: 'visits' },
+                    React.createElement('div', { className: 'card' }, [
+                        React.createElement('div', { className: 'card-header' },
+                            React.createElement('h6', { className: 'mb-0' }, 'Visit Statistics')
+                        ),
+                        React.createElement('div', { className: 'card-body' }, [
+                            React.createElement('p', null, [
+                                React.createElement('strong', null, 'Total Visits: '),
+                                analytics.visitCount
+                            ]),
+                            React.createElement('p', null, [
+                                React.createElement('strong', null, 'Average Visit Frequency: '),
+                                analytics.visitFrequency
+                            ]),
+                            React.createElement('p', null, [
+                                React.createElement('strong', null, 'Last Visit: '),
+                                analytics.lastVisit ? new Date(analytics.lastVisit).toLocaleDateString() : 'Never'
+                            ])
+                        ])
+                    ])
+                ),
+                React.createElement('div', { className: 'col-md-6 mb-4', key: 'spending' },
+                    React.createElement('div', { className: 'card' }, [
+                        React.createElement('div', { className: 'card-header' },
+                            React.createElement('h6', { className: 'mb-0' }, 'Spending Analysis')
+                        ),
+                        React.createElement('div', { className: 'card-body' }, [
+                            React.createElement('p', null, [
+                                React.createElement('strong', null, 'Total Spent: '),
+                                `R${analytics.totalSpent.toFixed(2)}`
+                            ]),
+                            React.createElement('p', null, [
+                                React.createElement('strong', null, 'Average Spend per Visit: '),
+                                `R${analytics.averageSpend.toFixed(2)}`
+                            ])
+                        ])
+                    ])
+                )
+            ])
         );
     }
-};
+}
+
+// Assign to window object for global access
+window.GuestAnalytics = GuestAnalytics;
