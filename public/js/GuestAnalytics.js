@@ -157,10 +157,5 @@ class GuestAnalytics extends React.Component {
     }
 }
 
-// PropTypes validation
-GuestAnalytics.propTypes = {
-    phoneNumber: PropTypes.string.isRequired
-};
-
-// Assign to window object for global access
+// Just keep the window assignment
 window.GuestAnalytics = GuestAnalytics;
