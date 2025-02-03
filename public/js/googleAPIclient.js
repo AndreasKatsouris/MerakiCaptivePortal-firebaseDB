@@ -73,7 +73,10 @@ const handlePlacesError = (status) => {
 
 const getConfig = async () => {
     try {
+        // Get Remote Config instance
         const remoteConfig = firebase.remoteConfig();
+
+        // Fetch and activate latest values
         await remoteConfig.fetchAndActivate();
 
         const apiKey = remoteConfig.getString('GOOGLE_PLACES_API_KEY');
@@ -95,6 +98,11 @@ const getConfig = async () => {
             region: 'ZA',
             language: 'en'
         };
+
+        console.log('Config loaded:', {
+            apiKeySet: !!config.apiKey,
+            placeIdSet: !!config.placeId
+        });
 
         return config;
     } catch (error) {

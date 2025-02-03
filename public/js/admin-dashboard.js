@@ -6,7 +6,19 @@ import { initializeGuestManagement } from './guest-management.js';
 
 // Import the Google Reviews manager
 import { googleReviewsManager } from './googleReviews.js';
+const remoteConfig = firebase.remoteConfig();
 
+// Initialize Remote Config with settings
+remoteConfig.settings = {
+    minimumFetchIntervalMillis: 3600000, // 1 hour
+    fetchTimeoutMillis: 60000 // 1 minute
+};
+
+// Set default values
+remoteConfig.defaultConfig = ({
+    'GOOGLE_PLACES_API_KEY': '',
+    'GOOGLE_PLACE_ID': ''
+});
 window.addEventListener('error', function(e) {
     console.error('Global error:', e.error);
 
