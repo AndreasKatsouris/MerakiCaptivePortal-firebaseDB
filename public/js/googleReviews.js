@@ -1,3 +1,5 @@
+import config from './googleAPIclient.js';
+
 // Google Reviews Management Module
 const googleReviewsManager = {
     // State management
@@ -14,12 +16,14 @@ const googleReviewsManager = {
             averageRating: 0,
             totalReviews: 0,
             responseRate: 0
-        }
+        },
+        config: null
     },
 
     // Initialize the module
     async initialize() {
         try {
+            this.state.config = config;
             await this.loadGooglePlacesAPI();
             this.addEventListeners();
             await this.loadReviews();
@@ -34,7 +38,7 @@ const googleReviewsManager = {
     async loadGooglePlacesAPI() {
         return new Promise((resolve, reject) => {
             const script = document.createElement('script');
-            script.src = `https://maps.googleapis.com/maps/api/js?key=${process.env.GOOGLE_PLACES_API_KEY}&libraries=places`;
+            script.src = `https://maps.googleapis.com/maps/api/js?key=${this.state.config.apiKey}&libraries=places`;
             script.async = true;
             script.defer = true;
             script.onload = resolve;
@@ -44,13 +48,13 @@ const googleReviewsManager = {
     },
 
     // Fetch reviews from Google Places API
-    async fetchGoogleReviews(placeId) {
+    async fetchGoogleReviews() {
         try {
             const service = new google.maps.places.PlacesService(document.createElement('div'));
             
             const place = await new Promise((resolve, reject) => {
                 service.getDetails({
-                    placeId: placeId,
+                    placeId: this.state.config.placeId,  // Use placeId from config
                     fields: ['reviews', 'rating', 'user_ratings_total']
                 }, (place, status) => {
                     if (status === google.maps.places.PlacesServiceStatus.OK) {
