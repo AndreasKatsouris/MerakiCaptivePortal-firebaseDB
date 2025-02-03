@@ -47,11 +47,13 @@ document.addEventListener('DOMContentLoaded', function () {
         });
 
     // Initialize Google Reviews
-    try {
-        await googleReviewsManager.initialize();
-    } catch (error) {
-        console.error('Failed to initialize Google Reviews:', error);
-    }
+    googleReviewsManager.initialize()
+        .then(() => {
+            console.log('Google Reviews initialized successfully');
+        })
+        .catch(error => {
+            console.error('Failed to initialize Google Reviews:', error);
+        });
 });
 
 // ==================== Authentication Section ====================
