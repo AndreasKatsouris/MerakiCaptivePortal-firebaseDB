@@ -50,12 +50,23 @@ const googleReviewsManager = {
     // Fetch reviews from Google Places API
     async fetchGoogleReviews() {
         try {
-            const service = new google.maps.places.PlacesService(document.createElement('div'));
+            // Create a map div - required by Places API
+            const mapDiv = document.createElement('div');
+            mapDiv.style.display = 'none';
+            document.body.appendChild(mapDiv);
+    
+            // Initialize map - required for Places service
+            const map = new google.maps.Map(mapDiv, {
+                center: { lat: -34.397, lng: 150.644 },
+                zoom: 8
+            });
+    
+            const service = new google.maps.places.PlacesService(map);
             
             const place = await new Promise((resolve, reject) => {
                 service.getDetails({
-                    placeId: this.state.config.placeId,  // Use placeId from config
-                    fields: ['reviews', 'rating', 'user_ratings_total']
+                    placeId: this.state.config.placeId,
+                    fields: REQUIRED_FIELDS
                 }, (place, status) => {
                     if (status === google.maps.places.PlacesServiceStatus.OK) {
                         resolve(place);
@@ -64,22 +75,37 @@ const googleReviewsManager = {
                     }
                 });
             });
-
-            // Transform reviews to match our format
+    
+            // Enhanced review mapping
             const reviews = place.reviews.map(review => ({
-                id: review.time.toString(), // Use timestamp as ID
+                id: review.time.toString(),
                 reviewerName: review.author_name,
                 rating: review.rating,
                 text: review.text,
-                timestamp: review.time * 1000, // Convert to milliseconds
+                timestamp: review.time * 1000,
                 profilePhoto: review.profile_photo_url,
-                response: null, // Initialize with no response
+                language: review.language,
+                authorUrl: review.author_url,
+                relativeTimeDescription: review.relative_time_description,
+                response: null,
                 flagged: false
             }));
-
-            // Store reviews in Firebase
+    
+            // Store additional place details
+            this.state.placeDetails = {
+                name: place.name,
+                rating: place.rating,
+                totalRatings: place.user_ratings_total,
+                address: place.formatted_address,
+                phoneNumber: place.formatted_phone_number,
+                businessStatus: place.business_status
+            };
+    
             await this.syncReviewsWithFirebase(reviews);
-
+            
+            // Cleanup
+            document.body.removeChild(mapDiv);
+            
             return reviews;
         } catch (error) {
             console.error('Error fetching Google reviews:', error);
@@ -160,47 +186,121 @@ const googleReviewsManager = {
 
     // Render reviews to the DOM
     renderReviews() {
+        // Place Details Section
+        const placeDetailsDiv = document.querySelector('#placeDetails');
+        if (placeDetailsDiv && this.state.placeDetails) {
+            placeDetailsDiv.innerHTML = `
+                <div class="card mb-4">
+                    <div class="card-body">
+                        <div class="d-flex justify-content-between align-items-start">
+                            <div>
+                                <h3 class="card-title mb-2">${this.state.placeDetails.name}</h3>
+                                <p class="text-muted mb-1">${this.state.placeDetails.address}</p>
+                                <p class="mb-0">${this.state.placeDetails.phoneNumber || 'No phone number available'}</p>
+                            </div>
+                            <div class="text-end">
+                                <div class="d-flex align-items-center mb-2">
+                                    ${this.generateStarRating(this.state.placeDetails.rating)}
+                                    <span class="ms-2 h4 mb-0">${this.state.placeDetails.rating}</span>
+                                </div>
+                                <p class="text-muted mb-0">${this.state.placeDetails.totalRatings} reviews</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            `;
+        }
+    
+        // Reviews Table
         const tableBody = document.querySelector('#reviewsTable tbody');
         if (!tableBody) return;
-
+    
         if (this.state.loading) {
-            tableBody.innerHTML = '<tr><td colspan="6" class="text-center">Loading reviews...</td></tr>';
+            tableBody.innerHTML = `
+                <tr>
+                    <td colspan="6" class="text-center p-5">
+                        <div class="spinner-border text-primary mb-2"></div>
+                        <div>Loading reviews...</div>
+                    </td>
+                </tr>`;
             return;
         }
-
+    
         if (!this.state.reviews.length) {
-            tableBody.innerHTML = '<tr><td colspan="6" class="text-center">No reviews found</td></tr>';
+            tableBody.innerHTML = `
+                <tr>
+                    <td colspan="6" class="text-center p-4">
+                        <i class="fas fa-comment-slash fa-2x mb-3 text-muted"></i>
+                        <div>No reviews found</div>
+                    </td>
+                </tr>`;
             return;
         }
-
+    
         tableBody.innerHTML = this.state.reviews.map(review => `
             <tr>
-                <td>${review.formattedDate}</td>
+                <td class="text-nowrap">${review.formattedDate}</td>
                 <td>
                     <div class="d-flex align-items-center">
-                        ${this.generateStarRating(review.rating)}
-                        <span class="ms-2">${review.rating}</span>
+                        <div class="me-2">
+                            <img src="${review.profilePhoto || '/images/default-avatar.png'}" 
+                                 alt="${review.reviewerName}" 
+                                 class="rounded-circle"
+                                 width="32" height="32">
+                        </div>
+                        <div>
+                            <div class="fw-bold">
+                                ${review.authorUrl 
+                                    ? `<a href="${review.authorUrl}" target="_blank" rel="noopener noreferrer">${review.reviewerName}</a>`
+                                    : review.reviewerName}
+                            </div>
+                            <div class="d-flex align-items-center">
+                                ${this.generateStarRating(review.rating)}
+                                <small class="ms-2 text-muted">${review.relativeTimeDescription || ''}</small>
+                            </div>
+                        </div>
                     </div>
                 </td>
-                <td>${review.reviewerName}</td>
-                <td>${review.text}</td>
                 <td>
-                    <span class="badge badge-${review.response ? 'success' : 'warning'}">
+                    <div class="review-content">
+                        <p class="mb-1">${review.text}</p>
+                        ${review.language 
+                            ? `<small class="text-muted">Language: ${review.language}</small>`
+                            : ''}
+                    </div>
+                    ${review.response 
+                        ? `<div class="review-response mt-2 p-2 bg-light rounded">
+                               <small class="text-muted">Response:</small>
+                               <p class="mb-0">${review.response}</p>
+                           </div>`
+                        : ''}
+                </td>
+                <td class="text-center">
+                    <span class="badge rounded-pill bg-${review.response ? 'success' : 'warning'}">
                         ${review.response ? 'Responded' : 'Pending'}
                     </span>
                 </td>
                 <td>
                     <div class="btn-group">
-                        <button class="btn btn-sm btn-outline-primary" onclick="googleReviewsManager.respondToReview('${review.id}')">
-                            ${review.response ? 'Edit Response' : 'Respond'}
+                        <button class="btn btn-sm btn-outline-primary" 
+                                title="${review.response ? 'Edit Response' : 'Respond'}"
+                                onclick="googleReviewsManager.respondToReview('${review.id}')">
+                            <i class="fas ${review.response ? 'fa-edit' : 'fa-reply'}"></i>
                         </button>
-                        <button class="btn btn-sm btn-outline-danger" onclick="googleReviewsManager.flagReview('${review.id}')">
-                            Flag
+                        <button class="btn btn-sm btn-outline-danger" 
+                                title="${review.flagged ? 'Flagged' : 'Flag Review'}"
+                                onclick="googleReviewsManager.flagReview('${review.id}')"
+                                ${review.flagged ? 'disabled' : ''}>
+                            <i class="fas fa-flag"></i>
                         </button>
                     </div>
                 </td>
             </tr>
         `).join('');
+    
+        // Initialize tooltips for the newly added buttons
+        const tooltipTriggerList = [].slice.call(tableBody.querySelectorAll('[title]'));
+        tooltipTriggerList.forEach(el => new bootstrap.Tooltip(el));
     },
 
     // Generate star rating HTML
@@ -297,6 +397,18 @@ const googleReviewsManager = {
             Swal.fire('Error', error.message, 'error');
         }
     },
+    // Add specific error handling for Places API
+handlePlacesError(status) {
+    const errorMessages = {
+        ZERO_RESULTS: 'No reviews found for this location.',
+        OVER_QUERY_LIMIT: 'API request limit exceeded. Please try again later.',
+        REQUEST_DENIED: 'API request was denied. Please check your API key.',
+        INVALID_REQUEST: 'Invalid request. Please check your place ID.',
+        NOT_FOUND: 'Place not found. Please check your place ID.',
+    };
+
+    return errorMessages[status] || 'An error occurred while fetching reviews.';
+},
 
     // Apply filters to reviews
     applyFilters(review, filters) {

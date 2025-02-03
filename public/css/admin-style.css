@@ -404,3 +404,18 @@ body {
     background-color: rgba(0, 0, 0, 0.03);
     border-radius: 4px;
 }
+
+.review-content {
+  max-width: 500px;
+  word-break: break-word;
+}
+
+.review-response {
+  border-left: 3px solid #198754;
+  background-color: #f8f9fa;
+}
+
+.badge.rounded-pill {
+  font-weight: normal;
+  padding: 0.5em 1em;
+}
