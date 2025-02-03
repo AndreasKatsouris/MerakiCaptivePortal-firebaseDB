@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
 import { Activity, TrendingUp, Calendar, Store } from 'lucide-react';
-import _ from 'lodash';
+const _ = window._;
 
 const GuestAnalytics = ({ phoneNumber }) => {
   const [metrics, setMetrics] = useState(null);
