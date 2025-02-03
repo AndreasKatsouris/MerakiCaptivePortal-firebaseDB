@@ -23,6 +23,7 @@ const initializeMap = () => {
 
     return { map, mapDiv };
 };
+
 // Get reviews using Places API
 const getPlaceReviews = async (config) => {
     try {
@@ -68,19 +69,32 @@ const handlePlacesError = (status) => {
     return errorMessages[status] || 'An error occurred while fetching data from Google Places API.';
 };
 
+
+
 const getConfig = async () => {
     try {
         const remoteConfig = firebase.remoteConfig();
         await remoteConfig.fetchAndActivate();
 
-        const config = {
-            apiKey: remoteConfig.getString('GOOGLE_PLACES_API_KEY'),
-            placeId: remoteConfig.getString('GOOGLE_PLACE_ID')
-        };
+        const apiKey = remoteConfig.getString('GOOGLE_PLACES_API_KEY');
+        const placeId = remoteConfig.getString('GOOGLE_PLACE_ID');
 
-        if (!config.apiKey || !config.placeId) {
-            throw new Error("Google Places credentials are not set.");
+        // Explicit validation
+        if (!apiKey || apiKey === 'undefined') {
+            throw new Error('Google Places API key is not configured');
         }
+
+        if (!placeId || placeId === 'undefined') {
+            throw new Error('Google Place ID is not configured');
+        }
+
+        const config = {
+            apiKey,
+            placeId,
+            libraries: ['places'],
+            region: 'ZA',
+            language: 'en'
+        };
 
         return config;
     } catch (error) {

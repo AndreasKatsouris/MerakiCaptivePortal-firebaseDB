@@ -23,8 +23,18 @@ const googleReviewsManager = {
     // Initialize the module
     async initialize() {
         try {
-            this.state.config = getConfig;
+            // Get config first
+            this.state.config = await getConfig();
+            
+            // Validate config
+            if (!this.state.config.apiKey) {
+                throw new Error('Google Places API key not configured');
+            }
+    
+            // Then load the API
             await this.loadGooglePlacesAPI();
+            
+            // Continue with initialization
             this.addEventListeners();
             await this.loadReviews();
             this.calculateMetrics();
@@ -36,9 +46,19 @@ const googleReviewsManager = {
 
     // Load Google Places API
     async loadGooglePlacesAPI() {
+        // Check if API is already loaded
+        if (window.google && window.google.maps) {
+            return Promise.resolve();
+        }
+    
+        // Ensure we have config before loading
+        if (!this.state.config || !this.state.config.apiKey) {
+            throw new Error('Google Places API key not configured');
+        }
+    
         return new Promise((resolve, reject) => {
             const script = document.createElement('script');
-            script.src = `https://maps.googleapis.com/maps/api/js?key=${this.state.config.apiKey}&libraries=places`;
+            script.src = `https://maps.googleapis.com/maps/api/js?key=${this.state.config.apiKey}&libraries=places&loading=async`;
             script.async = true;
             script.defer = true;
             script.onload = resolve;
@@ -367,6 +387,18 @@ const googleReviewsManager = {
     handleError(error) {
         this.state.error = error.message;
         console.error('Google Reviews Error:', error);
+        
+        // Special handling for configuration errors
+        if (error.message.includes('API key')) {
+            Swal.fire({
+                icon: 'error',
+                title: 'Configuration Error',
+                text: 'Google Places API is not properly configured. Please contact your administrator.',
+                confirmButtonText: 'OK'
+            });
+            return;
+        }
+    
         if (typeof Swal !== 'undefined') {
             Swal.fire('Error', error.message, 'error');
         }
