@@ -1,6 +1,3 @@
-// googleAPIclient.js
-
-
 // Google Maps/Places Configuration
 const GOOGLE_MAPS_CONFIG = {
     apiKey: process.env.GOOGLE_PLACES_API_KEY,

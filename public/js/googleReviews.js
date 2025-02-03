@@ -1,5 +1,5 @@
 // Google Reviews Management Module
-import { config, REQUIRED_FIELDS } from './googleAPIclient.js';
+import { getConfig, REQUIRED_FIELDS } from './googleAPIclient.js';
 
 const googleReviewsManager = {
     // State management
@@ -17,13 +17,13 @@ const googleReviewsManager = {
             totalReviews: 0,
             responseRate: 0
         },
-        config: null
+        getConfigconfig: null
     },
 
     // Initialize the module
     async initialize() {
         try {
-            this.state.config = config;
+            this.state.config = getConfig;
             await this.loadGooglePlacesAPI();
             this.addEventListeners();
             await this.loadReviews();
