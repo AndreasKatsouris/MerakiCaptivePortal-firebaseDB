@@ -144,6 +144,11 @@ function initializeMenuListeners() {
             await updateDashboardStats();
         });
     }
+    addEventListenerSafely('googleReviewsMenu', 'click', function(e) {
+        e.preventDefault();
+        displaySection('googleReviewsContent');
+        googleReviewsManager.loadReviews();
+    });
 
     // Submenu toggles
     document.querySelectorAll('.nav-link[data-toggle="collapse"]').forEach(item => {
