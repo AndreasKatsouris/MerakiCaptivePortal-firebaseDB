@@ -20,16 +20,9 @@ const googleReviewsManager = {
     // Initialize the module
     async initialize() {
         try {
-            // Load Google Places API
             await this.loadGooglePlacesAPI();
-            
-            // Add event listeners for review management
             this.addEventListeners();
-            
-            // Load initial reviews
             await this.loadReviews();
-            
-            // Calculate initial metrics
             this.calculateMetrics();
         } catch (error) {
             console.error('Error initializing Google Reviews:', error);
@@ -121,29 +114,31 @@ const googleReviewsManager = {
 
     // Event listener setup
     addEventListeners() {
-        addEventListenerSafely('reviewFilterRating', 'change', () => this.handleFilterChange());
-        addEventListenerSafely('reviewFilterDate', 'change', () => this.handleFilterChange());
-        addEventListenerSafely('reviewFilterResponded', 'change', () => this.handleFilterChange());
-        addEventListenerSafely('reviewSearchInput', 'input', () => this.handleSearch());
+        const elements = {
+            'reviewFilterRating': () => this.handleFilterChange(),
+            'reviewFilterDate': () => this.handleFilterChange(),
+            'reviewFilterResponded': () => this.handleFilterChange(),
+            'reviewSearchInput': () => this.handleSearch()
+        };
+
+        Object.entries(elements).forEach(([id, handler]) => {
+            const element = document.getElementById(id);
+            if (element) {
+                element.addEventListener('change', handler);
+            }
+        });
     },
 
-    // Modified loadReviews to fetch from Google first
+    // Load reviews
     async loadReviews(filters = {}) {
         try {
             this.state.loading = true;
-            
-            // Fetch fresh reviews from Google Places API
-            const placeId = process.env.GOOGLE_PLACE_ID; // Your business's Place ID
-            await this.fetchGoogleReviews(placeId);
-
-            // Load from Firebase (now including the fresh reviews)
             const reviewsRef = firebase.database().ref('googleReviews');
             const snapshot = await reviewsRef.once('value');
             const reviews = snapshot.val() || {};
 
-            this.state.reviews = Object.entries(reviews)
-                .map(([id, review]) => ({
-                    id,
+            this.state.reviews = Object.values(reviews)
+                .map(review => ({
                     ...review,
                     formattedDate: new Date(review.timestamp).toLocaleDateString()
                 }))
@@ -247,18 +242,27 @@ const googleReviewsManager = {
         }
     },
 
-    // Calculate review metrics
+    // Calculate metrics
     calculateMetrics() {
         const reviews = this.state.reviews;
         const totalReviews = reviews.length;
         
-        this.state.metrics = {
-            averageRating: totalReviews ? 
-                (reviews.reduce((sum, review) => sum + review.rating, 0) / totalReviews).toFixed(1) : 0,
-            totalReviews,
-            responseRate: totalReviews ? 
-                ((reviews.filter(review => review.response).length / totalReviews) * 100).toFixed(1) : 0
-        };
+        if (totalReviews === 0) {
+            this.state.metrics = {
+                averageRating: 0,
+                totalReviews: 0,
+                responseRate: 0
+            };
+        } else {
+            const totalRating = reviews.reduce((sum, review) => sum + review.rating, 0);
+            const respondedReviews = reviews.filter(review => review.response).length;
+            
+            this.state.metrics = {
+                averageRating: (totalRating / totalReviews).toFixed(1),
+                totalReviews,
+                responseRate: ((respondedReviews / totalReviews) * 100).toFixed(1)
+            };
+        }
 
         this.updateMetricsDisplay();
     },
@@ -267,45 +271,82 @@ const googleReviewsManager = {
     updateMetricsDisplay() {
         const { averageRating, totalReviews, responseRate } = this.state.metrics;
         
-        document.getElementById('averageRating')?.textContent = averageRating;
-        document.getElementById('totalReviews')?.textContent = totalReviews;
-        document.getElementById('responseRate')?.textContent = `${responseRate}%`;
+        const elements = {
+            'averageRating': averageRating,
+            'totalReviews': totalReviews,
+            'responseRate': `${responseRate}%`
+        };
+
+        Object.entries(elements).forEach(([id, value]) => {
+            const element = document.getElementById(id);
+            if (element) {
+                element.textContent = value;
+            }
+        });
     },
 
     // Error handling
     handleError(error) {
         this.state.error = error.message;
-        Swal.fire('Error', error.message, 'error');
-    },
-
-    // Filter application
-    applyFilters(review, filters) {
-        return (!filters.rating || review.rating === parseInt(filters.rating)) &&
-               (!filters.responded || (filters.responded === 'true') === !!review.response) &&
-               (!filters.dateRange || this.isWithinDateRange(review.timestamp, filters.dateRange));
-    },
-
-    // Date range check
-    isWithinDateRange(timestamp, range) {
-        const reviewDate = new Date(timestamp);
-        const now = new Date();
-        const msPerDay = 24 * 60 * 60 * 1000;
-        
-        switch (range) {
-            case 'week':
-                const weekAgo = new Date(now.getTime() - (7 * msPerDay));
-                return reviewDate >= weekAgo;
-            case 'month':
-                const monthAgo = new Date(now);
-                monthAgo.setMonth(monthAgo.getMonth() - 1);
-                return reviewDate >= monthAgo;
-            case 'year':
-                const yearAgo = new Date(now);
-                yearAgo.setFullYear(yearAgo.getFullYear() - 1);
-                return reviewDate >= yearAgo;
-            default:
-                return true;
+        console.error('Google Reviews Error:', error);
+        if (typeof Swal !== 'undefined') {
+            Swal.fire('Error', error.message, 'error');
         }
+    },
+
+    // Apply filters to reviews
+    applyFilters(review, filters) {
+        if (filters.rating && review.rating !== parseInt(filters.rating)) {
+            return false;
+        }
+
+        if (filters.responded !== null) {
+            const hasResponse = Boolean(review.response);
+            if (filters.responded === 'true' !== hasResponse) {
+                return false;
+            }
+        }
+
+        if (filters.dateRange) {
+            const reviewDate = new Date(review.timestamp);
+            const now = new Date();
+            
+            let compareDate = new Date(now);
+            switch (filters.dateRange) {
+                case 'week':
+                    compareDate.setDate(compareDate.getDate() - 7);
+                    break;
+                case 'month':
+                    compareDate.setMonth(compareDate.getMonth() - 1);
+                    break;
+                case 'year':
+                    compareDate.setFullYear(compareDate.getFullYear() - 1);
+                    break;
+                default:
+                    return true;
+            }
+            
+            if (reviewDate < compareDate) {
+                return false;
+            }
+        }
+
+        return true;
+    },
+
+    // Handle search
+    handleSearch() {
+        // Implementation of handleSearch method
+    },
+
+    // Handle filter change
+    handleFilterChange() {
+        // Implementation of handleFilterChange method
+    },
+
+    // Handle flagging a review
+    async flagReview(reviewId) {
+        // Implementation of flagReview method
     }
 };
 
