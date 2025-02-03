@@ -6,7 +6,7 @@ import { initializeGuestManagement } from './guest-management.js';
 
 // Import the Google Reviews manager
 import { googleReviewsManager } from './googleReviews.js';
-const remoteConfig = firebase.remoteConfig();
+//const remoteConfig = firebase.remoteConfig();
 
 // Initialize Remote Config with settings
 remoteConfig.settings = {
