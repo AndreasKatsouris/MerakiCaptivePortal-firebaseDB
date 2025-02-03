@@ -5,24 +5,25 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>RDP - Admin Dashboard</title>
 
-<!-- Firebase SDKs -->
-<script src="/__/firebase/10.12.5/firebase-app-compat.js"></script>
-<script src="/__/firebase/10.12.5/firebase-auth-compat.js"></script>
-<script src="/__/firebase/10.12.5/firebase-database-compat.js"></script>
-<script src="/__/firebase/10.12.5/firebase-storage-compat.js"></script>
-<script src="/__/firebase/init.js?useEmulator=false"></script>
-
-<!-- Third-party libraries -->
+<!-- Dependencies first -->
 <script src="https://code.jquery.com/jquery-3.7.1.min.js" crossorigin="anonymous"></script>
 <script src="https://cdn.jsdelivr.net/npm/lodash@4.17.21/lodash.min.js" crossorigin="anonymous"></script>
-<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/moment.js/2.29.1/moment.min.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
-<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/js/bootstrap.bundle.min.js"></script>
 
 <!-- React Dependencies -->
 <script src="https://unpkg.com/react@17/umd/react.production.min.js"></script>
 <script src="https://unpkg.com/react-dom@17/umd/react-dom.production.min.js"></script>
+
+<!-- Firebase Dependencies -->
+<script src="/__/firebase/10.12.5/firebase-app-compat.js"></script>
+<script src="/__/firebase/10.12.5/firebase-auth-compat.js"></script>
+<script src="/__/firebase/10.12.5/firebase-database-compat.js"></script>
+<script src="/__/firebase/init.js?useEmulator=false"></script>
+
+<!-- Third-party libraries -->
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/moment.js/2.29.1/moment.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/js/bootstrap.bundle.min.js"></script>
 
 <!-- Load Vue and Pinia from CDN -->
 <script src="https://unpkg.com/vue@3/dist/vue.global.prod.js"></script>
@@ -36,11 +37,11 @@
 
 <!-- Application scripts (after dependencies) -->
 <script type="module" src="js/googleReviews.js"></script>
+<script src="js/GuestAnalytics.js"></script>
 <script type="module" src="js/dashboard.js"></script>
 <script type="module" src="js/project-management.js"></script>
 <script type="module" src="js/reward-types.js"></script>
 <script type="module" src="js/guest-management.js"></script>
-<script src="js/GuestAnalytics.js"></script>
 <script src="js/campaigns/campaigns.js"></script>
 <script type="module" src="js/admin-dashboard.js"></script>
 
