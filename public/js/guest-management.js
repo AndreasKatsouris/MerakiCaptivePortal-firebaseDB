@@ -1,7 +1,6 @@
-// Import dependencies
-import _ from 'lodash';
-import React from 'react';
-import ReactDOM from 'react-dom';
+
+// With this:
+const _ = window._;
 
 // Guest Management State
 const guestManagement = {
