@@ -287,16 +287,22 @@ const googleReviewsManager = {
 
     // Date range check
     isWithinDateRange(timestamp, range) {
-        const date = new Date(timestamp);
+        const reviewDate = new Date(timestamp);
         const now = new Date();
+        const msPerDay = 24 * 60 * 60 * 1000;
         
         switch (range) {
             case 'week':
-                return date >= new Date(now - 7 * 24 * 60 * 60 * 1000);
+                const weekAgo = new Date(now.getTime() - (7 * msPerDay));
+                return reviewDate >= weekAgo;
             case 'month':
-                return date >= new Date(now.setMonth(now.getMonth() - 1));
+                const monthAgo = new Date(now);
+                monthAgo.setMonth(monthAgo.getMonth() - 1);
+                return reviewDate >= monthAgo;
             case 'year':
-                return date >= new Date(now.setFullYear(now.getFullYear() - 1));
+                const yearAgo = new Date(now);
+                yearAgo.setFullYear(yearAgo.getFullYear() - 1);
+                return reviewDate >= yearAgo;
             default:
                 return true;
         }
