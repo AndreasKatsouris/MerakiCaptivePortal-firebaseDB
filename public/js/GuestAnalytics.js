@@ -43,7 +43,8 @@ class GuestAnalytics extends React.Component {
                 firebase.database().ref(`guests/${phoneNumber}`).once('value'),
                 firebase.database().ref('guest-receipts').child(phoneNumber).once('value')
             ]);
-
+            console.log('Loaded guest data:', guestSnapshot.val()); // Debug log
+            console.log('Loaded receipts:', receiptSnapshot.val()); // Debug log
             const guest = guestSnapshot.val();
             const receipts = receiptSnapshot.val() || {};
 
@@ -60,14 +61,21 @@ class GuestAnalytics extends React.Component {
 
         const receiptsList = Object.values(receipts);
         const visitDates = receiptsList.map(r => new Date(r.processedAt).getTime());
+        console.log('Processing receipts:', receiptsList); // Debug log
+
+            // Add defensive total calculation
+        const totalSpent = _.sumBy(receiptsList, receipt => {
+        const amount = receipt?.totalAmount;
+        return typeof amount === 'number' ? amount : 0;
+        }) || 0;
 
         return {
-            totalSpent: _.sumBy(receiptsList, 'totalAmount'),
+            totalSpent,
             visitCount: receiptsList.length,
-            averageSpend: receiptsList.length > 0 ? _.sumBy(receiptsList, 'totalAmount') / receiptsList.length : 0,
-            visitFrequency: this.calculateVisitFrequency(visitDates),
+            averageSpend: receiptsList.length > 0 ? totalSpent / receiptsList.length : 0,
+            visitFrequency: this.calculateVisitFrequency(receiptsList.map(r => r.processedAt || 0)),
             popularItems: this.calculateItemFrequency(receiptsList),
-            lastVisit: _.max(visitDates) || null
+            lastVisit: _.max(receiptsList.map(r => r.processedAt)) || null
         };
     }
 
@@ -111,28 +119,25 @@ class GuestAnalytics extends React.Component {
     renderAnalytics() {
         const { analytics } = this.state;
         
-        const visitStats = React.createElement('div', { className: 'card-body' }, [
-            this.renderStatItem('Total Visits', analytics.visitCount),
-            this.renderStatItem('Average Visit Frequency', analytics.visitFrequency),
-            this.renderStatItem('Last Visit', analytics.lastVisit ? new Date(analytics.lastVisit).toLocaleDateString() : 'Never')
-        ]);
+    // Add defensive rendering
+    const visitStats = React.createElement('div', { className: 'card-body' }, [
+        this.renderStatItem('Total Visits', analytics.visitCount || 0),
+        this.renderStatItem('Average Visit Frequency', analytics.visitFrequency || 'N/A'),
+        this.renderStatItem('Last Visit', 
+            analytics.lastVisit ? new Date(analytics.lastVisit).toLocaleDateString() : 'Never')
+    ]);
 
-        const spendingStats = React.createElement('div', { className: 'card-body' }, [
-            this.renderStatItem('Total Spent', `R${analytics.totalSpent.toFixed(2)}`),
-            this.renderStatItem('Average Spend per Visit', `R${analytics.averageSpend.toFixed(2)}`)
-        ]);
+    const spendingStats = React.createElement('div', { className: 'card-body' }, [
+        this.renderStatItem('Total Spent', 
+            `R${(analytics.totalSpent || 0).toFixed(2)}`),
+        this.renderStatItem('Average Spend per Visit', 
+            `R${(analytics.averageSpend || 0).toFixed(2)}`)
+    ]);
 
-        return React.createElement('div', { className: 'guest-analytics row' }, [
-            this.renderCard('Visit Statistics', visitStats, 'visits'),
-            this.renderCard('Spending Analysis', spendingStats, 'spending')
-        ]);
-    }
-
-    renderStatItem(label, value) {
-        return React.createElement('p', { key: label }, [
-            React.createElement('strong', null, `${label}: `),
-            value.toString()
-        ]);
+    return React.createElement('div', { className: 'guest-analytics row' }, [
+        this.renderCard('Visit Statistics', visitStats, 'visits'),
+        this.renderCard('Spending Analysis', spendingStats, 'spending')
+    ]);
     }
 
     renderCard(title, content, key) {
@@ -145,6 +150,13 @@ class GuestAnalytics extends React.Component {
             ])
         );
     }
+// Add proper error boundary
+componentDidCatch(error, errorInfo) {
+    console.error('Error in GuestAnalytics:', error, errorInfo);
+    this.setState({
+        error: 'Failed to load analytics'
+    });
+}    
 
     render() {
         const { loading, error, analytics } = this.state;
@@ -153,7 +165,12 @@ class GuestAnalytics extends React.Component {
         if (error) return this.renderError();
         if (!analytics) return React.createElement('div', { className: 'alert alert-warning' }, 'No data available');
 
-        return this.renderAnalytics();
+        try {
+            return this.renderAnalytics();
+        } catch (error) {
+            console.error('Render error:', error);
+            return this.renderError();
+        }
     }
 }
 
