@@ -57,7 +57,26 @@ document.addEventListener('DOMContentLoaded', function () {
                 showError('An error occurred in campaign management. Please try again.');
             }
         });
-
+        let remoteConfig;
+        try {
+            remoteConfig = firebase.remoteConfig();
+            
+            // Configure Remote Config settings
+            remoteConfig.settings = {
+                minimumFetchIntervalMillis: 3600000, // 1 hour
+                fetchTimeoutMillis: 60000 // 1 minute
+            };
+    
+            // Set default values
+            remoteConfig.defaultConfig = {
+                'GOOGLE_PLACES_API_KEY': '',
+                'GOOGLE_PLACE_ID': ''
+            };
+    
+            console.log('Remote Config initialized successfully');
+        } catch (error) {
+            console.error('Error initializing Remote Config:', error);
+        }
     // Initialize Google Reviews
     googleReviewsManager.initialize()
         .then(() => {

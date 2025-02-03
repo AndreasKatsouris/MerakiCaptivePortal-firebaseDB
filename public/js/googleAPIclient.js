@@ -73,38 +73,33 @@ const handlePlacesError = (status) => {
 
 const getConfig = async () => {
     try {
-        // Get Remote Config instance
-        const remoteConfig = firebase.remoteConfig();
+        // Check if Remote Config is available
+        if (!firebase.remoteConfig) {
+            throw new Error('Firebase Remote Config is not initialized');
+        }
 
-        // Fetch and activate latest values
+        const remoteConfig = firebase.remoteConfig();
         await remoteConfig.fetchAndActivate();
 
-        const apiKey = remoteConfig.getString('GOOGLE_PLACES_API_KEY');
-        const placeId = remoteConfig.getString('GOOGLE_PLACE_ID');
+        // Get values with fallbacks
+        const apiKey = remoteConfig.getString('GOOGLE_PLACES_API_KEY') || process.env.GOOGLE_PLACES_API_KEY;
+        const placeId = remoteConfig.getString('GOOGLE_PLACE_ID') || process.env.GOOGLE_PLACE_ID;
 
-        // Explicit validation
-        if (!apiKey || apiKey === 'undefined') {
+        if (!apiKey) {
             throw new Error('Google Places API key is not configured');
         }
 
-        if (!placeId || placeId === 'undefined') {
+        if (!placeId) {
             throw new Error('Google Place ID is not configured');
         }
 
-        const config = {
+        return {
             apiKey,
             placeId,
             libraries: ['places'],
             region: 'ZA',
             language: 'en'
         };
-
-        console.log('Config loaded:', {
-            apiKeySet: !!config.apiKey,
-            placeIdSet: !!config.placeId
-        });
-
-        return config;
     } catch (error) {
         console.error("Error loading Google Places configuration:", error);
         throw error;
