@@ -89,8 +89,8 @@ const getConfig = async () => {
     }
 };
 // Log configuration status
-console.log('GOOGLE_PLACES_API_KEY:', config.apiKey ? 'Set' : 'Not set');
-console.log('GOOGLE_PLACE_ID:', config.placeId ? 'Set' : 'Not set');
+console.log('GOOGLE_PLACES_API_KEY:', getConfig.apiKey ? 'Set' : 'Not set');
+console.log('GOOGLE_PLACE_ID:', getConfig.placeId ? 'Set' : 'Not set');
 
 export { getConfig, REQUIRED_FIELDS, handlePlacesError, getPlaceReviews };
 
