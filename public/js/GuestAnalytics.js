@@ -1,6 +1,10 @@
 // Access lodash from window object
 const _ = window._;
 
+// Memoize expensive calculations
+const memoizedSortDates = _.memoize(dates => _.sortBy(dates));
+const memoizedMean = _.memoize(arr => _.mean(arr));
+
 // Create the GuestAnalytics React component
 class GuestAnalytics extends React.Component {
     constructor(props) {
@@ -10,34 +14,39 @@ class GuestAnalytics extends React.Component {
             error: null,
             analytics: null
         };
+
+        // Bind methods
+        this.loadGuestAnalytics = this.loadGuestAnalytics.bind(this);
+        this.processAnalytics = this.processAnalytics.bind(this);
+        this.calculateVisitFrequency = this.calculateVisitFrequency.bind(this);
+        this.calculateItemFrequency = this.calculateItemFrequency.bind(this);
     }
 
-    async componentDidMount() {
-        try {
-            const { phoneNumber } = this.props;
-            await this.loadGuestAnalytics(phoneNumber);
-        } catch (error) {
-            console.error('Error loading guest analytics:', error);
-            this.setState({ error: 'Failed to load analytics', loading: false });
+    static defaultProps = {
+        phoneNumber: null
+    };
+
+    componentDidMount() {
+        if (this.props.phoneNumber) {
+            this.loadGuestAnalytics(this.props.phoneNumber).catch(error => {
+                console.error('Error loading guest analytics:', error);
+                this.setState({ error: 'Failed to load analytics', loading: false });
+            });
+        } else {
+            this.setState({ error: 'No phone number provided', loading: false });
         }
     }
 
     async loadGuestAnalytics(phoneNumber) {
         try {
-            // Fetch guest data from Firebase
-            const guestSnapshot = await firebase.database()
-                .ref(`guests/${phoneNumber}`)
-                .once('value');
-            
-            const receiptSnapshot = await firebase.database()
-                .ref('guest-receipts')
-                .child(phoneNumber)
-                .once('value');
+            const [guestSnapshot, receiptSnapshot] = await Promise.all([
+                firebase.database().ref(`guests/${phoneNumber}`).once('value'),
+                firebase.database().ref('guest-receipts').child(phoneNumber).once('value')
+            ]);
 
             const guest = guestSnapshot.val();
             const receipts = receiptSnapshot.val() || {};
 
-            // Process analytics data
             const analytics = this.processAnalytics(guest, receipts);
             this.setState({ analytics, loading: false });
         } catch (error) {
@@ -50,23 +59,14 @@ class GuestAnalytics extends React.Component {
         if (!guest) return null;
 
         const receiptsList = Object.values(receipts);
-        const totalSpent = _.sumBy(receiptsList, 'totalAmount');
-        const visitCount = receiptsList.length;
-        const averageSpend = visitCount > 0 ? totalSpent / visitCount : 0;
-
-        // Get visit frequency
         const visitDates = receiptsList.map(r => new Date(r.processedAt).getTime());
-        const visitFrequency = this.calculateVisitFrequency(visitDates);
-
-        // Get popular items
-        const itemFrequency = this.calculateItemFrequency(receiptsList);
 
         return {
-            totalSpent,
-            visitCount,
-            averageSpend,
-            visitFrequency,
-            popularItems: itemFrequency,
+            totalSpent: _.sumBy(receiptsList, 'totalAmount'),
+            visitCount: receiptsList.length,
+            averageSpend: receiptsList.length > 0 ? _.sumBy(receiptsList, 'totalAmount') / receiptsList.length : 0,
+            visitFrequency: this.calculateVisitFrequency(visitDates),
+            popularItems: this.calculateItemFrequency(receiptsList),
             lastVisit: _.max(visitDates) || null
         };
     }
@@ -74,24 +74,23 @@ class GuestAnalytics extends React.Component {
     calculateVisitFrequency(dates) {
         if (dates.length < 2) return 'Insufficient data';
         
-        const sortedDates = _.sortBy(dates);
+        const sortedDates = memoizedSortDates(dates);
         const differences = [];
         
         for (let i = 1; i < sortedDates.length; i++) {
-            const diff = sortedDates[i] - sortedDates[i-1];
-            differences.push(diff / (1000 * 60 * 60 * 24)); // Convert to days
+            differences.push((sortedDates[i] - sortedDates[i-1]) / (1000 * 60 * 60 * 24));
         }
         
-        return _.mean(differences).toFixed(1) + ' days';
+        return `${memoizedMean(differences).toFixed(1)} days`;
     }
 
     calculateItemFrequency(receipts) {
-        const items = {};
-        receipts.forEach(receipt => {
+        const items = receipts.reduce((acc, receipt) => {
             (receipt.items || []).forEach(item => {
-                items[item.name] = (items[item.name] || 0) + 1;
+                acc[item.name] = (acc[item.name] || 0) + 1;
             });
-        });
+            return acc;
+        }, {});
         
         return _(items)
             .map((count, name) => ({ name, count }))
@@ -100,65 +99,68 @@ class GuestAnalytics extends React.Component {
             .value();
     }
 
-    render() {
-        const { loading, error, analytics } = this.state;
+    // Separate render methods for better organization
+    renderLoading() {
+        return React.createElement('div', { className: 'text-center p-4' }, 'Loading analytics...');
+    }
 
-        if (loading) {
-            return React.createElement('div', { className: 'text-center p-4' }, 'Loading analytics...');
-        }
+    renderError() {
+        return React.createElement('div', { className: 'alert alert-danger' }, this.state.error);
+    }
 
-        if (error) {
-            return React.createElement('div', { className: 'alert alert-danger' }, error);
-        }
+    renderAnalytics() {
+        const { analytics } = this.state;
+        
+        const visitStats = React.createElement('div', { className: 'card-body' }, [
+            this.renderStatItem('Total Visits', analytics.visitCount),
+            this.renderStatItem('Average Visit Frequency', analytics.visitFrequency),
+            this.renderStatItem('Last Visit', analytics.lastVisit ? new Date(analytics.lastVisit).toLocaleDateString() : 'Never')
+        ]);
 
-        if (!analytics) {
-            return React.createElement('div', { className: 'alert alert-warning' }, 'No data available');
-        }
+        const spendingStats = React.createElement('div', { className: 'card-body' }, [
+            this.renderStatItem('Total Spent', `R${analytics.totalSpent.toFixed(2)}`),
+            this.renderStatItem('Average Spend per Visit', `R${analytics.averageSpend.toFixed(2)}`)
+        ]);
 
-        return React.createElement('div', { className: 'guest-analytics' },
-            React.createElement('div', { className: 'row' }, [
-                React.createElement('div', { className: 'col-md-6 mb-4', key: 'visits' },
-                    React.createElement('div', { className: 'card' }, [
-                        React.createElement('div', { className: 'card-header' },
-                            React.createElement('h6', { className: 'mb-0' }, 'Visit Statistics')
-                        ),
-                        React.createElement('div', { className: 'card-body' }, [
-                            React.createElement('p', null, [
-                                React.createElement('strong', null, 'Total Visits: '),
-                                analytics.visitCount
-                            ]),
-                            React.createElement('p', null, [
-                                React.createElement('strong', null, 'Average Visit Frequency: '),
-                                analytics.visitFrequency
-                            ]),
-                            React.createElement('p', null, [
-                                React.createElement('strong', null, 'Last Visit: '),
-                                analytics.lastVisit ? new Date(analytics.lastVisit).toLocaleDateString() : 'Never'
-                            ])
-                        ])
-                    ])
+        return React.createElement('div', { className: 'guest-analytics row' }, [
+            this.renderCard('Visit Statistics', visitStats, 'visits'),
+            this.renderCard('Spending Analysis', spendingStats, 'spending')
+        ]);
+    }
+
+    renderStatItem(label, value) {
+        return React.createElement('p', { key: label }, [
+            React.createElement('strong', null, `${label}: `),
+            value.toString()
+        ]);
+    }
+
+    renderCard(title, content, key) {
+        return React.createElement('div', { className: 'col-md-6 mb-4', key }, 
+            React.createElement('div', { className: 'card' }, [
+                React.createElement('div', { className: 'card-header' },
+                    React.createElement('h6', { className: 'mb-0' }, title)
                 ),
-                React.createElement('div', { className: 'col-md-6 mb-4', key: 'spending' },
-                    React.createElement('div', { className: 'card' }, [
-                        React.createElement('div', { className: 'card-header' },
-                            React.createElement('h6', { className: 'mb-0' }, 'Spending Analysis')
-                        ),
-                        React.createElement('div', { className: 'card-body' }, [
-                            React.createElement('p', null, [
-                                React.createElement('strong', null, 'Total Spent: '),
-                                `R${analytics.totalSpent.toFixed(2)}`
-                            ]),
-                            React.createElement('p', null, [
-                                React.createElement('strong', null, 'Average Spend per Visit: '),
-                                `R${analytics.averageSpend.toFixed(2)}`
-                            ])
-                        ])
-                    ])
-                )
+                content
             ])
         );
     }
+
+    render() {
+        const { loading, error, analytics } = this.state;
+
+        if (loading) return this.renderLoading();
+        if (error) return this.renderError();
+        if (!analytics) return React.createElement('div', { className: 'alert alert-warning' }, 'No data available');
+
+        return this.renderAnalytics();
+    }
 }
+
+// PropTypes validation
+GuestAnalytics.propTypes = {
+    phoneNumber: PropTypes.string.isRequired
+};
 
 // Assign to window object for global access
 window.GuestAnalytics = GuestAnalytics;
