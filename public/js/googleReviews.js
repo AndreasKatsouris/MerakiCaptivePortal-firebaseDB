@@ -50,63 +50,37 @@ const googleReviewsManager = {
     // Fetch reviews from Google Places API
     async fetchGoogleReviews() {
         try {
-            // Create a map div - required by Places API
-            const mapDiv = document.createElement('div');
-            mapDiv.style.display = 'none';
-            document.body.appendChild(mapDiv);
-    
-            // Initialize map - required for Places service
-            const map = new google.maps.Map(mapDiv, {
-                center: { lat: -34.397, lng: 150.644 },
-                zoom: 8
-            });
-    
-            const service = new google.maps.places.PlacesService(map);
+            const place = await getPlaceReviews(this.state.config);
             
-            const place = await new Promise((resolve, reject) => {
-                service.getDetails({
-                    placeId: this.state.config.placeId,
-                    fields: REQUIRED_FIELDS
-                }, (place, status) => {
-                    if (status === google.maps.places.PlacesServiceStatus.OK) {
-                        resolve(place);
-                    } else {
-                        reject(new Error(`Places API Error: ${status}`));
-                    }
-                });
-            });
-    
-            // Enhanced review mapping
+            // Transform reviews according to the documentation
             const reviews = place.reviews.map(review => ({
                 id: review.time.toString(),
-                reviewerName: review.author_name,
-                rating: review.rating,
-                text: review.text,
-                timestamp: review.time * 1000,
-                profilePhoto: review.profile_photo_url,
-                language: review.language,
+                authorName: review.author_name,
                 authorUrl: review.author_url,
+                language: review.language,
+                profilePhotoUrl: review.profile_photo_url,
+                rating: review.rating,
                 relativeTimeDescription: review.relative_time_description,
+                text: review.text,
+                time: review.time,
+                translated: review.translated || false,
                 response: null,
                 flagged: false
             }));
     
-            // Store additional place details
+            // Store place details
             this.state.placeDetails = {
                 name: place.name,
                 rating: place.rating,
                 totalRatings: place.user_ratings_total,
                 address: place.formatted_address,
                 phoneNumber: place.formatted_phone_number,
-                businessStatus: place.business_status
+                location: place.geometry.location
             };
     
             await this.syncReviewsWithFirebase(reviews);
-            
-            // Cleanup
-            document.body.removeChild(mapDiv);
-            
             return reviews;
+    
         } catch (error) {
             console.error('Error fetching Google reviews:', error);
             throw error;

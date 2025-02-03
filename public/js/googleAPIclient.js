@@ -1,11 +1,3 @@
-// Google Maps/Places Configuration
-const GOOGLE_MAPS_CONFIG = {
-    apiKey: process.env.GOOGLE_PLACES_API_KEY,
-    placeId: process.env.GOOGLE_PLACE_ID,
-    libraries: ['places'],
-    region: 'ZA',  // For South Africa
-    language: 'en'
-};
 
 // Define required fields
 const REQUIRED_FIELDS = [
@@ -18,45 +10,49 @@ const REQUIRED_FIELDS = [
     'business_status',
     'formatted_phone_number'
 ];
+// Initialize a hidden map element (required by Places API)
+const initializeMap = () => {
+    const mapDiv = document.createElement('div');
+    mapDiv.style.display = 'none';
+    document.body.appendChild(mapDiv);
 
-// Initialize Firebase Remote Config
-const getConfig = async () => {
+    const map = new google.maps.Map(mapDiv, {
+        center: { lat: -33.8688, lng: 151.2195 }, // Default center
+        zoom: 13
+    });
+
+    return { map, mapDiv };
+};
+// Get reviews using Places API
+const getPlaceReviews = async (config) => {
     try {
-        const remoteConfig = firebase.remoteConfig();
-        await remoteConfig.fetchAndActivate();
+        const { map, mapDiv } = initializeMap();
+        const service = new google.maps.places.PlacesService(map);
 
-        const config = {
-            apiKey: remoteConfig.getString('GOOGLE_PLACES_API_KEY'),
-            placeId: remoteConfig.getString('GOOGLE_PLACE_ID'),
-            libraries: GOOGLE_MAPS_CONFIG.libraries,
-            region: GOOGLE_MAPS_CONFIG.region,
-            language: GOOGLE_MAPS_CONFIG.language
+        const request = {
+            placeId: config.placeId,
+            fields: REQUIRED_FIELDS
         };
 
-        // Validate configuration
-        if (!config.apiKey || !config.placeId) {
-            throw new Error("Google Places credentials are not set.");
-        }
-
-        // Log configuration status
-        console.log('Google Places API Configuration:', {
-            apiKey: config.apiKey ? 'Set' : 'Not set',
-            placeId: config.placeId ? 'Set' : 'Not set',
-            libraries: config.libraries,
-            region: config.region,
-            language: config.language
+        const place = await new Promise((resolve, reject) => {
+            service.getDetails(request, (result, status) => {
+                if (status === google.maps.places.PlacesServiceStatus.OK) {
+                    resolve(result);
+                } else {
+                    reject(new Error(handlePlacesError(status)));
+                }
+            });
         });
 
-        return config;
+        // Cleanup map div after use
+        document.body.removeChild(mapDiv);
+
+        return place;
     } catch (error) {
-        console.error("Error loading Google Places configuration:", error);
+        console.error('Error fetching place details:', error);
         throw error;
     }
 };
-
-// Log configuration status
-console.log('GOOGLE_PLACES_API_KEY:', config.apiKey ? 'Set' : 'Not set');
-console.log('GOOGLE_PLACE_ID:', config.placeId ? 'Set' : 'Not set');
 
 // Error handling for Places API responses
 const handlePlacesError = (status) => {
@@ -72,5 +68,30 @@ const handlePlacesError = (status) => {
     return errorMessages[status] || 'An error occurred while fetching data from Google Places API.';
 };
 
-// Export both config and REQUIRED_FIELDS
-export { getConfig, REQUIRED_FIELDS, handlePlacesError };
+const getConfig = async () => {
+    try {
+        const remoteConfig = firebase.remoteConfig();
+        await remoteConfig.fetchAndActivate();
+
+        const config = {
+            apiKey: remoteConfig.getString('GOOGLE_PLACES_API_KEY'),
+            placeId: remoteConfig.getString('GOOGLE_PLACE_ID')
+        };
+
+        if (!config.apiKey || !config.placeId) {
+            throw new Error("Google Places credentials are not set.");
+        }
+
+        return config;
+    } catch (error) {
+        console.error("Error loading Google Places configuration:", error);
+        throw error;
+    }
+};
+// Log configuration status
+console.log('GOOGLE_PLACES_API_KEY:', config.apiKey ? 'Set' : 'Not set');
+console.log('GOOGLE_PLACE_ID:', config.placeId ? 'Set' : 'Not set');
+
+export { getConfig, REQUIRED_FIELDS, handlePlacesError, getPlaceReviews };
+
+
