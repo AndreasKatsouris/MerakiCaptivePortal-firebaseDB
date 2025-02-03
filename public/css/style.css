@@ -296,4 +296,44 @@ input.form-control:focus:invalid + .validation-message {
   opacity: 1; /* Ensure the placeholder is fully visible */
 }
 
+/* Google Reviews Styles */
+.metric-card {
+    background-color: #fff;
+    transition: transform 0.2s;
+}
+
+.metric-card:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+}
+
+#reviewsTable .fa-star {
+    font-size: 0.875rem;
+}
+
+#reviewsTable .badge {
+    font-size: 0.75rem;
+    padding: 0.25em 0.75em;
+}
+
+/* Review filters */
+.filters .form-select,
+.filters .form-control {
+    max-width: 150px;
+}
+
+/* Review text cell */
+#reviewsTable td:nth-child(4) {
+    max-width: 300px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+/* Response modal */
+#responseText {
+    min-height: 100px;
+    resize: vertical;
+}
+
 

@@ -4,6 +4,8 @@
 import { initializeGuestManagement } from './guest-management.js';
 //import { initializeCampaignManagement } from './campaigns/campaigns.js';
 
+// Import the Google Reviews manager
+import { googleReviewsManager } from './googleReviews.js';
 
 window.addEventListener('error', function(e) {
     console.error('Global error:', e.error);
@@ -43,6 +45,13 @@ document.addEventListener('DOMContentLoaded', function () {
                 showError('An error occurred in campaign management. Please try again.');
             }
         });
+
+    // Initialize Google Reviews
+    try {
+        await googleReviewsManager.initialize();
+    } catch (error) {
+        console.error('Failed to initialize Google Reviews:', error);
+    }
 });
 
 // ==================== Authentication Section ====================

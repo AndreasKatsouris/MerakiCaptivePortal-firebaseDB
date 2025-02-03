@@ -29,6 +29,19 @@
   ".indexOn": ["phoneNumber", "guestPhoneNumber"],
   ".read": true,
   ".write": true
+  },
+  "googleReviews": {
+    ".read": "auth != null",
+    ".write": "auth != null && auth.token.admin === true",
+    "$reviewId": {
+      ".validate": "newData.hasChildren(['reviewerName', 'rating', 'text', 'timestamp'])",
+      "rating": {
+        ".validate": "newData.isNumber() && newData.val() >= 1 && newData.val() <= 5"
+      },
+      "timestamp": {
+        ".validate": "newData.isNumber()"
+      }
+    }
   }
 }
 }
