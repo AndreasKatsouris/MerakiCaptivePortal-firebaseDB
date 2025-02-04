@@ -1,1 +1,18 @@
-{}
+{
+    "parameters": {
+      "GOOGLE_PLACES_API_KEY": {
+        "defaultValue": "AIzaSyBSvEPNoh0ZBSnxZhwXeVIEeXLkkP9arw4",
+        "description": "Google Places API Key for accessing Places API services",
+        "valueType": "STRING"
+      },
+      "GOOGLE_PLACE_ID": {
+        "defaultValue": "ChIJuQtzRj9elR4RAt72vRFTqJw",
+        "description": "Google Place ID for the specific business location",
+        "valueType": "STRING"
+      }
+    },
+    "version": {
+      "versionNumber": "1",
+      "updateTime": "2024-02-04T12:00:00.000Z"
+    }
+  }
