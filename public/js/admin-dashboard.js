@@ -1,3 +1,6 @@
+let firebaseInitialized = false;
+
+
 //import { updateDashboardStats, initializeDashboardListeners } from './dashboard.js';
 //import { initializeProjectManagement } from './project-management.js';
 //import { initializeRewardTypes } from './reward-types.js';
@@ -8,6 +11,19 @@ import { initializeGuestManagement } from './guest-management.js';
 import { googleReviewsManager } from './googleReviews.js';
 //const remoteConfig = firebase.remoteConfig();
 
+async function waitForFirebaseInit() {
+    return new Promise((resolve) => {
+        const checkInit = () => {
+            if (firebase.apps.length) {
+                firebaseInitialized = true;
+                resolve();
+            } else {
+                setTimeout(checkInit, 100);
+            }
+        };
+        checkInit();
+    });
+}
 
 window.addEventListener('error', function(e) {
     console.error('Global error:', e.error);
@@ -22,7 +38,22 @@ window.addEventListener('error', function(e) {
 
 document.addEventListener('DOMContentLoaded', async function () {
     // Initialize all event listeners after DOM is loaded
-    await initializeFirebaseFeatures();
+    try {
+        // Wait for Firebase to initialize
+        await waitForFirebaseInit();
+        console.log('Firebase initialized successfully');
+
+        // Now initialize Remote Config
+        await initializeFirebaseFeatures();
+
+        // Then initialize Google Reviews
+        await googleReviewsManager.initialize()
+            .then(() => {
+                console.log('Google Reviews initialized successfully');
+            })
+            .catch(error => {
+                console.error('Failed to initialize Google Reviews:', error);
+            });
     initializeAuthentication();
     initializeMenuListeners();
     initializeLoyaltyListeners();
@@ -37,7 +68,9 @@ document.addEventListener('DOMContentLoaded', async function () {
     initializeGuestManagement();
     //initializeCampaignManagement();
     initializeCampaignMenuListener();
-
+} catch (error) {
+    console.error('Initialization error:', error);
+}
         // Global error handler
         window.addEventListener('error', function(e) {
             console.error('Global error:', e.error);

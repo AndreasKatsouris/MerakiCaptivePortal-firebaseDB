@@ -93,26 +93,37 @@ const handlePlacesError = (status) => {
 
 const getConfig = async () => {
     try {
+        // Wait for Firebase to be initialized
+        if (!firebase?.apps?.length) {
+            console.log('Waiting for Firebase initialization...');
+            await new Promise(resolve => {
+                const checkInit = () => {
+                    if (firebase?.apps?.length) {
+                        resolve();
+                    } else {
+                        setTimeout(checkInit, 100);
+                    }
+                };
+                checkInit();
+            });
+        }
+
+        console.log('Firebase ready, getting Remote Config...');
         const remoteConfig = firebase.remoteConfig();
+        await remoteConfig.ensureInitialized();
         await remoteConfig.fetchAndActivate();
 
         const apiKey = remoteConfig.getString('GOOGLE_PLACES_API_KEY');
         const placeId = remoteConfig.getString('GOOGLE_PLACE_ID');
 
-        // Add debug logging
-        console.log('Google Places Configuration:', {
+        // Debug logging
+        console.log('Config values loaded:', {
             apiKeyExists: !!apiKey,
-            apiKeyLength: apiKey ? apiKey.length : 0,
-            placeIdExists: !!placeId,
-            placeIdValue: placeId || 'Not set'
+            placeIdExists: !!placeId
         });
 
-        if (!apiKey) {
-            throw new Error('Google Places API key is not configured');
-        }
-
-        if (!placeId) {
-            throw new Error('Google Place ID is not configured');
+        if (!apiKey || !placeId) {
+            throw new Error('Required configuration values are missing');
         }
 
         return {
@@ -123,11 +134,7 @@ const getConfig = async () => {
             language: 'en'
         };
     } catch (error) {
-        console.error("Config Error Details:", {
-            error: error.message,
-            stack: error.stack,
-            timestamp: new Date().toISOString()
-        });
+        console.error('Config initialization error:', error);
         throw error;
     }
 };
