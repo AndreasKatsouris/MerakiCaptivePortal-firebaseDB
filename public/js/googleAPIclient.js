@@ -27,19 +27,35 @@ const initializeMap = () => {
 // Get reviews using Places API
 const getPlaceReviews = async (config) => {
     try {
+        console.log('Initiating Places API request with:', {
+            placeId: config.placeId,
+            fields: REQUIRED_FIELDS
+        });
+
         const { map, mapDiv } = initializeMap();
         const service = new google.maps.places.PlacesService(map);
 
-        const request = {
-            placeId: config.placeId,
-            fields: REQUIRED_FIELDS
-        };
-
         const place = await new Promise((resolve, reject) => {
-            service.getDetails(request, (result, status) => {
+            service.getDetails({
+                placeId: config.placeId,
+                fields: REQUIRED_FIELDS
+            }, (result, status) => {
+                // Add detailed logging
+                console.log('Places API Response:', {
+                    status: status,
+                    hasResult: !!result,
+                    resultFields: result ? Object.keys(result) : [],
+                    timestamp: new Date().toISOString()
+                });
+
                 if (status === google.maps.places.PlacesServiceStatus.OK) {
                     resolve(result);
                 } else {
+                    console.error('Places API Error:', {
+                        status: status,
+                        errorMessage: handlePlacesError(status),
+                        timestamp: new Date().toISOString()
+                    });
                     reject(new Error(handlePlacesError(status)));
                 }
             });
@@ -50,7 +66,11 @@ const getPlaceReviews = async (config) => {
 
         return place;
     } catch (error) {
-        console.error('Error fetching place details:', error);
+        console.error('Place Details Error:', {
+            error: error.message,
+            stack: error.stack,
+            timestamp: new Date().toISOString()
+        });
         throw error;
     }
 };
@@ -74,32 +94,43 @@ const handlePlacesError = (status) => {
 const getConfig = async () => {
     try {
         const remoteConfig = firebase.remoteConfig();
-        if (!remoteConfig) {
-            throw new Error('Remote Config not initialized');
+        await remoteConfig.fetchAndActivate();
+
+        const apiKey = remoteConfig.getString('GOOGLE_PLACES_API_KEY');
+        const placeId = remoteConfig.getString('GOOGLE_PLACE_ID');
+
+        // Add debug logging
+        console.log('Google Places Configuration:', {
+            apiKeyExists: !!apiKey,
+            apiKeyLength: apiKey ? apiKey.length : 0,
+            placeIdExists: !!placeId,
+            placeIdValue: placeId || 'Not set'
+        });
+
+        if (!apiKey) {
+            throw new Error('Google Places API key is not configured');
         }
 
-        await remoteConfig.ensureInitialized();
-        const config = {
-            apiKey: remoteConfig.getString('GOOGLE_PLACES_API_KEY'),
-            placeId: remoteConfig.getString('GOOGLE_PLACE_ID'),
+        if (!placeId) {
+            throw new Error('Google Place ID is not configured');
+        }
+
+        return {
+            apiKey,
+            placeId,
             libraries: ['places'],
             region: 'ZA',
             language: 'en'
         };
-
-        if (!config.apiKey || !config.placeId) {
-            throw new Error('Missing required configuration');
-        }
-
-        return config;
     } catch (error) {
-        console.error('Config error:', error);
+        console.error("Config Error Details:", {
+            error: error.message,
+            stack: error.stack,
+            timestamp: new Date().toISOString()
+        });
         throw error;
     }
 };
-// Log configuration status
-//console.log('GOOGLE_PLACES_API_KEY:', getConfig.apiKey ? 'Set' : 'Not set');
-//console.log('GOOGLE_PLACE_ID:', getConfig.placeId ? 'Set' : 'Not set');
 
 export { getConfig, REQUIRED_FIELDS, handlePlacesError, getPlaceReviews };
 
