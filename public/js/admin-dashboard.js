@@ -8,17 +8,7 @@ import { initializeGuestManagement } from './guest-management.js';
 import { googleReviewsManager } from './googleReviews.js';
 //const remoteConfig = firebase.remoteConfig();
 
-// Initialize Remote Config with settings
-remoteConfig.settings = {
-    minimumFetchIntervalMillis: 3600000, // 1 hour
-    fetchTimeoutMillis: 60000 // 1 minute
-};
 
-// Set default values
-remoteConfig.defaultConfig = ({
-    'GOOGLE_PLACES_API_KEY': '',
-    'GOOGLE_PLACE_ID': ''
-});
 window.addEventListener('error', function(e) {
     console.error('Global error:', e.error);
 
@@ -30,8 +20,9 @@ window.addEventListener('error', function(e) {
 });
 
 
-document.addEventListener('DOMContentLoaded', function () {
+document.addEventListener('DOMContentLoaded', async function () {
     // Initialize all event listeners after DOM is loaded
+    await initializeFirebaseFeatures();
     initializeAuthentication();
     initializeMenuListeners();
     initializeLoyaltyListeners();
@@ -57,26 +48,12 @@ document.addEventListener('DOMContentLoaded', function () {
                 showError('An error occurred in campaign management. Please try again.');
             }
         });
-        let remoteConfig;
-        try {
-            remoteConfig = firebase.remoteConfig();
-            
-            // Configure Remote Config settings
-            remoteConfig.settings = {
-                minimumFetchIntervalMillis: 3600000, // 1 hour
-                fetchTimeoutMillis: 60000 // 1 minute
-            };
-    
-            // Set default values
-            remoteConfig.defaultConfig = {
-                'GOOGLE_PLACES_API_KEY': '',
-                'GOOGLE_PLACE_ID': ''
-            };
-    
-            console.log('Remote Config initialized successfully');
-        } catch (error) {
-            console.error('Error initializing Remote Config:', error);
-        }
+        window.addEventListener('unhandledrejection', function(event) {
+            console.error('Unhandled promise rejection:', event.reason);
+            if (event.reason?.message?.includes('Remote Config')) {
+                showError('Failed to initialize remote configuration. Please check your setup.');
+            }
+        });   
     // Initialize Google Reviews
     googleReviewsManager.initialize()
         .then(() => {
@@ -86,6 +63,32 @@ document.addEventListener('DOMContentLoaded', function () {
             console.error('Failed to initialize Google Reviews:', error);
         });
 });
+
+// ==================== FIREBASE INIT =============================
+async function initializeFirebaseFeatures() {
+    try {
+        // Initialize Remote Config
+        const remoteConfig = firebase.remoteConfig();
+        await remoteConfig.ensureInitialized();
+        
+        remoteConfig.settings = {
+            minimumFetchIntervalMillis: 3600000,
+            fetchTimeoutMillis: 60000
+        };
+
+        remoteConfig.defaultConfig = {
+            'GOOGLE_PLACES_API_KEY': '',
+            'GOOGLE_PLACE_ID': ''
+        };
+
+        await remoteConfig.fetchAndActivate();
+        
+        return remoteConfig;
+    } catch (error) {
+        console.error('Firebase Remote Config initialization error:', error);
+        throw error;
+    }
+}
 
 // ==================== Authentication Section ====================
 function initializeAuthentication() {
