@@ -764,27 +764,15 @@ function initializeCampaignMenuListener() {
     if (campaignManagementMenu) {
         campaignManagementMenu.addEventListener('click', async function(e) {
             e.preventDefault();
+            displaySection('campaignManagementContent'); // This will now properly hide other sections
             
-            // Hide all content sections first
-            document.querySelectorAll('.content-section').forEach(section => {
-                section.style.display = 'none';
-                section.classList.remove('active');
-            });
-            
-            // Show campaign section
-            const campaignSection = document.getElementById('campaignManagementContent');
-            if (campaignSection) {
-                campaignSection.style.display = 'block';
-                campaignSection.classList.add('active');
-                
-                // Initialize campaign manager if not already done
-                if (!window.campaignManagerInstance) {
-                    try {
-                        window.campaignManagerInstance = window.CampaignManager.init('campaignManagementRoot');
-                    } catch (error) {
-                        console.error('Error initializing campaign management:', error);
-                        showError('Failed to initialize campaign management');
-                    }
+            // Initialize campaign manager if not already done
+            if (!window.campaignManagerInstance) {
+                try {
+                    window.campaignManagerInstance = window.CampaignManager.init('campaignManagementRoot');
+                } catch (error) {
+                    console.error('Error initializing campaign management:', error);
+                    showError('Failed to initialize campaign management');
                 }
             }
         });
@@ -1621,7 +1609,7 @@ function displaySection(sectionId) {
     try {
         showLoading();
         
-        // Hide all sections
+        // Hide all sections including campaign management
         document.querySelectorAll('.content-section').forEach(section => {
             section.style.display = 'none';
             section.classList.remove('active');
@@ -1631,9 +1619,7 @@ function displaySection(sectionId) {
         const section = document.getElementById(sectionId);
         if (section) {
             section.style.display = 'block';
-            section.classList.add('active');  // Add active class to any shown section
-        } else {
-            console.error(`Section ${sectionId} not found`);
+            section.classList.add('active');
         }
     } catch (error) {
         console.error('Error displaying section:', error);
@@ -1642,6 +1628,7 @@ function displaySection(sectionId) {
         hideLoading();
     }
 }
+
 function showError(message) {
     Swal.fire({
         icon: 'error',
