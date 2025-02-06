@@ -99,28 +99,7 @@ document.addEventListener('DOMContentLoaded', async function () {
 
 // ==================== FIREBASE INIT =============================
 async function initializeFirebaseFeatures() {
-    try {
-        // Initialize Remote Config
-        const remoteConfig = firebase.remoteConfig();
-        await remoteConfig.ensureInitialized();
-        
-        remoteConfig.settings = {
-            minimumFetchIntervalMillis: 3600000,
-            fetchTimeoutMillis: 60000
-        };
 
-        remoteConfig.defaultConfig = {
-            'GOOGLE_PLACES_API_KEY': '',
-            'GOOGLE_PLACE_ID': ''
-        };
-
-        await remoteConfig.fetchAndActivate();
-        
-        return remoteConfig;
-    } catch (error) {
-        console.error('Firebase Remote Config initialization error:', error);
-        throw error;
-    }
 }
 
 // ==================== Authentication Section ====================
