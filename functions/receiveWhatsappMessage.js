@@ -13,7 +13,19 @@ if (!admin.apps.length) {
         databaseURL: "https://merakicaptiveportal-firebasedb-default-rtdb.firebaseio.com",
     });
 }
-
+async function sendWhatsAppNotification(phoneNumber, message) {
+    try {
+        await client.messages.create({
+            body: message,
+            from: `whatsapp:${twilioPhone}`,
+            to: `whatsapp:${phoneNumber}`
+        });
+        return { success: true };
+    } catch (error) {
+        console.error('Error sending WhatsApp message:', error);
+        throw error;
+    }
+}
 /**
  * Handle incoming WhatsApp messages
  * @param {object} req - HTTP request object
@@ -318,4 +330,4 @@ function getHelpMessage() {
 • "Help" to see this menu again`;
 }
 
-module.exports = { receiveWhatsAppMessage };
+module.exports = { receiveWhatsAppMessage,sendWhatsAppNotification };
