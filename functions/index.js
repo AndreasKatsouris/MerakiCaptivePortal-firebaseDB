@@ -44,3 +44,10 @@ exports.merakiWebhook = onRequest((req, res) => {
             return res.status(500).send('Error storing data.');
         });
 });
+
+exports.getGoogleConfig = onRequest(async (req, res) => {
+    res.json({
+        apiKey: functions.config().google.places_api_key,
+        placeId: functions.config().google.place_id
+    });
+});

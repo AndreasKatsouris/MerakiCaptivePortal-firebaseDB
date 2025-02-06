@@ -22,18 +22,13 @@ const googleReviewsManager = {
     },
 
     // Initialize the module
-    initialize() {
+    async initialize() {
         try {
-            const apiKey = process.env.GOOGLE_PLACES_API_KEY;
-            const placeId = process.env.GOOGLE_PLACE_ID;
+            const response = await fetch('/api/getGoogleConfig');
+            const config = await response.json();
             
-            if (!apiKey || !placeId) {
-                throw new Error('Google Places API credentials not configured');
-            }
-    
             this.config = {
-                apiKey,
-                placeId,
+                ...config,
                 libraries: ['places'],
                 region: 'ZA',
                 language: 'en'
