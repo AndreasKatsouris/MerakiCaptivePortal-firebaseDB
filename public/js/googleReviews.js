@@ -21,26 +21,27 @@ const googleReviewsManager = {
     },
 
     // Initialize the module
-    async initialize() {
+    initialize() {
         try {
-            // Get config first
-            this.state.config = await getConfig();
+            const apiKey = process.env.GOOGLE_PLACES_API_KEY;
+            const placeId = process.env.GOOGLE_PLACE_ID;
             
-            // Validate config
-            if (!this.state.config.apiKey) {
-                throw new Error('Google Places API key not configured');
+            if (!apiKey || !placeId) {
+                throw new Error('Google Places API credentials not configured');
             }
     
-            // Then load the API
-            await this.loadGooglePlacesAPI();
-            
-            // Continue with initialization
-            this.addEventListeners();
-            await this.loadReviews();
-            this.calculateMetrics();
+            this.config = {
+                apiKey,
+                placeId,
+                libraries: ['places'],
+                region: 'ZA',
+                language: 'en'
+            };
+    
+            return this.loadGooglePlacesAPI();
         } catch (error) {
             console.error('Error initializing Google Reviews:', error);
-            this.handleError(error);
+            throw error;
         }
     },
 

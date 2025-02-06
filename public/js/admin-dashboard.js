@@ -44,7 +44,7 @@ document.addEventListener('DOMContentLoaded', async function () {
         console.log('Firebase initialized successfully');
 
         // Now initialize Remote Config
-        await initializeFirebaseFeatures();
+        //await initializeFirebaseFeatures();
 
         // Then initialize Google Reviews
         await googleReviewsManager.initialize()
