@@ -602,39 +602,86 @@ async function viewRewardDetails(rewardId) {
  */
 async function handleRewardApproval(rewardId) {
     try {
+        // First fetch reward types
+        const rewardTypesSnapshot = await firebase.database().ref('rewardTypes').once('value');
+        const rewardTypes = rewardTypesSnapshot.val() || {};
+        
         const result = await Swal.fire({
-            title: 'Approve Reward?',
-            text: 'This will mark the reward as approved',
-            icon: 'question',
+            title: 'Approve Reward',
+            html: `
+                <div class="form-group mb-3">
+                    <label>Select Reward Type</label>
+                    <select id="rewardTypeSelect" class="form-select">
+                        ${Object.entries(rewardTypes).map(([id, type]) => 
+                            `<option value="${id}">${type.name}</option>`
+                        ).join('')}
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label>Message to Guest</label>
+                    <textarea id="guestMessage" class="form-control" rows="3" 
+                        placeholder="Enter message that will be sent to guest"></textarea>
+                </div>
+            `,
             showCancelButton: true,
             confirmButtonColor: '#28a745',
-            cancelButtonColor: '#6c757d',
-            confirmButtonText: 'Yes, approve it!'
+            confirmButtonText: 'Approve'
         });
 
         if (result.isConfirmed) {
+            const rewardTypeId = document.getElementById('rewardTypeSelect').value;
+            const guestMessage = document.getElementById('guestMessage').value;
+
             showLoading();
             
-            // Update reward status in Firebase
+            // Update reward in Firebase
             await firebase.database().ref(`rewards/${rewardId}`).update({
                 status: 'approved',
+                rewardTypeId,
+                guestMessage,
                 approvedAt: Date.now(),
                 approvedBy: firebase.auth().currentUser.uid
             });
 
-            // Close any open modals
-            $('.modal').modal('hide');
-            
+            // Send WhatsApp message to guest
+            await sendWhatsAppNotification(rewardId, guestMessage);
+
             // Refresh rewards list
             await loadRewards();
             
-            Swal.fire('Approved!', 'The reward has been approved.', 'success');
+            Swal.fire('Approved!', 'Reward has been approved and guest notified.', 'success');
         }
     } catch (error) {
         console.error('Error approving reward:', error);
         Swal.fire('Error', 'Failed to approve reward', 'error');
     } finally {
         hideLoading();
+    }
+}
+
+async function sendWhatsAppNotification(rewardId, customMessage) {
+    try {
+        const rewardSnapshot = await firebase.database().ref(`rewards/${rewardId}`).once('value');
+        const reward = rewardSnapshot.val();
+
+        // Call your WhatsApp API endpoint
+        const response = await fetch('/api/sendWhatsApp', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+                phoneNumber: reward.guestPhone,
+                message: customMessage || `Congratulations! Your reward for ${reward.campaignName} has been approved.`
+            })
+        });
+
+        if (!response.ok) {
+            throw new Error('Failed to send WhatsApp notification');
+        }
+    } catch (error) {
+        console.error('Error sending WhatsApp notification:', error);
+        throw error;
     }
 }
 

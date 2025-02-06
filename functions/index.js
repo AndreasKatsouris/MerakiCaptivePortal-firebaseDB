@@ -10,7 +10,19 @@ if (!admin.apps.length) {
     });
 }
 exports.receiveWhatsAppMessage = onRequest(receiveWhatsAppMessage);
-
+exports.sendWhatsApp = functions.https.onRequest(async (req, res) => {
+    try {
+        await client.messages.create({
+            body: req.body.message,
+            from: `whatsapp:${twilioPhone}`,
+            to: `whatsapp:${req.body.phoneNumber}`
+        });
+        res.status(200).send({ success: true });
+    } catch (error) {
+        console.error('Error sending WhatsApp message:', error);
+        res.status(500).send({ error: 'Failed to send message' });
+    }
+});
 /**
  * Cloud Function to handle Meraki Webhook
  */
@@ -44,3 +56,5 @@ exports.merakiWebhook = onRequest((req, res) => {
             return res.status(500).send('Error storing data.');
         });
 });
+
+
