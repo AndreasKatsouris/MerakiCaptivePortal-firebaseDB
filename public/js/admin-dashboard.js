@@ -602,7 +602,6 @@ async function viewRewardDetails(rewardId) {
  */
 async function handleRewardApproval(rewardId) {
     try {
-        // First fetch reward types
         const rewardTypesSnapshot = await firebase.database().ref('rewardTypes').once('value');
         const rewardTypes = rewardTypesSnapshot.val() || {};
         
@@ -611,7 +610,7 @@ async function handleRewardApproval(rewardId) {
             html: `
                 <div class="form-group mb-3">
                     <label>Select Reward Type</label>
-                    <select id="rewardTypeSelect" class="form-select">
+                    <select id="rewardTypeSelect" class="swal2-select">
                         ${Object.entries(rewardTypes).map(([id, type]) => 
                             `<option value="${id}">${type.name}</option>`
                         ).join('')}
@@ -619,13 +618,18 @@ async function handleRewardApproval(rewardId) {
                 </div>
                 <div class="form-group">
                     <label>Message to Guest</label>
-                    <textarea id="guestMessage" class="form-control" rows="3" 
+                    <textarea id="guestMessage" class="swal2-textarea" 
                         placeholder="Enter message that will be sent to guest"></textarea>
                 </div>
             `,
+            focusConfirm: false,
             showCancelButton: true,
-            confirmButtonColor: '#28a745',
-            confirmButtonText: 'Approve'
+            confirmButtonText: 'Approve',
+            cancelButtonText: 'Cancel',
+            preConfirm: () => ({
+                rewardType: document.getElementById('rewardTypeSelect').value,
+                message: document.getElementById('guestMessage').value
+            })
         });
 
         if (result.isConfirmed) {
