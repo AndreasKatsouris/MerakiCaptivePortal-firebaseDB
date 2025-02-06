@@ -93,37 +93,11 @@ const handlePlacesError = (status) => {
 
 const getConfig = async () => {
     try {
-        // Wait for Firebase to be initialized
-        if (!firebase?.apps?.length) {
-            console.log('Waiting for Firebase initialization...');
-            await new Promise(resolve => {
-                const checkInit = () => {
-                    if (firebase?.apps?.length) {
-                        resolve();
-                    } else {
-                        setTimeout(checkInit, 100);
-                    }
-                };
-                checkInit();
-            });
-        }
-
-        console.log('Firebase ready, getting Remote Config...');
-        const remoteConfig = firebase.remoteConfig();
-        await remoteConfig.ensureInitialized();
-        await remoteConfig.fetchAndActivate();
-
-        const apiKey = remoteConfig.getString('GOOGLE_PLACES_API_KEY');
-        const placeId = remoteConfig.getString('GOOGLE_PLACE_ID');
-
-        // Debug logging
-        console.log('Config values loaded:', {
-            apiKeyExists: !!apiKey,
-            placeIdExists: !!placeId
-        });
+        const apiKey = process.env.GOOGLE_PLACES_API_KEY;
+        const placeId = process.env.GOOGLE_PLACE_ID;
 
         if (!apiKey || !placeId) {
-            throw new Error('Required configuration values are missing');
+            throw new Error('Required environment variables GOOGLE_PLACES_API_KEY and GOOGLE_PLACE_ID are missing');
         }
 
         return {
