@@ -1,5 +1,5 @@
 // Google Reviews Management Module
-require('dotenv').config();
+//require('dotenv').config();
 import { getConfig, REQUIRED_FIELDS } from './googleAPIclient.js';
 
 const googleReviewsManager = {
