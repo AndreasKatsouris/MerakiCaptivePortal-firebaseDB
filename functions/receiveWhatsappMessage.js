@@ -5,6 +5,12 @@ const { processReceipt } = require('./receiptProcessor');
 const { matchReceiptToCampaign } = require('./guardRail');
 const { processReward } = require('./rewardsProcessor');
 const { processMessage } = require('./menuLogic');
+const { 
+    checkConsent, 
+    handleConsentFlow, 
+    isConsentMessage, 
+    requiresConsent 
+} = require('./consent/consent-handler');
 
 // Initialize Firebase Admin if not already initialized
 if (!admin.apps.length) {
@@ -52,12 +58,39 @@ async function receiveWhatsAppMessage(req, res) {
         if (!guestData.name) {
             return await handleNameCollection(guestData, Body, MediaUrl0, res);
         }
+        //=============================================================
+        // Check consent status
+        const consentStatus = await checkConsent(guestData);     
+        // Handle consent flow if needed
+        if (consentStatus.requiresConsent || isConsentMessage(Body)) {
+            const consentResult = await handleConsentFlow(guestData, Body);
+            if (consentResult.shouldMessage) {
+                await sendWhatsAppMessage(phoneNumber, consentResult.message);
+            }
+            return res.status(consentResult.success ? 200 : 400)
+                     .send(consentResult.success ? 'Consent handled' : 'Invalid consent response');
+        }           
 
         if (MediaUrl0) {
+            // Check consent for receipt processing
+            if (!consentStatus.hasConsent) {
+                await sendWhatsAppMessage(phoneNumber, 
+                    'To process receipts and earn rewards, we need your consent. ' +
+                    'Reply "consent" to review and accept our privacy policy.'
+                );
+                return res.status(200).send('Consent required');
+            }
             return await handleReceiptProcessing(guestData, MediaUrl0, res);
         }
-
         if (Body) {
+            // Check if command requires consent
+            if (requiresConsent(Body) && !consentStatus.hasConsent) {
+                await sendWhatsAppMessage(phoneNumber, 
+                    'This feature requires your consent. ' +
+                    'Reply "consent" to review our privacy policy and enable all features.'
+                );
+                return res.status(200).send('Consent required for command');
+            }
             return await handleTextCommand(guestData, Body, res);
         }
 

@@ -1,0 +1,187 @@
+const admin = require('firebase-admin');
+
+/**
+ * Check guest's consent status
+ * @param {object} guestData - Guest data
+ * @returns {Promise<object>} Consent status
+ */
+async function checkConsent(guestData) {
+    if (!guestData) return { requiresConsent: true, hasConsent: false };
+
+    // If guest is in consent flow, continue that
+    if (guestData.consentPending) {
+        return {
+            requiresConsent: true,
+            inConsentFlow: true,
+            hasConsent: false
+        };
+    }
+
+    // Check existing consent
+    const consent = guestData.consent || {};
+    const hasValidConsent = consent.status === 'accepted' && 
+                          consent.version === '1.0' && 
+                          consent.timestamp;
+
+    // Check consent age
+    const consentAge = consent.timestamp ? Date.now() - consent.timestamp : Infinity;
+    const requiresRenewal = consentAge > (365 * 24 * 60 * 60 * 1000);
+
+    return {
+        requiresConsent: !hasValidConsent || requiresRenewal,
+        hasConsent: hasValidConsent && !requiresRenewal,
+        requiresRenewal,
+        consentAge
+    };
+}
+
+/**
+ * Start or continue consent flow
+ * @param {object} guestData - Guest data
+ * @param {string} message - Incoming message
+ * @returns {Promise<object>} Flow result
+ */
+async function handleConsentFlow(guestData, message) {
+    const phoneNumber = guestData.phoneNumber;
+
+    // If no pending consent, start the flow
+    if (!guestData.consentPending) {
+        await admin.database().ref(`guests/${phoneNumber}`).update({
+            consentPending: true,
+            lastConsentPrompt: Date.now()
+        });
+
+        return {
+            success: true,
+            shouldMessage: true,
+            message: getConsentMessage()
+        };
+    }
+
+    // Handle consent response
+    return await processConsentResponse(guestData, message);
+}
+
+/**
+ * Process guest's consent response
+ * @param {object} guestData - Guest data
+ * @param {string} message - Guest's response
+ * @returns {Promise<object>} Processing result
+ */
+async function processConsentResponse(guestData, message) {
+    const response = message.toLowerCase().trim();
+    const phoneNumber = guestData.phoneNumber;
+
+    if (response.match(/^(yes|y|agree|accept|ok|okay)$/)) {
+        const consentData = {
+            status: 'accepted',
+            timestamp: Date.now(),
+            version: '1.0',
+            platform: 'whatsapp'
+        };
+
+        const updates = {
+            [`guests/${phoneNumber}/consent`]: consentData,
+            [`guests/${phoneNumber}/consentPending`]: null,
+            [`consent-history/${phoneNumber}/${Date.now()}`]: consentData
+        };
+
+        await admin.database().ref().update(updates);
+
+        return {
+            success: true,
+            shouldMessage: true,
+            message: 'Thank you! You can now earn rewards by sending photos of your receipts. Send "help" to see all available commands.',
+            consentGranted: true
+        };
+
+    } else if (response.match(/^(no|n|disagree|decline|reject)$/)) {
+        await admin.database().ref(`guests/${phoneNumber}`).update({
+            consent: {
+                status: 'declined',
+                timestamp: Date.now(),
+                version: '1.0',
+                platform: 'whatsapp'
+            },
+            consentPending: null
+        });
+
+        return {
+            success: true,
+            shouldMessage: true,
+            message: 'We understand. You can still use basic features, but reward functionality will be limited. You can enable rewards anytime by sending "consent".',
+            consentGranted: false
+        };
+
+    } else {
+        return {
+            success: false,
+            shouldMessage: true,
+            message: 'Please reply with "yes" to accept or "no" to decline data collection for rewards functionality.'
+        };
+    }
+}
+
+/**
+ * Check if a command requires consent
+ * @param {string} command - Command to check
+ * @returns {boolean} Whether command requires consent
+ */
+function requiresConsent(command) {
+    if (!command) return false;
+    
+    const consentRequiredCommands = [
+        'points',
+        'rewards',
+        'balance',
+        'history',
+        'profile'
+    ];
+    
+    return consentRequiredCommands.some(cmd => 
+        command.toLowerCase().includes(cmd)
+    );
+}
+
+/**
+ * Check if message is consent-related
+ * @param {string} message - Message to check
+ * @returns {boolean} Whether message is about consent
+ */
+function isConsentMessage(message) {
+    if (!message) return false;
+    
+    const consentKeywords = ['consent', 'privacy', 'agree', 'accept', 'gdpr'];
+    return consentKeywords.some(keyword => 
+        message.toLowerCase().includes(keyword)
+    );
+}
+
+/**
+ * Get consent request message
+ * @returns {string} Formatted consent message
+ */
+function getConsentMessage() {
+    return `Welcome to our rewards program! To provide you with the best experience, we need your consent to:
+
+• Process your receipts for rewards
+• Send you personalized offers
+• Track your reward redemptions
+• Analyze shopping patterns
+
+Reply:
+• YES - to accept and enable rewards
+• NO - to decline (limited functionality)
+
+You can change your preference anytime by sending "consent".
+View our privacy policy: [privacy-url]`;
+}
+
+module.exports = {
+    checkConsent,
+    handleConsentFlow,
+    processConsentResponse,
+    requiresConsent,
+    isConsentMessage,
+    getConsentMessage
+};
