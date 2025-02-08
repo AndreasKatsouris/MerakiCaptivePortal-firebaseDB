@@ -100,6 +100,14 @@ export const useCampaignStore = defineStore('campaigns', {
           throw new Error(validationResult.errors.join(', '))
         }
 
+            // Validate reward types if present
+            if (campaignData.rewardTypes?.length) {
+              const rewardTypeValidation = await this.validateRewardTypes(campaignData.rewardTypes);
+              if (!rewardTypeValidation.isValid) {
+                  throw new Error(rewardTypeValidation.errors.join(', '));
+              }
+          }
+        
         const campaignRef = firebase.database().ref('campaigns').push()
         
         const campaign = {
@@ -127,6 +135,33 @@ export const useCampaignStore = defineStore('campaigns', {
         this.loading = false
       }
     },
+
+        // Add new validation method
+        async validateRewardTypes(rewardTypes) {
+          const errors = [];
+          
+          for (const reward of rewardTypes) {
+              if (!reward.typeId) {
+                  errors.push('Invalid reward type');
+                  continue;
+              }
+  
+              // Validate criteria
+              if (reward.criteria?.minPurchaseAmount < 0) {
+                  errors.push('Minimum purchase amount cannot be negative');
+              }
+  
+              if (reward.criteria?.maxRewards < 1) {
+                  errors.push('Maximum rewards must be at least 1');
+              }
+          }
+  
+          return {
+              isValid: errors.length === 0,
+              errors
+          };
+      }
+  },
 
     async updateCampaign(campaignId, updateData) {
       this.loading = true

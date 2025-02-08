@@ -19,7 +19,10 @@
                     { value: 4, label: 'Thursday' },
                     { value: 5, label: 'Friday' },
                     { value: 6, label: 'Saturday' }
-                ]
+                ],
+                selectedRewardTypes: [],
+                rewardCriteria: {},
+                availableRewardTypes: []
             }
         },
         template: `
@@ -113,7 +116,41 @@
                     </div>
                 </div>
             </div>
-        `,
+    <!-- Add this section after existing campaign fields in the form -->
+    <div class="form-group" v-if="showRewardTypeSection">
+        <h5>Campaign Rewards</h5>
+        <div class="reward-types-container">
+            <div v-for="type in availableRewardTypes" :key="type.id" class="reward-type-item">
+                <div class="form-check">
+                    <input type="checkbox" 
+                        class="form-check-input" 
+                        :id="'reward-type-' + type.id"
+                        v-model="selectedRewardTypes"
+                        :value="type.id">
+                    <label class="form-check-label" :for="'reward-type-' + type.id">
+                        {{ type.name }}
+                    </label>
+                </div>
+                <div v-if="isRewardTypeSelected(type.id)" class="reward-criteria mt-2">
+                    <div class="form-row">
+                        <div class="col">
+                            <label>Minimum Purchase Amount</label>
+                            <input type="number" 
+                                class="form-control" 
+                                v-model="rewardCriteria[type.id].minPurchaseAmount">
+                        </div>
+                        <div class="col">
+                            <label>Maximum Rewards</label>
+                            <input type="number" 
+                                class="form-control" 
+                                v-model="rewardCriteria[type.id].maxRewards">
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+`,
 
         computed: {
             filteredCampaigns() {
@@ -145,6 +182,24 @@
                     this.loading = false;
                 }
             },
+            async loadRewardTypes() {
+                try {
+                    const snapshot = await firebase.database()
+                        .ref('rewardTypes')
+                        .orderByChild('status')
+                        .equalTo('active')
+                        .once('value');
+                    
+                    this.availableRewardTypes = Object.entries(snapshot.val() || {})
+                        .map(([id, data]) => ({ id, ...data }));
+                } catch (error) {
+                    console.error('Error loading reward types:', error);
+                }
+            },
+        
+            isRewardTypeSelected(typeId) {
+                return this.selectedRewardTypes.includes(typeId);
+            },            
 
             formatDate(date) {
                 if (!date) return 'N/A';
@@ -268,6 +323,42 @@
                                 </div>
                             </div>
                         </div>
+                        <div class="row">
+                            <div class="col">
+                                <h6>Campaign Rewards</h6>
+                                <div id="rewardTypesSection">
+                                    ${this.availableRewardTypes.map(type => `
+                                        <div class="reward-type-item">
+                                            <div class="form-check">
+                                                <input type="checkbox" 
+                                                    class="form-check-input" 
+                                                    id="reward-type-${type.id}"
+                                                    value="${type.id}">
+                                                <label class="form-check-label" for="reward-type-${type.id}">
+                                                    ${type.name}
+                                                </label>
+                                            </div>
+                                            <div class="reward-criteria mt-2" style="display:none;">
+                                                <div class="form-row">
+                                                    <div class="col">
+                                                        <label>Minimum Purchase Amount</label>
+                                                        <input type="number" 
+                                                            class="form-control reward-min-purchase" 
+                                                            data-type-id="${type.id}">
+                                                    </div>
+                                                    <div class="col">
+                                                        <label>Maximum Rewards</label>
+                                                        <input type="number" 
+                                                            class="form-control reward-max-rewards" 
+                                                            data-type-id="${type.id}">
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    `).join('')}
+                                </div>
+                            </div>
+                        </div>
                     `,
                     didOpen: () => {
                         // Add event listener for adding new item rows
@@ -288,6 +379,12 @@
                                 }
                             });
                         });
+                        document.querySelectorAll('#rewardTypesSection input[type="checkbox"]').forEach(checkbox => {
+                            checkbox.addEventListener('change', (e) => {
+                                const criteriaDiv = e.target.closest('.reward-type-item').querySelector('.reward-criteria');
+                                criteriaDiv.style.display = e.target.checked ? 'block' : 'none';
+                            });
+                        });
                     },
                     showCancelButton: true,
                     confirmButtonText: 'Create',
@@ -302,7 +399,20 @@
                             Swal.showValidationMessage('Campaign name and brand name are required');
                             return false;
                         }
-                        
+                        const selectedRewardTypes = [];
+                        document.querySelectorAll('#rewardTypesSection input[type="checkbox"]:checked').forEach(checkbox => {
+                            const typeId = checkbox.value;
+                            const minPurchase = document.querySelector(`.reward-min-purchase[data-type-id="${typeId}"]`)?.value || 0;
+                            const maxRewards = document.querySelector(`.reward-max-rewards[data-type-id="${typeId}"]`)?.value || 0;
+                            
+                            selectedRewardTypes.push({
+                                typeId,
+                                criteria: {
+                                    minPurchaseAmount: parseFloat(minPurchase),
+                                    maxRewards: parseInt(maxRewards)
+                                }
+                            });
+                        });
                         return {
                             name,
                             brandName,
@@ -312,6 +422,7 @@
                             endDate: document.getElementById('endDate').value,
                             requiredItems,
                             activeDays,
+                            rewardTypes: selectedRewardTypes,
                             status: 'active'
                         };
                     }
@@ -350,6 +461,18 @@
                             <p><strong>Minimum Purchase:</strong> R${campaign.minPurchaseAmount || 0}</p>
                             <p><strong>Status:</strong> ${campaign.status}</p>
                             <p><strong>Created:</strong> ${this.formatDate(campaign.createdAt)}</p>
+                            ${campaign.rewardTypes ? `
+                            <div class="mt-3">
+                            <strong>Reward Types:</strong>
+                            <ul>
+                                ${campaign.rewardTypes.map(reward => `
+                                    <li>${this.availableRewardTypes.find(t => t.id === reward.typeId)?.name || 'Unknown Reward'}
+                                        (Min Purchase: R${reward.criteria.minPurchaseAmount}, 
+                                        Max Rewards: ${reward.criteria.maxRewards})</li>
+                                `).join('')}
+                            </ul>
+                            </div>
+                        ` : ''}
                         </div>
                     `,
                     width: '600px'
@@ -471,6 +594,14 @@
                                 }
                             });
                         });
+
+                            // Add reward type checkbox handlers
+                        document.querySelectorAll('#rewardTypesSection input[type="checkbox"]').forEach(checkbox => {
+                            checkbox.addEventListener('change', (e) => {
+                                const criteriaDiv = e.target.closest('.reward-type-item').querySelector('.reward-criteria');
+                                criteriaDiv.style.display = e.target.checked ? 'block' : 'none';
+                            });
+                        });
                     },
                     showCancelButton: true,
                     confirmButtonText: 'Update',
@@ -485,6 +616,21 @@
                             Swal.showValidationMessage('Campaign name and brand name are required');
                             return false;
                         }
+                            // Collect selected reward types and their criteria
+                        const selectedRewardTypes = [];
+                        document.querySelectorAll('#rewardTypesSection input[type="checkbox"]:checked').forEach(checkbox => {
+                            const typeId = checkbox.value;
+                            const minPurchase = document.querySelector(`.reward-min-purchase[data-type-id="${typeId}"]`)?.value || 0;
+                            const maxRewards = document.querySelector(`.reward-max-rewards[data-type-id="${typeId}"]`)?.value || 0;
+                            
+                            selectedRewardTypes.push({
+                                typeId,
+                                criteria: {
+                                    minPurchaseAmount: parseFloat(minPurchase),
+                                    maxRewards: parseInt(maxRewards)
+                                }
+                            });
+                        });
                         
                         return {
                             name,
@@ -495,6 +641,7 @@
                             endDate: document.getElementById('endDate').value,
                             status: document.getElementById('campaignStatus').value,
                             requiredItems,
+                            rewardTypes: selectedRewardTypes,
                             activeDays
                         };
                     }
@@ -540,6 +687,7 @@
 
         mounted() {
             console.log('CampaignManager component mounted');
+            this.loadRewardTypes();
             this.loadCampaigns();
         }
     };

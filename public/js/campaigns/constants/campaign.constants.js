@@ -33,6 +33,16 @@ export const CAMPAIGN_STATUS = {
       min: 0
     }
   }
+  export const REWARD_TYPE_VALIDATION = {
+    MIN_PURCHASE: {
+        min: 0,
+        required: false
+    },
+    MAX_REWARDS: {
+        min: 1,
+        required: false
+    }
+};
   
   export const DEFAULT_CAMPAIGN_SETTINGS = {
     status: CAMPAIGN_STATUS.DRAFT,
@@ -43,5 +53,6 @@ export const CAMPAIGN_STATUS = {
     timeRestrictions: null,
     maxRewardsPerUser: null,
     maxTotalRewards: null,
+    rewardTypes: [],
     requiresReceipt: true
   }
