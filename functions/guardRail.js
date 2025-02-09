@@ -120,6 +120,7 @@ async function validateAgainstCampaign(receiptData, campaign) {
         // Validate basic campaign criteria
         if (!validateBasicCriteria(receiptData, campaign)) {
             result.failureReason = campaign.lastFailureReason;
+            console.log("Basic Criteria failure:" + result);
             return result;
         }
 
@@ -129,6 +130,8 @@ async function validateAgainstCampaign(receiptData, campaign) {
         // Validate campaign date and time criteria
         if (!validateDateTimeCriteria(receiptData, campaign)) {
             result.failureReason = 'Receipt date/time outside campaign window';
+            console.log("Date & Time failure:" + result);
+
             return result;
         }
 
@@ -138,17 +141,22 @@ async function validateAgainstCampaign(receiptData, campaign) {
         const eligibleTypes = await validateRewardTypes(receiptData, campaign);
         if (eligibleTypes.length === 0) {
             result.failureReason = 'No eligible reward types found';
+            console.log("Reward Types failure:" + result);
+
             return result;
         }
 
         result.isValid = true;
         result.eligibleRewardTypes = eligibleTypes;
         result.matchedCriteria.push('reward_types_match');
+        console.log("Results:" + result);
 
         return result;
 
     } catch (error) {
         console.error('Error in validateAgainstCampaign:', error);
+        console.log("validateAgainstCampaign failure:" + result);
+
         result.failureReason = 'Internal validation error';
         return result;
     }
