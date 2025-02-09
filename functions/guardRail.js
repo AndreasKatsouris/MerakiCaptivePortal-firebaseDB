@@ -1,5 +1,5 @@
 const admin = require('firebase-admin');
-const { REWARD_TYPE_VALIDATION } = require('..campaigns/constants/campaign.constants');
+const { REWARD_TYPE_VALIDATION } = require('../campaigns/constants/campaign.constants');
 
 /**
  * Match receipt to campaign with enhanced reward type validation
