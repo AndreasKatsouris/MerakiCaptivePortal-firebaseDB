@@ -153,7 +153,31 @@ async function validateAgainstCampaign(receiptData, campaign) {
         return result;
     }
 }
+/**
+ * Validate if all required items are present in the receipt items
+ * @param {Array} receiptItems - Items from the receipt
+ * @param {Array} requiredItems - Items required by the campaign
+ * @returns {boolean} Whether all required items are present
+ */
+function validateRequiredItems(receiptItems, requiredItems) {
+    // If no required items, consider it valid
+    if (!requiredItems || requiredItems.length === 0) {
+        return true;
+    }
 
+    // Check each required item
+    return requiredItems.every(requiredItem => {
+        // Find a matching item in the receipt
+        const matchedItem = receiptItems.find(receiptItem => 
+            // Case-insensitive name match
+            receiptItem.name.toLowerCase().includes(requiredItem.name.toLowerCase()) &&
+            // Check if quantity meets or exceeds required quantity
+            receiptItem.quantity >= requiredItem.quantity
+        );
+
+        return !!matchedItem;
+    });
+}
 /**
  * Validate basic campaign criteria
  * @private
