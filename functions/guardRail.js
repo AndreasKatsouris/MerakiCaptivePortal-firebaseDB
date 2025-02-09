@@ -307,52 +307,71 @@ function validateBasicCriteria(receiptData, campaign) {
 }
 
 /**
- * Validates date and time criteria for a campaign
- * @function validateDateTimeCriteria
- * @param {Object} receiptData - Receipt data containing date information
- * @param {Object} campaign - Campaign object containing date/time restrictions
- * @returns {boolean} True if date/time criteria are met
+ * Validates campaign date and time criteria
+ * @param {Object} receiptData - Receipt data containing date
+ * @param {Object} campaign - Campaign with start/end dates
+ * @returns {boolean} True if receipt date is within campaign period
  */
 function validateDateTimeCriteria(receiptData, campaign) {
-    const receiptDate = new Date(receiptData.date);
-    const campaignStart = new Date(campaign.startDate);
-    const campaignEnd = new Date(campaign.endDate);
+    try {
+        const [part1, part2, year] = receiptData.date.split('/').map(Number);
+        const campaignStart = new Date(campaign.startDate);
+        const campaignEnd = new Date(campaign.endDate);
+        const currentMonth = new Date().getMonth() + 1; // 1-based month
 
-    console.log('Validating date/time criteria:', {
-        receipt: {
-            date: receiptDate,
-            day: receiptDate.getDay()
-        },
-        campaign: {
-            start: campaignStart,
-            end: campaignEnd,
-            activeDays: campaign.activeDays
+        console.log('Campaign date validation:', {
+            receiptDate: receiptData.date,
+            campaignStart,
+            campaignEnd,
+            currentMonth
+        });
+
+        // Check if parts could be valid months (1-12)
+        const couldBeMonth = part1 >= 1 && part1 <= 12;
+        const part2CouldBeMonth = part2 >= 1 && part2 <= 12;
+
+        // Create receipt date based on current month interpretation
+        let receiptDate;
+        if (currentMonth === part1 && couldBeMonth) {
+            // Interpret as MM/DD/YYYY
+            receiptDate = new Date(year, part1 - 1, part2);
+            console.log('Interpreting as MM/DD/YYYY:', receiptDate);
+        } else if (currentMonth === part2 && part2CouldBeMonth) {
+            // Interpret as DD/MM/YYYY
+            receiptDate = new Date(year, part2 - 1, part1);
+            console.log('Interpreting as DD/MM/YYYY:', receiptDate);
+        } else {
+            console.log('Could not determine date format:', {
+                interpretedAsMMDD: { month: part1, day: part2 },
+                interpretedAsDDMM: { month: part2, day: part1 },
+                currentMonth
+            });
+            return false;
         }
-    });
 
-    // Check campaign period
-    if (receiptDate < campaignStart || receiptDate > campaignEnd) {
-        console.log('Date range validation failed:', {
+        // Check if receipt date falls within campaign period
+        const isWithinPeriod = receiptDate >= campaignStart && receiptDate <= campaignEnd;
+        
+        console.log('Campaign period check:', {
             receiptDate,
             campaignStart,
-            campaignEnd
+            campaignEnd,
+            isWithinPeriod
+        });
+
+        return isWithinPeriod;
+
+    } catch (error) {
+        console.error('Campaign date validation error:', {
+            error: error.message,
+            receiptDate: receiptData.date,
+            campaign: {
+                startDate: campaign.startDate,
+                endDate: campaign.endDate
+            }
         });
         return false;
     }
-
-    // Check active days
-    const receiptDay = receiptDate.getDay();
-    if (campaign.activeDays?.length > 0 && 
-        !campaign.activeDays.includes(receiptDay)) {
-        console.log('Active days validation failed:', {
-            receiptDay,
-            activeDays: campaign.activeDays
-        });
-        return false;
-    }
-
-    console.log('Date/time criteria validation passed');
-    return true;
 }
 
 /**
@@ -552,7 +571,7 @@ async function validateMaximumRewards(criteria, receiptData, rewardType) {
 }
 
 /**
- * Gets the count of specific reward type for a user
+  * Gets the count of specific reward type for a user
  * @async
  * @function getUserRewardTypeCount
  * @param {string} phoneNumber - User's phone number
