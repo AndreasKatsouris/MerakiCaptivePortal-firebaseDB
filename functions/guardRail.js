@@ -210,10 +210,6 @@ async function validateRewardTypes(receiptData, campaign) {
  * Validate specific reward type criteria
  * @private
  */
-/**
- * Validate specific reward type criteria
- * @private
- */
 async function validateRewardTypeCriteria(receiptData, rewardType) {
     const { criteria } = rewardType;
 

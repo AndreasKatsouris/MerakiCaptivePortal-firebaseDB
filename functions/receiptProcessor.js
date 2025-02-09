@@ -362,10 +362,17 @@ function extractReceiptDetails(fullText) {
     details.invoiceNumber = invoiceMatch ? invoiceMatch[1] : null;
 
     // Extract date and time
-    const dateMatch = fullText.match(/(\d{2}\/\d{2}\/\d{4})/);
-    const timeMatch = fullText.match(/TIME\s*:\s*(.+?)(?:\n|$)/i);
-    details.date = dateMatch ? dateMatch[1] : null;
-    details.time = timeMatch ? timeMatch[1].trim() : null;
+    const dateMatch = fullText.match(/DATE\s*:?\s*(\d{2}\/\d{2}\/\d{4}|\d{4}\/\d{2}\/\d{2})/i);
+    details.date = dateMatch ? dateMatch[1] : null;    
+    // Precise time extraction - only when explicitly labeled as "TIME"
+    const timeMatch = fullText.match(/TIME\s*:\s*(\d{2}:\d{2})\s*(?:TO\s*(\d{2}:\d{2}))?/i);
+    if (timeMatch) {
+        details.time = timeMatch[1]; // Start time
+        if (timeMatch[2]) {
+            details.endTime = timeMatch[2]; // Optional end time
+        }
+    }
+    //details.time = timeMatch ? timeMatch[1].trim() : null;
 
     // Extract waiter and table info
     const waiterMatch = fullText.match(/WAITER:?\s*(.+?)(?:\(|\n|$)/i);
