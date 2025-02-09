@@ -1,4 +1,4 @@
-import { REWARD_TYPE_VALIDATION } from './constants/campaign.constants.js';
+const { REWARD_TYPE_VALIDATION } = require('./constants/campaign.constants');
 const admin = require('firebase-admin');
 
 /**

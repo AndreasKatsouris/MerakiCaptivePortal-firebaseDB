@@ -1,4 +1,4 @@
-export const REWARD_TYPE_VALIDATION = {
+const REWARD_TYPE_VALIDATION = {
     MIN_PURCHASE: {
         min: 0,
         required: false
@@ -26,4 +26,8 @@ export const REWARD_TYPE_VALIDATION = {
         required: false,
         format: 'HH:mm'
     }
+};
+
+module.exports = {
+    REWARD_TYPE_VALIDATION
 }; 
