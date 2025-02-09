@@ -1,5 +1,5 @@
 const admin = require('firebase-admin');
-const { REWARD_TYPE_VALIDATION } = require('./constants/campaign.constants');
+const { REWARD_TYPE_VALIDATION } = require('.campaigns/constants/campaign.constants');
 
 /**
  * Match receipt to campaign with enhanced reward type validation
@@ -210,44 +210,29 @@ async function validateRewardTypes(receiptData, campaign) {
  * Validate specific reward type criteria
  * @private
  */
+/**
+ * Validate specific reward type criteria
+ * @private
+ */
 async function validateRewardTypeCriteria(receiptData, rewardType) {
     const { criteria } = rewardType;
 
     // Check minimum purchase amount
-    if (criteria.minPurchaseAmount !== undefined && 
-        criteria.minPurchaseAmount > receiptData.totalAmount) {
-        return false;
-    }
-
-    // Check store restrictions
-    if (criteria.storeRestrictions?.length > 0 && 
-        !criteria.storeRestrictions.includes(receiptData.storeName)) {
-        return false;
-    }
-
-    // Check required items
-    if (criteria.requiredItems?.length > 0 && 
-        !validateRequiredItems(receiptData.items, criteria.requiredItems)) {
-        return false;
-    }
-
-    // Check time restrictions
-    if (criteria.startTime && criteria.endTime) {
-        const receiptTime = new Date(receiptData.time);
-        const [startHour, startMinute] = criteria.startTime.split(':');
-        const [endHour, endMinute] = criteria.endTime.split(':');
-        
-        if (!isTimeInRange(
-            receiptTime,
-            { hour: parseInt(startHour), minute: parseInt(startMinute) },
-            { hour: parseInt(endHour), minute: parseInt(endMinute) }
-        )) {
+    if (criteria.minPurchaseAmount !== undefined) {
+        if (criteria.minPurchaseAmount < REWARD_TYPE_VALIDATION.MIN_PURCHASE.min) {
+            return false;
+        }
+        if (criteria.minPurchaseAmount > receiptData.totalAmount) {
             return false;
         }
     }
 
-    // Check maximum rewards per user if specified
-    if (criteria.maxRewards !== undefined) {
+    // Check maximum rewards
+    if (criteria.maxRewards !== undefined && criteria.maxRewards !== null) {
+        if (criteria.maxRewards < REWARD_TYPE_VALIDATION.MAX_REWARDS.min) {
+            return false;
+        }
+        
         const currentCount = await getUserRewardTypeCount(
             receiptData.guestPhoneNumber, 
             rewardType.typeId
@@ -255,6 +240,65 @@ async function validateRewardTypeCriteria(receiptData, rewardType) {
         if (currentCount >= criteria.maxRewards) {
             return false;
         }
+    }
+
+    // Check store restrictions
+    if (criteria.storeRestrictions?.length > 0) {
+        if (criteria.storeRestrictions.length < REWARD_TYPE_VALIDATION.STORE_RESTRICTIONS.minStores) {
+            return false;
+        }
+        if (!criteria.storeRestrictions.includes(receiptData.storeName)) {
+            return false;
+        }
+    }
+
+    // Check required items
+    if (criteria.requiredItems?.length > 0) {
+        const hasAllItems = criteria.requiredItems.every(required => {
+            const receiptItem = receiptData.items.find(
+                item => item.name.toLowerCase().includes(required.name.toLowerCase())
+            );
+            return receiptItem && receiptItem.quantity >= required.quantity;
+        });
+        if (!hasAllItems) {
+            return false;
+        }
+    }
+
+    // Check time restrictions
+    if (criteria.startTime || criteria.endTime) {
+        // Validate time format
+        const timeFormat = REWARD_TYPE_VALIDATION.TIME_RESTRICTIONS.format;
+        const timeRegex = timeFormat === 'HH:mm' ? /^([01]?[0-9]|2[0-3]):[0-5][0-9]$/ : null;
+        
+        if (criteria.startTime && !timeRegex.test(criteria.startTime)) {
+            return false;
+        }
+        if (criteria.endTime && !timeRegex.test(criteria.endTime)) {
+            return false;
+        }
+
+        if (criteria.startTime && criteria.endTime) {
+            const receiptTime = new Date(receiptData.time);
+            const [startHour, startMinute] = criteria.startTime.split(':').map(Number);
+            const [endHour, endMinute] = criteria.endTime.split(':').map(Number);
+            
+            if (!isTimeInRange(
+                receiptTime,
+                { hour: startHour, minute: startMinute },
+                { hour: endHour, minute: endMinute }
+            )) {
+                return false;
+            }
+        }
+    }
+
+    // Validate that all criteria fields are recognized
+    const validFields = REWARD_TYPE_VALIDATION.CRITERIA.validFields;
+    const criteriaFields = Object.keys(criteria);
+    const hasInvalidField = criteriaFields.some(field => !validFields.includes(field));
+    if (hasInvalidField) {
+        return false;
     }
 
     return true;
