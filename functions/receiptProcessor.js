@@ -556,33 +556,56 @@ async function testReceiptProcessing(imageUrl, phoneNumber) {
 
 /**
  * Validates if receipt date is within the current month
- * @param {string} receiptDate - Date from receipt (format: DD/MM/YYYY)
+ * @param {string} receiptDate - Date from receipt (format: MM/DD/YYYY or DD/MM/YYYY)
  * @returns {boolean} - True if date is valid and within current month
  */
 function validateReceiptDate(receiptDate) {
     try {
-        // Parse the receipt date (assuming DD/MM/YYYY format)
-        const [day, month, year] = receiptDate.split('/').map(Number);
-        const parsedReceiptDate = new Date(year, month - 1, day); // month is 0-based in JS
-
-        // Get current date
+        const [part1, part2, year] = receiptDate.split('/').map(Number);
         const currentDate = new Date();
-        
-        // Check if receipt is from current month and year
-        const isCurrentMonth = parsedReceiptDate.getMonth() === currentDate.getMonth();
-        const isCurrentYear = parsedReceiptDate.getFullYear() === currentDate.getFullYear();
-        
-        console.log('Date validation:', {
+        const currentMonth = currentDate.getMonth() + 1; // 1-based month
+        const currentYear = currentDate.getFullYear();
+
+        console.log('Date validation input:', {
             receiptDate,
-            parsedReceiptDate,
-            currentDate,
-            isCurrentMonth,
-            isCurrentYear
+            part1,
+            part2,
+            year,
+            currentMonth,
+            currentYear
         });
 
-        return isCurrentMonth && isCurrentYear;
+        // Check if parts could be valid months (1-12)
+        const couldBeMonth = part1 >= 1 && part1 <= 12;
+        const part2CouldBeMonth = part2 >= 1 && part2 <= 12;
+
+        // If current month matches either possible month interpretation,
+        // prioritize that interpretation
+        if (currentMonth === part1 && couldBeMonth) {
+            // Interpret as MM/DD/YYYY
+            console.log('Interpreting as MM/DD/YYYY (current month matches first part)');
+            return year === currentYear;
+        }
+
+        if (currentMonth === part2 && part2CouldBeMonth) {
+            // Interpret as DD/MM/YYYY
+            console.log('Interpreting as DD/MM/YYYY (current month matches second part)');
+            return year === currentYear;
+        }
+
+        // If no interpretation matches current month, reject
+        console.log('Date not in current month:', {
+            interpretedAsMMDD: { month: part1, day: part2 },
+            interpretedAsDDMM: { month: part2, day: part1 },
+            currentMonth
+        });
+        return false;
+
     } catch (error) {
-        console.error('Date validation error:', error);
+        console.error('Date validation error:', {
+            error: error.message,
+            receiptDate
+        });
         return false;
     }
 }
