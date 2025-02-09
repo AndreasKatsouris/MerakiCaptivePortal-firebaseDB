@@ -15,10 +15,10 @@ async function matchReceiptToCampaign(receiptData) {
         });
 
         // Basic receipt validation
-        const validationResult = await validateReceipt(receiptData, receiptData.brandName);
-        if (!validationResult.isValid) {
-            return validationResult;
-        }
+        //const validationResult = await validateReceipt(receiptData, receiptData.brandName);
+        //if (!validationResult.isValid) {
+        //    return validationResult;
+        //}
 
         // Get active campaigns
         const activeCampaigns = await getActiveCampaigns();
