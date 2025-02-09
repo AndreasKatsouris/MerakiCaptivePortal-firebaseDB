@@ -367,54 +367,53 @@ function extractReceiptDetails(fullText) {
             return match;
         }    
 
-    // Extraction strategies in order of preference
-    const extractionStrategies = [
-        // Strategy 1: Integrated date and time in TIME field
-        () => {
-            const timeRegex = /TIME\s*:\s*(\d{2}\/\d{2}\/\d{4})\s*(\d{2}:\d{2})\s*TO\s*(\d{2}:\d{2})/i;
-            const timeMatch = fullText.match(timeRegex);
-            
-            if (timeMatch) {
-                console.log('Integrated Date/Time Strategy Matched');
-                return {
-                    date: timeMatch[1],
-                    time: timeMatch[2],
-                    endTime: timeMatch[3]
-                };
+        const extractionStrategies = [
+            // Strategy 1: Specific Ocean Basket style integrated date and time
+            () => {
+                const timeRegex = /TIME\s*(\d{2}\/\d{2}\/\d{4})\s*(\d{2}:\d{2})\s*TO\s*(\d{2}:\d{2})/i;
+                const timeMatch = fullText.match(timeRegex);
+                
+                if (timeMatch) {
+                    console.log('Pilot Receipt Integrated Date/Time Strategy Matched');
+                    return {
+                        date: timeMatch[1],
+                        time: timeMatch[2],
+                        endTime: timeMatch[3]
+                    };
+                }
+                return null;
+            },
+    
+            // Strategy 2: Separate Date field
+            () => {
+                const dateRegex = /DATE\s*:\s*(\d{2}\/\d{2}\/\d{4})/i;
+                const timeRegex = /TIME\s*:\s*(\d{2}:\d{2})(?:\s*TO\s*(\d{2}:\d{2}))?/i;
+                
+                const dateMatch = fullText.match(dateRegex);
+                const timeMatch = fullText.match(timeRegex);
+                
+                if (dateMatch || timeMatch) {
+                    console.log('Separate Date/Time Strategy Matched');
+                    return {
+                        date: dateMatch ? dateMatch[1] : null,
+                        time: timeMatch ? timeMatch[1] : null,
+                        endTime: timeMatch && timeMatch[2] ? timeMatch[2] : null
+                    };
+                }
+                return null;
             }
-            return null;
-        },
-
-        // Strategy 2: Separate Date field
-        () => {
-            const dateRegex = /DATE\s*:\s*(\d{2}\/\d{2}\/\d{4})/i;
-            const timeRegex = /TIME\s*:\s*(\d{2}:\d{2})(?:\s*TO\s*(\d{2}:\d{2}))?/i;
-            
-            const dateMatch = fullText.match(dateRegex);
-            const timeMatch = fullText.match(timeRegex);
-            
-            if (dateMatch || timeMatch) {
-                console.log('Separate Date/Time Strategy Matched');
-                return {
-                    date: dateMatch ? dateMatch[1] : null,
-                    time: timeMatch ? timeMatch[1] : null,
-                    endTime: timeMatch && timeMatch[2] ? timeMatch[2] : null
-                };
+        ];
+    
+        // Try each extraction strategy
+        for (const strategy of extractionStrategies) {
+            const result = strategy();
+            if (result) {
+                details.date = result.date || details.date;
+                details.time = result.time || details.time;
+                details.endTime = result.endTime || details.endTime;
+                break;
             }
-            return null;
         }
-    ];
-
-    // Try each extraction strategy
-    for (const strategy of extractionStrategies) {
-        const result = strategy();
-        if (result) {
-            details.date = result.date || details.date;
-            details.time = result.time || details.time;
-            details.endTime = result.endTime || details.endTime;
-            break;
-        }
-    }
 
 
     //====================================  END =============================    
