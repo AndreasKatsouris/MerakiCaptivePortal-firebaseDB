@@ -17,8 +17,32 @@
     },
     "rewards": {
       ".indexOn": ["status", "guestPhone", "campaignId"],
-      ".read": true,
-      ".write": true
+        "$rewardId": {
+        ".read": "auth != null && (root.child('guest-rewards').child(auth.token.phone_number).child($rewardId).exists() || auth.token.admin === true)",
+        ".write": "auth != null && auth.token.admin === true",
+        ".validate": "newData.hasChildren(['typeId', 'guestPhone', 'campaignId', 'status', 'createdAt'])",
+        "status": {
+          ".validate": "newData.val().matches(/^(pending|active|used|expired|cancelled)$/)"
+        },
+        "value": {
+          ".validate": "newData.isNumber()"
+        },
+        "expiresAt": {
+          ".validate": "newData.isNumber() && newData.val() > now"
+        }
+      }
+    },
+    "guest-rewards": {
+      "$phoneNumber": {
+        ".read": "auth != null && auth.token.phone_number === $phoneNumber",
+        ".write": "auth != null && auth.token.admin === true"
+      }
+    },
+    "campaign-rewards": {
+      "$campaignId": {
+        ".read": "auth != null && auth.token.admin === true",
+        ".write": "auth != null && auth.token.admin === true"
+      }
     },
     "rewardTypes": {
       ".indexOn": ["status", "category"],
@@ -43,5 +67,6 @@
       }
     }
   }
+
 }
 }

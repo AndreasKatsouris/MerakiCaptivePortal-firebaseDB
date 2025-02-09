@@ -155,14 +155,23 @@ function formatRewardsMessage(rewards) {
         };
     }
 
-    const rewardsList = rewards
-        .map(reward => `- ${reward.campaignName}: ${formatRewardStatus(reward)}`)
+    const activeRewards = rewards.filter(reward => 
+        reward.status === 'active' && 
+        reward.expiresAt > Date.now()
+    );
+
+    const rewardsList = activeRewards
+        .map(reward => formatSingleReward(reward))
         .join('\n');
 
     return {
         success: true,
-        message: `Here are your rewards:\n\n${rewardsList}`
+        message: `Here are your active rewards:\n\n${rewardsList}`
     };
+}
+function formatSingleReward(reward) {
+    const expiryDate = new Date(reward.expiresAt).toLocaleDateString();
+    return `${reward.metadata.description}\nExpires: ${expiryDate}\n`;
 }
 
 /**

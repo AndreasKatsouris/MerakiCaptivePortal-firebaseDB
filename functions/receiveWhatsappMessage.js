@@ -168,7 +168,7 @@ async function handleNameCollection(guestData, body, mediaUrl, res) {
 }
 
 /**
- * Handle receipt processing
+ * Handle receipt processing with enhanced reward type support
  * @param {object} guestData - Guest data
  * @param {string} mediaUrl - Receipt image URL
  * @param {object} res - Response object
@@ -180,7 +180,7 @@ async function handleReceiptProcessing(guestData, mediaUrl, res) {
         // Process receipt image
         const receiptData = await processReceipt(mediaUrl, guestData.phoneNumber);
         
-        // Match receipt to campaign using new guardrail
+        // Match receipt to campaign with enhanced validation
         const matchResult = await matchReceiptToCampaign(receiptData);
 
         if (matchResult.isValid) {
@@ -192,16 +192,16 @@ async function handleReceiptProcessing(guestData, mediaUrl, res) {
         console.error('Receipt processing error:', error);
         await sendWhatsAppMessage(
             guestData.phoneNumber,
-            `Sorry, we encountered an issue processing your receipt: ${error.message}\nPlease try again later.`
+            constructErrorMessage(error)
         );
         return res.status(500).send('Error processing receipt.');
     }
 }
 
 /**
- * Handle successful receipt-campaign match
+ * Handle successful receipt-campaign match with multiple reward types
  * @param {object} guestData - Guest data
- * @param {object} matchResult - Campaign matching result
+ * @param {object} matchResult - Campaign matching result with eligible reward types
  * @param {object} receiptData - Processed receipt data
  * @param {object} res - Response object
  */
@@ -210,19 +210,28 @@ async function handleSuccessfulMatch(guestData, matchResult, receiptData, res) {
         console.log('Processing successful match:', {
             guest: guestData.phoneNumber,
             campaign: matchResult.campaign.name,
-            criteria: matchResult.matchedCriteria
+            eligibleRewardTypes: matchResult.eligibleRewardTypes.length
         });
 
-        await processReward(guestData, matchResult.campaign, receiptData);
+        // Process rewards for all eligible types
+        const rewardResult = await processReward(
+            guestData, 
+            {
+                ...matchResult.campaign,
+                rewardTypes: matchResult.eligibleRewardTypes
+            }, 
+            receiptData
+        );
         
+        // Send success message with reward details
         await sendWhatsAppMessage(
             guestData.phoneNumber,
-            `Congratulations ${guestData.name}! Your receipt for ${matchResult.campaign.brandName} has been validated. Your reward will be processed shortly.`
+            constructSuccessMessage(guestData.name, matchResult, rewardResult)
         );
 
-        return res.status(200).send('Receipt validated and reward processed.');
+        return res.status(200).send('Receipt validated and rewards processed.');
     } catch (error) {
-        console.error('Error processing reward:', error);
+        console.error('Error processing rewards:', error);
         throw error;
     }
 }
@@ -230,7 +239,7 @@ async function handleSuccessfulMatch(guestData, matchResult, receiptData, res) {
 /**
  * Handle failed receipt-campaign match
  * @param {object} guestData - Guest data
- * @param {object} matchResult - Campaign matching result
+ * @param {object} matchResult - Failed matching result
  * @param {object} receiptData - Processed receipt data
  * @param {object} res - Response object
  */
@@ -242,61 +251,417 @@ async function handleFailedMatch(guestData, matchResult, receiptData, res) {
 }
 
 /**
- * Construct failure message based on validation results
+ * Construct success message for multiple rewards
+ * @private
+ */
+function constructSuccessMessage(guestName, matchResult, rewardResult) {
+    const rewardsList = rewardResult.rewards
+        .map(reward => {
+            const expiryDate = new Date(reward.expiresAt).toLocaleDateString();
+            return `• ${reward.metadata.description}\n  Expires: ${expiryDate}`;
+        })
+        .join('\n');
+
+    return `Congratulations ${guestName}! 🎉\n\n` +
+           `Your receipt from ${matchResult.campaign.brandName} has earned you:\n\n` +
+           `${rewardsList}\n\n` +
+           `Reply "view rewards" anytime to check your rewards!`;
+}
+
+/**
+ * Construct detailed failure message based on validation results
  * @param {string} guestName - Guest's name
  * @param {object} matchResult - Campaign matching result
  * @param {object} receiptData - Processed receipt data
  * @returns {string} Formatted failure message
  */
 function constructFailureMessage(guestName, matchResult, receiptData) {
-    let message = `Sorry ${guestName}, we couldn't validate your receipt.`;
-
+    // Handle case where no campaigns are active
     if (matchResult.error === 'No active campaigns found') {
-        return `Sorry ${guestName}, there are no active campaigns at the moment.`;
+        return `Sorry ${guestName}, there are no active campaigns at the moment. Please try again later!`;
     }
 
-    const missingDetails = [];
-    
-    // Check receipt data completeness
-    if (!receiptData.brandName || receiptData.brandName === 'Unknown Brand') {
-        missingDetails.push("- The brand/restaurant name isn't clearly visible");
-    }
-    if (!receiptData.storeName || receiptData.storeName === 'Unknown Location') {
-        missingDetails.push("- The store location isn't visible");
-    }
-    if (!receiptData.date) {
-        missingDetails.push("- The receipt date isn't visible");
-    }
-    if (!receiptData.totalAmount || receiptData.totalAmount === 0) {
-        missingDetails.push("- The total amount isn't clear");
-    }
-    if (!receiptData.items || receiptData.items.length === 0) {
-        missingDetails.push("- The list of purchased items isn't visible");
+    // Handle case where brand has no active campaigns
+    if (matchResult.error === `No active campaigns found for ${receiptData.brandName}`) {
+        return `Sorry ${guestName}, there are currently no active campaigns for ${receiptData.brandName}. Please check our other participating brands!`;
     }
 
-    if (missingDetails.length > 0) {
-        message += "\n\nThe following details are missing or unclear:\n" + missingDetails.join("\n");
-        message += "\n\nPlease send a new photo making sure all these details are clearly visible.";
-    } else if (matchResult.failedCriteria) {
-        message += "\n\nCampaign requirements not met:\n" + 
-                  matchResult.failedCriteria.map(c => `- ${c.reason}`).join("\n");
-    } else {
-        message += "\n\n" + matchResult.error;
+    let message = `Sorry ${guestName}, we couldn't validate your receipt.`;
+    const issues = [];
+
+    // Check receipt data quality issues
+    const dataIssues = checkReceiptDataIssues(receiptData);
+    if (dataIssues.length > 0) {
+        issues.push('\nReceipt clarity issues:', ...dataIssues);
+    }
+
+    // Check campaign criteria issues
+    if (matchResult.failedCriteria?.length > 0) {
+        issues.push('\nCampaign requirements not met:', 
+            ...matchResult.failedCriteria.map(c => `• ${formatCriteriaFailure(c)}`)
+        );
+    }
+
+    // Check reward type eligibility issues
+    if (matchResult.rewardTypeIssues?.length > 0) {
+        issues.push('\nReward eligibility issues:', 
+            ...matchResult.rewardTypeIssues.map(issue => `• ${formatRewardTypeIssue(issue)}`)
+        );
+    }
+
+    // Add resolution steps
+    let resolutionSteps = [];
+    if (dataIssues.length > 0) {
+        resolutionSteps.push(
+            '\nTo ensure your receipt can be processed:',
+            '• Take the photo in good lighting',
+            '• Make sure the receipt is flat and not folded',
+            '• Include the entire receipt in the photo',
+            '• Ensure all text is clearly visible'
+        );
+    }
+
+    if (matchResult.failedCriteria?.length > 0) {
+        resolutionSteps.push(
+            '\nTo meet campaign requirements:',
+            ...getCampaignRequirementTips(matchResult.failedCriteria)
+        );
+    }
+
+    // Construct final message
+    if (issues.length > 0) {
+        message += '\n' + issues.join('\n');
+    }
+    if (resolutionSteps.length > 0) {
+        message += '\n' + resolutionSteps.join('\n');
     }
 
     return message;
 }
 
 /**
- * Handle text commands
+ * Check receipt data for quality issues
+ * @private
+ */
+function checkReceiptDataIssues(receiptData) {
+    const issues = [];
+
+    if (!receiptData.brandName || receiptData.brandName === 'Unknown Brand') {
+        issues.push("• The brand/restaurant name isn't clearly visible");
+    }
+    if (!receiptData.storeName || receiptData.storeName === 'Unknown Location') {
+        issues.push("• The store location isn't visible");
+    }
+    if (!receiptData.date) {
+        issues.push("• The receipt date isn't visible");
+    }
+    if (!receiptData.time) {
+        issues.push("• The receipt time isn't visible");
+    }
+    if (!receiptData.totalAmount || receiptData.totalAmount === 0) {
+        issues.push("• The total amount isn't clear");
+    }
+    if (!receiptData.items || receiptData.items.length === 0) {
+        issues.push("• The list of purchased items isn't readable");
+    }
+    if (!receiptData.invoiceNumber) {
+        issues.push("• The receipt/invoice number isn't visible");
+    }
+
+    return issues;
+}
+
+/**
+ * Format campaign criteria failure message
+ * @private
+ */
+function formatCriteriaFailure(criteria) {
+    const commonReasons = {
+        minimum_amount: 'Purchase amount does not meet the minimum requirement',
+        time_window: 'Receipt is outside the valid time window',
+        store_match: 'Receipt is not from a participating store',
+        required_items: 'Required items are missing from the purchase',
+        campaign_period: 'Receipt date is outside the campaign period',
+        active_days: 'Purchase was not made on an eligible day'
+    };
+
+    return commonReasons[criteria.reason] || criteria.reason;
+}
+
+/**
+ * Format reward type eligibility issue
+ * @private
+ */
+function formatRewardTypeIssue(issue) {
+    const issueMessages = {
+        min_purchase: `Minimum purchase amount of R${issue.required} not met (receipt total: R${issue.actual})`,
+        max_rewards: 'Maximum number of rewards already claimed',
+        time_restriction: 'Purchase time outside eligible hours',
+        store_restriction: 'Store not eligible for this reward type',
+        required_items: 'Required items for this reward not found'
+    };
+
+    return issueMessages[issue.type] || issue.message;
+}
+
+/**
+ * Get tips for meeting campaign requirements
+ * @private
+ */
+function getCampaignRequirementTips(failedCriteria) {
+    const tips = [];
+
+    failedCriteria.forEach(criteria => {
+        switch (criteria.reason) {
+            case 'minimum_amount':
+                tips.push(`• Ensure your purchase meets the minimum amount (R${criteria.required})`);
+                break;
+            case 'time_window':
+                tips.push(`• Visit during campaign hours: ${criteria.validHours}`);
+                break;
+            case 'required_items':
+                tips.push(`• Include the required items in your purchase: ${criteria.items.join(', ')}`);
+                break;
+            case 'active_days':
+                tips.push(`• Visit on eligible days: ${criteria.validDays.join(', ')}`);
+                break;
+        }
+    });
+
+    if (tips.length === 0) {
+        tips.push('• Check campaign details for specific requirements');
+    }
+
+    return tips;
+}
+
+/**
+ * Construct error message based on error type
+ * @private
+ */
+function constructErrorMessage(error) {
+    // Network or system errors
+    if (error.code === 'ECONNREFUSED' || error.code === 'ETIMEDOUT') {
+        return 'Sorry, we\'re having trouble connecting to our servers. Please try again in a few minutes.';
+    }
+
+    // Receipt processing errors
+    if (error.message.includes('OCR') || error.message.includes('image')) {
+        return `We couldn't read your receipt clearly. Please ensure:\n\n` +
+               `• Good lighting with no glare\n` +
+               `• Receipt is flat and not folded\n` +
+               `• The entire receipt is visible\n` +
+               `• All text is clear and readable`;
+    }
+
+    // Campaign validation errors
+    if (error.message.includes('campaign') || error.message.includes('reward')) {
+        return `Sorry, we encountered an issue validating your receipt. Please try again, and if the problem persists, contact support.`;
+    }
+
+    // Default error message
+    return 'Sorry, something went wrong. Please try again later.';
+}
+
+/**
+ * Handle text commands with enhanced reward support
  * @param {object} guestData - Guest data
  * @param {string} body - Message body
  * @param {object} res - Response object
  */
 async function handleTextCommand(guestData, body, res) {
+    const normalizedCommand = body.toLowerCase().trim();
+
+    // Enhanced reward-specific commands
+    if (normalizedCommand.startsWith('use reward')) {
+        return await handleUseRewardCommand(guestData, body, res);
+    }
+
+    if (normalizedCommand === 'view rewards' || normalizedCommand === 'my rewards') {
+        return await handleViewRewardsCommand(guestData, res);
+    }
+
+    // Default command processing
     const result = await processMessage(body, guestData.phoneNumber);
     await sendWhatsAppMessage(guestData.phoneNumber, result.message);
     return res.status(result.success ? 200 : 400).send(result.message);
+}
+
+/**
+ * Handle the "use reward" command
+ * @private
+ */
+async function handleUseRewardCommand(guestData, body, res) {
+    try {
+        // Extract reward ID from command (e.g., "use reward ABC123")
+        const rewardId = body.split(' ')[2];
+        if (!rewardId) {
+            await sendWhatsAppMessage(
+                guestData.phoneNumber,
+                'Please specify which reward you want to use (e.g., "use reward ABC123").'
+            );
+            return res.status(400).send('Invalid reward usage command');
+        }
+
+        // Verify reward ownership and status
+        const rewardRef = admin.database().ref(`rewards/${rewardId}`);
+        const snapshot = await rewardRef.once('value');
+        const reward = snapshot.val();
+
+        if (!reward || reward.guestPhone !== guestData.phoneNumber) {
+            await sendWhatsAppMessage(
+                guestData.phoneNumber,
+                'Sorry, we couldn\'t find that reward. Please check the reward ID and try again.'
+            );
+            return res.status(404).send('Reward not found');
+        }
+
+        if (reward.status !== 'active') {
+            await sendWhatsAppMessage(
+                guestData.phoneNumber,
+                `This reward cannot be used because it is ${reward.status}.`
+            );
+            return res.status(400).send('Invalid reward status');
+        }
+
+        if (reward.expiresAt < Date.now()) {
+            await sendWhatsAppMessage(
+                guestData.phoneNumber,
+                'Sorry, this reward has expired.'
+            );
+            return res.status(400).send('Reward expired');
+        }
+
+        // Generate use code and update reward status
+        const useCode = generateRewardUseCode();
+        await rewardRef.update({
+            status: 'pending_use',
+            useCode,
+            useRequestedAt: admin.database.ServerValue.TIMESTAMP
+        });
+
+        // Send use instructions
+        const message = formatRewardUseInstructions(reward, useCode);
+        await sendWhatsAppMessage(guestData.phoneNumber, message);
+        
+        return res.status(200).send('Reward use code generated');
+
+    } catch (error) {
+        console.error('Error handling reward use command:', error);
+        await sendWhatsAppMessage(
+            guestData.phoneNumber,
+            'Sorry, we encountered an error processing your reward. Please try again later.'
+        );
+        return res.status(500).send('Error processing reward use');
+    }
+}
+
+/**
+ * Handle the "view rewards" command
+ * @private
+ */
+async function handleViewRewardsCommand(guestData, res) {
+    try {
+        // Get user's rewards
+        const snapshot = await admin.database()
+            .ref('rewards')
+            .orderByChild('guestPhone')
+            .equalTo(guestData.phoneNumber)
+            .once('value');
+
+        const rewards = snapshot.val() || {};
+        
+        // Group rewards by status
+        const groupedRewards = {
+            active: [],
+            pending: [],
+            used: [],
+            expired: []
+        };
+
+        Object.entries(rewards).forEach(([id, reward]) => {
+            if (reward.expiresAt < Date.now() && reward.status === 'active') {
+                reward.status = 'expired';
+            }
+            groupedRewards[reward.status] = groupedRewards[reward.status] || [];
+            groupedRewards[reward.status].push({ id, ...reward });
+        });
+
+        // Format and send rewards message
+        const message = formatRewardsOverview(groupedRewards);
+        await sendWhatsAppMessage(guestData.phoneNumber, message);
+        
+        return res.status(200).send('Rewards overview sent');
+
+    } catch (error) {
+        console.error('Error handling view rewards command:', error);
+        await sendWhatsAppMessage(
+            guestData.phoneNumber,
+            'Sorry, we encountered an error retrieving your rewards. Please try again later.'
+        );
+        return res.status(500).send('Error retrieving rewards');
+    }
+}
+
+/**
+ * Format reward use instructions
+ * @private
+ */
+function formatRewardUseInstructions(reward, useCode) {
+    return `*Ready to use your reward!* 🎉\n\n` +
+           `${reward.metadata.description}\n\n` +
+           `Show this code to the staff: *${useCode}*\n\n` +
+           `This code will be valid for the next 15 minutes.\n` +
+           `Reply "view rewards" to see all your rewards.`;
+}
+
+/**
+ * Format rewards overview message
+ * @private
+ */
+function formatRewardsOverview(groupedRewards) {
+    const sections = [];
+
+    if (groupedRewards.active?.length > 0) {
+        const activeRewards = groupedRewards.active
+            .map(reward => formatSingleReward(reward))
+            .join('\n\n');
+        sections.push(`*Active Rewards:*\n${activeRewards}`);
+    }
+
+    if (groupedRewards.pending?.length > 0) {
+        const pendingRewards = groupedRewards.pending
+            .map(reward => `• ${reward.metadata.description} (Processing)`)
+            .join('\n');
+        sections.push(`*Pending Rewards:*\n${pendingRewards}`);
+    }
+
+    if (sections.length === 0) {
+        return `You don't have any active rewards yet.\n\n` +
+               `Send us a receipt from your next purchase to earn rewards!`;
+    }
+
+    return sections.join('\n\n') + '\n\n' +
+           `To use a reward, reply with "use reward" followed by the reward ID.`;
+}
+
+/**
+ * Format single reward details
+ * @private
+ */
+function formatSingleReward(reward) {
+    const expiryDate = new Date(reward.expiresAt).toLocaleDateString();
+    return `• ${reward.metadata.description}\n` +
+           `  ID: ${reward.id}\n` +
+           `  Expires: ${expiryDate}`;
+}
+
+/**
+ * Generate random reward use code
+ * @private
+ */
+function generateRewardUseCode() {
+    return Math.random().toString(36).substring(2, 8).toUpperCase();
 }
 
 /**
@@ -363,4 +728,10 @@ function getHelpMessage() {
 • "Help" to see this menu again`;
 }
 
-module.exports = { receiveWhatsAppMessage,sendWhatsAppNotification };
+module.exports = {
+    receiveWhatsAppMessage,
+    handleReceiptProcessing,
+    handleTextCommand,
+    constructFailureMessage,
+    sendWhatsAppMessage
+};

@@ -1,4 +1,4 @@
-import { CAMPAIGN_STATUS, VALIDATION_RULES } from '../constants/campaign.constants'
+import { CAMPAIGN_STATUS, VALIDATION_RULES, REWARD_TYPE_VALIDATION } from '../constants/campaign.constants'
 
 export function validateCampaign(campaign) {
   const errors = []
@@ -37,6 +37,61 @@ export function validateCampaign(campaign) {
   // Validate minimum purchase amount if set
   if (campaign.minPurchaseAmount !== null && campaign.minPurchaseAmount < 0) {
     errors.push('Minimum purchase amount cannot be negative')
+  }
+
+  // Validate reward types if present
+  if (campaign.rewardTypes?.length > 0) {
+    // Check for duplicate reward types
+    const seenTypes = new Set()
+    campaign.rewardTypes.forEach((reward, index) => {
+      if (seenTypes.has(reward.typeId)) {
+        errors.push(`Duplicate reward type found at index ${index}`)
+        return
+      }
+      seenTypes.add(reward.typeId)
+
+      // Validate reward criteria
+      if (!reward.criteria) {
+        errors.push(`Reward type at index ${index} must have criteria`)
+        return
+      }
+
+      // Validate minimum purchase amount
+      if (reward.criteria.minPurchaseAmount !== undefined) {
+        if (reward.criteria.minPurchaseAmount < REWARD_TYPE_VALIDATION.MIN_PURCHASE.min) {
+          errors.push(`Reward type ${index}: Minimum purchase amount cannot be negative`)
+        }
+      }
+
+      // Validate maximum rewards
+      if (reward.criteria.maxRewards !== undefined && reward.criteria.maxRewards !== null) {
+        if (reward.criteria.maxRewards < REWARD_TYPE_VALIDATION.MAX_REWARDS.min) {
+          errors.push(`Reward type ${index}: Maximum rewards must be at least ${REWARD_TYPE_VALIDATION.MAX_REWARDS.min}`)
+        }
+      }
+
+      // Validate time restrictions if present
+      if (reward.criteria.startTime || reward.criteria.endTime) {
+        const timeFormat = /^([01]?[0-9]|2[0-3]):[0-5][0-9]$/
+        
+        if (reward.criteria.startTime && !timeFormat.test(reward.criteria.startTime)) {
+          errors.push(`Reward type ${index}: Invalid start time format. Use HH:mm`)
+        }
+        
+        if (reward.criteria.endTime && !timeFormat.test(reward.criteria.endTime)) {
+          errors.push(`Reward type ${index}: Invalid end time format. Use HH:mm`)
+        }
+
+        if (reward.criteria.startTime && reward.criteria.endTime) {
+          const [startHour, startMinute] = reward.criteria.startTime.split(':').map(Number)
+          const [endHour, endMinute] = reward.criteria.endTime.split(':').map(Number)
+          
+          if (startHour > endHour || (startHour === endHour && startMinute >= endMinute)) {
+            errors.push(`Reward type ${index}: End time must be after start time`)
+          }
+        }
+      }
+    })
   }
 
   return {
