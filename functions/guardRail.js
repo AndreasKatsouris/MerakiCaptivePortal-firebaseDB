@@ -1,6 +1,34 @@
 const { REWARD_TYPE_VALIDATION } = require('./constants/campaign.constants');
 const admin = require('firebase-admin');
+/**
+ * Retrieve active campaigns from Firebase
+ * @returns {Promise<Array>} List of active campaigns
+ */
+async function getActiveCampaigns() {
+    try {
+        const snapshot = await admin.database()
+            .ref('campaigns')
+            .orderByChild('status')
+            .equalTo('active')
+            .once('value');
+        
+        const campaigns = snapshot.val();
+        
+        if (!campaigns) {
+            console.log('No active campaigns found');
+            return [];
+        }
 
+        // Convert to array and add the key as the campaign ID
+        return Object.entries(campaigns).map(([id, campaign]) => ({
+            id,
+            ...campaign
+        }));
+    } catch (error) {
+        console.error('Error fetching active campaigns:', error);
+        return [];
+    }
+}
 /**
  * Match receipt to campaign with enhanced reward type validation
  * @param {object} receiptData - Processed receipt data
@@ -329,5 +357,6 @@ function isTimeInRange(time, start, end) {
 
 module.exports = {
     matchReceiptToCampaign,
-    validateAgainstCampaign
+    validateAgainstCampaign,
+    getActiveCampaigns
 };
