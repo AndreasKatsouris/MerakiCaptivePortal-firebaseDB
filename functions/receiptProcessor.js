@@ -355,24 +355,76 @@ function debugWhitespace(str) {
 function extractReceiptDetails(fullText) {
     const details = {};
 
+    //====================================  DATE & TIME  =============================
+    console.log('=== RECEIPT DETAILS EXTRACTION ===');
+    console.log('Full Receipt Text (START):\n', fullText);
+    console.log('Full Receipt Text Length:', fullText.length);
+        // Logging helper function
+        function logMatch(name, regex, text) {
+            const match = text.match(regex);
+            console.log(`${name} Regex:`, regex);
+            console.log(`${name} Match:`, match);
+            return match;
+        }    
+
+    // Extraction strategies in order of preference
+    const extractionStrategies = [
+        // Strategy 1: Integrated date and time in TIME field
+        () => {
+            const timeRegex = /TIME\s*:\s*(\d{2}\/\d{2}\/\d{4})\s*(\d{2}:\d{2})\s*TO\s*(\d{2}:\d{2})/i;
+            const timeMatch = fullText.match(timeRegex);
+            
+            if (timeMatch) {
+                console.log('Integrated Date/Time Strategy Matched');
+                return {
+                    date: timeMatch[1],
+                    time: timeMatch[2],
+                    endTime: timeMatch[3]
+                };
+            }
+            return null;
+        },
+
+        // Strategy 2: Separate Date field
+        () => {
+            const dateRegex = /DATE\s*:\s*(\d{2}\/\d{2}\/\d{4})/i;
+            const timeRegex = /TIME\s*:\s*(\d{2}:\d{2})(?:\s*TO\s*(\d{2}:\d{2}))?/i;
+            
+            const dateMatch = fullText.match(dateRegex);
+            const timeMatch = fullText.match(timeRegex);
+            
+            if (dateMatch || timeMatch) {
+                console.log('Separate Date/Time Strategy Matched');
+                return {
+                    date: dateMatch ? dateMatch[1] : null,
+                    time: timeMatch ? timeMatch[1] : null,
+                    endTime: timeMatch && timeMatch[2] ? timeMatch[2] : null
+                };
+            }
+            return null;
+        }
+    ];
+
+    // Try each extraction strategy
+    for (const strategy of extractionStrategies) {
+        const result = strategy();
+        if (result) {
+            details.date = result.date || details.date;
+            details.time = result.time || details.time;
+            details.endTime = result.endTime || details.endTime;
+            break;
+        }
+    }
+
+
+    //====================================  END =============================    
     // Extract invoice number
     const invoiceMatch = fullText.match(/(?:PRO-FORMA\s+)?INVOICE:?\s*#?\s*(\d+)/i) ||
                         fullText.match(/RECEIPT\s*#?\s*(\d+)/i) ||
                         fullText.match(/PRO-FORMA INVOICE:\s*(\d+)/i);
     details.invoiceNumber = invoiceMatch ? invoiceMatch[1] : null;
 
-    // Extract date and time
-    const dateMatch = fullText.match(/DATE\s*:?\s*(\d{2}\/\d{2}\/\d{4}|\d{4}\/\d{2}\/\d{2})/i);
-    details.date = dateMatch ? dateMatch[1] : null;    
-    // Precise time extraction - only when explicitly labeled as "TIME"
-    const timeMatch = fullText.match(/TIME\s*:\s*(\d{2}:\d{2})\s*(?:TO\s*(\d{2}:\d{2}))?/i);
-    if (timeMatch) {
-        details.time = timeMatch[1]; // Start time
-        if (timeMatch[2]) {
-            details.endTime = timeMatch[2]; // Optional end time
-        }
-    }
-    //details.time = timeMatch ? timeMatch[1].trim() : null;
+
 
     // Extract waiter and table info
     const waiterMatch = fullText.match(/WAITER:?\s*(.+?)(?:\(|\n|$)/i);
@@ -387,7 +439,11 @@ function extractReceiptDetails(fullText) {
     
     details.vatAmount = vatMatch ? parseFloat(vatMatch[1]) : 0;
     details.totalAmount = totalMatch ? parseFloat(totalMatch[1]) : 0;
-
+    
+    // Final logging of extracted details
+    console.log('=== EXTRACTED DETAILS ===');
+    console.log(JSON.stringify(details, null, 2));
+    console.log('=== END OF EXTRACTION ===');
     return details;
 }
 
