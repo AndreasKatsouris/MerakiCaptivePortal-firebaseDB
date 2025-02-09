@@ -115,6 +115,13 @@ async function processReceipt(imageUrl, phoneNumber) {
             console.warn('Missing receipt fields:', missingFields);
         }
 
+        // Validate receipt date
+        if (receiptData.date && !validateReceiptDate(receiptData.date)) {
+            throw new Error(
+                'This receipt is not from the current month. Please submit receipts within the same month of purchase.'
+            );
+        }
+
         // Save receipt data
         const savedReceipt = await saveReceiptData(receiptData);
         return savedReceipt;
@@ -368,7 +375,7 @@ function extractReceiptDetails(fullText) {
         }    
 
         const extractionStrategies = [
-            // Strategy 1: Specific Ocean Basket style integrated date and time
+            // Strategy 1: Specific Pilot POS style integrated date and time
             () => {
                 const timeRegex = /TIME\s*(\d{2}\/\d{2}\/\d{4})\s*(\d{2}:\d{2})\s*TO\s*(\d{2}:\d{2})/i;
                 const timeMatch = fullText.match(timeRegex);
@@ -544,6 +551,39 @@ async function testReceiptProcessing(imageUrl, phoneNumber) {
             success: false,
             error: error.message
         };
+    }
+}
+
+/**
+ * Validates if receipt date is within the current month
+ * @param {string} receiptDate - Date from receipt (format: DD/MM/YYYY)
+ * @returns {boolean} - True if date is valid and within current month
+ */
+function validateReceiptDate(receiptDate) {
+    try {
+        // Parse the receipt date (assuming DD/MM/YYYY format)
+        const [day, month, year] = receiptDate.split('/').map(Number);
+        const parsedReceiptDate = new Date(year, month - 1, day); // month is 0-based in JS
+
+        // Get current date
+        const currentDate = new Date();
+        
+        // Check if receipt is from current month and year
+        const isCurrentMonth = parsedReceiptDate.getMonth() === currentDate.getMonth();
+        const isCurrentYear = parsedReceiptDate.getFullYear() === currentDate.getFullYear();
+        
+        console.log('Date validation:', {
+            receiptDate,
+            parsedReceiptDate,
+            currentDate,
+            isCurrentMonth,
+            isCurrentYear
+        });
+
+        return isCurrentMonth && isCurrentYear;
+    } catch (error) {
+        console.error('Date validation error:', error);
+        return false;
     }
 }
 

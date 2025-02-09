@@ -1,8 +1,11 @@
 const { REWARD_TYPE_VALIDATION } = require('./constants/campaign.constants');
 const admin = require('firebase-admin');
 /**
- * Retrieve active campaigns from Firebase
- * @returns {Promise<Array>} List of active campaigns
+ * Retrieves all active campaigns from the database
+ * @async
+ * @function getActiveCampaigns
+ * @returns {Promise<Array>} Array of active campaign objects
+ * @throws {Error} If Firebase admin is not initialized or database operation fails
  */
 async function getActiveCampaigns() {
     try {
@@ -243,8 +246,11 @@ function validateRequiredItems(receiptItems, requiredItems) {
     });
 }
 /**
- * Validate basic campaign criteria
- * @private
+ * Validates basic campaign criteria against receipt data
+ * @function validateBasicCriteria
+ * @param {Object} receiptData - The receipt data to validate
+ * @param {Object} campaign - Campaign object containing validation rules
+ * @returns {boolean} True if basic criteria are met
  */
 function validateBasicCriteria(receiptData, campaign) {
     console.log('Validating basic criteria:', {
@@ -301,8 +307,11 @@ function validateBasicCriteria(receiptData, campaign) {
 }
 
 /**
- * Validate campaign date and time criteria
- * @private
+ * Validates date and time criteria for a campaign
+ * @function validateDateTimeCriteria
+ * @param {Object} receiptData - Receipt data containing date information
+ * @param {Object} campaign - Campaign object containing date/time restrictions
+ * @returns {boolean} True if date/time criteria are met
  */
 function validateDateTimeCriteria(receiptData, campaign) {
     const receiptDate = new Date(receiptData.date);
@@ -347,8 +356,12 @@ function validateDateTimeCriteria(receiptData, campaign) {
 }
 
 /**
- * Validate reward types criteria and return eligible types
- * @private
+ * Validates reward types criteria and returns eligible types
+ * @async
+ * @function validateRewardTypes
+ * @param {Object} receiptData - Receipt data to validate against
+ * @param {Object} campaign - Campaign containing reward types
+ * @returns {Promise<Array>} Array of eligible reward types
  */
 async function validateRewardTypes(receiptData, campaign) {
     console.log('Starting reward types validation:', {
@@ -397,8 +410,14 @@ async function validateRewardTypes(receiptData, campaign) {
 }
 
 /**
- * Validate specific reward type criteria
- * @private
+ * Validates a reward type's criteria against receipt data
+ * @async
+ * @function validateRewardTypeCriteria
+ * @param {Object} receiptData - The receipt data to validate
+ * @param {Object} rewardType - The reward type with criteria to validate against
+ * @param {Object} rewardType.criteria - Criteria object containing validation rules
+ * @param {string} rewardType.typeId - Unique identifier for the reward type
+ * @returns {Promise<boolean>} True if criteria is met, false otherwise
  */
 async function validateRewardTypeCriteria(receiptData, rewardType) {
     if (!receiptData || !rewardType) {
@@ -440,6 +459,16 @@ async function validateRewardTypeCriteria(receiptData, rewardType) {
     }
 }
 
+/**
+ * Validates the minimum purchase requirement for a reward
+ * @async
+ * @function validateMinimumPurchase
+ * @param {Object} criteria - The criteria object containing minimum purchase rules
+ * @param {number} criteria.minPurchaseAmount - Minimum required purchase amount
+ * @param {Object} receiptData - Receipt data containing the purchase amount
+ * @param {number} receiptData.totalAmount - Total amount of the purchase
+ * @returns {Promise<boolean>} True if minimum purchase requirement is met
+ */
 async function validateMinimumPurchase(criteria, receiptData) {
     if (criteria.minPurchaseAmount !== undefined) {
         if (typeof criteria.minPurchaseAmount !== 'number') {
@@ -466,6 +495,18 @@ async function validateMinimumPurchase(criteria, receiptData) {
     return true;
 }
 
+/**
+ * Validates the maximum rewards limit for a user
+ * @async
+ * @function validateMaximumRewards
+ * @param {Object} criteria - The criteria object containing maximum rewards rules
+ * @param {number} criteria.maxRewards - Maximum number of rewards allowed
+ * @param {Object} receiptData - Receipt data containing user information
+ * @param {string} receiptData.guestPhoneNumber - User's phone number
+ * @param {Object} rewardType - The reward type being validated
+ * @param {string} rewardType.typeId - Unique identifier for the reward type
+ * @returns {Promise<boolean>} True if under max rewards limit
+ */
 async function validateMaximumRewards(criteria, receiptData, rewardType) {
     if (criteria.maxRewards !== undefined && criteria.maxRewards !== null) {
         if (typeof criteria.maxRewards !== 'number') {
@@ -511,8 +552,13 @@ async function validateMaximumRewards(criteria, receiptData, rewardType) {
 }
 
 /**
- * Get count of specific reward type for user
- * @private
+ * Gets the count of specific reward type for a user
+ * @async
+ * @function getUserRewardTypeCount
+ * @param {string} phoneNumber - User's phone number
+ * @param {string} rewardTypeId - ID of the reward type to count
+ * @returns {Promise<number>} Count of rewards for the specified type
+ * @throws {Error} If database operation fails
  */
 async function getUserRewardTypeCount(phoneNumber, rewardTypeId) {
     const snapshot = await admin.database()
