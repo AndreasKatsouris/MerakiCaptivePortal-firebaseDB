@@ -106,7 +106,16 @@ async function matchReceiptToCampaign(receiptData) {
  * @returns {Promise<object>} Validation result with eligible reward types
  */
 async function validateAgainstCampaign(receiptData, campaign) {
-    console.log(`Validating receipt against campaign: ${campaign.name}`);
+    console.log('Starting validation for campaign:', {
+        campaignName: campaign.name,
+        campaignId: campaign.id,
+        receipt: {
+            date: receiptData.date,
+            store: receiptData.storeName,
+            amount: receiptData.totalAmount,
+            items: receiptData.items?.length
+        }
+    });
     
     const result = {
         isValid: false,
@@ -120,7 +129,14 @@ async function validateAgainstCampaign(receiptData, campaign) {
         // Validate basic campaign criteria
         if (!validateBasicCriteria(receiptData, campaign)) {
             result.failureReason = campaign.lastFailureReason;
-            console.log("Basic Criteria failure:" + result);
+            console.log('Basic criteria validation failed:', {
+                campaignName: campaign.name,
+                reason: campaign.lastFailureReason,
+                receiptStore: receiptData.storeName,
+                campaignStore: campaign.storeName,
+                receiptAmount: receiptData.totalAmount,
+                minRequired: campaign.minPurchaseAmount
+            });
             return result;
         }
 
@@ -130,7 +146,6 @@ async function validateAgainstCampaign(receiptData, campaign) {
         // Validate campaign date and time criteria
         if (!validateDateTimeCriteria(receiptData, campaign)) {
             result.failureReason = 'Receipt date/time outside campaign window';
-            console.log("Date & Time failure:" + result);
 
             return result;
         }
@@ -139,24 +154,52 @@ async function validateAgainstCampaign(receiptData, campaign) {
 
         // Get eligible reward types
         const eligibleTypes = await validateRewardTypes(receiptData, campaign);
+        console.log('Reward types validation result:', {
+            campaignName: campaign.name,
+            totalTypes: campaign.rewardTypes?.length || 0,
+            eligibleCount: eligibleTypes.length,
+            eligibleTypes: eligibleTypes.map(type => ({
+                typeId: type.typeId,
+                criteria: type.criteria
+            }))
+        });
+
         if (eligibleTypes.length === 0) {
             result.failureReason = 'No eligible reward types found';
-            console.log("Reward Types failure:" + result);
-
+            console.log('No eligible reward types found for campaign:', {
+                campaignName: campaign.name,
+                receiptAmount: receiptData.totalAmount,
+                rewardTypes: campaign.rewardTypes?.map(type => ({
+                    typeId: type.typeId,
+                    minPurchase: type.criteria?.minPurchaseAmount,
+                    maxRewards: type.criteria?.maxRewards
+                }))
+            });
             return result;
         }
 
         result.isValid = true;
         result.eligibleRewardTypes = eligibleTypes;
         result.matchedCriteria.push('reward_types_match');
-        console.log("Results:" + result);
+        
+        console.log('Campaign validation successful:', {
+            campaignName: campaign.name,
+            matchedCriteria: result.matchedCriteria,
+            eligibleRewardCount: eligibleTypes.length
+        });
 
         return result;
 
     } catch (error) {
-        console.error('Error in validateAgainstCampaign:', error);
-        console.log("validateAgainstCampaign failure:" + result);
-
+        console.error('Error in validateAgainstCampaign:', {
+            error: error.message,
+            campaignName: campaign.name,
+            receiptData: {
+                date: receiptData.date,
+                store: receiptData.storeName,
+                amount: receiptData.totalAmount
+            }
+        });
         result.failureReason = 'Internal validation error';
         return result;
     }
