@@ -6,6 +6,11 @@ const admin = require('firebase-admin');
  */
 async function getActiveCampaigns() {
     try {
+        if (!admin.apps.length) {
+            throw new Error('Firebase admin not initialized');
+        }
+
+        console.log('Fetching active campaigns from database');
         const snapshot = await admin.database()
             .ref('campaigns')
             .orderByChild('status')
@@ -15,18 +20,23 @@ async function getActiveCampaigns() {
         const campaigns = snapshot.val();
         
         if (!campaigns) {
-            console.log('No active campaigns found');
+            console.warn('No active campaigns found in database');
             return [];
         }
 
-        // Convert to array and add the key as the campaign ID
-        return Object.entries(campaigns).map(([id, campaign]) => ({
+        const campaignArray = Object.entries(campaigns).map(([id, campaign]) => ({
             id,
             ...campaign
         }));
+
+        console.log(`Found ${campaignArray.length} active campaigns`);
+        return campaignArray;
     } catch (error) {
-        console.error('Error fetching active campaigns:', error);
-        return [];
+        console.error('Error fetching active campaigns:', {
+            error: error.message,
+            stack: error.stack
+        });
+        throw new Error(`Failed to fetch campaigns: ${error.message}`);
     }
 }
 /**
@@ -36,17 +46,11 @@ async function getActiveCampaigns() {
  */
 async function matchReceiptToCampaign(receiptData) {
     try {
-        console.log('Starting enhanced receipt-to-campaign matching:', {
+        console.log('Starting receipt-to-campaign matching:', {
             receiptDate: receiptData.date,
             brandName: receiptData.brandName,
             totalAmount: receiptData.totalAmount
         });
-
-        // Basic receipt validation
-        //const validationResult = await validateReceipt(receiptData, receiptData.brandName);
-        //if (!validationResult.isValid) {
-        //    return validationResult;
-        //}
 
         // Get active campaigns
         const activeCampaigns = await getActiveCampaigns();
@@ -57,21 +61,30 @@ async function matchReceiptToCampaign(receiptData) {
             };
         }
 
-        // Find matching campaigns
-        const matchResults = await Promise.all(
-            activeCampaigns
-                .filter(campaign => campaign.brandName.toLowerCase() === receiptData.brandName.toLowerCase())
-                .map(campaign => validateAgainstCampaign(receiptData, campaign))
+        // Find matching campaigns by brand name
+        const matchingCampaigns = activeCampaigns.filter(campaign => 
+            campaign.brandName.toLowerCase() === receiptData.brandName.toLowerCase()
         );
 
-        // Get successful matches with their reward types
-        const successfulMatches = matchResults.filter(result => result.isValid);
+        if (matchingCampaigns.length === 0) {
+            return {
+                isValid: false,
+                error: 'No campaigns found for this brand'
+            };
+        }
 
-        if (successfulMatches.length === 0) {
+        // Validate each matching campaign
+        const validationResults = await Promise.all(
+            matchingCampaigns.map(campaign => validateAgainstCampaign(receiptData, campaign))
+        );
+
+        const validMatches = validationResults.filter(result => result.isValid);
+
+        if (validMatches.length === 0) {
             return {
                 isValid: false,
                 error: 'Receipt does not meet any campaign requirements',
-                failedCriteria: matchResults.map(result => ({
+                failedCriteria: validationResults.map(result => ({
                     campaignName: result.campaign?.name,
                     reason: result.failureReason
                 }))
@@ -79,7 +92,7 @@ async function matchReceiptToCampaign(receiptData) {
         }
 
         // Return the best match (most eligible reward types)
-        const bestMatch = successfulMatches.reduce((best, current) => 
+        const bestMatch = validMatches.reduce((best, current) => 
             (current.eligibleRewardTypes.length > best.eligibleRewardTypes.length) ? current : best
         );
 
@@ -234,10 +247,28 @@ function validateRequiredItems(receiptItems, requiredItems) {
  * @private
  */
 function validateBasicCriteria(receiptData, campaign) {
+    console.log('Validating basic criteria:', {
+        receipt: {
+            store: receiptData.storeName,
+            amount: receiptData.totalAmount,
+            items: receiptData.items?.length
+        },
+        campaign: {
+            name: campaign.name,
+            store: campaign.storeName,
+            minAmount: campaign.minPurchaseAmount,
+            requiredItems: campaign.requiredItems?.length
+        }
+    });
+
     // Store validation
     if (campaign.storeName && 
         campaign.storeName.toLowerCase() !== receiptData.storeName.toLowerCase()) {
         campaign.lastFailureReason = 'Store mismatch';
+        console.log('Store validation failed:', {
+            receiptStore: receiptData.storeName,
+            campaignStore: campaign.storeName
+        });
         return false;
     }
 
@@ -245,6 +276,10 @@ function validateBasicCriteria(receiptData, campaign) {
     if (campaign.minPurchaseAmount && 
         receiptData.totalAmount < campaign.minPurchaseAmount) {
         campaign.lastFailureReason = 'Below minimum purchase amount';
+        console.log('Minimum purchase validation failed:', {
+            receiptAmount: receiptData.totalAmount,
+            requiredAmount: campaign.minPurchaseAmount
+        });
         return false;
     }
 
@@ -253,10 +288,15 @@ function validateBasicCriteria(receiptData, campaign) {
         const hasAllRequired = validateRequiredItems(receiptData.items, campaign.requiredItems);
         if (!hasAllRequired) {
             campaign.lastFailureReason = 'Missing required items';
+            console.log('Required items validation failed:', {
+                receiptItems: receiptData.items,
+                requiredItems: campaign.requiredItems
+            });
             return false;
         }
     }
 
+    console.log('Basic criteria validation passed');
     return true;
 }
 
@@ -269,8 +309,25 @@ function validateDateTimeCriteria(receiptData, campaign) {
     const campaignStart = new Date(campaign.startDate);
     const campaignEnd = new Date(campaign.endDate);
 
+    console.log('Validating date/time criteria:', {
+        receipt: {
+            date: receiptDate,
+            day: receiptDate.getDay()
+        },
+        campaign: {
+            start: campaignStart,
+            end: campaignEnd,
+            activeDays: campaign.activeDays
+        }
+    });
+
     // Check campaign period
     if (receiptDate < campaignStart || receiptDate > campaignEnd) {
+        console.log('Date range validation failed:', {
+            receiptDate,
+            campaignStart,
+            campaignEnd
+        });
         return false;
     }
 
@@ -278,9 +335,14 @@ function validateDateTimeCriteria(receiptData, campaign) {
     const receiptDay = receiptDate.getDay();
     if (campaign.activeDays?.length > 0 && 
         !campaign.activeDays.includes(receiptDay)) {
+        console.log('Active days validation failed:', {
+            receiptDay,
+            activeDays: campaign.activeDays
+        });
         return false;
     }
 
+    console.log('Date/time criteria validation passed');
     return true;
 }
 
@@ -289,7 +351,14 @@ function validateDateTimeCriteria(receiptData, campaign) {
  * @private
  */
 async function validateRewardTypes(receiptData, campaign) {
+    console.log('Starting reward types validation:', {
+        campaignName: campaign.name,
+        rewardTypesCount: campaign.rewardTypes?.length,
+        receiptAmount: receiptData.totalAmount
+    });
+
     if (!campaign.rewardTypes?.length) {
+        console.log('No reward types defined for campaign');
         return [];
     }
 
@@ -297,14 +366,32 @@ async function validateRewardTypes(receiptData, campaign) {
 
     for (const rewardType of campaign.rewardTypes) {
         try {
+            console.log('Validating reward type:', {
+                typeId: rewardType.typeId,
+                criteria: rewardType.criteria
+            });
+
             if (await validateRewardTypeCriteria(receiptData, rewardType)) {
                 eligibleTypes.push(rewardType);
+                console.log('Reward type eligible:', rewardType.typeId);
+            } else {
+                console.log('Reward type not eligible:', {
+                    typeId: rewardType.typeId,
+                    reason: 'Failed criteria validation'
+                });
             }
         } catch (error) {
-            console.error(`Error validating reward type ${rewardType.typeId}:`, error);
-            // Continue with other reward types
+            console.error('Error validating reward type:', {
+                typeId: rewardType.typeId,
+                error: error.message
+            });
         }
     }
+
+    console.log('Reward types validation complete:', {
+        totalTypes: campaign.rewardTypes.length,
+        eligibleCount: eligibleTypes.length
+    });
 
     return eligibleTypes;
 }
@@ -314,92 +401,112 @@ async function validateRewardTypes(receiptData, campaign) {
  * @private
  */
 async function validateRewardTypeCriteria(receiptData, rewardType) {
-    const { criteria } = rewardType;
-
-    // Check minimum purchase amount
-    if (criteria.minPurchaseAmount !== undefined) {
-        if (criteria.minPurchaseAmount < REWARD_TYPE_VALIDATION.MIN_PURCHASE.min) {
-            return false;
-        }
-        if (criteria.minPurchaseAmount > receiptData.totalAmount) {
-            return false;
-        }
-    }
-
-    // Check maximum rewards
-    if (criteria.maxRewards !== undefined && criteria.maxRewards !== null) {
-        if (criteria.maxRewards < REWARD_TYPE_VALIDATION.MAX_REWARDS.min) {
-            return false;
-        }
-        
-        const currentCount = await getUserRewardTypeCount(
-            receiptData.guestPhoneNumber, 
-            rewardType.typeId
-        );
-        if (currentCount >= criteria.maxRewards) {
-            return false;
-        }
-    }
-
-    // Check store restrictions
-    if (criteria.storeRestrictions?.length > 0) {
-        if (criteria.storeRestrictions.length < REWARD_TYPE_VALIDATION.STORE_RESTRICTIONS.minStores) {
-            return false;
-        }
-        if (!criteria.storeRestrictions.includes(receiptData.storeName)) {
-            return false;
-        }
-    }
-
-    // Check required items
-    if (criteria.requiredItems?.length > 0) {
-        const hasAllItems = criteria.requiredItems.every(required => {
-            const receiptItem = receiptData.items.find(
-                item => item.name.toLowerCase().includes(required.name.toLowerCase())
-            );
-            return receiptItem && receiptItem.quantity >= required.quantity;
+    if (!receiptData || !rewardType) {
+        console.error('Invalid input for reward type validation:', {
+            hasReceiptData: !!receiptData,
+            hasRewardType: !!rewardType
         });
-        if (!hasAllItems) {
-            return false;
-        }
-    }
-
-    // Check time restrictions
-    if (criteria.startTime || criteria.endTime) {
-        // Validate time format
-        const timeFormat = REWARD_TYPE_VALIDATION.TIME_RESTRICTIONS.format;
-        const timeRegex = timeFormat === 'HH:mm' ? /^([01]?[0-9]|2[0-3]):[0-5][0-9]$/ : null;
-        
-        if (criteria.startTime && !timeRegex.test(criteria.startTime)) {
-            return false;
-        }
-        if (criteria.endTime && !timeRegex.test(criteria.endTime)) {
-            return false;
-        }
-
-        if (criteria.startTime && criteria.endTime) {
-            const receiptTime = new Date(receiptData.time);
-            const [startHour, startMinute] = criteria.startTime.split(':').map(Number);
-            const [endHour, endMinute] = criteria.endTime.split(':').map(Number);
-            
-            if (!isTimeInRange(
-                receiptTime,
-                { hour: startHour, minute: startMinute },
-                { hour: endHour, minute: endMinute }
-            )) {
-                return false;
-            }
-        }
-    }
-
-    // Validate that all criteria fields are recognized
-    const validFields = REWARD_TYPE_VALIDATION.CRITERIA.validFields;
-    const criteriaFields = Object.keys(criteria);
-    const hasInvalidField = criteriaFields.some(field => !validFields.includes(field));
-    if (hasInvalidField) {
         return false;
     }
 
+    if (!rewardType.criteria) {
+        console.error('Missing criteria in reward type:', rewardType.typeId);
+        return false;
+    }
+
+    const { criteria } = rewardType;
+    console.log('Validating reward type criteria:', {
+        typeId: rewardType.typeId,
+        criteria,
+        receiptAmount: receiptData.totalAmount
+    });
+
+    try {
+        // Validate minimum purchase
+        if (!await validateMinimumPurchase(criteria, receiptData)) return false;
+
+        // Validate maximum rewards
+        if (!await validateMaximumRewards(criteria, receiptData, rewardType)) return false;
+
+        console.log('Reward type criteria validation passed:', rewardType.typeId);
+        return true;
+    } catch (error) {
+        console.error('Error in reward type validation:', {
+            typeId: rewardType.typeId,
+            error: error.message,
+            stack: error.stack
+        });
+        return false;
+    }
+}
+
+async function validateMinimumPurchase(criteria, receiptData) {
+    if (criteria.minPurchaseAmount !== undefined) {
+        if (typeof criteria.minPurchaseAmount !== 'number') {
+            console.error('Invalid minPurchaseAmount type:', typeof criteria.minPurchaseAmount);
+            return false;
+        }
+
+        if (criteria.minPurchaseAmount < REWARD_TYPE_VALIDATION.MIN_PURCHASE.min) {
+            console.error('Invalid minimum purchase amount in criteria:', {
+                minAmount: criteria.minPurchaseAmount,
+                allowedMin: REWARD_TYPE_VALIDATION.MIN_PURCHASE.min
+            });
+            return false;
+        }
+
+        if (criteria.minPurchaseAmount > receiptData.totalAmount) {
+            console.log('Receipt amount below minimum required:', {
+                receiptAmount: receiptData.totalAmount,
+                requiredAmount: criteria.minPurchaseAmount
+            });
+            return false;
+        }
+    }
+    return true;
+}
+
+async function validateMaximumRewards(criteria, receiptData, rewardType) {
+    if (criteria.maxRewards !== undefined && criteria.maxRewards !== null) {
+        if (typeof criteria.maxRewards !== 'number') {
+            console.error('Invalid maxRewards type:', typeof criteria.maxRewards);
+            return false;
+        }
+
+        if (criteria.maxRewards < REWARD_TYPE_VALIDATION.MAX_REWARDS.min) {
+            console.error('Invalid maximum rewards in criteria:', {
+                maxRewards: criteria.maxRewards,
+                allowedMin: REWARD_TYPE_VALIDATION.MAX_REWARDS.min
+            });
+            return false;
+        }
+
+        try {
+            if (!receiptData.guestPhoneNumber) {
+                console.error('Missing guest phone number for reward count check');
+                return false;
+            }
+
+            const currentCount = await getUserRewardTypeCount(
+                receiptData.guestPhoneNumber, 
+                rewardType.typeId
+            );
+
+            console.log('Checking max rewards limit:', {
+                currentCount,
+                maxAllowed: criteria.maxRewards,
+                guestPhone: receiptData.guestPhoneNumber
+            });
+            
+            if (currentCount >= criteria.maxRewards) {
+                console.log('Max rewards limit reached');
+                return false;
+            }
+        } catch (error) {
+            console.error('Error checking user reward count:', error);
+            return false;
+        }
+    }
     return true;
 }
 
