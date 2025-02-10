@@ -1,5 +1,3 @@
-
-// With this:
 const _ = window._;
 
 // Guest Management State
@@ -271,10 +269,15 @@ const guestManagement = {
 
             async getGuestReceipts(phoneNumber) {
                 try {
+                    // Normalize phone number by ensuring it has a + prefix
+                    const normalizedPhone = phoneNumber.startsWith('+') ? 
+                        phoneNumber : 
+                        `+${phoneNumber}`;
+                        
                     // First check guest-receipts index
                     const receiptIndexSnapshot = await firebase.database()
                         .ref('guest-receipts')
-                        .child(phoneNumber)
+                        .child(normalizedPhone)
                         .once('value');
                     
                     const receiptIds = Object.keys(receiptIndexSnapshot.val() || {});
