@@ -1,4 +1,5 @@
 let firebaseInitialized = false;
+let currentUser = null;
 
 
 //import { updateDashboardStats, initializeDashboardListeners } from './dashboard.js';
@@ -12,16 +13,19 @@ import { googleReviewsManager } from './googleReviews.js';
 //const remoteConfig = firebase.remoteConfig();
 
 async function waitForFirebaseInit() {
-    return new Promise((resolve) => {
-        const checkInit = () => {
-            if (firebase.apps.length) {
-                firebaseInitialized = true;
-                resolve();
+    return new Promise((resolve, reject) => {
+        const unsubscribe = firebase.auth().onAuthStateChanged((user) => {
+            unsubscribe();
+            currentUser = user;
+            if (user) {
+                console.log('User authenticated:', user.email);
+                resolve(true);
             } else {
-                setTimeout(checkInit, 100);
+                console.log('No user authenticated, redirecting to login');
+                window.location.href = 'admin-login.html';
+                reject(new Error('No authenticated user'));
             }
-        };
-        checkInit();
+        });
     });
 }
 
@@ -104,20 +108,43 @@ async function initializeFirebaseFeatures() {
 
 // ==================== Authentication Section ====================
 function initializeAuthentication() {
-    firebase.auth().onAuthStateChanged((user) => {
+    // Set auth persistence
+    firebase.auth().setPersistence(firebase.auth.Auth.Persistence.SESSION)
+        .then(() => {
+            console.log('Firebase Auth persistence set to SESSION');
+        })
+        .catch((error) => {
+            console.error('Error setting auth persistence:', error);
+        });
+
+    // Add auth state observer
+    firebase.auth().onAuthStateChanged(async (user) => {
+        currentUser = user;
         if (user) {
-            console.log("User is authenticated:", user.uid);
-            loadInitialData();
+            console.log('User is signed in:', user.email);
+            // Check if user has admin claim
+            const tokenResult = await user.getIdTokenResult();
+            console.log('User claims:', tokenResult.claims);
+            if (!tokenResult.claims.admin) {
+                console.log('User is not an admin, redirecting to login');
+                await firebase.auth().signOut();
+                window.location.href = 'admin-login.html';
+            }
         } else {
-            console.log("User is not authenticated");
+            console.log('No user is signed in, redirecting to login');
             window.location.href = 'admin-login.html';
         }
     });
 
-    const logoutButton = document.getElementById('logoutButton');
-    if (logoutButton) {
-        logoutButton.addEventListener('click', handleLogout);
-    }
+    // Add logout button handler
+    document.querySelector('.user-profile')?.addEventListener('click', async () => {
+        try {
+            await firebase.auth().signOut();
+            window.location.href = 'admin-login.html';
+        } catch (error) {
+            console.error('Error signing out:', error);
+        }
+    });
 }
 
 function handleLogout() {
@@ -385,6 +412,8 @@ async function handleCreateReward() {
 }
 
 async function loadRewards(filters = {}) {
+    if (!await checkAuthState()) return;
+    
     console.log('Loading rewards...');
     
     const rewardsTable = document.querySelector('#rewardsTable tbody');
@@ -1933,5 +1962,22 @@ function initializeMobileMenu() {
             }
         });
     });
+}
+
+// Add this helper function to check auth state
+async function checkAuthState() {
+    if (!currentUser) {
+        console.error('No authenticated user');
+        window.location.href = 'admin-login.html';
+        return false;
+    }
+    const tokenResult = await currentUser.getIdTokenResult();
+    if (!tokenResult.claims.admin) {
+        console.error('User is not an admin');
+        await firebase.auth().signOut();
+        window.location.href = 'admin-login.html';
+        return false;
+    }
+    return true;
 }
 
