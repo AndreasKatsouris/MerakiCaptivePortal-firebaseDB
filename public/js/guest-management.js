@@ -269,11 +269,18 @@ const guestManagement = {
 
             async getGuestReceipts(phoneNumber) {
                 try {
+                    // Debug authentication state
+                    const currentUser = firebase.auth().currentUser;
+                    console.log('Current user:', currentUser);
+                    console.log('Auth token claims:', await currentUser?.getIdTokenResult());
+                    
                     // Normalize phone number by ensuring it has a + prefix
                     const normalizedPhone = phoneNumber.startsWith('+') ? 
                         phoneNumber : 
                         `+${phoneNumber}`;
                         
+                    console.log('Attempting to access:', normalizedPhone);
+                    
                     // First check guest-receipts index
                     const receiptIndexSnapshot = await firebase.database()
                         .ref('guest-receipts')
@@ -295,7 +302,11 @@ const guestManagement = {
 
                     return receiptsData;
                 } catch (error) {
-                    console.error('Error retrieving receipts:', error);
+                    console.error('Error retrieving receipts:', error, {
+                        phoneNumber,
+                        authState: firebase.auth().currentUser?.uid,
+                        claims: await firebase.auth().currentUser?.getIdTokenResult()
+                    });
                     return [];
                 }
             },
