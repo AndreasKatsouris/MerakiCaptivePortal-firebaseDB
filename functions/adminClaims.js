@@ -24,6 +24,9 @@ exports.setAdminClaim = functions.https.onCall(async (data) => {
         // Set admin claim
         await admin.auth().setCustomUserClaims(user.uid, { admin: isAdmin });
         
+        // Force token refresh on the server side
+        await admin.auth().revokeRefreshTokens(user.uid);
+        
         return {
             result: `Admin claim ${isAdmin ? 'set' : 'removed'} for ${user.email}`,
             isAdmin: isAdmin
