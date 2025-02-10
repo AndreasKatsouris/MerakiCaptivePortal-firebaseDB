@@ -17,6 +17,7 @@
     },
     
 "rewards": {
+  ".read": "auth != null",
   ".indexOn": ["status", "guestPhone", "campaignId"],
   "$rewardId": {
     ".read": true,
@@ -91,6 +92,10 @@
           ".validate": "newData.isNumber()"
         }
       }
+    },
+    "wifiLogins": {
+      ".read": "auth != null", 
+      ".write": "auth != null && auth.token.admin === true"
     }
   }
 }
