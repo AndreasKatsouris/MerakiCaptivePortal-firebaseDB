@@ -16,26 +16,38 @@
       ".write": true
     },
     
-    "rewards": {
-      ".indexOn": ["status", "guestPhone", "campaignId"],
-      "$rewardId": {
-        ".read": "auth != null && (root.child('guest-rewards').child(auth.token.phone_number).child($rewardId).exists() || auth.token.admin === true)",
-        ".write": "auth != null && auth.token.admin === true",
-        ".validate": "newData.hasChildren(['metadata', 'status', 'value', 'expiresAt'])",
-        "metadata": {
-          ".validate": "newData.hasChildren(['type']) && newData.child('type').isString()"
-        },
-        "status": {
-          ".validate": "newData.val().matches(/^(pending|active|used|expired|cancelled)$/)"
-        },
-        "value": {
-          ".validate": "newData.isNumber()"
-        },
-        "expiresAt": {
-          ".validate": "newData.isNumber() && newData.val() > now"
-        }
-      }
+"rewards": {
+  ".indexOn": ["status", "guestPhone", "campaignId"],
+  "$rewardId": {
+    ".read": "auth != null && (root.child('guest-rewards').child(auth.token.phone_number).child($rewardId).exists() || auth.token.admin === true)",
+    ".write": "auth != null && (auth.token.admin === true || root.child('guest-rewards').child(auth.token.phone_number).child($rewardId).exists() ||!data.exists())",
+    ".validate": "newData.hasChildren(['metadata', 'status', 'value', 'expiresAt'])",
+    "status": {
+      ".validate": "newData.val().matches(/^(pending|active|used|expired|cancelled|approved)$/)"
     },
+    "value": {
+      ".validate": "newData.isNumber()"
+    },
+    "expiresAt": {
+      ".validate": "newData.isNumber() && newData.val() > now"
+    },
+    "metadata": {
+      ".validate": "newData.hasChildren(['type']) && newData.child('type').isString()"
+    },
+    "approvedAt": {
+      ".validate": "!data.exists() || auth.token.admin === true"
+    },
+    "approvedBy": {
+      ".validate": "!data.exists() || auth.token.admin === true"
+    },
+    "rewardTypeId": {
+      ".validate": "!data.exists() || auth.token.admin === true"
+    },
+    "guestMessage": {
+      ".validate": "!data.exists() || auth.token.admin === true"
+    }
+  }
+},
     
     "guest-rewards": {
       "$phoneNumber": {

@@ -53,7 +53,7 @@ async function processReward(guest, campaign, receiptData) {
         await admin.database().ref().update(rewardUpdates);
 
         // Send notifications
-        await sendRewardNotifications(guest, createdRewards);
+        //await sendRewardNotifications(guest, createdRewards);
 
         return {
             success: true,
