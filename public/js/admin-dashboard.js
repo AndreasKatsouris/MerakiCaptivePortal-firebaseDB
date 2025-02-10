@@ -1,16 +1,9 @@
 let firebaseInitialized = false;
 let currentUser = null;
 
-
-//import { updateDashboardStats, initializeDashboardListeners } from './dashboard.js';
-//import { initializeProjectManagement } from './project-management.js';
-//import { initializeRewardTypes } from './reward-types.js';
 import { initializeGuestManagement } from './guest-management.js';
-//import { initializeCampaignManagement } from './campaigns/campaigns.js';
-
 // Import the Google Reviews manager
 import { googleReviewsManager } from './googleReviews.js';
-//const remoteConfig = firebase.remoteConfig();
 
 async function waitForFirebaseInit() {
     return new Promise((resolve, reject) => {
@@ -122,12 +115,30 @@ function initializeAuthentication() {
         currentUser = user;
         if (user) {
             console.log('User is signed in:', user.email);
-            // Check if user has admin claim
-            const tokenResult = await user.getIdTokenResult();
-            console.log('User claims:', tokenResult.claims);
-            if (!tokenResult.claims.admin) {
-                console.log('User is not an admin, redirecting to login');
-                await firebase.auth().signOut();
+            try {
+                // Force token refresh to get latest claims
+                await user.getIdToken(true);
+                const tokenResult = await user.getIdTokenResult();
+                console.log('User claims:', tokenResult.claims);
+
+                if (!tokenResult.claims.admin) {
+                    // Try to set admin claim
+                    const setAdminClaimFunction = firebase.functions().httpsCallable('setAdminClaim');
+                    const result = await setAdminClaimFunction({ email: user.email });
+                    console.log('Admin claim result:', result.data);
+
+                    if (result.data.isAdmin) {
+                        // Refresh token to get new claims
+                        await user.getIdToken(true);
+                        window.location.reload();
+                    } else {
+                        console.log('User is not an admin, redirecting to login');
+                        await firebase.auth().signOut();
+                        window.location.href = 'admin-login.html';
+                    }
+                }
+            } catch (error) {
+                console.error('Error checking/setting admin claim:', error);
                 window.location.href = 'admin-login.html';
             }
         } else {
@@ -137,14 +148,18 @@ function initializeAuthentication() {
     });
 
     // Add logout button handler
-    document.querySelector('.user-profile')?.addEventListener('click', async () => {
-        try {
-            await firebase.auth().signOut();
-            window.location.href = 'admin-login.html';
-        } catch (error) {
-            console.error('Error signing out:', error);
-        }
-    });
+    const logoutButton = document.getElementById('logoutButton');
+    if (logoutButton) {
+        logoutButton.addEventListener('click', async (e) => {
+            e.preventDefault();
+            try {
+                await firebase.auth().signOut();
+                window.location.href = 'admin-login.html';
+            } catch (error) {
+                console.error('Error signing out:', error);
+            }
+        });
+    }
 }
 
 function handleLogout() {
