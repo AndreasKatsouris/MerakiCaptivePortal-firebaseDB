@@ -7,7 +7,7 @@ const admin = require('firebase-admin');
  * @param {object} receiptData - Validated receipt data
  * @returns {Promise<object>} Processing result
  */
-// In rewardsProcessor.js
+
 async function processReward(guest, campaign, receiptData) {
     const campaignId = campaign.id || campaign.name.replace(/\s+/g, '_').toLowerCase();
     let createdRewards = [];
@@ -27,7 +27,11 @@ async function processReward(guest, campaign, receiptData) {
                     campaignId: campaignId
                 };
             });
-
+            console.log('Reward type data:', {
+                type: rewardType.type,
+                typeId: rewardType.typeId,
+                criteria: rewardType.criteria
+            });
         // Create rewards after successful receipt validation
         const rewardUpdates = {};
         for (const rewardType of campaign.rewardTypes) {
@@ -168,6 +172,14 @@ async function checkRewardEligibility(rewardType, receiptData, guest) {
  * Create reward object based on reward type
  */
 function createRewardObject(rewardType, guest, campaign, receiptData) {
+    // Validate required fields
+    if (!rewardType || !rewardType.typeId) {
+        throw new Error('Invalid reward type data');
+    }
+
+    // Determine reward type from criteria or default to 'standard'
+    const rewardTypeCategory = determineRewardType(rewardType);
+
     return {
         typeId: rewardType.typeId,
         guestPhone: guest.phoneNumber,
@@ -182,11 +194,67 @@ function createRewardObject(rewardType, guest, campaign, receiptData) {
         expiresAt: calculateExpiryDate(rewardType),
         value: calculateRewardValue(rewardType, receiptData.totalAmount),
         metadata: {
-            type: rewardType.type,
+            type: rewardTypeCategory,
             description: getRewardDescription(rewardType),
             originalCriteria: rewardType.criteria
         }
     };
+}
+
+function determineRewardType(rewardType) {
+    // If type is explicitly set, use it
+    if (rewardType.type) {
+        return rewardType.type;
+    }
+
+    // Otherwise determine type from criteria
+    if (rewardType.criteria) {
+        if (rewardType.criteria.points) return 'points';
+        if (rewardType.criteria.discountPercentage) return 'discount_percent';
+        if (rewardType.criteria.discountAmount) return 'discount_amount';
+        if (rewardType.criteria.freeItem) return 'free_item';
+    }
+
+    // Default type if nothing else matches
+    return 'standard';
+}
+
+function calculateRewardValue(rewardType, receiptAmount) {
+    const type = determineRewardType(rewardType);
+    
+    switch (type) {
+        case 'points':
+            return Math.floor(receiptAmount * (rewardType.criteria?.pointsMultiplier || 1));
+        case 'discount_amount':
+            return rewardType.criteria?.discountAmount || 0;
+        case 'discount_percent':
+            const percentage = rewardType.criteria?.discountPercentage || 0;
+            const maxValue = rewardType.criteria?.maxDiscountAmount;
+            const calculatedValue = (receiptAmount * (percentage / 100));
+            return maxValue ? Math.min(maxValue, calculatedValue) : calculatedValue;
+        default:
+            return 0;
+    }
+}
+
+function getRewardDescription(rewardType) {
+    const type = determineRewardType(rewardType);
+
+    switch (type) {
+        case 'points':
+            const points = calculateRewardValue(rewardType, 0);
+            return `${points} points reward`;
+        case 'discount_amount':
+            const amount = rewardType.criteria?.discountAmount || 0;
+            return `R${amount} off your next purchase`;
+        case 'discount_percent':
+            const percentage = rewardType.criteria?.discountPercentage || 0;
+            return `${percentage}% off your next purchase`;
+        case 'free_item':
+            return `Free ${rewardType.criteria?.itemName || 'item'}`;
+        default:
+            return 'Standard reward';
+    }
 }
 
 /**
