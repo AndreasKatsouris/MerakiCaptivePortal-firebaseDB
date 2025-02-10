@@ -5,8 +5,8 @@ const admin = require('firebase-admin');
 exports.setAdminClaim = functions.https.onCall(async (data) => {
     // List of admin email addresses
     const adminEmails = [
-        // Add your admin email addresses here
-        'your-email@example.com'  // Replace with your email
+        'andreas@askgroupholdings.com',  // Replace this with your actual admin email
+        // Add more admin emails here if needed
     ];
 
     try {
