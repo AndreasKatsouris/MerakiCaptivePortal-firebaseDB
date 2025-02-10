@@ -581,6 +581,18 @@ async function viewRewardDetails(rewardId) {
 */
 async function handleRewardApproval(rewardId) {
    try {
+        const currentUser = firebase.auth().currentUser;
+        if (!currentUser) {
+            throw new Error('User not authenticated');
+        }
+
+        // Get ID token result to check admin claim
+        const idTokenResult = await currentUser.getIdTokenResult();
+        console.log('User token claims:', idTokenResult.claims);
+        
+        if (!idTokenResult.claims.admin) {
+            throw new Error('User does not have admin privileges');
+        }
        // First verify the reward exists and we have permission to modify it
        const rewardSnapshot = await firebase.database().ref(`rewards/${rewardId}`).once('value');
        const reward = rewardSnapshot.val();
@@ -736,7 +748,33 @@ async function sendWhatsAppNotification(rewardId, customMessage) {
         throw error;
     }
 }
+// In your authentication setup code
+async function setAdminClaim(uid) {
+    try {
+        const adminRef = firebase.database().ref(`admins/${uid}`);
+        const snapshot = await adminRef.once('value');
+        const isAdmin = snapshot.val() === true;
 
+        // Set custom claim through your backend
+        await fetch('/api/setAdminClaim', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+                uid,
+                isAdmin
+            })
+        });
+
+        // Force token refresh
+        await firebase.auth().currentUser.getIdToken(true);
+        
+        console.log('Admin claim updated');
+    } catch (error) {
+        console.error('Error setting admin claim:', error);
+    }
+}
 /**
  * Handles reward rejection
  * @param {string} rewardId - ID of the reward to reject
