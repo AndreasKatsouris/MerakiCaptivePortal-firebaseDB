@@ -2,7 +2,7 @@ const functions = require('firebase-functions');
 const admin = require('firebase-admin');
 
 // This function sets admin claim for specified email addresses
-exports.setAdminClaim = functions.https.onCall(async (data, context) => {
+exports.setAdminClaim = functions.https.onCall(async (data) => {
     // List of admin email addresses
     const adminEmails = [
         // Add your admin email addresses here
