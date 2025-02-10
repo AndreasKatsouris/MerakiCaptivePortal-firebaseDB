@@ -18,8 +18,8 @@
       ".write": "auth != null",
       ".indexOn": ["status", "guestPhone", "campaignId"],
       "$rewardId": {
-        ".write": "auth != null && (auth.token.admin === true || !data.exists() || data.child('status').val() !== 'approved')",
-        ".validate": "newData.hasChildren(['metadata', 'status', 'value', 'expiresAt'])"
+        ".write": "auth != null && (auth.token.admin === true || !data.exists() || (data.exists() && data.child('status').val() !== 'approved' && data.child('guestPhone').val() === auth.token.phone_number))",
+        ".validate": "newData.hasChildren(['metadata', 'status', 'value', 'expiresAt']) && (!data.exists() || auth.token.admin === true || (data.child('guestPhone').val() === auth.token.phone_number && data.child('status').val() !== 'approved'))"
       }
     },
 
@@ -32,8 +32,8 @@
     },
     "guest-receipts": {
       "$phoneNumber": {
-        ".read": "auth != null && (auth.token.phone_number === $phoneNumber || auth.token.admin === true)",
-        ".write": "auth != null && (auth.token.admin === true || auth.token.phone_number === $phoneNumber)",
+        ".read": "auth != null && (auth.token.admin === true || auth.token.phone_number === $phoneNumber || auth.token.phone_number === '+' + $phoneNumber)",
+        ".write": "auth != null && (auth.token.admin === true || auth.token.phone_number === $phoneNumber ||auth.token.phone_number === '+' + $phoneNumber)",
         ".indexOn": ["createdAt", "processedAt"]
       }
     },
