@@ -6,6 +6,7 @@
     <title>Admin Login</title>
     <script src="/__/firebase/10.12.5/firebase-app-compat.js"></script>
     <script src="/__/firebase/10.12.5/firebase-auth-compat.js"></script>
+    <script src="/__/firebase/10.12.5/firebase-functions-compat.js"></script>
     <script src="/__/firebase/init.js?useEmulator=false"></script>
 
     <link rel="stylesheet" href="css/bootstrap.min.css">
@@ -21,18 +22,35 @@
     </form>
 
     <script>
-        document.getElementById('loginForm').addEventListener('submit', function(event) {
+        document.getElementById('loginForm').addEventListener('submit', async function(event) {
             event.preventDefault();
             const email = document.getElementById('adminEmail').value;
             const password = document.getElementById('adminPassword').value;
-            firebase.auth().signInWithEmailAndPassword(email, password)
-                .then((userCredential) => {
-                    // Redirect to admin dashboard
+            
+            try {
+                // Sign in
+                const userCredential = await firebase.auth().signInWithEmailAndPassword(email, password);
+                
+                // Call the admin claim function
+                const setAdminClaimFunction = firebase.functions().httpsCallable('setAdminClaim');
+                const result = await setAdminClaimFunction({ email });
+                
+                // Force token refresh
+                await userCredential.user.getIdToken(true);
+                
+                // Check admin claim
+                const tokenResult = await userCredential.user.getIdTokenResult();
+                
+                if (tokenResult.claims.admin) {
                     window.location.href = 'admin-dashboard.html';
-                })
-                .catch((error) => {
-                    console.error('Login failed:', error.message);
-                });
+                } else {
+                    await firebase.auth().signOut();
+                    alert('Access denied: Not an admin user');
+                }
+            } catch (error) {
+                console.error('Login failed:', error);
+                alert(error.message);
+            }
         });
     </script>
 </body>
