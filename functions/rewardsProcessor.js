@@ -7,55 +7,47 @@ const admin = require('firebase-admin');
  * @param {object} receiptData - Validated receipt data
  * @returns {Promise<object>} Processing result
  */
+// In rewardsProcessor.js
 async function processReward(guest, campaign, receiptData) {
-    console.log('Starting enhanced reward processing:', {
-        guestId: guest.phoneNumber,
-        campaignId: campaign.id,
-        receiptId: receiptData.receiptId
-    });
-
-    // Input validation
-    validateInputs(guest, campaign, receiptData);
-
     const campaignId = campaign.id || campaign.name.replace(/\s+/g, '_').toLowerCase();
     let createdRewards = [];
 
     try {
-        // Start a transaction to ensure data consistency
-        await admin.database().ref().transaction(async (data) => {
-            // Check if receipt already processed
-            if (data?.receipts?.[receiptData.receiptId]?.status === 'validated') {
-                throw new Error('Receipt already processed');
-            }
-
-            // Process each eligible reward type
-            const eligibleRewards = await processRewardTypes(guest, campaign, receiptData);
-            
-            // Prepare database updates
-            const updates = {
-                // Update receipt status
-                [`receipts/${receiptData.receiptId}/status`]: 'validated',
-                [`receipts/${receiptData.receiptId}/validatedAt`]: admin.database.ServerValue.TIMESTAMP,
-                [`receipts/${receiptData.receiptId}/campaignId`]: campaignId
-            };
-
-            // Add each reward's updates
-            eligibleRewards.forEach(reward => {
-                const rewardRef = admin.database().ref('rewards').push().key;
-                updates[`rewards/${rewardRef}`] = reward;
-                updates[`guest-rewards/${guest.phoneNumber}/${rewardRef}`] = true;
-                updates[`campaign-rewards/${campaignId}/${rewardRef}`] = true;
-                
-                createdRewards.push({
-                    id: rewardRef,
-                    ...reward
-                });
+        // Scope transaction to just the receipt
+        await admin.database()
+            .ref(`receipts/${receiptData.receiptId}`)
+            .transaction(currentData => {
+                if (currentData?.status === 'validated') {
+                    return; // Abort transaction
+                }
+                return {
+                    ...currentData,
+                    status: 'validated',
+                    validatedAt: admin.database.ServerValue.TIMESTAMP,
+                    campaignId: campaignId
+                };
             });
 
-            return updates;
-        });
+        // Create rewards after successful receipt validation
+        const rewardUpdates = {};
+        for (const rewardType of campaign.rewardTypes) {
+            const rewardRef = admin.database().ref('rewards').push().key;
+            const reward = createRewardObject(rewardType, guest, campaign, receiptData);
+            
+            rewardUpdates[`rewards/${rewardRef}`] = reward;
+            rewardUpdates[`guest-rewards/${guest.phoneNumber}/${rewardRef}`] = true;
+            rewardUpdates[`campaign-rewards/${campaignId}/${rewardRef}`] = true;
+            
+            createdRewards.push({
+                id: rewardRef,
+                ...reward
+            });
+        }
 
-        // After successful transaction, send notifications
+        // Apply reward updates separately
+        await admin.database().ref().update(rewardUpdates);
+
+        // Send notifications
         await sendRewardNotifications(guest, createdRewards);
 
         return {
@@ -66,7 +58,6 @@ async function processReward(guest, campaign, receiptData) {
 
     } catch (error) {
         console.error('Error in reward processing:', error);
-        // Attempt rollback for any partially created rewards
         if (createdRewards.length > 0) {
             await rollbackRewards(createdRewards, guest.phoneNumber, campaignId);
         }

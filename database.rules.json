@@ -35,7 +35,9 @@
     "guest-rewards": {
       "$phoneNumber": {
         ".read": "auth != null && auth.token.phone_number === $phoneNumber",
-        ".write": "auth != null && auth.token.admin === true"
+        ".write": "auth != null && auth.token.admin === true",
+        ".indexOn": ["typeId"]
+        }
       }
     },
     "campaign-rewards": {
