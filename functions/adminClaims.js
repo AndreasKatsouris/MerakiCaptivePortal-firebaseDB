@@ -18,14 +18,31 @@ exports.setAdminClaim = functions.https.onCall(async (data) => {
         // Get user by email
         const user = await admin.auth().getUserByEmail(data.email);
         
-        // Check if user's email is in admin list
-        const isAdmin = adminEmails.includes(user.email);
+        // Add debug logging
+        console.log('Setting admin claim for:', {
+            userEmail: user.email,
+            adminEmails: adminEmails,
+            isInList: adminEmails.includes(user.email),
+            exactMatch: adminEmails.some(email => email === user.email)
+        });
+        
+        // Check if user's email is in admin list (case-insensitive)
+        const isAdmin = adminEmails.some(email => 
+            email.toLowerCase() === user.email.toLowerCase()
+        );
         
         // Set admin claim
         await admin.auth().setCustomUserClaims(user.uid, { admin: isAdmin });
         
         // Force token refresh on the server side
         await admin.auth().revokeRefreshTokens(user.uid);
+        
+        // Add verification logging
+        const updatedUser = await admin.auth().getUser(user.uid);
+        console.log('Updated user claims:', {
+            email: user.email,
+            claims: updatedUser.customClaims
+        });
         
         return {
             result: `Admin claim ${isAdmin ? 'set' : 'removed'} for ${user.email}`,
