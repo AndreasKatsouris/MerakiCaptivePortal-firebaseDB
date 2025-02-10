@@ -30,10 +30,20 @@
         ".write": "auth != null && (auth.token.admin === true || auth.token.phone_number === $phoneNumber)"
       }
     },
-
+    "guest-receipts": {
+      "$phoneNumber": {
+        ".read": "auth != null && (auth.token.phone_number === $phoneNumber || auth.token.admin === true)",
+        ".write": "auth != null && (auth.token.admin === true || auth.token.phone_number === $phoneNumber)",
+        ".indexOn": ["createdAt", "processedAt"]
+      }
+    },
     "scanningData": {
       ".read": "auth != null",
-      ".write": "auth != null && auth.token.admin === true"
+      ".write": "auth != null",
+      "$dataId": {
+        ".write": "auth != null",
+        ".delete": "auth != null"
+      }
     },
 
     "customization": {
@@ -69,7 +79,22 @@
         ".validate": "newData.hasChildren(['reviewerName', 'rating', 'text', 'timestamp'])"
       }
     },
-
+      "projects": {
+        ".read": "auth != null",
+        ".write": "auth != null && auth.token.admin === true",
+        ".indexOn": ["status", "createdAt"],
+        "$projectId": {
+          ".read": "auth != null",
+          ".write": "auth != null && auth.token.admin === true",
+          ".validate": "newData.hasChildren(['name', 'status', 'createdAt'])",
+          "status": {
+            ".validate": "newData.val().matches(/^(planned|in_progress|completed|blocked)$/)"
+          },
+          "createdAt": {
+            ".validate": "newData.isNumber()"
+          }
+        }
+      },
     "wifiLogins": {
       ".read": "auth != null",
       ".write": "auth != null && auth.token.admin === true"
