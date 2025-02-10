@@ -79,22 +79,22 @@
         ".validate": "newData.hasChildren(['reviewerName', 'rating', 'text', 'timestamp'])"
       }
     },
-      "projects": {
+    "projects": {
+      ".read": "auth != null",
+      ".write": "auth != null && auth.token.admin === true",
+      ".indexOn": ["status", "createdAt"],
+      "$projectId": {
         ".read": "auth != null",
         ".write": "auth != null && auth.token.admin === true",
-        ".indexOn": ["status", "createdAt"],
-        "$projectId": {
-          ".read": "auth != null",
-          ".write": "auth != null && auth.token.admin === true",
-          ".validate": "newData.hasChildren(['name', 'status', 'createdAt'])",
-          "status": {
-            ".validate": "newData.val().matches(/^(planned|in_progress|completed|blocked)$/)"
-          },
-          "createdAt": {
-            ".validate": "newData.isNumber()"
-          }
+        ".validate": "newData.hasChildren(['name', 'status', 'createdAt'])",
+        "status": {
+          ".validate": "newData.val().matches(/^(planned|in_progress|completed|blocked)$/)"
+        },
+        "createdAt": {
+          ".validate": "newData.isNumber()"
         }
-      },
+      }
+    },
     "wifiLogins": {
       ".read": "auth != null",
       ".write": "auth != null && auth.token.admin === true"
