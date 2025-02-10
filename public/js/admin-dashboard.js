@@ -575,7 +575,7 @@ async function viewRewardDetails(rewardId) {
     }
 }
 
-//**
+/**
 * Handles reward approval
 * @param {string} rewardId - ID of the reward to approve
 */
