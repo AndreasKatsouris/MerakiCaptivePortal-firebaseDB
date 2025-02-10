@@ -576,139 +576,144 @@ async function viewRewardDetails(rewardId) {
 }
 
 /**
-* Handles reward approval
-* @param {string} rewardId - ID of the reward to approve
-*/
+ * Handles reward approval
+ * @param {string} rewardId - ID of the reward to approve
+ */
 async function handleRewardApproval(rewardId) {
-   try {
+    try {
+        // Initial checks
         const currentUser = firebase.auth().currentUser;
         if (!currentUser) {
             throw new Error('User not authenticated');
         }
 
-        // Get ID token result to check admin claim
-        const idTokenResult = await currentUser.getIdTokenResult();
-        console.log('User token claims:', idTokenResult.claims);
-        
-        if (!idTokenResult.claims.admin) {
-            throw new Error('User does not have admin privileges');
+        // Check if reward exists
+        const rewardRef = firebase.database().ref(`rewards/${rewardId}`);
+        const rewardSnapshot = await rewardRef.once('value');
+        const reward = rewardSnapshot.val();
+
+        if (!reward) {
+            throw new Error('Reward not found');
         }
-       // First verify the reward exists and we have permission to modify it
-       const rewardSnapshot = await firebase.database().ref(`rewards/${rewardId}`).once('value');
-       const reward = rewardSnapshot.val();
-       
-       if (!reward) {
-           throw new Error('Reward not found');
-       }
 
-       // Get reward types for selection
-       const rewardTypesSnapshot = await firebase.database().ref('rewardTypes').once('value');
-       const rewardTypes = rewardTypesSnapshot.val() || {};
-       
-       if (Object.keys(rewardTypes).length === 0) {
-           throw new Error('No reward types available');
-       }
+        if (reward.status === 'approved') {
+            throw new Error('Reward already approved');
+        }
 
-       // Show approval dialog
-       const result = await Swal.fire({
-           title: 'Approve Reward',
-           html: `
-               <div class="form-group mb-3">
-                   <label>Select Reward Type</label>
-                   <select id="rewardTypeSelect" class="swal2-select">
-                       ${Object.entries(rewardTypes).map(([id, type]) => 
-                           `<option value="${id}">${type.name}</option>`
-                       ).join('')}
-                   </select>
-               </div>
-               <div class="form-group">
-                   <label>Message to Guest</label>
-                   <textarea id="guestMessage" class="swal2-textarea" 
-                       placeholder="Enter message that will be sent to guest"></textarea>
-               </div>
-           `,
-           focusConfirm: false,
-           showCancelButton: true,
-           confirmButtonText: 'Approve',
-           cancelButtonText: 'Cancel',
-           preConfirm: () => {
-               const rewardType = document.getElementById('rewardTypeSelect').value;
-               const message = document.getElementById('guestMessage').value;
-               
-               if (!rewardType) {
-                   Swal.showValidationMessage('Please select a reward type');
-                   return false;
-               }
-               
-               return { rewardType, message };
-           }
-       });
+        // Get available reward types
+        const rewardTypesSnapshot = await firebase.database().ref('rewardTypes').once('value');
+        const rewardTypes = rewardTypesSnapshot.val() || {};
+        
+        if (Object.keys(rewardTypes).length === 0) {
+            throw new Error('No reward types available');
+        }
 
-       if (result.isConfirmed) {
-           showLoading();
-           
-           const currentUser = firebase.auth().currentUser;
-           if (!currentUser) {
-               throw new Error('User not authenticated');
-           }
+        // Show approval dialog
+        const result = await Swal.fire({
+            title: 'Approve Reward',
+            html: `
+                <div class="form-group mb-3">
+                    <label>Select Reward Type</label>
+                    <select id="rewardTypeSelect" class="swal2-select">
+                        ${Object.entries(rewardTypes).map(([id, type]) => 
+                            `<option value="${id}">${type.name}</option>`
+                        ).join('')}
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label>Message to Guest</label>
+                    <textarea id="guestMessage" class="swal2-textarea" 
+                        placeholder="Enter message that will be sent to guest"></textarea>
+                </div>
+            `,
+            focusConfirm: false,
+            showCancelButton: true,
+            confirmButtonText: 'Approve',
+            cancelButtonText: 'Cancel',
+            preConfirm: () => {
+                const rewardType = document.getElementById('rewardTypeSelect').value;
+                const message = document.getElementById('guestMessage').value;
+                
+                if (!rewardType) {
+                    Swal.showValidationMessage('Please select a reward type');
+                    return false;
+                }
+                
+                return { rewardType, message };
+            }
+        });
 
-           // Create update object
-           const updateData = {
-               status: 'approved',
-               rewardTypeId: result.value.rewardType,
-               guestMessage: result.value.message,
-               approvedAt: firebase.database.ServerValue.TIMESTAMP,
-               approvedBy: currentUser.uid
-           };
+        if (result.isConfirmed) {
+            showLoading();
 
-           // Perform updates in a transaction to ensure data consistency
-           await firebase.database().ref(`rewards/${rewardId}`).transaction(currentData => {
-               if (!currentData) return null; // Abort if reward doesn't exist
-               if (currentData.status === 'approved') return; // Abort if already approved
-               
-               return {
-                   ...currentData,
-                   ...updateData
-               };
-           });
+            // Use transaction for atomic update
+            await rewardRef.transaction((currentData) => {
+                if (!currentData) return null; // Abort if reward doesn't exist
+                if (currentData.status === 'approved') return currentData; // No change if already approved
 
-           // Update guest-rewards index if needed
-           if (reward.guestPhone) {
-               await firebase.database()
-                   .ref(`guest-rewards/${reward.guestPhone}/${rewardId}`)
-                   .update({ status: 'approved' });
-           }
+                return {
+                    ...currentData,
+                    status: 'approved',
+                    rewardTypeId: result.value.rewardType,
+                    guestMessage: result.value.message,
+                    approvedAt: firebase.database.ServerValue.TIMESTAMP,
+                    approvedBy: currentUser.uid
+                };
+            });
 
-           // Send notification after successful update
-           try {
-               await sendWhatsAppNotification(rewardId, result.value.message);
-           } catch (notificationError) {
-               console.error('Error sending notification:', notificationError);
-               // Continue even if notification fails
-           }
+            // Update guest-rewards index
+            if (reward.guestPhone) {
+                await firebase.database()
+                    .ref(`guest-rewards/${reward.guestPhone}/${rewardId}`)
+                    .update({
+                        status: 'approved',
+                        updatedAt: firebase.database.ServerValue.TIMESTAMP
+                    });
+            }
 
-           // Refresh rewards list
-           await loadRewards();
-           
-           Swal.fire('Approved!', 'Reward has been approved and guest notified.', 'success');
-       }
-   } catch (error) {
-       console.error('Error approving reward:', {
-           error,
-           rewardId,
-           currentUser: firebase.auth().currentUser?.uid,
-           timestamp: new Date().toISOString()
-       });
-       
-       let errorMessage = 'Failed to approve reward';
-       if (error.code === 'PERMISSION_DENIED') {
-           errorMessage = 'You do not have permission to approve rewards. Please contact an administrator.';
-       }
-       
-       Swal.fire('Error', errorMessage, 'error');
-   } finally {
-       hideLoading();
-   }
+            // Send notification
+            try {
+                await sendWhatsAppNotification(rewardId, result.value.message);
+            } catch (notificationError) {
+                console.error('Notification error:', notificationError);
+                // Continue even if notification fails
+            }
+
+            // Refresh rewards list
+            await loadRewards();
+            
+            Swal.fire({
+                icon: 'success',
+                title: 'Approved!',
+                text: 'Reward has been approved and guest notified.',
+                timer: 2000,
+                showConfirmButton: false
+            });
+        }
+    } catch (error) {
+        console.error('Error approving reward:', {
+            error,
+            rewardId,
+            userId: firebase.auth().currentUser?.uid,
+            timestamp: new Date().toISOString()
+        });
+
+        let errorMessage = 'Failed to approve reward';
+        
+        if (error.code === 'PERMISSION_DENIED') {
+            errorMessage = 'You do not have permission to approve rewards';
+        } else if (error.message) {
+            errorMessage = error.message;
+        }
+
+        Swal.fire({
+            icon: 'error',
+            title: 'Error',
+            text: errorMessage
+        });
+    } finally {
+        hideLoading();
+    }
 }
 
 /**
