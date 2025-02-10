@@ -274,7 +274,7 @@ function isTimeInRange(time, start, end) {
  * Send WhatsApp notifications for created rewards
  */
 async function sendRewardNotifications(guest, rewards) {
-    const { sendWhatsAppNotification } = require('./receiveWhatsappMessage');
+    const { sendWhatsAppMessage } = require('./receiveWhatsappMessage');
     
     const rewardMessages = rewards.map(reward => 
         `• ${reward.metadata.description}`
@@ -282,7 +282,7 @@ async function sendRewardNotifications(guest, rewards) {
 
     const message = `Congratulations ${guest.name}! You've earned:\n${rewardMessages}\n\nCheck your rewards anytime by replying "view rewards"`;
     
-    await sendWhatsAppNotification(guest.phoneNumber, message);
+    await sendWhatsAppMessage(guest.phoneNumber, message);
 }
 
 /**
