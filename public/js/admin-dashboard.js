@@ -101,7 +101,6 @@ async function initializeFirebaseFeatures() {
 
 // ==================== Authentication Section ====================
 function initializeAuthentication() {
-    // Set auth persistence
     firebase.auth().setPersistence(firebase.auth.Auth.Persistence.SESSION)
         .then(() => {
             console.log('Firebase Auth persistence set to SESSION');
@@ -110,39 +109,31 @@ function initializeAuthentication() {
             console.error('Error setting auth persistence:', error);
         });
 
-    // Add auth state observer
     firebase.auth().onAuthStateChanged(async (user) => {
-        currentUser = user;
         if (user) {
             console.log('User is signed in:', user.email);
             try {
-                // Force token refresh to get latest claims
+                // Call the admin claim function
+                const setAdminClaimFunction = firebase.functions().httpsCallable('setAdminClaim');
+                const result = await setAdminClaimFunction({ email: user.email });
+                console.log('Admin claim result:', result.data);
+
+                // Force token refresh
                 await user.getIdToken(true);
+                
+                // Check if admin claim was set
                 const tokenResult = await user.getIdTokenResult();
-                console.log('User claims:', tokenResult.claims);
-
+                console.log('Updated claims:', tokenResult.claims);
+                
                 if (!tokenResult.claims.admin) {
-                    // Try to set admin claim
-                    const setAdminClaimFunction = firebase.functions().httpsCallable('setAdminClaim');
-                    const result = await setAdminClaimFunction({ email: user.email });
-                    console.log('Admin claim result:', result.data);
-
-                    if (result.data.isAdmin) {
-                        // Refresh token to get new claims
-                        await user.getIdToken(true);
-                        window.location.reload();
-                    } else {
-                        console.log('User is not an admin, redirecting to login');
-                        await firebase.auth().signOut();
-                        window.location.href = 'admin-login.html';
-                    }
+                    console.log('User is not an admin');
+                    await firebase.auth().signOut();
+                    window.location.href = 'admin-login.html';
                 }
             } catch (error) {
-                console.error('Error checking/setting admin claim:', error);
-                window.location.href = 'admin-login.html';
+                console.error('Error checking admin status:', error);
             }
         } else {
-            console.log('No user is signed in, redirecting to login');
             window.location.href = 'admin-login.html';
         }
     });
