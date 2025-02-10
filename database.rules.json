@@ -41,8 +41,7 @@
       ".read": "auth != null",
       ".write": "auth != null",
       "$dataId": {
-        ".write": "auth != null",
-        ".delete": "auth != null"
+        ".write": "auth != null"
       }
     },
 
