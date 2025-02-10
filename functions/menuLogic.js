@@ -75,6 +75,23 @@ const COMMANDS = {
  * @returns {Promise<Object>} Processing result
  */
 async function processMessage(message, phoneNumber) {
+    // Input validation
+    if (!message || typeof message !== 'string') {
+        console.error('Invalid message format:', message);
+        return {
+            success: false,
+            message: 'Invalid message format. Please try again.'
+        };
+    }
+
+    if (!phoneNumber || typeof phoneNumber !== 'string' || !/^\+?\d{10,}$/.test(phoneNumber)) {
+        console.error('Invalid phone number format:', phoneNumber);
+        return {
+            success: false,
+            message: 'Invalid phone number format. Please try again.'
+        };
+    }
+
     console.log(`Processing message: "${message}" from ${phoneNumber}`);
     
     const normalizedMessage = message.toLowerCase().trim();
@@ -108,9 +125,22 @@ async function processMessage(message, phoneNumber) {
  * @returns {Promise<number>} Point balance
  */
 async function getGuestPoints(phoneNumber) {
+    if (!phoneNumber || typeof phoneNumber !== 'string') {
+        console.error('Invalid phone number:', phoneNumber);
+        throw new Error('Invalid phone number format');
+    }
+
     try {
         const snapshot = await admin.database().ref(`guests/${phoneNumber}/points`).once('value');
-        return snapshot.val() || 0;
+        const points = snapshot.val();
+        
+        // Validate points value
+        if (points !== null && (!Number.isFinite(points) || points < 0)) {
+            console.error('Invalid points value in database:', points);
+            throw new Error('Invalid points data');
+        }
+        
+        return points || 0;
     } catch (error) {
         console.error('Error fetching points:', error);
         throw new Error('Failed to fetch points');
@@ -123,15 +153,39 @@ async function getGuestPoints(phoneNumber) {
  * @returns {Promise<Array>} List of rewards
  */
 async function getGuestRewards(phoneNumber) {
+    if (!phoneNumber || typeof phoneNumber !== 'string') {
+        console.error('Invalid phone number:', phoneNumber);
+        throw new Error('Invalid phone number format');
+    }
+
     try {
         const snapshot = await admin.database().ref(`guest-rewards/${phoneNumber}`).once('value');
         const rewards = snapshot.val() || {};
         
+        // Validate rewards object
+        if (typeof rewards !== 'object') {
+            console.error('Invalid rewards data format:', rewards);
+            throw new Error('Invalid rewards data format');
+        }
+
         // Fetch full reward details
         const rewardDetails = await Promise.all(
             Object.keys(rewards).map(async (rewardId) => {
-                const rewardSnapshot = await admin.database().ref(`rewards/${rewardId}`).once('value');
-                return rewardSnapshot.val();
+                try {
+                    const rewardSnapshot = await admin.database().ref(`rewards/${rewardId}`).once('value');
+                    const reward = rewardSnapshot.val();
+                    
+                    // Validate reward object structure
+                    if (!reward || !reward.status || !reward.expiresAt || !reward.metadata) {
+                        console.error('Invalid reward structure:', rewardId, reward);
+                        return null;
+                    }
+                    
+                    return reward;
+                } catch (error) {
+                    console.error(`Error fetching reward ${rewardId}:`, error);
+                    return null;
+                }
             })
         );
 
