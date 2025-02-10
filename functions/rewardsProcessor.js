@@ -1,13 +1,13 @@
 const admin = require('firebase-admin');
 
 /**
- * Process rewards for a validated receipt against campaign reward types
- * @param {object} guest - Guest data
- * @param {object} campaign - Campaign data with reward types
- * @param {object} receiptData - Validated receipt data
- * @returns {Promise<object>} Processing result
+ * Main function to process rewards for a validated receipt
+ * Handles receipt validation, reward creation, notifications, and rollback on failure
+ * @param {object} guest - Guest data containing phone number and name
+ * @param {object} campaign - Campaign data with reward types and criteria
+ * @param {object} receiptData - Validated receipt data with total amount and items
+ * @returns {Promise<object>} Processing result with created rewards
  */
-
 async function processReward(guest, campaign, receiptData) {
     const campaignId = campaign.id || campaign.name.replace(/\s+/g, '_').toLowerCase();
     let createdRewards = [];
@@ -27,15 +27,16 @@ async function processReward(guest, campaign, receiptData) {
                     campaignId: campaignId
                 };
             });
+
+        // Create rewards after successful receipt validation
+        const rewardUpdates = {};
+        for (const rewardType of campaign.rewardTypes) {
+            const rewardRef = admin.database().ref('rewards').push().key;
             console.log('Reward type data:', {
                 type: rewardType.type,
                 typeId: rewardType.typeId,
                 criteria: rewardType.criteria
             });
-        // Create rewards after successful receipt validation
-        const rewardUpdates = {};
-        for (const rewardType of campaign.rewardTypes) {
-            const rewardRef = admin.database().ref('rewards').push().key;
             const reward = createRewardObject(rewardType, guest, campaign, receiptData);
             
             rewardUpdates[`rewards/${rewardRef}`] = reward;
@@ -70,7 +71,9 @@ async function processReward(guest, campaign, receiptData) {
 }
 
 /**
- * Validate all reward processing inputs
+ * Validates all required input parameters for reward processing
+ * Checks for presence of guest phone number, campaign details, and receipt data
+ * @throws {Error} If any required fields are missing
  */
 function validateInputs(guest, campaign, receiptData) {
     if (!guest?.phoneNumber) {
@@ -87,7 +90,10 @@ function validateInputs(guest, campaign, receiptData) {
 }
 
 /**
- * Process each reward type and determine eligibility
+ * Processes each reward type in a campaign to determine eligible rewards
+ * Checks eligibility criteria and creates reward objects for qualifying types
+ * @throws {Error} If no eligible rewards are found
+ * @returns {Promise<Array>} Array of eligible reward objects
  */
 async function processRewardTypes(guest, campaign, receiptData) {
     const eligibleRewards = [];
@@ -107,7 +113,9 @@ async function processRewardTypes(guest, campaign, receiptData) {
 }
 
 /**
- * Check if a reward type's criteria are met
+ * Evaluates if a receipt qualifies for a specific reward type
+ * Checks purchase amount, reward limits, store restrictions, required items, and time constraints
+ * @returns {Promise<boolean>} True if eligible, false otherwise
  */
 async function checkRewardEligibility(rewardType, receiptData, guest) {
     const { criteria } = rewardType;
@@ -169,7 +177,9 @@ async function checkRewardEligibility(rewardType, receiptData, guest) {
 }
 
 /**
- * Create reward object based on reward type
+ * Creates a standardized reward object with all necessary metadata
+ * Includes reward type, guest info, campaign details, and expiry calculations
+ * @returns {object} Formatted reward object
  */
 function createRewardObject(rewardType, guest, campaign, receiptData) {
     // Validate required fields
@@ -201,6 +211,11 @@ function createRewardObject(rewardType, guest, campaign, receiptData) {
     };
 }
 
+/**
+ * Determines the reward type category based on criteria or explicit type
+ * Categories include points, discount_percent, discount_amount, free_item, or standard
+ * @returns {string} Reward type category
+ */
 function determineRewardType(rewardType) {
     // If type is explicitly set, use it
     if (rewardType.type) {
@@ -219,6 +234,11 @@ function determineRewardType(rewardType) {
     return 'standard';
 }
 
+/**
+ * Calculates the numerical value of a reward based on its type and receipt amount
+ * Handles points multiplication, fixed discounts, and percentage-based calculations
+ * @returns {number} Calculated reward value
+ */
 function calculateRewardValue(rewardType, receiptAmount) {
     const type = determineRewardType(rewardType);
     
@@ -237,6 +257,11 @@ function calculateRewardValue(rewardType, receiptAmount) {
     }
 }
 
+/**
+ * Generates a human-readable description of the reward
+ * Formats the description based on reward type and value
+ * @returns {string} Reward description
+ */
 function getRewardDescription(rewardType) {
     const type = determineRewardType(rewardType);
 
@@ -258,7 +283,9 @@ function getRewardDescription(rewardType) {
 }
 
 /**
- * Calculate reward expiry date
+ * Calculates the expiry date for a reward
+ * Uses reward type validity days or defaults to 30 days
+ * @returns {number} Timestamp of expiry date
  */
 function calculateExpiryDate(rewardType) {
     const now = new Date();
@@ -268,44 +295,9 @@ function calculateExpiryDate(rewardType) {
 }
 
 /**
- * Calculate reward value based on type and receipt amount
- */
-function calculateRewardValue(rewardType, receiptAmount) {
-    switch (rewardType.type) {
-        case 'points':
-            return Math.floor(receiptAmount * (rewardType.pointsMultiplier || 1));
-        case 'discount_amount':
-            return rewardType.value;
-        case 'discount_percent':
-            return Math.min(
-                rewardType.maxValue || Infinity,
-                (receiptAmount * (rewardType.value / 100))
-            );
-        default:
-            return 0;
-    }
-}
-
-/**
- * Generate human-readable reward description
- */
-function getRewardDescription(rewardType) {
-    switch (rewardType.type) {
-        case 'points':
-            return `${rewardType.value} points reward`;
-        case 'discount_amount':
-            return `R${rewardType.value} off your next purchase`;
-        case 'discount_percent':
-            return `${rewardType.value}% off your next purchase`;
-        case 'free_item':
-            return `Free ${rewardType.itemName}`;
-        default:
-            return 'Reward';
-    }
-}
-
-/**
- * Count existing rewards of a type for a user
+ * Retrieves the count of existing rewards for a specific user and type
+ * Used for enforcing maximum reward limits
+ * @returns {Promise<number>} Count of existing rewards
  */
 async function countUserRewardsForType(phoneNumber, typeId) {
     const snapshot = await admin.database()
@@ -319,7 +311,9 @@ async function countUserRewardsForType(phoneNumber, typeId) {
 }
 
 /**
- * Check if time is within range
+ * Checks if a given time falls within a specified range
+ * Used for time-restricted rewards
+ * @returns {boolean} True if time is within range
  */
 function isTimeInRange(time, start, end) {
     const timeValue = time.getHours() * 60 + time.getMinutes();
@@ -330,7 +324,8 @@ function isTimeInRange(time, start, end) {
 }
 
 /**
- * Send WhatsApp notifications for created rewards
+ * Sends WhatsApp notifications to guests about their earned rewards
+ * Formats a message with all reward descriptions
  */
 async function sendRewardNotifications(guest, rewards) {
     const { sendWhatsAppMessage } = require('./receiveWhatsappMessage');
@@ -345,7 +340,9 @@ async function sendRewardNotifications(guest, rewards) {
 }
 
 /**
- * Rollback rewards in case of error
+ * Handles rollback of created rewards in case of processing errors
+ * Removes rewards from all relevant database paths
+ * @throws {Error} If rollback fails, indicating need for manual intervention
  */
 async function rollbackRewards(rewards, phoneNumber, campaignId) {
     try {
