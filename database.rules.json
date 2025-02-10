@@ -20,8 +20,8 @@
   ".indexOn": ["status", "guestPhone", "campaignId"],
   "$rewardId": {
     ".read": true,
-    ".write": "auth != null && (auth.token.admin === true ||!data.exists() ||data.child('status').val() !== 'approved')",
-    ".validate": "newData.hasChildren(['metadata', 'status', 'value', 'expiresAt']) && (debug('Write attempt:', {'uid': auth.uid,'isAdmin': auth.token.admin,'status': newData.child('status').val()}))",
+    ".write": "auth != null && (auth.token.admin === true || !data.exists() || data.child('status').val() !== 'approved')",
+    ".validate": "newData.hasChildren(['metadata', 'status', 'value', 'expiresAt'])",
     "status": {
       ".validate": "newData.val().matches(/^(pending|active|used|expired|cancelled|approved)$/)"
     },
@@ -33,6 +33,18 @@
     },
     "metadata": {
       ".validate": "newData.hasChildren(['type']) && newData.child('type').isString()"
+    },
+    "approvedAt": {
+      ".validate": "!data.exists() || auth.token.admin === true"
+    },
+    "approvedBy": {
+      ".validate": "!data.exists() || auth.token.admin === true"
+    },
+    "rewardTypeId": {
+      ".validate": "!data.exists() || auth.token.admin === true"
+    },
+    "guestMessage": {
+      ".validate": "!data.exists() || auth.token.admin === true"
     }
   }
 },
