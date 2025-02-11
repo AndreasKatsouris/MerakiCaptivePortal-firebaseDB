@@ -9,6 +9,7 @@
     <script src="/__/firebase/10.12.5/firebase-auth-compat.js"></script>
     <script src="/__/firebase/10.12.5/firebase-functions-compat.js"></script>
     <script src="/__/firebase/init.js?useEmulator=false"></script>
+    <script src="/js/firebase-init-check.js"></script>
 
     <link rel="stylesheet" href="css/bootstrap.min.css">
     <link rel="stylesheet" href="css/style.css">
@@ -76,7 +77,15 @@
             const errorDiv = document.getElementById('errorMessage');
             errorDiv.textContent = message;
             errorDiv.style.display = 'block';
+            console.error('Error occurred:', message);
         }
+
+        // Verify Firebase initialization
+        document.addEventListener('DOMContentLoaded', () => {
+            console.log('Firebase app:', firebase.app());
+            console.log('Firebase functions:', firebase.functions());
+            console.log('Firebase auth:', firebase.auth());
+        });
 
         // Handle login form submission
         document.getElementById('loginForm').addEventListener('submit', async function(event) {
@@ -87,30 +96,46 @@
             setLoading(true);
             
             try {
+                console.log('Starting login process...');
                 const email = document.getElementById('adminEmail').value;
                 const password = document.getElementById('adminPassword').value;
                 
+                console.log('Attempting sign in...');
                 // Sign in with Firebase Auth
                 const userCredential = await firebase.auth().signInWithEmailAndPassword(email, password);
+                console.log('Sign in successful:', userCredential.user.email);
                 
-                // Call the admin claim function using callable functions
-                const setAdminClaimFunction = firebase.functions().httpsCallable('setAdminClaim');
+                // Initialize the callable function
+                console.log('Initializing callable function...');
+                const functions = firebase.functions();
+                console.log('Functions initialized:', functions);
+                
+                const setAdminClaimFunction = functions.httpsCallable('setAdminClaim');
+                console.log('Callable function created');
+                
+                console.log('Calling setAdminClaim function...');
                 const result = await setAdminClaimFunction({ email });
+                console.log('Function result:', result);
                 
                 // Force token refresh
+                console.log('Refreshing token...');
                 await userCredential.user.getIdToken(true);
                 
                 // Check admin claim
+                console.log('Checking admin claim...');
                 const tokenResult = await userCredential.user.getIdTokenResult();
+                console.log('Token claims:', tokenResult.claims);
                 
                 if (tokenResult.claims.admin) {
+                    console.log('Admin claim verified, redirecting...');
                     window.location.href = 'admin-dashboard.html';
                 } else {
+                    console.log('Not an admin user');
                     await firebase.auth().signOut();
                     throw new Error('Access denied: Not an admin user');
                 }
             } catch (error) {
-                console.error('Login failed:', error);
+                console.error('Login process failed:', error);
                 showError(error.message || 'Login failed');
                 // Sign out user if login failed
                 try {
