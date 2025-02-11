@@ -7,15 +7,23 @@ exports.setAdminClaim = functions.https.onCall(async (data, context) => {
 
     try {
         // Validate input data
-        if (!data || !data.email) {
-            console.error('Missing email in request data');
+        if (!data || !data.email || typeof data.email !== 'string') {
+            console.error('Invalid or missing email in request data');
             throw new functions.https.HttpsError(
                 'invalid-argument',
-                'Email is required'
+                'A valid email is required'
             );
         }
 
         const email = data.email.trim().toLowerCase();
+        if (!email) {
+            console.error('Empty email provided');
+            throw new functions.https.HttpsError(
+                'invalid-argument',
+                'Email cannot be empty'
+            );
+        }
+
         console.log('Processing email:', email);
 
         // List of admin emails
