@@ -9,7 +9,6 @@
     <script src="/__/firebase/10.12.5/firebase-functions-compat.js"></script>
     <script src="/__/firebase/init.js?useEmulator=false"></script>
 
-    <!-- Bootstrap CSS -->
     <link rel="stylesheet" href="css/bootstrap.min.css">
     <link rel="stylesheet" href="css/style.css">
 </head>
@@ -23,16 +22,35 @@
                     </div>
                     <div class="card-body">
                         <div id="errorMessage" class="alert alert-danger" style="display: none;"></div>
+                        <div id="loadingIndicator" class="text-center" style="display: none;">
+                            <div class="spinner-border text-primary" role="status">
+                                <span class="visually-hidden">Loading...</span>
+                            </div>
+                        </div>
                         <form id="loginForm">
                             <div class="form-group mb-3">
                                 <label for="adminEmail">Email</label>
-                                <input type="email" class="form-control" id="adminEmail" required>
+                                <input 
+                                    type="email" 
+                                    class="form-control" 
+                                    id="adminEmail" 
+                                    required 
+                                    autocomplete="username"
+                                    name="email">
                             </div>
                             <div class="form-group mb-3">
                                 <label for="adminPassword">Password</label>
-                                <input type="password" class="form-control" id="adminPassword" required>
+                                <input 
+                                    type="password" 
+                                    class="form-control" 
+                                    id="adminPassword" 
+                                    required 
+                                    autocomplete="current-password"
+                                    name="password">
                             </div>
-                            <button type="submit" class="btn btn-primary w-100">Login</button>
+                            <button type="submit" class="btn btn-primary w-100" id="loginButton">
+                                Login
+                            </button>
                         </form>
                     </div>
                 </div>
@@ -41,31 +59,62 @@
     </div>
 
     <script>
+        // Function to show/hide loading state
+        function setLoading(isLoading) {
+            const loadingIndicator = document.getElementById('loadingIndicator');
+            const loginForm = document.getElementById('loginForm');
+            const loginButton = document.getElementById('loginButton');
+            
+            loadingIndicator.style.display = isLoading ? 'block' : 'none';
+            loginForm.style.opacity = isLoading ? '0.5' : '1';
+            loginButton.disabled = isLoading;
+        }
+
+        // Function to show error message
+        function showError(message) {
+            const errorDiv = document.getElementById('errorMessage');
+            errorDiv.textContent = message;
+            errorDiv.style.display = 'block';
+        }
+
+        // Handle login form submission
         document.getElementById('loginForm').addEventListener('submit', async function(event) {
             event.preventDefault();
             
             // Hide any existing error messages
-            const errorDiv = document.getElementById('errorMessage');
-            errorDiv.style.display = 'none';
+            document.getElementById('errorMessage').style.display = 'none';
+            setLoading(true);
             
             try {
                 const email = document.getElementById('adminEmail').value;
                 const password = document.getElementById('adminPassword').value;
                 
-                // Sign in
+                // Sign in with Firebase Auth
                 const userCredential = await firebase.auth().signInWithEmailAndPassword(email, password);
                 
-                // Call the admin claim function
-                const setAdminClaimFunction = firebase.functions().httpsCallable('setAdminClaim');
-                const result = await setAdminClaimFunction({ email });
+                // Get the ID token
+                const idToken = await userCredential.user.getIdToken();
                 
-                // Force token refresh
-                await userCredential.user.getIdToken(true);
+                // Make request to your Cloud Function
+                const functionUrl = 'https://us-central1-merakicaptiveportal-firebasedb.cloudfunctions.net/setAdminClaim';
+                const response = await fetch(functionUrl, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': `Bearer ${idToken}`
+                    },
+                    body: JSON.stringify({ email })
+                });
+
+                if (!response.ok) {
+                    throw new Error('Failed to set admin claim');
+                }
+
+                const result = await response.json();
                 
-                // Check admin claim
-                const tokenResult = await userCredential.user.getIdTokenResult();
-                
-                if (tokenResult.claims.admin) {
+                if (result.isAdmin) {
+                    // Force token refresh
+                    await userCredential.user.getIdToken(true);
                     window.location.href = 'admin-dashboard.html';
                 } else {
                     await firebase.auth().signOut();
@@ -73,8 +122,10 @@
                 }
             } catch (error) {
                 console.error('Login failed:', error);
-                errorDiv.textContent = error.message;
-                errorDiv.style.display = 'block';
+                showError(error.message);
+                await firebase.auth().signOut();
+            } finally {
+                setLoading(false);
             }
         });
     </script>
