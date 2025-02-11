@@ -5,10 +5,10 @@
     <title>Admin Login</title>
     
     <!-- Firebase SDKs -->
-    <script defer src="/__/firebase/10.12.5/firebase-app-compat.js"></script>
-    <script defer src="/__/firebase/10.12.5/firebase-auth-compat.js"></script>
-    <script defer src="/__/firebase/10.12.5/firebase-functions-compat.js"></script>
-    <script defer src="/__/firebase/init.js?useEmulator=false"></script>
+    <script src="/__/firebase/10.12.5/firebase-app-compat.js"></script>
+    <script src="/__/firebase/10.12.5/firebase-auth-compat.js"></script>
+    <script src="/__/firebase/10.12.5/firebase-functions-compat.js"></script>
+    <script src="/__/firebase/init.js?useEmulator=false"></script>
 
     <link rel="stylesheet" href="css/bootstrap.min.css">
     <link rel="stylesheet" href="css/style.css">
@@ -46,29 +46,16 @@
     </div>
 
     <script>
-        // Wait for Firebase to initialize
-        window.addEventListener('load', function() {
-            console.log('Page loaded, checking Firebase initialization...');
-            
-            // Check if Firebase is initialized
-            if (firebase.app()) {
-                console.log('Firebase initialized successfully');
-                console.log('Auth instance:', firebase.auth());
-                console.log('Functions instance:', firebase.functions());
-                
-                // Set up auth state listener
-                firebase.auth().onAuthStateChanged((user) => {
-                    console.log('Auth state changed:', user ? `User logged in: ${user.email}` : 'No user');
-                    if (user) {
-                        console.log('User ID:', user.uid);
-                        console.log('Email verified:', user.emailVerified);
-                        user.getIdTokenResult().then(tokenResult => {
-                            console.log('User claims:', tokenResult.claims);
-                        });
-                    }
+        // Initialize Firebase Functions
+        const functions = firebase.functions();
+
+        // Handle auth state changes
+        firebase.auth().onAuthStateChanged((user) => {
+            console.log('Auth state changed:', user ? `User logged in: ${user.email}` : 'No user');
+            if (user) {
+                user.getIdTokenResult().then(token => {
+                    console.log('User token claims:', token.claims);
                 });
-            } else {
-                console.error('Firebase not initialized!');
             }
         });
 
@@ -86,69 +73,88 @@
             const errorDiv = document.getElementById('errorMessage');
             errorDiv.textContent = message;
             errorDiv.style.display = 'block';
-            console.error('Error shown to user:', message);
+            console.error('Error:', message);
         }
 
-        // Inside your submit event listener, replace the function call section with:
+        async function setAdminClaim(user, email) {
+            try {
+                // Get a fresh token
+                const token = await user.getIdToken(true);
+                console.log('Got fresh token');
 
-document.getElementById('loginForm').addEventListener('submit', async function(event) {
-    event.preventDefault();
-    document.getElementById('errorMessage').style.display = 'none';
-    setLoading(true);
+                // Create callable function
+                const setAdminClaimFunction = functions.httpsCallable('setAdminClaim');
+                
+                // Call the function
+                console.log('Calling setAdminClaim function...');
+                const result = await setAdminClaimFunction({ email });
+                console.log('Function result:', result.data);
 
-    try {
-        const email = document.getElementById('adminEmail').value.trim();
-        const password = document.getElementById('adminPassword').value;
-
-        console.log('Starting login process for:', email);
-        
-        // 1. Sign in
-        console.log('Attempting sign in...');
-        const userCredential = await firebase.auth().signInWithEmailAndPassword(email, password);
-        console.log('Sign in successful:', userCredential.user.email);
-
-        // 2. Get the ID token
-        const token = await userCredential.user.getIdToken();
-        console.log('Got ID token');
-
-        // 3. Create the callable function
-        const functions = firebase.functions();
-        const setAdminClaimFunction = functions.httpsCallable('setAdminClaim');
-        
-        // 4. Call the function
-        console.log('Calling setAdminClaim function...');
-        const result = await setAdminClaimFunction({
-            email: email  // Pass email in the data
-        });
-        console.log('Function result:', result.data);
-
-        // 5. Check the result
-        if (result.data.success) {
-            // Force token refresh
-            await userCredential.user.getIdToken(true);
-            const tokenResult = await userCredential.user.getIdTokenResult();
-            console.log('New token claims:', tokenResult.claims);
-
-            if (tokenResult.claims.admin) {
-                window.location.href = '/admin-dashboard.html';
-                return;
+                return result.data;
+            } catch (error) {
+                console.error('Error setting admin claim:', error);
+                throw error;
             }
         }
 
-        throw new Error('Access denied: Not an admin user');
+        document.getElementById('loginForm').addEventListener('submit', async function(event) {
+            event.preventDefault();
+            document.getElementById('errorMessage').style.display = 'none';
+            setLoading(true);
 
-    } catch (error) {
-        console.error('Login error:', error);
-        showError(error.message);
-        try {
-            await firebase.auth().signOut();
-        } catch (signOutError) {
-            console.error('Sign out error:', signOutError);
-        }
-    } finally {
-        setLoading(false);
-    }
-});
+            try {
+                const email = document.getElementById('adminEmail').value.trim();
+                const password = document.getElementById('adminPassword').value;
+
+                console.log('Starting login process...');
+                
+                // Sign in
+                const userCredential = await firebase.auth().signInWithEmailAndPassword(email, password);
+                console.log('Sign in successful');
+
+                // Wait for auth state to fully update
+                await new Promise(resolve => {
+                    const unsubscribe = firebase.auth().onAuthStateChanged((user) => {
+                        if (user) {
+                            unsubscribe();
+                            resolve();
+                        }
+                    });
+                });
+
+                const user = firebase.auth().currentUser;
+                if (!user) {
+                    throw new Error('Failed to get current user');
+                }
+
+                // Set admin claim
+                const result = await setAdminClaim(user, email);
+                
+                if (result.success && result.isAdmin) {
+                    // Force token refresh and verify admin status
+                    await user.getIdToken(true);
+                    const tokenResult = await user.getIdTokenResult();
+                    
+                    if (tokenResult.claims.admin) {
+                        window.location.href = '/admin-dashboard.html';
+                        return;
+                    }
+                }
+
+                throw new Error('Access denied: Not an admin user');
+
+            } catch (error) {
+                console.error('Login error:', error);
+                showError(error.message);
+                try {
+                    await firebase.auth().signOut();
+                } catch (signOutError) {
+                    console.error('Sign out error:', signOutError);
+                }
+            } finally {
+                setLoading(false);
+            }
+        });
     </script>
 </body>
 </html>
