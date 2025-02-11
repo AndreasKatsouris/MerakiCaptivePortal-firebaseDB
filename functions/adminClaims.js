@@ -7,8 +7,12 @@ if (!admin.apps.length) {
 }
 
 exports.setAdminClaim = functions.https.onCall(async (data, context) => {
-    // Check if request is authorized
+    // Log the incoming request
+    console.log('Received request:', { data, auth: context.auth });
+
+    // Check authentication
     if (!context.auth) {
+        console.error('No auth context found');
         throw new functions.https.HttpsError(
             'unauthenticated',
             'User must be authenticated to perform this action.'
@@ -16,15 +20,10 @@ exports.setAdminClaim = functions.https.onCall(async (data, context) => {
     }
 
     try {
-        // The user's ID token will have already been verified by the Functions SDK
         const uid = context.auth.uid;
-        const email = context.auth.token.email;
+        const email = data.email.toLowerCase(); // Get email from data, not context
 
-        console.log('Processing request for:', {
-            uid: uid,
-            email: email,
-            existingClaims: context.auth.token.claims
-        });
+        console.log('Processing request for:', { uid, email });
 
         // List of admin emails
         const adminEmails = [
@@ -33,29 +32,17 @@ exports.setAdminClaim = functions.https.onCall(async (data, context) => {
         ];
 
         // Check if user should be admin
-        const isAdmin = adminEmails.includes(email.toLowerCase());
+        const isAdmin = adminEmails.includes(email);
+        console.log('Admin check:', { email, isAdmin, adminEmails });
 
         // Set custom claims
         await admin.auth().setCustomUserClaims(uid, { admin: isAdmin });
-
-        // Get a new token with updated claims
-        const updatedUser = await admin.auth().getUser(uid);
-
-        // Force token refresh
-        await admin.auth().revokeRefreshTokens(uid);
-
-        console.log('Updated user claims:', {
-            uid: uid,
-            email: email,
-            newClaims: updatedUser.customClaims,
-            tokenRevoked: true
-        });
+        console.log('Claims set successfully');
 
         return {
             success: true,
             isAdmin: isAdmin,
-            message: `Admin claim ${isAdmin ? 'set' : 'removed'} for ${email}`,
-            requiresRefresh: true
+            message: `Admin claim ${isAdmin ? 'set' : 'removed'} for ${email}`
         };
 
     } catch (error) {
