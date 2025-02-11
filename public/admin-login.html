@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <title>Admin Login</title>
     
-    <!-- Firebase SDK -->
+    <!-- Firebase SDKs -->
     <script src="/__/firebase/10.12.5/firebase-app-compat.js"></script>
     <script src="/__/firebase/10.12.5/firebase-auth-compat.js"></script>
     <script src="/__/firebase/10.12.5/firebase-functions-compat.js"></script>
@@ -31,27 +31,13 @@
                         <form id="loginForm">
                             <div class="form-group mb-3">
                                 <label for="adminEmail">Email</label>
-                                <input 
-                                    type="email" 
-                                    class="form-control" 
-                                    id="adminEmail" 
-                                    required 
-                                    autocomplete="username"
-                                    name="email">
+                                <input type="email" class="form-control" id="adminEmail" required>
                             </div>
                             <div class="form-group mb-3">
                                 <label for="adminPassword">Password</label>
-                                <input 
-                                    type="password" 
-                                    class="form-control" 
-                                    id="adminPassword" 
-                                    required 
-                                    autocomplete="current-password"
-                                    name="password">
+                                <input type="password" class="form-control" id="adminPassword" required>
                             </div>
-                            <button type="submit" class="btn btn-primary w-100" id="loginButton">
-                                Login
-                            </button>
+                            <button type="submit" class="btn btn-primary w-100" id="loginButton">Login</button>
                         </form>
                     </div>
                 </div>
@@ -60,7 +46,11 @@
     </div>
 
     <script>
-        // Function to show/hide loading state
+        // Initialize Firebase Auth listener
+        firebase.auth().onAuthStateChanged((user) => {
+            console.log('Auth state changed:', user ? 'User logged in' : 'No user');
+        });
+
         function setLoading(isLoading) {
             const loadingIndicator = document.getElementById('loadingIndicator');
             const loginForm = document.getElementById('loginForm');
@@ -71,7 +61,6 @@
             loginButton.disabled = isLoading;
         }
 
-        // Function to show error message
         function showError(message) {
             const errorDiv = document.getElementById('errorMessage');
             errorDiv.textContent = message;
@@ -79,62 +68,57 @@
         }
 
         document.getElementById('loginForm').addEventListener('submit', async function(event) {
-    event.preventDefault();
-    
-    // Hide any existing error messages
-    document.getElementById('errorMessage').style.display = 'none';
-    setLoading(true);
-    
-    try {
-        const email = document.getElementById('adminEmail').value.trim();
-        const password = document.getElementById('adminPassword').value;
-        
-        // 1. First sign in with Firebase Auth
-        console.log('Attempting sign in...');
-        const userCredential = await firebase.auth().signInWithEmailAndPassword(email, password);
-        console.log('Sign in successful');
+            event.preventDefault();
+            document.getElementById('errorMessage').style.display = 'none';
+            setLoading(true);
 
-        // 2. Wait a moment for auth state to fully update
-        await new Promise(resolve => setTimeout(resolve, 1000));
-        
-        // 3. Call the admin claim function with the email
-        console.log('Calling setAdminClaim...');
-        const setAdminClaimFunction = firebase.functions().httpsCallable('setAdminClaim');
-        const result = await setAdminClaimFunction({ email });
-        console.log('setAdminClaim result:', result.data);
-        
-        if (result.data.isAdmin) {
-            // 4. Force token refresh to get new claims
-            await userCredential.user.getIdToken(true);
-            
-            // 5. Get token result to verify claims
-            const tokenResult = await userCredential.user.getIdTokenResult();
-            
-            if (tokenResult.claims.admin) {
-                // Success! Redirect to dashboard
-                window.location.href = '/admin-dashboard.html';
-                return;
+            try {
+                const email = document.getElementById('adminEmail').value.trim();
+                const password = document.getElementById('adminPassword').value;
+
+                console.log('Starting login process...');
+                
+                // Sign in
+                const userCredential = await firebase.auth().signInWithEmailAndPassword(email, password);
+                console.log('User signed in:', userCredential.user.uid);
+
+                // Ensure we have the latest token
+                const idToken = await userCredential.user.getIdToken();
+                console.log('Got ID token');
+
+                // Call the admin claim function
+                const functions = firebase.functions();
+                const setAdminClaimFunction = functions.httpsCallable('setAdminClaim');
+                
+                console.log('Calling setAdminClaim function...');
+                const result = await setAdminClaimFunction({ email });
+                console.log('Function result:', result.data);
+
+                if (result.data.isAdmin) {
+                    // Force token refresh
+                    await userCredential.user.getIdToken(true);
+                    const tokenResult = await userCredential.user.getIdTokenResult();
+
+                    if (tokenResult.claims.admin) {
+                        window.location.href = '/admin-dashboard.html';
+                        return;
+                    }
+                }
+
+                throw new Error('Access denied: Not an admin user');
+
+            } catch (error) {
+                console.error('Login error:', error);
+                showError(error.message);
+                try {
+                    await firebase.auth().signOut();
+                } catch (signOutError) {
+                    console.error('Sign out error:', signOutError);
+                }
+            } finally {
+                setLoading(false);
             }
-        }
-        
-        // If we get here, user is not an admin
-        await firebase.auth().signOut();
-        throw new Error('Access denied: Not an admin user');
-        
-    } catch (error) {
-        console.error('Login failed:', error);
-        showError(error.message || 'Login failed');
-        
-        // Sign out user if login failed
-        try {
-            await firebase.auth().signOut();
-        } catch (signOutError) {
-            console.error('Error signing out:', signOutError);
-        }
-    } finally {
-        setLoading(false);
-    }
-});
+        });
     </script>
 </body>
 </html>
