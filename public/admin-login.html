@@ -114,7 +114,9 @@
                 console.log('Callable function created');
                 
                 console.log('Calling setAdminClaim function...');
-                const result = await setAdminClaimFunction({ email });
+                const result = await setAdminClaimFunction({ 
+                    email: userCredential.user.email 
+                });
                 console.log('Function result:', result);
                 
                 // Force token refresh
