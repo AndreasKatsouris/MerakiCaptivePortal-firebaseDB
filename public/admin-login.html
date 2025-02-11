@@ -89,74 +89,66 @@
             console.error('Error shown to user:', message);
         }
 
-        document.getElementById('loginForm').addEventListener('submit', async function(event) {
-            event.preventDefault();
-            document.getElementById('errorMessage').style.display = 'none';
-            setLoading(true);
+        // Inside your submit event listener, replace the function call section with:
 
-            try {
-                const email = document.getElementById('adminEmail').value.trim();
-                const password = document.getElementById('adminPassword').value;
+document.getElementById('loginForm').addEventListener('submit', async function(event) {
+    event.preventDefault();
+    document.getElementById('errorMessage').style.display = 'none';
+    setLoading(true);
 
-                console.log('Starting login process for:', email);
-                
-                // Sign in
-                console.log('Attempting sign in...');
-                const userCredential = await firebase.auth().signInWithEmailAndPassword(email, password);
-                console.log('Sign in successful:', userCredential.user.email);
-                
-                // Wait for auth state to stabilize
-                await new Promise(resolve => setTimeout(resolve, 2000));
-                
-                // Verify we're still signed in
-                const currentUser = firebase.auth().currentUser;
-                if (!currentUser) {
-                    throw new Error('User not authenticated after login');
-                }
-                console.log('Current user verified:', currentUser.email);
+    try {
+        const email = document.getElementById('adminEmail').value.trim();
+        const password = document.getElementById('adminPassword').value;
 
-                // Get fresh token
-                console.log('Getting fresh token...');
-                const idToken = await currentUser.getIdToken(true);
-                console.log('Got fresh token');
+        console.log('Starting login process for:', email);
+        
+        // 1. Sign in
+        console.log('Attempting sign in...');
+        const userCredential = await firebase.auth().signInWithEmailAndPassword(email, password);
+        console.log('Sign in successful:', userCredential.user.email);
 
-                // Call the admin claim function
-                console.log('Creating callable function...');
-                const setAdminClaimFunction = firebase.functions().httpsCallable('setAdminClaim');
-                
-                console.log('Calling setAdminClaim function...');
-                const result = await setAdminClaimFunction({ 
-                    email,
-                    idToken // Include the token explicitly
-                });
-                console.log('Function result:', result.data);
+        // 2. Get the ID token
+        const token = await userCredential.user.getIdToken();
+        console.log('Got ID token');
 
-                if (result.data.isAdmin) {
-                    // Force token refresh
-                    await currentUser.getIdToken(true);
-                    const tokenResult = await currentUser.getIdTokenResult();
-                    console.log('New token claims:', tokenResult.claims);
-
-                    if (tokenResult.claims.admin) {
-                        window.location.href = '/admin-dashboard.html';
-                        return;
-                    }
-                }
-
-                throw new Error('Access denied: Not an admin user');
-
-            } catch (error) {
-                console.error('Login error:', error);
-                showError(error.message);
-                try {
-                    await firebase.auth().signOut();
-                } catch (signOutError) {
-                    console.error('Sign out error:', signOutError);
-                }
-            } finally {
-                setLoading(false);
-            }
+        // 3. Create the callable function
+        const functions = firebase.functions();
+        const setAdminClaimFunction = functions.httpsCallable('setAdminClaim');
+        
+        // 4. Call the function
+        console.log('Calling setAdminClaim function...');
+        const result = await setAdminClaimFunction({
+            email: email  // Pass email in the data
         });
+        console.log('Function result:', result.data);
+
+        // 5. Check the result
+        if (result.data.success) {
+            // Force token refresh
+            await userCredential.user.getIdToken(true);
+            const tokenResult = await userCredential.user.getIdTokenResult();
+            console.log('New token claims:', tokenResult.claims);
+
+            if (tokenResult.claims.admin) {
+                window.location.href = '/admin-dashboard.html';
+                return;
+            }
+        }
+
+        throw new Error('Access denied: Not an admin user');
+
+    } catch (error) {
+        console.error('Login error:', error);
+        showError(error.message);
+        try {
+            await firebase.auth().signOut();
+        } catch (signOutError) {
+            console.error('Sign out error:', signOutError);
+        }
+    } finally {
+        setLoading(false);
+    }
+});
     </script>
 </body>
 </html>
