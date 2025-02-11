@@ -114,6 +114,7 @@
                 console.log('Callable function created');
                 
                 console.log('Calling setAdminClaim function...');
+                console.log('Data being sent to setAdminClaim:', { email: userCredential.user.email });
                 const result = await setAdminClaimFunction({ 
                     email: userCredential.user.email 
                 });
