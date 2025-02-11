@@ -3,6 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <title>Admin Login</title>
+    
     <!-- Firebase SDK -->
     <script src="/__/firebase/10.12.5/firebase-app-compat.js"></script>
     <script src="/__/firebase/10.12.5/firebase-auth-compat.js"></script>
@@ -92,29 +93,17 @@
                 // Sign in with Firebase Auth
                 const userCredential = await firebase.auth().signInWithEmailAndPassword(email, password);
                 
-                // Get the ID token
-                const idToken = await userCredential.user.getIdToken();
+                // Call the admin claim function using callable functions
+                const setAdminClaimFunction = firebase.functions().httpsCallable('setAdminClaim');
+                const result = await setAdminClaimFunction({ email });
                 
-                // Make request to your Cloud Function
-                const functionUrl = 'https://us-central1-merakicaptiveportal-firebasedb.cloudfunctions.net/setAdminClaim';
-                const response = await fetch(functionUrl, {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json',
-                        'Authorization': `Bearer ${idToken}`
-                    },
-                    body: JSON.stringify({ email })
-                });
-
-                if (!response.ok) {
-                    throw new Error('Failed to set admin claim');
-                }
-
-                const result = await response.json();
+                // Force token refresh
+                await userCredential.user.getIdToken(true);
                 
-                if (result.isAdmin) {
-                    // Force token refresh
-                    await userCredential.user.getIdToken(true);
+                // Check admin claim
+                const tokenResult = await userCredential.user.getIdTokenResult();
+                
+                if (tokenResult.claims.admin) {
                     window.location.href = 'admin-dashboard.html';
                 } else {
                     await firebase.auth().signOut();
@@ -122,8 +111,13 @@
                 }
             } catch (error) {
                 console.error('Login failed:', error);
-                showError(error.message);
-                await firebase.auth().signOut();
+                showError(error.message || 'Login failed');
+                // Sign out user if login failed
+                try {
+                    await firebase.auth().signOut();
+                } catch (signOutError) {
+                    console.error('Error signing out:', signOutError);
+                }
             } finally {
                 setLoading(false);
             }
