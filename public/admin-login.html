@@ -1,33 +1,57 @@
-<!-- admin-login.html -->
 <!DOCTYPE html>
 <html lang="en">
 <head>
     <meta charset="UTF-8">
     <title>Admin Login</title>
+    <!-- Firebase SDK -->
     <script src="/__/firebase/10.12.5/firebase-app-compat.js"></script>
     <script src="/__/firebase/10.12.5/firebase-auth-compat.js"></script>
     <script src="/__/firebase/10.12.5/firebase-functions-compat.js"></script>
     <script src="/__/firebase/init.js?useEmulator=false"></script>
 
+    <!-- Bootstrap CSS -->
     <link rel="stylesheet" href="css/bootstrap.min.css">
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/4.7.0/css/font-awesome.min.css">
     <link rel="stylesheet" href="css/style.css">
 </head>
 <body>
-    <h2>Admin Login</h2>
-    <form id="loginForm">
-        <input type="email" id="adminEmail" placeholder="Email" required>
-        <input type="password" id="adminPassword" placeholder="Password" required>
-        <button type="submit">Login</button>
-    </form>
+    <div class="container mt-5">
+        <div class="row justify-content-center">
+            <div class="col-md-6">
+                <div class="card">
+                    <div class="card-header">
+                        <h2 class="text-center">Admin Login</h2>
+                    </div>
+                    <div class="card-body">
+                        <div id="errorMessage" class="alert alert-danger" style="display: none;"></div>
+                        <form id="loginForm">
+                            <div class="form-group mb-3">
+                                <label for="adminEmail">Email</label>
+                                <input type="email" class="form-control" id="adminEmail" required>
+                            </div>
+                            <div class="form-group mb-3">
+                                <label for="adminPassword">Password</label>
+                                <input type="password" class="form-control" id="adminPassword" required>
+                            </div>
+                            <button type="submit" class="btn btn-primary w-100">Login</button>
+                        </form>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
 
     <script>
         document.getElementById('loginForm').addEventListener('submit', async function(event) {
             event.preventDefault();
-            const email = document.getElementById('adminEmail').value;
-            const password = document.getElementById('adminPassword').value;
+            
+            // Hide any existing error messages
+            const errorDiv = document.getElementById('errorMessage');
+            errorDiv.style.display = 'none';
             
             try {
+                const email = document.getElementById('adminEmail').value;
+                const password = document.getElementById('adminPassword').value;
+                
                 // Sign in
                 const userCredential = await firebase.auth().signInWithEmailAndPassword(email, password);
                 
@@ -45,11 +69,12 @@
                     window.location.href = 'admin-dashboard.html';
                 } else {
                     await firebase.auth().signOut();
-                    alert('Access denied: Not an admin user');
+                    throw new Error('Access denied: Not an admin user');
                 }
             } catch (error) {
                 console.error('Login failed:', error);
-                alert(error.message);
+                errorDiv.textContent = error.message;
+                errorDiv.style.display = 'block';
             }
         });
     </script>

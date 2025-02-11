@@ -47,4 +47,4 @@ exports.setAdminClaim = functions.https.onCall(async (data, context) => {
         console.error('Error setting admin claim:', error);
         throw new functions.https.HttpsError('internal', 'Error setting admin claim');
     }
-}); 
+});
