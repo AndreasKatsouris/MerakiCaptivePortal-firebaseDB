@@ -24,6 +24,56 @@
                 console.log('Lodash loaded successfully:', _.VERSION);
             }
         });
+
+
+    async function handleLogin(event) {
+    event.preventDefault();
+    setLoading(true);
+    document.getElementById('errorMessage').style.display = 'none';
+    
+    try {
+        const email = document.getElementById('adminEmail').value.trim();
+        const password = document.getElementById('adminPassword').value;
+        
+        // 1. Sign in with Firebase Auth
+        const userCredential = await firebase.auth().signInWithEmailAndPassword(email, password);
+        console.log('Successfully signed in:', userCredential.user.email);
+        
+        // 2. Call the admin claim function
+        const setAdminClaimFunction = firebase.functions().httpsCallable('setAdminClaim');
+        const result = await setAdminClaimFunction();  // No need to pass email, function gets it from context
+        console.log('setAdminClaim result:', result.data);
+        
+        if (result.data.requiresRefresh) {
+            // 3. Force token refresh as the claims have changed
+            await userCredential.user.getIdToken(true);
+        }
+        
+        // 4. Get fresh token result with new claims
+        const tokenResult = await userCredential.user.getIdTokenResult(true);
+        console.log('Token claims:', tokenResult.claims);
+        
+        if (tokenResult.claims.admin) {
+            // Add token to local storage for session management
+            localStorage.setItem('lastLoginAt', Date.now().toString());
+            window.location.href = '/admin-dashboard.html';
+        } else {
+            await firebase.auth().signOut();
+            throw new Error('Access denied: Not an admin user');
+        }
+    } catch (error) {
+        console.error('Login failed:', error);
+        showError(error.message || 'Login failed');
+        
+        try {
+            await firebase.auth().signOut();
+        } catch (signOutError) {
+            console.error('Error signing out:', signOutError);
+        }
+    } finally {
+        setLoading(false);
+    }
+}
     </script>
 
     <!-- Rest of your dependencies -->
@@ -48,8 +98,53 @@
     <script src="/__/firebase/10.12.5/firebase-database-compat.js"></script>
     <script src="/__/firebase/10.12.5/firebase-functions-compat.js"></script>
     <script src="/__/firebase/init.js?useEmulator=false"></script>
+
+    <script>
+        // Session verification - this runs before anything else
+        firebase.auth().onAuthStateChanged(async (user) => {
+            if (!user) {
+                // No user is signed in
+                window.location.href = '/admin-login.html';
+                return;
+            }
+
+            try {
+                // Get fresh token
+                const tokenResult = await user.getIdTokenResult(true);
+                
+                // Check if admin
+                if (!tokenResult.claims.admin) {
+                    await firebase.auth().signOut();
+                    window.location.href = '/admin-login.html';
+                    return;
+                }
+
+                // Check token age
+                const lastLoginAt = localStorage.getItem('lastLoginAt');
+                const MAX_SESSION_DURATION = 1000 * 60 * 60; // 1 hour
+                
+                if (!lastLoginAt || Date.now() - parseInt(lastLoginAt) > MAX_SESSION_DURATION) {
+                    // Session expired
+                    await firebase.auth().signOut();
+                    window.location.href = '/admin-login.html';
+                    return;
+                }
+
+                // If we get here, session is valid
+                // Show the dashboard content
+                document.body.style.visibility = 'visible';
+                
+                // Initialize your dashboard
+                initializeDashboard();
+                
+            } catch (error) {
+                console.error('Session verification failed:', error);
+                window.location.href = '/admin-login.html';
+            }
+        });
+    </script>
 </head>
-<body>
+<body style="visibility: hidden">
     <div class="sidebar-overlay" id="sidebarOverlay"></div>
     <button id="mobileSidebarToggle" class="d-md-none mobile-menu-toggle">
         <i class="fas fa-bars"></i>

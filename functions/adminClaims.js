@@ -1,87 +1,65 @@
 const functions = require('firebase-functions');
 const admin = require('firebase-admin');
 
+// Initialize admin SDK
+if (!admin.apps.length) {
+    admin.initializeApp();
+}
+
 exports.setAdminClaim = functions.https.onCall(async (data, context) => {
-    console.log('Function called with data:', data);
+    // Check if request is authorized
+    if (!context.auth) {
+        throw new functions.https.HttpsError(
+            'unauthenticated',
+            'User must be authenticated to perform this action.'
+        );
+    }
 
     try {
-        // Validate input data
-        if (!data || !data.email) {
-            console.error('Missing email in request data');
-            throw new functions.https.HttpsError(
-                'invalid-argument',
-                'Email is required'
-            );
-        }
+        // The user's ID token will have already been verified by the Functions SDK
+        const uid = context.auth.uid;
+        const email = context.auth.token.email;
 
-        const email = data.email.trim().toLowerCase();
-        console.log('Processing email:', email);
+        console.log('Processing request for:', {
+            uid: uid,
+            email: email,
+            existingClaims: context.auth.token.claims
+        });
 
         // List of admin emails
         const adminEmails = [
             'andreas@askgroupholdings.com'
             // Add more admin emails here
         ];
-        console.log('Admin emails configured:', adminEmails);
-
-        // Get user by email
-        console.log('Fetching user by email...');
-        const user = await admin.auth().getUserByEmail(email);
-        console.log('User found:', {
-            uid: user.uid,
-            email: user.email,
-            currentClaims: user.customClaims
-        });
 
         // Check if user should be admin
-        const isAdmin = adminEmails.includes(email);
-        console.log('Admin status check:', {
-            email,
-            isAdmin,
-            matchFound: adminEmails.includes(email)
-        });
+        const isAdmin = adminEmails.includes(email.toLowerCase());
 
-        // Set the admin claim
-        console.log('Setting custom claims...');
-        await admin.auth().setCustomUserClaims(user.uid, { admin: isAdmin });
+        // Set custom claims
+        await admin.auth().setCustomUserClaims(uid, { admin: isAdmin });
 
-        // Verify the claims were set
-        const updatedUser = await admin.auth().getUser(user.uid);
+        // Get a new token with updated claims
+        const updatedUser = await admin.auth().getUser(uid);
+
+        // Force token refresh
+        await admin.auth().revokeRefreshTokens(uid);
+
         console.log('Updated user claims:', {
-            email: updatedUser.email,
-            claims: updatedUser.customClaims
+            uid: uid,
+            email: email,
+            newClaims: updatedUser.customClaims,
+            tokenRevoked: true
         });
 
         return {
             success: true,
             isAdmin: isAdmin,
-            message: `Admin claim ${isAdmin ? 'set' : 'removed'} for ${email}`
+            message: `Admin claim ${isAdmin ? 'set' : 'removed'} for ${email}`,
+            requiresRefresh: true
         };
 
     } catch (error) {
-        console.error('Error in setAdminClaim:', {
-            error: error.message,
-            code: error.code,
-            stack: error.stack
-        });
-
-        if (error.code === 'auth/user-not-found') {
-            throw new functions.https.HttpsError(
-                'not-found',
-                'No user found with this email address'
-            );
-        }
-
-        if (error.code === 'auth/invalid-email') {
-            throw new functions.https.HttpsError(
-                'invalid-argument',
-                'Invalid email format'
-            );
-        }
-
-        throw new functions.https.HttpsError(
-            'internal',
-            'Error setting admin claim: ' + error.message
-        );
+        console.error('Error in setAdminClaim:', error);
+        throw new functions.https.HttpsError('internal', error.message);
     }
 });
