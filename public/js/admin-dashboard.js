@@ -115,7 +115,9 @@ function initializeAuthentication() {
             try {
                 // Call the admin claim function
                 const setAdminClaimFunction = firebase.functions().httpsCallable('setAdminClaim');
-                const result = await setAdminClaimFunction({ email: user.email });
+                const result = await setAdminClaimFunction({ 
+                    email: user.email 
+                });
                 console.log('Admin claim result:', result.data);
 
                 // Force token refresh
