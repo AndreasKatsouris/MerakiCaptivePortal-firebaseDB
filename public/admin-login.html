@@ -5,10 +5,10 @@
     <title>Admin Login</title>
     
     <!-- Firebase SDKs -->
-    <script src="/__/firebase/10.12.5/firebase-app-compat.js"></script>
-    <script src="/__/firebase/10.12.5/firebase-auth-compat.js"></script>
-    <script src="/__/firebase/10.12.5/firebase-functions-compat.js"></script>
-    <script src="/__/firebase/init.js?useEmulator=false"></script>
+    <script defer src="/__/firebase/10.12.5/firebase-app-compat.js"></script>
+    <script defer src="/__/firebase/10.12.5/firebase-auth-compat.js"></script>
+    <script defer src="/__/firebase/10.12.5/firebase-functions-compat.js"></script>
+    <script defer src="/__/firebase/init.js?useEmulator=false"></script>
 
     <link rel="stylesheet" href="css/bootstrap.min.css">
     <link rel="stylesheet" href="css/style.css">
@@ -46,9 +46,30 @@
     </div>
 
     <script>
-        // Initialize Firebase Auth listener
-        firebase.auth().onAuthStateChanged((user) => {
-            console.log('Auth state changed:', user ? 'User logged in' : 'No user');
+        // Wait for Firebase to initialize
+        window.addEventListener('load', function() {
+            console.log('Page loaded, checking Firebase initialization...');
+            
+            // Check if Firebase is initialized
+            if (firebase.app()) {
+                console.log('Firebase initialized successfully');
+                console.log('Auth instance:', firebase.auth());
+                console.log('Functions instance:', firebase.functions());
+                
+                // Set up auth state listener
+                firebase.auth().onAuthStateChanged((user) => {
+                    console.log('Auth state changed:', user ? `User logged in: ${user.email}` : 'No user');
+                    if (user) {
+                        console.log('User ID:', user.uid);
+                        console.log('Email verified:', user.emailVerified);
+                        user.getIdTokenResult().then(tokenResult => {
+                            console.log('User claims:', tokenResult.claims);
+                        });
+                    }
+                });
+            } else {
+                console.error('Firebase not initialized!');
+            }
         });
 
         function setLoading(isLoading) {
@@ -65,6 +86,7 @@
             const errorDiv = document.getElementById('errorMessage');
             errorDiv.textContent = message;
             errorDiv.style.display = 'block';
+            console.error('Error shown to user:', message);
         }
 
         document.getElementById('loginForm').addEventListener('submit', async function(event) {
@@ -76,28 +98,44 @@
                 const email = document.getElementById('adminEmail').value.trim();
                 const password = document.getElementById('adminPassword').value;
 
-                console.log('Starting login process...');
+                console.log('Starting login process for:', email);
                 
                 // Sign in
+                console.log('Attempting sign in...');
                 const userCredential = await firebase.auth().signInWithEmailAndPassword(email, password);
-                console.log('User signed in:', userCredential.user.uid);
+                console.log('Sign in successful:', userCredential.user.email);
+                
+                // Wait for auth state to stabilize
+                await new Promise(resolve => setTimeout(resolve, 2000));
+                
+                // Verify we're still signed in
+                const currentUser = firebase.auth().currentUser;
+                if (!currentUser) {
+                    throw new Error('User not authenticated after login');
+                }
+                console.log('Current user verified:', currentUser.email);
 
-                // Ensure we have the latest token
-                const idToken = await userCredential.user.getIdToken();
-                console.log('Got ID token');
+                // Get fresh token
+                console.log('Getting fresh token...');
+                const idToken = await currentUser.getIdToken(true);
+                console.log('Got fresh token');
 
                 // Call the admin claim function
-                const functions = firebase.functions();
-                const setAdminClaimFunction = functions.httpsCallable('setAdminClaim');
+                console.log('Creating callable function...');
+                const setAdminClaimFunction = firebase.functions().httpsCallable('setAdminClaim');
                 
                 console.log('Calling setAdminClaim function...');
-                const result = await setAdminClaimFunction({ email });
+                const result = await setAdminClaimFunction({ 
+                    email,
+                    idToken // Include the token explicitly
+                });
                 console.log('Function result:', result.data);
 
                 if (result.data.isAdmin) {
                     // Force token refresh
-                    await userCredential.user.getIdToken(true);
-                    const tokenResult = await userCredential.user.getIdTokenResult();
+                    await currentUser.getIdToken(true);
+                    const tokenResult = await currentUser.getIdTokenResult();
+                    console.log('New token claims:', tokenResult.claims);
 
                     if (tokenResult.claims.admin) {
                         window.location.href = '/admin-dashboard.html';
