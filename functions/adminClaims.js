@@ -3,32 +3,24 @@ const admin = require('firebase-admin');
 
 exports.setAdminClaim = functions.https.onCall(async (data, context) => {
     console.log('Function called with data:', data);
-    console.log('Function context:', context);
 
     try {
         // Validate input data
-        if (!data || !data.email || typeof data.email !== 'string') {
-            console.error('Invalid or missing email in request data');
+        if (!data || !data.email) {
+            console.error('Missing email in request data');
             throw new functions.https.HttpsError(
                 'invalid-argument',
-                'A valid email is required'
+                'Email is required'
             );
         }
 
         const email = data.email.trim().toLowerCase();
-        if (!email) {
-            console.error('Empty email provided');
-            throw new functions.https.HttpsError(
-                'invalid-argument',
-                'Email cannot be empty'
-            );
-        }
-
         console.log('Processing email:', email);
 
         // List of admin emails
         const adminEmails = [
             'andreas@askgroupholdings.com'
+            // Add more admin emails here
         ];
         console.log('Admin emails configured:', adminEmails);
 
@@ -73,7 +65,6 @@ exports.setAdminClaim = functions.https.onCall(async (data, context) => {
             stack: error.stack
         });
 
-        // Map specific errors to appropriate responses
         if (error.code === 'auth/user-not-found') {
             throw new functions.https.HttpsError(
                 'not-found',
@@ -88,7 +79,6 @@ exports.setAdminClaim = functions.https.onCall(async (data, context) => {
             );
         }
 
-        // For any other errors
         throw new functions.https.HttpsError(
             'internal',
             'Error setting admin claim: ' + error.message
