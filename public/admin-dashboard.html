@@ -25,55 +25,6 @@
             }
         });
 
-
-    async function handleLogin(event) {
-    event.preventDefault();
-    setLoading(true);
-    document.getElementById('errorMessage').style.display = 'none';
-    
-    try {
-        const email = document.getElementById('adminEmail').value.trim();
-        const password = document.getElementById('adminPassword').value;
-        
-        // 1. Sign in with Firebase Auth
-        const userCredential = await firebase.auth().signInWithEmailAndPassword(email, password);
-        console.log('Successfully signed in:', userCredential.user.email);
-        
-        // 2. Call the admin claim function
-        const setAdminClaimFunction = firebase.functions().httpsCallable('setAdminClaim');
-        const result = await setAdminClaimFunction();  // No need to pass email, function gets it from context
-        console.log('setAdminClaim result:', result.data);
-        
-        if (result.data.requiresRefresh) {
-            // 3. Force token refresh as the claims have changed
-            await userCredential.user.getIdToken(true);
-        }
-        
-        // 4. Get fresh token result with new claims
-        const tokenResult = await userCredential.user.getIdTokenResult(true);
-        console.log('Token claims:', tokenResult.claims);
-        
-        if (tokenResult.claims.admin) {
-            // Add token to local storage for session management
-            localStorage.setItem('lastLoginAt', Date.now().toString());
-            window.location.href = '/admin-dashboard.html';
-        } else {
-            await firebase.auth().signOut();
-            throw new Error('Access denied: Not an admin user');
-        }
-    } catch (error) {
-        console.error('Login failed:', error);
-        showError(error.message || 'Login failed');
-        
-        try {
-            await firebase.auth().signOut();
-        } catch (signOutError) {
-            console.error('Error signing out:', signOutError);
-        }
-    } finally {
-        setLoading(false);
-    }
-}
     </script>
 
     <!-- Rest of your dependencies -->
@@ -140,6 +91,17 @@
             } catch (error) {
                 console.error('Session verification failed:', error);
                 window.location.href = '/admin-login.html';
+            }
+        });
+
+        document.getElementById('logoutButton').addEventListener('click', async (e) => {
+            e.preventDefault();
+            try {
+                await firebase.auth().signOut();
+                localStorage.removeItem('lastLoginAt');
+                window.location.href = '/admin-login.html';
+            } catch (error) {
+                console.error('Error signing out:', error);
             }
         });
     </script>

@@ -77,51 +77,51 @@
         }
     
         document.getElementById('loginForm').addEventListener('submit', async function(event) {
-            event.preventDefault();
-            setLoading(true);
-            document.getElementById('errorMessage').style.display = 'none';
-    
-            try {
-                const email = document.getElementById('adminEmail').value.trim();
-                const password = document.getElementById('adminPassword').value;
-    
-                // 1. Sign in
-                console.log('Attempting sign in...');
-                const userCredential = await firebase.auth().signInWithEmailAndPassword(email, password);
-                console.log('User signed in:', userCredential.user.email);
-    
-                // 2. Call the admin claim function
-                console.log('Calling setAdminClaim function...');
-                const setAdminClaimFunction = functions.httpsCallable('setAdminClaim');
-                const result = await setAdminClaimFunction();
-                console.log('Function result:', result.data);
-    
-                if (result.data.success) {
-                    // 3. Force token refresh to get new claims
-                    await userCredential.user.getIdToken(true);
-                    const tokenResult = await userCredential.user.getIdTokenResult();
-                    console.log('New token claims:', tokenResult.claims);
-    
-                    if (tokenResult.claims.admin) {
-                        window.location.href = '/admin-dashboard.html';
-                        return;
-                    }
-                }
-    
-                throw new Error('Access denied: Not an admin user');
-    
-            } catch (error) {
-                console.error('Login error:', error);
-                showError(error.message);
-                try {
-                    await firebase.auth().signOut();
-                } catch (signOutError) {
-                    console.error('Sign out error:', signOutError);
-                }
-            } finally {
-                setLoading(false);
+    event.preventDefault();
+    setLoading(true);
+    document.getElementById('errorMessage').style.display = 'none';
+
+    try {
+        const email = document.getElementById('adminEmail').value.trim();
+        const password = document.getElementById('adminPassword').value;
+
+        // 1. Sign in
+        console.log('Attempting sign in...');
+        const userCredential = await firebase.auth().signInWithEmailAndPassword(email, password);
+        console.log('User signed in:', userCredential.user.email);
+
+        // 2. Call the admin claim function WITH EMAIL
+        console.log('Calling setAdminClaim function...');
+        const setAdminClaimFunction = firebase.functions().httpsCallable('setAdminClaim');
+        const result = await setAdminClaimFunction({ email: email });  // Pass the email here
+        console.log('Function result:', result.data);
+
+        if (result.data.success) {
+            // 3. Force token refresh to get new claims
+            await userCredential.user.getIdToken(true);
+            const tokenResult = await userCredential.user.getIdTokenResult();
+            console.log('New token claims:', tokenResult.claims);
+
+            if (tokenResult.claims.admin) {
+                window.location.href = '/admin-dashboard.html';
+                return;
             }
-        });
+        }
+
+        throw new Error('Access denied: Not an admin user');
+
+    } catch (error) {
+        console.error('Login error:', error);
+        showError(error.message);
+        try {
+            await firebase.auth().signOut();
+        } catch (signOutError) {
+            console.error('Sign out error:', signOutError);
+        }
+    } finally {
+        setLoading(false);
+    }
+});
     </script>
 </body>
 </html>
