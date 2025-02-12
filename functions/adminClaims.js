@@ -1,8 +1,8 @@
 const functions = require('firebase-functions');
 const admin = require('firebase-admin');
 
-// Proper initialization of Admin SDK
-admin.initializeApp();
+// Remove the initialization since it's done in index.js
+// admin.initializeApp();
 
 // Callable function with proper auth check
 exports.setAdminClaim = functions.https.onCall(async (data, context) => {
