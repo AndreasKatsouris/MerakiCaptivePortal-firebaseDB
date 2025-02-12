@@ -81,7 +81,8 @@
             console.error('Error:', message);
         }
     
-        document.getElementById('loginForm').addEventListener('submit', async function(event) {
+// Inside your login form handler in admin-login.html
+document.getElementById('loginForm').addEventListener('submit', async function(event) {
     event.preventDefault();
     setLoading(true);
     document.getElementById('errorMessage').style.display = 'none';
@@ -90,26 +91,21 @@
         const email = document.getElementById('adminEmail').value.trim();
         const password = document.getElementById('adminPassword').value;
 
-        // 1. Sign in and wait for auth state to be ready
+        console.log('Starting login process...');
+
+        // 1. Sign in with email and password
         const userCredential = await firebase.auth().signInWithEmailAndPassword(email, password);
-        console.log('User signed in:', userCredential.user.email);
+        console.log('Successfully signed in');
 
-        // 2. Wait for auth state to be fully initialized
-        await new Promise((resolve) => {
-            const unsubscribe = firebase.auth().onAuthStateChanged((user) => {
-                if (user) {
-                    unsubscribe();
-                    resolve();
-                }
-            });
-        });
+        // 2. Get ID token with fresh=true to ensure we have latest token
+        const idToken = await userCredential.user.getIdToken(true);
+        console.log('Got fresh ID token');
 
-        // 3. Get fresh token
-        await userCredential.user.getIdToken(true);
-        console.log('Got fresh token');
-
-        // 4. Call the function with auth context
+        // 3. Initialize callable function
         const setAdminClaimFunction = firebase.functions().httpsCallable('setAdminClaim');
+        console.log('Initialized callable function');
+
+        // 4. Call the function with email
         const result = await setAdminClaimFunction({ email });
         console.log('Function result:', result.data);
 
@@ -120,6 +116,7 @@
             console.log('New token claims:', tokenResult.claims);
 
             if (tokenResult.claims.admin) {
+                // Store login timestamp
                 localStorage.setItem('lastLoginAt', Date.now().toString());
                 window.location.href = '/admin-dashboard.html';
                 return;
@@ -130,7 +127,7 @@
 
     } catch (error) {
         console.error('Login error:', error);
-        showError(error.message);
+        showError(error.message || 'Failed to authenticate');
         try {
             await firebase.auth().signOut();
         } catch (signOutError) {
