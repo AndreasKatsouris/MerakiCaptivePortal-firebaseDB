@@ -73,26 +73,39 @@
                 // Check token age
                 const lastLoginAt = localStorage.getItem('lastLoginAt');
                 const MAX_SESSION_DURATION = 1000 * 60 * 60; // 1 hour
-                
-                if (!lastLoginAt || Date.now() - parseInt(lastLoginAt) > MAX_SESSION_DURATION) {
-                    // Session expired
-                    await firebase.auth().signOut();
-                    window.location.href = '/admin-login.html';
-                    return;
-                }
 
-                // If we get here, session is valid
-                // Show the dashboard content
-                document.body.style.visibility = 'visible';
-                
-                // Initialize your dashboard
-                initializeDashboard();
-                
-            } catch (error) {
-                console.error('Session verification failed:', error);
-                window.location.href = '/admin-login.html';
-            }
-        });
+                firebase.auth().onAuthStateChanged(async (user) => {
+                    if (!user) {
+                        window.location.href = '/admin-login.html';
+                        return;
+                    }
+
+                    try {
+                        const tokenResult = await user.getIdTokenResult(true);
+                        
+                        if (!tokenResult.claims.admin) {
+                            await firebase.auth().signOut();
+                            window.location.href = '/admin-login.html';
+                            return;
+                        }
+
+                        const lastLoginAt = localStorage.getItem('lastLoginAt');
+                        if (!lastLoginAt || Date.now() - parseInt(lastLoginAt) > MAX_SESSION_DURATION) {
+                            console.warn('Session expired, signing out...');
+                            await firebase.auth().signOut();
+                            window.location.href = '/admin-login.html';
+                            return;
+                        }
+
+                        document.body.style.visibility = 'visible';
+                        initializeDashboard();
+                        
+                    } catch (error) {
+                        console.error('Session verification failed:', error);
+                        window.location.href = '/admin-login.html';
+                    }
+                });
+
 
         document.getElementById('logoutButton').addEventListener('click', async (e) => {
             e.preventDefault();

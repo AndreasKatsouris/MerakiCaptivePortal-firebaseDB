@@ -109,36 +109,30 @@ function initializeAuthentication() {
             console.error('Error setting auth persistence:', error);
         });
 
-    firebase.auth().onAuthStateChanged(async (user) => {
-        if (user) {
-            console.log('User is signed in:', user.email);
-            try {
-                // Call the admin claim function
-                const setAdminClaimFunction = firebase.functions().httpsCallable('setAdminClaim');
-                const result = await setAdminClaimFunction({ 
-                    email: user.email 
-                });
-                console.log('Admin claim result:', result.data);
-
-                // Force token refresh
-                await user.getIdToken(true);
-                
-                // Check if admin claim was set
-                const tokenResult = await user.getIdTokenResult();
-                console.log('Updated claims:', tokenResult.claims);
-                
-                if (!tokenResult.claims.admin) {
-                    console.log('User is not an admin');
-                    await firebase.auth().signOut();
-                    window.location.href = 'admin-login.html';
+        firebase.auth().onAuthStateChanged(async (user) => {
+            if (user) {
+                console.log('User is signed in:', user.email);
+        
+                try {
+                    // Force token refresh to fetch latest claims
+                    await user.getIdToken(true);
+        
+                    const tokenResult = await user.getIdTokenResult();
+                    console.log('Updated claims:', tokenResult.claims);
+        
+                    if (!tokenResult.claims.admin) {
+                        console.log('User is not an admin');
+                        await firebase.auth().signOut();
+                        window.location.href = 'admin-login.html';
+                    }
+                } catch (error) {
+                    console.error('Error checking admin status:', error);
                 }
-            } catch (error) {
-                console.error('Error checking admin status:', error);
+            } else {
+                window.location.href = 'admin-login.html';
             }
-        } else {
-            window.location.href = 'admin-login.html';
-        }
-    });
+        });
+        
 
     // Add logout button handler
     const logoutButton = document.getElementById('logoutButton');

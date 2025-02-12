@@ -68,15 +68,16 @@ exports.setAdminClaim = functions.https.onCall(async (data, context) => {
             updatedAt: Date.now()
         });
 
-        // Verify claims were set
         const updatedUser = await admin.auth().getUser(userId);
         console.log('Updated user claims:', updatedUser.customClaims);
-
+        
         return {
             success: true,
             isAdmin,
-            claims: updatedUser.customClaims
+            claims: updatedUser.customClaims,
+            timestamp: Date.now()  // Ensures client can verify fresh claims
         };
+        
 
     } catch (error) {
         console.error('Error in setAdminClaim:', {

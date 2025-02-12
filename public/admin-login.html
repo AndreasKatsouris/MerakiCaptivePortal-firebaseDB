@@ -132,10 +132,18 @@ function initializeLoginForm(auth, functions) {
         console.log('Function call result:', result.data);
 
         if (result.data.success && result.data.isAdmin) {
+            console.log('Admin claim set, forcing token refresh...');
+            
+            // Force refresh the authentication token to get updated claims
+            await auth.currentUser.getIdToken(true);
+
+            // Store login timestamp
             localStorage.setItem('lastLoginAt', Date.now().toString());
+
             window.location.href = '/admin-dashboard.html';
             return;
         }
+
 
         throw new Error('Not authorized as admin');
 
