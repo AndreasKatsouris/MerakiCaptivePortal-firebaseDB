@@ -117,45 +117,47 @@ function initializeLoginForm(auth, functions) {
     document.getElementById('errorMessage').style.display = 'none';
 
     try {
-        const email = document.getElementById('adminEmail').value.trim();
-        const password = document.getElementById('adminPassword').value;
+    const email = document.getElementById('adminEmail').value.trim();
+    const password = document.getElementById('adminPassword').value;
 
-        // Sign in
-        const userCredential = await auth.signInWithEmailAndPassword(email, password);
-        console.log('Sign in successful:', userCredential.user.uid);
+    // Sign in
+    const userCredential = await firebase.auth().signInWithEmailAndPassword(email, password);
+    console.log('Sign in successful:', userCredential.user.uid);
 
-        // Call admin claim function
-        const setAdminClaimFunction = firebase.functions().httpsCallable('setAdminClaim');
-        console.log('Calling admin claim function...');
-        
-        const result = await setAdminClaimFunction({ email });
-        console.log('Function call result:', result.data);
+    // Ensure the user is authenticated before calling the function
+    const user = firebase.auth().currentUser;
+    if (!user) {
+        throw new Error('User authentication failed');
+    }
 
-        if (result.data.success && result.data.isAdmin) {
-            console.log('Admin claim set, forcing token refresh...');
-            
-            // Force refresh the authentication token to get updated claims
-            await auth.currentUser.getIdToken(true);
+    // Retrieve fresh token before calling the function
+    const idToken = await user.getIdToken(true);
 
-            // Store login timestamp
-            localStorage.setItem('lastLoginAt', Date.now().toString());
+    // Call admin claim function with explicit token
+    const setAdminClaimFunction = firebase.functions().httpsCallable('setAdminClaim');
+    console.log('Calling admin claim function...');
+    
+    const result = await setAdminClaimFunction({ email, idToken });
+    console.log('Function call result:', result.data);
 
-            window.location.href = '/admin-dashboard.html';
-            return;
-        }
+    if (result.data.success && result.data.isAdmin) {
+        localStorage.setItem('lastLoginAt', Date.now().toString());
+        window.location.href = '/admin-dashboard.html';
+        return;
+    }
 
-
-        throw new Error('Not authorized as admin');
+    throw new Error('Not authorized as admin');
 
     } catch (error) {
         console.error('Login process error:', error);
         showError(error.message || 'Authentication failed');
         try {
-            await auth.signOut();
+            await firebase.auth().signOut();
         } catch (signOutError) {
             console.error('Sign out error:', signOutError);
         }
-    } finally {
+    }
+ finally {
         setLoading(false);
     }
 });
