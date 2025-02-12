@@ -148,6 +148,29 @@ function initializeAuthentication() {
         });
     }
 }
+async function ensureUserIsAuthenticated() {
+    return new Promise((resolve, reject) => {
+        firebase.auth().onAuthStateChanged(user => {
+            if (user) {
+                console.log('User authenticated:', user.email);
+                resolve(user);
+            } else {
+                console.log('No user authenticated, redirecting to login');
+                window.location.href = 'admin-login.html';
+                reject(new Error('No authenticated user'));
+            }
+        });
+    });
+}
+
+// Call this function before checking tokens
+ensureUserIsAuthenticated().then(user => {
+    return user.getIdToken(true);
+}).then(token => {
+    console.log('Authenticated token:', token);
+}).catch(error => {
+    console.error('Authentication error:', error);
+});
 
 function handleLogout() {
     firebase.auth().signOut()
