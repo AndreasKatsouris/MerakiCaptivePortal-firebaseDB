@@ -48,7 +48,7 @@
     <script>
         // Initialize Firebase Functions
         const functions = firebase.functions();
-
+    
         // Handle auth state changes
         firebase.auth().onAuthStateChanged((user) => {
             console.log('Auth state changed:', user ? `User logged in: ${user.email}` : 'No user');
@@ -58,7 +58,7 @@
                 });
             }
         });
-
+    
         function setLoading(isLoading) {
             const loadingIndicator = document.getElementById('loadingIndicator');
             const loginForm = document.getElementById('loginForm');
@@ -68,81 +68,48 @@
             loginForm.style.opacity = isLoading ? '0.5' : '1';
             loginButton.disabled = isLoading;
         }
-
+    
         function showError(message) {
             const errorDiv = document.getElementById('errorMessage');
             errorDiv.textContent = message;
             errorDiv.style.display = 'block';
             console.error('Error:', message);
         }
-
-        async function setAdminClaim(user, email) {
-            try {
-                // Get a fresh token
-                const token = await user.getIdToken(true);
-                console.log('Got fresh token');
-
-                // Create callable function
-                const setAdminClaimFunction = functions.httpsCallable('setAdminClaim');
-                
-                // Call the function
-                console.log('Calling setAdminClaim function...');
-                const result = await setAdminClaimFunction({ email });
-                console.log('Function result:', result.data);
-
-                return result.data;
-            } catch (error) {
-                console.error('Error setting admin claim:', error);
-                throw error;
-            }
-        }
-
+    
         document.getElementById('loginForm').addEventListener('submit', async function(event) {
             event.preventDefault();
-            document.getElementById('errorMessage').style.display = 'none';
             setLoading(true);
-
+            document.getElementById('errorMessage').style.display = 'none';
+    
             try {
                 const email = document.getElementById('adminEmail').value.trim();
                 const password = document.getElementById('adminPassword').value;
-
-                console.log('Starting login process...');
-                
-                // Sign in
+    
+                // 1. Sign in
+                console.log('Attempting sign in...');
                 const userCredential = await firebase.auth().signInWithEmailAndPassword(email, password);
-                console.log('Sign in successful');
-
-                // Wait for auth state to fully update
-                await new Promise(resolve => {
-                    const unsubscribe = firebase.auth().onAuthStateChanged((user) => {
-                        if (user) {
-                            unsubscribe();
-                            resolve();
-                        }
-                    });
-                });
-
-                const user = firebase.auth().currentUser;
-                if (!user) {
-                    throw new Error('Failed to get current user');
-                }
-
-                // Set admin claim
-                const result = await setAdminClaim(user, email);
-                
-                if (result.success && result.isAdmin) {
-                    // Force token refresh and verify admin status
-                    await user.getIdToken(true);
-                    const tokenResult = await user.getIdTokenResult();
-                    
+                console.log('User signed in:', userCredential.user.email);
+    
+                // 2. Call the admin claim function
+                console.log('Calling setAdminClaim function...');
+                const setAdminClaimFunction = functions.httpsCallable('setAdminClaim');
+                const result = await setAdminClaimFunction();
+                console.log('Function result:', result.data);
+    
+                if (result.data.success) {
+                    // 3. Force token refresh to get new claims
+                    await userCredential.user.getIdToken(true);
+                    const tokenResult = await userCredential.user.getIdTokenResult();
+                    console.log('New token claims:', tokenResult.claims);
+    
                     if (tokenResult.claims.admin) {
                         window.location.href = '/admin-dashboard.html';
                         return;
                     }
                 }
-
+    
                 throw new Error('Access denied: Not an admin user');
-
+    
             } catch (error) {
                 console.error('Login error:', error);
                 showError(error.message);

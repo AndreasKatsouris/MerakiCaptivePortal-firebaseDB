@@ -1,44 +1,40 @@
 const functions = require('firebase-functions');
 const admin = require('firebase-admin');
 
-// Initialize Firebase Admin SDK
-if (!admin.apps.length) {
-    admin.initializeApp();
-}
+// Proper initialization of Admin SDK
+admin.initializeApp();
 
+// Callable function with proper auth check
 exports.setAdminClaim = functions.https.onCall(async (data, context) => {
-    // Debug logging
-    console.log('Function invoked with data:', data);
-    console.log('Auth context:', context.auth);
-
-    // Require authentication
+    // Check if request is authenticated
     if (!context.auth) {
-        console.error('No auth context');
         throw new functions.https.HttpsError(
             'unauthenticated',
             'The function must be called while authenticated.'
         );
     }
 
+    const uid = context.auth.uid;
+    const email = context.auth.token.email;
+
+    // Log authentication info
+    console.log('Authentication context:', {
+        uid: uid,
+        email: email,
+        token: context.auth.token
+    });
+
     try {
-        // Get the user's email from the authenticated context
-        const userEmail = context.auth.token.email || data.email;
-        const uid = context.auth.uid;
-
-        console.log('Processing request:', { userEmail, uid });
-
-        // List of admin emails - update with your admin emails
+        // List of admin emails
         const adminEmails = [
             'andreas@askgroupholdings.com'
         ];
 
         // Check if user should be admin
-        const isAdmin = adminEmails.includes(userEmail.toLowerCase());
-        console.log('Admin check:', { userEmail, isAdmin });
+        const isAdmin = adminEmails.includes(email.toLowerCase());
 
         // Set custom claims
         await admin.auth().setCustomUserClaims(uid, { admin: isAdmin });
-        console.log('Claims set successfully');
 
         // Get updated user to verify claims
         const updatedUser = await admin.auth().getUser(uid);
@@ -47,7 +43,8 @@ exports.setAdminClaim = functions.https.onCall(async (data, context) => {
         return {
             success: true,
             isAdmin: isAdmin,
-            message: `Admin claim ${isAdmin ? 'set' : 'removed'} for ${userEmail}`
+            message: `Admin claim ${isAdmin ? 'set' : 'removed'} for ${email}`,
+            claims: updatedUser.customClaims
         };
 
     } catch (error) {
