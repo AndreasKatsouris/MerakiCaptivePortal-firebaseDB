@@ -62,56 +62,8 @@ function showError(message) {
     errorDiv.style.display = 'block';
     console.error('Error:', message);
 }
- // At the top of your script
-document.addEventListener('DOMContentLoaded', function() {
-    // 1. Verify Firebase SDK loaded
-    if (typeof firebase === 'undefined') {
-        console.error('Firebase SDK not loaded');
-        showError('Firebase SDK failed to load');
-        return;
-    }
 
-    // 2. Verify Firebase is initialized
-    try {
-        // Log current Firebase config
-        console.log('Firebase apps:', firebase.apps.length ? 'Firebase initialized' : 'Firebase not initialized');
-        
-        // Verify required Firebase services
-        const auth = firebase.auth();
-        const functions = firebase.functions();
-        
-        console.log('Firebase services check:', {
-            auth: !!auth ? 'Available' : 'Not available',
-            functions: !!functions ? 'Available' : 'Not available'
-        });
-
-        // Initialize auth state listener
-        auth.onAuthStateChanged((user) => {
-            console.log('Auth state changed:', user ? {
-                email: user.email,
-                uid: user.uid,
-                emailVerified: user.emailVerified
-            } : 'No user');
-        });
-
-        // Initialize login form handler
-        initializeLoginForm(auth, functions);
-
-    } catch (error) {
-        console.error('Firebase initialization error:', error);
-        showError('Failed to initialize Firebase services');
-    }
-});
-
-// Separate login form initialization
-function initializeLoginForm(auth, functions) {
-    const loginForm = document.getElementById('loginForm');
-    if (!loginForm) {
-        console.error('Login form not found');
-        return;
-    }
-
-    loginForm.addEventListener('submit', async function(event) {
+loginForm.addEventListener('submit', async function(event) {
     event.preventDefault();
     setLoading(true);
     document.getElementById('errorMessage').style.display = 'none';
@@ -151,7 +103,6 @@ function initializeLoginForm(auth, functions) {
         setLoading(false);
     }
 });
-}
     </script>
 </body>
 </html>
