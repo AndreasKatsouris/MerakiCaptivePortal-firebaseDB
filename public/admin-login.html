@@ -97,17 +97,21 @@ document.getElementById('loginForm').addEventListener('submit', async function(e
         const userCredential = await firebase.auth().signInWithEmailAndPassword(email, password);
         console.log('Successfully signed in');
 
-        // 2. Get ID token with fresh=true to ensure we have latest token
-        const idToken = await userCredential.user.getIdToken(true);
+        // 2. Wait for auth state to fully initialize
+        await new Promise(resolve => setTimeout(resolve, 1000));
+
+        // 3. Get fresh ID token
+        await userCredential.user.getIdToken(true);
         console.log('Got fresh ID token');
 
-        // 3. Initialize callable function
+        // 4. Initialize and call function with proper auth context
         const setAdminClaimFunction = firebase.functions().httpsCallable('setAdminClaim');
         console.log('Initialized callable function');
-        
 
-        // 4. Call the function with email
-        const result = await setAdminClaimFunction({ email });
+        const result = await setAdminClaimFunction({ 
+            email: email
+        });
+        
         console.log('Function result:', result.data);
 
         if (result.data.success) {
