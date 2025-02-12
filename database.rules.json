@@ -12,6 +12,12 @@
         ".write": "auth != null && (auth.token.phone_number === $phoneNumber || auth.token.admin === true)"
       }
     },
+    "users": {
+  "$uid": {
+    ".read": "auth != null",
+    ".write": "auth != null && auth.uid === $uid"
+  }
+},
 
     "rewards": {
       ".read": "auth != null",

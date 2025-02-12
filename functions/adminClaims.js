@@ -17,13 +17,11 @@ exports.setAdminClaim = functions.https.onCall(async (data, context) => {
     });
 
     let userId;
-    
+
     try {
         if (context.auth) {
-            // Use Firebase-provided authentication context
             userId = context.auth.uid;
         } else if (data.idToken) {
-            // If no auth context, verify token manually
             console.log('Manually verifying ID token...');
             const decodedToken = await admin.auth().verifyIdToken(data.idToken);
             userId = decodedToken.uid;
@@ -47,11 +45,19 @@ exports.setAdminClaim = functions.https.onCall(async (data, context) => {
         // Set admin claim
         await admin.auth().setCustomUserClaims(userId, { admin: isAdmin });
 
-        return { success: true, isAdmin };
+        // Retrieve updated claims
+        const updatedUser = await admin.auth().getUser(userId);
+        console.log('Updated user claims:', updatedUser.customClaims);
+
+        return { success: true, isAdmin, claims: updatedUser.customClaims };
 
     } catch (error) {
-        console.error('Error in setAdminClaim:', error);
-        throw new functions.https.HttpsError('internal', 'Failed to set admin claim');
+        console.error('Error in setAdminClaim:', {
+            error: error.message,
+            stack: error.stack
+        });
+        throw new functions.https.HttpsError('internal', error.message);
     }
 });
+
 
