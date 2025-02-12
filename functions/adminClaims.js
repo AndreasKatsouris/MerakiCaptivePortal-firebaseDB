@@ -2,36 +2,30 @@ const functions = require('firebase-functions');
 const admin = require('firebase-admin');
 
 exports.setAdminClaim = functions.https.onCall(async (data, context) => {
-    // Initial logging
-    console.log('setAdminClaim function called with data:', {
-        email: data?.email,
-        timestamp: data?.timestamp
+    // Log function invocation
+    console.log('setAdminClaim invoked:', {
+        hasAuth: !!context.auth,
+        hasData: !!data,
+        dataEmail: data?.email,
+        authUid: context.auth?.uid,
+        authToken: !!context.auth?.token
     });
 
-    console.log('Auth context details:', {
-        exists: !!context.auth,
-        uid: context.auth?.uid,
-        token: context.auth?.token ? 'Present' : 'Missing'
-    });
-
-    // Ensure user is authenticated
+    // Verify auth context
     if (!context.auth) {
-        console.error('Authentication missing. Full context:', JSON.stringify({
-            rawRequest: context.rawRequest?.headers,
-            app: context.app
-        }));
+        console.error('Missing auth context');
         throw new functions.https.HttpsError(
             'unauthenticated',
-            'The function must be called while authenticated.'
+            'Must be authenticated to call this function'
         );
     }
 
-    // Validate email
+    // Verify data
     if (!data?.email) {
-        console.error('Email missing from request data');
+        console.error('Missing email in request data');
         throw new functions.https.HttpsError(
             'invalid-argument',
-            'Email must be provided'
+            'Email is required'
         );
     }
 
@@ -39,35 +33,40 @@ exports.setAdminClaim = functions.https.onCall(async (data, context) => {
         const userId = context.auth.uid;
         const userEmail = data.email.toLowerCase();
 
-        console.log('Processing admin claim for:', {
+        console.log('Processing admin claim:', {
             userId,
             userEmail,
-            requestTimestamp: data.timestamp
+            authEmail: context.auth.token.email
         });
 
+        // Verify user exists
+        const userRecord = await admin.auth().getUser(userId);
+        console.log('User record found:', userRecord.uid);
+
         // Admin emails list
-        const adminEmails = [
-            'andreas@askgroupholdings.com'
-        ];
-
+        const adminEmails = ['andreas@askgroupholdings.com'];
         const isAdmin = adminEmails.includes(userEmail);
-        console.log('Admin status check:', { userEmail, isAdmin });
 
-        // Set custom claim
-        await admin.auth().setCustomUserClaims(userId, { 
+        console.log('Admin status check:', {
+            userEmail,
+            isAdmin,
+            inAdminList: adminEmails.includes(userEmail)
+        });
+
+        // Set custom claims
+        await admin.auth().setCustomUserClaims(userId, {
             admin: isAdmin,
             updatedAt: Date.now()
         });
 
-        // Verify claim
+        // Verify claims were set
         const updatedUser = await admin.auth().getUser(userId);
         console.log('Updated user claims:', updatedUser.customClaims);
 
         return {
             success: true,
             isAdmin,
-            message: `Admin claim ${isAdmin ? 'set' : 'removed'} for ${userEmail}`,
-            timestamp: Date.now()
+            claims: updatedUser.customClaims
         };
 
     } catch (error) {
@@ -75,9 +74,6 @@ exports.setAdminClaim = functions.https.onCall(async (data, context) => {
             error: error.message,
             stack: error.stack
         });
-        throw new functions.https.HttpsError(
-            'internal',
-            'Error setting admin claim: ' + error.message
-        );
+        throw new functions.https.HttpsError('internal', error.message);
     }
 });
