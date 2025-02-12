@@ -47,16 +47,21 @@
 
     <script>
         // Initialize Firebase Functions
-        const functions = firebase.functions();
+        //const functions = firebase.functions();
     
-        // Handle auth state changes
         firebase.auth().onAuthStateChanged((user) => {
             console.log('Auth state changed:', user ? `User logged in: ${user.email}` : 'No user');
             if (user) {
                 user.getIdTokenResult().then(token => {
-                    console.log('User token claims:', token.claims);
+                    console.log('User token:', token);
                 });
             }
+        });
+        // Verify Firebase initialization
+        const functions = firebase.functions();
+        console.log('Firebase initialized:', {
+            auth: firebase.auth() ? 'Available' : 'Not available',
+            functions: functions ? 'Available' : 'Not available'
         });
     
         function setLoading(isLoading) {
@@ -85,24 +90,37 @@
         const email = document.getElementById('adminEmail').value.trim();
         const password = document.getElementById('adminPassword').value;
 
-        // 1. Sign in
-        console.log('Attempting sign in...');
+        // 1. Sign in and wait for auth state to be ready
         const userCredential = await firebase.auth().signInWithEmailAndPassword(email, password);
         console.log('User signed in:', userCredential.user.email);
 
-        // 2. Call the admin claim function WITH EMAIL
-        console.log('Calling setAdminClaim function...');
+        // 2. Wait for auth state to be fully initialized
+        await new Promise((resolve) => {
+            const unsubscribe = firebase.auth().onAuthStateChanged((user) => {
+                if (user) {
+                    unsubscribe();
+                    resolve();
+                }
+            });
+        });
+
+        // 3. Get fresh token
+        await userCredential.user.getIdToken(true);
+        console.log('Got fresh token');
+
+        // 4. Call the function with auth context
         const setAdminClaimFunction = firebase.functions().httpsCallable('setAdminClaim');
-        const result = await setAdminClaimFunction({ email: email });  // Pass the email here
+        const result = await setAdminClaimFunction({ email });
         console.log('Function result:', result.data);
 
         if (result.data.success) {
-            // 3. Force token refresh to get new claims
+            // 5. Force token refresh to get new claims
             await userCredential.user.getIdToken(true);
             const tokenResult = await userCredential.user.getIdTokenResult();
             console.log('New token claims:', tokenResult.claims);
 
             if (tokenResult.claims.admin) {
+                localStorage.setItem('lastLoginAt', Date.now().toString());
                 window.location.href = '/admin-dashboard.html';
                 return;
             }
