@@ -59,6 +59,13 @@ function initializeLoginForm() {
     loginForm.addEventListener('submit', async function(event) {
         event.preventDefault();
         setLoading(true);
+        firebase.auth().setPersistence(firebase.auth.Auth.Persistence.LOCAL)
+        .then(() => {
+            console.log('Auth persistence set to LOCAL');
+        })
+        .catch((error) => {
+            console.error('Error setting auth persistence:', error);
+        });
 
 
         try {
