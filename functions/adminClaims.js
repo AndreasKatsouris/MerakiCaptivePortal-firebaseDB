@@ -22,9 +22,13 @@ exports.setAdminClaim = functions.https.onCall(async (data, context) => {
         if (context.auth) {
             // Use Firebase-provided authentication context
             userId = context.auth.uid;
-        } else if (data.idToken) {
+        } else if (context.rawRequest.headers.authorization) {
             console.log('Manually verifying ID token...');
-            const decodedToken = await admin.auth().verifyIdToken(data.idToken);
+            const authHeader = context.rawRequest.headers.authorization;
+            const idToken = authHeader.startsWith('Bearer ') ? authHeader.split('Bearer ')[1] : null;
+            if (!idToken) throw new Error('No token provided in authorization header');
+
+            const decodedToken = await admin.auth().verifyIdToken(idToken);
             userId = decodedToken.uid;
         } else {
             console.error('Auth verification failed: No token provided');
@@ -53,6 +57,7 @@ exports.setAdminClaim = functions.https.onCall(async (data, context) => {
         throw new functions.https.HttpsError('internal', 'Failed to set admin claim');
     }
 });
+
 
 
 
