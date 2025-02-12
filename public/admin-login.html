@@ -104,6 +104,7 @@ document.getElementById('loginForm').addEventListener('submit', async function(e
         // 3. Initialize callable function
         const setAdminClaimFunction = firebase.functions().httpsCallable('setAdminClaim');
         console.log('Initialized callable function');
+        
 
         // 4. Call the function with email
         const result = await setAdminClaimFunction({ email });
