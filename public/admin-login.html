@@ -46,6 +46,61 @@
     </div>
 
     <script>
+
+function initializeLoginForm() {
+    console.log('Initializing login form...');
+
+    const loginForm = document.getElementById('loginForm');
+    if (!loginForm) {
+        console.error('Login form not found.');
+        return;
+    }
+
+    loginForm.addEventListener('submit', async function(event) {
+        event.preventDefault();
+        setLoading(true);
+
+
+        try {
+            const email = document.getElementById('adminEmail').value.trim();
+            const password = document.getElementById('adminPassword').value;
+
+            // Sign in user
+            const userCredential = await firebase.auth().signInWithEmailAndPassword(email, password);
+            console.log('Sign in successful:', userCredential.user.uid);
+
+            // Ensure the token is fresh
+            const idToken = await userCredential.user.getIdToken(true);
+            console.log('Fetched ID Token:', idToken);
+
+            // Call admin claim function
+            const setAdminClaimFunction = firebase.functions().httpsCallable('setAdminClaim');
+            console.log('Calling setAdminClaim with token...');
+
+            const result = await setAdminClaimFunction({ email });
+
+            console.log('Admin claim response:', result.data);
+
+            if (result.data.success && result.data.isAdmin) {
+                localStorage.setItem('lastLoginAt', Date.now().toString());
+                window.location.href = '/admin-dashboard.html';
+                return;
+            }
+
+            throw new Error('Not authorized as admin');
+
+        } catch (error) {
+            console.error('Login failed:', error);
+            showError(error.message || 'Authentication failed');
+            await firebase.auth().signOut();
+        } finally {
+            setLoading(false);
+        }
+    });
+}
+
+// Ensure function is initialized when the page loads
+document.addEventListener('DOMContentLoaded', initializeLoginForm);
 function setLoading(isLoading) {
     const loadingIndicator = document.getElementById('loadingIndicator');
     const loginForm = document.getElementById('loginForm');
@@ -62,97 +117,6 @@ function showError(message) {
     errorDiv.style.display = 'block';
     console.error('Error:', message);
 }
- // At the top of your script
-document.addEventListener('DOMContentLoaded', function() {
-    // 1. Verify Firebase SDK loaded
-    if (typeof firebase === 'undefined') {
-        console.error('Firebase SDK not loaded');
-        showError('Firebase SDK failed to load');
-        return;
-    }
-
-    // 2. Verify Firebase is initialized
-    try {
-        // Log current Firebase config
-        console.log('Firebase apps:', firebase.apps.length ? 'Firebase initialized' : 'Firebase not initialized');
-        
-        // Verify required Firebase services
-        const auth = firebase.auth();
-        const functions = firebase.functions();
-        
-        console.log('Firebase services check:', {
-            auth: !!auth ? 'Available' : 'Not available',
-            functions: !!functions ? 'Available' : 'Not available'
-        });
-
-        // Initialize auth state listener
-        auth.onAuthStateChanged((user) => {
-            console.log('Auth state changed:', user ? {
-                email: user.email,
-                uid: user.uid,
-                emailVerified: user.emailVerified
-            } : 'No user');
-        });
-
-        // Initialize login form handler
-        initializeLoginForm(auth, functions);
-
-    } catch (error) {
-        console.error('Firebase initialization error:', error);
-        showError('Failed to initialize Firebase services');
-    }
-});
-
-// Separate login form initialization
-async function handleAdminLogin(event) {
-    event.preventDefault();
-    setLoading(true);
-
-    try {
-        const email = document.getElementById('adminEmail').value.trim();
-        const password = document.getElementById('adminPassword').value;
-
-        // Sign in user
-        const userCredential = await firebase.auth().signInWithEmailAndPassword(email, password);
-        const user = userCredential.user;
-        console.log('Sign in successful:', user.uid);
-
-        // Ensure the token is fresh
-        const idToken = await user.getIdToken(true);
-        console.log('Fetched ID Token:', idToken);
-
-        // Manually set authentication headers
-        const functions = firebase.app().functions("us-central1");
-        const setAdminClaimFunction = functions.httpsCallable('setAdminClaim', {
-            headers: { Authorization: `Bearer ${idToken}` }
-        });
-
-        console.log('Calling setAdminClaim with token...');
-        const result = await setAdminClaimFunction({ email });
-
-        console.log('Admin claim response:', result.data);
-
-        if (result.data.success && result.data.isAdmin) {
-            localStorage.setItem('lastLoginAt', Date.now().toString());
-            window.location.href = '/admin-dashboard.html';
-            return;
-        }
-
-        throw new Error('Not authorized as admin');
-
-    } catch (error) {
-        console.error('Login failed:', error);
-        showError(error.message || 'Authentication failed');
-        try {
-            await firebase.auth().signOut();
-        } catch (signOutError) {
-            console.error('Sign out error:', signOutError);
-        }
-    } finally {
-        setLoading(false);
-    }
-}
-
 
 
     </script>
