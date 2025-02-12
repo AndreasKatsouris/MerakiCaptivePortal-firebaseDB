@@ -46,6 +46,22 @@
     </div>
 
     <script>
+function setLoading(isLoading) {
+    const loadingIndicator = document.getElementById('loadingIndicator');
+    const loginForm = document.getElementById('loginForm');
+    const loginButton = document.getElementById('loginButton');
+    
+    loadingIndicator.style.display = isLoading ? 'block' : 'none';
+    loginForm.style.opacity = isLoading ? '0.5' : '1';
+    loginButton.disabled = isLoading;
+}
+
+function showError(message) {
+    const errorDiv = document.getElementById('errorMessage');
+    errorDiv.textContent = message;
+    errorDiv.style.display = 'block';
+    console.error('Error:', message);
+}
  // At the top of your script
 document.addEventListener('DOMContentLoaded', function() {
     // 1. Verify Firebase SDK loaded
