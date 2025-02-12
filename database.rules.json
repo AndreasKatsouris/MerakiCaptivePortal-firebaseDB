@@ -1,7 +1,7 @@
 {
   "rules": {
-    ".read": "auth != null && auth.token.admin === true",
-    ".write": "auth != null && auth.token.admin === true",
+    ".read": "auth != null",
+    ".write": "auth != null",
 
     "guests": {
       ".read": "auth != null",
@@ -13,12 +13,15 @@
       }
     },
     "users": {
-  "$uid": {
-    ".read": "auth != null",
-    ".write": "auth != null && auth.uid === $uid"
+      "$uid": {
+        ".read": "auth != null",
+        ".write": "auth != null && auth.uid === $uid"
   }
 },
-
+"admin-claims": {
+  ".read": "auth != null",
+  ".write": "auth != null"
+},
     "rewards": {
       ".read": "auth != null",
       ".write": "auth != null",

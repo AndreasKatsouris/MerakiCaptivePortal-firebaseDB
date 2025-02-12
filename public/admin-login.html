@@ -47,7 +47,7 @@
 
     <script>
 
-function initializeLoginForm() {
+async function initializeLoginForm() {
     console.log('Initializing login form...');
 
     const loginForm = document.getElementById('loginForm');
@@ -59,14 +59,6 @@ function initializeLoginForm() {
     loginForm.addEventListener('submit', async function(event) {
         event.preventDefault();
         setLoading(true);
-        firebase.auth().setPersistence(firebase.auth.Auth.Persistence.LOCAL)
-        .then(() => {
-            console.log('Auth persistence set to LOCAL');
-        })
-        .catch((error) => {
-            console.error('Error setting auth persistence:', error);
-        });
-
 
         try {
             const email = document.getElementById('adminEmail').value.trim();
@@ -80,15 +72,17 @@ function initializeLoginForm() {
             const idToken = await userCredential.user.getIdToken(true);
             console.log('Fetched ID Token:', idToken);
 
-            // Call admin claim function
+            // Call admin claim function with the token
             const setAdminClaimFunction = firebase.functions().httpsCallable('setAdminClaim');
             console.log('Calling setAdminClaim with token...');
 
-            const result = await setAdminClaimFunction({ email });
+            const result = await setAdminClaimFunction({ email, idToken });
 
             console.log('Admin claim response:', result.data);
 
             if (result.data.success && result.data.isAdmin) {
+                // Refresh the token after claim update
+                await userCredential.user.getIdToken(true);
                 localStorage.setItem('lastLoginAt', Date.now().toString());
                 window.location.href = '/admin-dashboard.html';
                 return;
@@ -105,6 +99,7 @@ function initializeLoginForm() {
         }
     });
 }
+
 
 // Ensure function is initialized when the page loads
 document.addEventListener('DOMContentLoaded', initializeLoginForm);
