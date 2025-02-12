@@ -16,60 +16,42 @@ exports.setAdminClaim = functions.https.onCall(async (data, context) => {
         }
     });
 
-    // Verify auth context (fix)
-    if (!context.auth && !data.idToken) {
-        console.error('Auth verification failed:', {
-            rawAuth: context.auth,
-            rawToken: data.idToken || 'None provided'
-        });
-        throw new functions.https.HttpsError(
-            'unauthenticated',
-            'Must be authenticated to call this function'
-        );
-    }
-
     let userId;
+    
     try {
         if (context.auth) {
+            // Use Firebase-provided authentication context
             userId = context.auth.uid;
-        } else {
+        } else if (data.idToken) {
+            // If no auth context, verify token manually
+            console.log('Manually verifying ID token...');
             const decodedToken = await admin.auth().verifyIdToken(data.idToken);
             userId = decodedToken.uid;
+        } else {
+            console.error('Auth verification failed: No token provided');
+            throw new functions.https.HttpsError('unauthenticated', 'No authentication detected');
         }
 
-        console.log('Processing admin claim:', {
-            userId,
-            userEmail: data.email
-        });
+        console.log('Processing admin claim for user:', userId);
 
-        // Ensure user exists
+        // Get user record
         const userRecord = await admin.auth().getUser(userId);
         console.log('User record found:', userRecord.uid);
 
-        // Admin emails list
+        // Check if the user is an admin
         const adminEmails = ['andreas@askgroupholdings.com'];
-        const isAdmin = adminEmails.includes(data.email.toLowerCase());
+        const isAdmin = adminEmails.includes(userRecord.email.toLowerCase());
 
-        console.log('Admin status check:', { userEmail: data.email, isAdmin });
+        console.log('Admin status check:', { userEmail: userRecord.email, isAdmin });
 
-        // Set custom claims
+        // Set admin claim
         await admin.auth().setCustomUserClaims(userId, { admin: isAdmin });
 
-        // Verify claims were set
-        const updatedUser = await admin.auth().getUser(userId);
-        console.log('Updated user claims:', updatedUser.customClaims);
-
-        return {
-            success: true,
-            isAdmin,
-            claims: updatedUser.customClaims
-        };
+        return { success: true, isAdmin };
 
     } catch (error) {
-        console.error('Error in setAdminClaim:', {
-            error: error.message,
-            stack: error.stack
-        });
-        throw new functions.https.HttpsError('internal', error.message);
+        console.error('Error in setAdminClaim:', error);
+        throw new functions.https.HttpsError('internal', 'Failed to set admin claim');
     }
 });
+
