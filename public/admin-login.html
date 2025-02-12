@@ -120,38 +120,49 @@ function initializeLoginForm(auth, functions) {
         const email = document.getElementById('adminEmail').value.trim();
         const password = document.getElementById('adminPassword').value;
 
-        // First sign in and get user
+        // Sign in
         const userCredential = await auth.signInWithEmailAndPassword(email, password);
         console.log('Sign in successful:', userCredential.user.uid);
 
-        // IMPORTANT: Wait for auth state to be fully initialized
-        await new Promise((resolve) => {
+        // Wait for auth state to be fully propagated
+        const user = await new Promise((resolve) => {
             const unsubscribe = auth.onAuthStateChanged((user) => {
                 if (user) {
                     unsubscribe();
-                    resolve();
+                    resolve(user);
                 }
             });
+            // Add timeout to avoid hanging
+            setTimeout(() => resolve(null), 5000);
         });
 
-        // Get a fresh token
-        await userCredential.user.getIdToken(true);
-        console.log('Token refreshed');
+        if (!user) {
+            throw new Error('Auth state not propagated');
+        }
 
-        // Now call the function
-        const setAdminClaimFunction = functions.httpsCallable('setAdminClaim');
-        const result = await setAdminClaimFunction({ 
+        // Get fresh token and verify auth
+        const idToken = await user.getIdToken(true);
+        console.log('Fresh token obtained, length:', idToken.length);
+
+        // Connect to region-specific endpoint
+        const setAdminClaimFunction = functions
+            .httpsCallable('setAdminClaim', {
+                timeout: 30000 // 30 second timeout
+            });
+
+        console.log('Calling admin claim function...');
+        const result = await setAdminClaimFunction({
             email,
-            // Include additional verification data
-            timestamp: Date.now()
+            timestamp: Date.now(),
+            idToken // Explicitly pass the token
         });
 
-        console.log('Admin claim result:', result.data);
+        console.log('Function call result:', result.data);
 
         if (result.data.success && result.data.isAdmin) {
-            // Force another token refresh to get new claims
-            await userCredential.user.getIdToken(true);
-            const tokenResult = await userCredential.user.getIdTokenResult();
+            // Force token refresh to get new claims
+            await user.getIdToken(true);
+            const tokenResult = await user.getIdTokenResult();
             
             if (tokenResult.claims.admin) {
                 localStorage.setItem('lastLoginAt', Date.now().toString());
@@ -163,7 +174,11 @@ function initializeLoginForm(auth, functions) {
         throw new Error('Not authorized as admin');
 
     } catch (error) {
-        console.error('Login process error:', error);
+        console.error('Login process error:', {
+            message: error.message,
+            code: error.code,
+            details: error.details
+        });
         showError(error.message || 'Authentication failed');
         try {
             await auth.signOut();

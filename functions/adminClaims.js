@@ -2,18 +2,27 @@ const functions = require('firebase-functions');
 const admin = require('firebase-admin');
 
 exports.setAdminClaim = functions.https.onCall(async (data, context) => {
-    // Log function invocation
-    console.log('setAdminClaim invoked:', {
+    // Log complete invocation details
+    console.log('Function invocation details:', {
         hasAuth: !!context.auth,
-        hasData: !!data,
-        dataEmail: data?.email,
-        authUid: context.auth?.uid,
-        authToken: !!context.auth?.token
+        authDetails: context.auth ? {
+            uid: context.auth.uid,
+            email: context.auth.token.email,
+            tokenVerified: !!context.auth.token
+        } : null,
+        requestData: {
+            hasEmail: !!data?.email,
+            hasToken: !!data?.idToken,
+            timestamp: data?.timestamp
+        }
     });
 
     // Verify auth context
     if (!context.auth) {
-        console.error('Missing auth context');
+        console.error('Auth verification failed:', {
+            rawAuth: context.auth,
+            rawToken: context.rawRequest?.headers?.authorization
+        });
         throw new functions.https.HttpsError(
             'unauthenticated',
             'Must be authenticated to call this function'
