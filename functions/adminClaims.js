@@ -1,16 +1,15 @@
 const functions = require('firebase-functions');
 const admin = require('firebase-admin');
 
-// Note: Don't initialize admin here, it's done in index.js
-
 exports.setAdminClaim = functions.https.onCall(async (data, context) => {
-    // Debug logging
+    // Debug logging - safely handle circular references
     console.log('setAdminClaim function called');
-    console.log('Data received:', JSON.stringify(data));
+    console.log('Data received:', {
+        email: data.email
+    });
     console.log('Auth context:', context.auth ? {
         uid: context.auth.uid,
-        email: context.auth.token.email,
-        token: context.auth.token
+        email: context.auth.token.email
     } : 'No auth context');
 
     // Ensure user is authenticated
@@ -27,14 +26,10 @@ exports.setAdminClaim = functions.https.onCall(async (data, context) => {
         const userId = context.auth.uid;
         const userEmail = data.email.toLowerCase(); // Use provided email but normalize it
 
-        console.log('Processing admin claim for:', {
-            userId,
-            userEmail
-        });
-
         // List of admin emails
         const adminEmails = [
             'andreas@askgroupholdings.com'
+            // Add other admin emails as needed
         ];
 
         // Check if the email should have admin privileges
@@ -52,8 +47,7 @@ exports.setAdminClaim = functions.https.onCall(async (data, context) => {
         return {
             success: true,
             isAdmin: isAdmin,
-            message: `Admin claim ${isAdmin ? 'set' : 'removed'} for ${userEmail}`,
-            claims: updatedUser.customClaims
+            message: `Admin claim ${isAdmin ? 'set' : 'removed'} for ${userEmail}`
         };
 
     } catch (error) {
