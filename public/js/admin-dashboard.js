@@ -124,60 +124,55 @@ function initializeDashboard() {
 
 // ==================== Authentication Section ====================
 function initializeAuthentication() {
-    firebase.auth().setPersistence(firebase.auth.Auth.Persistence.SESSION)
-        .then(() => {
-            console.log('Firebase Auth persistence set to SESSION');
-        })
-        .catch((error) => {
-            console.error('Error setting auth persistence:', error);
-        });
+    firebase.auth().onAuthStateChanged(async (user) => {
+        if (!user) {
+            console.log("No user detected, redirecting to login...");
+            window.location.href = '/admin-login.html';
+            return;
+        }
 
-        firebase.auth().onAuthStateChanged(async (user) => {
-            if (!user) {
-                console.log("No user detected, redirecting to login...");
+        try {
+            // Ensure we fetch a fresh token
+            const tokenResult = await user.getIdTokenResult(true);
+            
+            // Verify if user has admin claim
+            if (!tokenResult.claims.admin) {
+                console.warn("User is not an admin, signing out...");
+                await firebase.auth().signOut();
                 window.location.href = '/admin-login.html';
                 return;
             }
-        
-            try {
-                // Ensure we fetch a fresh token
-                const tokenResult = await user.getIdTokenResult(true);
-                
-                // Verify if user has admin claim
-                if (!tokenResult.claims.admin) {
-                    console.warn("User is not an admin, signing out...");
-                    await firebase.auth().signOut();
-                    window.location.href = '/admin-login.html';
-                    return;
-                }
-        
-                // Verify session expiration (1 hour limit)
-                const lastLoginAt = localStorage.getItem('lastLoginAt');
-                const MAX_SESSION_DURATION = 1000 * 60 * 60;
-        
-                if (!lastLoginAt || Date.now() - parseInt(lastLoginAt) > MAX_SESSION_DURATION) {
-                    console.warn('Session expired, signing out...');
-                    await firebase.auth().signOut();
-                    window.location.href = '/admin-login.html';
-                    return;
-                }
-        
-                // Make page visible after authentication check
-                document.body.style.visibility = 'visible';
-                console.log("User authenticated successfully as admin.");
-        
-                // Initialize the dashboard after authentication is confirmed
-                initializeDashboard();
-        
-            } catch (error) {
-                console.error('Session verification failed:', error);
-                window.location.href = '/admin-login.html';
-            }
-        });
-        
-        
 
-        document.addEventListener("DOMContentLoaded", function() {
+            // Verify session expiration (1 hour limit)
+            const lastLoginAt = localStorage.getItem('lastLoginAt');
+            const MAX_SESSION_DURATION = 1000 * 60 * 60;
+
+            if (!lastLoginAt || Date.now() - parseInt(lastLoginAt) > MAX_SESSION_DURATION) {
+                console.warn('Session expired, signing out...');
+                await firebase.auth().signOut();
+                window.location.href = '/admin-login.html';
+                return;
+            }
+
+            // Make page visible after authentication check
+            document.body.style.visibility = 'visible';
+            console.log("User authenticated successfully as admin.");
+
+            // Initialize the dashboard after authentication is confirmed
+            initializeDashboard();
+
+        } catch (error) {
+            console.error('Session verification failed:', error);
+            window.location.href = '/admin-login.html';
+        }
+    });
+}
+
+// Ensure authentication is initialized when the dashboard loads
+document.addEventListener('DOMContentLoaded', () => {
+    initializeAuthentication();
+});
+document.addEventListener("DOMContentLoaded", function() {
             const logoutButton = document.getElementById('logoutButton');
             if (logoutButton) {
                 logoutButton.addEventListener('click', async (e) => {
@@ -194,11 +189,6 @@ function initializeAuthentication() {
                 console.warn("Logout button not found.");
             }
         });
-        // Ensure authentication is initialized when the dashboard loads
-        document.addEventListener('DOMContentLoaded', () => {
-        initializeAuthentication();
-});
-}
 async function ensureUserIsAuthenticated() {
     return new Promise((resolve, reject) => {
         firebase.auth().onAuthStateChanged(user => {
