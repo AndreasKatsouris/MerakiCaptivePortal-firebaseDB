@@ -5,22 +5,40 @@ import { initializeGuestManagement } from './guest-management.js';
 // Import the Google Reviews manager
 import { googleReviewsManager } from './googleReviews.js';
 
-async function waitForFirebaseInit() {
-    return new Promise((resolve, reject) => {
+async function ensureUserIsAuthenticated() {
+    return new Promise((resolve) => {
         const unsubscribe = firebase.auth().onAuthStateChanged((user) => {
-            unsubscribe();
-            currentUser = user;
             if (user) {
                 console.log('User authenticated:', user.email);
-                resolve(true);
+                resolve(user);
+                unsubscribe(); // Prevent multiple executions
             } else {
-                console.log('No user authenticated, redirecting to login');
-                window.location.href = 'admin-login.html';
-                reject(new Error('No authenticated user'));
+                console.log('No user authenticated, waiting...');
             }
         });
     });
 }
+
+// Wait for authentication before running dashboard logic
+ensureUserIsAuthenticated().then(async (user) => {
+    console.log('Ensuring token is fresh...');
+    await user.getIdToken(true);
+    console.log('Token refreshed.');
+
+    const tokenResult = await user.getIdTokenResult();
+    console.log('Updated claims:', tokenResult.claims);
+
+    if (!tokenResult.claims.admin) {
+        console.log('User is not an admin, redirecting...');
+        await firebase.auth().signOut();
+        window.location.href = 'admin-login.html';
+    } else {
+        console.log('User is an admin, loading dashboard...');
+    }
+}).catch(error => {
+    console.error('Authentication error:', error);
+});
+
 
 window.addEventListener('error', function(e) {
     console.error('Global error:', e.error);
@@ -98,6 +116,11 @@ document.addEventListener('DOMContentLoaded', async function () {
 async function initializeFirebaseFeatures() {
 
 }
+// ==================== Dashboard =============================
+function initializeDashboard() {
+    console.log("Initializing dashboard...");
+    // Add any necessary initialization logic here
+}
 
 // ==================== Authentication Section ====================
 function initializeAuthentication() {
@@ -110,43 +133,71 @@ function initializeAuthentication() {
         });
 
         firebase.auth().onAuthStateChanged(async (user) => {
-            if (user) {
-                console.log('User is signed in:', user.email);
+            if (!user) {
+                console.log("No user detected, redirecting to login...");
+                window.location.href = '/admin-login.html';
+                return;
+            }
         
-                try {
-                    // Force token refresh to fetch latest claims
-                    await user.getIdToken(true);
-        
-                    const tokenResult = await user.getIdTokenResult();
-                    console.log('Updated claims:', tokenResult.claims);
-        
-                    if (!tokenResult.claims.admin) {
-                        console.log('User is not an admin');
-                        await firebase.auth().signOut();
-                        window.location.href = 'admin-login.html';
-                    }
-                } catch (error) {
-                    console.error('Error checking admin status:', error);
+            try {
+                // Ensure we fetch a fresh token
+                const tokenResult = await user.getIdTokenResult(true);
+                
+                // Verify if user has admin claim
+                if (!tokenResult.claims.admin) {
+                    console.warn("User is not an admin, signing out...");
+                    await firebase.auth().signOut();
+                    window.location.href = '/admin-login.html';
+                    return;
                 }
-            } else {
-                window.location.href = 'admin-login.html';
+        
+                // Verify session expiration (1 hour limit)
+                const lastLoginAt = localStorage.getItem('lastLoginAt');
+                const MAX_SESSION_DURATION = 1000 * 60 * 60;
+        
+                if (!lastLoginAt || Date.now() - parseInt(lastLoginAt) > MAX_SESSION_DURATION) {
+                    console.warn('Session expired, signing out...');
+                    await firebase.auth().signOut();
+                    window.location.href = '/admin-login.html';
+                    return;
+                }
+        
+                // Make page visible after authentication check
+                document.body.style.visibility = 'visible';
+                console.log("User authenticated successfully as admin.");
+        
+                // Initialize the dashboard after authentication is confirmed
+                initializeDashboard();
+        
+            } catch (error) {
+                console.error('Session verification failed:', error);
+                window.location.href = '/admin-login.html';
             }
         });
+        
         
 
-    // Add logout button handler
-    const logoutButton = document.getElementById('logoutButton');
-    if (logoutButton) {
-        logoutButton.addEventListener('click', async (e) => {
-            e.preventDefault();
-            try {
-                await firebase.auth().signOut();
-                window.location.href = 'admin-login.html';
-            } catch (error) {
-                console.error('Error signing out:', error);
+        document.addEventListener("DOMContentLoaded", function() {
+            const logoutButton = document.getElementById('logoutButton');
+            if (logoutButton) {
+                logoutButton.addEventListener('click', async (e) => {
+                    e.preventDefault();
+                    try {
+                        await firebase.auth().signOut();
+                        localStorage.removeItem('lastLoginAt');
+                        window.location.href = '/admin-login.html';
+                    } catch (error) {
+                        console.error('Error signing out:', error);
+                    }
+                });
+            } else {
+                console.warn("Logout button not found.");
             }
         });
-    }
+        // Ensure authentication is initialized when the dashboard loads
+        document.addEventListener('DOMContentLoaded', () => {
+        initializeAuthentication();
+});
 }
 async function ensureUserIsAuthenticated() {
     return new Promise((resolve, reject) => {
