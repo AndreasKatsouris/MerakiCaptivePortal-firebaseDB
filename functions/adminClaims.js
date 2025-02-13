@@ -12,7 +12,6 @@ exports.setAdminClaim = functions.https.onCall(async (data, context) => {
 
     try {
         if (context.auth) {
-            // Use Firebase-provided authentication context
             userId = context.auth.uid;
         } else if (data.idToken) {
             console.log('Verifying token manually...');
@@ -27,8 +26,6 @@ exports.setAdminClaim = functions.https.onCall(async (data, context) => {
 
         // Get user details
         const userRecord = await admin.auth().getUser(userId);
-
-        // Only allow specific admins
         const adminEmails = ['andreas@askgroupholdings.com'];
         const isAdmin = adminEmails.includes(userRecord.email.toLowerCase());
 
@@ -44,4 +41,5 @@ exports.setAdminClaim = functions.https.onCall(async (data, context) => {
         throw new functions.https.HttpsError('internal', 'Failed to set admin claim');
     }
 });
+
 

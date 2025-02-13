@@ -123,7 +123,7 @@ function initializeDashboard() {
 }
 
 // ==================== Authentication Section ====================
-function initializeAuthentication() {
+async function initializeAuthentication() {
     firebase.auth().onAuthStateChanged(async (user) => {
         if (!user) {
             console.log("No user detected, redirecting to login...");
@@ -154,11 +154,8 @@ function initializeAuthentication() {
                 return;
             }
 
-            // Make page visible after authentication check
             document.body.style.visibility = 'visible';
             console.log("User authenticated successfully as admin.");
-
-            // Initialize the dashboard after authentication is confirmed
             initializeDashboard();
 
         } catch (error) {
@@ -172,6 +169,7 @@ function initializeAuthentication() {
 document.addEventListener('DOMContentLoaded', () => {
     initializeAuthentication();
 });
+
 document.addEventListener("DOMContentLoaded", function() {
             const logoutButton = document.getElementById('logoutButton');
             if (logoutButton) {
