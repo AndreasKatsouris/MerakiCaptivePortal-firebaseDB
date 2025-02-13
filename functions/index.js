@@ -54,4 +54,3 @@ exports.getGoogleConfig = onRequest(async (req, res) => {
     });
 });
 
-exports.setAdminClaim = setAdminClaim;
