@@ -53,4 +53,4 @@ exports.getGoogleConfig = onRequest(async (req, res) => {
         placeId: functions.config.google.place_id
     });
 });
-
+exports.setAdminClaim = setAdminClaim;
