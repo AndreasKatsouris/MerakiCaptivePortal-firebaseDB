@@ -85,7 +85,7 @@ async function handleAdminLogin(event) {
         const setAdminClaimFunction = firebase.functions().httpsCallable('setAdminClaim');
         console.log('Calling setAdminClaim with token:', idToken);
 
-        const result = await setAdminClaimFunction({ email, idToken });
+        const result = await setAdminClaimFunction({ email, idToken: idToken });
 
         console.log('Admin claim response:', result.data);
 
