@@ -37,8 +37,12 @@ exports.setAdminClaim = functions.https.onCall(async (data, context) => {
         return { success: true, isAdmin };
 
     } catch (error) {
-        console.error('Error in setAdminClaim:', error);
-        throw new functions.https.HttpsError('internal', 'Failed to set admin claim');
+        // If token verification fails, handle the error appropriately
+        if (error.code == 'auth/id-token-expired') {
+            throw new functions.https.HttpsError('unauthenticated', 'Token expired');
+        } else {
+            throw new functions.https.HttpsError('internal', 'Failed to verify token');
+        }
     }
 });
 
