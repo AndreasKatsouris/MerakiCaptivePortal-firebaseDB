@@ -81,9 +81,9 @@ async function handleAdminLogin(event) {
         const idToken = await user.getIdToken(true);
         console.log('Fetched ID Token:', idToken);
 
-        // Call setAdminClaim with the token
+        // Attach token explicitly in request headers
         const setAdminClaimFunction = firebase.functions().httpsCallable('setAdminClaim');
-        console.log('Calling setAdminClaim with token...');
+        console.log('Calling setAdminClaim with token:', idToken);
 
         const result = await setAdminClaimFunction({ email, idToken });
 
@@ -107,6 +107,7 @@ async function handleAdminLogin(event) {
         setLoading(false);
     }
 }
+
 
 // Ensure function is initialized when the page loads
 document.addEventListener('DOMContentLoaded', function() {

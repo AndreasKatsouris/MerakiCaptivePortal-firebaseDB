@@ -143,17 +143,6 @@ async function initializeAuthentication() {
                 return;
             }
 
-            // Verify session expiration (1 hour limit)
-            const lastLoginAt = localStorage.getItem('lastLoginAt');
-            const MAX_SESSION_DURATION = 1000 * 60 * 60;
-
-            if (!lastLoginAt || Date.now() - parseInt(lastLoginAt) > MAX_SESSION_DURATION) {
-                console.warn('Session expired, signing out...');
-                await firebase.auth().signOut();
-                window.location.href = '/admin-login.html';
-                return;
-            }
-
             document.body.style.visibility = 'visible';
             console.log("User authenticated successfully as admin.");
             initializeDashboard();
@@ -169,6 +158,7 @@ async function initializeAuthentication() {
 document.addEventListener('DOMContentLoaded', () => {
     initializeAuthentication();
 });
+
 
 document.addEventListener("DOMContentLoaded", function() {
             const logoutButton = document.getElementById('logoutButton');
