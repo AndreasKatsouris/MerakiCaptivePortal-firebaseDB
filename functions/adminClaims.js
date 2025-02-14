@@ -5,20 +5,21 @@ if (admin.apps.length === 0) {
     admin.initializeApp();
 }
 
-exports.setAdminClaim = functions.https.onCall(async (data) => {
+exports.setAdminClaim = functions.https.onCall(async (data, context) => {
     console.log('Function invoked:', { hasToken: !!data.idToken });
 
     let userId;
 
     try {
+        // Check if ID token is provided
         if (!data.idToken) {
-            console.error('Auth verification failed: No token provided');
-            throw new functions.https.HttpsError('unauthenticated', 'No authentication detected. Please provide an ID token.');
+            console.warn('Auth verification failed: No token provided');
+            return { success: false, error: 'No authentication detected. Please provide an ID token.' };
         }
 
-        console.log('Received ID Token:', data.idToken); // Log the token for debugging
+        console.log('Received ID Token. Attempting to verify...');
 
-        // Manually verify the token
+        // Verify ID Token
         const decodedToken = await admin.auth().verifyIdToken(data.idToken);
         userId = decodedToken.uid;
 
@@ -26,23 +27,22 @@ exports.setAdminClaim = functions.https.onCall(async (data) => {
 
         // Get user details
         const userRecord = await admin.auth().getUser(userId);
-        const adminEmails = ['ak@askgroupholdings.com'];
+        const adminEmails = ['andreas@askgroupholdings.com'];
         const isAdmin = adminEmails.includes(userRecord.email.toLowerCase());
 
         console.log('Admin status check:', { userEmail: userRecord.email, isAdmin });
 
         // Set admin claim
-        await admin.auth().setCustomUserClaims(userId, { admin: isAdmin });
-
-        console.log('Admin claim set successfully for:', userId);
-        return { success: true, isAdmin };
-
+        try {
+            await admin.auth().setCustomUserClaims(userId, { admin: isAdmin });
+            console.log('Admin claim successfully set for:', userId);
+            return { success: true, isAdmin };
+        } catch (claimError) {
+            console.warn('Admin claim assignment failed:', claimError);
+            return { success: true, isAdmin: false, warning: 'User authenticated but admin claim could not be assigned.' };
+        }
     } catch (error) {
         console.error('Error in setAdminClaim:', error);
-        throw new functions.https.HttpsError('internal', 'Failed to set admin claim: ' + error.message);
+        return { success: false, error: 'Failed to set admin claim: ' + error.message };
     }
 });
-
-
-
-
