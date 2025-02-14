@@ -5,7 +5,7 @@ if (admin.apps.length === 0) {
     admin.initializeApp();
 }
 
-exports.setAdminClaim = functions.https.onCall(async (data, context) => {
+exports.setAdminClaim = functions.https.onCall(async (data) => {
     console.log('Function invoked:', { hasToken: !!data.idToken });
 
     let userId;
@@ -26,7 +26,7 @@ exports.setAdminClaim = functions.https.onCall(async (data, context) => {
 
         // Get user details
         const userRecord = await admin.auth().getUser(userId);
-        const adminEmails = ['andreas@askgroupholdings.com'];
+        const adminEmails = ['ak@askgroupholdings.com'];
         const isAdmin = adminEmails.includes(userRecord.email.toLowerCase());
 
         console.log('Admin status check:', { userEmail: userRecord.email, isAdmin });
