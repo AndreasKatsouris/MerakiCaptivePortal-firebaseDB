@@ -77,39 +77,41 @@ async function handleAdminLogin(event) {
         const user = userCredential.user;
         console.log('Sign in successful:', user.uid);
 
-        // Ensure the token is fresh
-        const idToken = await user.getIdToken(true);
+        // Get token without forcing refresh
+        const idToken = await user.getIdToken();
         console.log('Fetched ID Token:', idToken);
 
-        // Attach token explicitly in request headers
+        // Call setAdminClaim without forcing logout on failure
         const setAdminClaimFunction = firebase.functions().httpsCallable('setAdminClaim');
         console.log('Calling setAdminClaim with token:', idToken);
 
-        // Log before making the call
-        console.log("Request payload:", { email, idToken });
+        try {
+            const result = await setAdminClaimFunction({ email, idToken });
 
-        const result = await setAdminClaimFunction({ email, idToken });
+            console.log('Admin claim response:', result.data);
 
-        console.log('Admin claim response:', result.data);
-
-        if (result.data.success && result.data.isAdmin) {
-            // Refresh the token after claim update
-            await user.getIdToken(true);
-            localStorage.setItem('lastLoginAt', Date.now().toString());
-            window.location.href = '/admin-dashboard.html';
-            return;
+            if (result.data.success && result.data.isAdmin) {
+                console.log("User is an admin. Redirecting...");
+                window.location.href = '/admin-dashboard.html';
+                return;
+            } else {
+                console.warn("User is not an admin. Showing message instead of logging out.");
+                alert("Login successful, but you don't have admin access.");
+                return;
+            }
+        } catch (error) {
+            console.error("Admin claim assignment failed:", error);
+            alert("Login successful, but admin claim could not be assigned.");
         }
-
-        throw new Error('Not authorized as admin');
-
+        
     } catch (error) {
         console.error('Login failed:', error);
         showError(error.message || 'Authentication failed');
-        await firebase.auth().signOut();
     } finally {
         setLoading(false);
     }
 }
+
 
 
 
