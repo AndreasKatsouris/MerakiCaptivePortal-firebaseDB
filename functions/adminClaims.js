@@ -11,18 +11,17 @@ exports.setAdminClaim = functions.https.onCall(async (data, context) => {
     let userId;
 
     try {
-        if (context.auth) {
-            userId = context.auth.uid;
-        } else if (data.idToken) {
-            console.log('Verifying token manually...');
-            const decodedToken = await admin.auth().verifyIdToken(data.idToken);
-            userId = decodedToken.uid;
-        } else {
+        // Ensure the token is included in the request
+        if (!data.idToken) {
             console.error('Auth verification failed: No token provided');
-            throw new functions.https.HttpsError('unauthenticated', 'No authentication detected');
+            throw new functions.https.HttpsError('unauthenticated', 'No authentication detected. Please provide an ID token.');
         }
 
-        console.log('Assigning admin claim to:', userId);
+        console.log('Verifying ID token manually...');
+        const decodedToken = await admin.auth().verifyIdToken(data.idToken);
+        userId = decodedToken.uid;
+
+        console.log('User authenticated:', userId);
 
         // Get user details
         const userRecord = await admin.auth().getUser(userId);
@@ -34,15 +33,12 @@ exports.setAdminClaim = functions.https.onCall(async (data, context) => {
         // Set admin claim
         await admin.auth().setCustomUserClaims(userId, { admin: isAdmin });
 
+        console.log('Admin claim set successfully for:', userId);
         return { success: true, isAdmin };
 
     } catch (error) {
-        // If token verification fails, handle the error appropriately
-        if (error.code == 'auth/id-token-expired') {
-            throw new functions.https.HttpsError('unauthenticated', 'Token expired');
-        } else {
-            throw new functions.https.HttpsError('internal', 'Failed to verify token');
-        }
+        console.error('Error in setAdminClaim:', error);
+        throw new functions.https.HttpsError('internal', 'Failed to set admin claim: ' + error.message);
     }
 });
 
