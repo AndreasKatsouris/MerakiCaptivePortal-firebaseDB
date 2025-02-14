@@ -6,18 +6,19 @@ if (admin.apps.length === 0) {
 }
 
 exports.setAdminClaim = functions.https.onCall(async (data, context) => {
-    console.log('Function invoked:', { hasAuth: !!context.auth, hasToken: !!data.idToken });
+    console.log('Function invoked:', { hasToken: !!data.idToken });
 
     let userId;
 
     try {
-        // Ensure the token is included in the request
         if (!data.idToken) {
             console.error('Auth verification failed: No token provided');
             throw new functions.https.HttpsError('unauthenticated', 'No authentication detected. Please provide an ID token.');
         }
 
-        console.log('Verifying ID token manually...');
+        console.log('Received ID Token:', data.idToken); // Log the token for debugging
+
+        // Manually verify the token
         const decodedToken = await admin.auth().verifyIdToken(data.idToken);
         userId = decodedToken.uid;
 
@@ -41,6 +42,7 @@ exports.setAdminClaim = functions.https.onCall(async (data, context) => {
         throw new functions.https.HttpsError('internal', 'Failed to set admin claim: ' + error.message);
     }
 });
+
 
 
 
