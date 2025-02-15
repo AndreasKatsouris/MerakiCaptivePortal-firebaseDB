@@ -54,7 +54,7 @@ class AuthManager {
         return this.initializePromise;
     }
 
-    private async initializeWithTimeout() {
+    async initializeWithTimeout() {
         return Promise.race([
             this.initializeFirebase(),
             new Promise((_, reject) => {
@@ -65,28 +65,32 @@ class AuthManager {
         ]);
     }
 
-    private async initializeFirebase() {
-        let retryCount = 0;
-
-        while (retryCount < this.config.maxRetries) {
-            try {
-                if (!firebase?.auth) {
-                    throw new Error('Firebase SDK not loaded');
+    initializeFirebase() {
+        return new Promise(async (resolve, reject) => {
+            let retryCount = 0;
+    
+            while (retryCount < this.config.maxRetries) {
+                try {
+                    if (!firebase?.auth) {
+                        throw new Error('Firebase SDK not loaded');
+                    }
+    
+                    if (firebase.apps.length === 0) {
+                        throw new Error('Firebase not initialized');
+                    }
+    
+                    resolve(true);
+                    return;
+                } catch (error) {
+                    retryCount++;
+                    if (retryCount === this.config.maxRetries) {
+                        reject(error);
+                        return;
+                    }
+                    await new Promise(resolve => setTimeout(resolve, this.config.retryDelay));
                 }
-
-                if (firebase.apps.length === 0) {
-                    throw new Error('Firebase not initialized');
-                }
-
-                return true;
-            } catch (error) {
-                retryCount++;
-                if (retryCount === this.config.maxRetries) {
-                    throw error;
-                }
-                await new Promise(resolve => setTimeout(resolve, this.config.retryDelay));
             }
-        }
+        });
     }
 
     async login(email, password) {
@@ -132,7 +136,7 @@ class AuthManager {
         }
     }
 
-    private setupAuthStateMonitoring() {
+    setupAuthStateMonitoring() {
         firebase.auth().onAuthStateChanged(async (user) => {
             try {
                 const previousUser = this.currentUser;
@@ -155,7 +159,7 @@ class AuthManager {
         });
     }
 
-    private async handleSignIn(user) {
+    async handleSignIn(user) {
         try {
             await this.validateSession(user);
             this.startSessionMonitoring();
@@ -165,12 +169,12 @@ class AuthManager {
         }
     }
 
-    private async handleSignOut() {
+    async handleSignOut() {
         this.stopSessionMonitoring();
         this.clearApplicationState();
     }
 
-    private async validateSession(user) {
+    async validateSession(user) {
         try {
             const tokenResult = await this.getAdminTokenResult(user);
             
@@ -190,7 +194,7 @@ class AuthManager {
         }
     }
 
-    private async getAdminTokenResult(user, forceRefresh = false) {
+    async getAdminTokenResult(user, forceRefresh = false) {
         try {
             const tokenResult = await user.getIdTokenResult(forceRefresh);
             const isAdmin = this.validateAdminClaims(tokenResult.claims);
@@ -208,12 +212,12 @@ class AuthManager {
         }
     }
 
-    private validateAdminClaims(claims) {
+    validateAdminClaims(claims) {
         return claims.admin === true && 
                claims.email?.endsWith(this.config.adminEmailDomain);
     }
 
-    private startSessionMonitoring() {
+    startSessionMonitoring() {
         this.stopSessionMonitoring();
 
         this.sessionCheckInterval = setInterval(async () => {
@@ -235,14 +239,14 @@ class AuthManager {
         }, this.config.sessionCheckInterval);
     }
 
-    private stopSessionMonitoring() {
+    stopSessionMonitoring() {
         if (this.sessionCheckInterval) {
             clearInterval(this.sessionCheckInterval);
             this.sessionCheckInterval = null;
         }
     }
 
-    private async updateUserMetadata(user) {
+    async updateUserMetadata(user) {
         try {
             const userRef = firebase.database().ref(`adminUsers/${user.uid}`);
             await userRef.update({
@@ -255,7 +259,7 @@ class AuthManager {
         }
     }
 
-    private async endSession(reason) {
+    async endSession(reason) {
         this.isRedirecting = true;
 
         try {
@@ -271,7 +275,7 @@ class AuthManager {
         }
     }
 
-    private clearApplicationState() {
+    clearApplicationState() {
         this.currentUser = null;
         this.authStateListeners.clear();
         
@@ -287,7 +291,7 @@ class AuthManager {
         }
     }
 
-    private notifyAuthStateListeners(user) {
+    notifyAuthStateListeners(user) {
         this.authStateListeners.forEach(listener => {
             try {
                 listener(user);
