@@ -858,6 +858,60 @@
         window._ = lodash;
     }
 </script>
+
+<script type="module">
+    import { dashboardAuth } from './js/admin/DashboardAuth.js';
+    import { AuthErrorHandler } from './js/auth/AuthErrors.js';
+
+    // Global error handlers
+    window.addEventListener('error', function(event) {
+        console.error('Global error:', event.error);
+        hideLoading();
+        handleGlobalError(event.error);
+    });
+
+    window.addEventListener('unhandledrejection', function(event) {
+        console.error('Unhandled promise rejection:', event.reason);
+        hideLoading();
+        handleGlobalError(event.reason);
+    });
+
+    function handleGlobalError(error) {
+        const handledError = AuthErrorHandler.handleError(error, 'global');
+        
+        // Show error message to user
+        const errorDiv = document.createElement('div');
+        errorDiv.className = 'alert alert-danger alert-dismissible fade show m-3';
+        errorDiv.innerHTML = `
+            <strong>Error:</strong> ${handledError.message}
+            <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+        `;
+        document.body.prepend(errorDiv);
+    }
+
+    // Initialize dashboard
+    async function initializeDashboard() {
+        try {
+            showLoading();
+            await dashboardAuth.initialize();
+            hideLoading();
+            
+            // Make body visible after initialization
+            document.body.style.visibility = 'visible';
+            
+        } catch (error) {
+            hideLoading();
+            handleGlobalError(error);
+        }
+    }
+
+    // Start initialization when DOM is ready
+    if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', initializeDashboard);
+    } else {
+        initializeDashboard();
+    }
+</script>
 <script src="js/GuestAnalytics.js"></script>
 <script type="module" src="js/googleReviews.js"></script>
 <script type="module" src="js/dashboard.js"></script>

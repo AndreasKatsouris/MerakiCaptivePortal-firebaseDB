@@ -2,7 +2,8 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <title>Admin Login</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Admin Login - RDP Platform</title>
     
     <!-- Firebase SDKs -->
     <script src="/__/firebase/10.12.5/firebase-app-compat.js"></script>
@@ -10,124 +11,117 @@
     <script src="/__/firebase/10.12.5/firebase-functions-compat.js"></script>
     <script src="/__/firebase/init.js?useEmulator=false"></script>
 
+    <!-- Vue.js -->
+    <script src="https://unpkg.com/vue@3/dist/vue.global.prod.js"></script>
+
+    <!-- Styles -->
     <link rel="stylesheet" href="css/bootstrap.min.css">
     <link rel="stylesheet" href="css/style.css">
+
+    <!-- Add loading overlay -->
+    <style>
+        .loading-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(255, 255, 255, 0.9);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            z-index: 9999;
+        }
+
+        .loading-spinner {
+            width: 50px;
+            height: 50px;
+            border: 3px solid #f3f3f3;
+            border-top: 3px solid #3498db;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+        }
+
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+    </style>
 </head>
 <body>
+    <!-- Loading overlay -->
+    <div id="loadingOverlay" class="loading-overlay">
+        <div class="loading-spinner"></div>
+    </div>
+
     <div class="container mt-5">
         <div class="row justify-content-center">
             <div class="col-md-6">
-                <div class="card">
-                    <div class="card-header">
-                        <h2 class="text-center">Admin Login</h2>
-                    </div>
-                    <div class="card-body">
-                        <div id="errorMessage" class="alert alert-danger" style="display: none;"></div>
-                        <div id="loadingIndicator" class="text-center" style="display: none;">
-                            <div class="spinner-border text-primary" role="status">
-                                <span class="visually-hidden">Loading...</span>
-                            </div>
-                        </div>
-                        <form id="loginForm">
-                            <div class="form-group mb-3">
-                                <label for="adminEmail">Email</label>
-                                <input type="email" class="form-control" id="adminEmail" required>
-                            </div>
-                            <div class="form-group mb-3">
-                                <label for="adminPassword">Password</label>
-                                <input type="password" class="form-control" id="adminPassword" required>
-                            </div>
-                            <button type="submit" class="btn btn-primary w-100" id="loginButton">Login</button>
-                        </form>
-                    </div>
-                </div>
+                <!-- Vue mount point -->
+                <div id="adminLoginApp"></div>
             </div>
         </div>
     </div>
 
+    <!-- Add global error handling -->
     <script>
+        window.addEventListener('error', function(event) {
+            console.error('Global error:', event.error);
+            hideLoading();
+            alert('An error occurred. Please try again.');
+        });
 
+        window.addEventListener('unhandledrejection', function(event) {
+            console.error('Unhandled promise rejection:', event.reason);
+            hideLoading();
+            alert('An error occurred. Please try again.');
+        });
 
-function setLoading(isLoading) {
-    const loadingIndicator = document.getElementById('loadingIndicator');
-    const loginForm = document.getElementById('loginForm');
-    const loginButton = document.getElementById('loginButton');
-    
-    loadingIndicator.style.display = isLoading ? 'block' : 'none';
-    loginForm.style.opacity = isLoading ? '0.5' : '1';
-    loginButton.disabled = isLoading;
-}
-
-function showError(message) {
-    const errorDiv = document.getElementById('errorMessage');
-    errorDiv.textContent = message;
-    errorDiv.style.display = 'block';
-    console.error('Error:', message);
-}
-async function handleAdminLogin(event) {
-    event.preventDefault();
-    setLoading(true);
-
-    try {
-        const email = document.getElementById('adminEmail').value.trim();
-        const password = document.getElementById('adminPassword').value;
-
-        // Sign in user
-        const userCredential = await firebase.auth().signInWithEmailAndPassword(email, password);
-        const user = userCredential.user;
-        console.log('Sign in successful:', user.uid);
-
-        // Get token without forcing refresh
-        const idToken = await user.getIdToken();
-        console.log('Fetched ID Token:', idToken);
-
-        // Call setAdminClaim without forcing logout on failure
-        const setAdminClaimFunction = firebase.functions().httpsCallable('setAdminClaim');
-        console.log('Calling setAdminClaim with token:', idToken);
-
-        try {
-            const result = await setAdminClaimFunction({ email, idToken });
-
-            console.log('Admin claim response:', result.data);
-
-            if (result.data.success && result.data.isAdmin) {
-                console.log("User is an admin. Redirecting...");
-                window.location.href = '/admin-dashboard.html';
-                return;
-            } else {
-                console.warn("User is not an admin. Showing message instead of logging out.");
-                alert("Login successful, but you don't have admin access.");
-                return;
-            }
-        } catch (error) {
-            console.error("Admin claim assignment failed:", error);
-            alert("Login successful, but admin claim could not be assigned.");
+        function showLoading() {
+            document.getElementById('loadingOverlay').style.display = 'flex';
         }
-        
-    } catch (error) {
-        console.error('Login failed:', error);
-        showError(error.message || 'Authentication failed');
-    } finally {
-        setLoading(false);
-    }
-}
 
+        function hideLoading() {
+            document.getElementById('loadingOverlay').style.display = 'none';
+        }
 
+        // Hide loading when everything is loaded
+        window.addEventListener('load', hideLoading);
+    </script>
 
+    <!-- Load our auth modules -->
+    <script type="module" src="js/auth/AuthErrors.js"></script>
+    <script type="module" src="js/auth/AuthManager.js"></script>
+    <script type="module" src="js/auth/AuthGuard.js"></script>
+    <script type="module" src="js/auth/RouteGuard.js"></script>
+    
+    <!-- Load our login component -->
+    <script type="module" src="js/admin/AdminLogin.js"></script>
 
-// Ensure function is initialized when the page loads
-document.addEventListener('DOMContentLoaded', function() {
-    const loginForm = document.getElementById('loginForm');
-    if (loginForm) {
-        loginForm.addEventListener('submit', handleAdminLogin);
-    } else {
-        console.error('Login form not found.');
-    }
-});
+    <!-- Initialize auth -->
+    <script type="module">
+        import { authManager } from './js/auth/AuthManager.js';
+        import { routeGuard } from './js/auth/RouteGuard.js';
 
+        async function initialize() {
+            try {
+                await authManager.initialize();
+                await routeGuard.initialize();
 
+                // Check if user is already authenticated
+                if (authManager.isAuthenticated()) {
+                    window.location.href = '/admin-dashboard.html';
+                }
 
+                hideLoading();
+            } catch (error) {
+                console.error('Initialization error:', error);
+                hideLoading();
+                alert('Failed to initialize application. Please refresh the page.');
+            }
+        }
 
+        initialize();
     </script>
 </body>
 </html>
