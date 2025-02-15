@@ -31,7 +31,7 @@ class AuthManager {
             return this.initializePromise;
         }
     
-        const initPromise = (async () => {
+        this.initializePromise = (async () => {
             try {
                 if (this.initialized) {
                     console.warn('AuthManager already initialized');
@@ -50,9 +50,7 @@ class AuthManager {
             }
         })();
     
-        this.initializePromise = initPromise;
-    
-        return initPromise;
+        return this.initializePromise;
     }
 
     async initializeWithTimeout() {
