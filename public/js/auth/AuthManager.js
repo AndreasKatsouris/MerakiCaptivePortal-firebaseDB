@@ -30,28 +30,29 @@ class AuthManager {
         if (this.initializePromise) {
             return this.initializePromise;
         }
-
-        this.initializePromise = (async () => {
+    
+        const initPromise = (async () => {
             try {
                 if (this.initialized) {
                     console.warn('AuthManager already initialized');
                     return;
                 }
-
+    
                 await this.initializeWithTimeout();
                 this.setupAuthStateMonitoring();
                 await this.checkExistingSession();
-
+    
                 this.initialized = true;
                 console.log('AuthManager initialized successfully');
             } catch (error) {
                 this.initialized = false;
-                this.initializePromise = null;
                 throw AuthErrorHandler.handleError(error, 'initialization');
             }
         })();
-
-        return this.initializePromise;
+    
+        this.initializePromise = initPromise;
+    
+        return initPromise;
     }
 
     async initializeWithTimeout() {
