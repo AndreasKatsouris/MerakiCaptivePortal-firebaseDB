@@ -1,15 +1,17 @@
-(function(Vue) {
-    // CampaignManager Component Definition
-    const CampaignManager = {
+import { auth } from '../config/firebase-config.js';
+
+export function initializeCampaignManagement() {
+    console.log('Initializing campaign management...');
+    
+    const app = Vue.createApp({
         data() {
             return {
                 campaigns: [],
                 loading: false,
                 error: null,
                 filters: {
-                    status: '',
                     brandName: '',
-                    dateRange: null
+                    status: ''
                 },
                 daysOfWeek: [
                     { value: 0, label: 'Sunday' },
@@ -23,7 +25,7 @@
                 selectedRewardTypes: [],
                 rewardCriteria: {},
                 availableRewardTypes: []
-            }
+            };
         },
         template: `
             <div class="campaign-management">
@@ -686,20 +688,20 @@
         },
 
         mounted() {
-            console.log('CampaignManager component mounted');
+            console.log('Campaign management component mounted');
             this.loadRewardTypes();
             this.loadCampaigns();
         }
-    };
+    });
 
-    // Initialize function that can be called from the vanilla JS world
-    window.CampaignManager = {
-        init: function(containerId) {
-            console.log('Initializing Campaign Manager on:', containerId);
-            const app = Vue.createApp(CampaignManager);
-            app.mount(`#${containerId}`);
-            return app;
-        }
-    };
+    // Mount the app to the campaign management container
+    const mountPoint = document.getElementById('campaignManagementContent');
+    if (mountPoint) {
+        app.mount(mountPoint);
+        console.log('Campaign management initialized');
+    } else {
+        console.error('Campaign management mount point not found');
+    }
 
-})(Vue);
+    return app;
+}
