@@ -340,4 +340,4 @@ class AuthManager {
 export const authManager = new AuthManager();
 
 // Prevent modifications to the instance
-Object.freeze(authManager);
+//Object.freeze(authManager);
