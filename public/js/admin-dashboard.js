@@ -25,7 +25,7 @@ class AdminDashboard {
                     window.location.href = '/admin-login.html';
                     return;
                 }
-                this.loadDashboardContent();
+                this.setupDashboard();
             });
 
             this.initialized = true;
@@ -36,61 +36,50 @@ class AdminDashboard {
         }
     }
 
-    loadDashboardContent() {
-        // Show dashboard content
-        document.getElementById('dashboardContent').style.display = 'block';
-        // Hide other content sections
-        document.querySelectorAll('.content-section').forEach(section => {
-            if (section.id !== 'dashboardContent') {
-                section.style.display = 'none';
-            }
-        });
+    setupDashboard() {
+        this.registerSections();
+        this.setupEventListeners();
+        // Show default section (dashboard)
+        this.showSection('dashboard');
     }
 
     registerSections() {
-        // Define all sections with their initialization functions
-        const sectionConfigs = {
+        const sections = {
             dashboard: {
                 menuId: 'dashboardMenu',
                 contentId: 'dashboardContent',
-                init: initializeDashboard
-            },
-            projects: {
-                menuId: 'projectManagementMenu',
-                contentId: 'projectManagementContent',
-                init: initializeProjectManagement
+                initialize: initializeDashboard
             },
             campaigns: {
                 menuId: 'campaignManagementMenu',
                 contentId: 'campaignManagementContent',
-                init: initializeCampaignManagement
+                initialize: initializeCampaignManagement
+            },
+            projects: {
+                menuId: 'projectManagementMenu',
+                contentId: 'projectManagementContent',
+                initialize: initializeProjectManagement
             },
             guests: {
                 menuId: 'guestManagementMenu',
                 contentId: 'guestManagementContent',
-                init: initializeGuestManagement
+                initialize: initializeGuestManagement
             }
-            // Add other sections as needed
         };
 
-        // Register each section
-        Object.entries(sectionConfigs).forEach(([name, config]) => {
-            this.sections.set(name, {
-                name,
-                initialized: false,
-                ...config
-            });
+        Object.entries(sections).forEach(([name, config]) => {
+            this.sections.set(name, { ...config, initialized: false });
         });
     }
 
     setupEventListeners() {
-        // Handle menu clicks
-        this.sections.forEach(section => {
+        // Add click listeners to all menu items
+        this.sections.forEach((section, name) => {
             const menuElement = document.getElementById(section.menuId);
             if (menuElement) {
-                menuElement.addEventListener('click', async (e) => {
+                menuElement.addEventListener('click', (e) => {
                     e.preventDefault();
-                    await this.showSection(section.name);
+                    this.showSection(name);
                 });
             }
         });
@@ -115,40 +104,36 @@ class AdminDashboard {
     }
 
     async showSection(sectionName) {
-        try {
-            const section = this.sections.get(sectionName);
-            if (!section) {
-                console.warn(`Section ${sectionName} not found`);
-                return;
-            }
-
-            // Hide all sections
-            this.hideAllSections();
-
-            // Show selected section
-            const contentElement = document.getElementById(section.contentId);
-            if (contentElement) {
-                contentElement.style.display = 'block';
-            }
-
-            // Initialize section if needed
-            if (!section.initialized && section.init) {
-                await section.init();
-                section.initialized = true;
-            }
-
-            this.currentSection = sectionName;
-
-        } catch (error) {
-            console.error(`Error showing section ${sectionName}:`, error);
-            this.handleError(error);
+        console.log(`Showing section: ${sectionName}`);
+        const section = this.sections.get(sectionName);
+        
+        if (!section) {
+            console.error(`Section ${sectionName} not found`);
+            return;
         }
-    }
 
-    hideAllSections() {
-        document.querySelectorAll('.content-section').forEach(section => {
-            section.style.display = 'none';
+        // Hide all sections
+        document.querySelectorAll('.content-section').forEach(el => {
+            el.style.display = 'none';
         });
+
+        // Show selected section
+        const contentElement = document.getElementById(section.contentId);
+        if (contentElement) {
+            contentElement.style.display = 'block';
+        }
+
+        // Initialize section if not already initialized
+        if (!section.initialized && section.initialize) {
+            try {
+                await section.initialize();
+                section.initialized = true;
+            } catch (error) {
+                console.error(`Error initializing ${sectionName}:`, error);
+            }
+        }
+
+        this.currentSection = sectionName;
     }
 
     async handleLogout() {
