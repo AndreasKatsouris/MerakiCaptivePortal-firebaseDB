@@ -16,12 +16,6 @@ const AdminLogin = {
     mounted() {
         // Clear any existing session data
         sessionStorage.removeItem('logoutReason');
-        
-        // Initialize auth manager
-        authManager.initialize().catch(error => {
-            console.error('Auth initialization error:', error);
-            this.error = error.message;
-        });
     },
 
     methods: {
