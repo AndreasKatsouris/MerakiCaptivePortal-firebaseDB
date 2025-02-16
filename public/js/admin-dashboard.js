@@ -2,6 +2,7 @@ import { initializeDashboard } from './dashboard.js';
 import { initializeProjectManagement } from './project-management.js';
 import { initializeGuestManagement } from './guest-management.js';
 import { initializeCampaignManagement } from './campaigns/campaigns.js';
+import { initializeRewardTypes } from './reward-types.js';
 import { authManager } from './auth/auth.js';
 import { auth } from './config/firebase-config.js';
 
@@ -39,22 +40,51 @@ class AdminDashboard {
     setupDashboard() {
         this.registerSections();
         this.setupEventListeners();
+        this.setupSubmenuListeners();
         // Show default section (dashboard)
         this.showSection('dashboard');
     }
 
     registerSections() {
         const sections = {
+            // Main Dashboard
             dashboard: {
                 menuId: 'dashboardMenu',
                 contentId: 'dashboardContent',
                 initialize: initializeDashboard
             },
+            // Loyalty Program Sections
             campaigns: {
                 menuId: 'campaignManagementMenu',
                 contentId: 'campaignManagementContent',
-                initialize: initializeCampaignManagement
+                initialize: initializeCampaignManagement,
+                parent: 'loyaltySubmenu'
             },
+            rewardTypes: {
+                menuId: 'rewardTypesMenu',
+                contentId: 'rewardTypesContent',
+                initialize: initializeRewardTypes,
+                parent: 'loyaltySubmenu'
+            },
+            receipts: {
+                menuId: 'receiptManagementMenu',
+                contentId: 'receiptManagementContent',
+                initialize: initializeReceiptManagement,
+                parent: 'loyaltySubmenu'
+            },
+            points: {
+                menuId: 'pointManagementMenu',
+                contentId: 'pointManagementContent',
+                initialize: initializePointManagement,
+                parent: 'loyaltySubmenu'
+            },
+            rewards: {
+                menuId: 'rewardManagementMenu',
+                contentId: 'rewardManagementContent',
+                initialize: initializeRewardManagement,
+                parent: 'loyaltySubmenu'
+            },
+            // Other Sections
             projects: {
                 menuId: 'projectManagementMenu',
                 contentId: 'projectManagementContent',
@@ -101,6 +131,54 @@ class AdminDashboard {
                 sidebar.classList.toggle('active');
             });
         }
+    }
+
+    setupSubmenuListeners() {
+        // Handle submenu toggles
+        document.querySelectorAll('[data-toggle="collapse"]').forEach(toggle => {
+            toggle.addEventListener('click', (e) => {
+                e.preventDefault();
+                const targetId = toggle.getAttribute('data-target');
+                const submenu = document.querySelector(targetId);
+                if (submenu) {
+                    // Close other submenus
+                    document.querySelectorAll('.submenu.show').forEach(menu => {
+                        if (menu !== submenu) {
+                            menu.classList.remove('show');
+                            const parentToggle = menu.previousElementSibling;
+                            parentToggle?.querySelector('.fas.fa-chevron-down')?.classList.remove('rotate');
+                        }
+                    });
+                    // Toggle current submenu
+                    submenu.classList.toggle('show');
+                    toggle.querySelector('.fas.fa-chevron-down')?.classList.toggle('rotate');
+                }
+            });
+        });
+
+        // Handle all submenu items
+        document.querySelectorAll('.submenu').forEach(submenu => {
+            submenu.addEventListener('click', (e) => {
+                const menuItem = e.target.closest('a');
+                if (menuItem) {
+                    e.preventDefault();
+                    const menuId = menuItem.id;
+                    const sectionName = this.getSectionNameFromMenuId(menuId);
+                    if (sectionName) {
+                        this.showSection(sectionName);
+                    }
+                }
+            });
+        });
+    }
+
+    getSectionNameFromMenuId(menuId) {
+        for (const [name, section] of this.sections) {
+            if (section.menuId === menuId) {
+                return name;
+            }
+        }
+        return null;
     }
 
     async showSection(sectionName) {
