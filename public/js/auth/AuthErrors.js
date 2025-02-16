@@ -26,12 +26,21 @@ export const AUTH_ERRORS = {
     },
     
     // Admin errors
+    // Admin-specific errors
+    'admin/unauthorized-domain': {
+        message: 'This email domain is not authorized for admin access',
+        category: ERROR_CATEGORIES.ADMIN
+    },
     'admin/insufficient-privileges': {
-        message: 'Admin access required',
+        message: 'Your account does not have administrative privileges',
+        category: ERROR_CATEGORIES.ADMIN
+    },
+    'admin/invalid-claims': {
+        message: 'Invalid administrative credentials',
         category: ERROR_CATEGORIES.ADMIN
     },
     'admin/claim-failed': {
-        message: 'Failed to verify admin status',
+        message: 'Failed to verify administrative access',
         category: ERROR_CATEGORIES.ADMIN
     },
     

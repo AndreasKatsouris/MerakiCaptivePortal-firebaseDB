@@ -173,36 +173,71 @@ async initialize() {
             console.error('Error updating session timestamp:', error);
         }
     }
+    async setAdminClaim(user) {
+        try {
+            // Call the Cloud Function to set admin claim
+            const setAdminClaimFunction = firebase.functions().httpsCallable('setAdminClaim');
+            const result = await setAdminClaimFunction({ idToken: await user.getIdToken() });
+    
+            if (!result.data.success) {
+                throw new Error(result.data.error || 'Failed to set admin claim');
+            }
+    
+            // Force token refresh to get the new claim
+            await user.getIdToken(true);
+            return result.data;
+        } catch (error) {
+            throw AuthErrorHandler.handleError(error, 'set-admin-claim');
+        }
+    }
     async login(email, password) {
         try {
-            // Validate input
             if (!email || !password) {
                 throw new Error('Email and password are required');
             }
-
+    
             // Attempt login
             const userCredential = await firebase.auth()
                 .signInWithEmailAndPassword(email, password);
+    
+            // Check if email domain is allowed
+            if (!this.isAllowedAdminDomain(userCredential.user.email)) {
+                await this.signOut('Unauthorized email domain');
+                throw new Error('admin/unauthorized-domain');
+            }
+    
+            // Set/verify admin claim
+            const adminClaimResult = await this.setAdminClaim(userCredential.user);
             
-            // Validate admin status
-            const tokenResult = await this.getAdminTokenResult(userCredential.user, true);
-            
-            if (!tokenResult.success || !tokenResult.isAdmin) {
+            if (!adminClaimResult.isAdmin) {
                 await this.signOut('Admin access required');
                 throw new Error('admin/insufficient-privileges');
             }
-
+    
+            // Get fresh token with updated claims
+            const tokenResult = await userCredential.user.getIdTokenResult(true);
+            
+            // Validate admin claims
+            if (!this.validateAdminClaims(tokenResult.claims)) {
+                await this.signOut('Invalid admin privileges');
+                throw new Error('admin/invalid-claims');
+            }
+    
             // Update last login timestamp
             await this.updateUserMetadata(userCredential.user);
-
+    
             return {
                 success: true,
                 user: userCredential.user
             };
+    
         } catch (error) {
             const handledError = AuthErrorHandler.handleError(error, 'login');
             throw handledError;
         }
+    }
+    isAllowedAdminDomain(email) {
+        return email.endsWith(this.config.adminEmailDomain);
     }
 
     async signOut(reason = 'User logout') {
@@ -317,10 +352,10 @@ async initialize() {
     }
 
     validateAdminClaims(claims) {
-        return claims.admin === true && 
+        return claims && 
+               claims.admin === true && 
                claims.email?.endsWith(this.config.adminEmailDomain);
     }
-
     startSessionMonitoring() {
         this.stopSessionMonitoring();
 
