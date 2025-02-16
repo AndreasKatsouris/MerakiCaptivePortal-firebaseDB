@@ -209,7 +209,7 @@ async initialize() {
                 await this.signOut('Unauthorized email domain');
                 throw new Error('admin/unauthorized-domain');
             }
-    
+            console.log('ID Token before calling setAdminClaim:', await userCredential.user.getIdToken());
             // Set admin claims
             const setAdminClaimFunction = firebase.functions().httpsCallable('setAdminClaim');
             const result = await setAdminClaimFunction({ 
