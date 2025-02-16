@@ -3,6 +3,8 @@ import { initializeProjectManagement } from './project-management.js';
 import { initializeGuestManagement } from './guest-management.js';
 import { initializeCampaignManagement } from './campaigns/campaigns.js';
 import { initializeRewardTypes } from './reward-types.js';
+import { initializeReceiptManagement } from './receipt-management.js';
+import { initializeRewardManagement } from './reward-management.js';
 import { authManager } from './auth/auth.js';
 import { auth } from './config/firebase-config.js';
 
