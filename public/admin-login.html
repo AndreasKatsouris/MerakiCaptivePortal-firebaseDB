@@ -4,9 +4,8 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Admin Login</title>
-    <!-- Add Vue.js -->
-    <script src="https://unpkg.com/vue@3/dist/vue.global.js"></script>
-    <!-- Add your CSS here -->
+    <!-- Add Vue.js Production Build -->
+    <script src="https://unpkg.com/vue@3/dist/vue.global.prod.js"></script>
     <style>
         .error-message {
             color: red;
@@ -29,6 +28,7 @@
                         id="email" 
                         v-model="email" 
                         required
+                        autocomplete="username"
                         :disabled="isLoading">
                 </div>
                 <div>
@@ -38,6 +38,7 @@
                         id="password" 
                         v-model="password" 
                         required
+                        autocomplete="current-password"
                         :disabled="isLoading">
                 </div>
                 <button type="submit" :disabled="isLoading">
@@ -50,18 +51,11 @@
         </div>
     </div>
 
-    <!-- Firebase SDK -->
-    <script src="https://www.gstatic.com/firebasejs/9.x.x/firebase-app.js"></script>
-    <script src="https://www.gstatic.com/firebasejs/9.x.x/firebase-auth.js"></script>
-    <script src="https://www.gstatic.com/firebasejs/9.x.x/firebase-functions.js"></script>
-
-    <!-- Firebase Config -->
-    <script type="module" src="js/config/firebase-config.js"></script>
-
-    <!-- Vue Login Component -->
+    <!-- Firebase SDK (using modules) -->
     <script type="module">
-        import { auth } from './js/auth/auth.js';
+        import { auth } from './js/config/firebase-config.js';
         import { AdminClaims } from './js/auth/admin-claims.js';
+        import { authManager } from './js/auth/auth.js';
 
         const { createApp, ref } = Vue;
 
@@ -78,16 +72,16 @@
 
                     try {
                         // Initialize auth if needed
-                        await auth.initialize();
+                        await authManager.initialize();
 
                         // Attempt login
-                        const user = await auth.login(email.value, password.value);
+                        const user = await authManager.login(email.value, password.value);
                         
                         // Verify and set admin status
                         const adminStatus = await AdminClaims.setAdminClaim(user);
                         
                         if (!adminStatus.success) {
-                            await auth.logout();
+                            await authManager.logout();
                             throw new Error('Admin access required');
                         }
 

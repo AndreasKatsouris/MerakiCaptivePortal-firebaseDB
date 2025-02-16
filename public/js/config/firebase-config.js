@@ -1,5 +1,10 @@
+// Import Firebase modules
+import { initializeApp } from 'https://www.gstatic.com/firebasejs/9.x.x/firebase-app.js';
+import { getAuth } from 'https://www.gstatic.com/firebasejs/9.x.x/firebase-auth.js';
+import { getFunctions } from 'https://www.gstatic.com/firebasejs/9.x.x/firebase-functions.js';
+
 // Firebase configuration
-const config = {
+const firebaseConfig = {
     apiKey: "AIzaSyBf96GNLhtz6FDdbLxIW9efh98WG__eQmk",
     authDomain: "merakicaptiveportal-firebasedb.firebaseapp.com",
     databaseURL: "https://merakicaptiveportal-firebasedb-default-rtdb.firebaseio.com",
@@ -11,7 +16,6 @@ const config = {
 };
 
 // Initialize Firebase
-firebase.initializeApp(config);
-
-export const auth = firebase.auth();
-export const functions = firebase.functions(); 
+const app = initializeApp(firebaseConfig);
+export const auth = getAuth(app);
+export const functions = getFunctions(app); 

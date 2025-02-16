@@ -1,4 +1,6 @@
 // Core authentication module
+import { auth } from '../config/firebase-config.js';
+
 class Auth {
     constructor() {
         this.user = null;
@@ -10,7 +12,7 @@ class Auth {
         
         try {
             // Initialize Firebase Auth
-            firebase.auth().onAuthStateChanged((user) => {
+            auth.onAuthStateChanged((user) => {
                 this.user = user;
                 console.log('Auth state changed:', user ? 'User logged in' : 'No user');
             });
@@ -25,8 +27,7 @@ class Auth {
     // Basic authentication methods
     async login(email, password) {
         try {
-            const userCredential = await firebase.auth()
-                .signInWithEmailAndPassword(email, password);
+            const userCredential = await auth.signInWithEmailAndPassword(email, password);
             return userCredential.user;
         } catch (error) {
             console.error('Login failed:', error);
@@ -36,7 +37,7 @@ class Auth {
 
     async logout() {
         try {
-            await firebase.auth().signOut();
+            await auth.signOut();
             this.user = null;
         } catch (error) {
             console.error('Logout failed:', error);
@@ -50,4 +51,4 @@ class Auth {
 }
 
 // Export a singleton instance
-export const auth = new Auth(); 
+export const authManager = new Auth(); 
