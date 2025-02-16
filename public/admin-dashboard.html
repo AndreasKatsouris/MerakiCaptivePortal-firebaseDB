@@ -920,5 +920,27 @@
 <script type="module" src="js/reward-types.js"></script>
 <script type="module" src="js/guest-management.js"></script>
 <script type="module" src="js/admin-dashboard.js"></script>
+
+<!-- Add this before the closing </body> tag -->
+<script type="module">
+    import { dashboard } from './js/admin-dashboard.js';
+    
+    // Vue app initialization
+    const { createApp } = Vue;
+    
+    createApp({
+        data() {
+            return {
+                // Your dashboard data here
+            }
+        },
+        methods: {
+            // Your dashboard methods here
+        },
+        mounted() {
+            console.log('Vue app mounted');
+        }
+    }).mount('#app');
+</script>
 </body>
 </html>

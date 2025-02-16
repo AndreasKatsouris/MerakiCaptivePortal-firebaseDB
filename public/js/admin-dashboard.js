@@ -2,8 +2,8 @@ import { initializeDashboard } from './dashboard.js';
 import { initializeProjectManagement } from './project-management.js';
 import { initializeGuestManagement } from './guest-management.js';
 import { CampaignManager } from './campaigns/campaigns.js';
-import { authManager } from './auth/AuthManager.js';
-import { routeGuard } from './auth/RouteGuard.js';
+import { authManager } from './auth/auth.js';
+//import { routeGuard } from './auth/RouteGuard.js';
 
 class AdminDashboard {
     constructor() {
@@ -16,37 +16,35 @@ class AdminDashboard {
         if (this.initialized) return;
 
         try {
-            // Initialize auth and route protection
-            await this.initializeAuth();
-            
-            // Register sections
-            this.registerSections();
-            
-            // Set up event listeners
-            this.setupEventListeners();
-            
-            // Show initial section
-            await this.showSection('dashboard');
-
-            this.initialized = true;
-            console.log('Admin dashboard initialized successfully');
-
-        } catch (error) {
-            console.error('Failed to initialize admin dashboard:', error);
-            this.handleError(error);
-        }
-    }
-
-    async initializeAuth() {
-        try {
+            // Initialize auth
             await authManager.initialize();
             
             // Set up auth state listener
-            authManager.onAuthStateChanged(this.handleAuthStateChange.bind(this));
+            auth.onAuthStateChanged((user) => {
+                if (!user) {
+                    window.location.href = '/admin-login.html';
+                    return;
+                }
+                this.loadDashboardContent();
+            });
+
+            this.initialized = true;
+            console.log('Dashboard initialized');
         } catch (error) {
-            console.error('Auth initialization failed:', error);
+            console.error('Dashboard initialization failed:', error);
             throw error;
         }
+    }
+
+    loadDashboardContent() {
+        // Show dashboard content
+        document.getElementById('dashboardContent').style.display = 'block';
+        // Hide other content sections
+        document.querySelectorAll('.content-section').forEach(section => {
+            if (section.id !== 'dashboardContent') {
+                section.style.display = 'none';
+            }
+        });
     }
 
     registerSections() {
@@ -162,13 +160,6 @@ class AdminDashboard {
         }
     }
 
-    handleAuthStateChange(user) {
-        if (!user) {
-            // Redirect to login if not authenticated
-            window.location.href = '/admin-login.html';
-        }
-    }
-
     updateUserInfo(user) {
         const profileElement = document.querySelector('.user-profile');
         if (profileElement && user) {
@@ -206,11 +197,14 @@ class AdminDashboard {
     }
 }
 
-// Create and export singleton instance
-const adminDashboard = new AdminDashboard();
-export default adminDashboard;
+// Initialize dashboard
+const dashboard = new AdminDashboard();
+dashboard.initialize().catch(console.error);
+
+// Export for module usage
+export { dashboard };
 
 // Initialize dashboard when DOM is ready
 document.addEventListener('DOMContentLoaded', () => {
-    adminDashboard.initialize();
+    dashboard.initialize();
 });
