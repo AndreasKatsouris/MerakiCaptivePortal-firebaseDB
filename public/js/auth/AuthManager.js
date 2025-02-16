@@ -172,6 +172,7 @@ async initialize() {
             console.error('Error updating session timestamp:', error);
         }
     }
+    /**
     async setAdminClaim(user) {
         try {
             // Call the Cloud Function to set admin claim
@@ -189,8 +190,7 @@ async initialize() {
             throw AuthErrorHandler.handleError(error, 'set-admin-claim');
         }
     }
-    // auth/AuthManager.js
-
+ */
     async login(email, password) {
         try {
             if (!email || !password) {
