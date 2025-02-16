@@ -45,7 +45,7 @@ class AuthManager {
                 this.initialized = true;
                 console.log('AuthManager initialized successfully');
             } catch (error) {
-                this.initialized = false;
+                //this.initialized = false;
                 throw AuthErrorHandler.handleError(error, 'initialization');
             }
         })();
