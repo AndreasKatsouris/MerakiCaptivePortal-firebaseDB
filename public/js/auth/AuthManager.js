@@ -298,7 +298,7 @@ async initialize() {
         console.warn('Application is in offline mode');
         // Additional offline mode logic
     }
-}
+    
     async getAdminTokenResult(user, forceRefresh = false) {
         try {
             const tokenResult = await user.getIdTokenResult(forceRefresh);
