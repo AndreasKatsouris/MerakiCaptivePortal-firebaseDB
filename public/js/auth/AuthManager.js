@@ -192,39 +192,36 @@ async initialize() {
     }
     async login(email, password) {
         try {
-            if (!email || !password) {
-                throw new Error('Email and password are required');
-            }
-    
-            // Attempt login
             const userCredential = await firebase.auth()
                 .signInWithEmailAndPassword(email, password);
     
-            // Check if email domain is allowed
-            if (!this.isAllowedAdminDomain(userCredential.user.email)) {
-                await this.signOut('Unauthorized email domain');
-                throw new Error('admin/unauthorized-domain');
-            }
+            console.log('User logged in:', {
+                email: userCredential.user.email,
+                uid: userCredential.user.uid
+            });
     
-            // Set/verify admin claim
-            const adminClaimResult = await this.setAdminClaim(userCredential.user);
-            
-            if (!adminClaimResult.isAdmin) {
+            // Set admin claims
+            const claimResult = await this.setAdminClaim(userCredential.user);
+            console.log('Claim result:', claimResult);
+    
+            if (!claimResult.success || !claimResult.isAdmin) {
                 await this.signOut('Admin access required');
                 throw new Error('admin/insufficient-privileges');
             }
     
-            // Get fresh token with updated claims
+            // Force token refresh
+            await userCredential.user.getIdToken(true);
             const tokenResult = await userCredential.user.getIdTokenResult(true);
             
-            // Validate admin claims
+            console.log('Token refreshed:', {
+                claims: tokenResult.claims,
+                expirationTime: tokenResult.expirationTime
+            });
+    
             if (!this.validateAdminClaims(tokenResult.claims)) {
                 await this.signOut('Invalid admin privileges');
                 throw new Error('admin/invalid-claims');
             }
-    
-            // Update last login timestamp
-            await this.updateUserMetadata(userCredential.user);
     
             return {
                 success: true,
@@ -232,8 +229,8 @@ async initialize() {
             };
     
         } catch (error) {
-            const handledError = AuthErrorHandler.handleError(error, 'login');
-            throw handledError;
+            console.error('Login error:', error);
+            throw AuthErrorHandler.handleError(error, 'login');
         }
     }
     isAllowedAdminDomain(email) {
