@@ -6,7 +6,10 @@ if (admin.apps.length === 0) {
 }
 
 exports.setAdminClaim = functions.https.onCall(async (data, context) => {
-    console.log('Function invoked:', { hasToken: !!data.idToken });
+    console.log('setAdminClaim called:', {
+        hasToken: !!data.idToken,
+        context: context ? 'exists' : 'missing'
+    });
 
     let userId;
 
@@ -27,16 +30,36 @@ exports.setAdminClaim = functions.https.onCall(async (data, context) => {
 
         // Get user details
         const userRecord = await admin.auth().getUser(userId);
+        console.log('User record:', {
+            email: userRecord.email,
+            uid: userRecord.uid
+        });
         const adminEmails = ['andreas@askgroupholdings.com']; // Add your admin emails here
         const isAdmin = adminEmails.includes(userRecord.email.toLowerCase());
+        console.log('Admin check:', {
+            email: userRecord.email,
+            isAdmin,
+            adminEmails
+        });
 
         console.log('Admin status check:', { userEmail: userRecord.email, isAdmin });
-
+        const claims = {
+            admin: isAdmin,
+            email: userRecord.email
+        };
         // Set admin claim
         try {
-            await admin.auth().setCustomUserClaims(userId, { admin: isAdmin });
+            await admin.auth().setCustomUserClaims(userId, claims);
+            console.log('Claims set:', claims);
             console.log('Admin claim successfully set for:', userId);
-            return { success: true, isAdmin };
+            // Get updated token
+            const updatedToken = await admin.auth().createCustomToken(userId, claims);
+            return {
+                success: true,
+                isAdmin,
+                claims,
+                token: updatedToken
+            };
         } catch (claimError) {
             console.warn('Admin claim assignment failed:', claimError);
             return { success: true, isAdmin: false, warning: 'User authenticated but admin claim could not be assigned.' };

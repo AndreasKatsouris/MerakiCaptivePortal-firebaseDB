@@ -293,29 +293,31 @@ async initialize() {
         try {
             const tokenResult = await this.getAdminTokenResult(user);
             
+            console.log('Token validation:', {
+                userEmail: user.email,
+                claims: tokenResult.tokenResult?.claims,
+                isAdmin: tokenResult.isAdmin,
+                success: tokenResult.success
+            });
+            
             if (!tokenResult.success || !tokenResult.isAdmin) {
                 throw new Error('admin/insufficient-privileges');
             }
-
+    
             // Verify token expiration
             const tokenExp = new Date(tokenResult.tokenResult.claims.exp * 1000);
             if (tokenExp <= new Date()) {
                 throw new Error('session/expired');
             }
-
-            const sessionData = this.getStoredSessionData();
-            if (!sessionData) {
-                throw new Error('session/invalid');
-            }
-
+    
             return true;
         } catch (error) {
-            // Now uses ERROR_CATEGORIES through AuthErrorHandler
-            const handledError = AuthErrorHandler.handleError(error, 'session-validation');
-            if (AuthErrorHandler.shouldRedirectToLogin(handledError)) {
-                await this.signOut('Session validation failed');
-            }
-            throw handledError;
+            console.error('Session validation failed:', {
+                error,
+                user: user?.email,
+                timestamp: new Date().toISOString()
+            });
+            throw AuthErrorHandler.handleError(error, 'session-validation');
         }
     }
     async handleNetworkError(error) {
@@ -336,14 +338,26 @@ async initialize() {
     async getAdminTokenResult(user, forceRefresh = false) {
         try {
             const tokenResult = await user.getIdTokenResult(forceRefresh);
+            console.log('Token result:', {
+                claims: tokenResult.claims,
+                signInProvider: tokenResult.signInProvider,
+                issuedAt: tokenResult.issuedAtTime,
+                expirationTime: tokenResult.expirationTime
+            });
+    
             const isAdmin = this.validateAdminClaims(tokenResult.claims);
-
+            console.log('Admin validation result:', {
+                isAdmin,
+                email: user.email
+            });
+    
             return {
                 success: true,
                 tokenResult,
                 isAdmin
             };
         } catch (error) {
+            console.error('Error getting token result:', error);
             return {
                 success: false,
                 error: error.message
@@ -352,9 +366,17 @@ async initialize() {
     }
 
     validateAdminClaims(claims) {
-        return claims && 
-               claims.admin === true && 
-               claims.email?.endsWith(this.config.adminEmailDomain);
+        const isAdmin = claims?.admin === true;
+        const hasValidEmail = claims?.email?.endsWith(this.config.adminEmailDomain);
+        
+        console.log('Validating admin claims:', {
+            claims,
+            isAdmin,
+            hasValidEmail,
+            requiredDomain: this.config.adminEmailDomain
+        });
+    
+        return isAdmin && hasValidEmail;
     }
     startSessionMonitoring() {
         this.stopSessionMonitoring();
