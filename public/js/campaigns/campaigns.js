@@ -1,5 +1,3 @@
-import { auth } from '../config/firebase-config.js';
-
 export function initializeCampaignManagement() {
     if (typeof Vue === 'undefined') {
         console.error('Vue is not loaded. Cannot initialize campaign management.');

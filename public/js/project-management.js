@@ -8,6 +8,27 @@ const projectManagement = {
     }
 };
 
+// Export the initialization function
+export function initializeProjectManagement() {
+    // Project menu click handler
+    const projectManagementMenu = document.getElementById('projectManagementMenu');
+    if (projectManagementMenu) {
+        projectManagementMenu.addEventListener('click', function(e) {
+            e.preventDefault();
+            document.querySelectorAll('.content-section').forEach(section => {
+                section.style.display = 'none';
+            });
+            const projectSection = document.getElementById('projectManagementContent');
+            if (projectSection) {
+                projectSection.style.display = 'block';
+            }
+            loadProjects();
+        });
+    }
+
+    initializeProjectListeners();
+}
+
 // Project Modal Functions
 function showAddProjectModal() {
     Swal.fire({
@@ -97,18 +118,6 @@ async function createTask(taskData) {
     }
 }
 
-// Export necessary functions
-//export {
-//    initializeProjectManagement,
-//    createProject,
-//    createTask
-//};
-// Change from export to window global
-window.initializeProjectManagement = initializeProjectManagement;
-window.createProject = createProject;
-window.createTask = createTask;
-
-
 async function loadProjectTasks() {
     try {
         const tasksData = [];
@@ -131,27 +140,6 @@ async function loadProjectTasks() {
         showError('Failed to load project tasks');
     }
 }
-// Main initialization function
-function initializeProjectManagement() {
-    // Project menu click handler
-    const projectManagementMenu = document.getElementById('projectManagementMenu');
-    if (projectManagementMenu) {
-        projectManagementMenu.addEventListener('click', function(e) {
-            e.preventDefault();
-            document.querySelectorAll('.content-section').forEach(section => {
-                section.style.display = 'none';
-            });
-            const projectSection = document.getElementById('projectManagementContent');
-            if (projectSection) {
-                projectSection.style.display = 'block';
-            }
-            loadProjects();
-        });
-    }
-
-    initializeProjectListeners();
-}
-
 
 // Initialize project-related event listeners
 function initializeProjectListeners() {
