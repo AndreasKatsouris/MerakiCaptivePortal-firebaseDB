@@ -1,4 +1,3 @@
-
 import { AuthErrorHandler} from './AuthErrors.js';
 
 class AuthManager {
@@ -212,8 +211,10 @@ async initialize() {
             console.log('ID Token before calling setAdminClaim:', await userCredential.user.getIdToken());
             // Set admin claims
             const setAdminClaimFunction = firebase.functions().httpsCallable('setAdminClaim');
-            const result = await setAdminClaimFunction({ 
-                idToken: await userCredential.user.getIdToken() 
+            // Add a small delay (500ms) to ensure token propagation
+            await new Promise(resolve => setTimeout(resolve, 500));
+            const result = await setAdminClaimFunction({
+                idToken: await userCredential.user.getIdToken()
             });
     
             console.log('Claim setting result:', result.data);
