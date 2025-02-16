@@ -1,7 +1,7 @@
 // Core authentication module
-import { auth } from '../config/firebase-config.js';
+import { auth, signInWithEmailAndPassword, signOut } from '../config/firebase-config.js';
 
-class Auth {
+class AuthManager {
     constructor() {
         this.user = null;
         this.initialized = false;
@@ -27,7 +27,7 @@ class Auth {
     // Basic authentication methods
     async login(email, password) {
         try {
-            const userCredential = await auth.signInWithEmailAndPassword(email, password);
+            const userCredential = await signInWithEmailAndPassword(auth, email, password);
             return userCredential.user;
         } catch (error) {
             console.error('Login failed:', error);
@@ -37,7 +37,7 @@ class Auth {
 
     async logout() {
         try {
-            await auth.signOut();
+            await signOut(auth);
             this.user = null;
         } catch (error) {
             console.error('Logout failed:', error);
@@ -50,5 +50,5 @@ class Auth {
     }
 }
 
-// Export a singleton instance
-export const authManager = new Auth(); 
+// Export a single instance
+export const authManager = new AuthManager(); 

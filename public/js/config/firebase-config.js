@@ -1,6 +1,6 @@
 // Import Firebase modules
 import { initializeApp } from 'https://www.gstatic.com/firebasejs/9.x.x/firebase-app.js';
-import { getAuth } from 'https://www.gstatic.com/firebasejs/9.x.x/firebase-auth.js';
+import { getAuth, signInWithEmailAndPassword, signOut } from 'https://www.gstatic.com/firebasejs/9.x.x/firebase-auth.js';
 import { getFunctions } from 'https://www.gstatic.com/firebasejs/9.x.x/firebase-functions.js';
 
 // Firebase configuration
@@ -17,5 +17,13 @@ const firebaseConfig = {
 
 // Initialize Firebase
 const app = initializeApp(firebaseConfig);
-export const auth = getAuth(app);
-export const functions = getFunctions(app); 
+const auth = getAuth(app);
+const functions = getFunctions(app);
+
+// Export Firebase instances and auth methods
+export {
+    auth,
+    functions,
+    signInWithEmailAndPassword,
+    signOut
+}; 
