@@ -1,6 +1,5 @@
-// auth/AuthManager.js
 
-import { AuthErrorHandler, ERROR_CATEGORIES } from './AuthErrors.js';
+import { AuthErrorHandler} from './AuthErrors.js';
 
 class AuthManager {
     constructor() {
@@ -298,7 +297,7 @@ async initialize() {
         console.warn('Application is in offline mode');
         // Additional offline mode logic
     }
-    
+
     async getAdminTokenResult(user, forceRefresh = false) {
         try {
             const tokenResult = await user.getIdTokenResult(forceRefresh);

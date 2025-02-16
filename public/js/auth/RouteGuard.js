@@ -3,32 +3,47 @@
 import { authGuard } from './AuthGuard.js';
 import { AuthErrorHandler } from './AuthErrors.js';
 
-export class RouteGuard {
+class RouteGuard {
+    #initialized = false;  // Private field for initialization state
+    #routes = new Map();
+    #fallbackRoute = '/admin-login.html';
+    #initializePromise = null;
+
     constructor() {
-        this.initialized = false;
-        this.routes = new Map();
-        this.fallbackRoute = '/admin-login.html';
+        // Set up internal state
+        this.#routes = new Map();
+        this.#fallbackRoute = '/admin-login.html';
     }
 
     async initialize() {
-        if (this.initialized) {
-            return;
+        // Return existing promise if initialization is in progress
+        if (this.#initializePromise) {
+            return this.#initializePromise;
         }
 
-        try {
-            // Initialize auth guard
-            await authGuard.initialize();
+        this.#initializePromise = (async () => {
+            try {
+                if (this.#initialized) {
+                    console.warn('RouteGuard already initialized');
+                    return;
+                }
 
-            // Setup navigation handler
-            this.setupNavigationHandler();
+                // Initialize auth guard
+                await authGuard.initialize();
 
-            this.initialized = true;
-            console.log('RouteGuard initialized successfully');
-        } catch (error) {
-            const handledError = AuthErrorHandler.handleError(error, 'route-guard-init');
-            console.error('RouteGuard initialization failed:', handledError);
-            throw handledError;
-        }
+                // Setup navigation handler
+                this.setupNavigationHandler();
+
+                this.#initialized = true;
+                console.log('RouteGuard initialized successfully');
+            } catch (error) {
+                const handledError = AuthErrorHandler.handleError(error, 'route-guard-init');
+                console.error('RouteGuard initialization failed:', handledError);
+                throw handledError;
+            }
+        })();
+
+        return this.#initializePromise;
     }
 
     setupNavigationHandler() {
@@ -55,9 +70,9 @@ export class RouteGuard {
     async navigateTo(path) {
         try {
             // Check if route is registered
-            if (!this.routes.has(path)) {
+            if (!this.#routes.has(path)) {
                 console.warn(`Route not registered: ${path}`);
-                path = this.fallbackRoute;
+                path = this.#fallbackRoute;
             }
 
             // Validate access
@@ -80,7 +95,7 @@ export class RouteGuard {
 
     async handleRouteChange(path) {
         try {
-            const routeHandler = this.routes.get(path);
+            const routeHandler = this.#routes.get(path);
             if (routeHandler) {
                 // Hide all sections first
                 document.querySelectorAll('.content-section').forEach(section => {
@@ -119,26 +134,24 @@ export class RouteGuard {
         }
     }
 
+    // Public methods
     registerRoute(path, handler) {
         if (typeof handler !== 'function') {
             throw new Error('Route handler must be a function');
         }
-        this.routes.set(path, handler);
+        this.#routes.set(path, handler);
     }
 
     setFallbackRoute(path) {
-        this.fallbackRoute = path;
+        this.#fallbackRoute = path;
     }
 
-    // Static method to create and initialize guard
-    static async create() {
-        const guard = new RouteGuard();
-        await guard.initialize();
-        return guard;
+    isInitialized() {
+        return this.#initialized;
     }
 }
 
-// Create and export singleton instance
+// Create singleton instance
 const routeGuard = new RouteGuard();
 
 // Register default routes
@@ -159,8 +172,5 @@ routeGuard.registerRoute('/admin-login.html', () => {
         loginSection.style.display = 'block';
     }
 });
-
-// Prevent modifications
-Object.freeze(routeGuard);
 
 export { routeGuard };
