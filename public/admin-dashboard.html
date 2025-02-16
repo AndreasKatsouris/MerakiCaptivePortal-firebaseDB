@@ -43,21 +43,25 @@
     <script src="https://cdnjs.cloudflare.com/ajax/libs/pinia/2.1.7/pinia.iife.min.js" crossorigin="anonymous"></script>
 
     <!-- Firebase Dependencies -->
-
     <script src="/__/firebase/10.12.5/firebase-app-compat.js"></script>
     <script src="/__/firebase/10.12.5/firebase-auth-compat.js"></script>
     <script src="/__/firebase/10.12.5/firebase-database-compat.js"></script>
     <script src="/__/firebase/10.12.5/firebase-functions-compat.js"></script>
     <script src="/__/firebase/init.js?useEmulator=false"></script>
+
+    <!-- Initialize Vue -->
     <script>
-        document.addEventListener('DOMContentLoaded', function() {
-            if (typeof firebase === 'undefined') {
-                console.error('Firebase SDK not loaded.');
-            } else {
-                console.log('Firebase SDK initialized.');
-            }
-        });
-        </script>
+        if (typeof Vue === 'undefined') {
+            console.error('Vue is not loaded');
+        } else {
+            console.log('Vue version:', Vue.version);
+        }
+    </script>
+
+    <!-- Module imports -->
+    <script type="module">
+        import { dashboard } from './js/admin-dashboard.js';
+    </script>
 </head>
 <body>
     <div class="sidebar-overlay" id="sidebarOverlay"></div>
