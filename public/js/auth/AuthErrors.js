@@ -1,6 +1,3 @@
-// auth/AuthErrors.js
-
-// Define error categories
 export const ERROR_CATEGORIES = {
     AUTH: 'auth',
     ADMIN: 'admin',
@@ -9,7 +6,6 @@ export const ERROR_CATEGORIES = {
     UNKNOWN: 'unknown'
 };
 
-// Define specific error codes and messages
 export const AUTH_ERRORS = {
     // Authentication errors
     'auth/invalid-email': {
@@ -60,7 +56,6 @@ export const AUTH_ERRORS = {
     }
 };
 
-// Error handling utility class
 export class AuthErrorHandler {
     static getErrorDetails(error) {
         const errorCode = error.code || 'unknown';

@@ -25,33 +25,44 @@ class AuthManager {
         this.initializePromise = null;
     }
 
-    async initialize() {
-        // Prevent multiple initializations
-        if (this.initializePromise) {
-            return this.initializePromise;
-        }
-    
-        this.initializePromise = (async () => {
-            try {
-                if (this.initialized) {
-                    console.warn('AuthManager already initialized');
-                    return;
-                }
-    
-                await this.initializeWithTimeout();
-                this.setupAuthStateMonitoring();
-                await this.checkExistingSession();
-    
-                this.initialized = true;
-                console.log('AuthManager initialized successfully');
-            } catch (error) {
-                //this.initialized = false;
-                throw AuthErrorHandler.handleError(error, 'initialization');
-            }
-        })();
-    
+// Update the existing initialize method to properly chain the initialization steps
+async initialize() {
+    if (this.initializePromise) {
         return this.initializePromise;
     }
+
+    this.initializePromise = (async () => {
+        try {
+            if (this.initialized) {
+                console.warn('AuthManager already initialized');
+                return;
+            }
+
+            // Initialize Firebase first
+            await this.initializeWithTimeout();
+            
+            // Setup auth state monitoring
+            this.setupAuthStateMonitoring();
+            
+            // Check existing session
+            const hasValidSession = await this.checkExistingSession();
+            
+            // Set initialized flag
+            this.initialized = true;
+            
+            console.log('AuthManager initialized successfully');
+            
+            return hasValidSession;
+            
+        } catch (error) {
+            const handledError = AuthErrorHandler.handleError(error, 'initialization');
+            console.error('AuthManager initialization failed:', handledError);
+            throw handledError;
+        }
+    })();
+
+    return this.initializePromise;
+}
 
     async initializeWithTimeout() {
         return Promise.race([
@@ -91,7 +102,78 @@ class AuthManager {
             }
         });
     }
-
+    async checkExistingSession() {
+        try {
+            const user = firebase.auth().currentUser;
+            
+            if (!user) {
+                return false;
+            }
+    
+            // Check for existing session data
+            const sessionData = this.getStoredSessionData();
+            
+            if (!sessionData) {
+                return false;
+            }
+    
+            // Validate session
+            const isValid = await this.validateSession(user);
+            
+            if (!isValid) {
+                await this.endSession('Invalid session');
+                return false;
+            }
+    
+            // Check session expiry
+            if (this.isSessionExpired(sessionData)) {
+                await this.endSession('Session expired');
+                return false;
+            }
+    
+            // Session is valid - update timestamp
+            this.updateSessionTimestamp();
+            return true;
+    
+        } catch (error) {
+            console.error('Error checking existing session:', error);
+            await this.endSession('Session check failed');
+            return false;
+        }
+    }
+    getStoredSessionData() {
+        try {
+            const sessionStr = localStorage.getItem('adminSession');
+            if (!sessionStr) {
+                return null;
+            }
+            return JSON.parse(sessionStr);
+        } catch (error) {
+            console.error('Error parsing session data:', error);
+            return null;
+        }
+    }
+    isSessionExpired(sessionData) {
+        if (!sessionData || !sessionData.lastActivity) {
+            return true;
+        }
+    
+        const lastActivity = new Date(sessionData.lastActivity);
+        const now = new Date();
+        const timeDiff = now - lastActivity;
+    
+        return timeDiff > this.config.sessionTimeout;
+    }
+    
+    updateSessionTimestamp() {
+        try {
+            const sessionData = this.getStoredSessionData() || {};
+            sessionData.lastActivity = new Date().toISOString();
+            localStorage.setItem('adminSession', JSON.stringify(sessionData));
+        } catch (error) {
+            console.error('Error updating session timestamp:', error);
+        }
+    }
     async login(email, password) {
         try {
             // Validate input
@@ -187,12 +269,36 @@ class AuthManager {
                 throw new Error('session/expired');
             }
 
+            const sessionData = this.getStoredSessionData();
+            if (!sessionData) {
+                throw new Error('session/invalid');
+            }
+
             return true;
         } catch (error) {
-            throw AuthErrorHandler.handleError(error, 'session-validation');
+            // Now uses ERROR_CATEGORIES through AuthErrorHandler
+            const handledError = AuthErrorHandler.handleError(error, 'session-validation');
+            if (AuthErrorHandler.shouldRedirectToLogin(handledError)) {
+                await this.signOut('Session validation failed');
+            }
+            throw handledError;
         }
     }
+    async handleNetworkError(error) {
+        const handledError = AuthErrorHandler.handleError(error, 'network');
+        if (AuthErrorHandler.isNetworkError(handledError)) {
+            // Handle offline scenario
+            this.handleOfflineMode();
+        }
+        throw handledError;
+    }
 
+    handleOfflineMode() {
+        // Implement offline mode handling
+        console.warn('Application is in offline mode');
+        // Additional offline mode logic
+    }
+}
     async getAdminTokenResult(user, forceRefresh = false) {
         try {
             const tokenResult = await user.getIdTokenResult(forceRefresh);
