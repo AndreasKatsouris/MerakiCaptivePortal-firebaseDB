@@ -3,16 +3,15 @@
 import { authGuard } from './AuthGuard.js';
 import { AuthErrorHandler } from './AuthErrors.js';
 
-class RouteGuard {
+export class RouteGuard {
     #initialized = false;  // Private field for initialization state
     #routes = new Map();
     #fallbackRoute = '/admin-login.html';
     #initializePromise = null;
 
     constructor() {
-        // Set up internal state
-        this.#routes = new Map();
-        this.#fallbackRoute = '/admin-login.html';
+        this.routes = new Map();
+        this.fallbackRoute = '/admin-login.html';
     }
 
     async initialize() {
@@ -112,8 +111,8 @@ class RouteGuard {
     }
 
     async validateRouteAccess(path) {
-        // Public routes don't need validation
-        if (authGuard.isPublicPath(path)) {
+        // Use getter for accessing paths
+        if (authGuard.publicPaths.has(path)) {
             return true;
         }
 

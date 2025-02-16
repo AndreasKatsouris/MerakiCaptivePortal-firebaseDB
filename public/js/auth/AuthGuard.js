@@ -4,19 +4,25 @@ import { authManager } from './AuthManager.js';
 import { AuthErrorHandler } from './AuthErrors.js';
 
 class AuthGuard {
-    constructor() {
-        this.initialized = false;
-        this.unsubscribe = null;
-        this.protectedPaths = new Set([
+    #unsubscribe = null; // Private field for subscription
+    #initialized = false;
+    #state = {
+        protectedPaths: new Set([
             '/admin-dashboard.html',
             '/admin/dashboard',
             '/admin/settings'
-        ]);
-        this.publicPaths = new Set([
+        ]),
+        publicPaths: new Set([
             '/admin-login.html',
             '/login',
             '/forgot-password'
-        ]);
+        ])
+    };
+
+    constructor() {
+        // Initialize with immutable properties only
+        Object.freeze(this.#state.protectedPaths);
+        Object.freeze(this.#state.publicPaths);
     }
 
     async initialize() {
@@ -28,15 +34,16 @@ class AuthGuard {
             // Initialize auth manager if not already initialized
             await authManager.initialize();
 
-            // Setup auth state listener
-            this.unsubscribe = authManager.onAuthStateChanged(
+            // Store unsubscribe function in private field
+            this.#unsubscribe = authManager.onAuthStateChanged(
                 this.handleAuthStateChange.bind(this)
             );
 
             // Check current route
             await this.validateCurrentRoute();
+            this.#initialized = true;
 
-            this.initialized = true;
+
             console.log('AuthGuard initialized successfully');
         } catch (error) {
             const handledError = AuthErrorHandler.handleError(error, 'auth-guard-init');
@@ -44,7 +51,25 @@ class AuthGuard {
             this.redirectToLogin(handledError.message);
         }
     }
+    get initialized() {
+        return this.#initialized;
+    }
 
+    get protectedPaths() {
+        return this.#state.protectedPaths;
+    }
+
+    get publicPaths() {
+        return this.#state.publicPaths;
+    }
+
+    destroy() {
+        if (this.#unsubscribe) {
+            this.#unsubscribe();
+            this.#unsubscribe = null;
+        }
+        this.#initialized = false;
+    }
     async validateCurrentRoute() {
         const currentPath = window.location.pathname;
 
@@ -164,8 +189,5 @@ class AuthGuard {
 
 // Create singleton instance
 const authGuard = new AuthGuard();
-
-// Prevent modifications
-Object.freeze(authGuard);
 
 export { authGuard };
