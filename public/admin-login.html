@@ -71,7 +71,6 @@
     <!-- Firebase SDK (using modules) -->
     <script type="module">
         import { authManager } from './js/auth/auth.js';
-        import { AdminClaims } from './js/auth/admin-claims.js';
 
         const { createApp, ref } = Vue;
 
@@ -87,21 +86,8 @@
                     isLoading.value = true;
 
                     try {
-                        // Initialize auth if needed
                         await authManager.initialize();
-
-                        // Attempt login
-                        const user = await authManager.login(email.value, password.value);
-                        
-                        // Verify and set admin status
-                        const adminStatus = await AdminClaims.setAdminClaim(user);
-                        
-                        if (!adminStatus.success) {
-                            await authManager.logout();
-                            throw new Error('Admin access required');
-                        }
-
-                        // Redirect to dashboard
+                        await authManager.login(email.value, password.value);
                         window.location.href = '/admin-dashboard.html';
                     } catch (err) {
                         console.error('Login failed:', err);

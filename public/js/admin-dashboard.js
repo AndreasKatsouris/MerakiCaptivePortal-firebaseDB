@@ -40,8 +40,7 @@ class AdminDashboard {
     async initializeAuth() {
         try {
             await authManager.initialize();
-            await routeGuard.initialize();
-
+            
             // Set up auth state listener
             authManager.onAuthStateChanged(this.handleAuthStateChange.bind(this));
         } catch (error) {
@@ -165,12 +164,9 @@ class AdminDashboard {
 
     handleAuthStateChange(user) {
         if (!user) {
-            // Handle unauthenticated state - redirect handled by AuthManager
-            return;
+            // Redirect to login if not authenticated
+            window.location.href = '/admin-login.html';
         }
-
-        // Update UI with user info
-        this.updateUserInfo(user);
     }
 
     updateUserInfo(user) {
