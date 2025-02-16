@@ -32,8 +32,8 @@ class AuthGuard {
 
         try {
             // Initialize auth manager if not already initialized
-            await authManager.initialize();
-            console.log('AuthGuard: AuthManager initialized AGAIN successfully');
+            //await authManager.initialize();
+            //console.log('AuthGuard: AuthManager initialized AGAIN successfully');
             // Store unsubscribe function in private field
             this.#unsubscribe = authManager.onAuthStateChanged(
                 this.handleAuthStateChange.bind(this)
