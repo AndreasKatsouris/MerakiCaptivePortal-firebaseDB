@@ -6,45 +6,59 @@ if (admin.apps.length === 0) {
 }
 
 exports.setAdminClaim = functions.https.onCall(async (data, context) => {
-    console.log('setAdminClaim called:', {
-        hasToken: !!data.idToken,
-        context: context ? 'exists' : 'missing'
-    });
+    console.log('Function invoked:', { hasToken: !!data.idToken });
+
+    let userId;
 
     try {
+        // Check if ID token is provided
+        if (!data.idToken) {
+            console.warn('Auth verification failed: No token provided');
+            return { success: false, error: 'No authentication detected. Please provide an ID token.' };
+        }
+
+        console.log('Received ID Token. Attempting to verify...');
+
         // Verify ID Token
         const decodedToken = await admin.auth().verifyIdToken(data.idToken);
-        const userId = decodedToken.uid;
-        
+        userId = decodedToken.uid;
+
+        console.log('User authenticated:', userId);
+
         // Get user details
         const userRecord = await admin.auth().getUser(userId);
-        console.log('Processing user:', userRecord.email);
-
-        // Admin emails whitelist
-        const adminEmails = ['andreas@askgroupholdings.com'];
+        const adminEmails = ['andreas@askgroupholdings.com']; 
         const isAdmin = adminEmails.includes(userRecord.email.toLowerCase());
 
-        // Set custom claims
-        const claims = {
-            admin: isAdmin,
+        console.log('Admin status check:', {
+            userEmail: userRecord.email,
+            isAdmin,
+            adminEmails
+        });
+
+        // Set admin claim
+        const customClaims = {
+            admin: true,  // Explicitly set to true for the admin email
             email: userRecord.email,
+            role: 'admin',
             timestamp: Date.now()
         };
 
-        console.log('Setting claims:', claims);
-        await admin.auth().setCustomUserClaims(userId, claims);
+        await admin.auth().setCustomUserClaims(userId, customClaims);
+        console.log('Claims set:', customClaims);
+
+        // Get updated user
+        const updatedUser = await admin.auth().getUser(userId);
+        console.log('Updated user claims:', updatedUser.customClaims);
 
         return {
             success: true,
-            isAdmin,
-            claims
+            isAdmin: true,
+            claims: customClaims
         };
 
     } catch (error) {
         console.error('Error in setAdminClaim:', error);
-        return {
-            success: false,
-            error: error.message
-        };
+        return { success: false, error: 'Failed to set admin claim: ' + error.message };
     }
 });

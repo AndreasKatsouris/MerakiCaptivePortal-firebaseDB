@@ -377,17 +377,26 @@ async initialize() {
     }
 
     validateAdminClaims(claims) {
-        const isAdmin = claims?.admin === true;
+        console.log('Raw claims:', claims);
+    
+        // Check for explicit admin claim
+        const hasAdminClaim = claims?.admin === true;
+        
+        // Check email domain
         const hasValidEmail = claims?.email?.endsWith(this.config.adminEmailDomain);
+        
+        // Check role
+        const hasAdminRole = claims?.role === 'admin';
         
         console.log('Validating admin claims:', {
             claims,
-            isAdmin,
+            hasAdminClaim,
             hasValidEmail,
+            hasAdminRole,
             requiredDomain: this.config.adminEmailDomain
         });
     
-        return isAdmin && hasValidEmail;
+        return hasAdminClaim && hasValidEmail;
     }
     startSessionMonitoring() {
         this.stopSessionMonitoring();
