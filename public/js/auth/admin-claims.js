@@ -1,3 +1,6 @@
+import { httpsCallable } from 'https://www.gstatic.com/firebasejs/10.12.5/firebase-functions.js';
+import { functions } from '../config/firebase-config.js';
+
 // Admin claims management
 export class AdminClaims {
     static async verifyAdminStatus(user) {
@@ -15,7 +18,7 @@ export class AdminClaims {
 
     static async setAdminClaim(user) {
         try {
-            const setAdminClaimFunction = firebase.functions().httpsCallable('setAdminClaim');
+            const setAdminClaimFunction = httpsCallable(functions, 'setAdminClaim');
             const result = await setAdminClaimFunction({
                 uid: user.uid,
                 email: user.email

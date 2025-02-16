@@ -1,7 +1,7 @@
 // Import Firebase modules
-import { initializeApp } from 'https://www.gstatic.com/firebasejs/9.x.x/firebase-app.js';
-import { getAuth, signInWithEmailAndPassword, signOut } from 'https://www.gstatic.com/firebasejs/9.x.x/firebase-auth.js';
-import { getFunctions } from 'https://www.gstatic.com/firebasejs/9.x.x/firebase-functions.js';
+import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.12.5/firebase-app.js';
+import { getAuth, signInWithEmailAndPassword, signOut } from 'https://www.gstatic.com/firebasejs/10.12.5/firebase-auth.js';
+import { getFunctions } from 'https://www.gstatic.com/firebasejs/10.12.5/firebase-functions.js';
 
 // Firebase configuration
 const firebaseConfig = {
@@ -19,6 +19,9 @@ const firebaseConfig = {
 const app = initializeApp(firebaseConfig);
 const auth = getAuth(app);
 const functions = getFunctions(app);
+
+// Log Firebase version
+console.log('Firebase SDK Version:', firebase.SDK_VERSION);
 
 // Export Firebase instances and auth methods
 export {

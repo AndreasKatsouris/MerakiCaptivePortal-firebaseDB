@@ -51,6 +51,23 @@
         </div>
     </div>
 
+    <!-- Firebase SDK -->
+    <script src="/__/firebase/10.12.5/firebase-app-compat.js"></script>
+    <script src="/__/firebase/10.12.5/firebase-auth-compat.js"></script>
+    <script src="/__/firebase/10.12.5/firebase-functions-compat.js"></script>
+    <script src="/__/firebase/init.js"></script>
+
+    <!-- Add version check -->
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            if (typeof firebase === 'undefined') {
+                console.error('Firebase SDK not loaded.');
+            } else {
+                console.log('Firebase SDK Version:', firebase.SDK_VERSION);
+            }
+        });
+    </script>
+
     <!-- Firebase SDK (using modules) -->
     <script type="module">
         import { authManager } from './js/auth/auth.js';
