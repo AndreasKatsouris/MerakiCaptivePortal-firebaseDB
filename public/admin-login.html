@@ -4,20 +4,50 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Admin Login</title>
+    <!-- Add Vue.js -->
+    <script src="https://unpkg.com/vue@3/dist/vue.global.js"></script>
+    <!-- Add your CSS here -->
+    <style>
+        .error-message {
+            color: red;
+            margin-top: 10px;
+        }
+        .loading {
+            opacity: 0.5;
+            pointer-events: none;
+        }
+    </style>
 </head>
 <body>
-    <div id="loginContainer">
-        <form id="loginForm">
-            <div>
-                <label for="email">Email:</label>
-                <input type="email" id="email" required>
-            </div>
-            <div>
-                <label for="password">Password:</label>
-                <input type="password" id="password" required>
-            </div>
-            <button type="submit">Login</button>
-        </form>
+    <div id="app">
+        <div class="login-container" :class="{ loading: isLoading }">
+            <form @submit.prevent="handleLogin">
+                <div>
+                    <label for="email">Email:</label>
+                    <input 
+                        type="email" 
+                        id="email" 
+                        v-model="email" 
+                        required
+                        :disabled="isLoading">
+                </div>
+                <div>
+                    <label for="password">Password:</label>
+                    <input 
+                        type="password" 
+                        id="password" 
+                        v-model="password" 
+                        required
+                        :disabled="isLoading">
+                </div>
+                <button type="submit" :disabled="isLoading">
+                    {{ isLoading ? 'Logging in...' : 'Login' }}
+                </button>
+                <div v-if="error" class="error-message">
+                    {{ error }}
+                </div>
+            </form>
+        </div>
     </div>
 
     <!-- Firebase SDK -->
@@ -25,16 +55,61 @@
     <script src="https://www.gstatic.com/firebasejs/9.x.x/firebase-auth.js"></script>
     <script src="https://www.gstatic.com/firebasejs/9.x.x/firebase-functions.js"></script>
 
-    <!-- Initialize Firebase -->
-    <script>
-        // Your Firebase configuration
-        const firebaseConfig = {
-            // Add your Firebase config here
-        };
-        firebase.initializeApp(firebaseConfig);
-    </script>
+    <!-- Firebase Config -->
+    <script type="module" src="js/config/firebase-config.js"></script>
 
-    <!-- Login Component -->
-    <script type="module" src="js/admin/login.js"></script>
+    <!-- Vue Login Component -->
+    <script type="module">
+        import { auth } from './js/auth/auth.js';
+        import { AdminClaims } from './js/auth/admin-claims.js';
+
+        const { createApp, ref } = Vue;
+
+        createApp({
+            setup() {
+                const email = ref('');
+                const password = ref('');
+                const error = ref('');
+                const isLoading = ref(false);
+
+                async function handleLogin() {
+                    error.value = '';
+                    isLoading.value = true;
+
+                    try {
+                        // Initialize auth if needed
+                        await auth.initialize();
+
+                        // Attempt login
+                        const user = await auth.login(email.value, password.value);
+                        
+                        // Verify and set admin status
+                        const adminStatus = await AdminClaims.setAdminClaim(user);
+                        
+                        if (!adminStatus.success) {
+                            await auth.logout();
+                            throw new Error('Admin access required');
+                        }
+
+                        // Redirect to dashboard
+                        window.location.href = '/admin-dashboard.html';
+                    } catch (err) {
+                        console.error('Login failed:', err);
+                        error.value = err.message;
+                    } finally {
+                        isLoading.value = false;
+                    }
+                }
+
+                return {
+                    email,
+                    password,
+                    error,
+                    isLoading,
+                    handleLogin
+                };
+            }
+        }).mount('#app');
+    </script>
 </body>
 </html>
