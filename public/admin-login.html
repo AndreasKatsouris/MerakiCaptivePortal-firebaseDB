@@ -3,125 +3,38 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Admin Login - RDP Platform</title>
-    
-    <!-- Firebase SDKs -->
-    <script src="/__/firebase/10.12.5/firebase-app-compat.js"></script>
-    <script src="/__/firebase/10.12.5/firebase-auth-compat.js"></script>
-    <script src="/__/firebase/10.12.5/firebase-functions-compat.js"></script>
-    <script src="/__/firebase/init.js?useEmulator=false"></script>
-
-    <!-- Vue.js -->
-    <script src="https://unpkg.com/vue@3/dist/vue.global.prod.js"></script>
-
-    <!-- Styles -->
-    <link rel="stylesheet" href="css/bootstrap.min.css">
-    <link rel="stylesheet" href="css/style.css">
-
-    <!-- Add loading overlay -->
-    <style>
-        .loading-overlay {
-            position: fixed;
-            top: 0;
-            left: 0;
-            right: 0;
-            bottom: 0;
-            background: rgba(255, 255, 255, 0.9);
-            display: flex;
-            justify-content: center;
-            align-items: center;
-            z-index: 9999;
-        }
-
-        .loading-spinner {
-            width: 50px;
-            height: 50px;
-            border: 3px solid #f3f3f3;
-            border-top: 3px solid #3498db;
-            border-radius: 50%;
-            animation: spin 1s linear infinite;
-        }
-
-        @keyframes spin {
-            0% { transform: rotate(0deg); }
-            100% { transform: rotate(360deg); }
-        }
-    </style>
+    <title>Admin Login</title>
 </head>
 <body>
-    <!-- Loading overlay -->
-    <div id="loadingOverlay" class="loading-overlay">
-        <div class="loading-spinner"></div>
-    </div>
-
-    <div class="container mt-5">
-        <div class="row justify-content-center">
-            <div class="col-md-6">
-                <!-- Vue mount point -->
-                <div id="adminLoginApp"></div>
+    <div id="loginContainer">
+        <form id="loginForm">
+            <div>
+                <label for="email">Email:</label>
+                <input type="email" id="email" required>
             </div>
-        </div>
+            <div>
+                <label for="password">Password:</label>
+                <input type="password" id="password" required>
+            </div>
+            <button type="submit">Login</button>
+        </form>
     </div>
 
-    <!-- Add global error handling -->
+    <!-- Firebase SDK -->
+    <script src="https://www.gstatic.com/firebasejs/9.x.x/firebase-app.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.x.x/firebase-auth.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.x.x/firebase-functions.js"></script>
+
+    <!-- Initialize Firebase -->
     <script>
-        window.addEventListener('error', function(event) {
-            console.error('Global error:', event.error);
-            hideLoading();
-            alert('An error occurred. Please try again.');
-        });
-
-        window.addEventListener('unhandledrejection', function(event) {
-            console.error('Unhandled promise rejection:', event.reason);
-            hideLoading();
-            alert('An error occurred. Please try again.');
-        });
-
-        function showLoading() {
-            document.getElementById('loadingOverlay').style.display = 'flex';
-        }
-
-        function hideLoading() {
-            document.getElementById('loadingOverlay').style.display = 'none';
-        }
-
-        // Hide loading when everything is loaded
-        window.addEventListener('load', hideLoading);
+        // Your Firebase configuration
+        const firebaseConfig = {
+            // Add your Firebase config here
+        };
+        firebase.initializeApp(firebaseConfig);
     </script>
 
-    <!-- Load our auth modules -->
-    <script type="module" src="js/auth/AuthErrors.js"></script>
-    <script type="module" src="js/auth/AuthManager.js"></script>
-    <script type="module" src="js/auth/AuthGuard.js"></script>
-    <script type="module" src="js/auth/RouteGuard.js"></script>
-    
-    <!-- Load our login component -->
-    <script type="module" src="js/admin/AdminLogin.js"></script>
-
-    <!-- Initialize auth -->
-    <script type="module">
-        import { authManager } from './js/auth/AuthManager.js';
-        import { routeGuard } from './js/auth/RouteGuard.js';
-
-        async function initialize() {
-            try {
-                await authManager.initialize();
-                await routeGuard.initialize();
-
-                // Check if user is already authenticated
-                if (authManager.isAuthenticated()) {
-                    window.location.href = '/admin-dashboard.html';
-                }
-
-                hideLoading();
-            } catch (error) {
-                console.error('Initialization error:', error);
-                hideLoading();
-                alert('Failed to initialize application. Please refresh the page.');
-            }
-        }
-
-        initialize();
-    </script>
+    <!-- Login Component -->
+    <script type="module" src="js/admin/login.js"></script>
 </body>
 </html>

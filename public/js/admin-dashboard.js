@@ -1,5 +1,3 @@
-// js/admin-dashboard.js
-
 import { initializeDashboard } from './dashboard.js';
 import { initializeProjectManagement } from './project-management.js';
 import { initializeGuestManagement } from './guest-management.js';

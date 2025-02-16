@@ -2,7 +2,6 @@ const { onRequest } = require('firebase-functions/v2/https');
 const functions = require('firebase-functions');
 const admin = require('firebase-admin');
 const { receiveWhatsAppMessage } = require('./receiveWhatsappMessage');
-const { setAdminClaim } = require('./adminClaims');
 
 // Initialize Firebase Admin SDK
 if (!admin.apps.length) {
@@ -53,4 +52,39 @@ exports.getGoogleConfig = onRequest(async (req, res) => {
         placeId: functions.config.google.place_id
     });
 });
-exports.setAdminClaim = setAdminClaim;
+
+exports.setAdminClaim = functions.https.onCall(async (data, context) => {
+    // Verify authentication
+    if (!context.auth) {
+        throw new functions.https.HttpsError('unauthenticated', 'User must be authenticated');
+    }
+
+    try {
+        const { uid, email } = data;
+        
+        // Verify user exists
+        const user = await admin.auth().getUser(uid);
+        
+        // Check if email is in allowed admin domains
+        const allowedDomains = ['askgroupholdings.com'];
+        const domain = email.split('@')[1];
+        
+        if (!allowedDomains.includes(domain)) {
+            throw new functions.https.HttpsError('permission-denied', 'Email domain not authorized for admin access');
+        }
+
+        // Set admin custom claim
+        await admin.auth().setCustomUserClaims(uid, {
+            admin: true,
+            timestamp: Date.now()
+        });
+
+        return {
+            success: true,
+            message: 'Admin claim set successfully'
+        };
+    } catch (error) {
+        console.error('Error setting admin claim:', error);
+        throw new functions.https.HttpsError('internal', error.message);
+    }
+});
