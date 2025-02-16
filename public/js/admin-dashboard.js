@@ -1,7 +1,7 @@
 import { initializeDashboard } from './dashboard.js';
 import { initializeProjectManagement } from './project-management.js';
 import { initializeGuestManagement } from './guest-management.js';
-import { CampaignManager } from './campaigns/campaigns.js';
+import { initializeCampaignManagement } from './campaigns/campaigns.js';
 import { authManager } from './auth/auth.js';
 //import { routeGuard } from './auth/RouteGuard.js';
 
@@ -63,7 +63,7 @@ class AdminDashboard {
             campaigns: {
                 menuId: 'campaignManagementMenu',
                 contentId: 'campaignManagementContent',
-                init: () => CampaignManager.init('campaignManagementRoot')
+                init: initializeCampaignManagement
             },
             guests: {
                 menuId: 'guestManagementMenu',
