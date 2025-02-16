@@ -1,29 +1,42 @@
-const dashboardState = {
-    dateRange: 'month',
-    charts: {
-        campaignPerformance: null,
-        receiptStatus: null
+export function initializeDashboard() {
+    console.log('Initializing dashboard...');
+
+    const dashboardState = {
+        dateRange: 'month',
+        charts: {
+            campaignPerformance: null,
+            receiptStatus: null
+        }
+    };
+
+    async function updateDashboardStats() {
+        try {
+            const [campaignsSnapshot, receiptsSnapshot, usersSnapshot] = await Promise.all([
+                firebase.database().ref('campaigns').once('value'),
+                firebase.database().ref('receipts').once('value'),
+                firebase.database().ref('guests').once('value')
+            ]);
+
+            const campaigns = campaignsSnapshot.val() || {};
+            const receipts = receiptsSnapshot.val() || {};
+            const users = usersSnapshot.val() || {};
+
+            updateStatCounters(campaigns, receipts, users);
+            updateDashboardCharts(campaigns, receipts);
+            updateRecentReceipts(receipts);
+        } catch (error) {
+            console.error('Error updating dashboard:', error);
+        }
     }
-};
 
-async function updateDashboardStats() {
-    try {
-        const [campaignsSnapshot, receiptsSnapshot, usersSnapshot] = await Promise.all([
-            firebase.database().ref('campaigns').once('value'),
-            firebase.database().ref('receipts').once('value'),
-            firebase.database().ref('guests').once('value')
-        ]);
+    // Initialize dashboard
+    updateDashboardStats();
+    initializeDashboardListeners();
 
-        const campaigns = campaignsSnapshot.val() || {};
-        const receipts = receiptsSnapshot.val() || {};
-        const users = usersSnapshot.val() || {};
-
-        updateStatCounters(campaigns, receipts, users);
-        updateDashboardCharts(campaigns, receipts);
-        updateRecentReceipts(receipts);
-    } catch (error) {
-        console.error('Error updating dashboard:', error);
-    }
+    return {
+        updateStats: updateDashboardStats,
+        state: dashboardState
+    };
 }
 
 function updateStatCounters(campaigns, receipts, users) {
@@ -151,12 +164,3 @@ function initializeDashboardListeners() {
         });
     }
 }
-
-// Change from export to window global
-window.updateDashboardStats = async function() {
-    // existing function code
-};
-
-window.initializeDashboardListeners = function() {
-    // existing function code
-};
