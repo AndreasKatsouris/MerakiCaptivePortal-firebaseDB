@@ -9,50 +9,28 @@ const rewardTypesState = {
     }
 };
 
-// Main initialization function
-function initializeRewardTypes() {
-    // Add menu click handler
-    const rewardTypesMenu = document.getElementById('rewardTypesMenu');
-    if (rewardTypesMenu) {
-        rewardTypesMenu.addEventListener('click', function(e) {
-            e.preventDefault();
-            document.querySelectorAll('.content-section').forEach(section => {
-                section.style.display = 'none';
-            });
-            const typesSection = document.getElementById('rewardTypesContent');
-            if (typesSection) {
-                typesSection.style.display = 'block';
-            }
-            loadRewardTypes();
-        });
-    }
-
+// Export the initialization function
+export function initializeRewardTypes() {
+    console.log('Initializing reward types...');
+    
+    // Load initial data
+    loadRewardTypes();
+    
+    // Initialize listeners
     initializeRewardTypeListeners();
+    
+    return {
+        state: rewardTypesState,
+        loadTypes: loadRewardTypes
+    };
 }
 
+// Helper functions remain local to the module
 function initializeRewardTypeListeners() {
-    // Add new reward type button
-    const addRewardTypeBtn = document.getElementById('addRewardTypeBtn');
-    if (addRewardTypeBtn) {
-        addRewardTypeBtn.addEventListener('click', showAddRewardTypeModal);
+    const searchButton = document.getElementById('rewardTypeSearchBtn');
+    if (searchButton) {
+        searchButton.addEventListener('click', handleSearch);
     }
-
-    // Event delegation for dynamic elements
-    document.addEventListener('click', async function(e) {
-        const button = e.target.closest('button');
-        if (!button) return;
-
-        const typeId = button.getAttribute('data-type-id');
-
-        switch (true) {
-            case button.classList.contains('edit-reward-type-btn'):
-                handleEditRewardType(typeId);
-                break;
-            case button.classList.contains('delete-reward-type-btn'):
-                handleDeleteRewardType(typeId);
-                break;
-        }
-    });
 }
 
 async function loadRewardTypes() {
