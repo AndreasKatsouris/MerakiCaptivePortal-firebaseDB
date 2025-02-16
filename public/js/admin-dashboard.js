@@ -3,7 +3,7 @@ import { initializeProjectManagement } from './project-management.js';
 import { initializeGuestManagement } from './guest-management.js';
 import { initializeCampaignManagement } from './campaigns/campaigns.js';
 import { authManager } from './auth/auth.js';
-//import { routeGuard } from './auth/RouteGuard.js';
+import { auth } from './config/firebase-config.js';
 
 class AdminDashboard {
     constructor() {
