@@ -190,49 +190,58 @@ async initialize() {
             throw AuthErrorHandler.handleError(error, 'set-admin-claim');
         }
     }
-    async login(email, password) {
-        try {
-            const userCredential = await firebase.auth()
-                .signInWithEmailAndPassword(email, password);
-    
-            console.log('User logged in:', {
-                email: userCredential.user.email,
-                uid: userCredential.user.uid
-            });
-    
-            // Set admin claims
-            const claimResult = await this.setAdminClaim(userCredential.user);
-            console.log('Claim result:', claimResult);
-    
-            if (!claimResult.success || !claimResult.isAdmin) {
-                await this.signOut('Admin access required');
-                throw new Error('admin/insufficient-privileges');
-            }
-    
-            // Force token refresh
-            await userCredential.user.getIdToken(true);
-            const tokenResult = await userCredential.user.getIdTokenResult(true);
-            
-            console.log('Token refreshed:', {
-                claims: tokenResult.claims,
-                expirationTime: tokenResult.expirationTime
-            });
-    
-            if (!this.validateAdminClaims(tokenResult.claims)) {
-                await this.signOut('Invalid admin privileges');
-                throw new Error('admin/invalid-claims');
-            }
-    
-            return {
-                success: true,
-                user: userCredential.user
-            };
-    
-        } catch (error) {
-            console.error('Login error:', error);
-            throw AuthErrorHandler.handleError(error, 'login');
+    // auth/AuthManager.js
+
+async login(email, password) {
+    try {
+        if (!email || !password) {
+            throw new Error('Email and password are required');
         }
+
+        // Attempt login
+        const userCredential = await firebase.auth()
+            .signInWithEmailAndPassword(email, password);
+
+        // Check if email domain is allowed
+        if (!this.isAllowedAdminDomain(userCredential.user.email)) {
+            await this.signOut('Unauthorized email domain');
+            throw new Error('admin/unauthorized-domain');
+        }
+
+        console.log('Setting admin claim...');
+        
+        // Call cloud function to set admin claim
+        const setAdminClaimFunction = firebase.functions().httpsCallable('setAdminClaim');
+        const result = await setAdminClaimFunction({ 
+            idToken: await userCredential.user.getIdToken() 
+        });
+
+        console.log('Claim setting result:', result.data);
+
+        if (!result.data.success || !result.data.isAdmin) {
+            await this.signOut('Admin access required');
+            throw new Error('admin/insufficient-privileges');
+        }
+
+        // Force token refresh to get new claims
+        await userCredential.user.getIdToken(true);
+        const tokenResult = await userCredential.user.getIdTokenResult(true);
+
+        console.log('New token claims:', tokenResult.claims);
+
+        // Update last login timestamp
+        await this.updateUserMetadata(userCredential.user);
+
+        return {
+            success: true,
+            user: userCredential.user
+        };
+
+    } catch (error) {
+        const handledError = AuthErrorHandler.handleError(error, 'login');
+        throw handledError;
     }
+}
     isAllowedAdminDomain(email) {
         return email.endsWith(this.config.adminEmailDomain);
     }
