@@ -1,13 +1,16 @@
-import { auth, rtdb, ref, get, set, push, update } from '../config/firebase-config.js';
-import { createApp, ref as vueRef, computed } from 'vue';
-import Swal from 'sweetalert2';
+import { auth, rtdb, ref, get } from '../config/firebase-config.js';
 
 export function initializeCampaignManagement() {
-    const app = createApp({
+    if (typeof Vue === 'undefined') {
+        console.error('Vue is not loaded. Cannot initialize campaign management.');
+        return;
+    }
+
+    const app = Vue.createApp({
         data() {
             return {
                 campaigns: [],
-                loading: false,
+                loading: true,
                 error: null,
                 filters: {
                     brandName: '',
@@ -52,8 +55,6 @@ export function initializeCampaignManagement() {
         },
         methods: {
             async loadCampaigns() {
-                this.loading = true;
-                this.error = null;
                 try {
                     const campaignsRef = ref(rtdb, 'campaigns');
                     const snapshot = await get(campaignsRef);
@@ -64,7 +65,7 @@ export function initializeCampaignManagement() {
                     })) : [];
                 } catch (error) {
                     console.error('Error loading campaigns:', error);
-                    this.error = 'Failed to load campaigns. Please try again.';
+                    this.error = 'Failed to load campaigns';
                 } finally {
                     this.loading = false;
                 }
@@ -596,8 +597,8 @@ export function initializeCampaignManagement() {
             }
         },
         mounted() {
-            this.loadRewardTypes();
             this.loadCampaigns();
+            this.loadRewardTypes();
         },
         template: `
             <div class="campaign-management">
@@ -694,13 +695,8 @@ export function initializeCampaignManagement() {
     });
 
     // Mount the app to the campaign management container
-    const mountPoint = document.getElementById('campaignManagementContent');
-    if (mountPoint) {
-        app.mount(mountPoint);
-        console.log('Campaign management initialized');
-    } else {
-        console.error('Campaign management mount point not found');
-    }
+    app.mount('#campaigns-app');
+    console.log('Campaign management initialized');
 
     return app;
 }

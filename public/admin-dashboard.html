@@ -141,16 +141,28 @@
             <!-- Campaigns Section -->
             <div id="campaignManagementContent" class="content-section" style="display: none;">
                 <div id="campaigns-app">
-                    <template v-if="campaigns.length > 0">
-                        <ul>
-                            <li v-for="campaign in campaigns" :key="campaign.id">
-                                {{ campaign.name }}
-                            </li>
-                        </ul>
-                    </template>
-                    <template v-else>
-                        <p>No campaigns found.</p>
-                    </template>
+                    <h2>Campaigns</h2>
+                    <div v-if="loading" class="text-center">
+                        <div class="spinner-border text-primary"></div>
+                    </div>
+                    <div v-else-if="error" class="alert alert-danger">
+                        {{ error }}
+                    </div>
+                    <div v-else>
+                        <div v-if="campaigns.length === 0" class="alert alert-info">
+                            No campaigns found
+                        </div>
+                        <div v-else class="row">
+                            <div v-for="campaign in campaigns" :key="campaign.id" class="col-md-4 mb-3">
+                                <div class="card">
+                                    <div class="card-body">
+                                        <h5 class="card-title">{{ campaign.name }}</h5>
+                                        <p class="card-text">{{ campaign.description }}</p>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
                 </div>
             </div>
 
@@ -330,9 +342,9 @@
     </div>
 
     <!-- Scripts -->
-    <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
     <!-- Vue.js -->
     <script src="https://unpkg.com/vue@3/dist/vue.global.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
     <!-- Bootstrap Bundle with Popper -->
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
     <!-- Chart.js -->
