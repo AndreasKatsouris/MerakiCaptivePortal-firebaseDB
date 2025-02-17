@@ -74,12 +74,12 @@ class AdminDashboard {
                 initialize: initializeReceiptManagement,
                 parent: 'loyaltySubmenu'
             },
-            points: {
-                menuId: 'pointManagementMenu',
-                contentId: 'pointManagementContent',
-                initialize: initializePointManagement,
-                parent: 'loyaltySubmenu'
-            },
+            //points: {
+            //    menuId: 'pointManagementMenu',
+            //    contentId: 'pointManagementContent',
+            //    initialize: initializePointManagement,
+            //    parent: 'loyaltySubmenu'
+          //  },
             rewards: {
                 menuId: 'rewardManagementMenu',
                 contentId: 'rewardManagementContent',
