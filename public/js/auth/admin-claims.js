@@ -1,6 +1,26 @@
 import { auth, signOut } from '../config/firebase-config.js';
 
+// Get Firebase config
+const firebaseConfig = {
+    apiKey: "AIzaSyBqXVRPtq-DGbXMUAhxHH8B10MOV5OZkzI",
+    authDomain: "merakicaptiveportal-firebasedb.firebaseapp.com",
+    databaseURL: "https://merakicaptiveportal-firebasedb-default-rtdb.firebaseio.com",
+    projectId: "merakicaptiveportal-firebasedb",
+    storageBucket: "merakicaptiveportal-firebasedb.appspot.com",
+    messagingSenderId: "854311920907",
+    appId: "1:854311920907:web:dd6e51c7f0989887c6c3bc"
+};
+
 export class AdminClaims {
+    /**
+     * Get the Firebase Functions base URL
+     * @returns {string} The base URL for Firebase Functions
+     */
+    static getFunctionsBaseUrl() {
+        const region = 'us-central1'; // Default Firebase Functions region
+        return `https://${region}-${firebaseConfig.projectId}.cloudfunctions.net`;
+    }
+
     /**
      * Verify if a user has admin privileges
      * @param {Object} user - Firebase user object
@@ -16,17 +36,38 @@ export class AdminClaims {
             // Get a fresh token to ensure latest claims
             const idToken = await user.getIdToken(true);
             
-            const response = await fetch('/verifyAdminStatus', {
+            // Use the full Firebase Functions URL
+            const functionsBaseUrl = this.getFunctionsBaseUrl();
+            const response = await fetch(`${functionsBaseUrl}/verifyAdminStatus`, {
                 method: 'GET',
                 headers: {
                     'Authorization': `Bearer ${idToken}`,
-                    'Content-Type': 'application/json'
+                    'Content-Type': 'application/json',
+                    'Accept': 'application/json'
                 }
             });
 
+            // Log the response for debugging
+            console.log('Admin verification response:', {
+                status: response.status,
+                statusText: response.statusText,
+                headers: Object.fromEntries(response.headers.entries())
+            });
+
             if (!response.ok) {
-                const errorData = await response.json();
-                throw new Error(errorData.error || 'Failed to verify admin status');
+                const contentType = response.headers.get('content-type');
+                let errorMessage;
+                
+                if (contentType && contentType.includes('application/json')) {
+                    const errorData = await response.json();
+                    errorMessage = errorData.error;
+                } else {
+                    const textContent = await response.text();
+                    console.error('Unexpected response format:', textContent);
+                    errorMessage = 'Server returned an invalid response format';
+                }
+                
+                throw new Error(errorMessage || 'Failed to verify admin status');
             }
 
             const result = await response.json();

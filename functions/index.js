@@ -1,6 +1,7 @@
 const { onRequest } = require('firebase-functions/v2/https');
 const functions = require('firebase-functions');
 const admin = require('firebase-admin');
+const cors = require('cors')({ origin: true });
 const { receiveWhatsAppMessage } = require('./receiveWhatsappMessage');
 
 // Initialize Firebase Admin SDK
@@ -105,35 +106,40 @@ exports.setAdminClaim = onRequest(async (req, res) => {
  * Returns isAdmin: true/false based on the user's custom claims
  */
 exports.verifyAdminStatus = onRequest(async (req, res) => {
-    // Only allow GET requests
-    if (req.method !== 'GET') {
-        return res.status(405).json({ error: 'Method not allowed' });
-    }
-
-    try {
-        // Get the ID token from the Authorization header
-        const idToken = req.headers.authorization?.split('Bearer ')[1];
-        if (!idToken) {
-            return res.status(401).json({ error: 'No token provided', isAdmin: false });
+    // Enable CORS
+    return cors(req, res, async () => {
+        // Only allow GET requests
+        if (req.method !== 'GET') {
+            return res.status(405).json({ error: 'Method not allowed' });
         }
 
-        // Verify the token and get the user's claims
-        const decodedToken = await admin.auth().verifyIdToken(idToken);
-        
-        // Check admin claim and admin-claims database entry
-        const isAdminInDb = await admin.database()
-            .ref(`admin-claims/${decodedToken.uid}`)
-            .once('value')
-            .then(snapshot => snapshot.val() === true);
+        try {
+            // Get the ID token from the Authorization header
+            const idToken = req.headers.authorization?.split('Bearer ')[1];
+            if (!idToken) {
+                return res.status(401).json({ error: 'No token provided', isAdmin: false });
+            }
 
-        // User is admin if both custom claim and database entry exist
-        const isAdmin = decodedToken.admin === true && isAdminInDb;
+            // Verify the token and get the user's claims
+            const decodedToken = await admin.auth().verifyIdToken(idToken);
+            
+            // Check admin claim and admin-claims database entry
+            const isAdminInDb = await admin.database()
+                .ref(`admin-claims/${decodedToken.uid}`)
+                .once('value')
+                .then(snapshot => snapshot.val() === true);
 
-        return res.status(200).json({ isAdmin });
-    } catch (error) {
-        console.error('Error verifying admin status:', error);
-        return res.status(401).json({ error: error.message, isAdmin: false });
-    }
+            // User is admin if both custom claim and database entry exist
+            const isAdmin = decodedToken.admin === true && isAdminInDb;
+
+            // Set proper content type
+            res.set('Content-Type', 'application/json');
+            return res.status(200).json({ isAdmin });
+        } catch (error) {
+            console.error('Error verifying admin status:', error);
+            return res.status(401).json({ error: error.message, isAdmin: false });
+        }
+    });
 });
 
 /**
