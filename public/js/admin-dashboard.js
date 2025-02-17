@@ -401,3 +401,53 @@ export { dashboard };
 document.addEventListener('DOMContentLoaded', () => {
     dashboard.initialize();
 });
+
+// Clear Scanning Data functionality
+const clearScanningDataBtn = document.getElementById('clearScanningDataBtn');
+const clearStatus = document.getElementById('clearStatus');
+
+async function clearScanningData() {
+    try {
+        clearScanningDataBtn.disabled = true;
+        clearScanningDataBtn.innerHTML = '<i class="fas fa-spinner fa-spin me-2"></i>Clearing...';
+        clearStatus.style.display = 'none';
+
+        const user = auth.currentUser;
+        if (!user) {
+            throw new Error('You must be logged in to perform this action');
+        }
+
+        const idToken = await user.getIdToken();
+        const response = await fetch('/clearScanningData', {
+            method: 'POST',
+            headers: {
+                'Authorization': `Bearer ${idToken}`,
+                'Content-Type': 'application/json'
+            }
+        });
+
+        const result = await response.json();
+        
+        if (!response.ok) {
+            throw new Error(result.error || 'Failed to clear scanning data');
+        }
+
+        clearStatus.className = 'alert alert-success mt-3';
+        clearStatus.textContent = `Successfully cleared ${result.recordsCleared} records at ${new Date(result.timestamp).toLocaleString()}`;
+        clearStatus.style.display = 'block';
+    } catch (error) {
+        console.error('Error clearing scanning data:', error);
+        clearStatus.className = 'alert alert-danger mt-3';
+        clearStatus.textContent = error.message;
+        clearStatus.style.display = 'block';
+    } finally {
+        clearScanningDataBtn.disabled = false;
+        clearScanningDataBtn.innerHTML = '<i class="fas fa-trash-alt me-2"></i>Clear Scanning Data';
+    }
+}
+
+clearScanningDataBtn.addEventListener('click', () => {
+    if (confirm('Are you sure you want to clear all scanning data? This action cannot be undone!')) {
+        clearScanningData();
+    }
+});
