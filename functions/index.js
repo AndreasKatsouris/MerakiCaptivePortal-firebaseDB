@@ -106,38 +106,85 @@ exports.setAdminClaim = onRequest(async (req, res) => {
  * Returns isAdmin: true/false based on the user's custom claims
  */
 exports.verifyAdminStatus = onRequest(async (req, res) => {
+    console.log('[verifyAdminStatus] Received request:', {
+        method: req.method,
+        headers: req.headers,
+        origin: req.headers.origin || 'No origin'
+    });
+
     // Enable CORS
     return cors(req, res, async () => {
+        console.log('[verifyAdminStatus] CORS middleware passed');
+
         // Only allow GET requests
         if (req.method !== 'GET') {
+            console.error('[verifyAdminStatus] Invalid method:', req.method);
             return res.status(405).json({ error: 'Method not allowed' });
         }
 
         try {
             // Get the ID token from the Authorization header
-            const idToken = req.headers.authorization?.split('Bearer ')[1];
+            const authHeader = req.headers.authorization;
+            console.log('[verifyAdminStatus] Auth header present:', !!authHeader);
+
+            const idToken = authHeader?.split('Bearer ')[1];
             if (!idToken) {
+                console.error('[verifyAdminStatus] No token provided in Authorization header');
                 return res.status(401).json({ error: 'No token provided', isAdmin: false });
             }
 
+            console.log('[verifyAdminStatus] Verifying ID token...');
             // Verify the token and get the user's claims
             const decodedToken = await admin.auth().verifyIdToken(idToken);
+            console.log('[verifyAdminStatus] Token verified. User:', {
+                uid: decodedToken.uid,
+                claims: decodedToken
+            });
             
             // Check admin claim and admin-claims database entry
+            console.log('[verifyAdminStatus] Checking admin-claims in database...');
             const isAdminInDb = await admin.database()
                 .ref(`admin-claims/${decodedToken.uid}`)
                 .once('value')
-                .then(snapshot => snapshot.val() === true);
+                .then(snapshot => {
+                    const val = snapshot.val();
+                    console.log('[verifyAdminStatus] Database admin value:', val);
+                    return val === true;
+                });
 
             // User is admin if both custom claim and database entry exist
             const isAdmin = decodedToken.admin === true && isAdminInDb;
+            console.log('[verifyAdminStatus] Admin status result:', {
+                tokenClaim: decodedToken.admin === true,
+                databaseClaim: isAdminInDb,
+                finalResult: isAdmin
+            });
 
             // Set proper content type
             res.set('Content-Type', 'application/json');
+            console.log('[verifyAdminStatus] Sending response:', { isAdmin });
             return res.status(200).json({ isAdmin });
         } catch (error) {
-            console.error('Error verifying admin status:', error);
-            return res.status(401).json({ error: error.message, isAdmin: false });
+            console.error('[verifyAdminStatus] Error:', error);
+            if (error.code === 'auth/id-token-expired') {
+                return res.status(401).json({ 
+                    error: 'Token expired', 
+                    code: error.code,
+                    isAdmin: false 
+                });
+            }
+            if (error.code === 'auth/argument-error') {
+                return res.status(401).json({ 
+                    error: 'Invalid token format', 
+                    code: error.code,
+                    isAdmin: false 
+                });
+            }
+            return res.status(401).json({ 
+                error: error.message, 
+                code: error.code || 'unknown',
+                isAdmin: false 
+            });
         }
     });
 });
