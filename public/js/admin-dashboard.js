@@ -1,3 +1,6 @@
+import { auth, functions, httpsCallable } from './config/firebase-config.js';
+import { AdminClaims } from './auth/admin-claims.js';
+import { AdminUserManagement } from './admin/user-management.js';
 import { initializeDashboard } from './dashboard.js';
 import { initializeProjectManagement } from './project-management.js';
 import { initializeGuestManagement } from './guest-management.js';
@@ -6,10 +9,6 @@ import { initializeRewardTypes } from './reward-types.js';
 import { initializeReceiptManagement } from './receipt-management.js';
 import { initializeRewardManagement } from './reward-management.js';
 import { authManager } from './auth/auth.js';
-import { auth } from './config/firebase-config.js';
-import { AdminClaims } from './auth/admin-claims.js';
-import { AdminUserManagement } from './admin/user-management.js';
-import { getFunctions, httpsCallable } from 'firebase/functions';
 
 async function verifyAdminAccess() {
     const hasAccess = await AdminClaims.checkAndRedirect();
