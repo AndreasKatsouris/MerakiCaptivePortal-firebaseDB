@@ -1,3 +1,8 @@
+import { getDatabase, ref, push, set, get, update, remove } from 'firebase/database';
+import { app } from './config/firebase-config.js';
+
+const db = getDatabase(app);
+
 // Project Management State
 const projectManagement = {
     projects: [],
@@ -24,6 +29,12 @@ export function initializeProjectManagement() {
             }
             loadProjects();
         });
+    }
+
+    // Add project button click handler
+    const addProjectBtn = document.getElementById('add-project-btn');
+    if (addProjectBtn) {
+        addProjectBtn.addEventListener('click', showAddProjectModal);
     }
 
     initializeProjectListeners();
@@ -58,39 +69,12 @@ function showAddProjectModal() {
     });
 }
 
-function showAddTaskModal(projectId) {
-    Swal.fire({
-        title: 'Add New Task',
-        html: `
-            <input id="taskDescription" class="swal2-input" placeholder="Task Description">
-            <select id="taskPriority" class="swal2-select">
-                <option value="low">Low Priority</option>
-                <option value="medium">Medium Priority</option>
-                <option value="high">High Priority</option>
-            </select>
-        `,
-        showCancelButton: true,
-        confirmButtonText: 'Add Task',
-        preConfirm: () => {
-            return {
-                projectId: projectId,
-                description: document.getElementById('taskDescription').value,
-                priority: document.getElementById('taskPriority').value,
-                status: 'todo'
-            };
-        }
-    }).then((result) => {
-        if (result.isConfirmed) {
-            createTask(result.value);
-        }
-    });
-}
-
 // Add these missing functions for project and task creation
 async function createProject(projectData) {
     try {
-        const projectRef = firebase.database().ref('projects').push();
-        await projectRef.set({
+        const projectRef = ref(db, 'projects');
+        const newProjectRef = push(projectRef);
+        await set(newProjectRef, {
             ...projectData,
             createdAt: Date.now()
         });
@@ -98,14 +82,16 @@ async function createProject(projectData) {
         return true;
     } catch (error) {
         console.error('Error creating project:', error);
+        showError('Failed to create project: ' + error.message);
         return false;
     }
 }
 
 async function createTask(taskData) {
     try {
-        const taskRef = firebase.database().ref(`tasks/${taskData.projectId}`).push();
-        await taskRef.set({
+        const taskRef = ref(db, `tasks/${taskData.projectId}/tasks`);
+        const newTaskRef = push(taskRef);
+        await set(newTaskRef, {
             ...taskData,
             createdAt: Date.now()
         });
@@ -114,6 +100,7 @@ async function createTask(taskData) {
         return true;
     } catch (error) {
         console.error('Error creating task:', error);
+        showError('Failed to create task: ' + error.message);
         return false;
     }
 }
@@ -122,16 +109,10 @@ async function loadProjectTasks() {
     try {
         const tasksData = [];
         for (const project of projectManagement.projects) {
-            const snapshot = await firebase.database().ref(`tasks/${project.id}`).once('value');
-            const projectTasks = snapshot.val();
+            const snapshot = await get(ref(db, `tasks/${project.id}/tasks`));
+            const projectTasks = snapshot.val() ? Object.keys(snapshot.val()).map(key => ({ id: key, ...snapshot.val()[key] })) : [];
             if (projectTasks) {
-                Object.entries(projectTasks).forEach(([taskId, taskData]) => {
-                    tasksData.push({
-                        id: taskId,
-                        projectId: project.id,
-                        ...taskData
-                    });
-                });
+                tasksData.push(...projectTasks);
             }
         }
         projectManagement.tasks = tasksData;
@@ -143,12 +124,6 @@ async function loadProjectTasks() {
 
 // Initialize project-related event listeners
 function initializeProjectListeners() {
-    // Add project button click handler
-    const addProjectBtn = document.getElementById('addProjectBtn');
-    if (addProjectBtn) {
-        addProjectBtn.addEventListener('click', showAddProjectModal);
-    }
-
     // Event delegation for dynamic elements
     document.addEventListener('click', async function(e) {
         const button = e.target.closest('button');
@@ -183,14 +158,11 @@ function initializeProjectListeners() {
 async function loadProjects() {
     try {
         showLoading();
-        const snapshot = await firebase.database().ref('projects').once('value');
-        const projects = snapshot.val();
+        const snapshot = await get(ref(db, 'projects'));
+        const projects = snapshot.val() ? Object.keys(snapshot.val()).map(key => ({ id: key, ...snapshot.val()[key] })) : [];
         
         if (projects) {
-            projectManagement.projects = Object.entries(projects).map(([id, data]) => ({
-                id,
-                ...data
-            }));
+            projectManagement.projects = projects;
             await loadProjectTasks();
             renderProjects();
         } else {
@@ -287,7 +259,7 @@ function renderProjectTasks(projectId) {
 // Action handlers
 async function handleEditProject(projectId) {
     try {
-        const snapshot = await firebase.database().ref(`projects/${projectId}`).once('value');
+        const snapshot = await get(ref(db, `projects/${projectId}`));
         const project = snapshot.val();
         
         if (!project) throw new Error('Project not found');
@@ -307,7 +279,7 @@ async function handleEditProject(projectId) {
             confirmButtonText: 'Update'
         }).then(async (result) => {
             if (result.isConfirmed) {
-                await firebase.database().ref(`projects/${projectId}`).update({
+                await update(ref(db, `projects/${projectId}`), {
                     name: document.getElementById('projectName').value,
                     description: document.getElementById('projectDescription').value,
                     status: document.getElementById('projectStatus').value,
@@ -334,8 +306,8 @@ async function handleDeleteProject(projectId) {
         });
 
         if (result.isConfirmed) {
-            await firebase.database().ref(`projects/${projectId}`).remove();
-            await firebase.database().ref(`tasks/${projectId}`).remove();
+            await remove(ref(db, `projects/${projectId}`));
+            await remove(ref(db, `tasks/${projectId}`));
             loadProjects();
         }
     } catch (error) {
@@ -346,7 +318,7 @@ async function handleDeleteProject(projectId) {
 
 async function handleEditTask(projectId, taskId) {
     try {
-        const snapshot = await firebase.database().ref(`tasks/${projectId}/${taskId}`).once('value');
+        const snapshot = await get(ref(db, `tasks/${projectId}/tasks/${taskId}`));
         const task = snapshot.val();
         
         if (!task) throw new Error('Task not found');
@@ -365,7 +337,7 @@ async function handleEditTask(projectId, taskId) {
             confirmButtonText: 'Update'
         }).then(async (result) => {
             if (result.isConfirmed) {
-                await firebase.database().ref(`tasks/${projectId}/${taskId}`).update({
+                await update(ref(db, `tasks/${projectId}/tasks/${taskId}`), {
                     description: document.getElementById('taskDescription').value,
                     priority: document.getElementById('taskPriority').value,
                     updatedAt: Date.now()
@@ -391,7 +363,7 @@ async function handleDeleteTask(projectId, taskId) {
         });
 
         if (result.isConfirmed) {
-            await firebase.database().ref(`tasks/${projectId}/${taskId}`).remove();
+            await remove(ref(db, `tasks/${projectId}/tasks/${taskId}`));
             loadProjects();
         }
     } catch (error) {
@@ -402,7 +374,7 @@ async function handleDeleteTask(projectId, taskId) {
 
 async function handleCompleteTask(projectId, taskId) {
     try {
-        await firebase.database().ref(`tasks/${projectId}/${taskId}`).update({
+        await update(ref(db, `tasks/${projectId}/tasks/${taskId}`), {
             status: 'completed',
             completedAt: Date.now()
         });
@@ -469,4 +441,32 @@ function showLoading() {
 
 function hideLoading() {
     // Loading will be hidden when content is rendered
+}
+
+function showAddTaskModal(projectId) {
+    Swal.fire({
+        title: 'Add New Task',
+        html: `
+            <input id="taskDescription" class="swal2-input" placeholder="Task Description">
+            <select id="taskPriority" class="swal2-select">
+                <option value="low">Low Priority</option>
+                <option value="medium">Medium Priority</option>
+                <option value="high">High Priority</option>
+            </select>
+        `,
+        showCancelButton: true,
+        confirmButtonText: 'Add Task',
+        preConfirm: () => {
+            return {
+                projectId: projectId,
+                description: document.getElementById('taskDescription').value,
+                priority: document.getElementById('taskPriority').value,
+                status: 'todo'
+            };
+        }
+    }).then((result) => {
+        if (result.isConfirmed) {
+            createTask(result.value);
+        }
+    });
 }
