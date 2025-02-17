@@ -86,11 +86,37 @@ class AdminDashboard {
                 contentId: 'dashboardContent',
                 initialize: initializeDashboard
             },
-            // Database Management
+            // Settings
+            settings: {
+                menuId: 'settingsMenu',
+                contentId: 'settingsContent'
+            },
+            // Database Management (under Settings)
             databaseManagement: {
                 menuId: 'databaseManagementMenu',
                 contentId: 'databaseManagementContent',
-                parent: 'settingsSubmenu'
+                parent: 'settingsSubmenu',
+                initialize: () => {
+                    // Initialize database management section
+                    const clearScanningDataBtn = document.getElementById('clearScanningDataBtn');
+                    if (clearScanningDataBtn) {
+                        clearScanningDataBtn.addEventListener('click', () => {
+                            Swal.fire({
+                                title: 'Are you sure?',
+                                text: "This will permanently delete all scanning data. This action cannot be undone!",
+                                icon: 'warning',
+                                showCancelButton: true,
+                                confirmButtonColor: '#d33',
+                                cancelButtonColor: '#3085d6',
+                                confirmButtonText: 'Yes, delete it!'
+                            }).then((result) => {
+                                if (result.isConfirmed) {
+                                    clearScanningData();
+                                }
+                            });
+                        });
+                    }
+                }
             },
             // Loyalty Program Sections
             campaigns: {
@@ -111,12 +137,6 @@ class AdminDashboard {
                 initialize: initializeReceiptManagement,
                 parent: 'loyaltySubmenu'
             },
-            //points: {
-            //    menuId: 'pointManagementMenu',
-            //    contentId: 'pointManagementContent',
-            //    initialize: initializePointManagement,
-            //    parent: 'loyaltySubmenu'
-          //  },
             rewards: {
                 menuId: 'rewardManagementMenu',
                 contentId: 'rewardManagementContent',
