@@ -101,32 +101,37 @@ exports.setAdminClaim = onRequest(async (req, res) => {
 });
 
 /**
- * Cloud Function to verify admin status of the current user
+ * Cloud Function to verify admin status of a user
+ * Returns isAdmin: true/false based on the user's custom claims
  */
 exports.verifyAdminStatus = onRequest(async (req, res) => {
+    // Only allow GET requests
+    if (req.method !== 'GET') {
+        return res.status(405).json({ error: 'Method not allowed' });
+    }
+
     try {
-        // Verify that the request has a valid Firebase ID token
+        // Get the ID token from the Authorization header
         const idToken = req.headers.authorization?.split('Bearer ')[1];
         if (!idToken) {
-            return res.status(401).json({ error: 'Unauthorized - No token provided' });
+            return res.status(401).json({ error: 'No token provided', isAdmin: false });
         }
 
         // Verify the token and get the user's claims
         const decodedToken = await admin.auth().verifyIdToken(idToken);
         
-        // Check admin status from both token and database
-        const isAdminInToken = decodedToken.admin === true;
-        const isAdminInDB = await admin.database()
+        // Check admin claim and admin-claims database entry
+        const isAdminInDb = await admin.database()
             .ref(`admin-claims/${decodedToken.uid}`)
             .once('value')
             .then(snapshot => snapshot.val() === true);
 
-        return res.status(200).json({
-            isAdmin: isAdminInToken && isAdminInDB,
-            uid: decodedToken.uid
-        });
+        // User is admin if both custom claim and database entry exist
+        const isAdmin = decodedToken.admin === true && isAdminInDb;
+
+        return res.status(200).json({ isAdmin });
     } catch (error) {
         console.error('Error verifying admin status:', error);
-        return res.status(500).json({ error: 'Internal server error' });
+        return res.status(401).json({ error: error.message, isAdmin: false });
     }
 });

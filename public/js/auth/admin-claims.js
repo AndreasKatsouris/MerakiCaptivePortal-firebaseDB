@@ -1,9 +1,20 @@
 import { auth, signOut } from '../config/firebase-config.js';
 
 export class AdminClaims {
+    /**
+     * Verify if a user has admin privileges
+     * @param {Object} user - Firebase user object
+     * @returns {Promise<boolean>} True if user is admin, false otherwise
+     */
     static async verifyAdminStatus(user) {
+        if (!user) {
+            console.error('No user provided to verifyAdminStatus');
+            return false;
+        }
+
         try {
-            const idToken = await user.getIdToken();
+            // Get a fresh token to ensure latest claims
+            const idToken = await user.getIdToken(true);
             
             const response = await fetch('/verifyAdminStatus', {
                 method: 'GET',
@@ -14,18 +25,27 @@ export class AdminClaims {
             });
 
             if (!response.ok) {
-                throw new Error('Failed to verify admin status');
+                const errorData = await response.json();
+                throw new Error(errorData.error || 'Failed to verify admin status');
             }
 
             const result = await response.json();
-            return result.isAdmin;
+            return result.isAdmin === true;
         } catch (error) {
             console.error('Error verifying admin status:', error);
+            // Don't throw, just return false for non-admin
             return false;
         }
     }
 
+    /**
+     * Refresh the user's token to get latest claims
+     * @param {Object} user - Firebase user object
+     * @returns {Promise<boolean>} True if refresh successful
+     */
     static async refreshToken(user) {
+        if (!user) return false;
+
         try {
             // Force token refresh to get latest claims
             await user.getIdToken(true);
@@ -36,6 +56,10 @@ export class AdminClaims {
         }
     }
 
+    /**
+     * Check admin status and redirect if not admin
+     * @returns {Promise<boolean>} True if user is admin
+     */
     static async checkAndRedirect() {
         const user = auth.currentUser;
         if (!user) {
