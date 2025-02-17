@@ -30,39 +30,43 @@ class AdminDashboard {
         if (this.initialized) return;
 
         try {
-            // Initialize auth
-            await authManager.initialize();
+            // Initialize auth and wait for state
+            const user = await authManager.initialize();
             
-            // Set up auth state listener
+            if (!user) {
+                window.location.href = '/admin-login.html';
+                return;
+            }
+
+            // Force token refresh to get latest claims
+            await user.getIdToken(true);
+            
+            // Verify admin access
+            const hasAccess = await AdminClaims.verifyAdminStatus(user);
+            if (!hasAccess) {
+                console.error('User does not have admin access');
+                await auth.signOut();
+                window.location.href = '/admin-login.html';
+                return;
+            }
+
+            // Set up auth state listener for future changes
             auth.onAuthStateChanged(async (user) => {
                 if (!user) {
                     window.location.href = '/admin-login.html';
                     return;
                 }
-
-                // Force token refresh to get latest claims
-                await user.getIdToken(true);
-                
-                // Verify admin access
-                const hasAccess = await AdminClaims.verifyAdminStatus(user);
-                if (!hasAccess) {
-                    console.error('User does not have admin access');
-                    await auth.signOut();
-                    window.location.href = '/admin-login.html';
-                    return;
-                }
-
-                this.setupDashboard();
             });
 
             // Initialize Bootstrap modal
             this.modal = new bootstrap.Modal(document.getElementById('add-admin-modal'));
 
+            this.setupDashboard();
             this.initialized = true;
             console.log('Dashboard initialized');
         } catch (error) {
             console.error('Dashboard initialization failed:', error);
-            throw error;
+            window.location.href = '/admin-login.html';
         }
     }
 
@@ -149,11 +153,15 @@ class AdminDashboard {
         });
 
         // Handle logout
-        const logoutButton = document.getElementById('logoutButton');
-        if (logoutButton) {
-            logoutButton.addEventListener('click', async (e) => {
-                e.preventDefault();
-                await this.handleLogout();
+        const logoutBtn = document.getElementById('logoutBtn');
+        if (logoutBtn) {
+            logoutBtn.addEventListener('click', async () => {
+                try {
+                    await auth.signOut();
+                    window.location.href = '/admin-login.html';
+                } catch (error) {
+                    console.error('Logout failed:', error);
+                }
             });
         }
 
