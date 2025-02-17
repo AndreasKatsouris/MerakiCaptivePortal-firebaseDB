@@ -3,875 +3,197 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>RDP - Admin Dashboard</title>
-
-    <!-- CSS Dependencies -->
-    <link rel="stylesheet" href="css/bootstrap.min.css">
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
-    <link rel="stylesheet" href="css/admin-style.css">
-
-    <!-- Core Dependencies (jQuery, Lodash, Bootstrap) -->
-    <script src="https://code.jquery.com/jquery-3.7.1.min.js" crossorigin="anonymous"></script>
-    <!-- Updated Lodash with integrity check and loading verification -->
-    <script src="https://cdn.jsdelivr.net/npm/lodash@4.17.21/lodash.min.js" integrity="sha256-qXBd/EfAdjOA2FGrGAG+b3YBn2tn5A6bhz+LSgYD96k=" crossorigin="anonymous"></script>
-
-    <script>
-        // Verify lodash loading
-        window.addEventListener('load', function() {
-            if (typeof _ === 'undefined') {
-                console.error('Lodash failed to load!');
-            } else {
-                console.log('Lodash loaded successfully:', _.VERSION);
-            }
-        });
-
-    </script>
-
-    <!-- Rest of your dependencies -->
-    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/js/bootstrap.bundle.min.js" crossorigin="anonymous"></script>
-    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/moment.js/2.29.1/moment.min.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
-
-    <!-- React Dependencies -->
-    <script src="https://unpkg.com/react@17/umd/react.production.min.js" crossorigin="anonymous"></script>
-    <script src="https://unpkg.com/react-dom@17/umd/react-dom.production.min.js" crossorigin="anonymous"></script>
-
-    <!-- Vue Dependencies -->
-    <script src="https://unpkg.com/vue@3/dist/vue.global.prod.js" crossorigin="anonymous"></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/vue-demi/0.14.7/index.iife.min.js" crossorigin="anonymous"></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/pinia/2.1.7/pinia.iife.min.js" crossorigin="anonymous"></script>
-
-    <!-- Firebase Dependencies -->
-    <script src="/__/firebase/10.12.5/firebase-app-compat.js"></script>
-    <script src="/__/firebase/10.12.5/firebase-auth-compat.js"></script>
-    <script src="/__/firebase/10.12.5/firebase-database-compat.js"></script>
-    <script src="/__/firebase/10.12.5/firebase-functions-compat.js"></script>
-    <script src="/__/firebase/init.js?useEmulator=false"></script>
-
-    <!-- Initialize Vue -->
-    <script>
-        if (typeof Vue === 'undefined') {
-            console.error('Vue is not loaded');
-        } else {
-            console.log('Vue version:', Vue.version);
-        }
-    </script>
-
-    <!-- Module imports -->
-    <script type="module">
-        import { dashboard } from './js/admin-dashboard.js';
-    </script>
+    <title>Admin Dashboard - Meraki Captive Portal</title>
+    
+    <!-- Bootstrap CSS -->
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <!-- Font Awesome -->
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <!-- Custom CSS -->
+    <link href="css/admin-dashboard.css" rel="stylesheet">
 </head>
 <body>
-    <div class="sidebar-overlay" id="sidebarOverlay"></div>
-    <button id="mobileSidebarToggle" class="d-md-none mobile-menu-toggle">
-        <i class="fas fa-bars"></i>
-    </button>
-    <!-- Header -->
-    <div class="main-header">
-        <button id="mobileSidebarToggle" class="d-md-none mobile-menu-toggle">
-            <i class="fas fa-bars"></i>
-        </button>
-        
-        <div class="header-search">
-            <i class="fas fa-search"></i>
-            <input type="text" placeholder="Search...">
-        </div>
-        
-        <div class="header-actions">
-            <div class="notifications">
-                <i class="fas fa-bell"></i>
-                <span class="badge">3</span>
+    <!-- Main container -->
+    <div class="wrapper">
+        <!-- Sidebar -->
+        <nav id="sidebar">
+            <div class="sidebar-header">
+                <h3>Admin Dashboard</h3>
             </div>
-            <div class="user-profile">
-                <img src="/images/avatar.png" alt="User Avatar">
-                <span class="d-none d-md-inline">Admin User</span>
-            </div>
-        </div>
-    </div>
-    <!-- End of Header-->
-    <!-- Sidebar -->
-    <div class="sidebar" id="sidebar">
-        <div class="sidebar-header">
-            <h3>RDP Admin</h3>
-            <button class="d-md-none close-sidebar">
-                <i class="fas fa-times"></i>
-            </button>
-        </div>
-        <nav class="sidebar-nav">
-            <ul>
+
+            <ul class="nav flex-column">
                 <li class="nav-item">
-                    <a href="#" id="dashboardMenu" class="nav-link">
-                        <i class="fas fa-home"></i>
+                    <a href="#" id="dashboardMenu" class="nav-link active">
+                        <i class="fas fa-chart-line"></i>
                         <span>Dashboard</span>
                     </a>
                 </li>
                 <li class="nav-item">
-                    <a href="#" id="projectManagementMenu" class="nav-link">
-                        <i class="fas fa-tasks"></i>
-                        <span>Project Management</span>
+                    <a href="#" id="campaignsMenu" class="nav-link">
+                        <i class="fas fa-bullhorn"></i>
+                        <span>Campaigns</span>
                     </a>
                 </li>
                 <li class="nav-item">
-                    <a href="#" class="nav-link" data-toggle="collapse" data-target="#wifiSubmenu">
-                        <i class="fas fa-wifi"></i>
-                        <span>WiFi Management</span>
-                        <i class="fas fa-chevron-down"></i>
-                    </a>
-                    <ul class="collapse submenu" id="wifiSubmenu">
-                        <li><a href="#" id="wifiSettingsMenu">Settings</a></li>
-                        <li><a href="#" id="wifiDevicesMenu">Devices</a></li>
-                        <li><a href="#" id="wifiReportsMenu">Reports</a></li>
-                    </ul>
-                </li>
-                <li class="nav-item">
-                    <a href="#" class="nav-link" data-toggle="collapse" data-target="#loyaltySubmenu">
-                        <i class="fas fa-gift"></i>
-                        <span>Loyalty Programs</span>
-                        <i class="fas fa-chevron-down"></i>
-                    </a>
-                    <ul class="collapse submenu" id="loyaltySubmenu">
-                        <li><a href="#" id="campaignManagementMenu">Campaigns</a></li>
-                        <li><a href="#" id="receiptScanningMenu">Receipts</a></li>
-                         <li><a href="#" id="rewardsManagementMenu">Rewards</a></li> 
-                         <li><a href="#" id="rewardTypesMenu">Reward Types</a></li>
-                         <li><a href="#" id="guestManagementMenu">Guest Management</a></li>
-                        <!--<li class="nav-item">
-                            <a href="#" class="nav-link" data-toggle="collapse" data-target="#rewardsSubmenu">
-                                <i class="fas fa-gift"></i>
-                                <span>Rewards</span>
-                                <i class="fas fa-chevron-down"></i>
-                            </a>
-                            <ul class="collapse submenu" id="rewardsSubmenu">
-                                <li><a href="#" id="rewardsManagementMenu">Manage Rewards</a></li>
-                                <li><a href="#" id="rewardTypesMenu">Reward Types</a></li>
-                            </ul>
-                        </li>-->
-                        <li><a href="#" id="loyaltySettingsMenu">Settings</a></li>
-                    </ul>
-                </li>
-                <li class="nav-item">
-                    <a href="#" id="googleReviewsMenu" class="nav-link">
-                        <i class="fas fa-star"></i>
-                        <span>Google Reviews</span>
-                    </a>
-                </li>
-                <li class="nav-item">
-                    <a href="#" class="nav-link" data-toggle="collapse" data-target="#dataSubmenu">
-                        <i class="fas fa-chart-line"></i>
+                    <a href="#" id="analyticsMenu" class="nav-link">
+                        <i class="fas fa-chart-bar"></i>
                         <span>Analytics</span>
-                        <i class="fas fa-chevron-down"></i>
                     </a>
-                    <ul class="collapse submenu" id="dataSubmenu">
-                        <li><a href="#" id="liveDataMenu">Live Data</a></li>
-                        <li><a href="#" id="dataDeletionMenu">Data Management</a></li>
-                        <li><a href="#" id="deleteAllDataMenu" class="text-danger">
-                            <i class="fas fa-trash-alt"></i> Delete All Scanning Data
-                        </a></li>
-                    </ul>
                 </li>
                 <li class="nav-item">
                     <a href="#" id="adminUsersMenu" class="nav-link">
-                        <i class="fas fa-users"></i>
+                        <i class="fas fa-users-cog"></i>
                         <span>Admin Users</span>
                     </a>
                 </li>
+                <li class="nav-item">
+                    <a href="#" id="settingsMenu" class="nav-link">
+                        <i class="fas fa-cog"></i>
+                        <span>Settings</span>
+                    </a>
+                </li>
             </ul>
+
+            <div class="sidebar-footer">
+                <button id="logoutBtn" class="btn btn-outline-light">
+                    <i class="fas fa-sign-out-alt"></i> Logout
+                </button>
+            </div>
         </nav>
-        <div class="sidebar-footer">
-            <a href="#" id="logoutButton">
-                <i class="fas fa-sign-out-alt"></i>
-                <span>Logout</span>
-            </a>
-        </div>
-    </div>
 
-<!-- Main Content -->
-<div class="content">
-    <div id="dashboardContent" class="content-section" style="display: none;">
-        <div class="dashboard-header">
-            <h1>Dashboard Overview</h1>
-            <div class="date-filter">
-                <select id="dashboardDateRange" class="form-control">
-                    <option value="today">Today</option>
-                    <option value="week">This Week</option>
-                    <option value="month" selected>This Month</option>
-                    <option value="year">This Year</option>
-                </select>
-            </div>
-        </div>
+        <!-- Main content -->
+        <div id="content">
+            <!-- Topbar -->
+            <nav class="navbar navbar-expand-lg navbar-light bg-light">
+                <div class="container-fluid">
+                    <button id="sidebarCollapse" class="btn btn-light">
+                        <i class="fas fa-bars"></i>
+                    </button>
+                    <div class="ml-auto">
+                        <span id="currentUserEmail"></span>
+                    </div>
+                </div>
+            </nav>
 
-        <!-- Quick Stats Section -->
-        <div class="row mb-4">
-            <div class="col-md-3">
-                <div class="stats-card">
-                    <i class="fas fa-bullhorn stats-icon"></i>
-                    <div class="stats-value" id="activeCampaignsCount">0</div>
-                    <div class="stats-label">Active Campaigns</div>
-                </div>
-            </div>
-            <div class="col-md-3">
-                <div class="stats-card">
-                    <i class="fas fa-receipt stats-icon"></i>
-                    <div class="stats-value" id="totalReceiptsCount">0</div>
-                    <div class="stats-label">Total Receipts</div>
-                </div>
-            </div>
-            <div class="col-md-3">
-                <div class="stats-card">
-                    <i class="fas fa-users stats-icon"></i>
-                    <div class="stats-value" id="activeUsersCount">0</div>
-                    <div class="stats-label">Active Users</div>
-                </div>
-            </div>
-            <div class="col-md-3">
-                <div class="stats-card">
-                    <i class="fas fa-chart-line stats-icon"></i>
-                    <div class="stats-value" id="conversionRate">0%</div>
-                    <div class="stats-label">Conversion Rate</div>
-                </div>
-            </div>
-        </div>
-    
-        <!-- Charts Row -->
-        <div class="row mb-4">
-            <div class="col-md-8">
-                <div class="card">
-                    <div class="card-header">
-                        <h5>Campaign Performance</h5>
+            <!-- Dashboard Section -->
+            <div id="dashboardContent" class="content-section">
+                <div class="row">
+                    <div class="col-md-3">
+                        <div class="card">
+                            <div class="card-body">
+                                <h5 class="card-title">Active Campaigns</h5>
+                                <h2 id="activeCampaignsCount">0</h2>
+                            </div>
+                        </div>
                     </div>
-                    <div class="card-body">
-                        <canvas id="campaignPerformanceChart"></canvas>
+                    <div class="col-md-3">
+                        <div class="card">
+                            <div class="card-body">
+                                <h5 class="card-title">Total Users</h5>
+                                <h2 id="totalUsersCount">0</h2>
+                            </div>
+                        </div>
                     </div>
-                </div>
-            </div>
-            <div class="col-md-4">
-                <div class="card">
-                    <div class="card-header">
-                        <h5>Receipt Status Distribution</h5>
+                    <div class="col-md-3">
+                        <div class="card">
+                            <div class="card-body">
+                                <h5 class="card-title">Today's Logins</h5>
+                                <h2 id="todayLoginsCount">0</h2>
+                            </div>
+                        </div>
                     </div>
-                    <div class="card-body">
-                        <canvas id="receiptStatusChart"></canvas>
-                    </div>
-                </div>
-            </div>
-        </div>
-    
-        <!-- Recent Activity Section -->
-        <div class="row">
-            <div class="col-md-6">
-                <div class="card">
-                    <div class="card-header">
-                        <h5>Recent Receipts</h5>
-                    </div>
-                    <div class="card-body">
-                        <div class="table-responsive">
-                            <table class="table table-sm" id="recentReceiptsTable">
-                                <thead>
-                                    <tr>
-                                        <th>Date</th>
-                                        <th>Customer</th>
-                                        <th>Amount</th>
-                                        <th>Status</th>
-                                    </tr>
-                                </thead>
-                                <tbody></tbody>
-                            </table>
+                    <div class="col-md-3">
+                        <div class="card">
+                            <div class="card-body">
+                                <h5 class="card-title">Active Admins</h5>
+                                <h2 id="activeAdminsCount">0</h2>
+                            </div>
                         </div>
                     </div>
                 </div>
             </div>
-            <div class="col-md-6">
-                <div class="card">
-                    <div class="card-header">
-                        <h5>Campaign Activity</h5>
-                    </div>
-                    <div class="card-body">
-                        <div id="campaignActivityFeed"></div>
-                    </div>
-                </div>
-            </div>
-        </div>
-    </div>
 
-<!-- Project Management Section-->        
-<div id="projectManagementContent" class="content-section" style="display: none;">
-    <div class="container-fluid">
-        <div class="d-flex justify-content-between align-items-center mb-4">
-            <h2>Project Management</h2>
-            <button id="addProjectBtn" class="btn btn-primary">
-                <i class="fas fa-plus"></i> New Project
-            </button>
-        </div>
-        <div id="projectsList">
-            <!-- Projects will be rendered here -->
-        </div>
-    </div>
-</div>
-
-    <div id="wifiSettingsContent" class="content-section" style="display: none;">
-        <h2>Customize Captive Portal</h2>
-        <form id="customizationForm">
-            <div class="form-group">
-                <label for="bgColor">Background Color:</label>
-                <input type="color" id="bgColor" name="bgColor" value="#ffffff">
-            </div>
-            
-            <div class="form-group">
-                <label for="bgImage">Upload Background Image:</label>
-                <input type="file" id="bgImage" name="bgImage">
-            </div>
-            
-
-            <div class="form-group">
-                <label for="font">Font:</label>
-                <input type="text" id="font" name="font">
-            </div>
-
-            <div class="form-group">
-                <label for="fontSize">Font Size:</label>
-                <input type="number" id="fontSize" name="fontSize" min="8" max="72">
-            </div>
-
-            <div class="form-group">
-                <label for="logo">Upload Logo:</label>
-                <input type="file" id="logo" name="logo">
-            </div>
-
-            <button type="submit">Save Changes</button>
-        </form>
-    </div>
-
-    <div id="wifiReportsContent" class="content-section" style="display: none;">
-        <h2>WiFi Reports</h2>
-        
-        <!-- Filter Inputs -->
-        <div class="filter-container">
-            <label for="nameFilter">Name:</label>
-            <input type="text" id="nameFilter" placeholder="Filter by Name">
-            
-            <label for="emailFilter">Email:</label>
-            <input type="text" id="emailFilter" placeholder="Filter by Email">
-            
-            <label for="timestampFilter">Login Timestamp:</label>
-            <input type="text" id="timestampFilter" placeholder="Filter by Timestamp">
-            
-            <label for="apMacFilter">Access Point MAC:</label>
-            <input type="text" id="apMacFilter" placeholder="Filter by AP MAC">
-            
-            <label for="sessionIdFilter">Session ID:</label>
-            <input type="text" id="sessionIdFilter" placeholder="Filter by Session ID">
-        </div>
-        
-        <!-- Table to display WiFi Login Data -->
-        <table id="wifiReportsTable" class="table">
-            <thead>
-                <tr>
-                    <th data-column="name" data-order="asc">Name</th>
-                    <th data-column="email" data-order="asc">Email Address</th>
-                    <th data-column="localTimeStamp" data-order="asc">Login Timestamp</th>
-                    <th data-column="accessPointMAC" data-order="asc">Access Point MAC</th>
-                    <th data-column="sessionID" data-order="asc">Session ID</th>
-                  </tr>
-            </thead>
-            <tbody>
-                <!-- Rows will be populated by JavaScript -->
-            </tbody>
-        </table>
-    </div>
-    <!-- start of wifi devices form-->
-    <div id="wifiDevicesContent" class="content-section" style="display: none;">
-        <h2>Manage Wifi Devices</h2>
-        <form id="wifiDevicesForm">
-            <div class="form-group">
-                <label for="deviceMac">Device MAC Address:</label>
-                <input type="text" id="deviceMac" name="deviceMac" class="form-control" required>
-            </div>
-            <div class="form-group">
-                <label for="storeId">Store ID:</label>
-                <input type="text" id="storeId" name="storeId" class="form-control" required>
-            </div>
-            <div class="form-group">
-                <label for="location">Location:</label>
-                <input type="text" id="location" name="location" class="form-control" required>
-            </div>
-            <div class="form-group">
-                <label for="deviceType">Device Type:</label>
-                <input type="text" id="deviceType" name="deviceType" class="form-control" required>
-            </div>
-            <button type="submit" class="btn btn-primary">Add Device</button>
-        </form>
-    
-        <h3>Existing Devices</h3>
-        <table class="table" id="devicesTable">
-            <thead>
-                <tr>
-                    <th>MAC Address</th>
-                    <th>Store ID</th>
-                    <th>Location</th>
-                    <th>Device Type</th>
-                    <th>Actions</th>
-                </tr>
-            </thead>
-            <tbody>
-                <!-- Rows will be dynamically inserted here -->
-            </tbody>
-        </table>
-    </div>
-    
-    <div id="liveDataContent" class="content-section" style="display: none;">
-        <h2>Live Data</h2>
-        <div id="liveDataDisplay">
-            <div id="liveDataContainer">
-                <p><strong>Client MAC:</strong> <span id="clientMac">undefined</span></p>
-                <p><strong>Access Point MAC:</strong> <span id="apMac">undefined</span></p>
-                <p><strong>Signal Strength (RSSI):</strong> <span id="rssi">undefined</span></p>
-                <p><strong>Manufacturer:</strong> <span id="manufacturer">undefined</span></p>
-            </div>
-        </div>
-    </div>
-<!-- Loyalty Settings Section -->
-<div id="loyaltySettingsContent" class="content-section" style="display: none;">
-    <div class="card">
-        <div class="card-header">
-            <h2>Loyalty Program Settings</h2>
-        </div>
-        <div class="card-body">
-            <form id="loyaltySettingsForm">
-                <div class="form-group">
-                    <label for="rewardPointsRate">Points Earning Rate</label>
-                    <input type="number" class="form-control" id="rewardPointsRate" min="0" step="0.01">
-                    <small class="form-text text-muted">Points earned per ZAR spent</small>
-                </div>
-                <div class="form-group">
-                    <label for="minimumRedemption">Minimum Points for Redemption</label>
-                    <input type="number" class="form-control" id="minimumRedemption" min="0">
-                </div>
-                <button type="submit" class="btn btn-primary">Save Settings</button>
-            </form>
-        </div>
-    </div>
-</div>   
-<!-- end of loyalty settings section-->
-
-<!-- Rewards Management Section -->
-<div id="rewardsManagementContent" class="content-section" style="display: none;">
-    <div class="d-flex justify-content-between align-items-center mb-4">
-        <h2>Rewards Management</h2>
-    </div>
-    <!-- Search and Filter -->
-    <div class="filter-section mb-4">
-        <div class="row">
-            <div class="col-md-3">
-                <input type="text" id="rewardSearchGuest" class="form-control" placeholder="Search by Guest">
-            </div>
-            <div class="col-md-3">
-                <select id="rewardCampaignFilter" class="form-control">
-                    <option value="">All Campaigns</option>
-                    <!-- Dynamically populated -->
-                </select>
-            </div>
-            <div class="col-md-3">
-                <select id="rewardStatusFilter" class="form-control">
-                    <option value="">All Statuses</option>
-                    <option value="pending">Pending</option>
-                    <option value="approved">Approved</option>
-                    <option value="rejected">Rejected</option>
-                    <option value="completed">Completed</option>
-                </select>
-            </div>
-            <div class="col-md-3">
-                <button id="rewardSearchBtn" class="btn btn-primary">Search</button>
-            </div>
-        </div>
-    </div>
-
-    <!-- Rewards Table -->
-    <table id="rewardsTable" class="table">
-        <thead>
-            <tr>
-                <th>Date</th>
-                <th>Guest</th>
-                <th>Campaign</th>
-                <th>Receipt #</th>
-                <th>Amount</th>
-                <th>Status</th>
-                <th>Actions</th>
-            </tr>
-        </thead>
-        <tbody>
-            <!-- Dynamically populated -->
-        </tbody>
-    </table>
-</div>
-<!-- End of Rewards Management Section -->
-<!-- Reward Types Section -->
-<div id="rewardTypesContent" class="content-section" style="display: none;">
-    <div class="container-fluid">
-        <div class="card">
-            <div class="card-header d-flex justify-content-between align-items-center">
-                <h2>Reward Types</h2>
-                <button id="addRewardTypeBtn" class="btn btn-primary">
-                    <i class="fas fa-plus"></i> New Reward Type
-                </button>
-            </div>
-            <div class="card-body">
-                <!-- Filter Section -->
-                <div class="row mb-4">
-                    <div class="col-md-4">
-                        <div class="form-group">
-                            <label for="rewardTypeFilter">Category</label>
-                            <select id="rewardTypeFilter" class="form-control">
-                                <option value="">All Categories</option>
-                                <option value="points">Points</option>
-                                <option value="discount">Discount</option>
-                                <option value="freeItem">Free Item</option>
-                                <option value="voucher">Voucher</option>
-                            </select>
-                        </div>
-                    </div>
-                    <div class="col-md-4">
-                        <div class="form-group">
-                            <label for="rewardTypeStatus">Status</label>
-                            <select id="rewardTypeStatus" class="form-control">
-                                <option value="">All Statuses</option>
-                                <option value="active">Active</option>
-                                <option value="inactive">Inactive</option>
-                            </select>
-                        </div>
-                    </div>
-                    <div class="col-md-4">
-                        <div class="form-group">
-                            <label>&nbsp;</label>
-                            <button id="rewardTypeSearchBtn" class="btn btn-primary btn-block">
-                                <i class="fas fa-search"></i> Search
-                            </button>
-                        </div>
-                    </div>
-                </div>
-
-                <!-- Reward Types List -->
-                <div id="rewardTypesList">
-                    <!-- Reward types will be rendered here -->
-                </div>
-            </div>
-        </div>
-    </div>
-</div>
-<!-- End of Reward Types Section -->
-<!-- Campaign Management Content -->
-<div id="campaignManagementContent" class="content-section">
-    <div id="campaignManagementRoot"></div>
-</div>
- <!-- Guest Management Section -->
- <div id="guestManagementContent" class="content-section" style="display: none;">
-    <div id="guestManagementRoot"></div>
-</div>
-
-  <!-- End of Guest Management Section -->
-
-<!-- Receipt Management Section -->
-<div id="receiptManagementContent" class="content-section" style="display: none;">
-    <div class="card">
-        <div class="card-header d-flex justify-content-between align-items-center">
-            <h2>Receipt Management</h2>
-            <div class="btn-group">
-                <button id="refreshReceipts" class="btn btn-outline-primary">
-                    <i class="fas fa-sync-alt"></i> Refresh
-                </button>
-            </div>
-        </div>
-        <div class="card-body">
-            <!-- Filters Section -->
-            <div class="row mb-4">
-                <div class="col-md-3">
-                    <div class="form-group">
-                        <label for="receiptSearchGuest">Guest Phone</label>
-                        <input type="text" id="receiptSearchGuest" class="form-control" placeholder="Search by phone number">
-                    </div>
-                </div>
-                <div class="col-md-3">
-                    <div class="form-group">
-                        <label for="receiptSearchInvoice">Invoice Number</label>
-                        <input type="text" id="receiptSearchInvoice" class="form-control" placeholder="Search by invoice">
-                    </div>
-                </div>
-                <div class="col-md-3">
-                    <div class="form-group">
-                        <label for="receiptStatusFilter">Status</label>
-                        <select id="receiptStatusFilter" class="form-control">
-                            <option value="">All Statuses</option>
-                            <option value="pending_validation">Pending Validation</option>
-                            <option value="validated">Validated</option>
-                            <option value="rejected">Rejected</option>
-                        </select>
-                    </div>
-                </div>
-                <div class="col-md-3 d-flex align-items-end">
-                    <button id="receiptSearchBtn" class="btn btn-primary btn-block">
-                        <i class="fas fa-search"></i> Search
+            <!-- Campaigns Section -->
+            <div id="campaignsContent" class="content-section" style="display: none;">
+                <div class="section-header">
+                    <h2>Campaign Management</h2>
+                    <button id="createCampaignBtn" class="btn btn-primary">
+                        <i class="fas fa-plus"></i> Create Campaign
                     </button>
                 </div>
+                <div id="campaignsList"></div>
             </div>
 
-            <!-- Loading Indicator -->
-            <div id="receiptLoadingIndicator" class="text-center py-4" style="display: none;">
-                <div class="spinner-border text-primary" role="status">
-                    <span class="sr-only">Loading...</span>
-                </div>
-            </div>
-
-            <!-- Error Alert -->
-            <div id="receiptErrorAlert" class="alert alert-danger" style="display: none;" role="alert">
-                <i class="fas fa-exclamation-triangle"></i>
-                <span id="receiptErrorMessage"></span>
-            </div>
-
-            <!-- Receipts Table -->
-            <div class="table-responsive">
-                <table id="receiptsTable" class="table table-hover">
-                    <thead class="thead-light">
-                        <tr>
-                            <th>Date</th>
-                            <th>Guest</th>
-                            <th>Invoice #</th>
-                            <th>Store</th>
-                            <th>Amount</th>
-                            <th>Status</th>
-                            <th>Actions</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        <!-- Table content will be dynamically populated -->
-                    </tbody>
-                </table>
-            </div>
-
-            <!-- No Results Message -->
-            <div id="noReceiptsMessage" class="text-center py-4" style="display: none;">
-                <i class="fas fa-receipt fa-2x mb-2"></i>
-                <p>No receipts found matching your criteria</p>
-            </div>
-        </div>
-    </div>
-</div>
-
-<!-- Receipt Details Modal -->
-
-<div class="modal fade" id="receiptDetailsModal" tabindex="-1" role="dialog" aria-hidden="true">
-    <div class="modal-dialog modal-lg" role="document">
-        <div class="modal-content">
-            <div class="modal-header">
-                <h5 class="modal-title">Receipt Details</h5>
-                <button type="button" class="close" data-dismiss="modal" aria-label="Close">
-                    <span aria-hidden="true">&times;</span>
-                </button>
-            </div>
-            <div class="modal-body">
-                <!-- Store Information -->
-                <div class="row mb-3">
-                    <div class="col-md-6">
-                        <div class="card">
-                            <div class="card-header">
-                                <h6 class="mb-0">Brand & Store Information</h6>
-                            </div>
-                            <div class="card-body">
-                                <p class="mb-1"><strong>Brand:</strong> <span id="modalBrandName">-</span></p>
-                                <p class="mb-1"><strong>Store:</strong> <span id="modalStoreName">-</span></p>
-                                <p class="mb-1"><strong>Address:</strong> <span id="modalStoreAddress">-</span></p>
-                            </div>
-                        </div>
+            <!-- Analytics Section -->
+            <div id="analyticsContent" class="content-section" style="display: none;">
+                <div class="section-header">
+                    <h2>Analytics</h2>
+                    <div class="date-range-picker">
+                        <input type="date" id="startDate" class="form-control">
+                        <input type="date" id="endDate" class="form-control">
+                        <button id="updateAnalytics" class="btn btn-primary">Update</button>
                     </div>
-                    <div class="col-md-6">
-                        <div class="card">
-                            <div class="card-header">
-                                <h6 class="mb-0">Receipt Details</h6>
-                            </div>
-                            <div class="card-body">
-                                <p class="mb-1"><strong>Invoice #:</strong> <span id="modalInvoiceNumber">-</span></p>
-                                <p class="mb-1"><strong>Date:</strong> <span id="modalDate">-</span></p>
-                                <p class="mb-1"><strong>Time:</strong> <span id="modalTime">-</span></p>
-                                <p class="mb-1"><strong>Status:</strong> <span id="modalStatus">-</span></p>
-                            </div>
+                </div>
+                <div class="analytics-charts">
+                    <div class="row">
+                        <div class="col-md-6">
+                            <canvas id="usersChart"></canvas>
+                        </div>
+                        <div class="col-md-6">
+                            <canvas id="campaignsChart"></canvas>
                         </div>
                     </div>
                 </div>
+            </div>
 
-                <!-- Guest Information -->
-                <div class="row mb-3">
-                    <div class="col-md-12">
-                        <div class="card">
-                            <div class="card-header">
-                                <h6 class="mb-0">Guest Information</h6>
-                            </div>
-                            <div class="card-body">
-                                <p class="mb-1"><strong>Phone:</strong> <span id="modalGuestPhone">-</span></p>
-                                <p class="mb-1"><strong>Name:</strong> <span id="modalGuestName">-</span></p>
-                            </div>
+            <!-- Admin Users Section -->
+            <div id="adminUsersContent" class="content-section" style="display: none;">
+                <div class="section-header">
+                    <h2>Admin User Management</h2>
+                    <button id="add-admin-btn" class="btn btn-primary">
+                        <i class="fas fa-user-plus"></i> Add Admin
+                    </button>
+                </div>
+                <div class="admin-users-list">
+                    <table class="table">
+                        <thead>
+                            <tr>
+                                <th>Email</th>
+                                <th>Display Name</th>
+                                <th>Last Sign In</th>
+                                <th>Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody id="admin-users-table-body"></tbody>
+                    </table>
+                </div>
+            </div>
+
+            <!-- Settings Section -->
+            <div id="settingsContent" class="content-section" style="display: none;">
+                <div class="section-header">
+                    <h2>Settings</h2>
+                </div>
+                <div class="settings-form">
+                    <form id="settingsForm">
+                        <div class="mb-3">
+                            <label for="apiKey" class="form-label">Meraki API Key</label>
+                            <input type="password" class="form-control" id="apiKey">
                         </div>
-                    </div>
-                </div>
-
-                <!-- Items Table -->
-                <div class="card mb-3">
-                    <div class="card-header">
-                        <h6 class="mb-0">Items Purchased</h6>
-                    </div>
-                    <div class="card-body">
-                        <div class="table-responsive">
-                            <table class="table table-sm">
-                                <thead>
-                                    <tr>
-                                        <th>Item</th>
-                                        <th class="text-center">Quantity</th>
-                                        <th class="text-right">Unit Price</th>
-                                        <th class="text-right">Total</th>
-                                    </tr>
-                                </thead>
-                                <tbody id="modalItemsTable">
-                                </tbody>
-                                <tfoot>
-                                    <tr>
-                                        <td colspan="3" class="text-right"><strong>Total:</strong></td>
-                                        <td class="text-right" id="modalTotal">-</td>
-                                    </tr>
-                                </tfoot>
-                            </table>
+                        <div class="mb-3">
+                            <label for="networkId" class="form-label">Network ID</label>
+                            <input type="text" class="form-control" id="networkId">
                         </div>
-                    </div>
-                </div>
-
-                <!-- Receipt Image -->
-                <div class="card">
-                    <div class="card-header">
-                        <h6 class="mb-0">Receipt Image</h6>
-                    </div>
-                    <div class="card-body text-center">
-                        <img id="modalReceiptImage" class="img-fluid" alt="Receipt Image">
-                    </div>
-                </div>
-            </div>
-            <div class="modal-footer">
-                <button type="button" class="btn btn-secondary" data-dismiss="modal">Close</button>
-                <div id="modalActionButtons">
-                    <!-- Action buttons will be inserted here -->
-                </div>
-            </div>
-                            <!-- Processing Notes -->
-                            <div class="mt-3" id="modalProcessingNotes">
-                                <h6>Processing Notes</h6>
-                                <div class="alert alert-info">
-                                    <small id="modalProcessingDetails"></small>
-                                </div>
-                            </div>
-                        </div>
-        </div>
-    </div>
-</div>
-
-<!-- Google Reviews Section -->
-<div id="googleReviewsContent" class="content-section" style="display: none;">
-<div class="card mb-4">
-    <div class="card-header d-flex justify-content-between align-items-center">
-        <h5>Google Reviews</h5>
-        <div class="filters d-flex gap-3">
-            <select id="reviewFilterRating" class="form-select form-select-sm">
-                <option value="">All Ratings</option>
-                <option value="5">5 Stars</option>
-                <option value="4">4 Stars</option>
-                <option value="3">3 Stars</option>
-                <option value="2">2 Stars</option>
-                <option value="1">1 Star</option>
-            </select>
-            <select id="reviewFilterDate" class="form-select form-select-sm">
-                <option value="">All Time</option>
-                <option value="week">Last Week</option>
-                <option value="month">Last Month</option>
-                <option value="year">Last Year</option>
-            </select>
-            <select id="reviewFilterResponded" class="form-select form-select-sm">
-                <option value="">All Reviews</option>
-                <option value="true">Responded</option>
-                <option value="false">Pending Response</option>
-            </select>
-            <input type="text" id="reviewSearchInput" class="form-control form-control-sm" placeholder="Search reviews...">
-        </div>
-    </div>
-    
-    <div class="card-body">
-        <!-- Metrics Row -->
-        <div class="row mb-4">
-            <div class="col-md-4">
-                <div class="metric-card text-center p-3 border rounded">
-                    <h6>Average Rating</h6>
-                    <div class="d-flex align-items-center justify-content-center">
-                        <span id="averageRating" class="h3 mb-0 me-2">0.0</span>
-                        <i class="fas fa-star text-warning"></i>
-                    </div>
-                </div>
-            </div>
-            <div class="col-md-4">
-                <div class="metric-card text-center p-3 border rounded">
-                    <h6>Total Reviews</h6>
-                    <span id="totalReviews" class="h3 mb-0">0</span>
-                </div>
-            </div>
-            <div class="col-md-4">
-                <div class="metric-card text-center p-3 border rounded">
-                    <h6>Response Rate</h6>
-                    <span id="responseRate" class="h3 mb-0">0%</span>
+                        <button type="submit" class="btn btn-primary">Save Settings</button>
+                    </form>
                 </div>
             </div>
         </div>
-
-        <!-- Reviews Table -->
-        <div class="table-responsive">
-            <table id="reviewsTable" class="table table-hover">
-                <thead>
-                    <tr>
-                        <th>Date</th>
-                        <th>Rating</th>
-                        <th>Reviewer</th>
-                        <th>Review</th>
-                        <th>Status</th>
-                        <th>Actions</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    <!-- Reviews will be populated here -->
-                </tbody>
-            </table>
-        </div>
-    </div>
-    </div>
-</div>
-
-<!-- Admin Users Section -->
-<div id="adminUsersContent" class="content-section" style="display: none;">
-    <div class="section-header">
-        <h2>Admin User Management</h2>
-        <button id="add-admin-btn" class="btn btn-primary">Add Admin User</button>
-    </div>
-    
-    <div class="admin-users-list">
-        <table class="table">
-            <thead>
-                <tr>
-                    <th>Email</th>
-                    <th>Display Name</th>
-                    <th>Last Sign In</th>
-                    <th>Actions</th>
-                </tr>
-            </thead>
-            <tbody id="admin-users-table-body">
-                <!-- Admin users will be populated here -->
-            </tbody>
-        </table>
     </div>
 
+    <!-- Modals -->
     <!-- Add Admin Modal -->
-    <div id="add-admin-modal" class="modal" tabindex="-1">
+    <div id="add-admin-modal" class="modal fade" tabindex="-1">
         <div class="modal-dialog">
             <div class="modal-content">
                 <div class="modal-header">
@@ -893,112 +215,57 @@
             </div>
         </div>
     </div>
-</div>
 
-<!-- Logs -->
-<div class="console-panel">
-    <div class="console-header">
-        <h5>System Logs</h5>
-        <button class="btn btn-sm btn-outline-secondary" onclick="clearLogs()">Clear</button>
+    <!-- Create Campaign Modal -->
+    <div id="create-campaign-modal" class="modal fade" tabindex="-1">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">Create Campaign</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <form id="campaign-form">
+                        <div class="mb-3">
+                            <label for="campaignName" class="form-label">Campaign Name</label>
+                            <input type="text" class="form-control" id="campaignName" required>
+                        </div>
+                        <div class="mb-3">
+                            <label for="campaignDescription" class="form-label">Description</label>
+                            <textarea class="form-control" id="campaignDescription" rows="3"></textarea>
+                        </div>
+                        <div class="mb-3">
+                            <label for="startDate" class="form-label">Start Date</label>
+                            <input type="date" class="form-control" id="campaignStartDate" required>
+                        </div>
+                        <div class="mb-3">
+                            <label for="endDate" class="form-label">End Date</label>
+                            <input type="date" class="form-control" id="campaignEndDate" required>
+                        </div>
+                    </form>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                    <button type="button" class="btn btn-primary" id="save-campaign">Create</button>
+                </div>
+            </div>
+        </div>
     </div>
-    <div id="logContainer" class="console-content"></div>
-</div>
 
+    <!-- Loading Spinner -->
+    <div id="loading-overlay" style="display: none;">
+        <div class="spinner-border text-primary" role="status">
+            <span class="visually-hidden">Loading...</span>
+        </div>
+    </div>
 
-<div id="globalLoadingOverlay" class="loading-overlay" style="display: none;">
-    <div class="loading-spinner"></div>
-</div>
-
-<!-- Application Scripts (after body content) -->
-<script>
-    // Additional lodash verification and global assignment if needed
-    if (typeof _ === 'undefined' && typeof lodash !== 'undefined') {
-        window._ = lodash;
-    }
-</script>
-
-<script type="module">
-    import { dashboardAuth } from './js/admin/DashboardAuth.js';
-    import { AuthErrorHandler } from './js/auth/AuthErrors.js';
-
-    // Global error handlers
-    window.addEventListener('error', function(event) {
-        console.error('Global error:', event.error);
-        hideLoading();
-        handleGlobalError(event.error);
-    });
-
-    window.addEventListener('unhandledrejection', function(event) {
-        console.error('Unhandled promise rejection:', event.reason);
-        hideLoading();
-        handleGlobalError(event.reason);
-    });
-
-    function handleGlobalError(error) {
-        const handledError = AuthErrorHandler.handleError(error, 'global');
-        
-        // Show error message to user
-        const errorDiv = document.createElement('div');
-        errorDiv.className = 'alert alert-danger alert-dismissible fade show m-3';
-        errorDiv.innerHTML = `
-            <strong>Error:</strong> ${handledError.message}
-            <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
-        `;
-        document.body.prepend(errorDiv);
-    }
-
-    // Initialize dashboard
-    async function initializeDashboard() {
-        try {
-            showLoading();
-            await dashboardAuth.initialize();
-            hideLoading();
-            
-            // Make body visible after initialization
-            document.body.style.visibility = 'visible';
-            
-        } catch (error) {
-            hideLoading();
-            handleGlobalError(error);
-        }
-    }
-
-    // Start initialization when DOM is ready
-    if (document.readyState === 'loading') {
-        document.addEventListener('DOMContentLoaded', initializeDashboard);
-    } else {
-        initializeDashboard();
-    }
-</script>
-<script src="js/GuestAnalytics.js"></script>
-<script type="module" src="js/googleReviews.js"></script>
-<script type="module" src="js/dashboard.js"></script>
-<script type="module" src="js/campaigns/campaigns.js"></script>
-<script type="module" src="js/project-management.js"></script>
-<script type="module" src="js/reward-types.js"></script>
-<script type="module" src="js/guest-management.js"></script>
-<script type="module" src="js/admin-dashboard.js"></script>
-
-<!-- Add this before the closing </body> tag -->
-<script type="module">
-    import { dashboard } from './js/admin-dashboard.js';
-    
-    // Vue app initialization
-    const { createApp } = Vue;
-    
-    createApp({
-        data() {
-            return {
-                // Your dashboard data here
-            }
-        },
-        methods: {
-            // Your dashboard methods here
-        },
-        mounted() {
-            console.log('Vue app mounted');
-        }
-    }).mount('#app');
-</script>
+    <!-- Scripts -->
+    <!-- Bootstrap Bundle with Popper -->
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    <!-- Chart.js -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <!-- Custom Scripts -->
+    <script type="module" src="js/config/firebase-config.js"></script>
+    <script type="module" src="js/admin-dashboard.js"></script>
 </body>
 </html>
