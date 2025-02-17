@@ -1,0 +1,109 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Meraki Admin Setup</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+</head>
+<body class="bg-light">
+    <div class="container mt-5">
+        <div class="row justify-content-center">
+            <div class="col-md-6">
+                <div class="card shadow">
+                    <div class="card-body">
+                        <h2 class="card-title text-center mb-4">Initial Admin Setup</h2>
+                        <form id="setupForm">
+                            <div class="mb-3">
+                                <label for="email" class="form-label">Admin Email</label>
+                                <input type="email" 
+                                       class="form-control" 
+                                       id="email" 
+                                       required
+                                       autocomplete="username">
+                                <div class="form-text">Enter the email of the user to make admin</div>
+                            </div>
+                            
+                            <div class="mb-3">
+                                <label for="setupSecret" class="form-label">Setup Secret</label>
+                                <input type="password" 
+                                       class="form-control" 
+                                       id="setupSecret" 
+                                       required
+                                       autocomplete="current-password">
+                                <div class="form-text">Enter the setup secret (check functions/index.js)</div>
+                            </div>
+
+                            <div id="error-message" class="alert alert-danger" style="display: none;"></div>
+                            <div id="success-message" class="alert alert-success" style="display: none;"></div>
+                            
+                            <div class="d-grid gap-2">
+                                <button type="submit" class="btn btn-primary" id="submitBtn">
+                                    Set Up Admin
+                                </button>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script type="module">
+        const form = document.getElementById('setupForm');
+        const errorDiv = document.getElementById('error-message');
+        const successDiv = document.getElementById('success-message');
+        const submitBtn = document.getElementById('submitBtn');
+
+        function showError(message) {
+            errorDiv.textContent = message;
+            errorDiv.style.display = 'block';
+            successDiv.style.display = 'none';
+        }
+
+        function showSuccess(message) {
+            successDiv.textContent = message;
+            successDiv.style.display = 'block';
+            errorDiv.style.display = 'none';
+        }
+
+        form.addEventListener('submit', async (e) => {
+            e.preventDefault();
+            
+            const email = document.getElementById('email').value;
+            const setupSecret = document.getElementById('setupSecret').value;
+
+            // Disable form while processing
+            submitBtn.disabled = true;
+            submitBtn.textContent = 'Setting up...';
+
+            try {
+                const response = await fetch('/setupInitialAdmin', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({
+                        email,
+                        setupSecret
+                    })
+                });
+
+                const data = await response.json();
+
+                if (!response.ok) {
+                    throw new Error(data.error || 'Failed to set up admin');
+                }
+
+                showSuccess(`Successfully set up ${email} as admin! Total admins: ${data.totalAdmins}`);
+                form.reset();
+            } catch (error) {
+                showError(error.message);
+            } finally {
+                submitBtn.disabled = false;
+                submitBtn.textContent = 'Set Up Admin';
+            }
+        });
+    </script>
+</body>
+</html>

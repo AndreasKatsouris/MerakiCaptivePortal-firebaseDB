@@ -135,3 +135,52 @@ exports.verifyAdminStatus = onRequest(async (req, res) => {
         return res.status(401).json({ error: error.message, isAdmin: false });
     }
 });
+
+/**
+ * One-time setup endpoint to create the initial admin user
+ * This should be secured and disabled after initial setup
+ */
+exports.setupInitialAdmin = onRequest(async (req, res) => {
+    if (req.method !== 'POST') {
+        return res.status(405).json({ error: 'Method not allowed' });
+    }
+
+    try {
+        const { email, setupSecret } = req.body;
+
+        // Verify setup secret to prevent unauthorized access
+        const SETUP_SECRET = 'MerakiAdmin2024!'; // You should change this!
+        if (setupSecret !== SETUP_SECRET) {
+            return res.status(403).json({ error: 'Invalid setup secret' });
+        }
+
+        // Get user by email
+        const user = await admin.auth().getUserByEmail(email);
+        if (!user) {
+            return res.status(404).json({ error: 'User not found' });
+        }
+
+        // Set custom claims
+        await admin.auth().setCustomUserClaims(user.uid, { admin: true });
+        
+        // Add to admin-claims in database
+        await admin.database().ref(`admin-claims/${user.uid}`).set(true);
+
+        // Get all admin users to verify
+        const adminSnapshot = await admin.database().ref('admin-claims').once('value');
+        const adminUsers = adminSnapshot.val() || {};
+
+        return res.status(200).json({ 
+            message: 'Admin setup successful',
+            user: {
+                uid: user.uid,
+                email: user.email,
+                isAdmin: true
+            },
+            totalAdmins: Object.keys(adminUsers).length
+        });
+    } catch (error) {
+        console.error('Error in admin setup:', error);
+        return res.status(500).json({ error: error.message });
+    }
+});
