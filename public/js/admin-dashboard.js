@@ -8,6 +8,7 @@ import { initializeRewardManagement } from './reward-management.js';
 import { authManager } from './auth/auth.js';
 import { auth } from './config/firebase-config.js';
 import { AdminClaims } from './auth/admin-claims.js';
+import { AdminUserManagement } from './admin/user-management.js';
 
 async function verifyAdminAccess() {
     const hasAccess = await AdminClaims.checkAndRedirect();
@@ -22,6 +23,7 @@ class AdminDashboard {
         this.sections = new Map();
         this.currentSection = null;
         this.initialized = false;
+        this.modal = null;
     }
 
     async initialize() {
@@ -52,6 +54,9 @@ class AdminDashboard {
 
                 this.setupDashboard();
             });
+
+            // Initialize Bootstrap modal
+            this.modal = new bootstrap.Modal(document.getElementById('add-admin-modal'));
 
             this.initialized = true;
             console.log('Dashboard initialized');
@@ -118,6 +123,11 @@ class AdminDashboard {
                 menuId: 'guestManagementMenu',
                 contentId: 'guestManagementContent',
                 initialize: initializeGuestManagement
+            },
+            adminUsers: {
+                menuId: 'adminUsersMenu',
+                contentId: 'adminUsersContent',
+                init: () => this.initializeAdminUsersSection()
             }
         };
 
@@ -233,6 +243,13 @@ class AdminDashboard {
             } catch (error) {
                 console.error(`Error initializing ${sectionName}:`, error);
             }
+        } else if (!section.initialized && section.init) {
+            try {
+                await section.init();
+                section.initialized = true;
+            } catch (error) {
+                console.error(`Error initializing ${sectionName}:`, error);
+            }
         }
 
         this.currentSection = sectionName;
@@ -266,6 +283,95 @@ class AdminDashboard {
             <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
         `;
         document.body.prepend(errorDiv);
+    }
+
+    async initializeAdminUsersSection() {
+        try {
+            // Add event listeners
+            document.getElementById('add-admin-btn').addEventListener('click', () => {
+                this.modal.show();
+            });
+
+            document.getElementById('confirm-add-admin').addEventListener('click', async () => {
+                await this.handleAddAdmin();
+            });
+
+            // Load admin users
+            await this.loadAdminUsers();
+        } catch (error) {
+            console.error('Error initializing admin users section:', error);
+        }
+    }
+
+    async loadAdminUsers() {
+        try {
+            const adminUsers = await AdminUserManagement.getAdminUsers();
+            const tableBody = document.getElementById('admin-users-table-body');
+            tableBody.innerHTML = '';
+
+            adminUsers.forEach(user => {
+                const row = document.createElement('tr');
+                row.innerHTML = `
+                    <td>${user.email}</td>
+                    <td>${user.displayName || 'N/A'}</td>
+                    <td>${new Date(user.lastSignInTime).toLocaleString()}</td>
+                    <td>
+                        <button class="btn btn-danger btn-sm remove-admin" data-uid="${user.uid}">
+                            Remove Admin
+                        </button>
+                    </td>
+                `;
+
+                // Add event listener for remove button
+                row.querySelector('.remove-admin').addEventListener('click', async (e) => {
+                    const uid = e.target.dataset.uid;
+                    if (confirm('Are you sure you want to remove admin privileges from this user?')) {
+                        await this.handleRemoveAdmin(uid);
+                    }
+                });
+
+                tableBody.appendChild(row);
+            });
+        } catch (error) {
+            console.error('Error loading admin users:', error);
+        }
+    }
+
+    async handleAddAdmin() {
+        const emailInput = document.getElementById('admin-email');
+        const email = emailInput.value.trim();
+
+        try {
+            // Get user by email
+            const userRecord = await auth.getUserByEmail(email);
+            
+            // Set admin privileges
+            await AdminUserManagement.setUserAdminStatus(userRecord.uid, true);
+            
+            // Refresh the list
+            await this.loadAdminUsers();
+            
+            // Close modal and reset form
+            this.modal.hide();
+            emailInput.value = '';
+            
+            // Show success message
+            alert('Admin privileges granted successfully');
+        } catch (error) {
+            console.error('Error adding admin:', error);
+            alert(error.message);
+        }
+    }
+
+    async handleRemoveAdmin(uid) {
+        try {
+            await AdminUserManagement.removeAdminPrivileges(uid);
+            await this.loadAdminUsers();
+            alert('Admin privileges removed successfully');
+        } catch (error) {
+            console.error('Error removing admin:', error);
+            alert(error.message);
+        }
     }
 
     destroy() {

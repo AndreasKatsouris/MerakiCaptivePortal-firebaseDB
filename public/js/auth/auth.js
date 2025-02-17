@@ -4,51 +4,81 @@ import { auth, signInWithEmailAndPassword, signOut } from '../config/firebase-co
 class AuthManager {
     constructor() {
         this.user = null;
-        this.initialized = false;
+        this.authStateListeners = new Set();
     }
 
+    /**
+     * Initialize authentication state
+     */
     async initialize() {
-        if (this.initialized) return;
-        
-        try {
-            // Initialize Firebase Auth
+        return new Promise((resolve) => {
             auth.onAuthStateChanged((user) => {
                 this.user = user;
-                console.log('Auth state changed:', user ? 'User logged in' : 'No user');
+                this.notifyListeners(user);
+                resolve(user);
             });
-            
-            this.initialized = true;
-        } catch (error) {
-            console.error('Auth initialization failed:', error);
-            throw error;
-        }
+        });
     }
 
-    // Basic authentication methods
-    async login(email, password) {
-        try {
-            const userCredential = await signInWithEmailAndPassword(auth, email, password);
-            return userCredential.user;
-        } catch (error) {
-            console.error('Login failed:', error);
-            throw error;
-        }
+    /**
+     * Add auth state change listener
+     * @param {Function} listener 
+     */
+    addAuthStateListener(listener) {
+        this.authStateListeners.add(listener);
     }
 
-    async logout() {
-        try {
-            await signOut(auth);
-            this.user = null;
-        } catch (error) {
-            console.error('Logout failed:', error);
-            throw error;
-        }
+    /**
+     * Remove auth state change listener
+     * @param {Function} listener 
+     */
+    removeAuthStateListener(listener) {
+        this.authStateListeners.delete(listener);
     }
 
+    /**
+     * Notify all listeners of auth state change
+     * @param {Object} user 
+     */
+    notifyListeners(user) {
+        this.authStateListeners.forEach(listener => listener(user));
+    }
+
+    /**
+     * Get current user
+     * @returns {Object|null}
+     */
     getCurrentUser() {
         return this.user;
     }
+
+    /**
+     * Basic sign in functionality
+     * @param {string} email 
+     * @param {string} password 
+     */
+    async signIn(email, password) {
+        const userCredential = await signInWithEmailAndPassword(auth, email, password);
+        await userCredential.user.getIdToken(true); // Force token refresh
+        return userCredential.user;
+    }
+
+    /**
+     * Sign out functionality
+     */
+    async signOut() {
+        await signOut(auth);
+    }
+
+    /**
+     * Refresh user token
+     */
+    async refreshToken() {
+        if (this.user) {
+            await this.user.getIdToken(true);
+        }
+    }
 }
 
-// Export a single instance
-export const authManager = new AuthManager(); 
+// Export singleton instance
+export const authManager = new AuthManager();

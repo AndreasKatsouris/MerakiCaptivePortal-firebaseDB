@@ -171,6 +171,12 @@
                         </a></li>
                     </ul>
                 </li>
+                <li class="nav-item">
+                    <a href="#" id="adminUsersMenu" class="nav-link">
+                        <i class="fas fa-users"></i>
+                        <span>Admin Users</span>
+                    </a>
+                </li>
             </ul>
         </nav>
         <div class="sidebar-footer">
@@ -838,6 +844,54 @@
             </table>
         </div>
     </div>
+    </div>
+</div>
+
+<!-- Admin Users Section -->
+<div id="adminUsersContent" class="content-section" style="display: none;">
+    <div class="section-header">
+        <h2>Admin User Management</h2>
+        <button id="add-admin-btn" class="btn btn-primary">Add Admin User</button>
+    </div>
+    
+    <div class="admin-users-list">
+        <table class="table">
+            <thead>
+                <tr>
+                    <th>Email</th>
+                    <th>Display Name</th>
+                    <th>Last Sign In</th>
+                    <th>Actions</th>
+                </tr>
+            </thead>
+            <tbody id="admin-users-table-body">
+                <!-- Admin users will be populated here -->
+            </tbody>
+        </table>
+    </div>
+
+    <!-- Add Admin Modal -->
+    <div id="add-admin-modal" class="modal" tabindex="-1">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">Add Admin User</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <form id="add-admin-form">
+                        <div class="mb-3">
+                            <label for="admin-email" class="form-label">User Email</label>
+                            <input type="email" class="form-control" id="admin-email" required>
+                        </div>
+                    </form>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                    <button type="button" class="btn btn-primary" id="confirm-add-admin">Add Admin</button>
+                </div>
+            </div>
+        </div>
     </div>
 </div>
 
