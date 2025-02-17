@@ -1,13 +1,8 @@
-export function initializeCampaignManagement() {
-    if (typeof Vue === 'undefined') {
-        console.error('Vue is not loaded. Cannot initialize campaign management.');
-        return;
-    }
+import { auth, rtdb, ref, get, set, push, update } from '../config/firebase-config.js';
+import { createApp, ref as vueRef, computed } from 'vue';
+import Swal from 'sweetalert2';
 
-    console.log('Initializing campaign management with Vue:', Vue.version);
-    
-    const { createApp, ref, computed } = Vue;
-    
+export function initializeCampaignManagement() {
     const app = createApp({
         data() {
             return {
@@ -29,136 +24,21 @@ export function initializeCampaignManagement() {
                 ],
                 selectedRewardTypes: [],
                 rewardCriteria: {},
-                availableRewardTypes: []
+                availableRewardTypes: [],
+                newCampaign: {
+                    name: '',
+                    brandName: '',
+                    storeName: '',
+                    minPurchaseAmount: '',
+                    startDate: '',
+                    endDate: '',
+                    status: 'draft',
+                    requiredItems: [],
+                    activeDays: [],
+                    rewardTypes: []
+                }
             };
         },
-        template: `
-            <div class="campaign-management">
-                <div class="header d-flex justify-content-between align-items-center mb-4">
-                    <h2>Campaign Management</h2>
-                    <div class="controls d-flex gap-2">
-                        <input 
-                            type="text" 
-                            class="form-control" 
-                            v-model="filters.brandName" 
-                            placeholder="Search campaigns...">
-                        <select 
-                            class="form-select" 
-                            v-model="filters.status">
-                            <option value="">All Status</option>
-                            <option value="active">Active</option>
-                            <option value="inactive">Inactive</option>
-                            <option value="draft">Draft</option>
-                        </select>
-                        <button 
-                            class="btn btn-primary"
-                            @click="showAddCampaignModal">
-                            <i class="fas fa-plus"></i> New Campaign
-                        </button>
-                    </div>
-                </div>
-
-                <!-- Loading State -->
-                <div v-if="loading" class="text-center py-4">
-                    <div class="spinner-border text-primary"></div>
-                    <p class="mt-2">Loading campaigns...</p>
-                </div>
-
-                <!-- Error State -->
-                <div v-else-if="error" class="alert alert-danger">
-                    {{ error }}
-                </div>
-
-                <!-- Campaign List -->
-                <div v-else class="campaign-list">
-                    <div v-if="filteredCampaigns.length === 0" class="alert alert-info">
-                        No campaigns found. Click "New Campaign" to create one.
-                    </div>
-                    <div v-else class="row">
-                        <div v-for="campaign in filteredCampaigns" 
-                             :key="campaign.id"
-                             class="col-md-6 col-lg-4 mb-4">
-                            <div class="card h-100">
-                                <div class="card-header d-flex justify-content-between align-items-center">
-                                    <h5 class="mb-0">{{ campaign.name }}</h5>
-                                    <span :class="getStatusBadgeClass(campaign.status)">
-                                        {{ campaign.status }}
-                                    </span>
-                                </div>
-                                <div class="card-body">
-                                    <p><strong>Brand:</strong> {{ campaign.brandName }}</p>
-                                    <p><strong>Store:</strong> {{ campaign.storeName || 'All Stores' }}</p>
-                                    <p><strong>Duration:</strong> {{ formatDate(campaign.startDate) }} - {{ formatDate(campaign.endDate) }}</p>
-                                    <p v-if="campaign.minPurchaseAmount">
-                                        <strong>Min. Purchase:</strong> R{{ campaign.minPurchaseAmount }}
-                                    </p>
-                                    <div v-if="campaign.requiredItems && campaign.requiredItems.length">
-                                        <strong>Required Items:</strong>
-                                        <ul class="list-unstyled">
-                                            <li v-for="item in campaign.requiredItems" :key="item.name">
-                                                {{ item.quantity }}x {{ item.name }}
-                                            </li>
-                                        </ul>
-                                    </div>
-                                    <div v-if="campaign.activeDays && campaign.activeDays.length">
-                                        <strong>Active Days:</strong>
-                                        <p class="mb-0">{{ formatActiveDays(campaign.activeDays) }}</p>
-                                    </div>
-                                </div>
-                                <div class="card-footer">
-                                    <div class="btn-group btn-group-sm">
-                                        <button class="btn btn-info" @click="viewCampaign(campaign)">
-                                            <i class="fas fa-eye"></i>
-                                        </button>
-                                        <button class="btn btn-warning" @click="editCampaign(campaign)">
-                                            <i class="fas fa-edit"></i>
-                                        </button>
-                                        <button class="btn btn-danger" @click="deleteCampaign(campaign)">
-                                            <i class="fas fa-trash"></i>
-                                        </button>
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-            </div>
-    <!-- Add this section after existing campaign fields in the form -->
-    <div class="form-group" v-if="showRewardTypeSection">
-        <h5>Campaign Rewards</h5>
-        <div class="reward-types-container">
-            <div v-for="type in availableRewardTypes" :key="type.id" class="reward-type-item">
-                <div class="form-check">
-                    <input type="checkbox" 
-                        class="form-check-input" 
-                        :id="'reward-type-' + type.id"
-                        v-model="selectedRewardTypes"
-                        :value="type.id">
-                    <label class="form-check-label" :for="'reward-type-' + type.id">
-                        {{ type.name }}
-                    </label>
-                </div>
-                <div v-if="isRewardTypeSelected(type.id)" class="reward-criteria mt-2">
-                    <div class="form-row">
-                        <div class="col">
-                            <label>Minimum Purchase Amount</label>
-                            <input type="number" 
-                                class="form-control" 
-                                v-model="rewardCriteria[type.id].minPurchaseAmount">
-                        </div>
-                        <div class="col">
-                            <label>Maximum Rewards</label>
-                            <input type="number" 
-                                class="form-control" 
-                                v-model="rewardCriteria[type.id].maxRewards">
-                        </div>
-                    </div>
-                </div>
-            </div>
-        </div>
-    </div>
-`,
-
         computed: {
             filteredCampaigns() {
                 return this.campaigns.filter(campaign => {
@@ -170,49 +50,97 @@ export function initializeCampaignManagement() {
                 });
             }
         },
-
         methods: {
             async loadCampaigns() {
                 this.loading = true;
+                this.error = null;
                 try {
-                    const snapshot = await firebase.database().ref('campaigns').once('value');
-                    const campaigns = snapshot.val();
-                    this.campaigns = campaigns ? Object.entries(campaigns).map(([id, data]) => ({
+                    const campaignsRef = ref(rtdb, 'campaigns');
+                    const snapshot = await get(campaignsRef);
+                    const data = snapshot.val();
+                    this.campaigns = data ? Object.entries(data).map(([id, campaign]) => ({
                         id,
-                        ...data
+                        ...campaign
                     })) : [];
-                    console.log('Loaded campaigns:', this.campaigns);
                 } catch (error) {
                     console.error('Error loading campaigns:', error);
-                    this.error = 'Failed to load campaigns';
+                    this.error = 'Failed to load campaigns. Please try again.';
                 } finally {
                     this.loading = false;
                 }
             },
             async loadRewardTypes() {
                 try {
-                    const snapshot = await firebase.database()
-                        .ref('rewardTypes')
-                        .orderByChild('status')
-                        .equalTo('active')
-                        .once('value');
-                    
-                    this.availableRewardTypes = Object.entries(snapshot.val() || {})
-                        .map(([id, data]) => ({ id, ...data }));
+                    const rewardTypesRef = ref(rtdb, 'rewardTypes');
+                    const snapshot = await get(rewardTypesRef);
+                    const data = snapshot.val();
+                    this.availableRewardTypes = data ? Object.entries(data).map(([id, rewardType]) => ({
+                        id,
+                        ...rewardType
+                    })) : [];
                 } catch (error) {
                     console.error('Error loading reward types:', error);
                 }
             },
-        
+            async createCampaign() {
+                this.loading = true;
+                this.error = null;
+                try {
+                    const campaignsRef = ref(rtdb, 'campaigns');
+                    const newCampaignRef = push(campaignsRef);
+                    await set(newCampaignRef, {
+                        ...this.newCampaign,
+                        createdAt: new Date().toISOString(),
+                        createdBy: auth.currentUser.uid
+                    });
+                    await this.loadCampaigns();
+                    this.resetForm();
+                } catch (error) {
+                    console.error('Error creating campaign:', error);
+                    this.error = 'Failed to create campaign. Please try again.';
+                } finally {
+                    this.loading = false;
+                }
+            },
+            async updateCampaign(campaign) {
+                this.loading = true;
+                this.error = null;
+                try {
+                    const campaignRef = ref(rtdb, `campaigns/${campaign.id}`);
+                    await update(campaignRef, {
+                        ...campaign,
+                        updatedAt: new Date().toISOString(),
+                        updatedBy: auth.currentUser.uid
+                    });
+                    await this.loadCampaigns();
+                } catch (error) {
+                    console.error('Error updating campaign:', error);
+                    this.error = 'Failed to update campaign. Please try again.';
+                } finally {
+                    this.loading = false;
+                }
+            },
+            resetForm() {
+                this.newCampaign = {
+                    name: '',
+                    brandName: '',
+                    storeName: '',
+                    minPurchaseAmount: '',
+                    startDate: '',
+                    endDate: '',
+                    status: 'draft',
+                    requiredItems: [],
+                    activeDays: [],
+                    rewardTypes: []
+                };
+            },
             isRewardTypeSelected(typeId) {
                 return this.selectedRewardTypes.includes(typeId);
-            },            
-
+            },
             formatDate(date) {
                 if (!date) return 'N/A';
                 return new Date(date).toLocaleDateString();
             },
-
             formatActiveDays(activeDays) {
                 if (!activeDays || !activeDays.length) return 'All days';
                 return activeDays
@@ -220,7 +148,6 @@ export function initializeCampaignManagement() {
                     .filter(Boolean)
                     .join(', ');
             },
-
             getRequiredItemsFromForm() {
                 const items = [];
                 document.querySelectorAll('.required-item-row').forEach(row => {
@@ -235,7 +162,6 @@ export function initializeCampaignManagement() {
                 });
                 return items;
             },
-
             getActiveDaysFromForm() {
                 const activeDays = [];
                 document.querySelectorAll('.day-checkbox:checked').forEach(checkbox => {
@@ -243,7 +169,6 @@ export function initializeCampaignManagement() {
                 });
                 return activeDays;
             },
-
             getStatusBadgeClass(status) {
                 const classes = {
                     active: 'badge bg-success',
@@ -253,7 +178,6 @@ export function initializeCampaignManagement() {
                 };
                 return classes[status] || classes.default;
             },
-
             async showAddCampaignModal() {
                 const itemRowTemplate = `
                     <div class="required-item-row mb-2">
@@ -329,40 +253,40 @@ export function initializeCampaignManagement() {
                                     </div>
                                 </div>
                             </div>
-                        </div>
-                        <div class="row">
-                            <div class="col">
-                                <h6>Campaign Rewards</h6>
-                                <div id="rewardTypesSection">
-                                    ${this.availableRewardTypes.map(type => `
-                                        <div class="reward-type-item">
-                                            <div class="form-check">
-                                                <input type="checkbox" 
-                                                    class="form-check-input" 
-                                                    id="reward-type-${type.id}"
-                                                    value="${type.id}">
-                                                <label class="form-check-label" for="reward-type-${type.id}">
-                                                    ${type.name}
-                                                </label>
-                                            </div>
-                                            <div class="reward-criteria mt-2" style="display:none;">
-                                                <div class="form-row">
-                                                    <div class="col">
-                                                        <label>Minimum Purchase Amount</label>
-                                                        <input type="number" 
-                                                            class="form-control reward-min-purchase" 
-                                                            data-type-id="${type.id}">
-                                                    </div>
-                                                    <div class="col">
-                                                        <label>Maximum Rewards</label>
-                                                        <input type="number" 
-                                                            class="form-control reward-max-rewards" 
-                                                            data-type-id="${type.id}">
+                            <div class="row">
+                                <div class="col">
+                                    <h6>Campaign Rewards</h6>
+                                    <div id="rewardTypesSection">
+                                        ${this.availableRewardTypes.map(type => `
+                                            <div class="reward-type-item">
+                                                <div class="form-check">
+                                                    <input type="checkbox" 
+                                                        class="form-check-input" 
+                                                        id="reward-type-${type.id}"
+                                                        value="${type.id}">
+                                                    <label class="form-check-label" for="reward-type-${type.id}">
+                                                        ${type.name}
+                                                    </label>
+                                                </div>
+                                                <div class="reward-criteria mt-2" style="display:none;">
+                                                    <div class="form-row">
+                                                        <div class="col">
+                                                            <label>Minimum Purchase Amount</label>
+                                                            <input type="number" 
+                                                                class="form-control reward-min-purchase" 
+                                                                data-type-id="${type.id}">
+                                                        </div>
+                                                        <div class="col">
+                                                            <label>Maximum Rewards</label>
+                                                            <input type="number" 
+                                                                class="form-control reward-max-rewards" 
+                                                                data-type-id="${type.id}">
+                                                        </div>
                                                     </div>
                                                 </div>
                                             </div>
-                                        </div>
-                                    `).join('')}
+                                        `).join('')}
+                                    </div>
                                 </div>
                             </div>
                         </div>
@@ -439,25 +363,7 @@ export function initializeCampaignManagement() {
                     this.createCampaign(formValues);
                 }
             },
-            
-
-            async createCampaign(campaignData) {
-                try {
-                    const campaignRef = firebase.database().ref('campaigns').push();
-                    await campaignRef.set({
-                        ...campaignData,
-                        createdAt: Date.now(),
-                        updatedAt: Date.now()
-                    });
-                    await this.loadCampaigns();
-                    Swal.fire('Success', 'Campaign created successfully', 'success');
-                } catch (error) {
-                    console.error('Error creating campaign:', error);
-                    Swal.fire('Error', 'Failed to create campaign', 'error');
-                }
-            },
-
-            viewCampaign(campaign) {
+            async viewCampaign(campaign) {
                 Swal.fire({
                     title: campaign.name,
                     html: `
@@ -485,8 +391,7 @@ export function initializeCampaignManagement() {
                     width: '600px'
                 });
             },
-
-            editCampaign(campaign) {
+            async editCampaign(campaign) {
                 const itemRowTemplate = `
                     <div class="required-item-row mb-2">
                         <div class="input-group">
@@ -668,7 +573,6 @@ export function initializeCampaignManagement() {
                     }
                 });
             },
-
             async deleteCampaign(campaign) {
                 const result = await Swal.fire({
                     title: 'Delete Campaign?',
@@ -691,12 +595,102 @@ export function initializeCampaignManagement() {
                 }
             }
         },
-
         mounted() {
-            console.log('Campaign management component mounted');
             this.loadRewardTypes();
             this.loadCampaigns();
-        }
+        },
+        template: `
+            <div class="campaign-management">
+                <div class="header d-flex justify-content-between align-items-center mb-4">
+                    <h2>Campaign Management</h2>
+                    <div class="controls d-flex gap-2">
+                        <input 
+                            type="text" 
+                            class="form-control" 
+                            v-model="filters.brandName" 
+                            placeholder="Search campaigns...">
+                        <select 
+                            class="form-select" 
+                            v-model="filters.status">
+                            <option value="">All Status</option>
+                            <option value="active">Active</option>
+                            <option value="inactive">Inactive</option>
+                            <option value="draft">Draft</option>
+                        </select>
+                        <button 
+                            class="btn btn-primary"
+                            @click="showAddCampaignModal">
+                            <i class="fas fa-plus"></i> New Campaign
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Loading State -->
+                <div v-if="loading" class="text-center py-4">
+                    <div class="spinner-border text-primary"></div>
+                    <p class="mt-2">Loading campaigns...</p>
+                </div>
+
+                <!-- Error State -->
+                <div v-else-if="error" class="alert alert-danger">
+                    {{ error }}
+                </div>
+
+                <!-- Campaign List -->
+                <div v-else class="campaign-list">
+                    <div v-if="filteredCampaigns.length === 0" class="alert alert-info">
+                        No campaigns found. Click "New Campaign" to create one.
+                    </div>
+                    <div v-else class="row">
+                        <div v-for="campaign in filteredCampaigns" 
+                             :key="campaign.id"
+                             class="col-md-6 col-lg-4 mb-4">
+                            <div class="card h-100">
+                                <div class="card-header d-flex justify-content-between align-items-center">
+                                    <h5 class="mb-0">{{ campaign.name }}</h5>
+                                    <span :class="getStatusBadgeClass(campaign.status)">
+                                        {{ campaign.status }}
+                                    </span>
+                                </div>
+                                <div class="card-body">
+                                    <p><strong>Brand:</strong> {{ campaign.brandName }}</p>
+                                    <p><strong>Store:</strong> {{ campaign.storeName || 'All Stores' }}</p>
+                                    <p><strong>Duration:</strong> {{ formatDate(campaign.startDate) }} - {{ formatDate(campaign.endDate) }}</p>
+                                    <p v-if="campaign.minPurchaseAmount">
+                                        <strong>Min. Purchase:</strong> R{{ campaign.minPurchaseAmount }}
+                                    </p>
+                                    <div v-if="campaign.requiredItems && campaign.requiredItems.length">
+                                        <strong>Required Items:</strong>
+                                        <ul class="list-unstyled">
+                                            <li v-for="item in campaign.requiredItems" :key="item.name">
+                                                {{ item.quantity }}x {{ item.name }}
+                                            </li>
+                                        </ul>
+                                    </div>
+                                    <div v-if="campaign.activeDays && campaign.activeDays.length">
+                                        <strong>Active Days:</strong>
+                                        <p class="mb-0">{{ formatActiveDays(campaign.activeDays) }}</p>
+                                    </div>
+                                </div>
+                                <div class="card-footer">
+                                    <div class="btn-group btn-group-sm">
+                                        <button class="btn btn-info" @click="viewCampaign(campaign)">
+                                            <i class="fas fa-eye"></i>
+                                        </button>
+                                        <button class="btn btn-warning" @click="editCampaign(campaign)">
+                                            <i class="fas fa-edit"></i>
+                                        </button>
+                                        <button class="btn btn-danger" @click="deleteCampaign(campaign)">
+                                            <i class="fas fa-trash"></i>
+                                        </button>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        `
     });
 
     // Mount the app to the campaign management container
