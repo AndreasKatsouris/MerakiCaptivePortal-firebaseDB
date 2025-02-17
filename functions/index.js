@@ -59,44 +59,70 @@ exports.getGoogleConfig = onRequest(async (req, res) => {
  * Requires the caller to be an admin themselves
  */
 exports.setAdminClaim = onRequest(async (req, res) => {
+    console.log('[setAdminClaim] Received request:', {
+        method: req.method,
+        headers: req.headers,
+        origin: req.headers.origin || 'No origin'
+    });
+
     // Verify the request method
     if (req.method !== 'POST') {
+        console.error('[setAdminClaim] Invalid method:', req.method);
         return res.status(405).json({ error: 'Method not allowed' });
     }
 
     try {
         // Verify that the request has a valid Firebase ID token
         const idToken = req.headers.authorization?.split('Bearer ')[1];
+        console.log('[setAdminClaim] Auth header present:', !!idToken);
+        
         if (!idToken) {
+            console.error('[setAdminClaim] No token provided');
             return res.status(401).json({ error: 'Unauthorized - No token provided' });
         }
 
         // Verify the token and get the caller's claims
+        console.log('[setAdminClaim] Verifying caller token');
         const callerToken = await admin.auth().verifyIdToken(idToken);
+        console.log('[setAdminClaim] Caller token verified:', {
+            uid: callerToken.uid,
+            claims: callerToken
+        });
         
         // Check if the caller is an admin
         if (!callerToken.admin === true) {
+            console.error('[setAdminClaim] Caller is not admin:', callerToken.uid);
             return res.status(403).json({ error: 'Forbidden - Caller is not an admin' });
         }
+        console.log('[setAdminClaim] Caller admin status verified');
 
         const { uid, isAdmin } = req.body;
+        console.log('[setAdminClaim] Request details:', { targetUid: uid, isAdmin });
+        
         if (!uid) {
+            console.error('[setAdminClaim] No uid provided in request');
             return res.status(400).json({ error: 'Bad Request - No uid provided' });
         }
 
         // Set the admin claim
+        console.log('[setAdminClaim] Setting custom claims for user:', uid);
         await admin.auth().setCustomUserClaims(uid, { admin: !!isAdmin });
+        console.log('[setAdminClaim] Custom claims set successfully');
         
         // Update the admin-claims node in the Realtime Database
+        console.log('[setAdminClaim] Updating admin-claims in database');
         if (isAdmin) {
             await admin.database().ref(`admin-claims/${uid}`).set(true);
+            console.log('[setAdminClaim] Added admin to database');
         } else {
             await admin.database().ref(`admin-claims/${uid}`).remove();
+            console.log('[setAdminClaim] Removed admin from database');
         }
 
+        console.log('[setAdminClaim] Operation completed successfully');
         return res.status(200).json({ message: `Successfully ${isAdmin ? 'added' : 'removed'} admin claim for user ${uid}` });
     } catch (error) {
-        console.error('Error setting admin claim:', error);
+        console.error('[setAdminClaim] Error:', error);
         return res.status(500).json({ error: 'Internal server error' });
     }
 });
@@ -163,7 +189,7 @@ exports.verifyAdminStatus = onRequest(async (req, res) => {
             // Set proper content type
             res.set('Content-Type', 'application/json');
             console.log('[verifyAdminStatus] Sending response:', { isAdmin });
-            return res.status(200).json({ isAdmin });
+            return res.status(200).json({ isAdmin: isAdmin });
         } catch (error) {
             console.error('[verifyAdminStatus] Error:', error);
             if (error.code === 'auth/id-token-expired') {
@@ -194,48 +220,77 @@ exports.verifyAdminStatus = onRequest(async (req, res) => {
  * This should be secured and disabled after initial setup
  */
 exports.setupInitialAdmin = onRequest(async (req, res) => {
-    if (req.method !== 'POST') {
-        return res.status(405).json({ error: 'Method not allowed' });
-    }
+    console.log('[setupInitialAdmin] Received request:', {
+        method: req.method,
+        headers: req.headers,
+        origin: req.headers.origin || 'No origin'
+    });
 
-    try {
-        const { email, setupSecret } = req.body;
+    // Enable CORS
+    return cors(req, res, async () => {
+        console.log('[setupInitialAdmin] CORS middleware passed');
 
-        // Verify setup secret to prevent unauthorized access
-        const SETUP_SECRET = 'MerakiAdmin2024!'; // You should change this!
-        if (setupSecret !== SETUP_SECRET) {
-            return res.status(403).json({ error: 'Invalid setup secret' });
+        if (req.method !== 'POST') {
+            console.error('[setupInitialAdmin] Invalid method:', req.method);
+            return res.status(405).json({ error: 'Method not allowed' });
         }
 
-        // Get user by email
-        const user = await admin.auth().getUserByEmail(email);
-        if (!user) {
-            return res.status(404).json({ error: 'User not found' });
+        try {
+            const { email, setupSecret } = req.body;
+            console.log('[setupInitialAdmin] Processing setup for email:', email);
+
+            // Verify setup secret to prevent unauthorized access
+            const SETUP_SECRET = 'MerakiAdmin2024!'; // You should change this!
+            console.log('[setupInitialAdmin] Verifying setup secret');
+            if (setupSecret !== SETUP_SECRET) {
+                console.error('[setupInitialAdmin] Invalid setup secret provided');
+                return res.status(403).json({ error: 'Invalid setup secret' });
+            }
+            console.log('[setupInitialAdmin] Setup secret verified');
+
+            // Get user by email
+            console.log('[setupInitialAdmin] Looking up user by email');
+            const user = await admin.auth().getUserByEmail(email);
+            if (!user) {
+                console.error('[setupInitialAdmin] User not found:', email);
+                return res.status(404).json({ error: 'User not found' });
+            }
+            console.log('[setupInitialAdmin] Found user:', user.uid);
+
+            // Set custom claims
+            console.log('[setupInitialAdmin] Setting admin custom claims');
+            await admin.auth().setCustomUserClaims(user.uid, { admin: true });
+            console.log('[setupInitialAdmin] Custom claims set successfully');
+            
+            // Add to admin-claims in database
+            console.log('[setupInitialAdmin] Adding admin to database');
+            await admin.database().ref(`admin-claims/${user.uid}`).set(true);
+            console.log('[setupInitialAdmin] Database updated successfully');
+
+            // Get all admin users to verify
+            console.log('[setupInitialAdmin] Retrieving all admin users');
+            const adminSnapshot = await admin.database().ref('admin-claims').once('value');
+            const adminUsers = adminSnapshot.val() || {};
+            console.log('[setupInitialAdmin] Total admin count:', Object.keys(adminUsers).length);
+
+            // Set proper content type
+            res.set('Content-Type', 'application/json');
+            
+            console.log('[setupInitialAdmin] Setup completed successfully');
+            return res.status(200).json({ 
+                message: 'Admin setup successful',
+                user: {
+                    uid: user.uid,
+                    email: user.email,
+                    isAdmin: true
+                },
+                totalAdmins: Object.keys(adminUsers).length
+            });
+        } catch (error) {
+            console.error('[setupInitialAdmin] Error:', error);
+            return res.status(500).json({ error: error.message });
         }
-
-        // Set custom claims
-        await admin.auth().setCustomUserClaims(user.uid, { admin: true });
-        
-        // Add to admin-claims in database
-        await admin.database().ref(`admin-claims/${user.uid}`).set(true);
-
-        // Get all admin users to verify
-        const adminSnapshot = await admin.database().ref('admin-claims').once('value');
-        const adminUsers = adminSnapshot.val() || {};
-
-        return res.status(200).json({ 
-            message: 'Admin setup successful',
-            user: {
-                uid: user.uid,
-                email: user.email,
-                isAdmin: true
-            },
-            totalAdmins: Object.keys(adminUsers).length
-        });
-    } catch (error) {
-        console.error('Error in admin setup:', error);
-        return res.status(500).json({ error: error.message });
-    }
+    });
 });
 
 /**
