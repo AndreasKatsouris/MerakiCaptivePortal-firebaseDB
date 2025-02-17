@@ -9,6 +9,7 @@ import { authManager } from './auth/auth.js';
 import { auth } from './config/firebase-config.js';
 import { AdminClaims } from './auth/admin-claims.js';
 import { AdminUserManagement } from './admin/user-management.js';
+import { getFunctions, httpsCallable } from 'firebase/functions';
 
 async function verifyAdminAccess() {
     const hasAccess = await AdminClaims.checkAndRedirect();
@@ -450,39 +451,36 @@ async function clearScanningData() {
             throw new Error('You must be logged in to perform this action');
         }
 
-        const idToken = await user.getIdToken();
-        const functionsBaseUrl = AdminClaims.getFunctionsBaseUrl();
-        const response = await fetch(`${functionsBaseUrl}/clearScanningData`, {
-            method: 'POST',
-            headers: {
-                'Authorization': `Bearer ${idToken}`,
-                'Content-Type': 'application/json'
-            }
-        });
+        // Get the Firebase Functions instance
+        const functions = getFunctions();
+        // Create a reference to the clearScanningData function
+        const clearScanningDataFunction = httpsCallable(functions, 'clearScanningData');
 
-        if (!response.ok) {
-            const result = await response.json();
-            throw new Error(result.error || 'Failed to clear scanning data');
+        // Call the function
+        const result = await clearScanningDataFunction();
+        
+        if (result.data.error) {
+            throw new Error(result.data.error);
         }
 
-        const result = await response.json();
         Swal.fire({
             icon: 'success',
             title: 'Success',
-            text: `Successfully cleared ${result.recordsCleared} records at ${new Date(result.timestamp).toLocaleString()}`
+            text: `Successfully cleared ${result.data.recordsCleared || 0} records`
         });
+
     } catch (error) {
         console.error('Error clearing scanning data:', error);
         Swal.fire({
             icon: 'error',
             title: 'Error',
-            text: error.message
+            text: error.message || 'Failed to clear scanning data'
         });
     } finally {
         const clearScanningDataBtn = document.getElementById('clearScanningDataBtn');
         if (clearScanningDataBtn) {
             clearScanningDataBtn.disabled = false;
-            clearScanningDataBtn.innerHTML = '<i class="fas fa-trash"></i> Clear Scanning Data';
+            clearScanningDataBtn.innerHTML = '<i class="fas fa-trash me-2"></i>Clear Scanning Data';
         }
     }
 }
