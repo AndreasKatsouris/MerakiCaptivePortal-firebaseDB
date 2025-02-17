@@ -139,7 +139,7 @@
             </div>
 
             <!-- Campaigns Section -->
-            <div id="campaignsContent" class="content-section" style="display: none;">
+            <div id="campaignManagementContent" class="content-section" style="display: none;">
                 <div class="section-header">
                     <h2>Campaign Management</h2>
                     <button id="createCampaignBtn" class="btn btn-primary">
@@ -218,40 +218,36 @@
                 <div class="section-header">
                     <h2>Settings</h2>
                 </div>
-                <div class="settings-form">
-                    <form id="settingsForm">
-                        <div class="mb-3">
-                            <label for="apiKey" class="form-label">Meraki API Key</label>
-                            <input type="password" class="form-control" id="apiKey">
+                <div class="row">
+                    <div class="col-md-6">
+                        <div class="card">
+                            <div class="card-body">
+                                <h5 class="card-title">General Settings</h5>
+                                <div class="form-group">
+                                    <label for="notificationEmail">Notification Email</label>
+                                    <input type="email" class="form-control" id="notificationEmail">
+                                </div>
+                                <button class="btn btn-primary mt-3" id="saveGeneralSettings">Save Settings</button>
+                            </div>
                         </div>
-                        <div class="mb-3">
-                            <label for="networkId" class="form-label">Network ID</label>
-                            <input type="text" class="form-control" id="networkId">
-                        </div>
-                        <button type="submit" class="btn btn-primary">Save Settings</button>
-                    </form>
+                    </div>
                 </div>
             </div>
-            
-            <!-- Database Management Section (Under Settings) -->
+
+            <!-- Database Management Section -->
             <div id="databaseManagementContent" class="content-section" style="display: none;">
                 <div class="section-header">
                     <h2>Database Management</h2>
                 </div>
-                <div class="row mt-4">
-                    <div class="col-12">
+                <div class="row">
+                    <div class="col-md-6">
                         <div class="card">
                             <div class="card-body">
-                                <div class="alert alert-warning">
-                                    <i class="fas fa-exclamation-triangle me-2"></i>
-                                    Warning: The following actions cannot be undone!
-                                </div>
-                                <div class="d-grid gap-3">
-                                    <button id="clearScanningDataBtn" class="btn btn-danger">
-                                        <i class="fas fa-trash me-2"></i>
-                                        Clear Scanning Data
-                                    </button>
-                                </div>
+                                <h5 class="card-title">Data Cleanup</h5>
+                                <p class="card-text">Use these tools carefully. Actions cannot be undone.</p>
+                                <button id="clearScanningDataBtn" class="btn btn-danger">
+                                    <i class="fas fa-trash"></i> Clear Scanning Data
+                                </button>
                             </div>
                         </div>
                     </div>

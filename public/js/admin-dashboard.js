@@ -86,87 +86,45 @@ class AdminDashboard {
                 contentId: 'dashboardContent',
                 initialize: initializeDashboard
             },
-            // Settings
-            settings: {
-                menuId: 'settingsMenu',
-                contentId: 'settingsContent'
-            },
-            // Database Management (under Settings)
-            databaseManagement: {
-                menuId: 'databaseManagementMenu',
-                contentId: 'databaseManagementContent',
-                parent: 'settingsSubmenu',
-                initialize: () => {
-                    // Initialize database management section
-                    const clearScanningDataBtn = document.getElementById('clearScanningDataBtn');
-                    if (clearScanningDataBtn) {
-                        clearScanningDataBtn.addEventListener('click', async () => {
-                            try {
-                                const result = await Swal.fire({
-                                    title: 'Are you sure?',
-                                    text: "This will permanently delete all scanning data. This action cannot be undone!",
-                                    icon: 'warning',
-                                    showCancelButton: true,
-                                    confirmButtonColor: '#d33',
-                                    cancelButtonColor: '#3085d6',
-                                    confirmButtonText: 'Yes, delete it!'
-                                });
-
-                                if (result.isConfirmed) {
-                                    await this.clearScanningData();
-                                }
-                            } catch (error) {
-                                console.error('Error in clear scanning data:', error);
-                                Swal.fire({
-                                    title: 'Error',
-                                    text: 'Failed to clear scanning data. Please try again.',
-                                    icon: 'error'
-                                });
-                            }
-                        });
-                    }
-                }
-            },
-            // Loyalty Program Sections
+            // Campaigns
             campaigns: {
-                menuId: 'campaignManagementMenu',
+                menuId: 'campaignsMenu',
                 contentId: 'campaignManagementContent',
-                initialize: initializeCampaignManagement,
-                parent: 'loyaltySubmenu'
+                initialize: initializeCampaignManagement
             },
-            rewardTypes: {
-                menuId: 'rewardTypesMenu',
-                contentId: 'rewardTypesContent',
-                initialize: initializeRewardTypes,
-                parent: 'loyaltySubmenu'
+            // Analytics
+            analytics: {
+                menuId: 'analyticsMenu',
+                contentId: 'analyticsContent'
             },
-            receipts: {
-                menuId: 'receiptManagementMenu',
-                contentId: 'receiptManagementContent',
-                initialize: initializeReceiptManagement,
-                parent: 'loyaltySubmenu'
+            // Admin Users
+            adminUsers: {
+                menuId: 'adminUsersMenu',
+                contentId: 'adminUsersContent',
+                initialize: () => this.initializeAdminUsersSection()
             },
-            rewards: {
-                menuId: 'rewardManagementMenu',
-                contentId: 'rewardManagementContent',
-                initialize: initializeRewardManagement,
-                parent: 'loyaltySubmenu'
-            },
-            // Other Sections
+            // Project Management
             projects: {
                 menuId: 'projectManagementMenu',
                 contentId: 'projectManagementContent',
                 initialize: initializeProjectManagement
             },
-            guests: {
-                menuId: 'guestManagementMenu',
-                contentId: 'guestManagementContent',
-                initialize: initializeGuestManagement
+            // Settings and Database Management
+            settings: {
+                menuId: 'settingsMenu',
+                contentId: 'settingsContent',
+                hasSubmenu: true
             },
-            adminUsers: {
-                menuId: 'adminUsersMenu',
-                contentId: 'adminUsersContent',
-                init: () => this.initializeAdminUsersSection()
+            databaseManagement: {
+                menuId: 'databaseManagementMenu',
+                contentId: 'databaseManagementContent',
+                parent: 'settingsSubmenu',
+                initialize: () => {
+                    const clearScanningDataBtn = document.getElementById('clearScanningDataBtn');
+                    if (clearScanningDataBtn) {
+                        clearScanningDataBtn.addEventListener('click', this.handleClearScanningData.bind(this));
+                    }
+                }
             }
         };
 
@@ -182,7 +140,9 @@ class AdminDashboard {
             if (menuElement) {
                 menuElement.addEventListener('click', (e) => {
                     e.preventDefault();
-                    this.showSection(name);
+                    if (!section.hasSubmenu) {
+                        this.showSection(name);
+                    }
                 });
             }
         });
@@ -190,60 +150,41 @@ class AdminDashboard {
         // Handle logout
         const logoutBtn = document.getElementById('logoutBtn');
         if (logoutBtn) {
-            logoutBtn.addEventListener('click', async () => {
-                try {
-                    await auth.signOut();
-                    window.location.href = '/admin-login.html';
-                } catch (error) {
-                    console.error('Logout failed:', error);
-                }
-            });
+            logoutBtn.addEventListener('click', () => this.handleLogout());
         }
 
-        // Handle mobile menu toggle
-        const mobileToggle = document.getElementById('mobileSidebarToggle');
+        // Handle sidebar collapse
+        const sidebarCollapse = document.getElementById('sidebarCollapse');
         const sidebar = document.getElementById('sidebar');
-        if (mobileToggle && sidebar) {
-            mobileToggle.addEventListener('click', () => {
-                sidebar.classList.toggle('active');
+        if (sidebarCollapse && sidebar) {
+            sidebarCollapse.addEventListener('click', () => {
+                sidebar.classList.toggle('collapsed');
+                document.getElementById('content').classList.toggle('expanded');
             });
         }
     }
 
     setupSubmenuListeners() {
-        // Handle submenu toggles
-        document.querySelectorAll('[data-toggle="collapse"]').forEach(toggle => {
-            toggle.addEventListener('click', (e) => {
+        // Handle settings submenu
+        const settingsLink = document.querySelector('[href="#settingsSubmenu"]');
+        if (settingsLink) {
+            settingsLink.addEventListener('click', (e) => {
                 e.preventDefault();
-                const targetId = toggle.getAttribute('data-target');
-                const submenu = document.querySelector(targetId);
+                const submenu = document.getElementById('settingsSubmenu');
                 if (submenu) {
-                    // Close other submenus
-                    document.querySelectorAll('.submenu.show').forEach(menu => {
-                        if (menu !== submenu) {
-                            menu.classList.remove('show');
-                            const parentToggle = menu.previousElementSibling;
-                            parentToggle?.querySelector('.fas.fa-chevron-down')?.classList.remove('rotate');
-                        }
-                    });
-                    // Toggle current submenu
                     submenu.classList.toggle('show');
-                    toggle.querySelector('.fas.fa-chevron-down')?.classList.toggle('rotate');
+                    settingsLink.querySelector('.fa-chevron-down')?.classList.toggle('rotate');
                 }
             });
-        });
+        }
 
-        // Handle all submenu items
-        document.querySelectorAll('.submenu').forEach(submenu => {
-            submenu.addEventListener('click', (e) => {
-                const menuItem = e.target.closest('a');
-                if (menuItem) {
-                    e.preventDefault();
-                    const menuId = menuItem.id;
-                    const sectionName = this.getSectionNameFromMenuId(menuId);
-                    if (sectionName) {
-                        this.showSection(sectionName);
-                    }
+        // Handle submenu items
+        document.querySelectorAll('.submenu .nav-link').forEach(link => {
+            link.addEventListener('click', (e) => {
+                e.preventDefault();
+                const sectionName = this.getSectionNameFromMenuId(link.id);
+                if (sectionName) {
+                    this.showSection(sectionName);
                 }
             });
         });
@@ -417,7 +358,7 @@ class AdminDashboard {
         }
     }
 
-    async clearScanningData() {
+    async handleClearScanningData() {
         try {
             Swal.fire({
                 title: 'Processing...',
