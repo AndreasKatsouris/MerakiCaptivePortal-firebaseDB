@@ -53,10 +53,21 @@
                     </a>
                 </li>
                 <li class="nav-item">
-                    <a href="#" id="settingsMenu" class="nav-link">
+                    <a href="#" id="settingsMenu" class="nav-link" data-bs-toggle="collapse" data-bs-target="#settingsSubmenu">
                         <i class="fas fa-cog"></i>
                         <span>Settings</span>
+                        <i class="fas fa-chevron-down float-end"></i>
                     </a>
+                    <div class="collapse" id="settingsSubmenu">
+                        <ul class="nav flex-column">
+                            <li class="nav-item">
+                                <a href="#" id="databaseManagementMenu" class="nav-link">
+                                    <i class="fas fa-database"></i>
+                                    <span>Database Management</span>
+                                </a>
+                            </li>
+                        </ul>
+                    </div>
                 </li>
             </ul>
 
@@ -202,6 +213,29 @@
                         <div class="card">
                             <div class="card-body">
                                 <div id="projectsList"></div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Database Management Section -->
+            <div id="databaseManagementContent" class="content-section" style="display: none;">
+                <div class="section-header">
+                    <h2>Database Management</h2>
+                </div>
+                <div class="row mt-4">
+                    <div class="col-12">
+                        <div class="card">
+                            <div class="card-body">
+                                <div class="alert alert-warning">
+                                    <i class="fas fa-exclamation-triangle"></i>
+                                    Warning: This action cannot be undone!
+                                </div>
+                                <button id="clearScanningDataBtn" class="btn btn-danger">
+                                    <i class="fas fa-trash"></i>
+                                    Clear Scanning Data
+                                </button>
                             </div>
                         </div>
                     </div>
