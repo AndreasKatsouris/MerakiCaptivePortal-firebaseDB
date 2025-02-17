@@ -450,8 +450,6 @@ async function clearScanningData() {
             throw new Error('You must be logged in to perform this action');
         }
 
-        // Get the Firebase Functions instance
-        const functions = getFunctions();
         // Create a reference to the clearScanningData function
         const clearScanningDataFunction = httpsCallable(functions, 'clearScanningData');
 
