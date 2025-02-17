@@ -11,6 +11,15 @@ export function initializeDashboard() {
 
     async function updateDashboardStats() {
         try {
+            // Force token refresh before database operations
+            const user = auth.currentUser;
+            if (!user) {
+                throw new Error('No user is signed in');
+            }
+            
+            // Refresh token to ensure latest claims
+            await user.getIdToken(true);
+
             const [campaignsSnapshot, receiptsSnapshot, usersSnapshot] = await Promise.all([
                 firebase.database().ref('campaigns').once('value'),
                 firebase.database().ref('receipts').once('value'),
@@ -26,6 +35,17 @@ export function initializeDashboard() {
             updateRecentReceipts(receipts);
         } catch (error) {
             console.error('Error updating dashboard:', error);
+            if (error.code === 'PERMISSION_DENIED') {
+                // If permission denied, might need to refresh admin status
+                const user = auth.currentUser;
+                if (user) {
+                    const isAdmin = await AdminClaims.verifyAdminStatus(user);
+                    if (!isAdmin) {
+                        window.location.href = '/admin-login.html';
+                        return;
+                    }
+                }
+            }
         }
     }
 

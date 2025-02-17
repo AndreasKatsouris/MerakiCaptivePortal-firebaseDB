@@ -28,20 +28,28 @@ class AdminDashboard {
         if (this.initialized) return;
 
         try {
-            // Verify admin access first
-            if (!await verifyAdminAccess()) {
-                return null;
-            }
-
             // Initialize auth
             await authManager.initialize();
             
             // Set up auth state listener
-            auth.onAuthStateChanged((user) => {
+            auth.onAuthStateChanged(async (user) => {
                 if (!user) {
                     window.location.href = '/admin-login.html';
                     return;
                 }
+
+                // Force token refresh to get latest claims
+                await user.getIdToken(true);
+                
+                // Verify admin access
+                const hasAccess = await AdminClaims.verifyAdminStatus(user);
+                if (!hasAccess) {
+                    console.error('User does not have admin access');
+                    await auth.signOut();
+                    window.location.href = '/admin-login.html';
+                    return;
+                }
+
                 this.setupDashboard();
             });
 
