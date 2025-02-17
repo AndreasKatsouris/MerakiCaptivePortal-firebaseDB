@@ -342,47 +342,50 @@ exports.tempClearData = onRequest(async (req, res) => {
  * Only admins can use this endpoint
  */
 exports.clearScanningData = onRequest(async (req, res) => {
-    if (req.method !== 'POST') {
-        return res.status(405).json({ error: 'Method not allowed' });
-    }
-
-    try {
-        // Verify admin token
-        const idToken = req.headers.authorization?.split('Bearer ')[1];
-        if (!idToken) {
-            return res.status(401).json({ error: 'No token provided' });
+    // Enable CORS
+    return cors(req, res, async () => {
+        if (req.method !== 'POST') {
+            return res.status(405).json({ error: 'Method not allowed' });
         }
 
-        // Verify the token and check admin status
-        const decodedToken = await admin.auth().verifyIdToken(idToken);
-        const isAdminInDb = await admin.database()
-            .ref(`admin-claims/${decodedToken.uid}`)
-            .once('value')
-            .then(snapshot => snapshot.val() === true);
+        try {
+            // Verify admin token
+            const idToken = req.headers.authorization?.split('Bearer ')[1];
+            if (!idToken) {
+                return res.status(401).json({ error: 'No token provided' });
+            }
 
-        if (!decodedToken.admin === true || !isAdminInDb) {
-            return res.status(403).json({ error: 'Unauthorized - Admin access required' });
-        }
+            // Verify the token and check admin status
+            const decodedToken = await admin.auth().verifyIdToken(idToken);
+            const isAdminInDb = await admin.database()
+                .ref(`admin-claims/${decodedToken.uid}`)
+                .once('value')
+                .then(snapshot => snapshot.val() === true);
 
-        // Get current count for reporting
-        const beforeCount = await admin.database()
-            .ref('scanningData')
-            .once('value')
-            .then(snapshot => {
-                const data = snapshot.val();
-                return data ? Object.keys(data).length : 0;
+            if (!decodedToken.admin === true || !isAdminInDb) {
+                return res.status(403).json({ error: 'Unauthorized - Admin access required' });
+            }
+
+            // Get current count for reporting
+            const beforeCount = await admin.database()
+                .ref('scanningData')
+                .once('value')
+                .then(snapshot => {
+                    const data = snapshot.val();
+                    return data ? Object.keys(data).length : 0;
+                });
+
+            // Clear the scanning data
+            await admin.database().ref('scanningData').remove();
+
+            return res.status(200).json({
+                message: 'Scanning data cleared successfully',
+                recordsCleared: beforeCount,
+                timestamp: new Date().toISOString()
             });
-
-        // Clear the scanning data
-        await admin.database().ref('scanningData').remove();
-
-        return res.status(200).json({
-            message: 'Scanning data cleared successfully',
-            recordsCleared: beforeCount,
-            timestamp: new Date().toISOString()
-        });
-    } catch (error) {
-        console.error('Error clearing scanning data:', error);
-        return res.status(500).json({ error: error.message });
-    }
+        } catch (error) {
+            console.error('Error clearing scanning data:', error);
+            return res.status(500).json({ error: error.message });
+        }
+    });
 });

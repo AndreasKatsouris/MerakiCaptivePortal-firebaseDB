@@ -1,4 +1,4 @@
-import { auth } from '../config/firebase-config.js';
+import { auth, rtdb, ref, get } from '../config/firebase-config.js';
 import { AdminClaims } from '../auth/admin-claims.js';
 
 export class AdminUserManagement {
@@ -64,8 +64,8 @@ export class AdminUserManagement {
             }
 
             // Get admin users from admin-claims node
-            const adminClaimsRef = firebase.database().ref('admin-claims');
-            const snapshot = await adminClaimsRef.once('value');
+            const adminClaimsRef = ref(rtdb, 'admin-claims');
+            const snapshot = await get(adminClaimsRef);
             const adminClaims = snapshot.val() || {};
 
             // Get user details for each admin
