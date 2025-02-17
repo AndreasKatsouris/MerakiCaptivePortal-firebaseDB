@@ -78,7 +78,8 @@
             submitBtn.textContent = 'Setting up...';
 
             try {
-                const response = await fetch('/setupInitialAdmin', {
+                // Use the full Firebase function URL
+                const response = await fetch('https://us-central1-merakicaptiveportal-firebasedb.cloudfunctions.net/setupInitialAdmin', {
                     method: 'POST',
                     headers: {
                         'Content-Type': 'application/json',
