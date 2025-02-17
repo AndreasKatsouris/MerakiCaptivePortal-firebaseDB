@@ -1,5 +1,5 @@
 import { authManager } from '../auth/auth.js';
-import { AdminUserManagement } from './user-management.js';
+import { AdminClaims } from '../auth/admin-claims.js';
 
 /**
  * AdminLoginComponent handles admin-specific authentication
@@ -32,7 +32,7 @@ class AdminLoginComponent {
             
             if (user) {
                 // If user exists, verify admin status
-                const isAdmin = await AdminUserManagement.verifyAdminStatus(user.uid);
+                const isAdmin = await AdminClaims.verifyAdminStatus(user);
                 if (isAdmin) {
                     // If admin, redirect to dashboard
                     window.location.href = '/admin-dashboard.html';
@@ -76,7 +76,7 @@ class AdminLoginComponent {
             const user = await authManager.signIn(email, password);
             
             // Step 2: Admin verification
-            const isAdmin = await AdminUserManagement.verifyAdminStatus(user.uid);
+            const isAdmin = await AdminClaims.verifyAdminStatus(user);
             
             if (!isAdmin) {
                 // Step 3: Handle non-admin user
