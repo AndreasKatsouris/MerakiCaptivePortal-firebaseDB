@@ -352,15 +352,12 @@
     <!-- Custom Scripts -->
     <script type="module" src="js/config/firebase-config.js"></script>
     <script type="module" src="js/admin-dashboard.js"></script>
-    <script>
-        const campaignsApp = Vue.createApp({
-            data() {
-                return {
-                    campaigns: []
-                }
-            }
-        })
-        campaignsApp.mount('#campaigns-app')
+    <script type="module" src="js/campaigns/campaigns.js"></script>
+    <script type="module">
+        import { initializeCampaignManagement } from './js/campaigns/campaigns.js';
+        document.addEventListener('DOMContentLoaded', () => {
+            initializeCampaignManagement();
+        });
     </script>
 </body>
 </html>
