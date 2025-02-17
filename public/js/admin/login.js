@@ -1,25 +1,35 @@
-import { auth } from '../auth/auth.js';
+import { auth, signInWithEmailAndPassword, signOut } from '../config/firebase-config.js';
 import { AdminClaims } from '../auth/admin-claims.js';
+
+// Initialize Firebase (make sure to replace with your config)
+const firebaseConfig = {
+    // Your firebase config here
+};
+
+// Initialize Firebase
+const app = initializeApp(firebaseConfig);
 
 class LoginComponent {
     constructor() {
-        this.initialized = false;
         this.form = document.getElementById('loginForm');
         this.emailInput = document.getElementById('email');
         this.passwordInput = document.getElementById('password');
+        this.errorDiv = document.getElementById('error-message');
+        this.initialize();
     }
 
-    async initialize() {
-        if (this.initialized) return;
-        
-        try {
-            await auth.initialize();
-            this.setupEventListeners();
-            this.initialized = true;
-        } catch (error) {
-            console.error('Login component initialization failed:', error);
-            throw error;
-        }
+    initialize() {
+        // Check if user is already logged in
+        auth.onAuthStateChanged(async (user) => {
+            if (user) {
+                const isAdmin = await AdminClaims.verifyAdminStatus(user);
+                if (isAdmin) {
+                    window.location.href = '/admin-dashboard.html';
+                }
+            }
+        });
+
+        this.setupEventListeners();
     }
 
     setupEventListeners() {
@@ -31,29 +41,65 @@ class LoginComponent {
 
     async handleLogin() {
         try {
+            this.setLoading(true);
+            this.clearError();
+
             const email = this.emailInput.value;
             const password = this.passwordInput.value;
 
             // Attempt login
-            const user = await auth.login(email, password);
+            const userCredential = await signInWithEmailAndPassword(auth, email, password);
+            const user = userCredential.user;
+
+            // Verify admin status
+            const isAdmin = await AdminClaims.verifyAdminStatus(user);
             
-            // Verify and set admin status
-            const adminStatus = await AdminClaims.setAdminClaim(user);
-            
-            if (!adminStatus.success) {
-                await auth.logout();
-                throw new Error('Admin access required');
+            if (!isAdmin) {
+                await signOut(auth);
+                throw new Error('You do not have admin privileges');
             }
+
+            // Force token refresh to get latest claims
+            await AdminClaims.refreshToken(user);
 
             // Redirect to dashboard
             window.location.href = '/admin-dashboard.html';
         } catch (error) {
             console.error('Login failed:', error);
-            alert(error.message);
+            this.showError(this.getErrorMessage(error));
+        } finally {
+            this.setLoading(false);
+        }
+    }
+
+    setLoading(isLoading) {
+        this.form.classList.toggle('loading', isLoading);
+        this.emailInput.disabled = isLoading;
+        this.passwordInput.disabled = isLoading;
+    }
+
+    showError(message) {
+        this.errorDiv.textContent = message;
+        this.errorDiv.style.display = 'block';
+    }
+
+    clearError() {
+        this.errorDiv.textContent = '';
+        this.errorDiv.style.display = 'none';
+    }
+
+    getErrorMessage(error) {
+        switch (error.code) {
+            case 'auth/user-not-found':
+            case 'auth/wrong-password':
+                return 'Invalid email or password';
+            case 'auth/too-many-requests':
+                return 'Too many failed attempts. Please try again later';
+            default:
+                return error.message;
         }
     }
 }
 
 // Initialize login component
-const loginComponent = new LoginComponent();
-loginComponent.initialize();
+new LoginComponent();

@@ -1,7 +1,7 @@
 {
   "rules": {
-".read": "auth != null",
-".write": "auth != null && auth.token.admin === true",
+    ".read": "auth != null",
+    ".write": "auth != null && auth.token.admin === true",
     "guests": {
       ".read": "auth != null",
       ".write": "auth != null && auth.token.admin === true",
@@ -15,12 +15,12 @@
       "$uid": {
         ".read": "auth != null",
         ".write": "auth != null && auth.uid === $uid && auth.token.admin === true"
-  }
-},
-"admin-claims": {
-  ".read": "auth != null",
-  ".write": "auth != null"
-},
+      }
+    },
+    "admin-claims": {
+      ".read": "auth != null",
+      ".write": "auth != null"
+    },
     "rewards": {
       ".read": "auth != null",
       ".write": "auth != null",
@@ -30,7 +30,6 @@
         ".validate": "newData.hasChildren(['metadata', 'status', 'value', 'expiresAt']) && (!data.exists() || auth.token.admin === true || (data.child('guestPhone').val() === auth.token.phone_number && data.child('status').val() !== 'approved'))"
       }
     },
-
     "guest-rewards": {
       "$phoneNumber": {
         ".indexOn": ["typeId"],
@@ -41,7 +40,7 @@
     "guest-receipts": {
       "$phoneNumber": {
         ".read": "auth != null && (auth.token.admin === true || auth.token.phone_number === $phoneNumber || auth.token.phone_number === '+' + $phoneNumber)",
-        ".write": "auth != null && (auth.token.admin === true || auth.token.phone_number === $phoneNumber ||auth.token.phone_number === '+' + $phoneNumber)",
+        ".write": "auth != null && (auth.token.admin === true || auth.token.phone_number === $phoneNumber || auth.token.phone_number === '+' + $phoneNumber)",
         ".indexOn": ["createdAt", "processedAt"]
       }
     },
@@ -52,24 +51,27 @@
         ".write": "auth != null"
       }
     },
-
     "customization": {
       ".read": "auth != null",
       ".write": "auth != null && auth.token.admin === true"
     },
-
     "campaigns": {
       ".indexOn": ["status", "brandName"],
-      ".read": "auth != null",
-      ".write": "auth != null && auth.token.admin === true"
-    },
+      ".read": "auth != null && (auth.token.admin === true || root.child('admin-claims').child(auth.uid).exists())",
+      ".write": "auth != null && (auth.token.admin === true || root.child('admin-claims').child(auth.uid).exists())",
+      "$campaignId": {
+        ".validate": "newData.hasChildren(['name', 'status', 'createdAt'])",
+        "status": {
+          ".validate": "newData.val().matches(/^(active|inactive|archived)$/)"
 
+        }
+      }
+    },
     "rewardTypes": {
       ".indexOn": ["status", "category"],
       ".read": "auth != null",
       ".write": "auth != null && auth.token.admin === true"
     },
-
     "receipts": {
       ".indexOn": ["phoneNumber", "guestPhoneNumber", "status", "processedAt"],
       ".read": "auth != null",
@@ -78,7 +80,6 @@
         ".validate": "newData.hasChildren(['guestPhoneNumber', 'totalAmount', 'processedAt'])"
       }
     },
-
     "googleReviews": {
       ".read": "auth != null",
       ".write": "auth != null && auth.token.admin === true",
@@ -96,6 +97,7 @@
         ".validate": "newData.hasChildren(['name', 'status', 'createdAt'])",
         "status": {
           ".validate": "newData.val().matches(/^(planned|in_progress|completed|blocked)$/)"
+
         },
         "createdAt": {
           ".validate": "newData.isNumber()"

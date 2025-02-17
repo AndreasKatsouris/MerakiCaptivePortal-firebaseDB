@@ -7,6 +7,15 @@ import { initializeReceiptManagement } from './receipt-management.js';
 import { initializeRewardManagement } from './reward-management.js';
 import { authManager } from './auth/auth.js';
 import { auth } from './config/firebase-config.js';
+import { AdminClaims } from './auth/admin-claims.js';
+
+async function verifyAdminAccess() {
+    const hasAccess = await AdminClaims.checkAndRedirect();
+    if (!hasAccess) {
+        return false;
+    }
+    return true;
+}
 
 class AdminDashboard {
     constructor() {
@@ -19,6 +28,11 @@ class AdminDashboard {
         if (this.initialized) return;
 
         try {
+            // Verify admin access first
+            if (!await verifyAdminAccess()) {
+                return null;
+            }
+
             // Initialize auth
             await authManager.initialize();
             

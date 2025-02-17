@@ -53,38 +53,80 @@ exports.getGoogleConfig = onRequest(async (req, res) => {
     });
 });
 
-exports.setAdminClaim = functions.https.onCall(async (data, context) => {
-    // Verify authentication
-    if (!context.auth) {
-        throw new functions.https.HttpsError('unauthenticated', 'User must be authenticated');
+/**
+ * Cloud Function to set admin claims for a user
+ * Requires the caller to be an admin themselves
+ */
+exports.setAdminClaim = onRequest(async (req, res) => {
+    // Verify the request method
+    if (req.method !== 'POST') {
+        return res.status(405).json({ error: 'Method not allowed' });
     }
 
     try {
-        const { uid, email } = data;
-        
-        // Verify user exists
-        const user = await admin.auth().getUser(uid);
-        
-        // Check if email is in allowed admin domains
-        const allowedDomains = ['askgroupholdings.com'];
-        const domain = email.split('@')[1];
-        
-        if (!allowedDomains.includes(domain)) {
-            throw new functions.https.HttpsError('permission-denied', 'Email domain not authorized for admin access');
+        // Verify that the request has a valid Firebase ID token
+        const idToken = req.headers.authorization?.split('Bearer ')[1];
+        if (!idToken) {
+            return res.status(401).json({ error: 'Unauthorized - No token provided' });
         }
 
-        // Set admin custom claim
-        await admin.auth().setCustomUserClaims(uid, {
-            admin: true,
-            timestamp: Date.now()
-        });
+        // Verify the token and get the caller's claims
+        const callerToken = await admin.auth().verifyIdToken(idToken);
+        
+        // Check if the caller is an admin
+        if (!callerToken.admin === true) {
+            return res.status(403).json({ error: 'Forbidden - Caller is not an admin' });
+        }
 
-        return {
-            success: true,
-            message: 'Admin claim set successfully'
-        };
+        const { uid, isAdmin } = req.body;
+        if (!uid) {
+            return res.status(400).json({ error: 'Bad Request - No uid provided' });
+        }
+
+        // Set the admin claim
+        await admin.auth().setCustomUserClaims(uid, { admin: !!isAdmin });
+        
+        // Update the admin-claims node in the Realtime Database
+        if (isAdmin) {
+            await admin.database().ref(`admin-claims/${uid}`).set(true);
+        } else {
+            await admin.database().ref(`admin-claims/${uid}`).remove();
+        }
+
+        return res.status(200).json({ message: `Successfully ${isAdmin ? 'added' : 'removed'} admin claim for user ${uid}` });
     } catch (error) {
         console.error('Error setting admin claim:', error);
-        throw new functions.https.HttpsError('internal', error.message);
+        return res.status(500).json({ error: 'Internal server error' });
+    }
+});
+
+/**
+ * Cloud Function to verify admin status of the current user
+ */
+exports.verifyAdminStatus = onRequest(async (req, res) => {
+    try {
+        // Verify that the request has a valid Firebase ID token
+        const idToken = req.headers.authorization?.split('Bearer ')[1];
+        if (!idToken) {
+            return res.status(401).json({ error: 'Unauthorized - No token provided' });
+        }
+
+        // Verify the token and get the user's claims
+        const decodedToken = await admin.auth().verifyIdToken(idToken);
+        
+        // Check admin status from both token and database
+        const isAdminInToken = decodedToken.admin === true;
+        const isAdminInDB = await admin.database()
+            .ref(`admin-claims/${decodedToken.uid}`)
+            .once('value')
+            .then(snapshot => snapshot.val() === true);
+
+        return res.status(200).json({
+            isAdmin: isAdminInToken && isAdminInDB,
+            uid: decodedToken.uid
+        });
+    } catch (error) {
+        console.error('Error verifying admin status:', error);
+        return res.status(500).json({ error: 'Internal server error' });
     }
 });
