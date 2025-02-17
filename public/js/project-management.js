@@ -1,7 +1,5 @@
-import { getDatabase, ref, push, set, get, update, remove } from 'firebase/database';
-import { app } from './config/firebase-config.js';
-
-const db = getDatabase(app);
+// Import Firebase database functions from our config
+import { db, ref, push, set, get, update, remove } from './config/firebase-config.js';
 
 // Project Management State
 const projectManagement = {
