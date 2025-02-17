@@ -22,6 +22,7 @@ const app = initializeApp(firebaseConfig);
 const auth = getAuth(app);
 const db = getFirestore(app);
 const functions = getFunctions(app);
+functions.region = 'us-central1'; // Set the region for Firebase Functions
 const rtdb = getDatabase(app);
 
 // Export Firebase instances and auth methods

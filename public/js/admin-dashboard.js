@@ -100,20 +100,29 @@ class AdminDashboard {
                     // Initialize database management section
                     const clearScanningDataBtn = document.getElementById('clearScanningDataBtn');
                     if (clearScanningDataBtn) {
-                        clearScanningDataBtn.addEventListener('click', () => {
-                            Swal.fire({
-                                title: 'Are you sure?',
-                                text: "This will permanently delete all scanning data. This action cannot be undone!",
-                                icon: 'warning',
-                                showCancelButton: true,
-                                confirmButtonColor: '#d33',
-                                cancelButtonColor: '#3085d6',
-                                confirmButtonText: 'Yes, delete it!'
-                            }).then((result) => {
+                        clearScanningDataBtn.addEventListener('click', async () => {
+                            try {
+                                const result = await Swal.fire({
+                                    title: 'Are you sure?',
+                                    text: "This will permanently delete all scanning data. This action cannot be undone!",
+                                    icon: 'warning',
+                                    showCancelButton: true,
+                                    confirmButtonColor: '#d33',
+                                    cancelButtonColor: '#3085d6',
+                                    confirmButtonText: 'Yes, delete it!'
+                                });
+
                                 if (result.isConfirmed) {
-                                    clearScanningData();
+                                    await this.clearScanningData();
                                 }
-                            });
+                            } catch (error) {
+                                console.error('Error in clear scanning data:', error);
+                                Swal.fire({
+                                    title: 'Error',
+                                    text: 'Failed to clear scanning data. Please try again.',
+                                    icon: 'error'
+                                });
+                            }
                         });
                     }
                 }
@@ -408,6 +417,41 @@ class AdminDashboard {
         }
     }
 
+    async clearScanningData() {
+        try {
+            Swal.fire({
+                title: 'Processing...',
+                text: 'Clearing scanning data...',
+                allowOutsideClick: false,
+                allowEscapeKey: false,
+                showConfirmButton: false,
+                willOpen: () => {
+                    Swal.showLoading();
+                }
+            });
+
+            const clearScanningDataFunction = httpsCallable(functions, 'clearScanningData');
+            const result = await clearScanningDataFunction();
+
+            if (result.data.success) {
+                await Swal.fire({
+                    title: 'Success!',
+                    text: 'Scanning data has been cleared successfully.',
+                    icon: 'success'
+                });
+            } else {
+                throw new Error(result.data.error || 'Unknown error occurred');
+            }
+        } catch (error) {
+            console.error('Error clearing scanning data:', error);
+            await Swal.fire({
+                title: 'Error',
+                text: 'Failed to clear scanning data: ' + error.message,
+                icon: 'error'
+            });
+        }
+    }
+
     destroy() {
         // Cleanup each section
         this.sections.forEach(section => {
@@ -434,72 +478,4 @@ export { dashboard };
 // Initialize dashboard when DOM is ready
 document.addEventListener('DOMContentLoaded', () => {
     dashboard.initialize();
-});
-
-// Clear Scanning Data functionality
-async function clearScanningData() {
-    try {
-        const clearScanningDataBtn = document.getElementById('clearScanningDataBtn');
-        if (!clearScanningDataBtn) return;
-
-        clearScanningDataBtn.disabled = true;
-        clearScanningDataBtn.innerHTML = '<i class="fas fa-spinner fa-spin me-2"></i>Clearing...';
-
-        const user = auth.currentUser;
-        if (!user) {
-            throw new Error('You must be logged in to perform this action');
-        }
-
-        // Create a reference to the clearScanningData function
-        const clearScanningDataFunction = httpsCallable(functions, 'clearScanningData');
-
-        // Call the function
-        const result = await clearScanningDataFunction();
-        
-        if (result.data.error) {
-            throw new Error(result.data.error);
-        }
-
-        Swal.fire({
-            icon: 'success',
-            title: 'Success',
-            text: `Successfully cleared ${result.data.recordsCleared || 0} records`
-        });
-
-    } catch (error) {
-        console.error('Error clearing scanning data:', error);
-        Swal.fire({
-            icon: 'error',
-            title: 'Error',
-            text: error.message || 'Failed to clear scanning data'
-        });
-    } finally {
-        const clearScanningDataBtn = document.getElementById('clearScanningDataBtn');
-        if (clearScanningDataBtn) {
-            clearScanningDataBtn.disabled = false;
-            clearScanningDataBtn.innerHTML = '<i class="fas fa-trash me-2"></i>Clear Scanning Data';
-        }
-    }
-}
-
-// Add event listener for clear scanning data button
-document.addEventListener('DOMContentLoaded', () => {
-    const clearScanningDataBtn = document.getElementById('clearScanningDataBtn');
-    if (clearScanningDataBtn) {
-        clearScanningDataBtn.addEventListener('click', () => {
-            Swal.fire({
-                title: 'Are you sure?',
-                text: "This action cannot be undone!",
-                icon: 'warning',
-                showCancelButton: true,
-                confirmButtonColor: '#d33',
-                cancelButtonColor: '#3085d6',
-                confirmButtonText: 'Yes, clear it!'
-            }).then((result) => {
-                if (result.isConfirmed) {
-                    clearScanningData();
-                }
-            });
-        });
-    }
 });
