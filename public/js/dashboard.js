@@ -1,3 +1,6 @@
+// Import Firebase instances from config
+import { auth, rtdb, ref } from './config/firebase-config.js';
+
 export function initializeDashboard() {
     console.log('Initializing dashboard...');
 
@@ -21,9 +24,9 @@ export function initializeDashboard() {
             await user.getIdToken(true);
 
             const [campaignsSnapshot, receiptsSnapshot, usersSnapshot] = await Promise.all([
-                firebase.database().ref('campaigns').once('value'),
-                firebase.database().ref('receipts').once('value'),
-                firebase.database().ref('guests').once('value')
+                ref(rtdb, 'campaigns').once('value'),
+                ref(rtdb, 'receipts').once('value'),
+                ref(rtdb, 'guests').once('value')
             ]);
 
             const campaigns = campaignsSnapshot.val() || {};
