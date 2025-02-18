@@ -1,5 +1,5 @@
 // Core authentication module
-import { auth, signInWithEmailAndPassword, signOut } from '../config/firebase-config.js';
+import { auth, rtdb, ref, set, signInWithEmailAndPassword, signOut } from '../config/firebase-config.js';
 
 class AuthManager {
     constructor() {
@@ -12,12 +12,35 @@ class AuthManager {
      */
     async initialize() {
         return new Promise((resolve) => {
-            auth.onAuthStateChanged((user) => {
+            auth.onAuthStateChanged(async (user) => {
                 this.user = user;
+                if (user) {
+                    // Sync user data to Realtime Database
+                    await this.syncUserData(user);
+                }
                 this.notifyListeners(user);
                 resolve(user);
             });
         });
+    }
+
+    /**
+     * Sync user data to Realtime Database
+     * @param {Object} user 
+     */
+    async syncUserData(user) {
+        try {
+            const userRef = ref(rtdb, `users/${user.uid}`);
+            await set(userRef, {
+                uid: user.uid,
+                email: user.email,
+                displayName: user.displayName,
+                lastSignInTime: new Date().toISOString(),
+                updatedAt: new Date().toISOString()
+            });
+        } catch (error) {
+            console.error('Error syncing user data:', error);
+        }
     }
 
     /**
@@ -60,6 +83,7 @@ class AuthManager {
     async signIn(email, password) {
         const userCredential = await signInWithEmailAndPassword(auth, email, password);
         await userCredential.user.getIdToken(true); // Force token refresh
+        await this.syncUserData(userCredential.user); // Sync user data on sign in
         return userCredential.user;
     }
 

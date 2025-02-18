@@ -68,16 +68,24 @@ export class AdminUserManagement {
             const snapshot = await get(adminClaimsRef);
             const adminClaims = snapshot.val() || {};
 
-            // Get user details for each admin
+            // Get user details from users node in Realtime Database
             const adminUsers = await Promise.all(
                 Object.keys(adminClaims).map(async (uid) => {
                     try {
-                        const userRecord = await auth.getUser(uid);
+                        const userRef = ref(rtdb, `users/${uid}`);
+                        const userSnapshot = await get(userRef);
+                        const userData = userSnapshot.val();
+                        
+                        if (!userData) {
+                            console.warn(`No user data found for ${uid}`);
+                            return null;
+                        }
+
                         return {
-                            uid: userRecord.uid,
-                            email: userRecord.email,
-                            displayName: userRecord.displayName,
-                            lastSignInTime: userRecord.metadata.lastSignInTime
+                            uid,
+                            email: userData.email,
+                            displayName: userData.displayName,
+                            lastSignInTime: userData.lastSignInTime
                         };
                     } catch (error) {
                         console.warn(`Could not fetch user details for ${uid}:`, error);
