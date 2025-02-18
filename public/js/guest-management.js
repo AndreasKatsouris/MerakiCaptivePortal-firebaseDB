@@ -184,6 +184,7 @@ const guestManagement = {
                     direction: 'asc'
                 },
                 loading: false,
+                error: null,
                 currentAnalyticsGuest: null
             }
         },
@@ -239,30 +240,42 @@ const guestManagement = {
         methods: {
             async loadGuests() {
                 this.loading = true;
+                this.error = null;
                 try {
                     const snapshot = await get(ref(rtdb, 'guests'));
-                    const guests = snapshot.val();
+                    const guests = snapshot.val() || {};
                     
-                    if (guests) {
-                        this.guests = await Promise.all(Object.entries(guests).map(async ([phoneNumber, data]) => {
-                            const receipts = await this.getGuestReceipts(phoneNumber);
-                            const metrics = await this.calculateGuestMetrics({
-                                ...data,
-                                receipts,
-                                phoneNumber
-                            });
+                    this.guests = await Promise.all(
+                        Object.entries(guests).map(async ([phoneNumber, data]) => {
+                            try {
+                                const receipts = await this.getGuestReceipts(phoneNumber);
+                                const metrics = this.calculateGuestMetrics({
+                                    ...data,
+                                    receipts,
+                                    phoneNumber
+                                });
 
-                            return {
-                                phoneNumber,
-                                ...data,
-                                receipts,
-                                metrics
-                            };
-                        }));
-                    }
+                                return {
+                                    phoneNumber,
+                                    ...data,
+                                    receipts,
+                                    metrics
+                                };
+                            } catch (err) {
+                                console.error(`Error processing guest ${phoneNumber}:`, err);
+                                return {
+                                    phoneNumber,
+                                    ...data,
+                                    receipts: [],
+                                    metrics: this.calculateGuestMetrics({})
+                                };
+                            }
+                        })
+                    );
                 } catch (error) {
                     console.error('Error loading guests:', error);
-                    Swal.fire('Error', 'Failed to load guests', 'error');
+                    this.error = 'Failed to load guests. Please try again.';
+                    this.guests = [];
                 } finally {
                     this.loading = false;
                 }
@@ -270,39 +283,12 @@ const guestManagement = {
 
             async getGuestReceipts(phoneNumber) {
                 try {
-                    // Debug authentication state
-                    const currentUser = auth.currentUser;
-                    console.log('Current user:', currentUser);
-                    console.log('Auth token claims:', await currentUser?.getIdTokenResult());
-                    
-                    // Normalize phone number by ensuring it has a + prefix
-                    const normalizedPhone = phoneNumber.startsWith('+') ? 
-                        phoneNumber : 
-                        `+${phoneNumber}`;
-                        
-                    console.log('Attempting to access:', normalizedPhone);
-                    
-                    // First check guest-receipts index
-                    const receiptIndexSnapshot = await get(ref(rtdb, `guest-receipts/${normalizedPhone}`));
-                    
-                    const receiptIds = Object.keys(receiptIndexSnapshot.val() || {});
-                    
-                    // Fetch full receipt details
-                    const receiptsData = await Promise.all(
-                        receiptIds.map(async id => {
-                            const receiptSnapshot = await get(ref(rtdb, `receipts/${id}`));
-                            return { id, ...receiptSnapshot.val() };
-                        })
-                    );
-
-                    return receiptsData;
+                    const receiptsRef = ref(rtdb, `receipts/${phoneNumber}`);
+                    const snapshot = await get(receiptsRef);
+                    return snapshot.val() || {};
                 } catch (error) {
-                    console.error('Error retrieving receipts:', error, {
-                        phoneNumber,
-                        authState: auth.currentUser?.uid,
-                        claims: await auth.currentUser?.getIdTokenResult()
-                    });
-                    return [];
+                    console.error(`Error fetching receipts for ${phoneNumber}:`, error);
+                    return {};
                 }
             },
 
