@@ -37,7 +37,7 @@ export function initializeCampaignManagement() {
                 rewardCriteria: {},
                 availableRewardTypes: [],
                 newCampaign: {
-                    name: '',
+                    campaignName: '',
                     brandName: '',
                     storeName: '',
                     minPurchaseAmount: '',
@@ -131,7 +131,7 @@ export function initializeCampaignManagement() {
             },
             resetForm() {
                 this.newCampaign = {
-                    name: '',
+                    campaignName: '',
                     brandName: '',
                     storeName: '',
                     minPurchaseAmount: '',
