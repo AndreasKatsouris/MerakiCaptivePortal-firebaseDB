@@ -150,18 +150,18 @@ export function initializeCampaignManagement() {
                     .join(', ');
             },
             getRequiredItemsFromForm() {
-                const items = [];
+                const requiredItems = [];
                 document.querySelectorAll('.required-item-row').forEach(row => {
-                    const quantity = row.querySelector('.item-quantity').value;
-                    const name = row.querySelector('.item-name').value;
-                    if (quantity && name) {
-                        items.push({
-                            quantity: parseInt(quantity),
-                            name: name.trim()
+                    const itemQuantity = row.querySelector('.item-quantity').value;
+                    const itemName = row.querySelector('.item-name').value;
+                    if (itemQuantity && itemName) {
+                        requiredItems.push({
+                            quantity: parseInt(itemQuantity),
+                            itemName: itemName.trim()
                         });
                     }
                 });
-                return items;
+                return requiredItems;
             },
             getActiveDaysFromForm() {
                 const activeDays = [];
@@ -325,11 +325,11 @@ export function initializeCampaignManagement() {
                         const activeDays = this.getActiveDaysFromForm();
                         
                         // Validate required fields with proper trimming
-                        const name = document.getElementById('campaignName')?.value?.trim();
+                        const campaignName = document.getElementById('campaignName')?.value?.trim();
                         const brandName = document.getElementById('brandName')?.value?.trim();
                         
                         let validationErrors = [];
-                        if (!name) validationErrors.push('Campaign name is required');
+                        if (!campaignName) validationErrors.push('Campaign name is required');
                         if (!brandName) validationErrors.push('Brand name is required');
                         
                         if (validationErrors.length > 0) {
@@ -354,7 +354,7 @@ export function initializeCampaignManagement() {
 
                         // Get form values with proper trimming and type conversion
                         const formData = {
-                            name,
+                            name: campaignName,
                             brandName,
                             storeName: document.getElementById('storeName')?.value?.trim() || '',
                             minPurchaseAmount: parseFloat(document.getElementById('minPurchase')?.value) || 0,
@@ -467,7 +467,7 @@ export function initializeCampaignManagement() {
                                                 <div class="required-item-row mb-2">
                                                     <div class="input-group">
                                                         <input type="number" class="form-control item-quantity" placeholder="Qty" min="1" value="${item.quantity}">
-                                                        <input type="text" class="form-control item-name" placeholder="Item Name" value="${item.name}">
+                                                        <input type="text" class="form-control item-name" placeholder="Item Name" value="${item.itemName}">
                                                         <button type="button" class="btn btn-danger remove-item">-</button>
                                                         <button type="button" class="btn btn-success add-item">+</button>
                                                     </div>
@@ -539,11 +539,11 @@ export function initializeCampaignManagement() {
                         const activeDays = this.getActiveDaysFromForm();
                         
                         // Validate required fields with proper trimming
-                        const name = document.getElementById('campaignName')?.value?.trim();
+                        const campaignName = document.getElementById('campaignName')?.value?.trim();
                         const brandName = document.getElementById('brandName')?.value?.trim();
                         
                         let validationErrors = [];
-                        if (!name) validationErrors.push('Campaign name is required');
+                        if (!campaignName) validationErrors.push('Campaign name is required');
                         if (!brandName) validationErrors.push('Brand name is required');
                         
                         if (validationErrors.length > 0) {
@@ -568,7 +568,7 @@ export function initializeCampaignManagement() {
 
                         // Get form values with proper trimming and type conversion
                         const formData = {
-                            name,
+                            name: campaignName,
                             brandName,
                             storeName: document.getElementById('storeName')?.value?.trim() || '',
                             minPurchaseAmount: parseFloat(document.getElementById('minPurchase')?.value) || 0,
@@ -693,8 +693,8 @@ export function initializeCampaignManagement() {
                                     <div v-if="campaign.requiredItems && campaign.requiredItems.length">
                                         <strong>Required Items:</strong>
                                         <ul class="list-unstyled">
-                                            <li v-for="item in campaign.requiredItems" :key="item.name">
-                                                {{ item.quantity }}x {{ item.name }}
+                                            <li v-for="item in campaign.requiredItems" :key="item.itemName">
+                                                {{ item.quantity }}x {{ item.itemName }}
                                             </li>
                                         </ul>
                                     </div>
