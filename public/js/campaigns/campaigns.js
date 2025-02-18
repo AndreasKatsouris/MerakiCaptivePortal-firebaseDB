@@ -1,14 +1,5 @@
-import { initializeApp } from 'firebase/app';
-import { getDatabase, ref, push, set, update, remove } from 'firebase/database';
-import { getAuth } from 'firebase/auth';
-
-const firebaseConfig = {
-  // Your Firebase config here
-};
-
-const app = initializeApp(firebaseConfig);
-const rtdb = getDatabase(app);
-const auth = getAuth(app);
+// Import Firebase dependencies from config
+import { auth, rtdb, ref, get, push, set, update, remove } from '../config/firebase-config.js';
 
 export function initializeCampaignManagement() {
     // Check if there's an existing app instance
