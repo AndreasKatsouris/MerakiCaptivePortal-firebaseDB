@@ -83,14 +83,14 @@ export function initializeCampaignManagement() {
                     console.error('Error loading reward types:', error);
                 }
             },
-            async createCampaign() {
+            async createCampaign(campaignData) {
                 this.loading = true;
                 this.error = null;
                 try {
                     const campaignsRef = ref(rtdb, 'campaigns');
                     const newCampaignRef = push(campaignsRef);
                     await set(newCampaignRef, {
-                        ...this.newCampaign,
+                        ...campaignData,
                         createdAt: new Date().toISOString(),
                         createdBy: auth.currentUser.uid
                     });
@@ -195,122 +195,127 @@ export function initializeCampaignManagement() {
                     title: 'Create New Campaign',
                     width: 800,
                     html: `
-                        <div class="container">
-                            <div class="row mb-3">
-                                <div class="col">
-                                    <input 
-                                        id="campaignName" 
-                                        type="text" 
-                                        class="form-control" 
-                                        placeholder="Campaign Name"
-                                        required
-                                        autocomplete="off"
-                                    >
-                                </div>
-                            </div>
-                            <div class="row mb-3">
-                                <div class="col">
-                                    <input 
-                                        id="brandName" 
-                                        type="text" 
-                                        class="form-control" 
-                                        placeholder="Brand Name"
-                                        required
-                                        autocomplete="off"
-                                    >
-                                </div>
-                                <div class="col">
-                                    <input 
-                                        id="storeName" 
-                                        type="text" 
-                                        class="form-control" 
-                                        placeholder="Store Name (optional)"
-                                        autocomplete="off"
-                                    >
-                                </div>
-                            </div>
-                            <div class="row mb-3">
-                                <div class="col">
-                                    <input id="minPurchase" class="form-control" type="number" placeholder="Minimum Purchase Amount">
-                                </div>
-                            </div>
-                            <div class="row mb-3">
-                                <div class="col">
-                                    <input id="startDate" class="form-control" type="date">
-                                </div>
-                                <div class="col">
-                                    <input id="endDate" class="form-control" type="date">
-                                </div>
-                            </div>
-                            <div class="row mb-3">
-                                <div class="col">
-                                    <h6>Required Items</h6>
-                                    <div id="requiredItems">
-                                        ${itemRowTemplate}
+                        <form id="campaignForm">
+                            <div class="container">
+                                <div class="row mb-3">
+                                    <div class="col">
+                                        <input 
+                                            id="campaignName" 
+                                            name="campaignName"
+                                            type="text" 
+                                            class="form-control swal2-input" 
+                                            placeholder="Campaign Name"
+                                            required
+                                            autocomplete="off"
+                                        >
                                     </div>
                                 </div>
-                            </div>
-                            <div class="row">
-                                <div class="col">
-                                    <h6>Active Days</h6>
-                                    <div id="activeDays" class="weekday-selector-grid">
-                                        ${this.daysOfWeek.map(day => `
-                                            <div class="weekday-item">
-                                                <input 
-                                                    type="checkbox" 
-                                                    class="form-check-input day-checkbox" 
-                                                    id="day${day.value}" 
-                                                    value="${day.value}"
-                                                    checked
-                                                >
-                                                <label 
-                                                    class="form-check-label" 
-                                                    for="day${day.value}"
-                                                >
-                                                    ${day.label}
-                                                </label>
-                                            </div>
-                                        `).join('')}
+                                <div class="row mb-3">
+                                    <div class="col">
+                                        <input 
+                                            id="brandName" 
+                                            name="brandName"
+                                            type="text" 
+                                            class="form-control swal2-input" 
+                                            placeholder="Brand Name"
+                                            required
+                                            autocomplete="off"
+                                        >
+                                    </div>
+                                    <div class="col">
+                                        <input 
+                                            id="storeName" 
+                                            name="storeName"
+                                            type="text" 
+                                            class="form-control swal2-input" 
+                                            placeholder="Store Name (optional)"
+                                            autocomplete="off"
+                                        >
                                     </div>
                                 </div>
-                            </div>
-                            <div class="row">
-                                <div class="col">
-                                    <h6>Campaign Rewards</h6>
-                                    <div id="rewardTypesSection">
-                                        ${this.availableRewardTypes.map(type => `
-                                            <div class="reward-type-item">
-                                                <div class="form-check">
-                                                    <input type="checkbox" 
-                                                        class="form-check-input" 
-                                                        id="reward-type-${type.id}"
-                                                        value="${type.id}">
-                                                    <label class="form-check-label" for="reward-type-${type.id}">
-                                                        ${type.name}
+                                <div class="row mb-3">
+                                    <div class="col">
+                                        <input id="minPurchase" class="form-control" type="number" placeholder="Minimum Purchase Amount">
+                                    </div>
+                                </div>
+                                <div class="row mb-3">
+                                    <div class="col">
+                                        <input id="startDate" class="form-control" type="date">
+                                    </div>
+                                    <div class="col">
+                                        <input id="endDate" class="form-control" type="date">
+                                    </div>
+                                </div>
+                                <div class="row mb-3">
+                                    <div class="col">
+                                        <h6>Required Items</h6>
+                                        <div id="requiredItems">
+                                            ${itemRowTemplate}
+                                        </div>
+                                    </div>
+                                </div>
+                                <div class="row">
+                                    <div class="col">
+                                        <h6>Active Days</h6>
+                                        <div id="activeDays" class="weekday-selector-grid">
+                                            ${this.daysOfWeek.map(day => `
+                                                <div class="weekday-item">
+                                                    <input 
+                                                        type="checkbox" 
+                                                        class="form-check-input day-checkbox" 
+                                                        id="day${day.value}" 
+                                                        value="${day.value}"
+                                                        checked
+                                                    >
+                                                    <label 
+                                                        class="form-check-label" 
+                                                        for="day${day.value}"
+                                                    >
+                                                        ${day.label}
                                                     </label>
                                                 </div>
-                                                <div class="reward-criteria mt-2" style="display:none;">
-                                                    <div class="form-row">
-                                                        <div class="col">
-                                                            <label>Minimum Purchase Amount</label>
-                                                            <input type="number" 
-                                                                class="form-control reward-min-purchase" 
-                                                                data-type-id="${type.id}">
-                                                        </div>
-                                                        <div class="col">
-                                                            <label>Maximum Rewards</label>
-                                                            <input type="number" 
-                                                                class="form-control reward-max-rewards" 
-                                                                data-type-id="${type.id}">
+                                            `).join('')}
+                                        </div>
+                                    </div>
+                                </div>
+                                <div class="row">
+                                    <div class="col">
+                                        <h6>Campaign Rewards</h6>
+                                        <div id="rewardTypesSection">
+                                            ${this.availableRewardTypes.map(type => `
+                                                <div class="reward-type-item">
+                                                    <div class="form-check">
+                                                        <input type="checkbox" 
+                                                            class="form-check-input" 
+                                                            id="reward-type-${type.id}"
+                                                            value="${type.id}">
+                                                        <label class="form-check-label" for="reward-type-${type.id}">
+                                                            ${type.name}
+                                                        </label>
+                                                    </div>
+                                                    <div class="reward-criteria mt-2" style="display:none;">
+                                                        <div class="form-row">
+                                                            <div class="col">
+                                                                <label>Minimum Purchase Amount</label>
+                                                                <input type="number" 
+                                                                    class="form-control reward-min-purchase" 
+                                                                    data-type-id="${type.id}">
+                                                            </div>
+                                                            <div class="col">
+                                                                <label>Maximum Rewards</label>
+                                                                <input type="number" 
+                                                                    class="form-control reward-max-rewards" 
+                                                                    data-type-id="${type.id}">
+                                                            </div>
                                                         </div>
                                                     </div>
                                                 </div>
-                                            </div>
-                                        `).join('')}
+                                            `).join('')}
+                                        </div>
                                     </div>
                                 </div>
                             </div>
-                        </div>
+                        </form>
                     `,
                     didOpen: () => {
                         // Add event listener for adding new item rows
@@ -341,74 +346,79 @@ export function initializeCampaignManagement() {
                     showCancelButton: true,
                     confirmButtonText: 'Create',
                     preConfirm: () => {
-                        const requiredItems = this.getRequiredItemsFromForm();
-                        const activeDays = this.getActiveDaysFromForm();
-                        
-                        // Debug logging for form elements
-                        console.log('Campaign Form Elements:', {
-                            campaignNameElement: document.getElementById('campaignName'),
-                            brandNameElement: document.getElementById('brandName')
-                        });
-                        
-                        // Validate required fields with proper trimming
                         const campaignNameInput = document.getElementById('campaignName');
                         const brandNameInput = document.getElementById('brandName');
-                        
-                        console.log('Form Input Values:', {
-                            campaignNameRaw: campaignNameInput?.value,
-                            campaignNameTrimmed: campaignNameInput?.value?.trim(),
-                            brandNameRaw: brandNameInput?.value,
-                            brandNameTrimmed: brandNameInput?.value?.trim()
-                        });
+                        const storeNameInput = document.getElementById('storeName');
                         
                         const campaignName = campaignNameInput?.value?.trim();
                         const brandName = brandNameInput?.value?.trim();
+                        const storeName = storeNameInput?.value?.trim();
                         
                         let validationErrors = [];
                         if (!campaignName) {
-                            console.log('Campaign name validation failed:', {
-                                campaignName,
-                                isEmpty: !campaignName,
-                                inputExists: !!campaignNameInput
-                            });
                             validationErrors.push('Campaign name is required');
                         }
-                        if (!brandName) validationErrors.push('Brand name is required');
+                        if (!brandName) {
+                            validationErrors.push('Brand name is required');
+                        }
                         
                         if (validationErrors.length > 0) {
-                            console.log('Validation errors:', validationErrors);
-                            Swal.showValidationMessage(validationErrors.join('\n'));
+                            Swal.showValidationMessage(validationErrors.join('<br>'));
                             return false;
                         }
-
-                        // Get form values with proper trimming and type conversion
-                        const formData = {
-                            name: campaignName,
+                        
+                        return {
+                            campaignName,
                             brandName,
-                            storeName: document.getElementById('storeName')?.value?.trim() || '',
-                            minPurchaseAmount: parseFloat(document.getElementById('minPurchase')?.value) || 0,
-                            startDate: document.getElementById('startDate')?.value?.trim(),
-                            endDate: document.getElementById('endDate')?.value?.trim(),
-                            requiredItems,
-                            activeDays,
-                            rewardTypes: selectedRewardTypes,
-                            status: 'active'
+                            storeName
                         };
-
-                        console.log('Form Data:', formData);
-
-                        // Additional validation for dates
-                        if (!formData.startDate || !formData.endDate) {
-                            Swal.showValidationMessage('Start and end dates are required');
-                            return false;
-                        }
-
-                        return formData;
                     }
                 });
             
                 if (formValues) {
-                    this.createCampaign(formValues);
+                    const requiredItems = this.getRequiredItemsFromForm();
+                    const activeDays = this.getActiveDaysFromForm();
+                    
+                    // Map form values to database structure
+                    const campaignData = {
+                        name: formValues.campaignName,  // Map campaignName to name field
+                        brandName: formValues.brandName,
+                        storeName: formValues.storeName || '',
+                        minPurchaseAmount: parseFloat(document.getElementById('minPurchase')?.value) || 0,
+                        startDate: document.getElementById('startDate')?.value?.trim(),
+                        endDate: document.getElementById('endDate')?.value?.trim(),
+                        requiredItems,
+                        activeDays,
+                        rewardTypes: selectedRewardTypes,
+                        status: 'active'
+                    };
+
+                    // Validate dates
+                    if (!campaignData.startDate || !campaignData.endDate) {
+                        Swal.fire({
+                            icon: 'error',
+                            title: 'Validation Error',
+                            text: 'Start and end dates are required'
+                        });
+                        return;
+                    }
+
+                    try {
+                        await this.createCampaign(campaignData);
+                        Swal.fire({
+                            icon: 'success',
+                            title: 'Success',
+                            text: 'Campaign created successfully!'
+                        });
+                        await this.loadCampaigns();
+                    } catch (error) {
+                        console.error('Error creating campaign:', error);
+                        Swal.fire({
+                            icon: 'error',
+                            title: 'Error',
+                            text: 'Failed to create campaign. Please try again.'
+                        });
+                    }
                 }
             },
             async viewCampaign(campaign) {
