@@ -4,7 +4,7 @@ import { AdminUserManagement } from './admin/user-management.js';
 import { initializeDashboard } from './dashboard.js';
 import { initializeProjectManagement } from './project-management.js';
 import { initializeGuestManagement } from './guest-management.js';
-import { initializeCampaignManagement } from './campaigns/campaigns.js';
+import { initializeCampaignManagement, cleanupCampaignManagement } from './campaigns/campaigns.js';
 import { initializeRewardTypes } from './reward-types.js';
 import { initializeReceiptManagement } from './receipt-management.js';
 import { initializeRewardManagement } from './reward-management.js';
@@ -206,6 +206,11 @@ class AdminDashboard {
         if (!section) {
             console.error(`Section ${sectionName} not found`);
             return;
+        }
+
+        // Cleanup previous section if needed
+        if (this.currentSection === 'campaigns' && sectionName !== 'campaigns') {
+            cleanupCampaignManagement();
         }
 
         // Hide all sections

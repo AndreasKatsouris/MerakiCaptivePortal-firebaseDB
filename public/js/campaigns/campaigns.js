@@ -1,6 +1,14 @@
 import { auth, rtdb, ref, get, push, set, update } from '../config/firebase-config.js';
 
 export function initializeCampaignManagement() {
+    // Check if there's an existing app instance
+    const container = document.getElementById('campaigns-app');
+    if (container._vue_app) {
+        console.log('Unmounting existing campaign management app');
+        container._vue_app.unmount();
+        container._vue_app = null;
+    }
+
     if (typeof Vue === 'undefined') {
         console.error('Vue is not loaded. Cannot initialize campaign management.');
         return;
@@ -799,9 +807,20 @@ export function initializeCampaignManagement() {
         `
     });
 
-    // Mount the app to the campaign management container
+    // Store the app instance on the container and mount it
+    container._vue_app = app;
     app.mount('#campaigns-app');
     console.log('Campaign management initialized');
 
     return app;
+}
+
+// Add cleanup function
+export function cleanupCampaignManagement() {
+    const container = document.getElementById('campaigns-app');
+    if (container && container._vue_app) {
+        console.log('Cleaning up campaign management');
+        container._vue_app.unmount();
+        container._vue_app = null;
+    }
 }
