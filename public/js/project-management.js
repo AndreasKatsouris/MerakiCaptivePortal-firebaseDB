@@ -1,5 +1,5 @@
 // Import Firebase database functions from our config
-import { db, ref, push, set, get, update, remove } from './config/firebase-config.js';
+import { rtdb, ref, push, set, get, update, remove } from './config/firebase-config.js';
 
 // Project Management State
 const projectManagement = {
@@ -70,7 +70,7 @@ function showAddProjectModal() {
 // Add these missing functions for project and task creation
 async function createProject(projectData) {
     try {
-        const projectRef = ref(db, 'projects');
+        const projectRef = ref(rtdb, 'projects');
         const newProjectRef = push(projectRef);
         await set(newProjectRef, {
             ...projectData,
@@ -87,7 +87,7 @@ async function createProject(projectData) {
 
 async function createTask(taskData) {
     try {
-        const taskRef = ref(db, `tasks/${taskData.projectId}/tasks`);
+        const taskRef = ref(rtdb, `tasks/${taskData.projectId}/tasks`);
         const newTaskRef = push(taskRef);
         await set(newTaskRef, {
             ...taskData,
@@ -107,7 +107,7 @@ async function loadProjectTasks() {
     try {
         const tasksData = [];
         for (const project of projectManagement.projects) {
-            const snapshot = await get(ref(db, `tasks/${project.id}/tasks`));
+            const snapshot = await get(ref(rtdb, `tasks/${project.id}/tasks`));
             const projectTasks = snapshot.val() ? Object.keys(snapshot.val()).map(key => ({ id: key, ...snapshot.val()[key] })) : [];
             if (projectTasks) {
                 tasksData.push(...projectTasks);
@@ -156,7 +156,7 @@ function initializeProjectListeners() {
 async function loadProjects() {
     try {
         showLoading();
-        const snapshot = await get(ref(db, 'projects'));
+        const snapshot = await get(ref(rtdb, 'projects'));
         const projects = snapshot.val() ? Object.keys(snapshot.val()).map(key => ({ id: key, ...snapshot.val()[key] })) : [];
         
         if (projects) {
@@ -257,7 +257,7 @@ function renderProjectTasks(projectId) {
 // Action handlers
 async function handleEditProject(projectId) {
     try {
-        const snapshot = await get(ref(db, `projects/${projectId}`));
+        const snapshot = await get(ref(rtdb, `projects/${projectId}`));
         const project = snapshot.val();
         
         if (!project) throw new Error('Project not found');
@@ -277,7 +277,7 @@ async function handleEditProject(projectId) {
             confirmButtonText: 'Update'
         }).then(async (result) => {
             if (result.isConfirmed) {
-                await update(ref(db, `projects/${projectId}`), {
+                await update(ref(rtdb, `projects/${projectId}`), {
                     name: document.getElementById('projectName').value,
                     description: document.getElementById('projectDescription').value,
                     status: document.getElementById('projectStatus').value,
@@ -304,8 +304,8 @@ async function handleDeleteProject(projectId) {
         });
 
         if (result.isConfirmed) {
-            await remove(ref(db, `projects/${projectId}`));
-            await remove(ref(db, `tasks/${projectId}`));
+            await remove(ref(rtdb, `projects/${projectId}`));
+            await remove(ref(rtdb, `tasks/${projectId}`));
             loadProjects();
         }
     } catch (error) {
@@ -316,7 +316,7 @@ async function handleDeleteProject(projectId) {
 
 async function handleEditTask(projectId, taskId) {
     try {
-        const snapshot = await get(ref(db, `tasks/${projectId}/tasks/${taskId}`));
+        const snapshot = await get(ref(rtdb, `tasks/${projectId}/tasks/${taskId}`));
         const task = snapshot.val();
         
         if (!task) throw new Error('Task not found');
@@ -335,7 +335,7 @@ async function handleEditTask(projectId, taskId) {
             confirmButtonText: 'Update'
         }).then(async (result) => {
             if (result.isConfirmed) {
-                await update(ref(db, `tasks/${projectId}/tasks/${taskId}`), {
+                await update(ref(rtdb, `tasks/${projectId}/tasks/${taskId}`), {
                     description: document.getElementById('taskDescription').value,
                     priority: document.getElementById('taskPriority').value,
                     updatedAt: Date.now()
@@ -361,7 +361,7 @@ async function handleDeleteTask(projectId, taskId) {
         });
 
         if (result.isConfirmed) {
-            await remove(ref(db, `tasks/${projectId}/tasks/${taskId}`));
+            await remove(ref(rtdb, `tasks/${projectId}/tasks/${taskId}`));
             loadProjects();
         }
     } catch (error) {
@@ -372,7 +372,7 @@ async function handleDeleteTask(projectId, taskId) {
 
 async function handleCompleteTask(projectId, taskId) {
     try {
-        await update(ref(db, `tasks/${projectId}/tasks/${taskId}`), {
+        await update(ref(rtdb, `tasks/${projectId}/tasks/${taskId}`), {
             status: 'completed',
             completedAt: Date.now()
         });
