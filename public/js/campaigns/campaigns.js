@@ -37,7 +37,7 @@ export function initializeCampaignManagement() {
                 rewardCriteria: {},
                 availableRewardTypes: [],
                 newCampaign: {
-                    campaignName: '',
+                    name: '',
                     brandName: '',
                     storeName: '',
                     minPurchaseAmount: '',
@@ -131,7 +131,7 @@ export function initializeCampaignManagement() {
             },
             resetForm() {
                 this.newCampaign = {
-                    campaignName: '',
+                    name: '',
                     brandName: '',
                     storeName: '',
                     minPurchaseAmount: '',
@@ -352,23 +352,16 @@ export function initializeCampaignManagement() {
                         });
                     },
                     preConfirm: () => {
-                        const campaignNameInput = document.getElementById('campaignName');
-                        const brandNameInput = document.getElementById('brandName');
-                        const storeNameInput = document.getElementById('storeName');
-                        const minPurchaseInput = document.getElementById('minPurchase');
-                        const startDateInput = document.getElementById('startDate');
-                        const endDateInput = document.getElementById('endDate');
+                        const modal = Swal.getHtmlContainer();
                         
-                        console.log('Form Inputs:', {
-                            campaignName: campaignNameInput?.value,
-                            brandName: brandNameInput?.value,
-                            storeName: storeNameInput?.value,
-                            minPurchase: minPurchaseInput?.value,
-                            startDate: startDateInput?.value,
-                            endDate: endDateInput?.value
-                        });
-
-                        // Get and trim input values
+                        const campaignNameInput = modal.querySelector('#campaignName');
+                        const brandNameInput = modal.querySelector('#brandName');
+                        const storeNameInput = modal.querySelector('#storeName');
+                        const minPurchaseInput = modal.querySelector('#minPurchase');
+                        const startDateInput = modal.querySelector('#startDate');
+                        const endDateInput = modal.querySelector('#endDate');
+                        
+                        // Trim values
                         const campaignName = campaignNameInput?.value?.trim();
                         const brandName = brandNameInput?.value?.trim();
                         const storeName = storeNameInput?.value?.trim();
@@ -376,7 +369,16 @@ export function initializeCampaignManagement() {
                         const startDate = startDateInput?.value?.trim();
                         const endDate = endDateInput?.value?.trim();
                         
-                        // Get additional form data
+                        console.log('Form Values:', {
+                            campaignName,
+                            brandName,
+                            storeName,
+                            minPurchaseAmount,
+                            startDate,
+                            endDate
+                        });
+                        
+                        // Get and trim input values
                         const requiredItems = this.getRequiredItemsFromForm();
                         const activeDays = this.getActiveDaysFromForm();
                         
@@ -401,7 +403,7 @@ export function initializeCampaignManagement() {
                         return {
                             name: campaignName,  // Map to database field name
                             brandName,
-                            storeName: storeName || '',
+                            storeName,
                             minPurchaseAmount,
                             startDate,
                             endDate,
@@ -466,6 +468,7 @@ export function initializeCampaignManagement() {
                 });
             },
             async editCampaign(campaign) {
+                let selectedRewardTypes = campaign.rewardTypes ? [...campaign.rewardTypes] : [];
                 const itemRowTemplate = `
                     <div class="required-item-row mb-2">
                         <div class="input-group">
@@ -624,9 +627,6 @@ export function initializeCampaignManagement() {
                         </div>
                     `,
                     didOpen: () => {
-                        // Initialize selected reward types from campaign data
-                        selectedRewardTypes = campaign.rewardTypes || [];
-                        
                         // Add event listener for adding new item rows
                         document.querySelectorAll('.add-item').forEach(button => {
                             button.addEventListener('click', () => {
@@ -692,28 +692,34 @@ export function initializeCampaignManagement() {
                     showCancelButton: true,
                     confirmButtonText: 'Update',
                     preConfirm: () => {
-                        const requiredItems = this.getRequiredItemsFromForm();
-                        const activeDays = this.getActiveDaysFromForm();
+                        const modal = Swal.getHtmlContainer();
                         
-                        // Debug logging for form elements
-                        console.log('Campaign Form Elements:', {
-                            campaignNameElement: document.getElementById('campaignName'),
-                            brandNameElement: document.getElementById('brandName')
-                        });
+                        const campaignNameInput = modal.querySelector('#campaignName');
+                        const brandNameInput = modal.querySelector('#brandName');
+                        const storeNameInput = modal.querySelector('#storeName');
+                        const minPurchaseInput = modal.querySelector('#minPurchase');
+                        const startDateInput = modal.querySelector('#startDate');
+                        const endDateInput = modal.querySelector('#endDate');
                         
-                        // Validate required fields with proper trimming
-                        const campaignNameInput = document.getElementById('campaignName');
-                        const brandNameInput = document.getElementById('brandName');
-                        
-                        console.log('Form Input Values:', {
-                            campaignNameRaw: campaignNameInput?.value,
-                            campaignNameTrimmed: campaignNameInput?.value?.trim(),
-                            brandNameRaw: brandNameInput?.value,
-                            brandNameTrimmed: brandNameInput?.value?.trim()
-                        });
-                        
+                        // Trim values
                         const campaignName = campaignNameInput?.value?.trim();
                         const brandName = brandNameInput?.value?.trim();
+                        const storeName = storeNameInput?.value?.trim();
+                        const minPurchaseAmount = parseFloat(minPurchaseInput?.value) || 0;
+                        const startDate = startDateInput?.value?.trim();
+                        const endDate = endDateInput?.value?.trim();
+                        
+                        console.log('Form Values:', {
+                            campaignName,
+                            brandName,
+                            storeName,
+                            minPurchaseAmount,
+                            startDate,
+                            endDate
+                        });
+                        
+                        const requiredItems = this.getRequiredItemsFromForm();
+                        const activeDays = this.getActiveDaysFromForm();
                         
                         let validationErrors = [];
                         if (!campaignName) {
@@ -736,10 +742,10 @@ export function initializeCampaignManagement() {
                         const formData = {
                             name: campaignName,
                             brandName,
-                            storeName: document.getElementById('storeName')?.value?.trim() || '',
-                            minPurchaseAmount: parseFloat(document.getElementById('minPurchase')?.value) || 0,
-                            startDate: document.getElementById('startDate')?.value?.trim(),
-                            endDate: document.getElementById('endDate')?.value?.trim(),
+                            storeName,
+                            minPurchaseAmount,
+                            startDate,
+                            endDate,
                             requiredItems,
                             activeDays,
                             rewardTypes: selectedRewardTypes,
