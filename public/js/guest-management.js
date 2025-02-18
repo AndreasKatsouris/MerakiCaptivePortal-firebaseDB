@@ -1,8 +1,6 @@
 // Import Firebase dependencies
 import { auth, rtdb, ref, get, push, set, update, remove } from './config/firebase-config.js';
 
-const _ = window._;
-
 // Guest Management State
 const guestManagement = {
     app: null,
@@ -308,69 +306,63 @@ const guestManagement = {
                 }
             },
 
-            async calculateGuestMetrics(guestData) {
-                const receipts = guestData.receipts || [];
-                const now = Date.now();
+            calculateGuestMetrics(guestData) {
+                if (!guestData || !guestData.receipts) {
+                    return {
+                        visitCount: 0,
+                        totalSpent: 0,
+                        averageSpend: 0,
+                        lastVisit: null,
+                        engagementScore: 0
+                    };
+                }
+
+                const receipts = Object.values(guestData.receipts || {});
+                const now = new Date();
                 
-                // Calculate basic metrics
-                const totalSpend = receipts.reduce((sum, receipt) => 
-                    sum + (receipt.totalAmount || 0), 0
-                );
-                
+                // Basic metrics
                 const visitCount = receipts.length;
-                const averageSpend = visitCount > 0 ? totalSpend / visitCount : 0;
+                const totalSpent = receipts.reduce((sum, receipt) => sum + (receipt.total || 0), 0);
+                const averageSpend = visitCount > 0 ? totalSpent / visitCount : 0;
+                const lastVisit = receipts.length > 0 
+                    ? new Date(Math.max(...receipts.map(r => new Date(r.timestamp))))
+                    : null;
 
-                // Calculate time-based metrics
-                const receiptDates = receipts
-                    .map(r => new Date(r.processedAt).getTime())
-                    .sort();
-                
-                const firstVisit = receiptDates[0];
-                const lastVisit = receiptDates[receiptDates.length - 1];
+                // Visit frequency (last 30 days)
+                const recentReceipts = receipts.filter(r => {
+                    const receiptDate = new Date(r.timestamp);
+                    return (now - receiptDate) <= 30 * 24 * 60 * 60 * 1000;
+                });
 
-                // Calculate visit frequency
-                const visitFrequency = visitCount > 1 ? 
-                    Math.round((lastVisit - firstVisit) / (1000 * 60 * 60 * 24 * (visitCount - 1))) : 
-                    0;
+                // Group visits by day
+                const visitsByDay = {};
+                recentReceipts.forEach(receipt => {
+                    const day = new Date(receipt.timestamp).toDateString();
+                    visitsByDay[day] = (visitsByDay[day] || 0) + 1;
+                });
 
-                // Analyze store preferences
-                const storeVisits = _.groupBy(receipts, 'storeName');
-                const storeStats = Object.entries(storeVisits)
-                    .map(([store, visits]) => ({
-                        store,
-                        visits: visits.length,
-                        totalSpend: visits.reduce((sum, visit) => 
-                            sum + (visit.totalAmount || 0), 0
-                        )
-                    }))
-                    .sort((a, b) => b.visits - a.visits);
-
-                // Calculate engagement score
-                const daysSinceLastVisit = lastVisit ? 
-                    Math.floor((now - lastVisit) / (1000 * 60 * 60 * 24)) : 
-                    Infinity;
-
-                const recencyScore = Math.max(0, 100 - (daysSinceLastVisit * 2));
-                const frequencyScore = Math.min(100, visitFrequency ? (30 / visitFrequency) * 100 : 0);
-                const monetaryScore = Math.min(100, (totalSpend / 10000) * 100);
-
-                const engagementScore = Math.round(
-                    (recencyScore * 0.4) + (frequencyScore * 0.3) + (monetaryScore * 0.3)
-                );
+                // Calculate engagement score (0-100)
+                let engagementScore = 0;
+                if (visitCount > 0) {
+                    // Frequency component (40%)
+                    const frequencyScore = Math.min(Object.keys(visitsByDay).length / 30 * 100, 100) * 0.4;
+                    
+                    // Recency component (30%)
+                    const daysSinceLastVisit = lastVisit ? (now - lastVisit) / (24 * 60 * 60 * 1000) : 30;
+                    const recencyScore = Math.max(0, (30 - daysSinceLastVisit) / 30 * 100) * 0.3;
+                    
+                    // Spend component (30%)
+                    const spendScore = Math.min(averageSpend / 1000 * 100, 100) * 0.3;
+                    
+                    engagementScore = Math.round(frequencyScore + recencyScore + spendScore);
+                }
 
                 return {
                     visitCount,
-                    totalSpend,
+                    totalSpent,
                     averageSpend,
-                    lifetimeValue: totalSpend,
-                    firstVisitDate: firstVisit,
-                    lastVisitDate: lastVisit,
-                    visitFrequency,
-                    daysSinceLastVisit,
-                    favoriteStore: storeStats[0]?.store || 'N/A',
-                    storePreferences: storeStats,
-                    engagementScore,
-                    tier: this.calculateLoyaltyTier(totalSpend, visitCount)
+                    lastVisit,
+                    engagementScore
                 };
             },
 
@@ -387,7 +379,7 @@ const guestManagement = {
             },
 
             getSortValue(guest, key) {
-                return _.get(guest, key);
+                return guest[key];
             },
 
             sort(key) {
@@ -404,19 +396,75 @@ const guestManagement = {
                 return this.sortConfig.direction === 'asc' ? 'fas fa-sort-up' : 'fas fa-sort-down';
             },
 
+            async showAddGuestModal() {
+                const { value: formValues } = await Swal.fire({
+                    title: 'Add New Guest',
+                    html: `
+                        <div class="form-group mb-3">
+                            <label for="name">Name</label>
+                            <input id="name" class="form-control" placeholder="Guest Name">
+                        </div>
+                        <div class="form-group mb-3">
+                            <label for="phoneNumber">Phone Number</label>
+                            <input id="phoneNumber" class="form-control" placeholder="+27 Phone Number">
+                        </div>
+                    `,
+                    focusConfirm: false,
+                    showCancelButton: true,
+                    confirmButtonText: 'Add',
+                    cancelButtonText: 'Cancel',
+                    preConfirm: () => {
+                        const name = Swal.getPopup().querySelector('#name').value;
+                        const phoneNumber = Swal.getPopup().querySelector('#phoneNumber').value;
+                        
+                        if (!name || !phoneNumber) {
+                            Swal.showValidationMessage('Please fill in all fields');
+                            return false;
+                        }
+                        
+                        return { name, phoneNumber };
+                    }
+                });
+
+                if (formValues) {
+                    try {
+                        const guestRef = ref(rtdb, `guests/${formValues.phoneNumber}`);
+                        await set(guestRef, {
+                            name: formValues.name,
+                            phoneNumber: formValues.phoneNumber,
+                            createdAt: new Date().toISOString(),
+                            metrics: {
+                                visitCount: 0,
+                                totalSpent: 0,
+                                lastVisit: null
+                            }
+                        });
+                        
+                        await this.loadGuests();
+                        Swal.fire('Success', 'Guest added successfully', 'success');
+                    } catch (error) {
+                        console.error('Error adding guest:', error);
+                        Swal.fire('Error', 'Failed to add guest', 'error');
+                    }
+                }
+            },
+
             async viewGuest(guest) {
                 const { metrics, receipts } = guest;
                 
                 // Calculate receipt patterns
-                const dayOfWeekCount = _.countBy(receipts, r => 
-                    new Date(r.processedAt).getDay()
-                );
-                
-                const timeOfDayCount = _.countBy(receipts, r => {
-                    const hour = new Date(r.processedAt).getHours();
-                    if (hour < 12) return 'morning';
-                    if (hour < 17) return 'afternoon';
-                    return 'evening';
+                const dayOfWeekCount = {};
+                receipts.forEach(receipt => {
+                    const day = new Date(receipt.timestamp).getDay();
+                    dayOfWeekCount[day] = (dayOfWeekCount[day] || 0) + 1;
+                });
+
+                const timeOfDayCount = {};
+                receipts.forEach(receipt => {
+                    const hour = new Date(receipt.timestamp).getHours();
+                    if (hour < 12) timeOfDayCount['morning'] = (timeOfDayCount['morning'] || 0) + 1;
+                    else if (hour < 17) timeOfDayCount['afternoon'] = (timeOfDayCount['afternoon'] || 0) + 1;
+                    else timeOfDayCount['evening'] = (timeOfDayCount['evening'] || 0) + 1;
                 });
 
                 const html = `
@@ -426,41 +474,37 @@ const guestManagement = {
                                 <h6 class="text-muted">Basic Information</h6>
                                 <p><strong>Name:</strong> ${guest.name || 'N/A'}</p>
                                 <p><strong>Phone:</strong> ${guest.phoneNumber}</p>
-                                <p><strong>Loyalty Tier:</strong> ${metrics.tier}</p>
-                                <p><strong>Joined:</strong> ${this.formatDate(metrics.firstVisitDate)}</p>
+                                <p><strong>Loyalty Tier:</strong> ${guest.metrics.tier}</p>
+                                <p><strong>Joined:</strong> ${this.formatDate(guest.metrics.firstVisitDate)}</p>
                             </div>
                             <div class="col-md-6">
                                 <h6 class="text-muted">Visit Statistics</h6>
-                                <p><strong>Total Visits:</strong> ${metrics.visitCount}</p>
-                                <p><strong>Average Spend:</strong> R${metrics.averageSpend.toFixed(2)}</p>
-                                <p><strong>Total Spend:</strong> R${metrics.totalSpend.toFixed(2)}</p>
-                                <p><strong>Last Visit:</strong> ${this.formatDate(metrics.lastVisitDate)}</p>
+                                <p><strong>Total Visits:</strong> ${guest.metrics.visitCount}</p>
+                                <p><strong>Average Spend:</strong> R${guest.metrics.averageSpend.toFixed(2)}</p>
+                                <p><strong>Total Spend:</strong> R${guest.metrics.totalSpent.toFixed(2)}</p>
+                                <p><strong>Last Visit:</strong> ${this.formatDate(guest.metrics.lastVisitDate)}</p>
                             </div>
                         </div>
                         <div class="row mb-4">
                             <div class="col-md-6">
                                 <h6 class="text-muted">Store Preferences</h6>
-                                ${metrics.storePreferences.map(store => `
+                                ${Object.entries(guest.metrics.storePreferences || {}).map(([store, visits]) => `
                                     <div class="d-flex justify-content-between mb-2">
-                                        <span>${store.store}</span>
-                                        <span>${store.visits} visits</span>
+                                        <span>${store}</span>
+                                        <span>${visits} visits</span>
                                     </div>
                                 `).join('')}
                             </div>
                             <div class="col-md-6">
                                 <h6 class="text-muted">Visit Patterns</h6>
                                 <p><strong>Preferred Days:</strong></p>
-                                ${Object.entries(dayOfWeekCount)
-                                    .map(([day, count]) => 
-                                        `${['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'][day]}: ${count}`
-                                    )
-                                    .join(', ')}
+                                ${Object.entries(dayOfWeekCount).map(([day, count]) => 
+                                    `${['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'][day]}: ${count}`
+                                ).join(', ')}
                                 <p class="mt-2"><strong>Time of Day:</strong></p>
-                                ${Object.entries(timeOfDayCount)
-                                    .map(([time, count]) => 
-                                        `${_.capitalize(time)}: ${count}`
-                                    )
-                                    .join(', ')}
+                                ${Object.entries(timeOfDayCount).map(([time, count]) => 
+                                    `${_.capitalize(time)}: ${count}`
+                                ).join(', ')}
                             </div>
                         </div>
                     </div>
