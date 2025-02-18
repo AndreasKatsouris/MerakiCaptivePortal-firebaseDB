@@ -1,4 +1,14 @@
-import { auth, rtdb, ref, get, push, set, update } from '../config/firebase-config.js';
+import { initializeApp } from 'firebase/app';
+import { getDatabase, ref, push, set, update, remove } from 'firebase/database';
+import { getAuth } from 'firebase/auth';
+
+const firebaseConfig = {
+  // Your Firebase config here
+};
+
+const app = initializeApp(firebaseConfig);
+const rtdb = getDatabase(app);
+const auth = getAuth(app);
 
 export function initializeCampaignManagement() {
     // Check if there's an existing app instance
@@ -95,8 +105,7 @@ export function initializeCampaignManagement() {
                 this.loading = true;
                 this.error = null;
                 try {
-                    const campaignsRef = ref(rtdb, 'campaigns');
-                    const newCampaignRef = push(campaignsRef);
+                    const newCampaignRef = push(ref(rtdb, 'campaigns'));
                     await set(newCampaignRef, {
                         ...campaignData,
                         createdAt: new Date().toISOString(),
@@ -115,8 +124,7 @@ export function initializeCampaignManagement() {
                 this.loading = true;
                 this.error = null;
                 try {
-                    const campaignRef = ref(rtdb, `campaigns/${campaign.id}`);
-                    await update(campaignRef, {
+                    await update(ref(rtdb, `campaigns/${campaign.id}`), {
                         ...campaign,
                         updatedAt: new Date().toISOString(),
                         updatedBy: auth.currentUser.uid
@@ -765,7 +773,7 @@ export function initializeCampaignManagement() {
                 }).then(async (result) => {
                     if (result.isConfirmed) {
                         try {
-                            await firebase.database().ref(`campaigns/${campaign.id}`).update({
+                            await update(ref(rtdb, `campaigns/${campaign.id}`), {
                                 ...result.value,
                                 updatedAt: Date.now()
                             });
@@ -790,7 +798,7 @@ export function initializeCampaignManagement() {
 
                 if (result.isConfirmed) {
                     try {
-                        await firebase.database().ref(`campaigns/${campaign.id}`).remove();
+                        await remove(ref(rtdb, `campaigns/${campaign.id}`));
                         await this.loadCampaigns();
                         Swal.fire('Deleted!', 'Campaign has been deleted.', 'success');
                     } catch (error) {
