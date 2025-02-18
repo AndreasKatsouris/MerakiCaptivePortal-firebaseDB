@@ -351,17 +351,36 @@ export function initializeCampaignManagement() {
                             });
                         });
                     },
-                    showCancelButton: true,
-                    confirmButtonText: 'Create',
                     preConfirm: () => {
                         const campaignNameInput = document.getElementById('campaignName');
                         const brandNameInput = document.getElementById('brandName');
                         const storeNameInput = document.getElementById('storeName');
+                        const minPurchaseInput = document.getElementById('minPurchase');
+                        const startDateInput = document.getElementById('startDate');
+                        const endDateInput = document.getElementById('endDate');
                         
+                        console.log('Form Inputs:', {
+                            campaignName: campaignNameInput?.value,
+                            brandName: brandNameInput?.value,
+                            storeName: storeNameInput?.value,
+                            minPurchase: minPurchaseInput?.value,
+                            startDate: startDateInput?.value,
+                            endDate: endDateInput?.value
+                        });
+
+                        // Get and trim input values
                         const campaignName = campaignNameInput?.value?.trim();
                         const brandName = brandNameInput?.value?.trim();
                         const storeName = storeNameInput?.value?.trim();
+                        const minPurchaseAmount = parseFloat(minPurchaseInput?.value) || 0;
+                        const startDate = startDateInput?.value?.trim();
+                        const endDate = endDateInput?.value?.trim();
                         
+                        // Get additional form data
+                        const requiredItems = this.getRequiredItemsFromForm();
+                        const activeDays = this.getActiveDaysFromForm();
+                        
+                        // Validate required fields
                         let validationErrors = [];
                         if (!campaignName) {
                             validationErrors.push('Campaign name is required');
@@ -369,59 +388,48 @@ export function initializeCampaignManagement() {
                         if (!brandName) {
                             validationErrors.push('Brand name is required');
                         }
-                        
+                        if (!startDate || !endDate) {
+                            validationErrors.push('Start and end dates are required');
+                        }
+
                         if (validationErrors.length > 0) {
                             Swal.showValidationMessage(validationErrors.join('<br>'));
                             return false;
                         }
-                        
+
+                        // Return the complete campaign data
                         return {
-                            campaignName,
+                            name: campaignName,  // Map to database field name
                             brandName,
-                            storeName
+                            storeName: storeName || '',
+                            minPurchaseAmount,
+                            startDate,
+                            endDate,
+                            requiredItems,
+                            activeDays,
+                            rewardTypes: selectedRewardTypes,
+                            status: 'active'
                         };
-                    }
+                    },
+                    showLoaderOnConfirm: true,
+                    allowOutsideClick: () => !Swal.isLoading()
                 });
             
                 if (formValues) {
-                    const requiredItems = this.getRequiredItemsFromForm();
-                    const activeDays = this.getActiveDaysFromForm();
-                    
-                    // Map form values to database structure
-                    const campaignData = {
-                        name: formValues.campaignName,  // Map campaignName to name field
-                        brandName: formValues.brandName,
-                        storeName: formValues.storeName || '',
-                        minPurchaseAmount: parseFloat(document.getElementById('minPurchase')?.value) || 0,
-                        startDate: document.getElementById('startDate')?.value?.trim(),
-                        endDate: document.getElementById('endDate')?.value?.trim(),
-                        requiredItems,
-                        activeDays,
-                        rewardTypes: selectedRewardTypes,
-                        status: 'active'
-                    };
-
-                    // Validate dates
-                    if (!campaignData.startDate || !campaignData.endDate) {
-                        Swal.fire({
-                            icon: 'error',
-                            title: 'Validation Error',
-                            text: 'Start and end dates are required'
-                        });
-                        return;
-                    }
-
                     try {
-                        await this.createCampaign(campaignData);
-                        Swal.fire({
+                        console.log('Creating campaign with data:', formValues);
+                        await this.createCampaign(formValues);
+                        
+                        await Swal.fire({
                             icon: 'success',
                             title: 'Success',
                             text: 'Campaign created successfully!'
                         });
+                        
                         await this.loadCampaigns();
                     } catch (error) {
                         console.error('Error creating campaign:', error);
-                        Swal.fire({
+                        await Swal.fire({
                             icon: 'error',
                             title: 'Error',
                             text: 'Failed to create campaign. Please try again.'
@@ -574,18 +582,59 @@ export function initializeCampaignManagement() {
                                     </div>
                                 </div>
                             </div>
+                            <div class="row">
+                                <div class="col">
+                                    <h6>Campaign Rewards</h6>
+                                    <div id="rewardTypesSection">
+                                        ${this.availableRewardTypes.map(type => `
+                                            <div class="reward-type-item">
+                                                <div class="form-check">
+                                                    <input type="checkbox" 
+                                                        class="form-check-input" 
+                                                        id="reward-type-${type.id}"
+                                                        value="${type.id}"
+                                                        ${campaign.rewardTypes && campaign.rewardTypes.some(r => r.typeId === type.id) ? 'checked' : ''}>
+                                                    <label class="form-check-label" for="reward-type-${type.id}">
+                                                        ${type.name}
+                                                    </label>
+                                                </div>
+                                                <div class="reward-criteria mt-2" style="display:${campaign.rewardTypes && campaign.rewardTypes.some(r => r.typeId === type.id) ? 'block' : 'none'}">
+                                                    <div class="form-row">
+                                                        <div class="col">
+                                                            <label>Minimum Purchase Amount</label>
+                                                            <input type="number" 
+                                                                class="form-control reward-min-purchase" 
+                                                                data-type-id="${type.id}"
+                                                                value="${(campaign.rewardTypes && campaign.rewardTypes.find(r => r.typeId === type.id)?.criteria?.minPurchaseAmount) || ''}">
+                                                        </div>
+                                                        <div class="col">
+                                                            <label>Maximum Rewards</label>
+                                                            <input type="number" 
+                                                                class="form-control reward-max-rewards" 
+                                                                data-type-id="${type.id}"
+                                                                value="${(campaign.rewardTypes && campaign.rewardTypes.find(r => r.typeId === type.id)?.criteria?.maxRewards) || ''}">
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        `).join('')}
+                                    </div>
+                                </div>
+                            </div>
                         </div>
                     `,
                     didOpen: () => {
+                        // Initialize selected reward types from campaign data
+                        selectedRewardTypes = campaign.rewardTypes || [];
+                        
                         // Add event listener for adding new item rows
                         document.querySelectorAll('.add-item').forEach(button => {
-                            button.addEventListener('click', (e) => {
-                                const newRow = document.createElement('div');
-                                newRow.innerHTML = itemRowTemplate;
-                                e.target.closest('.required-item-row').insertAdjacentElement('afterend', newRow.firstElementChild);
+                            button.addEventListener('click', () => {
+                                const container = document.getElementById('requiredItems');
+                                container.insertAdjacentHTML('beforeend', itemRowTemplate);
                             });
                         });
-            
+
                         // Add event listener for removing item rows
                         document.querySelectorAll('.remove-item').forEach(button => {
                             button.addEventListener('click', (e) => {
@@ -596,11 +645,47 @@ export function initializeCampaignManagement() {
                             });
                         });
 
-                            // Add reward type checkbox handlers
+                        // Add reward type checkbox handlers
                         document.querySelectorAll('#rewardTypesSection input[type="checkbox"]').forEach(checkbox => {
                             checkbox.addEventListener('change', (e) => {
+                                const typeId = e.target.value;
                                 const criteriaDiv = e.target.closest('.reward-type-item').querySelector('.reward-criteria');
                                 criteriaDiv.style.display = e.target.checked ? 'block' : 'none';
+                                
+                                if (e.target.checked) {
+                                    // Add reward type
+                                    const minPurchaseInput = criteriaDiv.querySelector('.reward-min-purchase');
+                                    const maxRewardsInput = criteriaDiv.querySelector('.reward-max-rewards');
+                                    selectedRewardTypes.push({
+                                        typeId,
+                                        criteria: {
+                                            minPurchaseAmount: parseFloat(minPurchaseInput.value) || 0,
+                                            maxRewards: parseInt(maxRewardsInput.value) || 0
+                                        }
+                                    });
+                                } else {
+                                    // Remove reward type
+                                    selectedRewardTypes = selectedRewardTypes.filter(r => r.typeId !== typeId);
+                                }
+                            });
+                            
+                            // Add change handlers for criteria inputs
+                            const criteriaDiv = checkbox.closest('.reward-type-item').querySelector('.reward-criteria');
+                            const minPurchaseInput = criteriaDiv.querySelector('.reward-min-purchase');
+                            const maxRewardsInput = criteriaDiv.querySelector('.reward-max-rewards');
+                            
+                            [minPurchaseInput, maxRewardsInput].forEach(input => {
+                                input.addEventListener('change', (e) => {
+                                    const typeId = e.target.dataset.typeId;
+                                    const rewardType = selectedRewardTypes.find(r => r.typeId === typeId);
+                                    if (rewardType) {
+                                        if (e.target.classList.contains('reward-min-purchase')) {
+                                            rewardType.criteria.minPurchaseAmount = parseFloat(e.target.value) || 0;
+                                        } else {
+                                            rewardType.criteria.maxRewards = parseInt(e.target.value) || 0;
+                                        }
+                                    }
+                                });
                             });
                         });
                     },
