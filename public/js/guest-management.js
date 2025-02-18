@@ -1,3 +1,6 @@
+// Import Firebase dependencies
+import { auth, rtdb, ref, get, push, set, update, remove } from './config/firebase-config.js';
+
 const _ = window._;
 
 // Guest Management State
@@ -239,7 +242,7 @@ const guestManagement = {
             async loadGuests() {
                 this.loading = true;
                 try {
-                    const snapshot = await firebase.database().ref('guests').once('value');
+                    const snapshot = await get(ref(rtdb, 'guests'));
                     const guests = snapshot.val();
                     
                     if (guests) {
@@ -270,7 +273,7 @@ const guestManagement = {
             async getGuestReceipts(phoneNumber) {
                 try {
                     // Debug authentication state
-                    const currentUser = firebase.auth().currentUser;
+                    const currentUser = auth.currentUser;
                     console.log('Current user:', currentUser);
                     console.log('Auth token claims:', await currentUser?.getIdTokenResult());
                     
@@ -282,20 +285,14 @@ const guestManagement = {
                     console.log('Attempting to access:', normalizedPhone);
                     
                     // First check guest-receipts index
-                    const receiptIndexSnapshot = await firebase.database()
-                        .ref('guest-receipts')
-                        .child(normalizedPhone)
-                        .once('value');
+                    const receiptIndexSnapshot = await get(ref(rtdb, `guest-receipts/${normalizedPhone}`));
                     
                     const receiptIds = Object.keys(receiptIndexSnapshot.val() || {});
                     
                     // Fetch full receipt details
                     const receiptsData = await Promise.all(
                         receiptIds.map(async id => {
-                            const receiptSnapshot = await firebase.database()
-                                .ref('receipts')
-                                .child(id)
-                                .once('value');
+                            const receiptSnapshot = await get(ref(rtdb, `receipts/${id}`));
                             return { id, ...receiptSnapshot.val() };
                         })
                     );
@@ -304,8 +301,8 @@ const guestManagement = {
                 } catch (error) {
                     console.error('Error retrieving receipts:', error, {
                         phoneNumber,
-                        authState: firebase.auth().currentUser?.uid,
-                        claims: await firebase.auth().currentUser?.getIdTokenResult()
+                        authState: auth.currentUser?.uid,
+                        claims: await auth.currentUser?.getIdTokenResult()
                     });
                     return [];
                 }
@@ -522,7 +519,7 @@ const guestManagement = {
                 if (formValues) {
                     try {
                         // Update guest data
-                        await firebase.database().ref(`guests/${guest.phoneNumber}`).update({
+                        await update(ref(rtdb, `guests/${guest.phoneNumber}`), {
                             name: formValues.name,
                             tier: formValues.tier,
                             updatedAt: Date.now()
@@ -557,7 +554,7 @@ const guestManagement = {
                             [`guest-receipts/${guest.phoneNumber}`]: null
                         };
 
-                        await firebase.database().ref().update(updates);
+                        await update(ref(rtdb), updates);
                         await this.loadGuests();
                         
                         Swal.fire('Deleted!', 'Guest has been deleted.', 'success');

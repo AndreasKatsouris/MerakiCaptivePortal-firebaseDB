@@ -79,57 +79,58 @@ class AdminDashboard {
     }
 
     registerSections() {
-        const sections = {
-            // Main Dashboard
-            dashboard: {
-                menuId: 'dashboardMenu',
-                contentId: 'dashboardContent',
-                initialize: initializeDashboard
-            },
-            // Campaigns
-            campaigns: {
-                menuId: 'campaignsMenu',
-                contentId: 'campaignManagementContent',
-                initialize: initializeCampaignManagement
-            },
-            // Analytics
-            analytics: {
-                menuId: 'analyticsMenu',
-                contentId: 'analyticsContent'
-            },
-            // Admin Users
-            adminUsers: {
-                menuId: 'adminUsersMenu',
-                contentId: 'adminUsersContent',
-                initialize: () => this.initializeAdminUsersSection()
-            },
-            // Project Management
-            projects: {
-                menuId: 'projectManagementMenu',
-                contentId: 'projectManagementContent',
-                initialize: initializeProjectManagement
-            },
-            // Settings and Database Management
-            settings: {
-                menuId: 'settingsMenu',
-                contentId: 'settingsContent',
-                hasSubmenu: true
-            },
-            databaseManagement: {
-                menuId: 'databaseManagementMenu',
-                contentId: 'databaseManagementContent',
-                parent: 'settingsSubmenu',
-                initialize: () => {
-                    const clearScanningDataBtn = document.getElementById('clearScanningDataBtn');
-                    if (clearScanningDataBtn) {
-                        clearScanningDataBtn.addEventListener('click', this.handleClearScanningData.bind(this));
-                    }
+        this.sections.set('dashboard', {
+            menuId: 'dashboardMenu',
+            contentId: 'dashboardContent',
+            init: initializeDashboard
+        });
+        
+        this.sections.set('campaigns', {
+            menuId: 'campaignsMenu',
+            contentId: 'campaignsContent',
+            init: initializeCampaignManagement,
+            cleanup: cleanupCampaignManagement
+        });
+
+        this.sections.set('guestManagement', {
+            menuId: 'guestManagementMenu',
+            contentId: 'guestManagementContent',
+            init: initializeGuestManagement
+        });
+
+        this.sections.set('analytics', {
+            menuId: 'analyticsMenu',
+            contentId: 'analyticsContent'
+        });
+
+        this.sections.set('adminUsers', {
+            menuId: 'adminUsersMenu',
+            contentId: 'adminUsersContent',
+            init: () => this.initializeAdminUsersSection()
+        });
+
+        this.sections.set('projects', {
+            menuId: 'projectManagementMenu',
+            contentId: 'projectManagementContent',
+            init: initializeProjectManagement
+        });
+
+        this.sections.set('settings', {
+            menuId: 'settingsMenu',
+            contentId: 'settingsContent',
+            hasSubmenu: true
+        });
+
+        this.sections.set('databaseManagement', {
+            menuId: 'databaseManagementMenu',
+            contentId: 'databaseManagementContent',
+            parent: 'settingsSubmenu',
+            init: () => {
+                const clearScanningDataBtn = document.getElementById('clearScanningDataBtn');
+                if (clearScanningDataBtn) {
+                    clearScanningDataBtn.addEventListener('click', this.handleClearScanningData.bind(this));
                 }
             }
-        };
-
-        Object.entries(sections).forEach(([name, config]) => {
-            this.sections.set(name, { ...config, initialized: false });
         });
     }
 
@@ -225,14 +226,7 @@ class AdminDashboard {
         }
 
         // Initialize section if not already initialized
-        if (!section.initialized && section.initialize) {
-            try {
-                await section.initialize();
-                section.initialized = true;
-            } catch (error) {
-                console.error(`Error initializing ${sectionName}:`, error);
-            }
-        } else if (!section.initialized && section.init) {
+        if (!section.initialized && section.init) {
             try {
                 await section.init();
                 section.initialized = true;
