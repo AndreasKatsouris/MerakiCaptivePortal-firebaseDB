@@ -3,7 +3,7 @@ import { AdminClaims } from './auth/admin-claims.js';
 import { AdminUserManagement } from './admin/user-management.js';
 import { initializeDashboard } from './dashboard.js';
 import { initializeProjectManagement } from './project-management.js';
-import { initializeGuestManagement } from './guest-management.js';
+import { initializeGuestManagement, cleanupGuestManagement } from './guest-management.js';
 import { initializeCampaignManagement, cleanupCampaignManagement } from './campaigns/campaigns.js';
 import { initializeRewardTypes } from './reward-types.js';
 import { initializeReceiptManagement } from './receipt-management.js';
@@ -95,7 +95,8 @@ class AdminDashboard {
         this.sections.set('guestManagement', {
             menuId: 'guestManagementMenu',
             contentId: 'guestManagementContent',
-            init: initializeGuestManagement
+            init: initializeGuestManagement,
+            cleanup: cleanupGuestManagement
         });
 
         this.sections.set('analytics', {
@@ -212,6 +213,10 @@ class AdminDashboard {
         // Cleanup previous section if needed
         if (this.currentSection === 'campaigns' && sectionName !== 'campaigns') {
             cleanupCampaignManagement();
+        }
+
+        if (this.currentSection === 'guestManagement' && sectionName !== 'guestManagement') {
+            cleanupGuestManagement();
         }
 
         // Hide all sections

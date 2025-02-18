@@ -611,9 +611,17 @@ function showGuestManagement() {
     // Initialize Vue app if not already done
     if (!guestManagement.app) {
         const app = Vue.createApp(guestManagement.component);
-        guestManagement.app = app.mount('#guestManagementRoot');
+        guestManagement.app = app.mount('#guest-management-app');
     }
 }
 
 // Export the initialization function for use in admin-dashboard.js
 export { initializeGuestManagement };
+
+// Add cleanup function
+export function cleanupGuestManagement() {
+    if (guestManagement.app) {
+        guestManagement.app.unmount();
+        guestManagement.app = null;
+    }
+}
