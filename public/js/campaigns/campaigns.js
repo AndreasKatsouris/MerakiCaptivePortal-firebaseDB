@@ -285,36 +285,27 @@ export function initializeCampaignManagement() {
                                         </div>
                                     </div>
                                 </div>
-                                <div class="row">
+                                <div class="row mt-4">
                                     <div class="col">
-                                        <h6>Campaign Rewards</h6>
+                                        <h6>Reward Types</h6>
                                         <div id="rewardTypesSection">
                                             ${this.availableRewardTypes.map(type => `
-                                                <div class="reward-type-item">
+                                                <div class="reward-type-item mb-3">
                                                     <div class="form-check">
                                                         <input type="checkbox" 
                                                             class="form-check-input" 
-                                                            id="reward-type-${type.id}"
+                                                            id="reward-type-${type.id}" 
                                                             value="${type.id}">
-                                                        <label class="form-check-label" for="reward-type-${type.id}">
+                                                        <label class="form-check-label" 
+                                                            for="reward-type-${type.id}">
                                                             ${type.name}
                                                         </label>
                                                     </div>
-                                                    <div class="reward-criteria mt-2" style="display:none;">
-                                                        <div class="form-row">
-                                                            <div class="col">
-                                                                <label>Minimum Purchase Amount</label>
-                                                                <input type="number" 
-                                                                    class="form-control reward-min-purchase" 
-                                                                    data-type-id="${type.id}">
-                                                            </div>
-                                                            <div class="col">
-                                                                <label>Maximum Rewards</label>
-                                                                <input type="number" 
-                                                                    class="form-control reward-max-rewards" 
-                                                                    data-type-id="${type.id}">
-                                                            </div>
-                                                        </div>
+                                                    <div class="reward-criteria mt-2" style="display: none">
+                                                        <input type="text" 
+                                                            class="form-control" 
+                                                            id="criteria-${type.id}" 
+                                                            placeholder="Enter criteria for ${type.name}">
                                                     </div>
                                                 </div>
                                             `).join('')}
@@ -325,6 +316,17 @@ export function initializeCampaignManagement() {
                         </form>
                     `,
                     didOpen: () => {
+                        // Set up event handlers for reward type checkboxes
+                        const modal = Swal.getHtmlContainer();
+                        const rewardTypeCheckboxes = modal.querySelectorAll('.reward-type-item input[type="checkbox"]');
+                        rewardTypeCheckboxes.forEach(checkbox => {
+                            checkbox.addEventListener('change', (e) => {
+                                const typeId = e.target.value;
+                                const criteriaDiv = modal.querySelector(`#criteria-${typeId}`).parentElement;
+                                criteriaDiv.style.display = e.target.checked ? 'block' : 'none';
+                            });
+                        });
+
                         // Add event listener for adding new item rows
                         document.querySelectorAll('.add-item').forEach(button => {
                             button.addEventListener('click', (e) => {
@@ -359,6 +361,20 @@ export function initializeCampaignManagement() {
                         const minPurchaseInput = modal.querySelector('#minPurchase');
                         const startDateInput = modal.querySelector('#startDate');
                         const endDateInput = modal.querySelector('#endDate');
+                        
+                        // Get reward types
+                        const selectedRewardTypes = [];
+                        const rewardTypeCheckboxes = modal.querySelectorAll('.reward-type-item input[type="checkbox"]');
+                        rewardTypeCheckboxes.forEach(checkbox => {
+                            if (checkbox.checked) {
+                                const typeId = checkbox.value;
+                                const criteriaInput = modal.querySelector(`#criteria-${typeId}`);
+                                selectedRewardTypes.push({
+                                    typeId,
+                                    criteria: criteriaInput ? criteriaInput.value : ''
+                                });
+                            }
+                        });
                         
                         // Trim values
                         const campaignName = campaignNameInput?.value?.trim();
@@ -586,37 +602,27 @@ export function initializeCampaignManagement() {
                             </div>
                             <div class="row">
                                 <div class="col">
-                                    <h6>Campaign Rewards</h6>
+                                    <h6>Reward Types</h6>
                                     <div id="rewardTypesSection">
                                         ${this.availableRewardTypes.map(type => `
-                                            <div class="reward-type-item">
+                                            <div class="reward-type-item mb-3">
                                                 <div class="form-check">
                                                     <input type="checkbox" 
                                                         class="form-check-input" 
-                                                        id="reward-type-${type.id}"
+                                                        id="reward-type-${type.id}" 
                                                         value="${type.id}"
                                                         ${campaign.rewardTypes && campaign.rewardTypes.some(r => r.typeId === type.id) ? 'checked' : ''}>
-                                                    <label class="form-check-label" for="reward-type-${type.id}">
+                                                    <label class="form-check-label" 
+                                                        for="reward-type-${type.id}">
                                                         ${type.name}
                                                     </label>
                                                 </div>
                                                 <div class="reward-criteria mt-2" style="display:${campaign.rewardTypes && campaign.rewardTypes.some(r => r.typeId === type.id) ? 'block' : 'none'}">
-                                                    <div class="form-row">
-                                                        <div class="col">
-                                                            <label>Minimum Purchase Amount</label>
-                                                            <input type="number" 
-                                                                class="form-control reward-min-purchase" 
-                                                                data-type-id="${type.id}"
-                                                                value="${(campaign.rewardTypes && campaign.rewardTypes.find(r => r.typeId === type.id)?.criteria?.minPurchaseAmount) || ''}">
-                                                        </div>
-                                                        <div class="col">
-                                                            <label>Maximum Rewards</label>
-                                                            <input type="number" 
-                                                                class="form-control reward-max-rewards" 
-                                                                data-type-id="${type.id}"
-                                                                value="${(campaign.rewardTypes && campaign.rewardTypes.find(r => r.typeId === type.id)?.criteria?.maxRewards) || ''}">
-                                                        </div>
-                                                    </div>
+                                                    <input type="text" 
+                                                        class="form-control" 
+                                                        id="criteria-${type.id}" 
+                                                        placeholder="Enter criteria for ${type.name}"
+                                                        value="${(campaign.rewardTypes && campaign.rewardTypes.find(r => r.typeId === type.id)?.criteria) || ''}">
                                                 </div>
                                             </div>
                                         `).join('')}
@@ -641,6 +647,17 @@ export function initializeCampaignManagement() {
                                 if (rows.length > 1) {
                                     e.target.closest('.required-item-row').remove();
                                 }
+                            });
+                        });
+
+                        // Set up event handlers for reward type checkboxes
+                        const modal = Swal.getHtmlContainer();
+                        const rewardTypeCheckboxes = modal.querySelectorAll('.reward-type-item input[type="checkbox"]');
+                        rewardTypeCheckboxes.forEach(checkbox => {
+                            checkbox.addEventListener('change', (e) => {
+                                const typeId = e.target.value;
+                                const criteriaDiv = modal.querySelector(`#criteria-${typeId}`).parentElement;
+                                criteriaDiv.style.display = e.target.checked ? 'block' : 'none';
                             });
                         });
 
