@@ -1,4 +1,4 @@
-import { auth, rtdb, ref, get } from '../config/firebase-config.js';
+import { auth, rtdb, ref, get, push, set, update } from '../config/firebase-config.js';
 
 export function initializeCampaignManagement() {
     if (typeof Vue === 'undefined') {
@@ -324,13 +324,19 @@ export function initializeCampaignManagement() {
                         const requiredItems = this.getRequiredItemsFromForm();
                         const activeDays = this.getActiveDaysFromForm();
                         
-                        // Validate required fields
-                        const name = document.getElementById('campaignName').value;
-                        const brandName = document.getElementById('brandName').value;
-                        if (!name || !brandName) {
-                            Swal.showValidationMessage('Campaign name and brand name are required');
+                        // Validate required fields with proper trimming
+                        const name = document.getElementById('campaignName')?.value?.trim();
+                        const brandName = document.getElementById('brandName')?.value?.trim();
+                        
+                        let validationErrors = [];
+                        if (!name) validationErrors.push('Campaign name is required');
+                        if (!brandName) validationErrors.push('Brand name is required');
+                        
+                        if (validationErrors.length > 0) {
+                            Swal.showValidationMessage(validationErrors.join('\n'));
                             return false;
                         }
+
                         const selectedRewardTypes = [];
                         document.querySelectorAll('#rewardTypesSection input[type="checkbox"]:checked').forEach(checkbox => {
                             const typeId = checkbox.value;
@@ -340,23 +346,33 @@ export function initializeCampaignManagement() {
                             selectedRewardTypes.push({
                                 typeId,
                                 criteria: {
-                                    minPurchaseAmount: parseFloat(minPurchase),
-                                    maxRewards: parseInt(maxRewards)
+                                    minPurchaseAmount: parseFloat(minPurchase) || 0,
+                                    maxRewards: parseInt(maxRewards) || 0
                                 }
                             });
                         });
-                        return {
+
+                        // Get form values with proper trimming and type conversion
+                        const formData = {
                             name,
                             brandName,
-                            storeName: document.getElementById('storeName').value,
-                            minPurchaseAmount: parseFloat(document.getElementById('minPurchase').value) || 0,
-                            startDate: document.getElementById('startDate').value,
-                            endDate: document.getElementById('endDate').value,
+                            storeName: document.getElementById('storeName')?.value?.trim() || '',
+                            minPurchaseAmount: parseFloat(document.getElementById('minPurchase')?.value) || 0,
+                            startDate: document.getElementById('startDate')?.value?.trim(),
+                            endDate: document.getElementById('endDate')?.value?.trim(),
                             requiredItems,
                             activeDays,
                             rewardTypes: selectedRewardTypes,
                             status: 'active'
                         };
+
+                        // Additional validation for dates
+                        if (!formData.startDate || !formData.endDate) {
+                            Swal.showValidationMessage('Start and end dates are required');
+                            return false;
+                        }
+
+                        return formData;
                     }
                 });
             
@@ -522,14 +538,19 @@ export function initializeCampaignManagement() {
                         const requiredItems = this.getRequiredItemsFromForm();
                         const activeDays = this.getActiveDaysFromForm();
                         
-                        // Validate required fields
-                        const name = document.getElementById('campaignName').value;
-                        const brandName = document.getElementById('brandName').value;
-                        if (!name || !brandName) {
-                            Swal.showValidationMessage('Campaign name and brand name are required');
+                        // Validate required fields with proper trimming
+                        const name = document.getElementById('campaignName')?.value?.trim();
+                        const brandName = document.getElementById('brandName')?.value?.trim();
+                        
+                        let validationErrors = [];
+                        if (!name) validationErrors.push('Campaign name is required');
+                        if (!brandName) validationErrors.push('Brand name is required');
+                        
+                        if (validationErrors.length > 0) {
+                            Swal.showValidationMessage(validationErrors.join('\n'));
                             return false;
                         }
-                            // Collect selected reward types and their criteria
+
                         const selectedRewardTypes = [];
                         document.querySelectorAll('#rewardTypesSection input[type="checkbox"]:checked').forEach(checkbox => {
                             const typeId = checkbox.value;
@@ -539,24 +560,33 @@ export function initializeCampaignManagement() {
                             selectedRewardTypes.push({
                                 typeId,
                                 criteria: {
-                                    minPurchaseAmount: parseFloat(minPurchase),
-                                    maxRewards: parseInt(maxRewards)
+                                    minPurchaseAmount: parseFloat(minPurchase) || 0,
+                                    maxRewards: parseInt(maxRewards) || 0
                                 }
                             });
                         });
-                        
-                        return {
+
+                        // Get form values with proper trimming and type conversion
+                        const formData = {
                             name,
                             brandName,
-                            storeName: document.getElementById('storeName').value,
-                            minPurchaseAmount: parseFloat(document.getElementById('minPurchase').value) || 0,
-                            startDate: document.getElementById('startDate').value,
-                            endDate: document.getElementById('endDate').value,
-                            status: document.getElementById('campaignStatus').value,
+                            storeName: document.getElementById('storeName')?.value?.trim() || '',
+                            minPurchaseAmount: parseFloat(document.getElementById('minPurchase')?.value) || 0,
+                            startDate: document.getElementById('startDate')?.value?.trim(),
+                            endDate: document.getElementById('endDate')?.value?.trim(),
                             requiredItems,
+                            activeDays,
                             rewardTypes: selectedRewardTypes,
-                            activeDays
+                            status: document.getElementById('campaignStatus').value
                         };
+
+                        // Additional validation for dates
+                        if (!formData.startDate || !formData.endDate) {
+                            Swal.showValidationMessage('Start and end dates are required');
+                            return false;
+                        }
+
+                        return formData;
                     }
                 }).then(async (result) => {
                     if (result.isConfirmed) {
