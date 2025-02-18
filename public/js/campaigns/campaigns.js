@@ -198,15 +198,35 @@ export function initializeCampaignManagement() {
                         <div class="container">
                             <div class="row mb-3">
                                 <div class="col">
-                                    <input id="campaignName" class="form-control" placeholder="Campaign Name">
+                                    <input 
+                                        id="campaignName" 
+                                        type="text" 
+                                        class="form-control" 
+                                        placeholder="Campaign Name"
+                                        required
+                                        autocomplete="off"
+                                    >
                                 </div>
                             </div>
                             <div class="row mb-3">
                                 <div class="col">
-                                    <input id="brandName" class="form-control" placeholder="Brand Name">
+                                    <input 
+                                        id="brandName" 
+                                        type="text" 
+                                        class="form-control" 
+                                        placeholder="Brand Name"
+                                        required
+                                        autocomplete="off"
+                                    >
                                 </div>
                                 <div class="col">
-                                    <input id="storeName" class="form-control" placeholder="Store Name (optional)">
+                                    <input 
+                                        id="storeName" 
+                                        type="text" 
+                                        class="form-control" 
+                                        placeholder="Store Name (optional)"
+                                        autocomplete="off"
+                                    >
                                 </div>
                             </div>
                             <div class="row mb-3">
@@ -324,33 +344,42 @@ export function initializeCampaignManagement() {
                         const requiredItems = this.getRequiredItemsFromForm();
                         const activeDays = this.getActiveDaysFromForm();
                         
+                        // Debug logging for form elements
+                        console.log('Campaign Form Elements:', {
+                            campaignNameElement: document.getElementById('campaignName'),
+                            brandNameElement: document.getElementById('brandName')
+                        });
+                        
                         // Validate required fields with proper trimming
-                        const campaignName = document.getElementById('campaignName')?.value?.trim();
-                        const brandName = document.getElementById('brandName')?.value?.trim();
+                        const campaignNameInput = document.getElementById('campaignName');
+                        const brandNameInput = document.getElementById('brandName');
+                        
+                        console.log('Form Input Values:', {
+                            campaignNameRaw: campaignNameInput?.value,
+                            campaignNameTrimmed: campaignNameInput?.value?.trim(),
+                            brandNameRaw: brandNameInput?.value,
+                            brandNameTrimmed: brandNameInput?.value?.trim()
+                        });
+                        
+                        const campaignName = campaignNameInput?.value?.trim();
+                        const brandName = brandNameInput?.value?.trim();
                         
                         let validationErrors = [];
-                        if (!campaignName) validationErrors.push('Campaign name is required');
+                        if (!campaignName) {
+                            console.log('Campaign name validation failed:', {
+                                campaignName,
+                                isEmpty: !campaignName,
+                                inputExists: !!campaignNameInput
+                            });
+                            validationErrors.push('Campaign name is required');
+                        }
                         if (!brandName) validationErrors.push('Brand name is required');
                         
                         if (validationErrors.length > 0) {
+                            console.log('Validation errors:', validationErrors);
                             Swal.showValidationMessage(validationErrors.join('\n'));
                             return false;
                         }
-
-                        const selectedRewardTypes = [];
-                        document.querySelectorAll('#rewardTypesSection input[type="checkbox"]:checked').forEach(checkbox => {
-                            const typeId = checkbox.value;
-                            const minPurchase = document.querySelector(`.reward-min-purchase[data-type-id="${typeId}"]`)?.value || 0;
-                            const maxRewards = document.querySelector(`.reward-max-rewards[data-type-id="${typeId}"]`)?.value || 0;
-                            
-                            selectedRewardTypes.push({
-                                typeId,
-                                criteria: {
-                                    minPurchaseAmount: parseFloat(minPurchase) || 0,
-                                    maxRewards: parseInt(maxRewards) || 0
-                                }
-                            });
-                        });
 
                         // Get form values with proper trimming and type conversion
                         const formData = {
@@ -365,6 +394,8 @@ export function initializeCampaignManagement() {
                             rewardTypes: selectedRewardTypes,
                             status: 'active'
                         };
+
+                        console.log('Form Data:', formData);
 
                         // Additional validation for dates
                         if (!formData.startDate || !formData.endDate) {
@@ -427,15 +458,38 @@ export function initializeCampaignManagement() {
                         <div class="container">
                             <div class="row mb-3">
                                 <div class="col">
-                                    <input id="campaignName" class="form-control" placeholder="Campaign Name" value="${campaign.name}">
+                                    <input 
+                                        id="campaignName" 
+                                        type="text" 
+                                        class="form-control" 
+                                        placeholder="Campaign Name"
+                                        required
+                                        autocomplete="off"
+                                        value="${campaign.name}"
+                                    >
                                 </div>
                             </div>
                             <div class="row mb-3">
                                 <div class="col">
-                                    <input id="brandName" class="form-control" placeholder="Brand Name" value="${campaign.brandName}">
+                                    <input 
+                                        id="brandName" 
+                                        type="text" 
+                                        class="form-control" 
+                                        placeholder="Brand Name"
+                                        required
+                                        autocomplete="off"
+                                        value="${campaign.brandName}"
+                                    >
                                 </div>
                                 <div class="col">
-                                    <input id="storeName" class="form-control" placeholder="Store Name (optional)" value="${campaign.storeName || ''}">
+                                    <input 
+                                        id="storeName" 
+                                        type="text" 
+                                        class="form-control" 
+                                        placeholder="Store Name (optional)"
+                                        autocomplete="off"
+                                        value="${campaign.storeName || ''}"
+                                    >
                                 </div>
                             </div>
                             <div class="row mb-3">
@@ -538,33 +592,42 @@ export function initializeCampaignManagement() {
                         const requiredItems = this.getRequiredItemsFromForm();
                         const activeDays = this.getActiveDaysFromForm();
                         
+                        // Debug logging for form elements
+                        console.log('Campaign Form Elements:', {
+                            campaignNameElement: document.getElementById('campaignName'),
+                            brandNameElement: document.getElementById('brandName')
+                        });
+                        
                         // Validate required fields with proper trimming
-                        const campaignName = document.getElementById('campaignName')?.value?.trim();
-                        const brandName = document.getElementById('brandName')?.value?.trim();
+                        const campaignNameInput = document.getElementById('campaignName');
+                        const brandNameInput = document.getElementById('brandName');
+                        
+                        console.log('Form Input Values:', {
+                            campaignNameRaw: campaignNameInput?.value,
+                            campaignNameTrimmed: campaignNameInput?.value?.trim(),
+                            brandNameRaw: brandNameInput?.value,
+                            brandNameTrimmed: brandNameInput?.value?.trim()
+                        });
+                        
+                        const campaignName = campaignNameInput?.value?.trim();
+                        const brandName = brandNameInput?.value?.trim();
                         
                         let validationErrors = [];
-                        if (!campaignName) validationErrors.push('Campaign name is required');
+                        if (!campaignName) {
+                            console.log('Campaign name validation failed:', {
+                                campaignName,
+                                isEmpty: !campaignName,
+                                inputExists: !!campaignNameInput
+                            });
+                            validationErrors.push('Campaign name is required');
+                        }
                         if (!brandName) validationErrors.push('Brand name is required');
                         
                         if (validationErrors.length > 0) {
+                            console.log('Validation errors:', validationErrors);
                             Swal.showValidationMessage(validationErrors.join('\n'));
                             return false;
                         }
-
-                        const selectedRewardTypes = [];
-                        document.querySelectorAll('#rewardTypesSection input[type="checkbox"]:checked').forEach(checkbox => {
-                            const typeId = checkbox.value;
-                            const minPurchase = document.querySelector(`.reward-min-purchase[data-type-id="${typeId}"]`)?.value || 0;
-                            const maxRewards = document.querySelector(`.reward-max-rewards[data-type-id="${typeId}"]`)?.value || 0;
-                            
-                            selectedRewardTypes.push({
-                                typeId,
-                                criteria: {
-                                    minPurchaseAmount: parseFloat(minPurchase) || 0,
-                                    maxRewards: parseInt(maxRewards) || 0
-                                }
-                            });
-                        });
 
                         // Get form values with proper trimming and type conversion
                         const formData = {
@@ -579,6 +642,8 @@ export function initializeCampaignManagement() {
                             rewardTypes: selectedRewardTypes,
                             status: document.getElementById('campaignStatus').value
                         };
+
+                        console.log('Form Data:', formData);
 
                         // Additional validation for dates
                         if (!formData.startDate || !formData.endDate) {
