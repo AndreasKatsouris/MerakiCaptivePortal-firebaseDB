@@ -89,7 +89,7 @@ class AdminDashboard {
             menuId: 'campaignsMenu',
             contentId: 'campaignsContent',
             init: initializeCampaignManagement,
-            cleanup: cleanupCampaignManagement
+            willDestroy: cleanupCampaignManagement
         });
 
         this.sections.set('guestManagementContent', {

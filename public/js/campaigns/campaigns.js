@@ -6,7 +6,7 @@ const campaignManagement = {
 };
 
 export function initializeCampaignManagement() {
-    const container = document.getElementById('campaigns-app');
+    const container = document.getElementById('campaign-management-app');
     if (!container) {
         console.error('Campaign management container not found');
         return;
@@ -924,7 +924,7 @@ export function initializeCampaignManagement() {
     });
 
     // Mount the app
-    campaignManagement.app.mount('#campaigns-app');
+    campaignManagement.app.mount('#campaign-management-app');
     console.log('Campaign management initialized');
 
     return campaignManagement.app;
