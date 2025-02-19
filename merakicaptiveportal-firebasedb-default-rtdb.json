@@ -1,0 +1,1912 @@
+{
+  "admin-claims": {
+    "OTnjPiIxRNejaJuaxoPrbFBw3L42": true
+  },
+  "campaign-rewards": {
+    "-OIjyTuxq5V7PCIsueCf": {
+      "-OIk1rY11CSwkCl1pMlz": true,
+      "-OIkQYfelUyXi4EhcZrr": true
+    }
+  },
+  "campaigns": {
+    "-OIjyTuxq5V7PCIsueCf": {
+      "activeDays": [
+        0,
+        1,
+        2,
+        3,
+        4,
+        5,
+        6
+      ],
+      "brandName": "Ocean Basket",
+      "createdAt": 1739192922047,
+      "endDate": "2025-02-28",
+      "minPurchaseAmount": 600,
+      "name": "Spin & Win",
+      "rewardTypes": [
+        {
+          "criteria": {
+            "maxRewards": 1,
+            "minPurchaseAmount": 1
+          },
+          "typeId": "-OIjyFU0fuwXkrSJl_7Q"
+        }
+      ],
+      "startDate": "2025-02-01",
+      "status": "active",
+      "storeName": "",
+      "updatedAt": 1739894501243
+    },
+    "-OJOnCYk_loxOYfwn5u6": {
+      "activeDays": [
+        0,
+        1,
+        2,
+        3,
+        4,
+        5,
+        6
+      ],
+      "brandName": "bt",
+      "createdAt": "2025-02-18T16:03:30.843Z",
+      "createdBy": "OTnjPiIxRNejaJuaxoPrbFBw3L42",
+      "endDate": "2025-02-25",
+      "minPurchaseAmount": 1,
+      "name": "ct",
+      "startDate": "2025-02-19",
+      "status": "active",
+      "storeName": "st",
+      "updatedAt": 1739899210171
+    }
+  },
+  "consent-history": {
+    "+27827001116": {
+      "1739192526772": {
+        "platform": "whatsapp",
+        "status": "accepted",
+        "timestamp": 1739192526772,
+        "version": "1.0"
+      }
+    }
+  },
+  "guest-receipts": {
+    "+27827001116": {
+      "00380073": true
+    }
+  },
+  "guest-rewards": {
+    "+27827001116": {
+      "-OIk1rY11CSwkCl1pMlz": true,
+      "-OIkQYfelUyXi4EhcZrr": true
+    }
+  },
+  "guests": {
+    "+27827001116": {
+      "consent": {
+        "platform": "whatsapp",
+        "status": "accepted",
+        "timestamp": 1739192526772,
+        "version": "1.0"
+      },
+      "createdAt": 1739188600258,
+      "lastConsentPrompt": 1739192482047,
+      "name": "AK",
+      "phoneNumber": "+27827001116",
+      "tier": "BRONZE",
+      "updatedAt": 1739192823848
+    }
+  },
+  "receipts": {
+    "00380073": {
+      "brandName": "ocean basket",
+      "campaignId": "-OIjyTuxq5V7PCIsueCf",
+      "createdAt": 1739200543411,
+      "date": "06/02/2025",
+      "fullStoreName": "ocean basket THE GROVE",
+      "guestPhoneNumber": "+27827001116",
+      "imageUrl": "https://api.twilio.com/2010-04-01/Accounts/ACe16ed0568c81a9febd64f304b0aedbaf/Messages/MM9ba83404643103eeb150acde683a9794/Media/MEefdf14fef4d7ebccbc663f5c363a45b5",
+      "invoiceNumber": "00380073",
+      "items": [
+        {
+          "name": "Calamari Wrap",
+          "quantity": 1,
+          "totalPrice": 87,
+          "unitPrice": 87
+        },
+        {
+          "name": "Cordial Cola T",
+          "quantity": 2,
+          "totalPrice": 16,
+          "unitPrice": 8
+        },
+        {
+          "name": "Halloumi Burge",
+          "quantity": 1,
+          "totalPrice": 109,
+          "unitPrice": 109
+        },
+        {
+          "name": "Kingklip 200g",
+          "quantity": 2,
+          "totalPrice": 360,
+          "unitPrice": 180
+        },
+        {
+          "name": "Pan oPrawns",
+          "quantity": 1,
+          "totalPrice": 70,
+          "unitPrice": 70
+        },
+        {
+          "name": "Panko Hake Fis",
+          "quantity": 1,
+          "totalPrice": 92,
+          "unitPrice": 92
+        },
+        {
+          "name": "Rock Shandy",
+          "quantity": 1,
+          "totalPrice": 30,
+          "unitPrice": 30
+        },
+        {
+          "name": "Water Spark La",
+          "quantity": 1,
+          "totalPrice": 44,
+          "unitPrice": 44
+        },
+        {
+          "name": "Water Still La",
+          "quantity": 1,
+          "totalPrice": 44,
+          "unitPrice": 44
+        },
+        {
+          "name": "Panko Zucchini",
+          "quantity": 1,
+          "totalPrice": 67,
+          "unitPrice": 67
+        },
+        {
+          "name": "100G AVO Sub",
+          "quantity": 3,
+          "totalPrice": 96,
+          "unitPrice": 32
+        }
+      ],
+      "processedAt": 1739200543404,
+      "rawText": "OB\nOCEAN BASKET\nTHE GROVE\nShop L47, The Grove Mall, Lynnwood Rd\nEquestria, Pretoria\nTel: 012 807 5473\nPRO-FORMA INVOICE: 00380073\n4580254417 | 2009/008158/07\nVAT 4580254417\nMEDITERRANEAN HOME OF SEAFOOD\nTIME 06/02/2025 16:33 TO 18:46\nWAITER: FORTUNE (21)\nTABLE: 070\nCOVERS: 3\nITEM\nQTY PRICE\nVALUE\nCalamari Wrap\n1\n87.00\n87.00\nCordial Cola T\n2\n8.00\n16.00\nHalloumi Burge\n1\n109.00\n109.00\nKingklip 200g\n2\n180.00\n360.00\nPan oPrawns\n1\n70.00\n70.00\nPanko Hake Fis\n1\n92.00\n92.00\nRock Shandy\n1\n30.00\n30.00\nWater Spark La\n1\n44.00\n44.00\nWater Still La\n1\n44.00\n44.00\nPanko Zucchini\n1\n67.00\n67.00\n100G AVO Sub\n3\n32.00\n96.00\nBill Excl\n882.61\nTax\n132.39\nBill\nTotal\n1015.00\nVAT 15% (already included)\n132.39\nTendered\n0.00\nYOUR SEAFOOD DESTINATION\nTHANK YOU FOR\n: TIP :R.......\nYOUR SUPPORT\n: TOTAL :R...",
+      "status": "validated",
+      "storeAddress": "Shop L47, The Grove Mall, Lynnwood Rd",
+      "storeName": "THE GROVE",
+      "subtotal": 1015,
+      "tableNumber": "070",
+      "time": "16:33",
+      "totalAmount": 1015,
+      "validatedAt": 1739200543463,
+      "vatAmount": 132.39,
+      "waiterName": "FORTUNE"
+    }
+  },
+  "rewardTypes": {
+    "-OIjyFU0fuwXkrSJl_7Q": {
+      "category": "freeItem",
+      "createdAt": 1739192862911,
+      "description": "You Earned 1 Spin & Win",
+      "name": "Spin & Win",
+      "requirements": "Spin & Win",
+      "status": "active",
+      "validityDays": "1",
+      "value": "0"
+    }
+  },
+  "rewards": {
+    "-OIk1rY11CSwkCl1pMlz": {
+      "approvedAt": 1739197371138,
+      "approvedBy": "OTnjPiIxRNejaJuaxoPrbFBw3L42",
+      "campaignId": "-OIjyTuxq5V7PCIsueCf",
+      "campaignName": "Spin & Win",
+      "createdAt": 1739194071242,
+      "expiresAt": 1741786071239,
+      "guestMessage": "test",
+      "guestName": "AK",
+      "guestPhone": "+27827001116",
+      "metadata": {
+        "description": "Standard reward",
+        "originalCriteria": {
+          "maxRewards": 1,
+          "minPurchaseAmount": 1
+        },
+        "type": "standard"
+      },
+      "receiptAmount": 1015,
+      "receiptId": "00380073",
+      "rewardTypeId": "-OIjyFU0fuwXkrSJl_7Q",
+      "status": "approved",
+      "typeId": "-OIjyFU0fuwXkrSJl_7Q",
+      "updatedAt": 1739194071242,
+      "value": 0
+    },
+    "-OIkQYfelUyXi4EhcZrr": {
+      "approvedAt": 1739202225896,
+      "approvedBy": "OTnjPiIxRNejaJuaxoPrbFBw3L42",
+      "campaignId": "-OIjyTuxq5V7PCIsueCf",
+      "campaignName": "Spin & Win",
+      "createdAt": 1739200543474,
+      "expiresAt": 1741792543471,
+      "guestMessage": "TEST",
+      "guestName": "AK",
+      "guestPhone": "+27827001116",
+      "metadata": {
+        "description": "Standard reward",
+        "originalCriteria": {
+          "maxRewards": 1,
+          "minPurchaseAmount": 1
+        },
+        "type": "standard"
+      },
+      "receiptAmount": 1015,
+      "receiptId": "00380073",
+      "rewardTypeId": "-OIjyFU0fuwXkrSJl_7Q",
+      "status": "approved",
+      "typeId": "-OIjyFU0fuwXkrSJl_7Q",
+      "updatedAt": 1739200543474,
+      "value": 0
+    }
+  },
+  "scanningData": {
+    "-OJPHIco0ljduZYO4p85": {
+      "data": {
+        "networkId": "N_676665844012431681",
+        "observations": [
+          {
+            "clientMac": "54:bd:79:7f:bf:6f",
+            "latestRecord": {
+              "nearestApMac": "00:18:0a:84:e2:2e",
+              "nearestApRssi": -66,
+              "time": "2025-02-18T18:17:19Z"
+            },
+            "manufacturer": "Samsung"
+          },
+          {
+            "clientMac": "94:fb:29:3c:d6:09",
+            "latestRecord": {
+              "nearestApMac": "00:18:0a:84:e2:2e",
+              "nearestApRssi": -86,
+              "time": "2025-02-18T18:17:19Z"
+            },
+            "manufacturer": "Zebra Technologies"
+          },
+          {
+            "clientMac": "d0:05:e4:09:69:c8",
+            "latestRecord": {
+              "nearestApMac": "00:18:0a:7f:32:b7",
+              "nearestApRssi": -61,
+              "time": "2025-02-18T18:17:39Z"
+            },
+            "manufacturer": "Huawei Device"
+          },
+          {
+            "clientMac": "74:f7:f6:cd:99:b3",
+            "latestRecord": {
+              "nearestApMac": "00:18:0a:84:e2:2e",
+              "nearestApRssi": -75,
+              "time": "2025-02-18T18:17:33Z"
+            },
+            "manufacturer": "Shanghai Sunmi Technology"
+          },
+          {
+            "clientMac": "e0:63:da:ba:85:b9",
+            "latestRecord": {
+              "nearestApMac": "00:18:0a:84:e2:2e",
+              "nearestApRssi": -71,
+              "time": "2025-02-18T18:17:37Z"
+            },
+            "manufacturer": "Ubiquiti"
+          },
+          {
+            "clientMac": "50:8b:b9:e0:4a:c4",
+            "latestRecord": {
+              "nearestApMac": "00:18:0a:84:e2:2e",
+              "nearestApRssi": -81,
+              "time": "2025-02-18T18:17:33Z"
+            },
+            "manufacturer": "Tuya Smart"
+          },
+          {
+            "clientMac": "10:91:d1:d2:2b:8e",
+            "latestRecord": {
+              "nearestApMac": "00:18:0a:84:e2:2e",
+              "nearestApRssi": -81,
+              "time": "2025-02-18T18:17:08Z"
+            },
+            "manufacturer": "Intel"
+          },
+          {
+            "clientMac": "78:28:ca:a9:45:71",
+            "latestRecord": {
+              "nearestApMac": "00:18:0a:84:e2:2e",
+              "nearestApRssi": -78,
+              "time": "2025-02-18T18:17:07Z"
+            },
+            "manufacturer": "Sonos"
+          },
+          {
+            "clientMac": "f4:02:23:6e:61:d2",
+            "latestRecord": {
+              "nearestApMac": "00:18:0a:6f:ed:e0",
+              "nearestApRssi": -71,
+              "time": "2025-02-18T18:17:35Z"
+            },
+            "manufacturer": "PAX Computer..."
+          },
+          {
+            "clientMac": "c0:e7:bf:eb:96:2c",
+            "latestRecord": {
+              "nearestApMac": "00:18:0a:84:e2:2e",
+              "nearestApRssi": -94,
+              "time": "2025-02-18T18:17:42Z"
+            },
+            "manufacturer": "Sichuan AI-Link..."
+          },
+          {
+            "clientMac": "1c:1a:1b:6e:1a:7d",
+            "latestRecord": {
+              "nearestApMac": "00:18:0a:84:e2:2e",
+              "nearestApRssi": -91,
+              "time": "2025-02-18T18:17:30Z"
+            },
+            "manufacturer": "Shanghai Sunmi Technology"
+          },
+          {
+            "clientMac": "48:87:59:8a:18:e7",
+            "latestRecord": {
+              "nearestApMac": "00:18:0a:6f:ed:e0",
+              "nearestApRssi": -31,
+              "time": "2025-02-18T18:17:38Z"
+            },
+            "manufacturer": "Xiaomi Communications"
+          },
+          {
+            "clientMac": "e0:00:84:65:a9:f8",
+            "latestRecord": {
+              "nearestApMac": "00:18:0a:d0:71:f0",
+              "nearestApRssi": -68,
+              "time": "2025-02-18T18:17:37Z"
+            },
+            "manufacturer": "Huawei Technologies"
+          },
+          {
+            "clientMac": "fc:67:1f:f0:50:87",
+            "latestRecord": {
+              "nearestApMac": "00:18:0a:84:e2:2e",
+              "nearestApRssi": -73,
+              "time": "2025-02-18T18:17:42Z"
+            },
+            "manufacturer": "Tuya Smart"
+          },
+          {
+            "clientMac": "88:28:7d:50:50:3d",
+            "latestRecord": {
+              "nearestApMac": "00:18:0a:d0:71:f0",
+              "nearestApRssi": -83,
+              "time": "2025-02-18T18:16:47Z"
+            },
+            "manufacturer": "AltoBeam (China)"
+          },
+          {
+            "clientMac": "4c:82:a9:a8:64:2f",
+            "latestRecord": {
+              "nearestApMac": "00:18:0a:d0:71:f0",
+              "nearestApRssi": -84,
+              "time": "2025-02-18T18:17:38Z"
+            },
+            "manufacturer": "CLOUD Network Technology..."
+          },
+          {
+            "clientMac": "d8:d6:68:ef:a6:01",
+            "latestRecord": {
+              "nearestApMac": "00:18:0a:84:e2:2e",
+              "nearestApRssi": -65,
+              "time": "2025-02-18T18:17:33Z"
+            },
+            "manufacturer": "Tuya Smart"
+          },
+          {
+            "clientMac": "c0:e7:bf:a8:b1:b4",
+            "latestRecord": {
+              "nearestApMac": "00:18:0a:84:e2:2e",
+              "nearestApRssi": -89,
+              "time": "2025-02-18T18:17:24Z"
+            },
+            "manufacturer": "Sichuan AI-Link..."
+          },
+          {
+            "clientMac": "50:8b:b9:e0:4b:a6",
+            "latestRecord": {
+              "nearestApMac": "00:18:0a:84:e2:2e",
+              "nearestApRssi": -69,
+              "time": "2025-02-18T18:17:28Z"
+            },
+            "manufacturer": "Tuya Smart"
+          },
+          {
+            "clientMac": "1c:1a:1b:6e:19:ad",
+            "latestRecord": {
+              "nearestApMac": "00:18:0a:84:e2:2e",
+              "nearestApRssi": -87,
+              "time": "2025-02-18T18:17:30Z"
+            },
+            "manufacturer": "Shanghai Sunmi Technology"
+          },
+          {
+            "clientMac": "a4:ef:15:89:21:28",
+            "latestRecord": {
+              "nearestApMac": "00:18:0a:d0:71:f0",
+              "nearestApRssi": -74,
+              "time": "2025-02-18T18:16:47Z"
+            },
+            "manufacturer": "AltoBeam (China)"
+          },
+          {
+            "clientMac": "5c:e4:2a:0d:8c:d4",
+            "latestRecord": {
+              "nearestApMac": "00:18:0a:84:e2:2e",
+              "nearestApRssi": -75,
+              "time": "2025-02-18T18:17:19Z"
+            },
+            "manufacturer": "Intel"
+          },
+          {
+            "clientMac": "e0:03:6b:fa:da:86",
+            "latestRecord": {
+              "nearestApMac": "00:18:0a:7f:35:6c",
+              "nearestApRssi": -94,
+              "time": "2025-02-18T18:17:33Z"
+            },
+            "manufacturer": "Samsung"
+          },
+          {
+            "clientMac": "b8:b1:ea:a9:99:f1",
+            "latestRecord": {
+              "nearestApMac": "00:18:0a:6f:ed:e0",
+              "nearestApRssi": -91,
+              "time": "2025-02-18T18:17:08Z"
+            },
+            "manufacturer": "Honor Device"
+          },
+          {
+            "clientMac": "38:90:52:93:67:f4",
+            "latestRecord": {
+              "nearestApMac": "00:18:0a:d0:71:f0",
+              "nearestApRssi": -81,
+              "time": "2025-02-18T18:17:38Z"
+            },
+            "manufacturer": "Huawei Technologies"
+          },
+          {
+            "clientMac": "38:90:52:42:e9:f8",
+            "latestRecord": {
+              "nearestApMac": "00:18:0a:d0:71:f0",
+              "nearestApRssi": -82,
+              "time": "2025-02-18T18:17:33Z"
+            },
+            "manufacturer": "Huawei Technologies"
+          },
+          {
+            "clientMac": "68:27:37:cc:ff:99",
+            "latestRecord": {
+              "nearestApMac": "00:18:0a:84:e2:2e",
+              "nearestApRssi": -76,
+              "time": "2025-02-18T18:17:19Z"
+            },
+            "manufacturer": "Samsung"
+          },
+          {
+            "clientMac": "26:39:5c:40:8a:da",
+            "ipv4": "10.143.165.80",
+            "latestRecord": {
+              "nearestApMac": "00:18:0a:7f:35:6c",
+              "nearestApRssi": -96,
+              "time": "2025-02-18T18:17:36Z"
+            },
+            "ssid": "OB SECURE"
+          },
+          {
+            "clientMac": "34:7e:5c:44:15:e5",
+            "latestRecord": {
+              "nearestApMac": "00:18:0a:84:e2:2e",
+              "nearestApRssi": -68,
+              "time": "2025-02-18T18:17:41Z"
+            },
+            "manufacturer": "Sonos"
+          },
+          {
+            "clientMac": "50:8b:b9:e0:48:0f",
+            "latestRecord": {
+              "nearestApMac": "00:18:0a:84:e2:2e",
+              "nearestApRssi": -65,
+              "time": "2025-02-18T18:17:42Z"
+            },
+            "manufacturer": "Tuya Smart"
+          },
+          {
+            "clientMac": "50:8b:b9:e0:34:68",
+            "latestRecord": {
+              "nearestApMac": "00:18:0a:84:e2:2e",
+              "nearestApRssi": -81,
+              "time": "2025-02-18T18:17:41Z"
+            },
+            "manufacturer": "Tuya Smart"
+          },
+          {
+            "clientMac": "90:e8:68:b1:c0:b5",
+            "latestRecord": {
+              "nearestApMac": "00:18:0a:7f:32:b7",
+              "nearestApRssi": -52,
+              "time": "2025-02-18T18:17:20Z"
+            },
+            "manufacturer": "AzureWave Technology"
+          },
+          {
+            "clientMac": "ec:1d:9e:88:89:82",
+            "latestRecord": {
+              "nearestApMac": "00:18:0a:7f:32:b7",
+              "nearestApRssi": -83,
+              "time": "2025-02-18T18:17:19Z"
+            },
+            "manufacturer": "Quectel Wireless..."
+          },
+          {
+            "clientMac": "38:ef:e3:bc:12:0c",
+            "latestRecord": {
+              "nearestApMac": "00:18:0a:d0:71:f0",
+              "nearestApRssi": -81,
+              "time": "2025-02-18T18:17:20Z"
+            },
+            "manufacturer": "INGENICO TERMINALS SAS"
+          },
+          {
+            "clientMac": "6c:3b:6b:27:71:96",
+            "latestRecord": {
+              "nearestApMac": "00:18:0a:7f:35:6c",
+              "nearestApRssi": -88,
+              "time": "2025-02-18T18:16:53Z"
+            },
+            "manufacturer": "Routerboard.com"
+          },
+          {
+            "clientMac": "80:2a:a8:55:47:17",
+            "latestRecord": {
+              "nearestApMac": "00:18:0a:84:e2:2e",
+              "nearestApRssi": -90,
+              "time": "2025-02-18T18:17:06Z"
+            },
+            "manufacturer": "Ubiquiti"
+          },
+          {
+            "clientMac": "dc:bd:cc:e9:ae:e5",
+            "latestRecord": {
+              "nearestApMac": "00:18:0a:7f:35:6c",
+              "nearestApRssi": -91,
+              "time": "2025-02-18T18:17:34Z"
+            },
+            "manufacturer": "Quectel Wireless..."
+          },
+          {
+            "clientMac": "f4:02:23:6e:46:a8",
+            "latestRecord": {
+              "nearestApMac": "00:18:0a:7f:44:ec",
+              "nearestApRssi": -74,
+              "time": "2025-02-18T18:17:35Z"
+            },
+            "manufacturer": "PAX Computer..."
+          },
+          {
+            "clientMac": "30:82:16:d5:07:1c",
+            "latestRecord": {
+              "nearestApMac": "00:18:0a:7f:35:6c",
+              "nearestApRssi": -68,
+              "time": "2025-02-18T18:17:40Z"
+            },
+            "manufacturer": "Apple"
+          },
+          {
+            "clientMac": "28:2d:7f:90:2d:07",
+            "latestRecord": {
+              "nearestApMac": "00:18:0a:d0:71:f0",
+              "nearestApRssi": -80,
+              "time": "2025-02-18T18:17:36Z"
+            },
+            "manufacturer": "Apple"
+          },
+          {
+            "clientMac": "f8:8f:07:b3:b3:cb",
+            "latestRecord": {
+              "nearestApMac": "00:18:0a:6f:ed:e0",
+              "nearestApRssi": -91,
+              "time": "2025-02-18T18:17:08Z"
+            },
+            "manufacturer": "Samsung"
+          },
+          {
+            "clientMac": "38:90:52:93:67:f0",
+            "latestRecord": {
+              "nearestApMac": "00:18:0a:d0:71:f0",
+              "nearestApRssi": -64,
+              "time": "2025-02-18T18:17:42Z"
+            },
+            "manufacturer": "Huawei Technologies"
+          },
+          {
+            "clientMac": "48:e7:29:47:80:c7",
+            "latestRecord": {
+              "nearestApMac": "00:18:0a:7f:32:b7",
+              "nearestApRssi": -89,
+              "time": "2025-02-18T18:17:20Z"
+            },
+            "manufacturer": "Espressif"
+          },
+          {
+            "clientMac": "80:af:ca:37:fa:19",
+            "latestRecord": {
+              "nearestApMac": "00:18:0a:7f:35:6c",
+              "nearestApRssi": -71,
+              "time": "2025-02-18T18:17:36Z"
+            },
+            "manufacturer": "Shenzhen Cudy Technology"
+          },
+          {
+            "clientMac": "d4:11:a3:98:55:f7",
+            "latestRecord": {
+              "nearestApMac": "00:18:0a:7f:32:b7",
+              "nearestApRssi": -68,
+              "time": "2025-02-18T18:17:40Z"
+            },
+            "locations": [
+              {
+                "lat": -24.824009711347244,
+                "lng": 0.5177533393760143,
+                "nearestApTags": [
+                  "",
+                  "Strand",
+                  "STRAND",
+                  ""
+                ],
+                "rssiRecords": [
+                  {
+                    "apMac": "00:18:0a:7f:32:b7",
+                    "rssi": -57
+                  },
+                  {
+                    "apMac": "00:18:0a:7f:35:6c",
+                    "rssi": -77
+                  },
+                  {
+                    "apMac": "00:18:0a:7f:44:ec",
+                    "rssi": -79
+                  }
+                ],
+                "time": "2025-02-18T18:16:46Z",
+                "variance": 100,
+                "x": "NaN",
+                "y": "NaN"
+              },
+              {
+                "lat": -23.11486220097224,
+                "lng": -2.8490847569984794,
+                "nearestApTags": [
+                  "",
+                  "Strand",
+                  "STRAND",
+                  ""
+                ],
+                "rssiRecords": [
+                  {
+                    "apMac": "00:18:0a:7f:32:b7",
+                    "rssi": -59
+                  },
+                  {
+                    "apMac": "00:18:0a:7f:35:6c",
+                    "rssi": -83
+                  },
+                  {
+                    "apMac": "00:18:0a:7f:44:ec",
+                    "rssi": -79
+                  }
+                ],
+                "time": "2025-02-18T18:16:51Z",
+                "variance": 100,
+                "x": "NaN",
+                "y": "NaN"
+              },
+              {
+                "lat": -24.035256043962136,
+                "lng": -1.0359421309728418,
+                "nearestApTags": [
+                  "",
+                  "Strand",
+                  "STRAND",
+                  ""
+                ],
+                "rssiRecords": [
+                  {
+                    "apMac": "00:18:0a:7f:32:b7",
+                    "rssi": -58
+                  },
+                  {
+                    "apMac": "00:18:0a:7f:35:6c",
+                    "rssi": -82
+                  },
+                  {
+                    "apMac": "00:18:0a:7f:44:ec",
+                    "rssi": -79
+                  }
+                ],
+                "time": "2025-02-18T18:16:55Z",
+                "variance": 100,
+                "x": "NaN",
+                "y": "NaN"
+              },
+              {
+                "lat": -22.197012114330263,
+                "lng": -4.657246641511847,
+                "nearestApTags": [
+                  "",
+                  "Strand",
+                  "STRAND",
+                  ""
+                ],
+                "rssiRecords": [
+                  {
+                    "apMac": "00:18:0a:7f:32:b7",
+                    "rssi": -59
+                  },
+                  {
+                    "apMac": "00:18:0a:7f:35:6c",
+                    "rssi": -82
+                  },
+                  {
+                    "apMac": "00:18:0a:7f:44:ec",
+                    "rssi": -78
+                  }
+                ],
+                "time": "2025-02-18T18:16:59Z",
+                "variance": 100,
+                "x": "NaN",
+                "y": "NaN"
+              },
+              {
+                "lat": -18.038078159713898,
+                "lng": -12.850293174700539,
+                "nearestApTags": [
+                  "",
+                  "Strand",
+                  "STRAND",
+                  ""
+                ],
+                "rssiRecords": [
+                  {
+                    "apMac": "00:18:0a:7f:32:b7",
+                    "rssi": -62
+                  },
+                  {
+                    "apMac": "00:18:0a:7f:35:6c",
+                    "rssi": -82
+                  },
+                  {
+                    "apMac": "00:18:0a:7f:44:ec",
+                    "rssi": -77
+                  }
+                ],
+                "time": "2025-02-18T18:17:04Z",
+                "variance": 100,
+                "x": "NaN",
+                "y": "NaN"
+              },
+              {
+                "lat": -22.368349545732826,
+                "lng": -4.319730999788618,
+                "nearestApTags": [
+                  "",
+                  "Strand",
+                  "STRAND",
+                  ""
+                ],
+                "rssiRecords": [
+                  {
+                    "apMac": "00:18:0a:7f:32:b7",
+                    "rssi": -60
+                  },
+                  {
+                    "apMac": "00:18:0a:7f:35:6c",
+                    "rssi": -82
+                  },
+                  {
+                    "apMac": "00:18:0a:7f:44:ec",
+                    "rssi": -79
+                  }
+                ],
+                "time": "2025-02-18T18:17:08Z",
+                "variance": 100,
+                "x": "NaN",
+                "y": "NaN"
+              },
+              {
+                "lat": -17.755561431505413,
+                "lng": -13.40688251814501,
+                "nearestApTags": [
+                  "",
+                  "Strand",
+                  "STRAND",
+                  ""
+                ],
+                "rssiRecords": [
+                  {
+                    "apMac": "00:18:0a:7f:32:b7",
+                    "rssi": -61
+                  },
+                  {
+                    "apMac": "00:18:0a:7f:35:6c",
+                    "rssi": -79
+                  },
+                  {
+                    "apMac": "00:18:0a:7f:44:ec",
+                    "rssi": -76
+                  }
+                ],
+                "time": "2025-02-18T18:17:12Z",
+                "variance": 100,
+                "x": "NaN",
+                "y": "NaN"
+              },
+              {
+                "lat": -21.443828761947238,
+                "lng": -6.141027341881141,
+                "nearestApTags": [
+                  "",
+                  "Strand",
+                  "STRAND",
+                  ""
+                ],
+                "rssiRecords": [
+                  {
+                    "apMac": "00:18:0a:7f:32:b7",
+                    "rssi": -61
+                  },
+                  {
+                    "apMac": "00:18:0a:7f:35:6c",
+                    "rssi": -82
+                  },
+                  {
+                    "apMac": "00:18:0a:7f:44:ec",
+                    "rssi": -79
+                  }
+                ],
+                "time": "2025-02-18T18:17:21Z",
+                "variance": 100,
+                "x": "NaN",
+                "y": "NaN"
+              },
+              {
+                "lat": -20.45551948475095,
+                "lng": -8.087986186323661,
+                "nearestApTags": [
+                  "",
+                  "Strand",
+                  "STRAND",
+                  ""
+                ],
+                "rssiRecords": [
+                  {
+                    "apMac": "00:18:0a:7f:32:b7",
+                    "rssi": -62
+                  },
+                  {
+                    "apMac": "00:18:0a:7f:35:6c",
+                    "rssi": -82
+                  },
+                  {
+                    "apMac": "00:18:0a:7f:44:ec",
+                    "rssi": -79
+                  }
+                ],
+                "time": "2025-02-18T18:17:25Z",
+                "variance": 100,
+                "x": "NaN",
+                "y": "NaN"
+              },
+              {
+                "lat": -14.524863557047333,
+                "lng": -19.77131195730459,
+                "nearestApTags": [
+                  "",
+                  "Strand",
+                  "STRAND",
+                  ""
+                ],
+                "rssiRecords": [
+                  {
+                    "apMac": "00:18:0a:7f:32:b7",
+                    "rssi": -67
+                  },
+                  {
+                    "apMac": "00:18:0a:7f:35:6c",
+                    "rssi": -82
+                  },
+                  {
+                    "apMac": "00:18:0a:7f:44:ec",
+                    "rssi": -79
+                  }
+                ],
+                "time": "2025-02-18T18:17:30Z",
+                "variance": 100,
+                "x": "NaN",
+                "y": "NaN"
+              },
+              {
+                "lat": -8.72187278779727,
+                "lng": -31.203131340393895,
+                "nearestApTags": [
+                  "",
+                  "Strand",
+                  "STRAND",
+                  ""
+                ],
+                "rssiRecords": [
+                  {
+                    "apMac": "00:18:0a:7f:32:b7",
+                    "rssi": -71
+                  },
+                  {
+                    "apMac": "00:18:0a:7f:35:6c",
+                    "rssi": -82
+                  },
+                  {
+                    "apMac": "00:18:0a:7f:44:ec",
+                    "rssi": -79
+                  }
+                ],
+                "time": "2025-02-18T18:17:34Z",
+                "variance": 100,
+                "x": "NaN",
+                "y": "NaN"
+              },
+              {
+                "lat": -11.717038472346069,
+                "lng": -25.302693394678244,
+                "nearestApTags": [
+                  "",
+                  "Strand",
+                  "STRAND",
+                  ""
+                ],
+                "rssiRecords": [
+                  {
+                    "apMac": "00:18:0a:7f:32:b7",
+                    "rssi": -69
+                  },
+                  {
+                    "apMac": "00:18:0a:7f:35:6c",
+                    "rssi": -82
+                  },
+                  {
+                    "apMac": "00:18:0a:7f:44:ec",
+                    "rssi": -79
+                  }
+                ],
+                "time": "2025-02-18T18:17:36Z",
+                "variance": 100,
+                "x": "NaN",
+                "y": "NaN"
+              },
+              {
+                "lat": -13.148274960105367,
+                "lng": -22.483175061314313,
+                "nearestApTags": [
+                  "",
+                  "Strand",
+                  "STRAND",
+                  ""
+                ],
+                "rssiRecords": [
+                  {
+                    "apMac": "00:18:0a:7f:32:b7",
+                    "rssi": -68
+                  },
+                  {
+                    "apMac": "00:18:0a:7f:35:6c",
+                    "rssi": -82
+                  },
+                  {
+                    "apMac": "00:18:0a:7f:44:ec",
+                    "rssi": -79
+                  }
+                ],
+                "time": "2025-02-18T18:17:38Z",
+                "variance": 100,
+                "x": "NaN",
+                "y": "NaN"
+              }
+            ],
+            "manufacturer": "Samsung"
+          },
+          {
+            "clientMac": "d8:d6:68:ef:b6:9f",
+            "latestRecord": {
+              "nearestApMac": "00:18:0a:84:e2:2e",
+              "nearestApRssi": -75,
+              "time": "2025-02-18T18:17:41Z"
+            },
+            "manufacturer": "Tuya Smart"
+          },
+          {
+            "clientMac": "02:3f:4d:05:96:0e",
+            "ipv4": "10.201.25.98",
+            "latestRecord": {
+              "nearestApMac": "00:18:0a:7f:32:b7",
+              "nearestApRssi": -58,
+              "time": "2025-02-18T18:17:16Z"
+            },
+            "locations": [
+              {
+                "lat": -8.239951749533587,
+                "lng": -32.152453901240335,
+                "nearestApTags": [
+                  "",
+                  "Strand",
+                  "STRAND",
+                  ""
+                ],
+                "rssiRecords": [
+                  {
+                    "apMac": "00:18:0a:7f:32:b7",
+                    "rssi": -63
+                  },
+                  {
+                    "apMac": "00:18:0a:7f:35:6c",
+                    "rssi": -69
+                  },
+                  {
+                    "apMac": "00:18:0a:7f:44:ec",
+                    "rssi": -72
+                  }
+                ],
+                "time": "2025-02-18T18:16:45Z",
+                "variance": 100,
+                "x": "NaN",
+                "y": "NaN"
+              },
+              {
+                "lat": 10.356193714448027,
+                "lng": -68.78675216863641,
+                "nearestApTags": [
+                  "",
+                  "Strand",
+                  "STRAND",
+                  ""
+                ],
+                "rssiRecords": [
+                  {
+                    "apMac": "00:18:0a:7f:32:b7",
+                    "rssi": -58
+                  },
+                  {
+                    "apMac": "00:18:0a:7f:35:6c",
+                    "rssi": -70
+                  },
+                  {
+                    "apMac": "00:18:0a:7f:44:ec",
+                    "rssi": -54
+                  }
+                ],
+                "time": "2025-02-18T18:16:54Z",
+                "variance": 100,
+                "x": "NaN",
+                "y": "NaN"
+              },
+              {
+                "lat": -25.64965346375341,
+                "lng": 2.144320125933092,
+                "nearestApTags": [
+                  "",
+                  "Strand",
+                  "STRAND",
+                  ""
+                ],
+                "rssiRecords": [
+                  {
+                    "apMac": "00:18:0a:7f:32:b7",
+                    "rssi": -56
+                  },
+                  {
+                    "apMac": "00:18:0a:7f:35:6c",
+                    "rssi": -79
+                  },
+                  {
+                    "apMac": "00:18:0a:7f:44:ec",
+                    "rssi": -79
+                  }
+                ],
+                "time": "2025-02-18T18:17:12Z",
+                "variance": 100,
+                "x": "NaN",
+                "y": "NaN"
+              },
+              {
+                "lat": -19.29791051855659,
+                "lng": -10.36851786739939,
+                "nearestApTags": [
+                  "",
+                  "Strand",
+                  "STRAND",
+                  ""
+                ],
+                "rssiRecords": [
+                  {
+                    "apMac": "00:18:0a:7f:32:b7",
+                    "rssi": -58
+                  },
+                  {
+                    "apMac": "00:18:0a:7f:35:6c",
+                    "rssi": -75
+                  },
+                  {
+                    "apMac": "00:18:0a:7f:44:ec",
+                    "rssi": -75
+                  }
+                ],
+                "time": "2025-02-18T18:17:16Z",
+                "variance": 100,
+                "x": "NaN",
+                "y": "NaN"
+              }
+            ],
+            "ssid": "OB SECURE"
+          },
+          {
+            "clientMac": "24:ae:cc:0d:83:0a",
+            "latestRecord": {
+              "nearestApMac": "00:18:0a:d0:71:f0",
+              "nearestApRssi": -79,
+              "time": "2025-02-18T18:17:18Z"
+            },
+            "manufacturer": "Honor Device"
+          },
+          {
+            "clientMac": "68:9c:70:4a:12:a1",
+            "latestRecord": {
+              "nearestApMac": "00:18:0a:d0:71:f0",
+              "nearestApRssi": -85,
+              "time": "2025-02-18T18:17:40Z"
+            },
+            "manufacturer": "Apple"
+          },
+          {
+            "clientMac": "1c:1a:1b:6e:19:d2",
+            "latestRecord": {
+              "nearestApMac": "00:18:0a:84:e2:2e",
+              "nearestApRssi": -86,
+              "time": "2025-02-18T18:17:13Z"
+            },
+            "manufacturer": "Shanghai Sunmi Technology"
+          },
+          {
+            "clientMac": "f4:02:23:6e:5f:32",
+            "latestRecord": {
+              "nearestApMac": "00:18:0a:6f:ed:e0",
+              "nearestApRssi": -76,
+              "time": "2025-02-18T18:17:35Z"
+            },
+            "manufacturer": "PAX Computer..."
+          },
+          {
+            "clientMac": "d8:d6:68:ef:b6:c7",
+            "latestRecord": {
+              "nearestApMac": "00:18:0a:84:e2:2e",
+              "nearestApRssi": -64,
+              "time": "2025-02-18T18:17:33Z"
+            },
+            "manufacturer": "Tuya Smart"
+          },
+          {
+            "clientMac": "e8:fd:f8:fc:7c:88",
+            "latestRecord": {
+              "nearestApMac": "00:18:0a:7f:32:b7",
+              "nearestApRssi": -82,
+              "time": "2025-02-18T18:17:25Z"
+            },
+            "manufacturer": "Shanghai High-Flying..."
+          },
+          {
+            "clientMac": "0a:80:31:a8:5f:97",
+            "ipv4": "10.34.44.175",
+            "latestRecord": {
+              "nearestApMac": "00:18:0a:7f:35:6c",
+              "nearestApRssi": -96,
+              "time": "2025-02-18T18:17:36Z"
+            },
+            "ssid": "OB SECURE"
+          },
+          {
+            "clientMac": "80:af:ca:38:16:65",
+            "latestRecord": {
+              "nearestApMac": "00:18:0a:7f:35:6c",
+              "nearestApRssi": -83,
+              "time": "2025-02-18T18:16:53Z"
+            },
+            "manufacturer": "Shenzhen Cudy Technology"
+          },
+          {
+            "clientMac": "78:45:58:1d:8a:e6",
+            "latestRecord": {
+              "nearestApMac": "00:18:0a:d0:71:f0",
+              "nearestApRssi": -67,
+              "time": "2025-02-18T18:17:38Z"
+            },
+            "manufacturer": "Ubiquiti"
+          },
+          {
+            "clientMac": "10:b2:32:2d:6c:18",
+            "latestRecord": {
+              "nearestApMac": "00:18:0a:d0:71:f0",
+              "nearestApRssi": -80,
+              "time": "2025-02-18T18:16:47Z"
+            },
+            "manufacturer": "Qingdao..."
+          },
+          {
+            "clientMac": "e0:63:da:ae:6d:55",
+            "latestRecord": {
+              "nearestApMac": "00:18:0a:84:e2:2e",
+              "nearestApRssi": -83,
+              "time": "2025-02-18T18:17:34Z"
+            },
+            "manufacturer": "Ubiquiti"
+          },
+          {
+            "clientMac": "a0:76:4e:bf:2b:54",
+            "latestRecord": {
+              "nearestApMac": "00:18:0a:d0:71:f0",
+              "nearestApRssi": -68,
+              "time": "2025-02-18T18:17:31Z"
+            },
+            "manufacturer": "Espressif"
+          },
+          {
+            "clientMac": "5c:e4:2a:0d:8a:ae",
+            "latestRecord": {
+              "nearestApMac": "00:18:0a:84:e2:2e",
+              "nearestApRssi": -60,
+              "time": "2025-02-18T18:17:19Z"
+            },
+            "manufacturer": "Intel"
+          },
+          {
+            "clientMac": "5c:aa:fd:ff:06:19",
+            "latestRecord": {
+              "nearestApMac": "00:18:0a:d0:71:f0",
+              "nearestApRssi": -70,
+              "time": "2025-02-18T18:17:07Z"
+            },
+            "manufacturer": "Sonos"
+          },
+          {
+            "clientMac": "34:7e:5c:d1:f8:23",
+            "latestRecord": {
+              "nearestApMac": "00:18:0a:d0:71:f0",
+              "nearestApRssi": -65,
+              "time": "2025-02-18T18:16:54Z"
+            },
+            "manufacturer": "Sonos"
+          },
+          {
+            "clientMac": "04:34:f6:05:36:eb",
+            "latestRecord": {
+              "nearestApMac": "00:18:0a:84:e2:2e",
+              "nearestApRssi": -71,
+              "time": "2025-02-18T18:17:41Z"
+            },
+            "manufacturer": "Motorola (Wuhan)..."
+          },
+          {
+            "clientMac": "b4:20:5b:2a:e0:11",
+            "ipv4": "10.53.143.113",
+            "latestRecord": {
+              "nearestApMac": "00:18:0a:7f:32:b7",
+              "nearestApRssi": -69,
+              "time": "2025-02-18T18:17:29Z"
+            },
+            "locations": [
+              {
+                "lat": -14.006360976025972,
+                "lng": -20.792189029108584,
+                "nearestApTags": [
+                  "",
+                  "STRAND",
+                  ""
+                ],
+                "rssiRecords": [
+                  {
+                    "apMac": "00:18:0a:7f:44:ec",
+                    "rssi": -82
+                  },
+                  {
+                    "apMac": "00:18:0a:7f:35:6c",
+                    "rssi": -69
+                  },
+                  {
+                    "apMac": "00:18:0a:7f:32:b7",
+                    "rssi": -72
+                  }
+                ],
+                "time": "2025-02-18T18:16:45Z",
+                "variance": 100,
+                "x": "NaN",
+                "y": "NaN"
+              },
+              {
+                "lat": -14.850626214907592,
+                "lng": -19.129609546385893,
+                "nearestApTags": [
+                  "",
+                  "Strand",
+                  "STRAND",
+                  ""
+                ],
+                "rssiRecords": [
+                  {
+                    "apMac": "00:18:0a:7f:44:ec",
+                    "rssi": -78
+                  },
+                  {
+                    "apMac": "00:18:0a:7f:35:6c",
+                    "rssi": -71
+                  },
+                  {
+                    "apMac": "00:18:0a:7f:32:b7",
+                    "rssi": -64
+                  }
+                ],
+                "time": "2025-02-18T18:16:50Z",
+                "variance": 100,
+                "x": "NaN",
+                "y": "NaN"
+              },
+              {
+                "lat": -11.323748712490845,
+                "lng": -26.077461761229927,
+                "nearestApTags": [
+                  "",
+                  "Strand",
+                  "STRAND",
+                  ""
+                ],
+                "rssiRecords": [
+                  {
+                    "apMac": "00:18:0a:7f:44:ec",
+                    "rssi": -78
+                  },
+                  {
+                    "apMac": "00:18:0a:7f:35:6c",
+                    "rssi": -73
+                  },
+                  {
+                    "apMac": "00:18:0a:7f:32:b7",
+                    "rssi": -67
+                  }
+                ],
+                "time": "2025-02-18T18:16:54Z",
+                "variance": 100,
+                "x": "NaN",
+                "y": "NaN"
+              },
+              {
+                "lat": -14.703688711032257,
+                "lng": -19.418478949540827,
+                "nearestApTags": [
+                  "",
+                  "STRAND",
+                  ""
+                ],
+                "rssiRecords": [
+                  {
+                    "apMac": "00:18:0a:7f:44:ec",
+                    "rssi": -78
+                  },
+                  {
+                    "apMac": "00:18:0a:7f:35:6c",
+                    "rssi": -64
+                  },
+                  {
+                    "apMac": "00:18:0a:7f:32:b7",
+                    "rssi": -68
+                  }
+                ],
+                "time": "2025-02-18T18:16:58Z",
+                "variance": 100,
+                "x": "NaN",
+                "y": "NaN"
+              },
+              {
+                "lat": -14.363182901946693,
+                "lng": -20.089587359659333,
+                "nearestApTags": [
+                  "",
+                  "Strand",
+                  "STRAND",
+                  ""
+                ],
+                "rssiRecords": [
+                  {
+                    "apMac": "00:18:0a:7f:44:ec",
+                    "rssi": -78
+                  },
+                  {
+                    "apMac": "00:18:0a:7f:35:6c",
+                    "rssi": -66
+                  },
+                  {
+                    "apMac": "00:18:0a:7f:32:b7",
+                    "rssi": -65
+                  }
+                ],
+                "time": "2025-02-18T18:17:03Z",
+                "variance": 100,
+                "x": "NaN",
+                "y": "NaN"
+              },
+              {
+                "lat": -22.454762916656918,
+                "lng": -4.14976545784063,
+                "nearestApTags": [
+                  "",
+                  "Strand",
+                  "STRAND",
+                  ""
+                ],
+                "rssiRecords": [
+                  {
+                    "apMac": "00:18:0a:7f:44:ec",
+                    "rssi": -78
+                  },
+                  {
+                    "apMac": "00:18:0a:7f:35:6c",
+                    "rssi": -66
+                  },
+                  {
+                    "apMac": "00:18:0a:7f:32:b7",
+                    "rssi": -56
+                  }
+                ],
+                "time": "2025-02-18T18:17:07Z",
+                "variance": 100,
+                "x": "NaN",
+                "y": "NaN"
+              },
+              {
+                "lat": -15.211631570851614,
+                "lng": -18.41833454767513,
+                "nearestApTags": [
+                  "",
+                  "Strand",
+                  "STRAND",
+                  ""
+                ],
+                "rssiRecords": [
+                  {
+                    "apMac": "00:18:0a:7f:44:ec",
+                    "rssi": -73
+                  },
+                  {
+                    "apMac": "00:18:0a:7f:35:6c",
+                    "rssi": -64
+                  },
+                  {
+                    "apMac": "00:18:0a:7f:32:b7",
+                    "rssi": -58
+                  }
+                ],
+                "time": "2025-02-18T18:17:16Z",
+                "variance": 100,
+                "x": "NaN",
+                "y": "NaN"
+              },
+              {
+                "lat": -10.234095050040334,
+                "lng": -28.223815217803264,
+                "nearestApTags": [
+                  "",
+                  "STRAND",
+                  ""
+                ],
+                "rssiRecords": [
+                  {
+                    "apMac": "00:18:0a:7f:44:ec",
+                    "rssi": -75
+                  },
+                  {
+                    "apMac": "00:18:0a:7f:35:6c",
+                    "rssi": -66
+                  },
+                  {
+                    "apMac": "00:18:0a:7f:32:b7",
+                    "rssi": -66
+                  }
+                ],
+                "time": "2025-02-18T18:17:20Z",
+                "variance": 12.086319043502336,
+                "x": "NaN",
+                "y": "NaN"
+              },
+              {
+                "lat": -12.496814380976655,
+                "lng": -23.765980748180738,
+                "nearestApTags": [
+                  "",
+                  "STRAND",
+                  ""
+                ],
+                "rssiRecords": [
+                  {
+                    "apMac": "00:18:0a:7f:44:ec",
+                    "rssi": -78
+                  },
+                  {
+                    "apMac": "00:18:0a:7f:35:6c",
+                    "rssi": -66
+                  },
+                  {
+                    "apMac": "00:18:0a:7f:32:b7",
+                    "rssi": -72
+                  }
+                ],
+                "time": "2025-02-18T18:17:24Z",
+                "variance": 100,
+                "x": "NaN",
+                "y": "NaN"
+              }
+            ],
+            "manufacturer": "GUANGDONG OPPO MOBILE...",
+            "ssid": "OB SECURE"
+          },
+          {
+            "clientMac": "c0:b6:f9:7d:8f:61",
+            "latestRecord": {
+              "nearestApMac": "00:18:0a:d0:71:f0",
+              "nearestApRssi": -73,
+              "time": "2025-02-18T18:16:47Z"
+            },
+            "manufacturer": "Intel"
+          },
+          {
+            "clientMac": "78:45:58:41:0d:ff",
+            "latestRecord": {
+              "nearestApMac": "00:18:0a:d0:71:f0",
+              "nearestApRssi": -71,
+              "time": "2025-02-18T18:17:42Z"
+            },
+            "manufacturer": "Ubiquiti"
+          },
+          {
+            "clientMac": "c4:a6:4e:6d:5c:09",
+            "latestRecord": {
+              "nearestApMac": "00:18:0a:7f:35:6c",
+              "nearestApRssi": -59,
+              "time": "2025-02-18T18:17:33Z"
+            },
+            "locations": [
+              {
+                "lat": -18.81142397322087,
+                "lng": -11.326156648074004,
+                "nearestApTags": [
+                  "",
+                  "STRAND",
+                  ""
+                ],
+                "rssiRecords": [
+                  {
+                    "apMac": "00:18:0a:7f:32:b7",
+                    "rssi": -79
+                  },
+                  {
+                    "apMac": "00:18:0a:7f:44:ec",
+                    "rssi": -75
+                  },
+                  {
+                    "apMac": "00:18:0a:7f:35:6c",
+                    "rssi": -59
+                  }
+                ],
+                "time": "2025-02-18T18:16:50Z",
+                "variance": 100,
+                "x": "NaN",
+                "y": "NaN"
+              },
+              {
+                "lat": -12.548147639489235,
+                "lng": -23.66485603707102,
+                "nearestApTags": [
+                  "",
+                  "STRAND",
+                  ""
+                ],
+                "rssiRecords": [
+                  {
+                    "apMac": "00:18:0a:7f:32:b7",
+                    "rssi": -79
+                  },
+                  {
+                    "apMac": "00:18:0a:7f:44:ec",
+                    "rssi": -75
+                  },
+                  {
+                    "apMac": "00:18:0a:7f:35:6c",
+                    "rssi": -64
+                  }
+                ],
+                "time": "2025-02-18T18:17:12Z",
+                "variance": 100,
+                "x": "NaN",
+                "y": "NaN"
+              }
+            ],
+            "manufacturer": "Quectel Wireless..."
+          },
+          {
+            "clientMac": "d4:f3:2d:52:39:60",
+            "latestRecord": {
+              "nearestApMac": "00:18:0a:d0:71:f0",
+              "nearestApRssi": -93,
+              "time": "2025-02-18T18:17:10Z"
+            },
+            "manufacturer": "Intel"
+          },
+          {
+            "clientMac": "e0:d8:c4:f8:15:62",
+            "latestRecord": {
+              "nearestApMac": "00:18:0a:7f:35:6c",
+              "nearestApRssi": -86,
+              "time": "2025-02-18T18:17:26Z"
+            },
+            "manufacturer": "Qingdao..."
+          },
+          {
+            "clientMac": "14:99:3e:91:9a:c0",
+            "latestRecord": {
+              "nearestApMac": "00:18:0a:7f:35:6c",
+              "nearestApRssi": -88,
+              "time": "2025-02-18T18:16:53Z"
+            },
+            "manufacturer": "Xiaomi Communications"
+          },
+          {
+            "clientMac": "50:8b:b9:e0:4a:0d",
+            "latestRecord": {
+              "nearestApMac": "00:18:0a:84:e2:2e",
+              "nearestApRssi": -74,
+              "time": "2025-02-18T18:16:54Z"
+            },
+            "manufacturer": "Tuya Smart"
+          },
+          {
+            "clientMac": "30:07:4d:59:3f:0d",
+            "latestRecord": {
+              "nearestApMac": "00:18:0a:d0:71:f0",
+              "nearestApRssi": -80,
+              "time": "2025-02-18T18:17:31Z"
+            },
+            "manufacturer": "Samsung(THAILAND)"
+          },
+          {
+            "clientMac": "e0:9d:31:9c:0e:fc",
+            "latestRecord": {
+              "nearestApMac": "00:18:0a:6f:ed:e0",
+              "nearestApRssi": -88,
+              "time": "2025-02-18T18:17:08Z"
+            },
+            "manufacturer": "Intel"
+          },
+          {
+            "clientMac": "5c:d0:6e:67:69:c7",
+            "latestRecord": {
+              "nearestApMac": "00:18:0a:6f:ed:e0",
+              "nearestApRssi": -56,
+              "time": "2025-02-18T18:17:03Z"
+            },
+            "manufacturer": "Xiaomi Communications"
+          },
+          {
+            "clientMac": "b0:99:d7:b3:d3:98",
+            "latestRecord": {
+              "nearestApMac": "00:18:0a:84:e2:2e",
+              "nearestApRssi": -67,
+              "time": "2025-02-18T18:17:33Z"
+            },
+            "manufacturer": "Samsung"
+          },
+          {
+            "clientMac": "12:69:81:1d:a1:76",
+            "ipv4": "10.90.100.129",
+            "latestRecord": {
+              "nearestApMac": "00:18:0a:84:e2:2e",
+              "nearestApRssi": -66,
+              "time": "2025-02-18T18:17:28Z"
+            },
+            "ssid": "OB SECURE"
+          },
+          {
+            "clientMac": "e0:63:da:ad:6d:55",
+            "latestRecord": {
+              "nearestApMac": "00:18:0a:84:e2:2e",
+              "nearestApRssi": -86,
+              "time": "2025-02-18T18:17:02Z"
+            },
+            "manufacturer": "Ubiquiti"
+          },
+          {
+            "clientMac": "f4:02:23:6c:97:9c",
+            "latestRecord": {
+              "nearestApMac": "00:18:0a:7f:44:ec",
+              "nearestApRssi": -77,
+              "time": "2025-02-18T18:17:04Z"
+            },
+            "manufacturer": "PAX Computer..."
+          },
+          {
+            "clientMac": "ac:6a:a3:20:bb:35",
+            "latestRecord": {
+              "nearestApMac": "00:18:0a:7f:44:ec",
+              "nearestApRssi": -93,
+              "time": "2025-02-18T18:17:37Z"
+            },
+            "locations": [
+              {
+                "lat": -0.9121400514736635,
+                "lng": -46.58789296301717,
+                "nearestApTags": [
+                  "",
+                  "STRAND",
+                  ""
+                ],
+                "rssiRecords": [
+                  {
+                    "apMac": "00:18:0a:7f:35:6c",
+                    "rssi": -91
+                  },
+                  {
+                    "apMac": "00:18:0a:7f:32:b7",
+                    "rssi": -92
+                  },
+                  {
+                    "apMac": "00:18:0a:7f:44:ec",
+                    "rssi": -93
+                  }
+                ],
+                "time": "2025-02-18T18:17:11Z",
+                "variance": 100,
+                "x": "NaN",
+                "y": "NaN"
+              },
+              {
+                "lat": 4.390538945921296,
+                "lng": -57.03431408924911,
+                "nearestApTags": [
+                  "",
+                  "Strand",
+                  "STRAND",
+                  ""
+                ],
+                "rssiRecords": [
+                  {
+                    "apMac": "00:18:0a:7f:35:6c",
+                    "rssi": -91
+                  },
+                  {
+                    "apMac": "00:18:0a:7f:32:b7",
+                    "rssi": -91
+                  },
+                  {
+                    "apMac": "00:18:0a:7f:44:ec",
+                    "rssi": -89
+                  }
+                ],
+                "time": "2025-02-18T18:17:29Z",
+                "variance": 12.086319044005448,
+                "x": "NaN",
+                "y": "NaN"
+              },
+              {
+                "lat": -1.0985507568319015,
+                "lng": -46.220970715239304,
+                "nearestApTags": [
+                  "",
+                  "Strand",
+                  "STRAND",
+                  ""
+                ],
+                "rssiRecords": [
+                  {
+                    "apMac": "00:18:0a:7f:35:6c",
+                    "rssi": -94
+                  },
+                  {
+                    "apMac": "00:18:0a:7f:32:b7",
+                    "rssi": -91
+                  },
+                  {
+                    "apMac": "00:18:0a:7f:44:ec",
+                    "rssi": -93
+                  }
+                ],
+                "time": "2025-02-18T18:17:37Z",
+                "variance": 100,
+                "x": "NaN",
+                "y": "NaN"
+              }
+            ],
+            "manufacturer": "Shenzhen Kertong..."
+          },
+          {
+            "clientMac": "82:c1:19:b9:18:70",
+            "ipv4": "10.88.199.41",
+            "latestRecord": {
+              "nearestApMac": "00:18:0a:7f:35:6c",
+              "nearestApRssi": -96,
+              "time": "2025-02-18T18:17:36Z"
+            },
+            "ssid": "OB SECURE"
+          },
+          {
+            "clientMac": "80:af:ca:38:16:64",
+            "latestRecord": {
+              "nearestApMac": "00:18:0a:7f:35:6c",
+              "nearestApRssi": -83,
+              "time": "2025-02-18T18:17:29Z"
+            },
+            "manufacturer": "Shenzhen Cudy Technology"
+          },
+          {
+            "clientMac": "10:b2:32:8a:e8:da",
+            "latestRecord": {
+              "nearestApMac": "00:18:0a:6f:ed:e0",
+              "nearestApRssi": -51,
+              "time": "2025-02-18T18:17:40Z"
+            },
+            "manufacturer": "Qingdao..."
+          },
+          {
+            "clientMac": "f4:fb:b8:bd:7b:b0",
+            "latestRecord": {
+              "nearestApMac": "00:18:0a:84:e2:2e",
+              "nearestApRssi": -88,
+              "time": "2025-02-18T18:17:02Z"
+            },
+            "manufacturer": "Huawei Technologies"
+          },
+          {
+            "clientMac": "cc:f7:35:71:77:00",
+            "latestRecord": {
+              "nearestApMac": "00:18:0a:7f:35:6c",
+              "nearestApRssi": -75,
+              "time": "2025-02-18T18:17:36Z"
+            },
+            "manufacturer": "Amazon Technologies"
+          }
+        ]
+      },
+      "secret": "Giulietta!16",
+      "type": "WiFi",
+      "version": "3.0"
+    }
+  },
+  "users": {
+    "OTnjPiIxRNejaJuaxoPrbFBw3L42": {
+      "email": "andreas@askgroupholdings.com",
+      "lastSignInTime": "2025-02-18T18:19:13.169Z",
+      "uid": "OTnjPiIxRNejaJuaxoPrbFBw3L42",
+      "updatedAt": "2025-02-18T18:19:13.169Z"
+    }
+  }
+}

@@ -101,24 +101,24 @@ const guestManagement = {
                                 <tbody>
                                     <tr v-for="guest in filteredGuests" :key="guest.phoneNumber">
                                         <td>{{ guest.name || 'N/A' }}</td>
-                                        <td>{{ guest.phoneNumber }}</td>
-                                        <td>{{ guest.metrics.visitCount }} visits</td>
-                                        <td>R{{ guest.metrics.averageSpend.toFixed(2) }}</td>
-                                        <td>R{{ guest.metrics.lifetimeValue.toFixed(2) }}</td>
+                                        <td>{{ guest.phoneNumber || 'N/A' }}</td>
+                                        <td>{{ guest.metrics?.visitCount || 0 }} visits</td>
+                                        <td>R{{ (guest.metrics?.totalSpent || 0).toFixed(2) }}</td>
+                                        <td>R{{ (guest.metrics?.lifetimeValue || 0).toFixed(2) }}</td>
                                         <td>
                                             <div class="d-flex align-items-center">
                                                 <div class="progress flex-grow-1" style="height: 8px;">
                                                     <div 
                                                         class="progress-bar" 
-                                                        :class="getEngagementClass(guest.metrics.engagementScore)"
-                                                        :style="{ width: guest.metrics.engagementScore + '%' }"
+                                                        :class="getEngagementClass(guest.metrics?.engagementScore || 0)"
+                                                        :style="{ width: (guest.metrics?.engagementScore || 0) + '%' }"
                                                     ></div>
                                                 </div>
-                                                <span class="ms-2">{{ guest.metrics.engagementScore }}%</span>
+                                                <span class="ms-2">{{ guest.metrics?.engagementScore || 0 }}%</span>
                                             </div>
                                         </td>
-                                        <td>{{ guest.metrics.favoriteStore }}</td>
-                                        <td>{{ formatDate(guest.metrics.lastVisitDate) }}</td>
+                                        <td>{{ guest.metrics?.favoriteStore }}</td>
+                                        <td>{{ formatDate(guest.metrics?.lastVisitDate) }}</td>
                                         <td>
                                             <div class="btn-group btn-group-sm">
                                                 <button 
@@ -178,61 +178,73 @@ const guestManagement = {
         data() {
             return {
                 guests: [],
+                loading: false,
+                error: null,
                 searchQuery: '',
                 sortConfig: {
                     key: 'name',
                     direction: 'asc'
                 },
-                loading: false,
-                error: null,
-                currentAnalyticsGuest: null
-            }
+                currentAnalyticsGuest: null,
+                showAddGuestModal: false
+            };
         },
 
         computed: {
             filteredGuests() {
-                // Keep existing filtered guests logic
+                if (!Array.isArray(this.guests)) return [];
+                
                 let result = this.guests;
 
                 if (this.searchQuery) {
                     const query = this.searchQuery.toLowerCase();
-                    result = result.filter(guest => 
-                        guest.name?.toLowerCase().includes(query) ||
-                        guest.phoneNumber.includes(query)
-                    );
+                    result = result.filter(guest => {
+                        const name = guest?.name || '';
+                        const phone = guest?.phoneNumber || '';
+                        return name.toLowerCase().includes(query) || phone.includes(query);
+                    });
                 }
 
-                result = [...result].sort((a, b) => {
-                    let aVal = this.getSortValue(a, this.sortConfig.key);
-                    let bVal = this.getSortValue(b, this.sortConfig.key);
+                const key = this.sortConfig?.key || 'name';
+                const direction = this.sortConfig?.direction || 'asc';
 
-                    if (aVal < bVal) return this.sortConfig.direction === 'asc' ? -1 : 1;
-                    if (aVal > bVal) return this.sortConfig.direction === 'asc' ? 1 : -1;
+                result = [...result].sort((a, b) => {
+                    let aVal = this.getSortValue(a, key) || '';
+                    let bVal = this.getSortValue(b, key) || '';
+
+                    if (aVal < bVal) return direction === 'asc' ? -1 : 1;
+                    if (aVal > bVal) return direction === 'asc' ? 1 : -1;
                     return 0;
                 });
 
                 return result;
             },
 
-            // New computed properties for analytics summary
             activeGuestsCount() {
+                if (!Array.isArray(this.guests)) return 0;
+                
                 const thirtyDaysAgo = Date.now() - (30 * 24 * 60 * 60 * 1000);
-                return this.guests.filter(guest => 
-                    guest.metrics.lastVisitDate > thirtyDaysAgo
-                ).length;
+                return this.guests.filter(guest => {
+                    const lastVisit = guest?.metrics?.lastVisit;
+                    if (!lastVisit) return false;
+                    return new Date(lastVisit).getTime() > thirtyDaysAgo;
+                }).length;
             },
 
             averageEngagement() {
-                if (this.guests.length === 0) return 0;
+                if (!Array.isArray(this.guests) || this.guests.length === 0) return 0;
+                
                 const totalEngagement = this.guests.reduce((sum, guest) => 
-                    sum + guest.metrics.engagementScore, 0
+                    sum + (guest?.metrics?.engagementScore || 0), 0
                 );
                 return Math.round(totalEngagement / this.guests.length);
             },
 
             totalRevenue() {
+                if (!Array.isArray(this.guests)) return 0;
+                
                 return this.guests.reduce((sum, guest) => 
-                    sum + guest.metrics.lifetimeValue, 0
+                    sum + (guest?.metrics?.totalSpent || 0), 0
                 );
             }
         },
@@ -243,41 +255,134 @@ const guestManagement = {
                 this.error = null;
                 try {
                     const snapshot = await get(ref(rtdb, 'guests'));
-                    const guests = snapshot.val() || {};
+                    const guestsData = snapshot.val() || {};
                     
-                    this.guests = await Promise.all(
-                        Object.entries(guests).map(async ([phoneNumber, data]) => {
-                            try {
-                                const receipts = await this.getGuestReceipts(phoneNumber);
-                                const metrics = this.calculateGuestMetrics({
-                                    ...data,
-                                    receipts,
-                                    phoneNumber
-                                });
-
-                                return {
-                                    phoneNumber,
-                                    ...data,
-                                    receipts,
-                                    metrics
-                                };
-                            } catch (err) {
-                                console.error(`Error processing guest ${phoneNumber}:`, err);
-                                return {
-                                    phoneNumber,
-                                    ...data,
-                                    receipts: [],
-                                    metrics: this.calculateGuestMetrics({})
-                                };
-                            }
-                        })
-                    );
+                    this.guests = Object.entries(guestsData).map(([phoneNumber, data]) => {
+                        // Get guest receipts and calculate metrics
+                        const metrics = this.calculateGuestMetrics(data);
+                        
+                        return {
+                            phoneNumber,
+                            name: data.name || 'N/A',
+                            createdAt: data.createdAt,
+                            lastConsentPrompt: data.lastConsentPrompt,
+                            consent: data.consent || false,
+                            tier: data.tier || 'Bronze',
+                            updatedAt: data.updatedAt,
+                            metrics
+                        };
+                    });
                 } catch (error) {
                     console.error('Error loading guests:', error);
                     this.error = 'Failed to load guests. Please try again.';
                     this.guests = [];
                 } finally {
                     this.loading = false;
+                }
+            },
+
+            calculateGuestMetrics(guestData) {
+                if (!guestData) return {
+                    visitCount: 0,
+                    totalSpent: 0,
+                    averageSpend: 0,
+                    lastVisit: null,
+                    engagementScore: this.calculateEngagementScore(guestData)
+                };
+
+                const now = new Date();
+                const lastActivity = guestData.lastConsentPrompt || guestData.createdAt;
+                
+                return {
+                    visitCount: 0, // Will implement when receipt tracking is added
+                    totalSpent: 0, // Will implement when receipt tracking is added
+                    averageSpend: 0, // Will implement when receipt tracking is added
+                    lastVisit: lastActivity,
+                    engagementScore: this.calculateEngagementScore(guestData)
+                };
+            },
+
+            calculateEngagementScore(guestData) {
+                if (!guestData) return 0;
+
+                const now = new Date();
+                const lastActivity = guestData.lastConsentPrompt || guestData.createdAt;
+                if (!lastActivity) return 0;
+
+                // Convert lastActivity to Date object if it's a string
+                const lastActivityDate = new Date(lastActivity);
+                
+                // Calculate days since last activity
+                const daysSinceLastActivity = (now - lastActivityDate) / (1000 * 60 * 60 * 24);
+                
+                // Score based on recency (max 100 points, decays over 30 days)
+                const recencyScore = Math.max(0, 100 - (daysSinceLastActivity * (100 / 30)));
+                
+                // Score based on consent (additional 20 points if they've given consent)
+                const consentScore = guestData.consent ? 20 : 0;
+                
+                // Calculate final score (weighted average)
+                const finalScore = Math.round((recencyScore * 0.8) + (consentScore * 0.2));
+                
+                return Math.min(100, Math.max(0, finalScore));
+            },
+
+            async showAddGuestModal() {
+                const { value: formValues } = await Swal.fire({
+                    title: 'Add New Guest',
+                    html: `
+                        <div class="form-group mb-3">
+                            <label for="name">Name</label>
+                            <input id="name" class="form-control" placeholder="Guest Name">
+                        </div>
+                        <div class="form-group mb-3">
+                            <label for="phoneNumber">Phone Number</label>
+                            <input id="phoneNumber" class="form-control" placeholder="+27 Phone Number">
+                        </div>
+                    `,
+                    focusConfirm: false,
+                    showCancelButton: true,
+                    confirmButtonText: 'Add',
+                    cancelButtonText: 'Cancel',
+                    preConfirm: () => {
+                        const name = Swal.getPopup().querySelector('#name').value;
+                        const phoneNumber = Swal.getPopup().querySelector('#phoneNumber').value;
+                        
+                        if (!name || !phoneNumber) {
+                            Swal.showValidationMessage('Please fill in all fields');
+                            return false;
+                        }
+                        
+                        // Validate phone number format
+                        if (!phoneNumber.startsWith('+27')) {
+                            Swal.showValidationMessage('Phone number must start with +27');
+                            return false;
+                        }
+                        
+                        return { name, phoneNumber };
+                    }
+                });
+
+                if (formValues) {
+                    try {
+                        const now = new Date().toISOString();
+                        const guestRef = ref(rtdb, `guests/${formValues.phoneNumber}`);
+                        await set(guestRef, {
+                            name: formValues.name,
+                            phoneNumber: formValues.phoneNumber,
+                            createdAt: now,
+                            updatedAt: now,
+                            consent: false,
+                            tier: 'Bronze',
+                            lastConsentPrompt: null
+                        });
+                        
+                        await this.loadGuests();
+                        Swal.fire('Success', 'Guest added successfully', 'success');
+                    } catch (error) {
+                        console.error('Error adding guest:', error);
+                        Swal.fire('Error', 'Failed to add guest', 'error');
+                    }
                 }
             },
 
@@ -290,66 +395,6 @@ const guestManagement = {
                     console.error(`Error fetching receipts for ${phoneNumber}:`, error);
                     return {};
                 }
-            },
-
-            calculateGuestMetrics(guestData) {
-                if (!guestData || !guestData.receipts) {
-                    return {
-                        visitCount: 0,
-                        totalSpent: 0,
-                        averageSpend: 0,
-                        lastVisit: null,
-                        engagementScore: 0
-                    };
-                }
-
-                const receipts = Object.values(guestData.receipts || {});
-                const now = new Date();
-                
-                // Basic metrics
-                const visitCount = receipts.length;
-                const totalSpent = receipts.reduce((sum, receipt) => sum + (receipt.total || 0), 0);
-                const averageSpend = visitCount > 0 ? totalSpent / visitCount : 0;
-                const lastVisit = receipts.length > 0 
-                    ? new Date(Math.max(...receipts.map(r => new Date(r.timestamp))))
-                    : null;
-
-                // Visit frequency (last 30 days)
-                const recentReceipts = receipts.filter(r => {
-                    const receiptDate = new Date(r.timestamp);
-                    return (now - receiptDate) <= 30 * 24 * 60 * 60 * 1000;
-                });
-
-                // Group visits by day
-                const visitsByDay = {};
-                recentReceipts.forEach(receipt => {
-                    const day = new Date(receipt.timestamp).toDateString();
-                    visitsByDay[day] = (visitsByDay[day] || 0) + 1;
-                });
-
-                // Calculate engagement score (0-100)
-                let engagementScore = 0;
-                if (visitCount > 0) {
-                    // Frequency component (40%)
-                    const frequencyScore = Math.min(Object.keys(visitsByDay).length / 30 * 100, 100) * 0.4;
-                    
-                    // Recency component (30%)
-                    const daysSinceLastVisit = lastVisit ? (now - lastVisit) / (24 * 60 * 60 * 1000) : 30;
-                    const recencyScore = Math.max(0, (30 - daysSinceLastVisit) / 30 * 100) * 0.3;
-                    
-                    // Spend component (30%)
-                    const spendScore = Math.min(averageSpend / 1000 * 100, 100) * 0.3;
-                    
-                    engagementScore = Math.round(frequencyScore + recencyScore + spendScore);
-                }
-
-                return {
-                    visitCount,
-                    totalSpent,
-                    averageSpend,
-                    lastVisit,
-                    engagementScore
-                };
             },
 
             getEngagementClass(score) {
@@ -382,127 +427,129 @@ const guestManagement = {
                 return this.sortConfig.direction === 'asc' ? 'fas fa-sort-up' : 'fas fa-sort-down';
             },
 
-            async showAddGuestModal() {
-                const { value: formValues } = await Swal.fire({
-                    title: 'Add New Guest',
-                    html: `
-                        <div class="form-group mb-3">
-                            <label for="name">Name</label>
-                            <input id="name" class="form-control" placeholder="Guest Name">
-                        </div>
-                        <div class="form-group mb-3">
-                            <label for="phoneNumber">Phone Number</label>
-                            <input id="phoneNumber" class="form-control" placeholder="+27 Phone Number">
-                        </div>
-                    `,
-                    focusConfirm: false,
-                    showCancelButton: true,
-                    confirmButtonText: 'Add',
-                    cancelButtonText: 'Cancel',
-                    preConfirm: () => {
-                        const name = Swal.getPopup().querySelector('#name').value;
-                        const phoneNumber = Swal.getPopup().querySelector('#phoneNumber').value;
-                        
-                        if (!name || !phoneNumber) {
-                            Swal.showValidationMessage('Please fill in all fields');
-                            return false;
-                        }
-                        
-                        return { name, phoneNumber };
-                    }
-                });
-
-                if (formValues) {
-                    try {
-                        const guestRef = ref(rtdb, `guests/${formValues.phoneNumber}`);
-                        await set(guestRef, {
-                            name: formValues.name,
-                            phoneNumber: formValues.phoneNumber,
-                            createdAt: new Date().toISOString(),
-                            metrics: {
-                                visitCount: 0,
-                                totalSpent: 0,
-                                lastVisit: null
-                            }
-                        });
-                        
-                        await this.loadGuests();
-                        Swal.fire('Success', 'Guest added successfully', 'success');
-                    } catch (error) {
-                        console.error('Error adding guest:', error);
-                        Swal.fire('Error', 'Failed to add guest', 'error');
-                    }
-                }
-            },
-
             async viewGuest(guest) {
-                const { metrics, receipts } = guest;
-                
-                // Calculate receipt patterns
-                const dayOfWeekCount = {};
-                receipts.forEach(receipt => {
-                    const day = new Date(receipt.timestamp).getDay();
-                    dayOfWeekCount[day] = (dayOfWeekCount[day] || 0) + 1;
-                });
-
-                const timeOfDayCount = {};
-                receipts.forEach(receipt => {
-                    const hour = new Date(receipt.timestamp).getHours();
-                    if (hour < 12) timeOfDayCount['morning'] = (timeOfDayCount['morning'] || 0) + 1;
-                    else if (hour < 17) timeOfDayCount['afternoon'] = (timeOfDayCount['afternoon'] || 0) + 1;
-                    else timeOfDayCount['evening'] = (timeOfDayCount['evening'] || 0) + 1;
-                });
-
                 const html = `
-                    <div class="guest-details">
+                    <div class="container">
                         <div class="row mb-4">
                             <div class="col-md-6">
                                 <h6 class="text-muted">Basic Information</h6>
                                 <p><strong>Name:</strong> ${guest.name || 'N/A'}</p>
                                 <p><strong>Phone:</strong> ${guest.phoneNumber}</p>
-                                <p><strong>Loyalty Tier:</strong> ${guest.metrics.tier}</p>
-                                <p><strong>Joined:</strong> ${this.formatDate(guest.metrics.firstVisitDate)}</p>
+                                <p><strong>Loyalty Tier:</strong> ${guest.tier}</p>
+                                <p><strong>Joined:</strong> ${this.formatDate(guest.createdAt)}</p>
                             </div>
                             <div class="col-md-6">
-                                <h6 class="text-muted">Visit Statistics</h6>
-                                <p><strong>Total Visits:</strong> ${guest.metrics.visitCount}</p>
-                                <p><strong>Average Spend:</strong> R${guest.metrics.averageSpend.toFixed(2)}</p>
-                                <p><strong>Total Spend:</strong> R${guest.metrics.totalSpent.toFixed(2)}</p>
-                                <p><strong>Last Visit:</strong> ${this.formatDate(guest.metrics.lastVisitDate)}</p>
+                                <h6 class="text-muted">Engagement Information</h6>
+                                <p><strong>Consent Status:</strong> ${guest.consent ? 'Given' : 'Not Given'}</p>
+                                <p><strong>Last Consent Prompt:</strong> ${this.formatDate(guest.lastConsentPrompt)}</p>
+                                <p><strong>Last Updated:</strong> ${this.formatDate(guest.updatedAt)}</p>
+                                <p><strong>Engagement Score:</strong> 
+                                    <span class="${this.getEngagementClass(guest.metrics.engagementScore)}">
+                                        ${guest.metrics.engagementScore}%
+                                    </span>
+                                </p>
                             </div>
                         </div>
-                        <div class="row mb-4">
-                            <div class="col-md-6">
-                                <h6 class="text-muted">Store Preferences</h6>
-                                ${Object.entries(guest.metrics.storePreferences || {}).map(([store, visits]) => `
-                                    <div class="d-flex justify-content-between mb-2">
-                                        <span>${store}</span>
-                                        <span>${visits} visits</span>
-                                    </div>
-                                `).join('')}
-                            </div>
-                            <div class="col-md-6">
-                                <h6 class="text-muted">Visit Patterns</h6>
-                                <p><strong>Preferred Days:</strong></p>
-                                ${Object.entries(dayOfWeekCount).map(([day, count]) => 
-                                    `${['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'][day]}: ${count}`
-                                ).join(', ')}
-                                <p class="mt-2"><strong>Time of Day:</strong></p>
-                                ${Object.entries(timeOfDayCount).map(([time, count]) => 
-                                    `${_.capitalize(time)}: ${count}`
-                                ).join(', ')}
-                            </div>
-                        </div>
-                    </div>
-                `;
+                    </div>`;
 
-                Swal.fire({
-                    title: 'Guest Details',
-                    html,
+                await Swal.fire({
+                    title: guest.name || 'Guest Details',
+                    html: html,
                     width: '800px',
-                    showConfirmButton: false,
-                    showCloseButton: true
+                    confirmButtonText: 'Close'
                 });
+            },
+
+            async editGuest(guest) {
+                const { value: formValues } = await Swal.fire({
+                    title: 'Edit Guest',
+                    html: `
+                        <div class="form-group mb-3">
+                            <label for="editName">Name</label>
+                            <input id="editName" class="form-control" value="${guest.name || ''}" placeholder="Guest Name">
+                        </div>
+                        <div class="form-group mb-3">
+                            <label for="editPhone">Phone Number</label>
+                            <input id="editPhone" class="form-control" value="${guest.phoneNumber}" readonly>
+                        </div>
+                        <div class="form-group mb-3">
+                            <label for="editTier">Loyalty Tier</label>
+                            <select id="editTier" class="form-control">
+                                <option value="Bronze" ${guest.tier === 'Bronze' ? 'selected' : ''}>Bronze</option>
+                                <option value="Silver" ${guest.tier === 'Silver' ? 'selected' : ''}>Silver</option>
+                                <option value="Gold" ${guest.tier === 'Gold' ? 'selected' : ''}>Gold</option>
+                                <option value="Platinum" ${guest.tier === 'Platinum' ? 'selected' : ''}>Platinum</option>
+                            </select>
+                        </div>
+                        <div class="form-group mb-3">
+                            <label for="editConsent">Consent Status</label>
+                            <select id="editConsent" class="form-control">
+                                <option value="true" ${guest.consent ? 'selected' : ''}>Given</option>
+                                <option value="false" ${!guest.consent ? 'selected' : ''}>Not Given</option>
+                            </select>
+                        </div>
+                    `,
+                    focusConfirm: false,
+                    showCancelButton: true,
+                    confirmButtonText: 'Save',
+                    cancelButtonText: 'Cancel',
+                    preConfirm: () => {
+                        const name = Swal.getPopup().querySelector('#editName').value;
+                        const tier = Swal.getPopup().querySelector('#editTier').value;
+                        const consent = Swal.getPopup().querySelector('#editConsent').value === 'true';
+                        
+                        if (!name) {
+                            Swal.showValidationMessage('Please fill in all fields');
+                            return false;
+                        }
+                        
+                        return { name, tier, consent };
+                    }
+                });
+
+                if (formValues) {
+                    try {
+                        const guestRef = ref(rtdb, `guests/${guest.phoneNumber}`);
+                        await update(guestRef, {
+                            name: formValues.name,
+                            tier: formValues.tier,
+                            consent: formValues.consent,
+                            updatedAt: new Date().toISOString(),
+                            lastConsentPrompt: formValues.consent !== guest.consent ? new Date().toISOString() : guest.lastConsentPrompt
+                        });
+                        
+                        await this.loadGuests();
+                        Swal.fire('Success', 'Guest updated successfully', 'success');
+                    } catch (error) {
+                        console.error('Error updating guest:', error);
+                        Swal.fire('Error', 'Failed to update guest', 'error');
+                    }
+                }
+            },
+
+            async deleteGuest(guest) {
+                const result = await Swal.fire({
+                    title: 'Delete Guest',
+                    text: `Are you sure you want to delete ${guest.name || 'this guest'}?`,
+                    icon: 'warning',
+                    showCancelButton: true,
+                    confirmButtonText: 'Delete',
+                    cancelButtonText: 'Cancel',
+                    confirmButtonColor: '#dc3545'
+                });
+
+                if (result.isConfirmed) {
+                    try {
+                        const guestRef = ref(rtdb, `guests/${guest.phoneNumber}`);
+                        await remove(guestRef);
+                        
+                        await this.loadGuests();
+                        Swal.fire('Success', 'Guest deleted successfully', 'success');
+                    } catch (error) {
+                        console.error('Error deleting guest:', error);
+                        Swal.fire('Error', 'Failed to delete guest', 'error');
+                    }
+                }
             },
 
             async viewAnalytics(guest) {
@@ -520,78 +567,6 @@ const guestManagement = {
                 } else {
                     console.error('GuestAnalytics component not found');
                     Swal.fire('Error', 'Analytics component failed to load', 'error');
-                }
-            },
-
-            async editGuest(guest) {
-                const { value: formValues } = await Swal.fire({
-                    title: 'Edit Guest',
-                    html: `
-                        <input id="editName" class="swal2-input" value="${guest.name || ''}" placeholder="Guest Name">
-                        <input id="editPhone" class="swal2-input" value="${guest.phoneNumber}" readonly>
-                        <select id="editTier" class="swal2-select">
-                            <option value="BRONZE" ${guest.metrics.tier === 'BRONZE' ? 'selected' : ''}>Bronze</option>
-                            <option value="SILVER" ${guest.metrics.tier === 'SILVER' ? 'selected' : ''}>Silver</option>
-                            <option value="GOLD" ${guest.metrics.tier === 'GOLD' ? 'selected' : ''}>Gold</option>
-                            <option value="PLATINUM" ${guest.metrics.tier === 'PLATINUM' ? 'selected' : ''}>Platinum</option>
-                        </select>
-                    `,
-                    focusConfirm: false,
-                    showCancelButton: true,
-                    confirmButtonText: 'Update',
-                    preConfirm: () => ({
-                        name: document.getElementById('editName').value,
-                        phoneNumber: guest.phoneNumber,
-                        tier: document.getElementById('editTier').value
-                    })
-                });
-
-                if (formValues) {
-                    try {
-                        // Update guest data
-                        await update(ref(rtdb, `guests/${guest.phoneNumber}`), {
-                            name: formValues.name,
-                            tier: formValues.tier,
-                            updatedAt: Date.now()
-                        });
-
-                        // Reload guests data
-                        await this.loadGuests();
-                        
-                        Swal.fire('Success', 'Guest updated successfully', 'success');
-                    } catch (error) {
-                        console.error('Error updating guest:', error);
-                        Swal.fire('Error', 'Failed to update guest', 'error');
-                    }
-                }
-            },
-
-            async deleteGuest(guest) {
-                const result = await Swal.fire({
-                    title: 'Delete Guest?',
-                    text: 'This will permanently remove all guest data and history. This action cannot be undone.',
-                    icon: 'warning',
-                    showCancelButton: true,
-                    confirmButtonColor: '#dc3545',
-                    confirmButtonText: 'Yes, delete guest'
-                });
-
-                if (result.isConfirmed) {
-                    try {
-                        // Delete guest data and related records
-                        const updates = {
-                            [`guests/${guest.phoneNumber}`]: null,
-                            [`guest-receipts/${guest.phoneNumber}`]: null
-                        };
-
-                        await update(ref(rtdb), updates);
-                        await this.loadGuests();
-                        
-                        Swal.fire('Deleted!', 'Guest has been deleted.', 'success');
-                    } catch (error) {
-                        console.error('Error deleting guest:', error);
-                        Swal.fire('Error', 'Failed to delete guest', 'error');
-                    }
                 }
             },
 
