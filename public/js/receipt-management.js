@@ -12,6 +12,19 @@ export function initializeReceiptManagement() {
         return;
     }
 
+    // Check for existing app instance
+    const mountPoint = document.getElementById('receiptManagementContent');
+    if (!mountPoint) {
+        console.error('Receipt management mount point not found');
+        return;
+    }
+
+    // Clean up any existing app instance
+    if (mountPoint.__vue_app__) {
+        console.log('Cleaning up existing Vue app instance');
+        mountPoint.__vue_app__.unmount();
+    }
+
     const app = Vue.createApp({
         data() {
             return {
@@ -318,14 +331,27 @@ export function initializeReceiptManagement() {
         }
     });
 
-    // Mount the app
-    const mountPoint = document.getElementById('receiptManagementContent');
-    if (mountPoint) {
-        app.mount(mountPoint);
-        console.log('Receipt management initialized');
-    } else {
-        console.error('Receipt management mount point not found');
-    }
+    // Mount the app and store the instance
+    app.mount(mountPoint);
+    mountPoint.__vue_app__ = app;
+    console.log('Receipt management initialized');
+    
+    // Return cleanup function
+    return () => {
+        console.log('Cleaning up receipt management...');
+        if (mountPoint.__vue_app__) {
+            mountPoint.__vue_app__.unmount();
+            delete mountPoint.__vue_app__;
+        }
+    };
+}
 
-    return app;
+// Export cleanup function for use in admin-dashboard
+export function cleanupReceiptManagement() {
+    const mountPoint = document.getElementById('receiptManagementContent');
+    if (mountPoint && mountPoint.__vue_app__) {
+        console.log('Cleaning up receipt management...');
+        mountPoint.__vue_app__.unmount();
+        delete mountPoint.__vue_app__;
+    }
 }

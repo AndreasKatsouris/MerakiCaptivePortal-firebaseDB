@@ -6,7 +6,7 @@ import { initializeProjectManagement } from './project-management.js';
 import { initializeGuestManagement, cleanupGuestManagement } from './guest-management.js';
 import { initializeCampaignManagement, cleanupCampaignManagement } from './campaigns/campaigns.js';
 import { initializeRewardTypes } from './reward-types.js';
-import { initializeReceiptManagement } from './receipt-management.js';
+import { initializeReceiptManagement, cleanupReceiptManagement } from './receipt-management.js';
 import { initializeRewardManagement } from './reward-management.js';
 import { authManager } from './auth/auth.js';
 
@@ -119,7 +119,8 @@ class AdminDashboard {
         this.sections.set('receiptManagementContent', {
             menuId: 'receiptManagementMenu',
             contentId: 'receiptManagementContent',
-            init: initializeReceiptManagement
+            init: initializeReceiptManagement,
+            cleanup: cleanupReceiptManagement
         });
 
         this.sections.set('settingsContent', {
@@ -213,6 +214,15 @@ class AdminDashboard {
         if (this.currentSection === sectionId) {
             console.log('Section already active:', sectionId);
             return;
+        }
+
+        // Clean up current section if needed
+        if (this.currentSection) {
+            const currentSection = this.sections.get(this.currentSection);
+            if (currentSection && currentSection.cleanup) {
+                console.log('Cleaning up section:', this.currentSection);
+                await currentSection.cleanup();
+            }
         }
 
         // Hide all sections
