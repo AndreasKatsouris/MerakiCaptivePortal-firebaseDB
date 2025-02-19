@@ -1,6 +1,17 @@
 import { auth, rtdb } from './config/firebase-config.js';
 
 export function initializeReceiptManagement() {
+    console.log('Initializing receipt management...', {
+        auth: !!auth,
+        rtdb: !!rtdb,
+        Vue: typeof Vue !== 'undefined' ? 'loaded' : 'not loaded'
+    });
+    
+    if (typeof Vue === 'undefined') {
+        console.error('Vue is not loaded. Make sure Vue.js script is included and loaded before initializing receipt management.');
+        return;
+    }
+
     console.log('Initializing receipt management...');
     
     const app = Vue.createApp({

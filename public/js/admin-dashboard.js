@@ -116,6 +116,12 @@ class AdminDashboard {
             init: initializeProjectManagement
         });
 
+        this.sections.set('receiptManagementContent', {
+            menuId: 'receiptManagementMenu',
+            contentId: 'receiptManagementContent',
+            init: initializeReceiptManagement
+        });
+
         this.sections.set('settingsContent', {
             menuId: 'settingsMenu',
             contentId: 'settingsContent',
@@ -202,51 +208,62 @@ class AdminDashboard {
     }
 
     async showSection(sectionId) {
-        // Hide all sections first
+        console.log('Showing section:', sectionId);
+        
+        if (this.currentSection === sectionId) {
+            console.log('Section already active:', sectionId);
+            return;
+        }
+
+        // Hide all sections
         document.querySelectorAll('.content-section').forEach(section => {
             section.style.display = 'none';
         });
+
+        // Show selected section
+        const selectedSection = document.getElementById(sectionId);
+        if (selectedSection) {
+            selectedSection.style.display = 'block';
+        }
 
         // Remove active class from all menu items
         document.querySelectorAll('.nav-link').forEach(link => {
             link.classList.remove('active');
         });
 
-        // Clean up previous section if needed
-        if (this.currentSection) {
-            switch (this.currentSection) {
-                case 'guestManagementContent':
-                    await cleanupGuestManagement();
-                    break;
-                case 'campaignsContent':
-                    await cleanupCampaignManagement();
-                    break;
+        // Add active class to current menu item
+        const section = this.sections.get(sectionId);
+        if (section) {
+            const menuElement = document.getElementById(section.menuId);
+            if (menuElement) {
+                menuElement.classList.add('active');
             }
         }
 
-        // Show selected section
-        const section = document.getElementById(sectionId);
-        if (section) {
-            section.style.display = 'block';
-        }
-
-        // Add active class to menu item
-        const menuItem = document.querySelector(`[data-section="${sectionId}"]`);
-        if (menuItem) {
-            menuItem.classList.add('active');
-        }
-
         // Initialize section if needed
-        switch (sectionId) {
-            case 'dashboardContent':
-                await initializeDashboard();
-                break;
-            case 'guestManagementContent':
-                await initializeGuestManagement();
-                break;
-            case 'campaignsContent':
-                await initializeCampaignManagement();
-                break;
+        try {
+            console.log('Checking initialization for section:', sectionId);
+            
+            switch (sectionId) {
+                case 'dashboardContent':
+                    await initializeDashboard();
+                    break;
+                case 'campaignsContent':
+                    await initializeCampaignManagement();
+                    break;
+                case 'receiptManagementContent':
+                    console.log('Initializing receipt management section...');
+                    await initializeReceiptManagement();
+                    break;
+                case 'guestManagementContent':
+                    await initializeGuestManagement();
+                    break;
+                case 'projectManagementContent':
+                    await initializeProjectManagement();
+                    break;
+            }
+        } catch (error) {
+            console.error('Error initializing section:', sectionId, error);
         }
 
         this.currentSection = sectionId;
