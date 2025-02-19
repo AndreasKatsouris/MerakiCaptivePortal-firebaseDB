@@ -4,6 +4,7 @@ import { getAuth, signInWithEmailAndPassword, signOut } from 'https://www.gstati
 import { getFirestore } from 'https://www.gstatic.com/firebasejs/10.12.5/firebase-firestore.js';
 import { getFunctions, httpsCallable } from 'https://www.gstatic.com/firebasejs/10.12.5/firebase-functions.js';
 import { getDatabase, ref, push, set, get, update, remove } from 'https://www.gstatic.com/firebasejs/10.12.5/firebase-database.js';
+import { getStorage, ref as storageRef, uploadBytesResumable, getDownloadURL } from 'https://www.gstatic.com/firebasejs/10.12.5/firebase-storage.js';
 
 // Firebase configuration
 const firebaseConfig = {
