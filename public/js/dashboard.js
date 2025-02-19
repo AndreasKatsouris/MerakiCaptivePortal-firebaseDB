@@ -1,5 +1,6 @@
 // Import Firebase instances from config
 import { auth, rtdb, ref, get } from './config/firebase-config.js';
+import { AdminClaims } from './auth/admin-claims.js';
 
 export function initializeDashboard() {
     console.log('Initializing dashboard...');

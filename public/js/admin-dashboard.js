@@ -84,7 +84,7 @@ class AdminDashboard {
             contentId: 'dashboardContent',
             init: initializeDashboard
         });
-        
+
         this.sections.set('campaignsContent', {
             menuId: 'campaignsMenu',
             contentId: 'campaignsContent',
@@ -238,11 +238,11 @@ class AdminDashboard {
 
         // Initialize section if needed
         switch (sectionId) {
+            case 'dashboardContent':
+                await initializeDashboard();
+                break;
             case 'guestManagementContent':
                 await initializeGuestManagement();
-                break;
-            case 'campaignsContent':
-                await initializeCampaignManagement();
                 break;
             case 'campaignsContent':
                 await initializeCampaignManagement();
