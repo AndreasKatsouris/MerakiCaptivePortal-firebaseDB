@@ -399,62 +399,103 @@ function extractReceiptDetails(fullText) {
     console.log('=== RECEIPT DETAILS EXTRACTION ===');
     console.log('Full Receipt Text (START):\n', fullText);
     console.log('Full Receipt Text Length:', fullText.length);
-        // Logging helper function
-        function logMatch(name, regex, text) {
-            const match = text.match(regex);
-            console.log(`${name} Regex:`, regex);
-            console.log(`${name} Match:`, match);
-            return match;
-        }    
 
-        const extractionStrategies = [
-            // Strategy 1: Specific Pilot POS style integrated date and time
-            () => {
-                const timeRegex = /TIME\s*(\d{2}\/\d{2}\/\d{4})\s*(\d{2}:\d{2})\s*TO\s*(\d{2}:\d{2})/i;
-                const timeMatch = fullText.match(timeRegex);
-                
-                if (timeMatch) {
-                    console.log('Pilot Receipt Integrated Date/Time Strategy Matched');
+    // Logging helper function
+    function logMatch(name, regex, text) {
+        const match = text.match(regex);
+        console.log(`${name} Regex:`, regex);
+        console.log(`${name} Match:`, match);
+        return match;
+    }    
+
+    const extractionStrategies = [
+        // Strategy 1: Specific Pilot POS style integrated date and time
+        () => {
+            const timeRegex = /TIME\s*(\d{2}\/\d{2}\/\d{4})\s*(\d{2}:\d{2})\s*TO\s*(\d{2}:\d{2})/i;
+            const match = logMatch('Pilot POS', timeRegex, fullText);
+            
+            if (match) {
+                console.log('Pilot Receipt Integrated Date/Time Strategy Matched');
+                return {
+                    date: match[1],
+                    time: match[2],
+                    endTime: match[3]
+                };
+            }
+            return null;
+        },
+
+        // Strategy 2: Separate Date and Time fields
+        () => {
+            const dateRegex = /(?:DATE|DT)\s*:?\s*(\d{2}\/\d{2}\/\d{4})/i;
+            const timeRegex = /(?:TIME|TM)\s*:?\s*(\d{2}:\d{2})(?:\s*TO\s*(\d{2}:\d{2}))?/i;
+            
+            const dateMatch = logMatch('Separate Date', dateRegex, fullText);
+            const timeMatch = logMatch('Separate Time', timeRegex, fullText);
+            
+            if (dateMatch || timeMatch) {
+                console.log('Separate Date/Time Strategy Matched');
+                return {
+                    date: dateMatch ? dateMatch[1] : null,
+                    time: timeMatch ? timeMatch[1] : null,
+                    endTime: timeMatch && timeMatch[2] ? timeMatch[2] : null
+                };
+            }
+            return null;
+        },
+
+        // Strategy 3: Generic date formats
+        () => {
+            const datePatterns = [
+                /(\d{2}\/\d{2}\/\d{4})/,  // DD/MM/YYYY or MM/DD/YYYY
+                /(\d{2}-\d{2}-\d{4})/,     // DD-MM-YYYY or MM-DD-YYYY
+                /(\d{1,2}\s+(?:Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)[a-z]*\s+\d{4})/i  // 15 Jan 2024
+            ];
+
+            const timePatterns = [
+                /(\d{2}:\d{2}(?::\d{2})?)/,  // HH:MM or HH:MM:SS
+                /(\d{1,2}:\d{2}\s*(?:AM|PM))/i  // H:MM AM/PM
+            ];
+
+            for (const pattern of datePatterns) {
+                const match = logMatch('Generic Date', pattern, fullText);
+                if (match) {
+                    console.log('Generic Date Pattern Matched');
+                    const timeMatch = timePatterns.reduce((found, pattern) => {
+                        return found || logMatch('Generic Time', pattern, fullText);
+                    }, null);
+
                     return {
-                        date: timeMatch[1],
-                        time: timeMatch[2],
-                        endTime: timeMatch[3]
+                        date: match[1],
+                        time: timeMatch ? timeMatch[1] : null
                     };
                 }
-                return null;
-            },
-    
-            // Strategy 2: Separate Date field
-            () => {
-                const dateRegex = /DATE\s*:\s*(\d{2}\/\d{2}\/\d{4})/i;
-                const timeRegex = /TIME\s*:\s*(\d{2}:\d{2})(?:\s*TO\s*(\d{2}:\d{2}))?/i;
-                
-                const dateMatch = fullText.match(dateRegex);
-                const timeMatch = fullText.match(timeRegex);
-                
-                if (dateMatch || timeMatch) {
-                    console.log('Separate Date/Time Strategy Matched');
-                    return {
-                        date: dateMatch ? dateMatch[1] : null,
-                        time: timeMatch ? timeMatch[1] : null,
-                        endTime: timeMatch && timeMatch[2] ? timeMatch[2] : null
-                    };
-                }
-                return null;
             }
-        ];
-    
-        // Try each extraction strategy
-        for (const strategy of extractionStrategies) {
-            const result = strategy();
-            if (result) {
-                details.date = result.date || details.date;
-                details.time = result.time || details.time;
-                details.endTime = result.endTime || details.endTime;
-                break;
-            }
+            return null;
         }
+    ];
 
+    // Try each extraction strategy
+    let dateTimeFound = false;
+    for (const strategy of extractionStrategies) {
+        const result = strategy();
+        if (result) {
+            details.date = result.date || details.date;
+            details.time = result.time || details.time;
+            details.endTime = result.endTime || details.endTime;
+            dateTimeFound = true;
+            console.log('Successfully extracted date/time:', {
+                date: details.date,
+                time: details.time,
+                endTime: details.endTime
+            });
+            break;
+        }
+    }
+
+    if (!dateTimeFound) {
+        console.warn('Failed to extract date/time from receipt');
+    }
 
     //====================================  END =============================    
     // Extract invoice number
@@ -524,23 +565,45 @@ async function fetchActiveBrands() {
  */
 async function saveReceiptData(receiptData) {
     try {
-        // Create a unique ID using invoice number if available
-        const receiptId = receiptData.invoiceNumber || push(ref(rtdb, 'receipts')).key;
-        
-        // Save to Firebase
-        await set(ref(rtdb, `receipts/${receiptId}`), {
-            ...receiptData,
-            createdAt: Date.now()
-        });
-        
-        // Create guest receipt index
-        await set(ref(rtdb, `guest-receipts/${receiptData.guestPhoneNumber}/${receiptId}`), true);
+        if (!receiptData || typeof receiptData !== 'object') {
+            throw new Error('Invalid receipt data');
+        }
 
-        console.log('Receipt data saved with ID:', receiptId);
+        // Ensure guestPhoneNumber is a string
+        if (!receiptData.guestPhoneNumber || typeof receiptData.guestPhoneNumber !== 'string') {
+            throw new Error('Invalid guest phone number');
+        }
+
+        // Clean phone number to ensure valid path
+        const cleanPhoneNumber = receiptData.guestPhoneNumber.replace(/[^\w\d]/g, '');
+        
+        // Create a unique ID using invoice number if available, or generate one
+        const receiptId = (receiptData.invoiceNumber || push(ref(rtdb, 'receipts')).key).toString();
+        
+        // Prepare receipt data with defaults for missing fields
+        const dataToSave = {
+            ...receiptData,
+            date: receiptData.date || null,
+            createdAt: Date.now(),
+            status: receiptData.status || 'pending_validation'
+        };
+        
+        // Save to receipts collection
+        const receiptRef = ref(rtdb, `receipts/${receiptId}`);
+        await set(receiptRef, dataToSave);
+        
+        // Create guest receipt index with clean phone number
+        const guestReceiptRef = ref(rtdb, `guest-receipts/${cleanPhoneNumber}/${receiptId}`);
+        await set(guestReceiptRef, true);
+
+        console.log('Receipt data saved successfully:', {
+            receiptId,
+            phoneNumber: cleanPhoneNumber
+        });
         
         return {
             receiptId,
-            ...receiptData
+            ...dataToSave
         };
     } catch (error) {
         console.error('Error saving receipt:', error);
