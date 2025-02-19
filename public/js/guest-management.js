@@ -616,17 +616,24 @@ function showGuestManagement() {
     // Initialize Vue app if not already done
     if (!guestManagement.app) {
         const app = Vue.createApp(guestManagement.component);
-        guestManagement.app = app.mount('#guest-management-app');
+        const mountPoint = document.getElementById('guest-management-app');
+        if (mountPoint) {
+            guestManagement.app = app;
+            guestManagement.app.mount('#guest-management-app');
+        }
     }
 }
 
 // Export the initialization function for use in admin-dashboard.js
-export { initializeGuestManagement };
+export { initializeGuestManagement, cleanupGuestManagement };
 
 // Add cleanup function
 export function cleanupGuestManagement() {
     if (guestManagement.app) {
-        guestManagement.app.unmount();
+        const mountPoint = document.getElementById('guest-management-app');
+        if (mountPoint) {
+            guestManagement.app.unmount('#guest-management-app');
+        }
         guestManagement.app = null;
     }
 }

@@ -75,54 +75,54 @@ class AdminDashboard {
         this.setupEventListeners();
         this.setupSubmenuListeners();
         // Show default section (dashboard)
-        this.showSection('dashboard');
+        this.showSection('dashboardContent');
     }
 
     registerSections() {
-        this.sections.set('dashboard', {
+        this.sections.set('dashboardContent', {
             menuId: 'dashboardMenu',
             contentId: 'dashboardContent',
             init: initializeDashboard
         });
         
-        this.sections.set('campaigns', {
+        this.sections.set('campaignsContent', {
             menuId: 'campaignsMenu',
             contentId: 'campaignsContent',
             init: initializeCampaignManagement,
             cleanup: cleanupCampaignManagement
         });
 
-        this.sections.set('guestManagement', {
+        this.sections.set('guestManagementContent', {
             menuId: 'guestManagementMenu',
             contentId: 'guestManagementContent',
             init: initializeGuestManagement,
             cleanup: cleanupGuestManagement
         });
 
-        this.sections.set('analytics', {
+        this.sections.set('analyticsContent', {
             menuId: 'analyticsMenu',
             contentId: 'analyticsContent'
         });
 
-        this.sections.set('adminUsers', {
+        this.sections.set('adminUsersContent', {
             menuId: 'adminUsersMenu',
             contentId: 'adminUsersContent',
             init: () => this.initializeAdminUsersSection()
         });
 
-        this.sections.set('projects', {
+        this.sections.set('projectManagementContent', {
             menuId: 'projectManagementMenu',
             contentId: 'projectManagementContent',
             init: initializeProjectManagement
         });
 
-        this.sections.set('settings', {
+        this.sections.set('settingsContent', {
             menuId: 'settingsMenu',
             contentId: 'settingsContent',
             hasSubmenu: true
         });
 
-        this.sections.set('databaseManagement', {
+        this.sections.set('databaseManagementContent', {
             menuId: 'databaseManagementMenu',
             contentId: 'databaseManagementContent',
             parent: 'settingsSubmenu',
@@ -143,7 +143,7 @@ class AdminDashboard {
                 menuElement.addEventListener('click', (e) => {
                     e.preventDefault();
                     if (!section.hasSubmenu) {
-                        this.showSection(name);
+                        this.showSection(section.contentId);
                     }
                 });
             }
@@ -201,46 +201,52 @@ class AdminDashboard {
         return null;
     }
 
-    async showSection(sectionName) {
-        console.log(`Showing section: ${sectionName}`);
-        const section = this.sections.get(sectionName);
-        
-        if (!section) {
-            console.error(`Section ${sectionName} not found`);
-            return;
-        }
-
-        // Cleanup previous section if needed
-        if (this.currentSection === 'campaigns' && sectionName !== 'campaigns') {
-            cleanupCampaignManagement();
-        }
-
-        if (this.currentSection === 'guestManagement' && sectionName !== 'guestManagement') {
-            cleanupGuestManagement();
-        }
-
-        // Hide all sections
-        document.querySelectorAll('.content-section').forEach(el => {
-            el.style.display = 'none';
+    async showSection(sectionId) {
+        // Hide all sections first
+        document.querySelectorAll('.content-section').forEach(section => {
+            section.style.display = 'none';
         });
 
-        // Show selected section
-        const contentElement = document.getElementById(section.contentId);
-        if (contentElement) {
-            contentElement.style.display = 'block';
-        }
+        // Remove active class from all menu items
+        document.querySelectorAll('.nav-link').forEach(link => {
+            link.classList.remove('active');
+        });
 
-        // Initialize section if not already initialized
-        if (!section.initialized && section.init) {
-            try {
-                await section.init();
-                section.initialized = true;
-            } catch (error) {
-                console.error(`Error initializing ${sectionName}:`, error);
+        // Clean up previous section if needed
+        if (this.currentSection) {
+            switch (this.currentSection) {
+                case 'guestManagementContent':
+                    await cleanupGuestManagement();
+                    break;
+                case 'campaignsContent':
+                    await cleanupCampaignManagement();
+                    break;
             }
         }
 
-        this.currentSection = sectionName;
+        // Show selected section
+        const section = document.getElementById(sectionId);
+        if (section) {
+            section.style.display = 'block';
+        }
+
+        // Add active class to menu item
+        const menuItem = document.querySelector(`[data-section="${sectionId}"]`);
+        if (menuItem) {
+            menuItem.classList.add('active');
+        }
+
+        // Initialize section if needed
+        switch (sectionId) {
+            case 'guestManagementContent':
+                await initializeGuestManagement();
+                break;
+            case 'campaignsContent':
+                await initializeCampaignManagement();
+                break;
+        }
+
+        this.currentSection = sectionId;
     }
 
     async handleLogout() {
