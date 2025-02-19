@@ -1,4 +1,11 @@
-const admin = require('firebase-admin');
+const { 
+    rtdb, 
+    ref, 
+    get, 
+    set, 
+    update,
+    push 
+} = require('./config/firebase-admin');
 
 /**
  * Main function to process rewards for a validated receipt
@@ -13,56 +20,55 @@ async function processReward(guest, campaign, receiptData) {
     let createdRewards = [];
 
     try {
-        // Scope transaction to just the receipt
-        await admin.database()
-            .ref(`receipts/${receiptData.receiptId}`)
-            .transaction(currentData => {
-                if (currentData?.status === 'validated') {
-                    return; // Abort transaction
-                }
-                return {
-                    ...currentData,
-                    status: 'validated',
-                    validatedAt: admin.database.ServerValue.TIMESTAMP,
-                    campaignId: campaignId
-                };
-            });
+        // Update receipt status
+        const receiptRef = ref(rtdb, `receipts/${receiptData.receiptId}`);
+        const receiptSnapshot = await get(receiptRef);
+        const currentData = receiptSnapshot.val();
 
-        // Create rewards after successful receipt validation
-        const rewardUpdates = {};
-        for (const rewardType of campaign.rewardTypes) {
-            const rewardRef = admin.database().ref('rewards').push().key;
-            console.log('Reward type data:', {
-                type: rewardType.type,
-                typeId: rewardType.typeId,
-                criteria: rewardType.criteria
-            });
-            const reward = createRewardObject(rewardType, guest, campaign, receiptData);
-            
-            rewardUpdates[`rewards/${rewardRef}`] = reward;
-            rewardUpdates[`guest-rewards/${guest.phoneNumber}/${rewardRef}`] = true;
-            rewardUpdates[`campaign-rewards/${campaignId}/${rewardRef}`] = true;
-            
-            createdRewards.push({
-                id: rewardRef,
-                ...reward
-            });
+        if (currentData?.status === 'validated') {
+            return; // Receipt already validated
         }
 
-        // Apply reward updates separately
-        await admin.database().ref().update(rewardUpdates);
+        await update(receiptRef, {
+            ...currentData,
+            status: 'validated',
+            validatedAt: Date.now(),
+            campaignId: campaignId
+        });
+
+        // Create rewards after successful receipt validation
+        const eligibleRewards = await processRewardTypes(guest, campaign, receiptData);
+        
+        for (const reward of eligibleRewards) {
+            const rewardRef = push(ref(rtdb, 'rewards'));
+            const rewardId = rewardRef.key;
+            
+            const rewardData = {
+                ...reward,
+                id: rewardId,
+                createdAt: Date.now()
+            };
+            
+            await set(rewardRef, rewardData);
+            
+            // Create guest-rewards index
+            await set(ref(rtdb, `guest-rewards/${guest.phoneNumber}/${rewardId}`), true);
+            
+            // Create campaign-rewards index
+            await set(ref(rtdb, `campaign-rewards/${campaignId}/${rewardId}`), true);
+            
+            createdRewards.push(rewardData);
+        }
 
         // Send notifications
-        //await sendRewardNotifications(guest, createdRewards);
-
+        await sendRewardNotifications(guest, createdRewards);
+        
         return {
             success: true,
-            rewardCount: createdRewards.length,
             rewards: createdRewards
         };
-
     } catch (error) {
-        console.error('Error in reward processing:', error);
+        console.error('Error processing reward:', error);
         if (createdRewards.length > 0) {
             await rollbackRewards(createdRewards, guest.phoneNumber, campaignId);
         }
@@ -199,8 +205,8 @@ function createRewardObject(rewardType, guest, campaign, receiptData) {
         receiptId: receiptData.receiptId,
         receiptAmount: receiptData.totalAmount,
         status: 'pending',
-        createdAt: admin.database.ServerValue.TIMESTAMP,
-        updatedAt: admin.database.ServerValue.TIMESTAMP,
+        createdAt: Date.now(),
+        updatedAt: Date.now(),
         expiresAt: calculateExpiryDate(rewardType),
         value: calculateRewardValue(rewardType, receiptData.totalAmount),
         metadata: {
@@ -300,14 +306,18 @@ function calculateExpiryDate(rewardType) {
  * @returns {Promise<number>} Count of existing rewards
  */
 async function countUserRewardsForType(phoneNumber, typeId) {
-    const snapshot = await admin.database()
-        .ref('guest-rewards')
-        .child(phoneNumber)
-        .orderByChild('typeId')
-        .equalTo(typeId)
-        .once('value');
-    
-    return snapshot.numChildren();
+    try {
+        const snapshot = await get(ref(rtdb, 'rewards'));
+        const rewards = snapshot.val() || {};
+        
+        return Object.values(rewards).filter(reward => 
+            reward.guestPhone === phoneNumber && 
+            reward.typeId === typeId
+        ).length;
+    } catch (error) {
+        console.error('Error counting user rewards:', error);
+        throw new Error('Failed to count user rewards');
+    }
 }
 
 /**
@@ -346,19 +356,19 @@ async function sendRewardNotifications(guest, rewards) {
  */
 async function rollbackRewards(rewards, phoneNumber, campaignId) {
     try {
-        const updates = {};
-        rewards.forEach(reward => {
-            updates[`rewards/${reward.id}`] = null;
-            updates[`guest-rewards/${phoneNumber}/${reward.id}`] = null;
-            updates[`campaign-rewards/${campaignId}/${reward.id}`] = null;
-        });
-        
-        await admin.database().ref().update(updates);
-        console.log('Successfully rolled back rewards:', rewards.map(r => r.id));
+        for (const reward of rewards) {
+            // Remove from rewards collection
+            await set(ref(rtdb, `rewards/${reward.id}`), null);
+            
+            // Remove from guest-rewards index
+            await set(ref(rtdb, `guest-rewards/${phoneNumber}/${reward.id}`), null);
+            
+            // Remove from campaign-rewards index
+            await set(ref(rtdb, `campaign-rewards/${campaignId}/${reward.id}`), null);
+        }
     } catch (error) {
-        console.error('Error rolling back rewards:', error);
-        // At this point, manual intervention may be needed
-        throw new Error('Critical: Reward rollback failed. Manual cleanup required.');
+        console.error('Rollback failed:', error);
+        throw new Error('Reward rollback failed - manual cleanup required');
     }
 }
 

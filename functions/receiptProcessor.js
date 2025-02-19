@@ -1,5 +1,13 @@
 const vision = require('@google-cloud/vision');
-const { rtdb, ref, get, set, push } = require('./config/firebase-admin');
+const { 
+    rtdb, 
+    ref, 
+    get, 
+    set, 
+    push, 
+    storage,
+    bucket 
+} = require('./config/firebase-admin');
 
 /**
  * Process a receipt image with Google Cloud Vision OCR and parse the text

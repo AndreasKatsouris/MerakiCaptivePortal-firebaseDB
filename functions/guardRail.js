@@ -1,5 +1,13 @@
 const { REWARD_TYPE_VALIDATION } = require('./constants/campaign.constants');
-const admin = require('firebase-admin');
+const { 
+    rtdb, 
+    ref, 
+    get, 
+    set, 
+    update,
+    push 
+} = require('./config/firebase-admin');
+
 /**
  * Retrieves all active campaigns from the database
  * @async
@@ -9,16 +17,10 @@ const admin = require('firebase-admin');
  */
 async function getActiveCampaigns() {
     try {
-        if (!admin.apps.length) {
-            throw new Error('Firebase admin not initialized');
-        }
-
         console.log('Fetching active campaigns from database');
-        const snapshot = await admin.database()
-            .ref('campaigns')
-            .orderByChild('status')
-            .equalTo('active')
-            .once('value');
+        const snapshot = await get(
+            ref(rtdb, 'campaigns')
+        );
         
         const campaigns = snapshot.val();
         
@@ -27,21 +29,21 @@ async function getActiveCampaigns() {
             return [];
         }
 
-        const campaignArray = Object.entries(campaigns).map(([id, campaign]) => ({
-            id,
-            ...campaign
-        }));
+        const campaignArray = Object.entries(campaigns)
+            .filter(([_, campaign]) => campaign.status === 'active')
+            .map(([id, campaign]) => ({
+                id,
+                ...campaign
+            }));
 
         console.log(`Found ${campaignArray.length} active campaigns`);
         return campaignArray;
     } catch (error) {
-        console.error('Error fetching active campaigns:', {
-            error: error.message,
-            stack: error.stack
-        });
-        throw new Error(`Failed to fetch campaigns: ${error.message}`);
+        console.error('Error fetching active campaigns:', error);
+        throw new Error('Failed to fetch active campaigns');
     }
 }
+
 /**
  * Match receipt to campaign with enhanced reward type validation
  * @param {object} receiptData - Processed receipt data
@@ -220,6 +222,7 @@ async function validateAgainstCampaign(receiptData, campaign) {
         return result;
     }
 }
+
 /**
  * Validate if all required items are present in the receipt items
  * @param {Array} receiptItems - Items from the receipt
@@ -245,6 +248,7 @@ function validateRequiredItems(receiptItems, requiredItems) {
         return !!matchedItem;
     });
 }
+
 /**
  * Validates basic campaign criteria against receipt data
  * @function validateBasicCriteria
@@ -580,14 +584,21 @@ async function validateMaximumRewards(criteria, receiptData, rewardType) {
  * @throws {Error} If database operation fails
  */
 async function getUserRewardTypeCount(phoneNumber, rewardTypeId) {
-    const snapshot = await admin.database()
-        .ref('guest-rewards')
-        .child(phoneNumber)
-        .orderByChild('typeId')
-        .equalTo(rewardTypeId)
-        .once('value');
-    
-    return snapshot.numChildren();
+    try {
+        const snapshot = await get(
+            ref(rtdb, 'rewards')
+        );
+        
+        const rewards = snapshot.val() || {};
+        
+        return Object.values(rewards).filter(reward => 
+            reward.guestPhone === phoneNumber && 
+            reward.typeId === rewardTypeId
+        ).length;
+    } catch (error) {
+        console.error('Error getting user reward count:', error);
+        throw new Error('Failed to get user reward count');
+    }
 }
 
 /**
