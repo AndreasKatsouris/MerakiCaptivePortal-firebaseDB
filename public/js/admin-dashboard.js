@@ -244,6 +244,9 @@ class AdminDashboard {
             case 'campaignsContent':
                 await initializeCampaignManagement();
                 break;
+            case 'campaignsContent':
+                await initializeCampaignManagement();
+                break;
         }
 
         this.currentSection = sectionId;

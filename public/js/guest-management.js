@@ -624,11 +624,10 @@ function showGuestManagement() {
     }
 }
 
-// Export the initialization function for use in admin-dashboard.js
-export { initializeGuestManagement, cleanupGuestManagement };
+// Export initialization and cleanup functions
+export { initializeGuestManagement };
 
-// Add cleanup function
-export function cleanupGuestManagement() {
+function cleanupGuestManagement() {
     if (guestManagement.app) {
         guestManagement.app.unmount();
         guestManagement.app = null;
