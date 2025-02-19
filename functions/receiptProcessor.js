@@ -1,5 +1,5 @@
 const vision = require('@google-cloud/vision');
-const admin = require('firebase-admin');
+const { rtdb, ref, get, set, push } = require('../public/js/config/firebase-config.js');
 
 /**
  * Process a receipt image with Google Cloud Vision OCR and parse the text
@@ -285,7 +285,11 @@ async function extractItems(fullText) {
             else if (line.length > 0 && !line.match(/^-+$/)) {
                 console.log('Found item name:', line);
                 // Save any previous item if complete
-                if (currentItem.name && currentItem.quantity && currentItem.unitPrice) {
+                if (currentItem.name && currentItem.unitPrice) {
+                    // If no quantity specified, assume 1
+                    if (!currentItem.quantity) {
+                        currentItem.quantity = 1;
+                    }
                     saveCurrentItem();
                 }
                 // Start new item
@@ -295,34 +299,55 @@ async function extractItems(fullText) {
                     unitPrice: null,
                     totalPrice: null
                 };
+                
+                // Check next line for price
+                if (i < lines.length - 1) {
+                    const nextLine = lines[i + 1].trim();
+                    if (/^\d+\.\d{2}$/.test(nextLine)) {
+                        currentItem.unitPrice = parseFloat(nextLine);
+                        i++; // Skip the price line since we've handled it
+                        
+                        // Check if there's a second price (total)
+                        if (i < lines.length - 1) {
+                            const totalLine = lines[i + 1].trim();
+                            if (/^\d+\.\d{2}$/.test(totalLine)) {
+                                currentItem.totalPrice = parseFloat(totalLine);
+                                i++; // Skip the total line
+                            }
+                        }
+                        
+                        // If we found a price, assume quantity 1 and save
+                        currentItem.quantity = 1;
+                        saveCurrentItem();
+                    } else if (nextLine.toLowerCase() === 'n/c') {
+                        // Handle no-charge items
+                        currentItem.quantity = 1;
+                        currentItem.unitPrice = 0;
+                        currentItem.totalPrice = 0;
+                        i++; // Skip the n/c line
+                        saveCurrentItem();
+                    }
+                }
             }
         }
     }
 
     function saveCurrentItem() {
         console.log('Saving current item:', currentItem);
-        if (currentItem.name && currentItem.quantity && currentItem.unitPrice) {
-            // If we don't have a total price, calculate it
-            if (!currentItem.totalPrice) {
-                currentItem.totalPrice = currentItem.quantity * currentItem.unitPrice;
-            }
-            
-            // Validate the item
-            if (!isNaN(currentItem.quantity) && 
-                !isNaN(currentItem.unitPrice) && 
-                !isNaN(currentItem.totalPrice) &&
-                currentItem.name.length > 0) {
-                console.log('Item validation passed, adding to list');
-                items.push({...currentItem});
-                subtotal += currentItem.totalPrice;
-            } else {
-                console.warn('Item validation failed:', {
-                    hasValidQuantity: !isNaN(currentItem.quantity),
-                    hasValidUnitPrice: !isNaN(currentItem.unitPrice),
-                    hasValidTotalPrice: !isNaN(currentItem.totalPrice),
-                    hasValidName: currentItem.name.length > 0
-                });
-            }
+        if (!isNaN(currentItem.quantity) && 
+            !isNaN(currentItem.unitPrice) && 
+            (currentItem.totalPrice === 0 || !isNaN(currentItem.totalPrice)) &&  // Allow 0 for n/c items
+            currentItem.name.length > 0) {
+            console.log('Item validation passed, adding to list');
+            items.push({...currentItem});
+            subtotal += currentItem.totalPrice;
+        } else {
+            console.warn('Item validation failed:', {
+                hasValidQuantity: !isNaN(currentItem.quantity),
+                hasValidUnitPrice: !isNaN(currentItem.unitPrice),
+                hasValidTotalPrice: !isNaN(currentItem.totalPrice),
+                hasValidName: currentItem.name.length > 0
+            });
         }
         // Reset current item
         currentItem = {
@@ -461,16 +486,16 @@ function extractReceiptDetails(fullText) {
 async function saveReceiptData(receiptData) {
     try {
         // Create a unique ID using invoice number if available
-        const receiptId = receiptData.invoiceNumber || admin.database().ref().push().key;
+        const receiptId = receiptData.invoiceNumber || push(ref(rtdb, 'receipts')).key;
         
         // Save to Firebase
-        await admin.database().ref(`receipts/${receiptId}`).set({
+        await set(ref(rtdb, `receipts/${receiptId}`), {
             ...receiptData,
-            createdAt: admin.database.ServerValue.TIMESTAMP
+            createdAt: Date.now()
         });
         
         // Create guest receipt index
-        await admin.database().ref(`guest-receipts/${receiptData.guestPhoneNumber}/${receiptId}`).set(true);
+        await set(ref(rtdb, `guest-receipts/${receiptData.guestPhoneNumber}/${receiptId}`), true);
 
         console.log('Receipt data saved with ID:', receiptId);
         
@@ -490,21 +515,22 @@ async function saveReceiptData(receiptData) {
  */
 async function fetchActiveBrands() {
     try {
-        const snapshot = await admin.database().ref('campaigns').once('value');
+        const snapshot = await get(ref(rtdb, 'campaigns'));
         const campaigns = snapshot.val();
         if (!campaigns) return new Set();
 
+        // Extract unique brand names from campaigns
         const brands = new Set();
         Object.values(campaigns).forEach(campaign => {
-            if (campaign.brandName) {
-                brands.add(campaign.brandName.toLowerCase());
+            if (campaign.brand) {
+                brands.add(campaign.brand.toLowerCase());
             }
         });
-        
+
         return brands;
     } catch (error) {
-        console.error('Error fetching brands:', error);
-        return new Set();
+        console.error('Error fetching active brands:', error);
+        throw new Error('Failed to fetch active brands');
     }
 }
 
