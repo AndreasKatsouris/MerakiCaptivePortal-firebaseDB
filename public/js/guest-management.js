@@ -630,10 +630,7 @@ export { initializeGuestManagement, cleanupGuestManagement };
 // Add cleanup function
 export function cleanupGuestManagement() {
     if (guestManagement.app) {
-        const mountPoint = document.getElementById('guest-management-app');
-        if (mountPoint) {
-            guestManagement.app.unmount('#guest-management-app');
-        }
+        guestManagement.app.unmount();
         guestManagement.app = null;
     }
 }
