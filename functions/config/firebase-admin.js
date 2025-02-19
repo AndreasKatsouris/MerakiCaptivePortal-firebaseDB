@@ -21,22 +21,65 @@ const bucket = storage.bucket();
 
 // Database functions
 const ref = (path) => {
-    // Ensure path is a string and handle empty/root path
-    const pathString = path ? String(path) : '/';
-    // Remove leading/trailing slashes for consistency
-    const cleanPath = pathString.replace(/^\/+|\/+$/g, '');
-    return rtdb.ref(cleanPath);
+    if (path === undefined || path === null) {
+        throw new Error('Path cannot be null or undefined');
+    }
+
+    // Convert to string and clean
+    const pathString = String(path).trim();
+    if (!pathString) {
+        throw new Error('Path cannot be empty');
+    }
+
+    // Remove leading/trailing slashes and spaces
+    const cleanPath = pathString.replace(/^[/\s]+|[/\s]+$/g, '');
+    
+    // Validate path segments
+    const segments = cleanPath.split('/');
+    const validSegments = segments.map(segment => {
+        // Remove invalid characters
+        return segment.replace(/[.#$\[\]]/g, '_');
+    });
+
+    // Join segments back together
+    const finalPath = validSegments.join('/');
+    
+    console.log('Database path:', finalPath);
+    return rtdb.ref(finalPath);
 };
+
 const get = async (ref) => await ref.once('value');
 const set = async (ref, data) => await ref.set(data);
 const update = async (ref, data) => await ref.update(data);
+
 const push = (path) => {
-    // Ensure path is a string and handle empty/root path
-    const pathString = path ? String(path) : '/';
-    // Remove leading/trailing slashes for consistency
-    const cleanPath = pathString.replace(/^\/+|\/+$/g, '');
-    return rtdb.ref(cleanPath).push();
+    if (path === undefined || path === null) {
+        throw new Error('Path cannot be null or undefined');
+    }
+
+    // Convert to string and clean
+    const pathString = String(path).trim();
+    if (!pathString) {
+        throw new Error('Path cannot be empty');
+    }
+
+    // Remove leading/trailing slashes and spaces
+    const cleanPath = pathString.replace(/^[/\s]+|[/\s]+$/g, '');
+    
+    // Validate path segments
+    const segments = cleanPath.split('/');
+    const validSegments = segments.map(segment => {
+        // Remove invalid characters
+        return segment.replace(/[.#$\[\]]/g, '_');
+    });
+
+    // Join segments back together
+    const finalPath = validSegments.join('/');
+    
+    console.log('Push path:', finalPath);
+    return rtdb.ref(finalPath).push();
 };
+
 const remove = async (ref) => await ref.remove();
 
 // Storage functions

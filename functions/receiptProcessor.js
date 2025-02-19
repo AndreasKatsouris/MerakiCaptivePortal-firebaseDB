@@ -569,13 +569,25 @@ async function saveReceiptData(receiptData) {
             throw new Error('Invalid receipt data');
         }
 
+        // Validate and standardize date/time
+        const standardizedDate = validateAndStandardizeDate(receiptData.date);
+        const standardizedTime = validateAndStandardizeTime(receiptData.time);
+        const standardizedEndTime = validateAndStandardizeTime(receiptData.endTime);
+
+        if (!standardizedDate) {
+            console.warn('Invalid or missing date in receipt:', receiptData.date);
+        }
+        if (!standardizedTime) {
+            console.warn('Invalid or missing time in receipt:', receiptData.time);
+        }
+
         // Ensure guestPhoneNumber is a string
         if (!receiptData.guestPhoneNumber || typeof receiptData.guestPhoneNumber !== 'string') {
             throw new Error('Invalid guest phone number');
         }
 
         // Clean phone number to ensure valid path
-        const cleanPhoneNumber = receiptData.guestPhoneNumber.replace(/[^\w\d]/g, '');
+        const cleanPhoneNumber = String(receiptData.guestPhoneNumber).replace(/[^\w\d]/g, '');
         
         // Generate receipt ID
         let receiptId;
@@ -583,7 +595,7 @@ async function saveReceiptData(receiptData) {
             receiptId = String(receiptData.invoiceNumber).replace(/[^\w\d-]/g, '');
         } else {
             // Generate new ID using push
-            const newRef = push('receipts');
+            const newRef = push(ref(rtdb, 'receipts'));
             receiptId = newRef.key;
         }
         
@@ -591,24 +603,29 @@ async function saveReceiptData(receiptData) {
         const dataToSave = {
             ...receiptData,
             id: receiptId,
-            date: receiptData.date || null,
+            date: standardizedDate,
+            time: standardizedTime,
+            endTime: standardizedEndTime,
             createdAt: Date.now(),
             status: receiptData.status || 'pending_validation',
             guestPhoneNumber: cleanPhoneNumber
         };
         
         // Save to receipts collection
-        await set(ref(rtdb, `receipts/${receiptId}`), dataToSave);
+        await set(ref(rtdb, 'receipts/' + receiptId), dataToSave);
         
-        // Create guest receipt index with clean phone number
-        await set(ref(rtdb, `guest-receipts/${cleanPhoneNumber}/${receiptId}`), {
+        // Create guest receipt index
+        await set(ref(rtdb, 'guest-receipts/' + cleanPhoneNumber + '/' + receiptId), {
             createdAt: Date.now(),
-            totalAmount: receiptData.totalAmount || 0
+            totalAmount: receiptData.totalAmount || 0,
+            date: standardizedDate
         });
 
         console.log('Receipt data saved successfully:', {
             receiptId,
-            phoneNumber: cleanPhoneNumber
+            phoneNumber: cleanPhoneNumber,
+            date: standardizedDate,
+            time: standardizedTime
         });
         
         return dataToSave;
@@ -616,6 +633,61 @@ async function saveReceiptData(receiptData) {
         console.error('Error saving receipt:', error);
         throw new Error('Failed to save receipt data');
     }
+}
+
+/**
+ * Validate and standardize date string
+ * @param {string} dateStr - Date string in DD/MM/YYYY format
+ * @returns {string|null} - ISO date string or null if invalid
+ */
+function validateAndStandardizeDate(dateStr) {
+    if (!dateStr) return null;
+
+    // Parse DD/MM/YYYY format
+    const parts = dateStr.split('/');
+    if (parts.length !== 3) return null;
+
+    const day = parseInt(parts[0], 10);
+    const month = parseInt(parts[1], 10);
+    const year = parseInt(parts[2], 10);
+
+    // Basic validation
+    if (isNaN(day) || isNaN(month) || isNaN(year)) return null;
+    if (month < 1 || month > 12) return null;
+    if (day < 1 || day > 31) return null;
+    if (year < 2020 || year > 2030) return null;
+
+    // Create date object for further validation
+    const date = new Date(year, month - 1, day);
+    if (date.getFullYear() !== year || date.getMonth() !== month - 1 || date.getDate() !== day) {
+        return null; // Invalid date (e.g., 31/04/2024)
+    }
+
+    // Return ISO format date
+    return date.toISOString().split('T')[0];
+}
+
+/**
+ * Validate and standardize time string
+ * @param {string} timeStr - Time string in HH:MM format
+ * @returns {string|null} - Standardized time or null if invalid
+ */
+function validateAndStandardizeTime(timeStr) {
+    if (!timeStr) return null;
+
+    const parts = timeStr.split(':');
+    if (parts.length !== 2) return null;
+
+    const hours = parseInt(parts[0], 10);
+    const minutes = parseInt(parts[1], 10);
+
+    // Basic validation
+    if (isNaN(hours) || isNaN(minutes)) return null;
+    if (hours < 0 || hours > 23) return null;
+    if (minutes < 0 || minutes > 59) return null;
+
+    // Return standardized format
+    return `${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}`;
 }
 
 /**
