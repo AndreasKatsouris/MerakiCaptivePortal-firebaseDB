@@ -487,6 +487,37 @@ function extractReceiptDetails(fullText) {
 }
 
 /**
+ * Fetch active brands from Firebase
+ * @returns {Promise<Set>} - Set of active brand names
+ */
+async function fetchActiveBrands() {
+    try {
+        const campaignsRef = ref(rtdb, '/campaigns');
+        const snapshot = await get(campaignsRef);
+        const campaigns = snapshot.val();
+        
+        if (!campaigns) {
+            console.log('No active campaigns found');
+            return new Set();
+        }
+
+        // Extract unique brand names from campaigns
+        const brands = new Set();
+        Object.values(campaigns).forEach(campaign => {
+            if (campaign?.brand && typeof campaign.brand === 'string') {
+                brands.add(campaign.brand.toLowerCase().trim());
+            }
+        });
+
+        console.log('Fetched active brands:', Array.from(brands));
+        return brands;
+    } catch (error) {
+        console.error('Error fetching active brands:', error);
+        throw new Error('Failed to fetch active brands');
+    }
+}
+
+/**
  * Save receipt data to Firebase
  * @param {object} receiptData - Processed receipt data
  * @returns {Promise<object>} - Saved receipt data with ID
@@ -514,31 +545,6 @@ async function saveReceiptData(receiptData) {
     } catch (error) {
         console.error('Error saving receipt:', error);
         throw new Error('Failed to save receipt data');
-    }
-}
-
-/**
- * Fetch active brands from Firebase
- * @returns {Promise<Set>} - Set of active brand names
- */
-async function fetchActiveBrands() {
-    try {
-        const snapshot = await get(ref(rtdb, 'campaigns'));
-        const campaigns = snapshot.val();
-        if (!campaigns) return new Set();
-
-        // Extract unique brand names from campaigns
-        const brands = new Set();
-        Object.values(campaigns).forEach(campaign => {
-            if (campaign.brand) {
-                brands.add(campaign.brand.toLowerCase());
-            }
-        });
-
-        return brands;
-    } catch (error) {
-        console.error('Error fetching active brands:', error);
-        throw new Error('Failed to fetch active brands');
     }
 }
 
