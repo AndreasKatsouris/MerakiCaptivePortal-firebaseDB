@@ -1,4 +1,4 @@
-import { auth, rtdb } from './config/firebase-config.js';
+import { auth, rtdb, ref, get, update, push } from './config/firebase-config.js';
 
 export function initializeReceiptManagement() {
     console.log('Initializing receipt management...', {
@@ -12,8 +12,6 @@ export function initializeReceiptManagement() {
         return;
     }
 
-    console.log('Initializing receipt management...');
-    
     const app = Vue.createApp({
         data() {
             return {
@@ -60,7 +58,7 @@ export function initializeReceiptManagement() {
             async loadReceipts() {
                 this.loading = true;
                 try {
-                    const snapshot = await rtdb.ref('receipts').once('value');
+                    const snapshot = await get(ref(rtdb, 'receipts'));
                     const data = snapshot.val() || {};
                     this.receipts = Object.entries(data).map(([id, receipt]) => ({
                         id,
@@ -77,7 +75,7 @@ export function initializeReceiptManagement() {
 
             async loadCampaigns() {
                 try {
-                    const snapshot = await rtdb.ref('campaigns').once('value');
+                    const snapshot = await get(ref(rtdb, 'campaigns'));
                     const data = snapshot.val() || {};
                     this.campaigns = Object.entries(data).map(([id, campaign]) => ({
                         id,
@@ -93,7 +91,7 @@ export function initializeReceiptManagement() {
                 
                 this.processingReceipt = true;
                 try {
-                    await rtdb.ref(`receipts/${receipt.id}`).update({
+                    await update(ref(rtdb, `receipts/${receipt.id}`), {
                         status: 'validated',
                         validatedAt: Date.now(),
                         validatedBy: auth.currentUser.uid
@@ -134,7 +132,7 @@ export function initializeReceiptManagement() {
                 
                 this.processingReceipt = true;
                 try {
-                    await rtdb.ref(`receipts/${receipt.id}`).update({
+                    await update(ref(rtdb, `receipts/${receipt.id}`), {
                         status: 'rejected',
                         rejectedAt: Date.now(),
                         rejectedBy: auth.currentUser.uid,
@@ -191,7 +189,7 @@ export function initializeReceiptManagement() {
                         createdBy: auth.currentUser.uid
                     };
 
-                    await rtdb.ref('rewards').push(rewardData);
+                    await push(ref(rtdb, 'rewards'), rewardData);
                 } catch (error) {
                     console.error('Error processing rewards:', error);
                     throw error; // Propagate error to calling function
