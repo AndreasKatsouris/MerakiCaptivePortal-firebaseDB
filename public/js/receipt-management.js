@@ -38,12 +38,12 @@ export function initializeReceiptManagement() {
                 return this.receipts.filter(receipt => {
                     const matchesStatus = !this.filters.status || receipt.status === this.filters.status;
                     const matchesGuest = !this.filters.guestName || 
-                        receipt.guestName.toLowerCase().includes(this.filters.guestName.toLowerCase());
+                        (receipt.guestPhoneNumber && receipt.guestPhoneNumber.includes(this.filters.guestName));
                     const matchesCampaign = !this.filters.campaignId || receipt.campaignId === this.filters.campaignId;
                     
                     let matchesDate = true;
                     if (this.filters.dateRange.start && this.filters.dateRange.end) {
-                        const receiptDate = new Date(receipt.timestamp);
+                        const receiptDate = new Date(receipt.date);
                         const startDate = new Date(this.filters.dateRange.start);
                         const endDate = new Date(this.filters.dateRange.end);
                         matchesDate = receiptDate >= startDate && receiptDate <= endDate;
@@ -63,8 +63,8 @@ export function initializeReceiptManagement() {
                     this.receipts = Object.entries(data).map(([id, receipt]) => ({
                         id,
                         ...receipt,
-                        timestamp: receipt.timestamp || Date.now()
-                    })).sort((a, b) => b.timestamp - a.timestamp);
+                        createdAt: receipt.createdAt || Date.now()
+                    })).sort((a, b) => b.createdAt - a.createdAt);
                 } catch (error) {
                     console.error('Error loading receipts:', error);
                     this.error = 'Failed to load receipts';
@@ -178,21 +178,31 @@ export function initializeReceiptManagement() {
 
                 try {
                     // Create reward entry
+                    const rewardRef = push(ref(rtdb, 'rewards'));
+                    const rewardId = rewardRef.key;
+                    
                     const rewardData = {
                         receiptId: receipt.id,
                         campaignId: campaign.id,
-                        guestId: receipt.guestId,
-                        amount: receipt.amount,
-                        type: campaign.rewardType,
+                        guestPhoneNumber: receipt.guestPhoneNumber,
+                        totalAmount: receipt.totalAmount,
                         status: 'pending',
                         createdAt: Date.now(),
                         createdBy: auth.currentUser.uid
                     };
 
-                    await push(ref(rtdb, 'rewards'), rewardData);
+                    // Update rewards node
+                    await update(ref(rtdb, `rewards/${rewardId}`), rewardData);
+                    
+                    // Update campaign-rewards mapping
+                    await update(ref(rtdb, `campaign-rewards/${campaign.id}/${rewardId}`), true);
+                    
+                    // Update guest-rewards mapping
+                    await update(ref(rtdb, `guest-rewards/${receipt.guestPhoneNumber}/${rewardId}`), true);
+                    
                 } catch (error) {
                     console.error('Error processing rewards:', error);
-                    throw error; // Propagate error to calling function
+                    throw error;
                 }
             },
 
@@ -213,18 +223,66 @@ export function initializeReceiptManagement() {
             async showReceiptDetails(receipt) {
                 this.selectedReceipt = receipt;
                 
+                // Format items for display
+                const itemsHtml = receipt.items ? receipt.items.map(item => `
+                    <tr>
+                        <td>${item.name}</td>
+                        <td>${item.quantity}</td>
+                        <td>R${item.unitPrice.toFixed(2)}</td>
+                        <td>R${item.totalPrice.toFixed(2)}</td>
+                    </tr>
+                `).join('') : '';
+                
                 // Show receipt details modal
                 const result = await Swal.fire({
                     title: 'Receipt Details',
                     html: `
                         <div class="receipt-details">
-                            <p><strong>Guest:</strong> ${receipt.guestName}</p>
-                            <p><strong>Amount:</strong> ${receipt.amount}</p>
-                            <p><strong>Date:</strong> ${this.formatDate(receipt.timestamp)}</p>
-                            <p><strong>Status:</strong> ${receipt.status}</p>
-                            ${receipt.imageUrl ? `<img src="${receipt.imageUrl}" alt="Receipt" class="img-fluid">` : ''}
+                            <div class="store-info mb-3">
+                                <h5>${receipt.fullStoreName || receipt.brandName}</h5>
+                                <p>${receipt.storeAddress || ''}</p>
+                            </div>
+                            
+                            <div class="receipt-meta mb-3">
+                                <p><strong>Invoice Number:</strong> ${receipt.invoiceNumber}</p>
+                                <p><strong>Date:</strong> ${receipt.date} ${receipt.time || ''}</p>
+                                <p><strong>Guest Phone:</strong> ${receipt.guestPhoneNumber}</p>
+                                <p><strong>Table:</strong> ${receipt.tableNumber || 'N/A'}</p>
+                                <p><strong>Waiter:</strong> ${receipt.waiterName || 'N/A'}</p>
+                                <p><strong>Status:</strong> <span class="badge ${this.getStatusBadgeClass(receipt.status)}">${receipt.status}</span></p>
+                            </div>
+                            
+                            <div class="items-table mb-3">
+                                <table class="table table-sm">
+                                    <thead>
+                                        <tr>
+                                            <th>Item</th>
+                                            <th>Qty</th>
+                                            <th>Unit Price</th>
+                                            <th>Total</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        ${itemsHtml}
+                                    </tbody>
+                                </table>
+                            </div>
+                            
+                            <div class="totals mb-3">
+                                <p><strong>Subtotal:</strong> R${receipt.subtotal.toFixed(2)}</p>
+                                <p><strong>VAT (15%):</strong> R${receipt.vatAmount.toFixed(2)}</p>
+                                <p><strong>Total Amount:</strong> R${receipt.totalAmount.toFixed(2)}</p>
+                            </div>
+                            
+                            ${receipt.imageUrl ? `
+                                <div class="receipt-image mb-3">
+                                    <h6>Receipt Image</h6>
+                                    <img src="${receipt.imageUrl}" alt="Receipt" class="img-fluid">
+                                </div>
+                            ` : ''}
                         </div>
                     `,
+                    width: '800px',
                     showCancelButton: true,
                     showDenyButton: receipt.status === 'pending',
                     confirmButtonText: receipt.status === 'pending' ? 'Validate' : 'Close',
