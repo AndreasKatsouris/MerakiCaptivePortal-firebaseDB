@@ -1,5 +1,4 @@
-// Import Vue and Firebase dependencies
-import { createApp } from 'vue';
+// Import Firebase dependencies
 import { auth, rtdb, ref, get, push, set, update, remove } from '../config/firebase-config.js';
 
 const campaignManagement = {
@@ -13,13 +12,19 @@ export function initializeCampaignManagement() {
         return;
     }
 
+    // Check if Vue is available
+    if (typeof Vue === 'undefined') {
+        console.error('Vue is not loaded. Cannot initialize campaign management.');
+        return;
+    }
+
     // Cleanup existing app if any
     if (campaignManagement.app) {
         campaignManagement.app.unmount();
         campaignManagement.app = null;
     }
 
-    campaignManagement.app = createApp({
+    campaignManagement.app = Vue.createApp({
         data() {
             return {
                 campaigns: [],
