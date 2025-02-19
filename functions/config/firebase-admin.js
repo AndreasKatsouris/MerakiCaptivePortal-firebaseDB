@@ -30,7 +30,13 @@ const ref = (path) => {
 const get = async (ref) => await ref.once('value');
 const set = async (ref, data) => await ref.set(data);
 const update = async (ref, data) => await ref.update(data);
-const push = (ref) => rtdb.ref(ref).push();
+const push = (path) => {
+    // Ensure path is a string and handle empty/root path
+    const pathString = path ? String(path) : '/';
+    // Remove leading/trailing slashes for consistency
+    const cleanPath = pathString.replace(/^\/+|\/+$/g, '');
+    return rtdb.ref(cleanPath).push();
+};
 const remove = async (ref) => await ref.remove();
 
 // Storage functions

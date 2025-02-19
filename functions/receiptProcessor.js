@@ -577,34 +577,41 @@ async function saveReceiptData(receiptData) {
         // Clean phone number to ensure valid path
         const cleanPhoneNumber = receiptData.guestPhoneNumber.replace(/[^\w\d]/g, '');
         
-        // Create a unique ID using invoice number if available, or generate one
-        const receiptId = (receiptData.invoiceNumber || push(ref(rtdb, 'receipts')).key).toString();
+        // Generate receipt ID
+        let receiptId;
+        if (receiptData.invoiceNumber) {
+            receiptId = String(receiptData.invoiceNumber).replace(/[^\w\d-]/g, '');
+        } else {
+            // Generate new ID using push
+            const newRef = push('receipts');
+            receiptId = newRef.key;
+        }
         
         // Prepare receipt data with defaults for missing fields
         const dataToSave = {
             ...receiptData,
+            id: receiptId,
             date: receiptData.date || null,
             createdAt: Date.now(),
-            status: receiptData.status || 'pending_validation'
+            status: receiptData.status || 'pending_validation',
+            guestPhoneNumber: cleanPhoneNumber
         };
         
         // Save to receipts collection
-        const receiptRef = ref(rtdb, `receipts/${receiptId}`);
-        await set(receiptRef, dataToSave);
+        await set(ref(rtdb, `receipts/${receiptId}`), dataToSave);
         
         // Create guest receipt index with clean phone number
-        const guestReceiptRef = ref(rtdb, `guest-receipts/${cleanPhoneNumber}/${receiptId}`);
-        await set(guestReceiptRef, true);
+        await set(ref(rtdb, `guest-receipts/${cleanPhoneNumber}/${receiptId}`), {
+            createdAt: Date.now(),
+            totalAmount: receiptData.totalAmount || 0
+        });
 
         console.log('Receipt data saved successfully:', {
             receiptId,
             phoneNumber: cleanPhoneNumber
         });
         
-        return {
-            receiptId,
-            ...dataToSave
-        };
+        return dataToSave;
     } catch (error) {
         console.error('Error saving receipt:', error);
         throw new Error('Failed to save receipt data');
