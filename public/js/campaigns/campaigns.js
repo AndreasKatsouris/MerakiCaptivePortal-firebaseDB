@@ -1,21 +1,25 @@
-// Import Firebase dependencies from config
+// Import Vue and Firebase dependencies
+import { createApp } from 'vue';
 import { auth, rtdb, ref, get, push, set, update, remove } from '../config/firebase-config.js';
 
-export function initializeCampaignManagement() {
-    // Check if there's an existing app instance
-    const container = document.getElementById('campaigns-app');
-    if (container._vue_app) {
-        console.log('Unmounting existing campaign management app');
-        container._vue_app.unmount();
-        container._vue_app = null;
-    }
+const campaignManagement = {
+    app: null
+};
 
-    if (typeof Vue === 'undefined') {
-        console.error('Vue is not loaded. Cannot initialize campaign management.');
+export function initializeCampaignManagement() {
+    const container = document.getElementById('campaigns-app');
+    if (!container) {
+        console.error('Campaign management container not found');
         return;
     }
 
-    const app = Vue.createApp({
+    // Cleanup existing app if any
+    if (campaignManagement.app) {
+        campaignManagement.app.unmount();
+        campaignManagement.app = null;
+    }
+
+    campaignManagement.app = createApp({
         data() {
             return {
                 campaigns: [],
@@ -914,20 +918,18 @@ export function initializeCampaignManagement() {
         `
     });
 
-    // Store the app instance on the container and mount it
-    container._vue_app = app;
-    app.mount('#campaigns-app');
+    // Mount the app
+    campaignManagement.app.mount('#campaigns-app');
     console.log('Campaign management initialized');
 
-    return app;
+    return campaignManagement.app;
 }
 
 // Add cleanup function
 export function cleanupCampaignManagement() {
-    const container = document.getElementById('campaigns-app');
-    if (container && container._vue_app) {
+    if (campaignManagement.app) {
         console.log('Cleaning up campaign management');
-        container._vue_app.unmount();
-        container._vue_app = null;
+        campaignManagement.app.unmount();
+        campaignManagement.app = null;
     }
 }

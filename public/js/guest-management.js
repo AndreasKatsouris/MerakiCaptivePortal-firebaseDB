@@ -590,6 +590,13 @@ const guestManagement = {
     }
 };
 
+function cleanupGuestManagement() {
+    if (guestManagement.app) {
+        guestManagement.app.unmount();
+        guestManagement.app = null;
+    }
+}
+
 function initializeGuestManagement() {
     // Guest menu click handler
     const guestManagementMenu = document.getElementById('guestManagementMenu');
@@ -625,11 +632,4 @@ function showGuestManagement() {
 }
 
 // Export initialization and cleanup functions
-export { initializeGuestManagement };
-
-function cleanupGuestManagement() {
-    if (guestManagement.app) {
-        guestManagement.app.unmount();
-        guestManagement.app = null;
-    }
-}
+export { initializeGuestManagement, cleanupGuestManagement };
