@@ -504,8 +504,8 @@ async function fetchActiveBrands() {
         // Extract unique brand names from campaigns
         const brands = new Set();
         Object.values(campaigns).forEach(campaign => {
-            if (campaign?.brand && typeof campaign.brand === 'string') {
-                brands.add(campaign.brand.toLowerCase().trim());
+            if (campaign?.brandName && typeof campaign.brandName === 'string') {
+                brands.add(campaign.brandName.toLowerCase().trim());
             }
         });
 
