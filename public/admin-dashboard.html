@@ -66,6 +66,12 @@
                     </a>
                 </li>
                 <li class="nav-item">
+                    <a href="#" id="receiptManagementMenu" class="nav-link" data-section="receiptManagementContent">
+                        <i class="fas fa-receipt"></i>
+                        <span>Receipt Management</span>
+                    </a>
+                </li>
+                <li class="nav-item">
                     <a href="#settingsSubmenu" class="nav-link" data-bs-toggle="collapse" role="button" aria-expanded="false">
                         <i class="fas fa-cog"></i>
                         Settings
@@ -244,6 +250,114 @@
                         <div class="card">
                             <div class="card-body">
                                 <div id="projectsList"></div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Receipt Management Section -->
+            <div id="receiptManagementContent" class="content-section" style="display: none;">
+                <div class="section-header">
+                    <h2>Receipt Management</h2>
+                </div>
+
+                <!-- Filters -->
+                <div class="card mb-4">
+                    <div class="card-body">
+                        <h5 class="card-title">Filters</h5>
+                        <div class="row g-3">
+                            <div class="col-md-3">
+                                <label class="form-label">Status</label>
+                                <select v-model="filters.status" class="form-select">
+                                    <option value="">All</option>
+                                    <option value="pending">Pending</option>
+                                    <option value="validated">Validated</option>
+                                    <option value="rejected">Rejected</option>
+                                </select>
+                            </div>
+                            <div class="col-md-3">
+                                <label class="form-label">Guest Name</label>
+                                <input type="text" v-model="filters.guestName" class="form-control" placeholder="Search guest...">
+                            </div>
+                            <div class="col-md-3">
+                                <label class="form-label">Campaign</label>
+                                <select v-model="filters.campaignId" class="form-select">
+                                    <option value="">All Campaigns</option>
+                                    <option v-for="campaign in campaigns" :key="campaign.id" :value="campaign.id">
+                                        {{ campaign.name }}
+                                    </option>
+                                </select>
+                            </div>
+                            <div class="col-md-3">
+                                <label class="form-label">Date Range</label>
+                                <div class="input-group">
+                                    <input type="date" v-model="filters.dateRange.start" class="form-control">
+                                    <input type="date" v-model="filters.dateRange.end" class="form-control">
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Receipts Table -->
+                <div class="card">
+                    <div class="card-body">
+                        <div v-if="loading" class="text-center py-4">
+                            <div class="spinner-border text-primary" role="status">
+                                <span class="visually-hidden">Loading...</span>
+                            </div>
+                        </div>
+                        
+                        <div v-else-if="error" class="alert alert-danger" role="alert">
+                            {{ error }}
+                        </div>
+                        
+                        <div v-else>
+                            <div class="table-responsive">
+                                <table class="table table-hover">
+                                    <thead>
+                                        <tr>
+                                            <th>Date</th>
+                                            <th>Guest</th>
+                                            <th>Amount</th>
+                                            <th>Campaign</th>
+                                            <th>Status</th>
+                                            <th>Actions</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        <tr v-for="receipt in filteredReceipts" :key="receipt.id">
+                                            <td>{{ formatDate(receipt.timestamp) }}</td>
+                                            <td>{{ receipt.guestName }}</td>
+                                            <td>{{ receipt.amount }}</td>
+                                            <td>
+                                                {{ campaigns.find(c => c.id === receipt.campaignId)?.name || 'Unknown Campaign' }}
+                                            </td>
+                                            <td>
+                                                <span :class="['badge', getStatusBadgeClass(receipt.status)]">
+                                                    {{ receipt.status }}
+                                                </span>
+                                            </td>
+                                            <td>
+                                                <button @click="showReceiptDetails(receipt)" 
+                                                        class="btn btn-sm btn-outline-primary">
+                                                    <i class="fas fa-eye"></i> View
+                                                </button>
+                                                <button v-if="receipt.status === 'pending'"
+                                                        @click="validateReceipt(receipt)"
+                                                        :disabled="processingReceipt"
+                                                        class="btn btn-sm btn-outline-success ms-1">
+                                                    <i class="fas fa-check"></i> Validate
+                                                </button>
+                                            </td>
+                                        </tr>
+                                    </tbody>
+                                </table>
+                            </div>
+                            
+                            <div v-if="filteredReceipts.length === 0" class="text-center py-4">
+                                <p class="text-muted">No receipts found matching the current filters.</p>
                             </div>
                         </div>
                     </div>

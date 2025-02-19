@@ -1,4 +1,4 @@
-import { auth } from './config/firebase-config.js';
+import { auth, rtdb } from './config/firebase-config.js';
 
 export function initializeReceiptManagement() {
     console.log('Initializing receipt management...');
@@ -11,23 +11,51 @@ export function initializeReceiptManagement() {
                 error: null,
                 filters: {
                     status: '',
+                    dateRange: {
+                        start: '',
+                        end: ''
+                    },
                     guestName: '',
                     campaignId: ''
                 },
-                campaigns: []
+                campaigns: [],
+                selectedReceipt: null,
+                processingReceipt: false
             };
+        },
+
+        computed: {
+            filteredReceipts() {
+                return this.receipts.filter(receipt => {
+                    const matchesStatus = !this.filters.status || receipt.status === this.filters.status;
+                    const matchesGuest = !this.filters.guestName || 
+                        receipt.guestName.toLowerCase().includes(this.filters.guestName.toLowerCase());
+                    const matchesCampaign = !this.filters.campaignId || receipt.campaignId === this.filters.campaignId;
+                    
+                    let matchesDate = true;
+                    if (this.filters.dateRange.start && this.filters.dateRange.end) {
+                        const receiptDate = new Date(receipt.timestamp);
+                        const startDate = new Date(this.filters.dateRange.start);
+                        const endDate = new Date(this.filters.dateRange.end);
+                        matchesDate = receiptDate >= startDate && receiptDate <= endDate;
+                    }
+
+                    return matchesStatus && matchesGuest && matchesCampaign && matchesDate;
+                });
+            }
         },
 
         methods: {
             async loadReceipts() {
                 this.loading = true;
                 try {
-                    const snapshot = await firebase.database().ref('receipts').once('value');
+                    const snapshot = await rtdb.ref('receipts').once('value');
                     const data = snapshot.val() || {};
                     this.receipts = Object.entries(data).map(([id, receipt]) => ({
                         id,
-                        ...receipt
-                    }));
+                        ...receipt,
+                        timestamp: receipt.timestamp || Date.now()
+                    })).sort((a, b) => b.timestamp - a.timestamp);
                 } catch (error) {
                     console.error('Error loading receipts:', error);
                     this.error = 'Failed to load receipts';
@@ -38,7 +66,7 @@ export function initializeReceiptManagement() {
 
             async loadCampaigns() {
                 try {
-                    const snapshot = await firebase.database().ref('campaigns').once('value');
+                    const snapshot = await rtdb.ref('campaigns').once('value');
                     const data = snapshot.val() || {};
                     this.campaigns = Object.entries(data).map(([id, campaign]) => ({
                         id,
@@ -46,6 +74,116 @@ export function initializeReceiptManagement() {
                     }));
                 } catch (error) {
                     console.error('Error loading campaigns:', error);
+                }
+            },
+
+            async validateReceipt(receipt) {
+                if (!receipt || this.processingReceipt) return;
+                
+                this.processingReceipt = true;
+                try {
+                    await rtdb.ref(`receipts/${receipt.id}`).update({
+                        status: 'validated',
+                        validatedAt: Date.now(),
+                        validatedBy: auth.currentUser.uid
+                    });
+                    
+                    // Update local state
+                    const index = this.receipts.findIndex(r => r.id === receipt.id);
+                    if (index !== -1) {
+                        this.receipts[index] = {
+                            ...receipt,
+                            status: 'validated',
+                            validatedAt: Date.now(),
+                            validatedBy: auth.currentUser.uid
+                        };
+                    }
+                    
+                    await this.processRewards(receipt);
+                    
+                    Swal.fire({
+                        icon: 'success',
+                        title: 'Receipt Validated',
+                        text: 'The receipt has been validated and rewards have been processed.'
+                    });
+                } catch (error) {
+                    console.error('Error validating receipt:', error);
+                    Swal.fire({
+                        icon: 'error',
+                        title: 'Validation Failed',
+                        text: 'Failed to validate the receipt. Please try again.'
+                    });
+                } finally {
+                    this.processingReceipt = false;
+                }
+            },
+
+            async rejectReceipt(receipt, reason) {
+                if (!receipt || this.processingReceipt) return;
+                
+                this.processingReceipt = true;
+                try {
+                    await rtdb.ref(`receipts/${receipt.id}`).update({
+                        status: 'rejected',
+                        rejectedAt: Date.now(),
+                        rejectedBy: auth.currentUser.uid,
+                        rejectionReason: reason
+                    });
+                    
+                    // Update local state
+                    const index = this.receipts.findIndex(r => r.id === receipt.id);
+                    if (index !== -1) {
+                        this.receipts[index] = {
+                            ...receipt,
+                            status: 'rejected',
+                            rejectedAt: Date.now(),
+                            rejectedBy: auth.currentUser.uid,
+                            rejectionReason: reason
+                        };
+                    }
+                    
+                    Swal.fire({
+                        icon: 'success',
+                        title: 'Receipt Rejected',
+                        text: 'The receipt has been marked as rejected.'
+                    });
+                } catch (error) {
+                    console.error('Error rejecting receipt:', error);
+                    Swal.fire({
+                        icon: 'error',
+                        title: 'Rejection Failed',
+                        text: 'Failed to reject the receipt. Please try again.'
+                    });
+                } finally {
+                    this.processingReceipt = false;
+                }
+            },
+
+            async processRewards(receipt) {
+                // Find the associated campaign
+                const campaign = this.campaigns.find(c => c.id === receipt.campaignId);
+                if (!campaign) {
+                    console.error('Campaign not found for receipt:', receipt.id);
+                    return;
+                }
+
+                try {
+                    // Create reward entry
+                    const rewardData = {
+                        receiptId: receipt.id,
+                        campaignId: campaign.id,
+                        guestId: receipt.guestId,
+                        amount: receipt.amount,
+                        type: campaign.rewardType,
+                        status: 'pending',
+                        createdAt: Date.now(),
+                        createdBy: auth.currentUser.uid
+                    };
+
+                    await rtdb.ref('rewards').push(rewardData);
+                } catch (error) {
+                    console.error('Error processing rewards:', error);
+                    throw error; // Propagate error to calling function
                 }
             },
 
@@ -57,6 +195,52 @@ export function initializeReceiptManagement() {
                     default: 'bg-secondary'
                 };
                 return classes[status] || classes.default;
+            },
+
+            formatDate(timestamp) {
+                return new Date(timestamp).toLocaleString();
+            },
+
+            async showReceiptDetails(receipt) {
+                this.selectedReceipt = receipt;
+                
+                // Show receipt details modal
+                const result = await Swal.fire({
+                    title: 'Receipt Details',
+                    html: `
+                        <div class="receipt-details">
+                            <p><strong>Guest:</strong> ${receipt.guestName}</p>
+                            <p><strong>Amount:</strong> ${receipt.amount}</p>
+                            <p><strong>Date:</strong> ${this.formatDate(receipt.timestamp)}</p>
+                            <p><strong>Status:</strong> ${receipt.status}</p>
+                            ${receipt.imageUrl ? `<img src="${receipt.imageUrl}" alt="Receipt" class="img-fluid">` : ''}
+                        </div>
+                    `,
+                    showCancelButton: true,
+                    showDenyButton: receipt.status === 'pending',
+                    confirmButtonText: receipt.status === 'pending' ? 'Validate' : 'Close',
+                    denyButtonText: 'Reject',
+                    denyButtonColor: '#dc3545'
+                });
+
+                if (result.isConfirmed && receipt.status === 'pending') {
+                    await this.validateReceipt(receipt);
+                } else if (result.isDenied) {
+                    const reason = await Swal.fire({
+                        title: 'Rejection Reason',
+                        input: 'text',
+                        inputLabel: 'Please provide a reason for rejection',
+                        inputValidator: (value) => {
+                            if (!value) {
+                                return 'You need to provide a reason!';
+                            }
+                        }
+                    });
+                    
+                    if (reason.value) {
+                        await this.rejectReceipt(receipt, reason.value);
+                    }
+                }
             }
         },
 
@@ -77,4 +261,4 @@ export function initializeReceiptManagement() {
     }
 
     return app;
-} 
+}
