@@ -1,31 +1,117 @@
 import { auth, rtdb, ref, get, update, push } from './config/firebase-config.js';
 
 export function initializeReceiptManagement() {
-    console.log('Initializing receipt management...', {
-        auth: !!auth,
-        rtdb: !!rtdb,
-        Vue: typeof Vue !== 'undefined' ? 'loaded' : 'not loaded'
-    });
+    console.log('Initializing receipt management...');
     
     if (typeof Vue === 'undefined') {
-        console.error('Vue is not loaded. Make sure Vue.js script is included and loaded before initializing receipt management.');
+        console.error('Vue is not loaded');
         return;
     }
 
-    // Check for existing app instance
     const mountPoint = document.getElementById('receiptManagementContent');
     if (!mountPoint) {
         console.error('Receipt management mount point not found');
         return;
     }
 
-    // Clean up any existing app instance
     if (mountPoint.__vue_app__) {
-        console.log('Cleaning up existing Vue app instance');
         mountPoint.__vue_app__.unmount();
     }
 
     const app = Vue.createApp({
+        template: `
+            <div class="receipt-management">
+                <div class="filters mb-4">
+                    <div class="row g-3">
+                        <div class="col-md-2">
+                            <label class="form-label">Status</label>
+                            <select v-model="filters.status" class="form-select">
+                                <option value="">All</option>
+                                <option value="pending">Pending</option>
+                                <option value="validated">Validated</option>
+                                <option value="rejected">Rejected</option>
+                            </select>
+                        </div>
+                        <div class="col-md-3">
+                            <label class="form-label">Guest Name</label>
+                            <input type="text" v-model="filters.guestName" class="form-control" placeholder="Search guest...">
+                        </div>
+                        <div class="col-md-3">
+                            <label class="form-label">Campaign</label>
+                            <select v-model="filters.campaignId" class="form-select">
+                                <option value="">All Campaigns</option>
+                                <option v-for="campaign in campaigns" :key="campaign.id" :value="campaign.id">
+                                    {{ campaign.name }}
+                                </option>
+                            </select>
+                        </div>
+                        <div class="col-md-4">
+                            <label class="form-label">Date Range</label>
+                            <div class="d-flex gap-2">
+                                <input type="date" v-model="filters.dateRange.start" class="form-control">
+                                <input type="date" v-model="filters.dateRange.end" class="form-control">
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="table-responsive">
+                    <table class="table table-hover">
+                        <thead>
+                            <tr>
+                                <th>Date</th>
+                                <th>Invoice #</th>
+                                <th>Guest Full Name</th>
+                                <th>Campaign</th>
+                                <th>Status</th>
+                                <th>Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr v-if="loading">
+                                <td colspan="6" class="text-center py-4">
+                                    <div class="spinner-border text-primary" role="status">
+                                        <span class="visually-hidden">Loading...</span>
+                                    </div>
+                                </td>
+                            </tr>
+                            <tr v-else-if="error">
+                                <td colspan="6" class="text-center text-danger">{{ error }}</td>
+                            </tr>
+                            <tr v-else-if="filteredReceipts.length === 0">
+                                <td colspan="6" class="text-center">No receipts found</td>
+                            </tr>
+                            <tr v-for="receipt in filteredReceipts" :key="receipt.id">
+                                <td>{{ formatDate(receipt.date) }}</td>
+                                <td>{{ receipt.invoiceNumber }}</td>
+                                <td>{{ receipt.guestName }}</td>
+                                <td>{{ getCampaignName(receipt.campaignId) }}</td>
+                                <td>
+                                    <span :class="getStatusBadgeClass(receipt.status)">
+                                        {{ receipt.status }}
+                                    </span>
+                                </td>
+                                <td>
+                                    <button class="btn btn-sm btn-primary me-1" @click="viewReceipt(receipt)">
+                                        <i class="fas fa-eye"></i>
+                                    </button>
+                                    <button v-if="receipt.status === 'pending'"
+                                            class="btn btn-sm btn-success me-1"
+                                            @click="validateReceipt(receipt)">
+                                        <i class="fas fa-check"></i>
+                                    </button>
+                                    <button v-if="receipt.status === 'pending'"
+                                            class="btn btn-sm btn-danger"
+                                            @click="promptRejectReceipt(receipt)">
+                                        <i class="fas fa-times"></i>
+                                    </button>
+                                </td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        `,
         data() {
             return {
                 receipts: [],
@@ -45,29 +131,23 @@ export function initializeReceiptManagement() {
                 processingReceipt: false
             };
         },
-
-        computed: {
-            filteredReceipts() {
-                return this.receipts.filter(receipt => {
-                    const matchesStatus = !this.filters.status || receipt.status === this.filters.status;
-                    const matchesGuest = !this.filters.guestName || 
-                        (receipt.guestPhoneNumber && receipt.guestPhoneNumber.includes(this.filters.guestName));
-                    const matchesCampaign = !this.filters.campaignId || receipt.campaignId === this.filters.campaignId;
-                    
-                    let matchesDate = true;
-                    if (this.filters.dateRange.start && this.filters.dateRange.end) {
-                        const receiptDate = new Date(receipt.date);
-                        const startDate = new Date(this.filters.dateRange.start);
-                        const endDate = new Date(this.filters.dateRange.end);
-                        matchesDate = receiptDate >= startDate && receiptDate <= endDate;
-                    }
-
-                    return matchesStatus && matchesGuest && matchesCampaign && matchesDate;
-                });
-            }
-        },
-
         methods: {
+            formatDate(date) {
+                if (!date) return 'N/A';
+                return new Date(date).toLocaleDateString();
+            },
+            getStatusBadgeClass(status) {
+                const classes = {
+                    pending: 'badge bg-warning',
+                    validated: 'badge bg-success',
+                    rejected: 'badge bg-danger'
+                };
+                return classes[status] || 'badge bg-secondary';
+            },
+            getCampaignName(campaignId) {
+                const campaign = this.campaigns.find(c => c.id === campaignId);
+                return campaign ? campaign.name : 'Unknown Campaign';
+            },
             async loadReceipts() {
                 this.loading = true;
                 try {
@@ -85,7 +165,6 @@ export function initializeReceiptManagement() {
                     this.loading = false;
                 }
             },
-
             async loadCampaigns() {
                 try {
                     const snapshot = await get(ref(rtdb, 'campaigns'));
@@ -98,7 +177,6 @@ export function initializeReceiptManagement() {
                     console.error('Error loading campaigns:', error);
                 }
             },
-
             async validateReceipt(receipt) {
                 if (!receipt || this.processingReceipt) return;
                 
@@ -219,21 +297,7 @@ export function initializeReceiptManagement() {
                 }
             },
 
-            getStatusBadgeClass(status) {
-                const classes = {
-                    pending: 'bg-warning',
-                    validated: 'bg-success',
-                    rejected: 'bg-danger',
-                    default: 'bg-secondary'
-                };
-                return classes[status] || classes.default;
-            },
-
-            formatDate(timestamp) {
-                return new Date(timestamp).toLocaleString();
-            },
-
-            async showReceiptDetails(receipt) {
+            async viewReceipt(receipt) {
                 this.selectedReceipt = receipt;
                 
                 // Format items for display
@@ -321,37 +385,68 @@ export function initializeReceiptManagement() {
                         await this.rejectReceipt(receipt, reason.value);
                     }
                 }
+            },
+            promptRejectReceipt(receipt) {
+                Swal.fire({
+                    title: 'Reject Receipt',
+                    text: 'Are you sure you want to reject this receipt?',
+                    icon: 'warning',
+                    showCancelButton: true,
+                    confirmButtonText: 'Reject',
+                    cancelButtonText: 'Cancel',
+                    reverseButtons: true
+                }).then(async (result) => {
+                    if (result.isConfirmed) {
+                        const reason = await Swal.fire({
+                            title: 'Rejection Reason',
+                            input: 'text',
+                            inputLabel: 'Please provide a reason for rejection',
+                            inputValidator: (value) => {
+                                if (!value) {
+                                    return 'You need to provide a reason!';
+                                }
+                            }
+                        });
+                        
+                        if (reason.value) {
+                            await this.rejectReceipt(receipt, reason.value);
+                        }
+                    }
+                });
             }
         },
+        computed: {
+            filteredReceipts() {
+                return this.receipts.filter(receipt => {
+                    const matchesStatus = !this.filters.status || receipt.status === this.filters.status;
+                    const matchesGuest = !this.filters.guestName || 
+                        (receipt.guestName && receipt.guestName.toLowerCase().includes(this.filters.guestName.toLowerCase()));
+                    const matchesCampaign = !this.filters.campaignId || receipt.campaignId === this.filters.campaignId;
+                    
+                    let matchesDate = true;
+                    if (this.filters.dateRange.start && this.filters.dateRange.end) {
+                        const receiptDate = new Date(receipt.date);
+                        const startDate = new Date(this.filters.dateRange.start);
+                        const endDate = new Date(this.filters.dateRange.end);
+                        matchesDate = receiptDate >= startDate && receiptDate <= endDate;
+                    }
 
+                    return matchesStatus && matchesGuest && matchesCampaign && matchesDate;
+                });
+            }
+        },
         mounted() {
-            console.log('Receipt management component mounted');
             this.loadReceipts();
             this.loadCampaigns();
         }
     });
 
-    // Mount the app and store the instance
-    app.mount(mountPoint);
-    mountPoint.__vue_app__ = app;
-    console.log('Receipt management initialized');
-    
-    // Return cleanup function
-    return () => {
-        console.log('Cleaning up receipt management...');
-        if (mountPoint.__vue_app__) {
-            mountPoint.__vue_app__.unmount();
-            delete mountPoint.__vue_app__;
-        }
-    };
+    app.mount('#receiptManagementContent');
 }
 
-// Export cleanup function for use in admin-dashboard
 export function cleanupReceiptManagement() {
     const mountPoint = document.getElementById('receiptManagementContent');
     if (mountPoint && mountPoint.__vue_app__) {
-        console.log('Cleaning up receipt management...');
         mountPoint.__vue_app__.unmount();
-        delete mountPoint.__vue_app__;
     }
 }
