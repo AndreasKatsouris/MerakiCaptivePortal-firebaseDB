@@ -492,8 +492,8 @@ function extractReceiptDetails(fullText) {
  */
 async function fetchActiveBrands() {
     try {
-        const campaignsRef = ref(rtdb, '/campaigns');
-        const snapshot = await get(campaignsRef);
+        // Use simple string path
+        const snapshot = await get(ref('campaigns'));
         const campaigns = snapshot.val();
         
         if (!campaigns) {

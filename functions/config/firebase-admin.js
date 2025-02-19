@@ -20,7 +20,13 @@ const storage = admin.storage();
 const bucket = storage.bucket();
 
 // Database functions
-const ref = (path) => rtdb.ref(path);
+const ref = (path) => {
+    // Ensure path is a string and handle empty/root path
+    const pathString = path ? String(path) : '/';
+    // Remove leading/trailing slashes for consistency
+    const cleanPath = pathString.replace(/^\/+|\/+$/g, '');
+    return rtdb.ref(cleanPath);
+};
 const get = async (ref) => await ref.once('value');
 const set = async (ref, data) => await ref.set(data);
 const update = async (ref, data) => await ref.update(data);
