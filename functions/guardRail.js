@@ -18,9 +18,9 @@ const {
 async function getActiveCampaigns() {
     try {
         console.log('Fetching active campaigns from database');
-        const snapshot = await get(
-            ref(rtdb, 'campaigns')
-        );
+        const dbRef = ref(rtdb, 'campaigns');
+        console.log('Database path:', dbRef.toString());
+        const snapshot = await get(dbRef);
         
         const campaigns = snapshot.val();
         
@@ -30,13 +30,26 @@ async function getActiveCampaigns() {
         }
 
         const campaignArray = Object.entries(campaigns)
-            .filter(([_, campaign]) => campaign.status === 'active')
+            .filter(([_, campaign]) => {
+                const isActive = campaign.status === 'active';
+                if (!isActive) {
+                    console.log(`Campaign ${campaign.name || 'unnamed'} skipped: status is ${campaign.status}`);
+                }
+                return isActive;
+            })
             .map(([id, campaign]) => ({
                 id,
                 ...campaign
             }));
 
-        console.log(`Found ${campaignArray.length} active campaigns`);
+        console.log(`Found ${campaignArray.length} active campaigns:`, 
+            campaignArray.map(c => ({
+                id: c.id,
+                name: c.name,
+                brandName: c.brandName,
+                status: c.status
+            }))
+        );
         return campaignArray;
     } catch (error) {
         console.error('Error fetching active campaigns:', error);
@@ -67,16 +80,32 @@ async function matchReceiptToCampaign(receiptData) {
         }
 
         // Find matching campaigns by brand name
-        const matchingCampaigns = activeCampaigns.filter(campaign => 
-            campaign.brandName.toLowerCase() === receiptData.brandName.toLowerCase()
-        );
+        const matchingCampaigns = activeCampaigns.filter(campaign => {
+            const receiptBrand = receiptData.brandName.toLowerCase();
+            const campaignBrand = campaign.brandName.toLowerCase();
+            const matches = campaignBrand === receiptBrand;
+            if (!matches) {
+                console.log(`Campaign ${campaign.name} (${campaign.brandName}) did not match receipt brand: ${receiptData.brandName}`);
+            }
+            return matches;
+        });
 
         if (matchingCampaigns.length === 0) {
+            console.log('No brand matches found. Receipt brand:', receiptData.brandName);
+            console.log('Available campaign brands:', activeCampaigns.map(c => c.brandName).join(', '));
             return {
                 isValid: false,
                 error: 'No campaigns found for this brand'
             };
         }
+
+        console.log(`Found ${matchingCampaigns.length} brand matches:`, 
+            matchingCampaigns.map(c => ({
+                id: c.id,
+                name: c.name,
+                brandName: c.brandName
+            }))
+        );
 
         // Validate each matching campaign
         const validationResults = await Promise.all(
@@ -86,6 +115,12 @@ async function matchReceiptToCampaign(receiptData) {
         const validMatches = validationResults.filter(result => result.isValid);
 
         if (validMatches.length === 0) {
+            console.log('All campaigns failed validation. Reasons:', 
+                validationResults.map(result => ({
+                    campaignName: result.campaign?.name,
+                    reason: result.failureReason
+                }))
+            );
             return {
                 isValid: false,
                 error: 'Receipt does not meet any campaign requirements',
