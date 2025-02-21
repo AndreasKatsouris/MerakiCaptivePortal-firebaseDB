@@ -4,8 +4,10 @@ const {
     ref, 
     get, 
     set, 
-    push 
-} = require('./config/firebase-config.js');
+    push,
+    storage,
+    bucket 
+} = require('./config/firebase-admin');
 
 /**
  * Process a receipt image with Google Cloud Vision OCR and parse the text

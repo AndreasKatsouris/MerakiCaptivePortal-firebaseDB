@@ -1,11 +1,13 @@
 const { 
+    admin,
+    auth,
     rtdb, 
     ref, 
     get, 
     set, 
     update, 
     push 
-} = require('./config/firebase-config.js');
+} = require('./config/firebase-admin');
 require('dotenv').config();
 const { client, twilioPhone } = require('./twilioClient');
 const { processReceipt } = require('./receiptProcessor');
