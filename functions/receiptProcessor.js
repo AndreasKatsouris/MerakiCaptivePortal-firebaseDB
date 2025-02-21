@@ -4,10 +4,8 @@ const {
     ref, 
     get, 
     set, 
-    push, 
-    storage,
-    bucket 
-} = require('./config/firebase-admin');
+    push 
+} = require('./config/firebase-config.js');
 
 /**
  * Process a receipt image with Google Cloud Vision OCR and parse the text
@@ -612,13 +610,14 @@ async function saveReceiptData(receiptData) {
         };
         
         // Save to receipts collection
-        await set(ref(rtdb, 'receipts/' + receiptId), dataToSave);
+        await set(ref(rtdb, `receipts/${receiptId}`), dataToSave);
         
         // Create guest receipt index
-        await set(ref(rtdb, 'guest-receipts/' + cleanPhoneNumber + '/' + receiptId), {
+        await set(ref(rtdb, `guest-receipts/${cleanPhoneNumber}/${receiptId}`), {
             createdAt: Date.now(),
             totalAmount: receiptData.totalAmount || 0,
-            date: standardizedDate
+            date: standardizedDate,
+            status: dataToSave.status
         });
 
         console.log('Receipt data saved successfully:', {

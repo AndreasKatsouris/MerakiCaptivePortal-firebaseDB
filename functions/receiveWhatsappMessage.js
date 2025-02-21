@@ -1,13 +1,11 @@
 const { 
-    admin, 
-    auth, 
     rtdb, 
     ref, 
     get, 
     set, 
     update, 
     push 
-} = require('./config/firebase-admin');
+} = require('./config/firebase-config.js');
 require('dotenv').config();
 const { client, twilioPhone } = require('./twilioClient');
 const { processReceipt } = require('./receiptProcessor');
@@ -135,7 +133,7 @@ function validateRequest(req) {
  * @returns {Promise<object>} Guest data
  */
 async function getOrCreateGuest(phoneNumber) {
-    const guestRef = rtdb.ref(`guests/${phoneNumber}`);
+    const guestRef = ref(rtdb, `guests/${phoneNumber}`);
     const guestSnapshot = await get(guestRef);
     let guestData = guestSnapshot.val();
 
@@ -160,7 +158,7 @@ async function getOrCreateGuest(phoneNumber) {
 async function handleNameCollection(guestData, body, mediaUrl, res) {
     if (!guestData.name && body && !mediaUrl) {
         const trimmedName = body.trim();
-        await update(rtdb.ref(`guests/${guestData.phoneNumber}`), { name: trimmedName });
+        await update(ref(rtdb, `guests/${guestData.phoneNumber}`), { name: trimmedName });
 
         await sendWhatsAppMessage(
             guestData.phoneNumber,
@@ -513,7 +511,7 @@ async function handleUseRewardCommand(guestData, body, res) {
         }
 
         // Verify reward ownership and status
-        const rewardRef = rtdb.ref(`rewards/${rewardId}`);
+        const rewardRef = ref(rtdb, `rewards/${rewardId}`);
         const snapshot = await get(rewardRef);
         const reward = snapshot.val();
 
@@ -543,7 +541,7 @@ async function handleUseRewardCommand(guestData, body, res) {
 
         // Generate use code and update reward status
         const useCode = generateRewardUseCode();
-        await update(rewardRef, {
+        await update(ref(rtdb, `rewards/${rewardId}`), {
             status: 'pending_use',
             useCode,
             useRequestedAt: admin.database.ServerValue.TIMESTAMP
@@ -572,7 +570,7 @@ async function handleUseRewardCommand(guestData, body, res) {
 async function handleViewRewardsCommand(guestData, res) {
     try {
         // Get user's rewards
-        const snapshot = await get(rtdb.ref('rewards')
+        const snapshot = await get(ref(rtdb, 'rewards')
             .orderByChild('guestPhone')
             .equalTo(guestData.phoneNumber));
 

@@ -5,7 +5,7 @@ const {
     set, 
     update,
     push 
-} = require('./config/firebase-admin');
+} = require('./config/firebase-config.js');
 
 /**
  * Main function to process rewards for a validated receipt
@@ -307,16 +307,18 @@ function calculateExpiryDate(rewardType) {
  */
 async function countUserRewardsForType(phoneNumber, typeId) {
     try {
-        const snapshot = await get(ref(rtdb, 'rewards'));
+        const rewardsRef = ref(rtdb, 'rewards');
+        const snapshot = await get(rewardsRef);
         const rewards = snapshot.val() || {};
         
         return Object.values(rewards).filter(reward => 
             reward.guestPhone === phoneNumber && 
-            reward.typeId === typeId
+            reward.typeId === typeId && 
+            reward.status !== 'expired'
         ).length;
     } catch (error) {
         console.error('Error counting user rewards:', error);
-        throw new Error('Failed to count user rewards');
+        return 0;
     }
 }
 
@@ -366,9 +368,11 @@ async function rollbackRewards(rewards, phoneNumber, campaignId) {
             // Remove from campaign-rewards index
             await set(ref(rtdb, `campaign-rewards/${campaignId}/${reward.id}`), null);
         }
+        
+        console.log('Successfully rolled back rewards:', rewards.map(r => r.id));
     } catch (error) {
-        console.error('Rollback failed:', error);
-        throw new Error('Reward rollback failed - manual cleanup required');
+        console.error('Failed to rollback rewards:', error);
+        throw new Error('Manual intervention required: Reward rollback failed');
     }
 }
 

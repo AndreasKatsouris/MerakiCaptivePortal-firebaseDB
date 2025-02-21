@@ -6,7 +6,7 @@ const {
     set, 
     update,
     push 
-} = require('./config/firebase-admin');
+} = require('./config/firebase-config.js');
 
 /**
  * Retrieves all active campaigns from the database
@@ -165,9 +165,21 @@ async function matchReceiptToCampaign(receiptData) {
  * @returns {Promise<object>} Validation result with eligible reward types
  */
 async function validateAgainstCampaign(receiptData, campaign) {
+    // Create a clean copy of campaign data without receipt data
+    const cleanCampaign = {
+        id: campaign.id,
+        name: campaign.name,
+        brandName: campaign.brandName,
+        storeName: campaign.storeName,
+        status: campaign.status,
+        startDate: campaign.startDate,
+        endDate: campaign.endDate,
+        rewardTypes: campaign.rewardTypes
+    };
+
     console.log('Starting validation for campaign:', {
-        campaignName: campaign.name,
-        campaignId: campaign.id,
+        campaignName: cleanCampaign.name,
+        campaignId: cleanCampaign.id,
         receipt: {
             date: receiptData.date,
             store: receiptData.storeName,
@@ -178,7 +190,7 @@ async function validateAgainstCampaign(receiptData, campaign) {
     
     const result = {
         isValid: false,
-        campaign,
+        campaign: cleanCampaign,
         eligibleRewardTypes: [],
         matchedCriteria: [],
         failureReason: null
@@ -186,15 +198,15 @@ async function validateAgainstCampaign(receiptData, campaign) {
 
     try {
         // Validate basic campaign criteria
-        if (!validateBasicCriteria(receiptData, campaign)) {
-            result.failureReason = campaign.lastFailureReason;
+        if (!validateBasicCriteria(receiptData, cleanCampaign)) {
+            result.failureReason = cleanCampaign.lastFailureReason;
             console.log('Basic criteria validation failed:', {
-                campaignName: campaign.name,
-                reason: campaign.lastFailureReason,
+                campaignName: cleanCampaign.name,
+                reason: cleanCampaign.lastFailureReason,
                 receiptStore: receiptData.storeName,
-                campaignStore: campaign.storeName,
+                campaignStore: cleanCampaign.storeName,
                 receiptAmount: receiptData.totalAmount,
-                minRequired: campaign.minPurchaseAmount
+                minRequired: cleanCampaign.minPurchaseAmount
             });
             return result;
         }
@@ -203,19 +215,18 @@ async function validateAgainstCampaign(receiptData, campaign) {
         result.matchedCriteria.push('store_match');
 
         // Validate campaign date and time criteria
-        if (!validateDateTimeCriteria(receiptData, campaign)) {
+        if (!validateDateTimeCriteria(receiptData, cleanCampaign)) {
             result.failureReason = 'Receipt date/time outside campaign window';
-
             return result;
         }
 
         result.matchedCriteria.push('date_time_match');
 
         // Get eligible reward types
-        const eligibleTypes = await validateRewardTypes(receiptData, campaign);
+        const eligibleTypes = await validateRewardTypes(receiptData, cleanCampaign);
         console.log('Reward types validation result:', {
-            campaignName: campaign.name,
-            totalTypes: campaign.rewardTypes?.length || 0,
+            campaignName: cleanCampaign.name,
+            totalTypes: cleanCampaign.rewardTypes?.length || 0,
             eligibleCount: eligibleTypes.length,
             eligibleTypes: eligibleTypes.map(type => ({
                 typeId: type.typeId,
@@ -226,9 +237,9 @@ async function validateAgainstCampaign(receiptData, campaign) {
         if (eligibleTypes.length === 0) {
             result.failureReason = 'No eligible reward types found';
             console.log('No eligible reward types found for campaign:', {
-                campaignName: campaign.name,
+                campaignName: cleanCampaign.name,
                 receiptAmount: receiptData.totalAmount,
-                rewardTypes: campaign.rewardTypes?.map(type => ({
+                rewardTypes: cleanCampaign.rewardTypes?.map(type => ({
                     typeId: type.typeId,
                     minPurchase: type.criteria?.minPurchaseAmount,
                     maxRewards: type.criteria?.maxRewards
@@ -242,7 +253,7 @@ async function validateAgainstCampaign(receiptData, campaign) {
         result.matchedCriteria.push('reward_types_match');
         
         console.log('Campaign validation successful:', {
-            campaignName: campaign.name,
+            campaignName: cleanCampaign.name,
             matchedCriteria: result.matchedCriteria,
             eligibleRewardCount: eligibleTypes.length
         });
@@ -252,7 +263,7 @@ async function validateAgainstCampaign(receiptData, campaign) {
     } catch (error) {
         console.error('Error in validateAgainstCampaign:', {
             error: error.message,
-            campaignName: campaign.name,
+            campaignName: cleanCampaign.name,
             receiptData: {
                 date: receiptData.date,
                 store: receiptData.storeName,
@@ -626,9 +637,8 @@ async function validateMaximumRewards(criteria, receiptData, rewardType) {
  */
 async function getUserRewardTypeCount(phoneNumber, rewardTypeId) {
     try {
-        const snapshot = await get(
-            ref(rtdb, 'rewards')
-        );
+        const rewardsRef = ref(rtdb, `rewards`);
+        const snapshot = await get(rewardsRef);
         
         const rewards = snapshot.val() || {};
         
