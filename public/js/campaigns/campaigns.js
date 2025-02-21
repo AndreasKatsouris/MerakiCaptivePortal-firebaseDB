@@ -105,12 +105,43 @@ export function initializeCampaignManagement() {
                 this.loading = true;
                 this.error = null;
                 try {
+                    // Validate campaign data
+                    if (!campaignData.name || !campaignData.brandName || !campaignData.status) {
+                        throw new Error('Missing required campaign fields');
+                    }
+
+                    // Clean up any incorrect data in the campaigns node
+                    const campaignsRef = ref(rtdb, 'campaigns');
+                    const snapshot = await get(campaignsRef);
+                    const campaigns = snapshot.val();
+
+                    if (campaigns) {
+                        const updates = {};
+                        Object.entries(campaigns).forEach(([key, value]) => {
+                            // Remove entries that don't have required campaign fields
+                            if (!value.name || !value.brandName || !value.status) {
+                                updates[key] = null;
+                            }
+                        });
+
+                        if (Object.keys(updates).length > 0) {
+                            console.log('Cleaning up invalid campaign data:', updates);
+                            await update(campaignsRef, updates);
+                        }
+                    }
+
+                    // Create the new campaign
                     const newCampaignRef = push(ref(rtdb, 'campaigns'));
-                    await set(newCampaignRef, {
+                    const campaignWithMeta = {
                         ...campaignData,
                         createdAt: new Date().toISOString(),
-                        createdBy: auth.currentUser.uid
-                    });
+                        createdBy: auth.currentUser.uid,
+                        status: 'active' // Ensure status is set to active
+                    };
+
+                    console.log('Creating new campaign:', campaignWithMeta);
+                    await set(newCampaignRef, campaignWithMeta);
+                    
                     await this.loadCampaigns();
                     this.resetForm();
                 } catch (error) {
