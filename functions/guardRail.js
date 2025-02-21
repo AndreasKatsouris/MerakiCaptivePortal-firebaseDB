@@ -18,19 +18,25 @@ const {
 async function getActiveCampaigns() {
     try {
         console.log('Fetching active campaigns from database');
-        const dbRef = ref(rtdb, 'campaigns');
-        console.log('Database path:', dbRef.toString());
-        const snapshot = await get(dbRef);
+        const campaignsRef = ref(rtdb, 'campaigns');
+        console.log('Database path:', campaignsRef.toString());
+        const snapshot = await get(campaignsRef);
         
         const campaigns = snapshot.val();
         
         if (!campaigns) {
-            console.warn('No active campaigns found in database');
+            console.warn('No campaigns found in database');
             return [];
         }
 
+        console.log('Raw campaigns data:', campaigns);
+
         const campaignArray = Object.entries(campaigns)
             .filter(([_, campaign]) => {
+                if (!campaign.status) {
+                    console.log(`Campaign ${campaign.name || 'unnamed'} has no status field`);
+                    return false;
+                }
                 const isActive = campaign.status === 'active';
                 if (!isActive) {
                     console.log(`Campaign ${campaign.name || 'unnamed'} skipped: status is ${campaign.status}`);
@@ -42,7 +48,7 @@ async function getActiveCampaigns() {
                 ...campaign
             }));
 
-        console.log(`Found ${campaignArray.length} active campaigns:`, 
+        console.log('Found active campaigns:', 
             campaignArray.map(c => ({
                 id: c.id,
                 name: c.name,
