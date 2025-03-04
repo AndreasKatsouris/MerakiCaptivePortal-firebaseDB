@@ -7,7 +7,7 @@ const {
     push,
     storage,
     bucket 
-} = require('./config/firebase-admin');
+} = require('./config/firebase-admin.js');
 
 /**
  * Process a receipt image with Google Cloud Vision OCR and parse the text

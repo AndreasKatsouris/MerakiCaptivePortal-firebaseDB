@@ -135,14 +135,18 @@ function validateRequest(req) {
  * @returns {Promise<object>} Guest data
  */
 async function getOrCreateGuest(phoneNumber) {
-    const guestRef = ref(rtdb, `guests/${phoneNumber}`);
+    // Strip 'whatsapp:' prefix for database storage
+    const cleanPhone = phoneNumber.replace('whatsapp:', '');
+    console.log('Getting/creating guest record for:', cleanPhone);
+    
+    const guestRef = ref(rtdb, `guests/${cleanPhone}`);
     const guestSnapshot = await get(guestRef);
     let guestData = guestSnapshot.val();
 
     if (!guestData) {
-        guestData = { phoneNumber, createdAt: Date.now() };
+        guestData = { phoneNumber: cleanPhone, createdAt: Date.now() };
         await set(guestRef, guestData);
-        console.log(`New guest added: ${phoneNumber}`);
+        console.log(`New guest added: ${cleanPhone}`);
     } else {
         console.log(`Returning guest: ${guestData.name || 'Guest'}`);
     }
@@ -158,22 +162,32 @@ async function getOrCreateGuest(phoneNumber) {
  * @param {object} res - Response object
  */
 async function handleNameCollection(guestData, body, mediaUrl, res) {
-    if (!guestData.name && body && !mediaUrl) {
-        const trimmedName = body.trim();
-        await update(ref(rtdb, `guests/${guestData.phoneNumber}`), { name: trimmedName });
+    try {
+        if (!guestData.phoneNumber) {
+            console.error('Missing phone number in guest data:', guestData);
+            return res.status(400).send('Invalid guest data');
+        }
+
+        if (!guestData.name && body && !mediaUrl) {
+            const trimmedName = body.trim();
+            await update(ref(rtdb, `guests/${guestData.phoneNumber}`), { name: trimmedName });
+
+            await sendWhatsAppMessage(
+                guestData.phoneNumber,
+                `Thank you, ${trimmedName}! Your profile has been updated.\n\n${getHelpMessage()}`
+            );
+            return res.status(200).send('Guest name updated.');
+        }
 
         await sendWhatsAppMessage(
             guestData.phoneNumber,
-            `Thank you, ${trimmedName}! Your profile has been updated.\n\n${getHelpMessage()}`
+            "Welcome! Please reply with your full name to complete your profile."
         );
-        return res.status(200).send('Guest name updated.');
+        return res.status(200).send('Prompted guest for name.');
+    } catch (error) {
+        console.error('Error in handleNameCollection:', error);
+        return res.status(500).send('Failed to handle name collection');
     }
-
-    await sendWhatsAppMessage(
-        guestData.phoneNumber,
-        "Welcome! Please reply with your full name to complete your profile."
-    );
-    return res.status(200).send('Prompted guest for name.');
 }
 
 /**
@@ -711,15 +725,28 @@ async function handleError(error, from, res) {
 
 /**
  * Send WhatsApp message
- * @param {string} to - Recipient phone number
+ * @param {string} to - Recipient phone number (E.164 format without whatsapp: prefix)
  * @param {string} message - Message to send
  */
 async function sendWhatsAppMessage(to, message) {
-    await client.messages.create({
-        body: message,
-        from: `whatsapp:${twilioPhone}`,
-        to: `whatsapp:${to}`
-    });
+    try {
+        if (!to) {
+            throw new Error('Phone number is required');
+        }
+
+        // Ensure proper WhatsApp format
+        const whatsappTo = to.startsWith('whatsapp:') ? to : `whatsapp:${to}`;
+        
+        console.log('Sending WhatsApp message to:', whatsappTo);
+        await client.messages.create({
+            body: message,
+            from: `whatsapp:${twilioPhone}`,
+            to: whatsappTo
+        });
+    } catch (error) {
+        console.error('Error sending WhatsApp message:', error);
+        throw error;
+    }
 }
 
 /**

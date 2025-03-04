@@ -6,7 +6,7 @@ const {
     set, 
     update,
     push 
-} = require('./config/firebase-admin');
+} = require('./config/firebase-admin.js');
 
 /**
  * Retrieves all active campaigns from the database
