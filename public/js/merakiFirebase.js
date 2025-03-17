@@ -281,9 +281,6 @@ document.addEventListener('DOMContentLoaded', function() {
                         
                         console.log('WiFi LOGIN DEBUG: Original base_grant_url:', base_grant_url);
                         
-                        // Decode the URL parameters first to make sure they're not double-encoded
-                        console.log('WiFi LOGIN DEBUG: Original base_grant_url:', base_grant_url);
-                        
                         // Decode the URLs
                         let decodedBaseGrantUrl = base_grant_url;
                         let decodedContinueUrl = user_continue_url;
@@ -303,48 +300,43 @@ document.addEventListener('DOMContentLoaded', function() {
                             console.error('WiFi LOGIN DEBUG: Error decoding URLs:', e);
                         }
                         
-                        // According to Meraki documentation, try both formats
-                        // Format 1: Add parameters directly to the URL
+                        // According to Meraki documentation for Click-through Splash Page with EXCAP:
+                        // The authentication URL must point to grant URL with continue_url parameter
+                        
+                        // Format the URL exactly as specified in the Meraki documentation
+                        // "The page must contain an authentication URL pointing to grant URL appended with the continue_url parameter"
+                        
                         let redirectUrl = '';
+                        
                         try {
-                            const baseUrl = new URL(decodedBaseGrantUrl);
-                            console.log('WiFi LOGIN DEBUG: URL parsing successful:', baseUrl.href);
+                            // Per Meraki docs, we need to append continue_url to the base_grant_url
+                            // Format: [base_grant_url]?continue_url=[user_continue_url]
+                            redirectUrl = `${decodedBaseGrantUrl}?continue_url=${encodeURIComponent(decodedContinueUrl)}`;
                             
-                            // IMPORTANT: Try duration first, then continue_url - this order matters for Meraki
-                            baseUrl.searchParams.append('duration', duration.toString());
-                            
-                            if (decodedContinueUrl) {
-                                baseUrl.searchParams.append('continue_url', decodedContinueUrl);
-                                console.log('WiFi LOGIN DEBUG: Added continue_url parameter:', decodedContinueUrl);
+                            // Only add the duration parameter if continue_url is already added (as it's less important)
+                            if (duration) {
+                                redirectUrl += `&duration=${duration}`;
                             }
                             
-                            console.log('WiFi LOGIN DEBUG: Added duration parameter:', duration);
-                            
-                            redirectUrl = baseUrl.href;
-                            console.log('WiFi LOGIN DEBUG: FINAL Redirect URL:', redirectUrl);
+                            console.log('WiFi LOGIN DEBUG: FINAL Redirect URL (per Meraki docs):', redirectUrl);
                         } catch (error) {
-                            console.error('WiFi LOGIN DEBUG: URL parsing failed:', error);
+                            console.error('WiFi LOGIN DEBUG: URL construction failed:', error);
                         }
                         
-                        // Create fallback URLs with different formats
+                        // Create fallback URLs with different formats based on Meraki documentation
                         
-                        // Format 2: Try with slash before query params
-                        const fallbackUrl = decodedBaseGrantUrl.endsWith('/')
-                            ? `${decodedBaseGrantUrl}?duration=${duration}${decodedContinueUrl ? `&continue_url=${encodeURIComponent(decodedContinueUrl)}` : ''}`
-                            : `${decodedBaseGrantUrl}/?duration=${duration}${decodedContinueUrl ? `&continue_url=${encodeURIComponent(decodedContinueUrl)}` : ''}`;
-                        console.log('WiFi LOGIN DEBUG: Fallback URL:', fallbackUrl);
+                        // Fallback 1: Try the exact documented format from Meraki
+                        const docFormat = `${decodedBaseGrantUrl}?continue_url=${encodeURIComponent(decodedContinueUrl)}${duration ? `&duration=${duration}` : ''}`;
+                        console.log('WiFi LOGIN DEBUG: Documentation format URL:', docFormat);
                         
-                        // Format 3: Try alternative parameter order
-                        const altFormatUrl = `${decodedBaseGrantUrl}?duration=${duration}${decodedContinueUrl ? `&continue_url=${encodeURIComponent(decodedContinueUrl)}` : ''}`;
-                        console.log('WiFi LOGIN DEBUG: Alternative format URL:', altFormatUrl);
-                        
-                        // Format 4: Try another format specific to Meraki captive portal
-                        const merakiFormat = `${decodedBaseGrantUrl}?duration=${duration}${decodedContinueUrl ? `&continue_url=${encodeURIComponent(decodedContinueUrl)}` : ''}`;
+                        // Fallback 2: Try with just continue_url (most essential parameter)
+                        const continueOnlyUrl = `${decodedBaseGrantUrl}?continue_url=${encodeURIComponent(decodedContinueUrl)}`;
+                        console.log('WiFi LOGIN DEBUG: Continue-only URL:', continueOnlyUrl);
                         
                         // Store all URLs in localStorage for emergency fallbacks
-                        localStorage.setItem('merakiRedirectUrl', redirectUrl || altFormatUrl);
-                        localStorage.setItem('merakiFallbackUrl', fallbackUrl);
-                        localStorage.setItem('merakiAltFormatUrl', altFormatUrl);
+                        localStorage.setItem('merakiRedirectUrl', redirectUrl);
+                        localStorage.setItem('merakiDocFormat', docFormat);
+                        localStorage.setItem('merakiContinueOnly', continueOnlyUrl);
                         
                         // Log WiFi connection to analytics
                         try {
@@ -366,21 +358,21 @@ document.addEventListener('DOMContentLoaded', function() {
                         // First attempt - Primary URL with a delay for the success message
                         setTimeout(() => {
                             // Try our primary redirect URL first
-                            console.log('WiFi LOGIN DEBUG: Now redirecting to:', redirectUrl || altFormatUrl);
-                            window.location.href = redirectUrl || altFormatUrl;
+                            console.log('WiFi LOGIN DEBUG: Now redirecting to:', redirectUrl);
+                            window.location.href = redirectUrl;
                             
                             // Set up fallbacks if the first redirect doesn't work
                             setTimeout(() => {
                                 console.log('WiFi LOGIN DEBUG: First redirect timed out, trying fallback format...');
                                 // Try fallback URL if the first one fails
                                 console.log('WiFi LOGIN DEBUG: Now trying fallback URL format...');
-                                window.location.href = merakiFormat;
+                                window.location.href = docFormat;
                                 
                                 // Last resort fallback
                                 setTimeout(() => {
                                     console.log('WiFi LOGIN DEBUG: All redirects failed, trying raw base_grant_url with parameters');
                                     // Try just the raw base_grant_url with minimal parameters as last resort
-                                    const lastResortUrl = `${decodedBaseGrantUrl}?duration=${duration}`;
+                                    const lastResortUrl = `${decodedBaseGrantUrl}?continue_url=${encodeURIComponent(decodedContinueUrl)}`;
                                     window.location.href = lastResortUrl;
                                 }, 2000);
                             }, 2000);
