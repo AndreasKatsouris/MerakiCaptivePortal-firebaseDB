@@ -54,6 +54,7 @@ document.addEventListener('DOMContentLoaded', function() {
     const form = document.querySelector('#loginForm');
     const nameInput = document.querySelector('#username');
     const emailInput = document.querySelector('#email');
+    //const phoneInputField = document.querySelector('#phone');
     const tableInput = document.querySelector('#table');
     const termsCheckbox = document.querySelector('#terms');
     const errorContainer = document.querySelector('#error-container');
@@ -223,15 +224,29 @@ document.addEventListener('DOMContentLoaded', function() {
                     .then(sessionID => {
                         // Redirect to Meraki auth URL
                         const duration = 3600; // 1 hour session duration
-                        let loginUrl = base_grant_url;
                         
-                        if (user_continue_url && user_continue_url !== "undefined") {
-                            // Add the user's intended website to the login parameters
-                            loginUrl += "?continue_url=" + encodeURIComponent(user_continue_url) + 
-                                      "&duration=" + duration;
-                        } else {
-                            loginUrl += "?duration=" + duration;
+                        // Make sure base_grant_url is valid
+                        if (!base_grant_url || base_grant_url === "undefined") {
+                            displayError('Missing Meraki authentication URL. Please refresh the page and try again.');
+                            return;
                         }
+                        
+                        // Clean and sanitize the URL
+                        let loginUrl = base_grant_url.trim();
+                        
+                        // Check if the URL already has query parameters
+                        const hasQueryParams = loginUrl.includes('?');
+                        const paramConnector = hasQueryParams ? '&' : '?';
+                        
+                        // Build the parameters separately
+                        let params = new URLSearchParams();
+                        if (user_continue_url && user_continue_url !== "undefined") {
+                            params.append('continue_url', user_continue_url);
+                        }
+                        params.append('duration', duration.toString());
+                        
+                        // Append params to the URL using the correct connector
+                        loginUrl += paramConnector + params.toString();
                         
                         console.log('Redirecting to:', loginUrl);
                         

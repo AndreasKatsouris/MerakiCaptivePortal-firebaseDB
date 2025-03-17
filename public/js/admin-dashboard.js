@@ -1,4 +1,4 @@
-import { auth, functions, httpsCallable } from './config/firebase-config.js';
+import { auth, functions, httpsCallable, rtdb, ref, remove } from './config/firebase-config.js';
 import { AdminClaims } from './auth/admin-claims.js';
 import { AdminUserManagement } from './admin/user-management.js';
 import { initializeDashboard } from './dashboard.js';
@@ -400,36 +400,74 @@ class AdminDashboard {
 
     async handleClearScanningData() {
         try {
+            // Use SweetAlert2 (Swal) which is already loaded in the HTML
+            if (!window.Swal) {
+                console.error('SweetAlert2 library not loaded');
+                alert('An error occurred. Please refresh the page and try again.');
+                return;
+            }
+
+            // Confirm before proceeding
+            const confirmation = await Swal.fire({
+                title: 'Clear Scanning Data?',
+                text: 'This will permanently delete all scanning data. This action cannot be undone.',
+                icon: 'warning',
+                showCancelButton: true,
+                confirmButtonColor: '#d33',
+                cancelButtonColor: '#3085d6',
+                confirmButtonText: 'Yes, delete it!'
+            });
+
+            if (!confirmation.isConfirmed) {
+                return;
+            }
+
+            // Show loading state
             Swal.fire({
                 title: 'Processing...',
                 text: 'Clearing scanning data...',
                 allowOutsideClick: false,
                 allowEscapeKey: false,
                 showConfirmButton: false,
-                willOpen: () => {
+                didOpen: () => {
                     Swal.showLoading();
                 }
             });
 
-            const clearScanningDataFunction = httpsCallable(functions, 'clearScanningData');
-            const result = await clearScanningDataFunction();
+            try {
+                // Direct database operation for immediate feedback
+                await remove(ref(rtdb, 'scanningData'));
+                
+                // Also try to call the Cloud Function if it exists
+                try {
+                    const clearScanningDataFunction = httpsCallable(functions, 'clearScanningData');
+                    await clearScanningDataFunction();
+                } catch (functionError) {
+                    console.warn('Cloud function not available, using direct database operation only', functionError);
+                }
 
-            if (result.data.success) {
+                // Show success message
                 await Swal.fire({
                     title: 'Success!',
                     text: 'Scanning data has been cleared successfully.',
                     icon: 'success'
                 });
-            } else {
-                throw new Error(result.data.error || 'Unknown error occurred');
+            } catch (error) {
+                throw new Error(`Failed to clear scanning data: ${error.message}`);
             }
         } catch (error) {
             console.error('Error clearing scanning data:', error);
-            await Swal.fire({
-                title: 'Error',
-                text: 'Failed to clear scanning data: ' + error.message,
-                icon: 'error'
-            });
+            
+            // Show error message using SweetAlert2 if available, otherwise fallback to alert
+            if (window.Swal) {
+                await Swal.fire({
+                    title: 'Error',
+                    text: error.message || 'An unknown error occurred',
+                    icon: 'error'
+                });
+            } else {
+                alert(`Error: ${error.message || 'An unknown error occurred'}`);
+            }
         }
     }
 
