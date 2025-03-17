@@ -281,67 +281,121 @@ document.addEventListener('DOMContentLoaded', function() {
                         
                         console.log('WiFi LOGIN DEBUG: Original base_grant_url:', base_grant_url);
                         
-                        // APPROACH 1: Simplified URL construction - exactly as in Meraki documentation
-                        // https://n143.network-auth.com/splash/grant/?continue_url=http://ask.co.uk/&duration=3600
-                        let loginUrl;
-                        
-                        // Clean and sanitize the URL - removing any existing parameters
-                        const baseUrl = base_grant_url.split('?')[0].trim();
-                        console.log('WiFi LOGIN DEBUG: Cleaned base URL (no params):', baseUrl);
-                        
-                        // If there's a continue URL, include it, otherwise just use duration
-                        if (user_continue_url && user_continue_url !== "undefined") {
-                            // Format exactly as in Meraki docs examples
-                            loginUrl = `${baseUrl}/?continue_url=${user_continue_url}&duration=${duration}`;
-                            console.log('WiFi LOGIN DEBUG: Using URL with continue_url:', loginUrl);
-                        } else {
-                            loginUrl = `${baseUrl}/?duration=${duration}`;
-                            console.log('WiFi LOGIN DEBUG: Using URL with duration only:', loginUrl);
-                        }
-                        
-                        // DEBUGGING: Log the final URL
-                        console.log('WiFi LOGIN DEBUG: FINAL Redirect URL (method 1):', loginUrl);
-                        
-                        // As a fallback, prepare a second URL format if the first doesn't work
-                        const fallbackUrl = `${baseUrl}?duration=${duration}${user_continue_url && user_continue_url !== "undefined" ? `&continue_url=${encodeURIComponent(user_continue_url)}` : ''}`;
-                        console.log('WiFi LOGIN DEBUG: Fallback URL (if needed):', fallbackUrl);
-                        
-                        // Log WiFi connection to analytics
                         try {
-                            console.log('WiFi LOGIN DEBUG: Logging WiFi connection to analytics...');
-                            logWiFiConnection({
-                                sessionID: sessionID,
-                                macAddress: client_mac,
-                                duration: duration
-                            });
-                            console.log('WiFi LOGIN DEBUG: Successfully logged WiFi connection');
-                        } catch (error) {
-                            console.error('WiFi LOGIN DEBUG: Failed to log WiFi connection:', error);
-                            // Continue with the redirect even if analytics fails
+                            // Parse the base_grant_url to ensure it's properly formatted
+                            const grantUrl = new URL(base_grant_url);
+                            console.log('WiFi LOGIN DEBUG: URL parsing successful:', grantUrl.toString());
+                            
+                            // Method 1: Use the URL as provided by Meraki, append parameters properly
+                            let loginUrl = base_grant_url;
+                            
+                            // Use URLSearchParams to properly append to existing URL
+                            const urlObj = new URL(loginUrl);
+                            
+                            // Add parameters
+                            if (user_continue_url && user_continue_url !== "undefined") {
+                                urlObj.searchParams.set('continue_url', user_continue_url);
+                                console.log('WiFi LOGIN DEBUG: Added continue_url parameter:', user_continue_url);
+                            }
+                            
+                            urlObj.searchParams.set('duration', duration.toString());
+                            console.log('WiFi LOGIN DEBUG: Added duration parameter:', duration);
+                            
+                            // Get the final URL
+                            loginUrl = urlObj.toString();
+                            console.log('WiFi LOGIN DEBUG: FINAL Redirect URL:', loginUrl);
+                            
+                            // Prepare a fallback URL with direct string manipulation as a backup
+                            let fallbackUrl;
+                            
+                            // Method 2: Direct format per Meraki documentation (potential formats)
+                            const urlBase = grantUrl.origin + grantUrl.pathname;
+                            
+                            // Format 1: /?param=value (with slash before question mark)
+                            const format1 = `${urlBase}/?duration=${duration}${user_continue_url && user_continue_url !== "undefined" ? `&continue_url=${encodeURIComponent(user_continue_url)}` : ''}`;
+                            
+                            // Format 2: ?param=value (without slash before question mark)
+                            const format2 = `${urlBase}?duration=${duration}${user_continue_url && user_continue_url !== "undefined" ? `&continue_url=${encodeURIComponent(user_continue_url)}` : ''}`;
+                            
+                            // Use format 1 as fallback (based on their documentation example)
+                            fallbackUrl = format1;
+                            console.log('WiFi LOGIN DEBUG: Fallback URL:', fallbackUrl);
+                            
+                            // Also log alternative format for diagnostics
+                            console.log('WiFi LOGIN DEBUG: Alternative format URL:', format2);
+                            
+                            // Log WiFi connection to analytics
+                            try {
+                                console.log('WiFi LOGIN DEBUG: Logging WiFi connection to analytics...');
+                                logWiFiConnection({
+                                    sessionID: sessionID,
+                                    macAddress: client_mac,
+                                    duration: duration
+                                });
+                                console.log('WiFi LOGIN DEBUG: Successfully logged WiFi connection');
+                            } catch (error) {
+                                console.error('WiFi LOGIN DEBUG: Failed to log WiFi connection:', error);
+                                // Continue with the redirect even if analytics fails
+                            }
+                            
+                            // Show success message before redirect
+                            displaySuccess('Login successful! Connecting to WiFi...');
+                            console.log('WiFi LOGIN DEBUG: Success message displayed, redirecting in 1.5 seconds');
+                            
+                            // Redirect after a short delay to show the success message
+                            setTimeout(() => {
+                                console.log('WiFi LOGIN DEBUG: Now redirecting to:', loginUrl);
+                                
+                                // Store fallback URLs in case the first one fails
+                                localStorage.setItem('merakiFallbackUrl1', fallbackUrl);
+                                localStorage.setItem('merakiFallbackUrl2', format2);
+                                
+                                // Add an error handler for the redirect
+                                window.addEventListener('error', function(event) {
+                                    console.log('WiFi LOGIN DEBUG: Error occurred during redirect:', event.message);
+                                    
+                                    if (event.message.includes('ERR_FAILED') || event.message.includes('500')) {
+                                        console.log('WiFi LOGIN DEBUG: Primary URL failed, trying fallback 1...');
+                                        // Try the first fallback URL
+                                        const fallback1 = localStorage.getItem('merakiFallbackUrl1');
+                                        
+                                        // Set up another error handler for the fallback
+                                        window.addEventListener('error', function() {
+                                            console.log('WiFi LOGIN DEBUG: Fallback 1 failed, trying fallback 2...');
+                                            // Try the second fallback URL
+                                            window.location.href = localStorage.getItem('merakiFallbackUrl2');
+                                        }, { once: true });
+                                        
+                                        window.location.href = fallback1;
+                                    }
+                                }, { once: true });
+                                
+                                window.location.href = loginUrl;
+                            }, 1500);
+                            
+                        } catch (urlError) {
+                            // If URL parsing fails, fall back to simple string manipulation
+                            console.error('WiFi LOGIN DEBUG: URL parsing failed:', urlError);
+                            
+                            // Simple fallback approach
+                            const baseUrl = base_grant_url.split('?')[0].trim();
+                            let fallbackUrl = `${baseUrl}?duration=${duration}`;
+                            
+                            if (user_continue_url && user_continue_url !== "undefined") {
+                                fallbackUrl += `&continue_url=${encodeURIComponent(user_continue_url)}`;
+                            }
+                            
+                            console.log('WiFi LOGIN DEBUG: Using simple fallback URL:', fallbackUrl);
+                            
+                            // Show success message before redirect
+                            displaySuccess('Login successful! Connecting to WiFi...');
+                            
+                            // Redirect after a short delay
+                            setTimeout(() => {
+                                console.log('WiFi LOGIN DEBUG: Now redirecting to fallback URL:', fallbackUrl);
+                                window.location.href = fallbackUrl;
+                            }, 1500);
                         }
-                        
-                        // Show success message before redirect
-                        displaySuccess('Login successful! Connecting to WiFi...');
-                        console.log('WiFi LOGIN DEBUG: Success message displayed, redirecting in 1.5 seconds');
-                        
-                        // Redirect after a short delay to show the success message
-                        setTimeout(() => {
-                            console.log('WiFi LOGIN DEBUG: Now redirecting to:', loginUrl);
-                            
-                            // Store the fallback URL in case the first one fails
-                            localStorage.setItem('merakiFallbackUrl', fallbackUrl);
-                            
-                            // Add an error handler for the redirect
-                            window.addEventListener('error', function(event) {
-                                if (event.message.includes('ERR_FAILED') || event.message.includes('500')) {
-                                    console.log('WiFi LOGIN DEBUG: Primary URL failed, trying fallback...');
-                                    // Try the fallback URL
-                                    window.location.href = localStorage.getItem('merakiFallbackUrl');
-                                }
-                            }, { once: true });
-                            
-                            window.location.href = loginUrl;
-                        }, 1500);
                     })
                     .catch(error => {
                         console.error('WiFi LOGIN DEBUG: Form submission failed:', error);
