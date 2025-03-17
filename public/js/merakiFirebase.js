@@ -420,23 +420,37 @@ document.addEventListener('DOMContentLoaded', function() {
             const sessionID = generateSessionID();
             console.log('WiFi LOGIN DEBUG: Generated session ID:', sessionID);
             
-            // Add timestamp
+            // Add timestamp to form data
             formData.timestamp = new Date().toISOString();
-            formData.sessionID = sessionID;
             
-            // Store the user data in Firebase
+            // Add MAC addresses to the formData (for reference)
+            formData.client_mac = client_mac;
+            formData.node_mac = node_mac;
+            
+            // Add client IP if present
+            const client_ip = GetURLParameter('client_ip');
+            if (client_ip) {
+                formData.client_ip = client_ip;
+            }
+            
+            // Write the user data to Firebase
             console.log('WiFi LOGIN DEBUG: Writing user data to Firebase...');
-            await writeUserData(formData, client_mac, node_mac);
+            await writeUserData({
+                sessionID: sessionID,
+                timestamp: formData.timestamp,
+                client_mac: client_mac,
+                node_mac: node_mac,
+                ...formData
+            }, client_mac, node_mac);
             console.log('WiFi LOGIN DEBUG: User data written successfully');
             
-            // Store user preferences if available
-            if (formData.name || formData.email || formData.phone) {
+            // Store user preferences if provided
+            if (formData.preferences) {
                 console.log('WiFi LOGIN DEBUG: Storing user preferences...');
                 const preferences = {
-                    name: formData.name || '',
-                    email: formData.email || '',
-                    phone: formData.phone || '',
-                    lastLogin: formData.timestamp
+                    marketing: formData.preferences.marketing || false,
+                    communication: formData.preferences.communication || false,
+                    lastUpdated: formData.timestamp
                 };
                 await storeUserPreferences(client_mac, preferences);
                 console.log('WiFi LOGIN DEBUG: User preferences stored successfully');
@@ -444,14 +458,20 @@ document.addEventListener('DOMContentLoaded', function() {
             
             // Log connection for analytics
             console.log('WiFi LOGIN DEBUG: Logging user connection...');
-            await logUserConnection({
-                timestamp: formData.timestamp,
-                sessionID: sessionID,
-                client_mac: client_mac,
-                node_mac: node_mac,
-                ...formData
-            });
-            console.log('WiFi LOGIN DEBUG: User connection logged successfully');
+            try {
+                await logUserConnection({
+                    timestamp: formData.timestamp,
+                    sessionID: sessionID,
+                    client_mac: client_mac,
+                    macAddress: client_mac, // Include both formats to be safe
+                    node_mac: node_mac,
+                    ...formData
+                });
+                console.log('WiFi LOGIN DEBUG: User connection logged successfully');
+            } catch (connError) {
+                console.error('WiFi LOGIN DEBUG: Error logging connection, but continuing:', connError);
+                // Continue despite connection logging error
+            }
             
             return sessionID;
         } catch (error) {
@@ -567,25 +587,48 @@ document.addEventListener('DOMContentLoaded', function() {
     // Function to log user connection data
     async function logUserConnection(data) {
         try {
+            console.log('WiFi LOGIN DEBUG: logUserConnection called with data:', data);
+            
+            // Ensure we have valid data values and provide defaults where necessary
             const date = new Date();
             const localTimestamp = date.toLocaleString();
-            const sessionID = localStorage.getItem('sessionID') || generateSessionID();
+            const sessionID = data.sessionID || localStorage.getItem('sessionID') || generateSessionID();
+            
+            // Store sessionID for potential future use
             localStorage.setItem('sessionID', sessionID);
+            
+            // Extract and validate the MAC address - this is the source of the error
+            const macAddress = data.client_mac || data.macAddress || '';
+            
+            if (!macAddress) {
+                console.warn('WiFi LOGIN DEBUG: No MAC address provided for connection logging');
+            }
+            
+            console.log('WiFi LOGIN DEBUG: Using MAC address:', macAddress);
+            console.log('WiFi LOGIN DEBUG: Using session ID:', sessionID);
         
             const connectionData = {
                 sessionID: sessionID,
-                name: data.name,
-                email: data.email,
-                table: data.table,
+                name: data.name || '',
+                email: data.email || '',
+                table: data.table || '',
                 phoneNumber: data.phoneNumber || '',
-                macAddress: data.macAddress,
+                macAddress: macAddress,
                 connectionTime: localTimestamp,
                 timestamp: Date.now(),
                 status: 'connected'
             };
+            
+            console.log('WiFi LOGIN DEBUG: Connection data prepared:', connectionData);
         
             // Store the connection data in Firebase under the 'activeUsers' node
-            await set(ref(rtdb, 'activeUsers/' + sessionID), connectionData);
+            if (sessionID) {
+                console.log(`WiFi LOGIN DEBUG: Writing to activeUsers/${sessionID}`);
+                await set(ref(rtdb, `activeUsers/${sessionID}`), connectionData);
+                console.log('WiFi LOGIN DEBUG: Successfully wrote connection data to Firebase');
+            } else {
+                throw new Error('Invalid session ID for connection logging');
+            }
             
             // Set up disconnect handler
             window.addEventListener('beforeunload', function() {
@@ -595,7 +638,9 @@ document.addEventListener('DOMContentLoaded', function() {
             return sessionID;
         } catch (error) {
             console.error('Database operation failed in logUserConnection:', error);
-            throw error; // Rethrow to be handled by the caller
+            // Don't throw the error, just log it and return a session ID anyway
+            // This prevents the connection error from blocking the WiFi login
+            return data.sessionID || localStorage.getItem('sessionID') || generateSessionID();
         }
     }
     
