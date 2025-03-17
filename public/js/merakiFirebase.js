@@ -279,41 +279,32 @@ document.addEventListener('DOMContentLoaded', function() {
                             return;
                         }
                         
-                        // Clean and sanitize the URL
-                        let loginUrl = base_grant_url.trim();
-                        console.log('WiFi LOGIN DEBUG: Base grant URL (cleaned):', loginUrl);
+                        console.log('WiFi LOGIN DEBUG: Original base_grant_url:', base_grant_url);
                         
-                        // Check if the URL already has query parameters
-                        const hasQueryParams = loginUrl.includes('?');
-                        const paramConnector = hasQueryParams ? '&' : '?';
-                        console.log('WiFi LOGIN DEBUG: URL has existing parameters:', hasQueryParams);
-                        console.log('WiFi LOGIN DEBUG: Parameter connector to use:', paramConnector);
+                        // APPROACH 1: Simplified URL construction - exactly as in Meraki documentation
+                        // https://n143.network-auth.com/splash/grant/?continue_url=http://ask.co.uk/&duration=3600
+                        let loginUrl;
                         
-                        // Build the parameters separately
-                        let params = new URLSearchParams();
+                        // Clean and sanitize the URL - removing any existing parameters
+                        const baseUrl = base_grant_url.split('?')[0].trim();
+                        console.log('WiFi LOGIN DEBUG: Cleaned base URL (no params):', baseUrl);
                         
-                        // DEBUGGING: Log user_continue_url details
-                        console.log('WiFi LOGIN DEBUG: user_continue_url present:', !!user_continue_url);
-                        console.log('WiFi LOGIN DEBUG: user_continue_url value:', user_continue_url);
-                        
+                        // If there's a continue URL, include it, otherwise just use duration
                         if (user_continue_url && user_continue_url !== "undefined") {
-                            params.append('continue_url', user_continue_url);
-                            console.log('WiFi LOGIN DEBUG: Added continue_url parameter:', user_continue_url);
+                            // Format exactly as in Meraki docs examples
+                            loginUrl = `${baseUrl}/?continue_url=${user_continue_url}&duration=${duration}`;
+                            console.log('WiFi LOGIN DEBUG: Using URL with continue_url:', loginUrl);
                         } else {
-                            console.log('WiFi LOGIN DEBUG: No continue_url parameter added (missing or undefined)');
+                            loginUrl = `${baseUrl}/?duration=${duration}`;
+                            console.log('WiFi LOGIN DEBUG: Using URL with duration only:', loginUrl);
                         }
                         
-                        params.append('duration', duration.toString());
-                        console.log('WiFi LOGIN DEBUG: Added duration parameter:', duration);
-                        
-                        // Debug the params object
-                        console.log('WiFi LOGIN DEBUG: URLSearchParams string:', params.toString());
-                        
-                        // Append params to the URL using the correct connector
-                        loginUrl += paramConnector + params.toString();
-                        
                         // DEBUGGING: Log the final URL
-                        console.log('WiFi LOGIN DEBUG: FINAL Redirect URL:', loginUrl);
+                        console.log('WiFi LOGIN DEBUG: FINAL Redirect URL (method 1):', loginUrl);
+                        
+                        // As a fallback, prepare a second URL format if the first doesn't work
+                        const fallbackUrl = `${baseUrl}?duration=${duration}${user_continue_url && user_continue_url !== "undefined" ? `&continue_url=${encodeURIComponent(user_continue_url)}` : ''}`;
+                        console.log('WiFi LOGIN DEBUG: Fallback URL (if needed):', fallbackUrl);
                         
                         // Log WiFi connection to analytics
                         try {
@@ -336,6 +327,19 @@ document.addEventListener('DOMContentLoaded', function() {
                         // Redirect after a short delay to show the success message
                         setTimeout(() => {
                             console.log('WiFi LOGIN DEBUG: Now redirecting to:', loginUrl);
+                            
+                            // Store the fallback URL in case the first one fails
+                            localStorage.setItem('merakiFallbackUrl', fallbackUrl);
+                            
+                            // Add an error handler for the redirect
+                            window.addEventListener('error', function(event) {
+                                if (event.message.includes('ERR_FAILED') || event.message.includes('500')) {
+                                    console.log('WiFi LOGIN DEBUG: Primary URL failed, trying fallback...');
+                                    // Try the fallback URL
+                                    window.location.href = localStorage.getItem('merakiFallbackUrl');
+                                }
+                            }, { once: true });
+                            
                             window.location.href = loginUrl;
                         }, 1500);
                     })
