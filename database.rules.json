@@ -52,7 +52,7 @@
       }
     },
     "customization": {
-      ".read": "auth != null",
+      ".read": true,
       ".write": "auth != null && auth.token.admin === true"
     },
     "campaigns": {
@@ -102,7 +102,15 @@
     },
     "wifiLogins": {
       ".read": "auth != null",
-      ".write": "auth != null && auth.token.admin === true"
+      ".write": true
+    },
+    "activeUsers": {
+      ".read": "auth != null",
+      ".write": true
+    },
+    "userPreferences": {
+      ".read": "auth != null",
+      ".write": true
     }
   }
 }
