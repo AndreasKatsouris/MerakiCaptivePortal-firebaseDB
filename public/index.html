@@ -5,6 +5,9 @@
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <meta name="description" content="Guest WiFi login for Ocean Basket restaurants">
     <title>Ocean Basket Guest WiFi</title>
+    <!-- PWA Support -->
+    <meta name="theme-color" content="#0074D9">
+    <link rel="manifest" href="manifest.json">
 
     <!-- Firebase SDK -->
     <script type="module">
@@ -193,5 +196,20 @@
     
     <!-- Main App Script -->
     <script type="module" src="js/merakiFirebase.js"></script>
+
+    <!-- Service Worker Registration -->
+    <script>
+      if ('serviceWorker' in navigator) {
+        window.addEventListener('load', () => {
+          navigator.serviceWorker.register('/service-worker.js')
+            .then(registration => {
+              console.log('Service Worker registered with scope:', registration.scope);
+            })
+            .catch(error => {
+              console.error('Service Worker registration failed:', error);
+            });
+        });
+      }
+    </script>
   </body>
 </html>
