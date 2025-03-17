@@ -246,13 +246,9 @@ document.addEventListener('DOMContentLoaded', function() {
                 const formData = {
                     name: nameInput ? nameInput.value : '',
                     email: emailInput ? emailInput.value : '',
-                    table: tableInput ? tableInput.value : ''
+                    table: tableInput ? tableInput.value : '',
+                    phoneNumber: phoneInput ? phoneInput.value : '' // Ensure we use phoneNumber consistently
                 };
-                
-                // Add phone number if available
-                if (phoneInputField && phoneInput) {
-                    formData.phoneNumber = phoneInput.getNumber();
-                }
                 
                 // Log the form submission to analytics
                 try {
@@ -507,7 +503,7 @@ document.addEventListener('DOMContentLoaded', function() {
                 timestamp: data.timestamp || new Date().toISOString(),
                 name: data.name || '',
                 email: data.email || '',
-                phone: data.phone || '',
+                phoneNumber: data.phoneNumber || '', // Changed from 'phone' to 'phoneNumber' for consistency
                 client_mac: client_mac,
                 node_mac: node_mac || '',
                 client_ip: data.client_ip || '',
@@ -533,7 +529,10 @@ document.addEventListener('DOMContentLoaded', function() {
                 await set(ref(rtdb, `activeUsers/${client_mac}`), {
                     sessionID: sessionID,
                     timestamp: loginData.timestamp,
-                    lastSeen: loginData.timestamp
+                    lastSeen: loginData.timestamp,
+                    name: loginData.name || '',
+                    email: loginData.email || '',
+                    phoneNumber: loginData.phoneNumber || '' // Added phone number to activeUsers record
                 });
                 console.log('WiFi LOGIN DEBUG: Successfully wrote to activeUsers path');
             } catch (fbError) {

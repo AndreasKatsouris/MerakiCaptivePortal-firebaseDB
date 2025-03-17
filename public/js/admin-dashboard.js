@@ -143,34 +143,69 @@ class AdminDashboard {
     }
 
     setupEventListeners() {
-        // Add click listeners to all menu items
-        this.sections.forEach((section, name) => {
-            const menuElement = document.getElementById(section.menuId);
-            if (menuElement) {
-                menuElement.addEventListener('click', (e) => {
-                    e.preventDefault();
-                    if (!section.hasSubmenu) {
-                        this.showSection(section.contentId);
-                    }
+        // General UI event listeners
+        document.addEventListener('DOMContentLoaded', () => {
+            console.log('DOMContentLoaded: Setting up event listeners');
+
+            // Menu toggle
+            const menuToggle = document.getElementById('menuToggle');
+            if (menuToggle) {
+                menuToggle.addEventListener('click', () => {
+                    document.body.classList.toggle('sidebar-collapsed');
+                });
+            }
+
+            // Logout button
+            const logoutBtn = document.getElementById('logoutBtn');
+            if (logoutBtn) {
+                logoutBtn.addEventListener('click', this.handleLogout.bind(this));
+            }
+
+            // Section-specific buttons and controls
+            const adminSection = document.getElementById('admin-users-section');
+            if (adminSection) {
+                const addAdminBtn = adminSection.querySelector('#addAdminBtn');
+                if (addAdminBtn) {
+                    addAdminBtn.addEventListener('click', this.handleAddAdmin.bind(this));
+                }
+            }
+            
+            // Clear scanning data button
+            console.log('Looking for clearScanningDataBtn');
+            const clearScanningDataBtn = document.getElementById('clearScanningDataBtn');
+            if (clearScanningDataBtn) {
+                console.log('Found clearScanningDataBtn, adding event listener');
+                clearScanningDataBtn.addEventListener('click', () => {
+                    console.log('Clear Scanning Data button clicked');
+                    this.handleClearScanningData();
+                });
+            } else {
+                console.warn('clearScanningDataBtn not found in the DOM');
+            }
+
+            // Add click listeners to all menu items
+            this.sections.forEach((section, name) => {
+                const menuElement = document.getElementById(section.menuId);
+                if (menuElement) {
+                    menuElement.addEventListener('click', (e) => {
+                        e.preventDefault();
+                        if (!section.hasSubmenu) {
+                            this.showSection(section.contentId);
+                        }
+                    });
+                }
+            });
+
+            // Handle sidebar collapse
+            const sidebarCollapse = document.getElementById('sidebarCollapse');
+            const sidebar = document.getElementById('sidebar');
+            if (sidebarCollapse && sidebar) {
+                sidebarCollapse.addEventListener('click', () => {
+                    sidebar.classList.toggle('collapsed');
+                    document.getElementById('content').classList.toggle('expanded');
                 });
             }
         });
-
-        // Handle logout
-        const logoutBtn = document.getElementById('logoutBtn');
-        if (logoutBtn) {
-            logoutBtn.addEventListener('click', () => this.handleLogout());
-        }
-
-        // Handle sidebar collapse
-        const sidebarCollapse = document.getElementById('sidebarCollapse');
-        const sidebar = document.getElementById('sidebar');
-        if (sidebarCollapse && sidebar) {
-            sidebarCollapse.addEventListener('click', () => {
-                sidebar.classList.toggle('collapsed');
-                document.getElementById('content').classList.toggle('expanded');
-            });
-        }
     }
 
     setupSubmenuListeners() {
@@ -399,14 +434,15 @@ class AdminDashboard {
     }
 
     async handleClearScanningData() {
-        try {
-            // Use SweetAlert2 (Swal) which is already loaded in the HTML
-            if (!window.Swal) {
-                console.error('SweetAlert2 library not loaded');
-                alert('An error occurred. Please refresh the page and try again.');
-                return;
-            }
+        console.log('handleClearScanningData method called');
+        
+        if (!window.Swal) {
+            console.error('SweetAlert2 library not loaded');
+            alert('An error occurred. SweetAlert2 library is not available. Please refresh the page and try again.');
+            return;
+        }
 
+        try {
             // Confirm before proceeding
             const confirmation = await Swal.fire({
                 title: 'Clear Scanning Data?',
@@ -419,6 +455,7 @@ class AdminDashboard {
             });
 
             if (!confirmation.isConfirmed) {
+                console.log('User cancelled the operation');
                 return;
             }
 
@@ -434,40 +471,40 @@ class AdminDashboard {
                 }
             });
 
-            try {
-                // Direct database operation for immediate feedback
-                await remove(ref(rtdb, 'scanningData'));
-                
-                // Also try to call the Cloud Function if it exists
-                try {
-                    const clearScanningDataFunction = httpsCallable(functions, 'clearScanningData');
-                    await clearScanningDataFunction();
-                } catch (functionError) {
-                    console.warn('Cloud function not available, using direct database operation only', functionError);
-                }
-
-                // Show success message
-                await Swal.fire({
-                    title: 'Success!',
-                    text: 'Scanning data has been cleared successfully.',
-                    icon: 'success'
-                });
-            } catch (error) {
-                throw new Error(`Failed to clear scanning data: ${error.message}`);
-            }
-        } catch (error) {
-            console.error('Error clearing scanning data:', error);
+            console.log('Attempting to clear scanning data from Firebase...');
             
-            // Show error message using SweetAlert2 if available, otherwise fallback to alert
-            if (window.Swal) {
-                await Swal.fire({
-                    title: 'Error',
-                    text: error.message || 'An unknown error occurred',
-                    icon: 'error'
-                });
-            } else {
-                alert(`Error: ${error.message || 'An unknown error occurred'}`);
+            // Direct database operation for immediate feedback
+            await remove(ref(rtdb, 'scanningData'));
+            console.log('Successfully removed scanning data from rtdb');
+            
+            // Also try to call the Cloud Function if it exists
+            try {
+                console.log('Attempting to call clearScanningData cloud function...');
+                const clearScanningDataFunction = httpsCallable(functions, 'clearScanningData');
+                await clearScanningDataFunction();
+                console.log('Cloud function clearScanningData executed successfully');
+            } catch (functionError) {
+                console.warn('Cloud function not available or failed, using direct database operation only', functionError);
+                // Continue anyway since we already did the direct database operation
             }
+
+            // Show success message
+            console.log('Operation completed, showing success message');
+            await Swal.fire({
+                title: 'Success!',
+                text: 'Scanning data has been cleared successfully.',
+                icon: 'success'
+            });
+            
+        } catch (error) {
+            console.error('Error in handleClearScanningData:', error);
+            
+            // Show error message
+            await Swal.fire({
+                title: 'Error',
+                text: `Failed to clear scanning data: ${error.message || 'Unknown error'}`,
+                icon: 'error'
+            });
         }
     }
 
