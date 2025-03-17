@@ -8,6 +8,54 @@ import { rtdb, ref, set, update, push, get } from './config/firebase-config.js';
 import { logPageView, logFormSubmission, logWiFiConnection } from './config/firebase-analytics.js';
 
 document.addEventListener('DOMContentLoaded', function() {
+    'use strict';
+    
+    console.log('=== WiFi LOGIN DEBUG: Script initialized ===');
+    
+    // Parse and log all URL parameters for debugging
+    const urlParams = {};
+    const queryString = window.location.search;
+    if (queryString) {
+        console.log('WiFi LOGIN DEBUG: URL query string:', queryString);
+        
+        const urlSearchParams = new URLSearchParams(queryString);
+        urlSearchParams.forEach((value, key) => {
+            urlParams[key] = value;
+            console.log(`WiFi LOGIN DEBUG: URL param - ${key}: ${value}`);
+        });
+    } else {
+        console.warn('WiFi LOGIN DEBUG: No URL parameters found!');
+    }
+    
+    // Meraki-specific URL parameters
+    const base_grant_url = GetURLParameter('base_grant_url');
+    const user_continue_url = GetURLParameter('user_continue_url');
+    const node_mac = GetURLParameter('node_mac');
+    const client_ip = GetURLParameter('client_ip');
+    const client_mac = GetURLParameter('client_mac');
+    
+    // Log Meraki parameters specifically for troubleshooting
+    console.log('=== WiFi LOGIN DEBUG: Meraki Parameters ===');
+    console.log('base_grant_url:', base_grant_url);
+    console.log('user_continue_url:', user_continue_url);
+    console.log('node_mac:', node_mac);
+    console.log('client_ip:', client_ip);
+    console.log('client_mac:', client_mac);
+    
+    // Validate Meraki parameters
+    if (!base_grant_url || base_grant_url === 'undefined') {
+        console.error('WiFi LOGIN DEBUG: Missing base_grant_url! This is required for Meraki authentication.');
+    }
+    
+    // Debugging function to log objects with circular references safely
+    function safeLogObject(obj, label = 'Object') {
+        try {
+            console.log(`WiFi LOGIN DEBUG: ${label}:`, JSON.stringify(obj, null, 2));
+        } catch (error) {
+            console.log(`WiFi LOGIN DEBUG: ${label} (non-stringifiable):`, obj);
+        }
+    }
+    
     // Log page view with Firebase Analytics
     try {
         logPageView('captive_portal');
@@ -16,20 +64,16 @@ document.addEventListener('DOMContentLoaded', function() {
     }
 
     // Parse Meraki supplied parameters
-    const base_grant_url = decodeURIComponent(GetURLParameter("base_grant_url") || '');
-    const user_continue_url = decodeURIComponent(GetURLParameter("user_continue_url") || '');
-    const node_mac = GetURLParameter("node_mac") || '';
-    const client_ip = GetURLParameter("client_ip") || '';
-    const client_mac = GetURLParameter("client_mac") || '';
-
-    // Log parameters to console for debugging
-    console.log("Meraki Parameters:", {
+    const merakiParams = {
         base_grant_url,
         user_continue_url,
         node_mac,
         client_ip,
         client_mac
-    });
+    };
+    
+    // Log parameters to console for debugging
+    console.log("Meraki Parameters:", merakiParams);
 
     // Initialize phone input field with international telephone input library
     const phoneInputField = document.querySelector("#phone");
@@ -222,98 +266,142 @@ document.addEventListener('DOMContentLoaded', function() {
                 // Process form and save data to Firebase
                 processFormData(formData, client_mac, node_mac)
                     .then(sessionID => {
+                        // DEBUGGING: Log the session ID
+                        console.log('WiFi LOGIN DEBUG: Generated session ID:', sessionID);
+                        
                         // Redirect to Meraki auth URL
                         const duration = 3600; // 1 hour session duration
                         
                         // Make sure base_grant_url is valid
                         if (!base_grant_url || base_grant_url === "undefined") {
+                            console.error('WiFi LOGIN DEBUG: Missing base_grant_url for redirection!');
                             displayError('Missing Meraki authentication URL. Please refresh the page and try again.');
                             return;
                         }
                         
                         // Clean and sanitize the URL
                         let loginUrl = base_grant_url.trim();
+                        console.log('WiFi LOGIN DEBUG: Base grant URL (cleaned):', loginUrl);
                         
                         // Check if the URL already has query parameters
                         const hasQueryParams = loginUrl.includes('?');
                         const paramConnector = hasQueryParams ? '&' : '?';
+                        console.log('WiFi LOGIN DEBUG: URL has existing parameters:', hasQueryParams);
+                        console.log('WiFi LOGIN DEBUG: Parameter connector to use:', paramConnector);
                         
                         // Build the parameters separately
                         let params = new URLSearchParams();
+                        
+                        // DEBUGGING: Log user_continue_url details
+                        console.log('WiFi LOGIN DEBUG: user_continue_url present:', !!user_continue_url);
+                        console.log('WiFi LOGIN DEBUG: user_continue_url value:', user_continue_url);
+                        
                         if (user_continue_url && user_continue_url !== "undefined") {
                             params.append('continue_url', user_continue_url);
+                            console.log('WiFi LOGIN DEBUG: Added continue_url parameter:', user_continue_url);
+                        } else {
+                            console.log('WiFi LOGIN DEBUG: No continue_url parameter added (missing or undefined)');
                         }
+                        
                         params.append('duration', duration.toString());
+                        console.log('WiFi LOGIN DEBUG: Added duration parameter:', duration);
+                        
+                        // Debug the params object
+                        console.log('WiFi LOGIN DEBUG: URLSearchParams string:', params.toString());
                         
                         // Append params to the URL using the correct connector
                         loginUrl += paramConnector + params.toString();
                         
-                        console.log('Redirecting to:', loginUrl);
+                        // DEBUGGING: Log the final URL
+                        console.log('WiFi LOGIN DEBUG: FINAL Redirect URL:', loginUrl);
                         
                         // Log WiFi connection to analytics
                         try {
+                            console.log('WiFi LOGIN DEBUG: Logging WiFi connection to analytics...');
                             logWiFiConnection({
                                 sessionID: sessionID,
                                 macAddress: client_mac,
                                 duration: duration
                             });
+                            console.log('WiFi LOGIN DEBUG: Successfully logged WiFi connection');
                         } catch (error) {
-                            console.error('Failed to log WiFi connection:', error);
+                            console.error('WiFi LOGIN DEBUG: Failed to log WiFi connection:', error);
                             // Continue with the redirect even if analytics fails
                         }
                         
                         // Show success message before redirect
                         displaySuccess('Login successful! Connecting to WiFi...');
+                        console.log('WiFi LOGIN DEBUG: Success message displayed, redirecting in 1.5 seconds');
                         
                         // Redirect after a short delay to show the success message
                         setTimeout(() => {
+                            console.log('WiFi LOGIN DEBUG: Now redirecting to:', loginUrl);
                             window.location.href = loginUrl;
                         }, 1500);
                     })
                     .catch(error => {
-                        console.error('Error during form processing:', error);
-                        displayError('An error occurred while processing your request. Please try again.');
+                        console.error('WiFi LOGIN DEBUG: Form submission failed:', error);
+                        displayError('Error: ' + error.message);
                     });
             } else {
+                console.warn('WiFi LOGIN DEBUG: Form validation failed');
                 displayError('Please correct the errors in the form before submitting.');
-                
-                // Scroll to the first invalid field
-                const firstInvalid = document.querySelector('.is-invalid');
-                if (firstInvalid) {
-                    firstInvalid.scrollIntoView({ behavior: 'smooth', block: 'center' });
-                    firstInvalid.focus();
-                }
             }
         });
     }
     
     // Process form data and save to Firebase
     async function processFormData(formData, client_mac, node_mac) {
+        console.log('WiFi LOGIN DEBUG: Processing form data...');
+        console.log('WiFi LOGIN DEBUG: Form data:', formData);
+        console.log('WiFi LOGIN DEBUG: Client MAC:', client_mac);
+        console.log('WiFi LOGIN DEBUG: Node MAC:', node_mac);
+        
         try {
-            console.log('Saving data to Firebase:', formData);
-            // Write user data to Firebase
-            const sessionID = await writeUserData(formData, client_mac, node_mac);
+            // Generate a unique session ID
+            const sessionID = generateSessionID();
+            console.log('WiFi LOGIN DEBUG: Generated session ID:', sessionID);
             
-            // Store user preferences
-            const userPreferences = {
-                theme: 'light',
-                language: 'en'
-            };
-            await storeUserPreferences(client_mac, userPreferences);
+            // Add timestamp
+            formData.timestamp = new Date().toISOString();
+            formData.sessionID = sessionID;
             
-            // Log connection
+            // Store the user data in Firebase
+            console.log('WiFi LOGIN DEBUG: Writing user data to Firebase...');
+            await writeUserData(formData, client_mac, node_mac);
+            console.log('WiFi LOGIN DEBUG: User data written successfully');
+            
+            // Store user preferences if available
+            if (formData.name || formData.email || formData.phone) {
+                console.log('WiFi LOGIN DEBUG: Storing user preferences...');
+                const preferences = {
+                    name: formData.name || '',
+                    email: formData.email || '',
+                    phone: formData.phone || '',
+                    lastLogin: formData.timestamp
+                };
+                await storeUserPreferences(client_mac, preferences);
+                console.log('WiFi LOGIN DEBUG: User preferences stored successfully');
+            }
+            
+            // Log connection for analytics
+            console.log('WiFi LOGIN DEBUG: Logging user connection...');
             await logUserConnection({
-                ...formData,
-                macAddress: client_mac
+                timestamp: formData.timestamp,
+                sessionID: sessionID,
+                client_mac: client_mac,
+                node_mac: node_mac,
+                ...formData
             });
+            console.log('WiFi LOGIN DEBUG: User connection logged successfully');
             
             return sessionID;
         } catch (error) {
-            console.error('Error in processFormData:', error);
-            throw error; // Rethrow to be handled by the caller
+            console.error('WiFi LOGIN DEBUG: Error in processFormData:', error);
+            throw error;
         }
     }
-    
+
     // Display success message
     function displaySuccess(message) {
         // Convert error container to success style
@@ -342,32 +430,63 @@ document.addEventListener('DOMContentLoaded', function() {
 
     // Function to write user data to Firebase using the proper Firebase methods
     async function writeUserData(data, client_mac, node_mac) {
+        console.log('WiFi LOGIN DEBUG: Starting writeUserData function');
+        
         try {
-            const date = new Date();
-            const localTimestamp = date.toLocaleString(); // User's local time
-            const timeZone = Intl.DateTimeFormat().resolvedOptions().timeZone; // User's time zone
-            const sessionID = localStorage.getItem('sessionID') || generateSessionID(); // Retrieve or generate session ID
-            localStorage.setItem('sessionID', sessionID);
-            const deviceType = navigator.userAgent; // Captures the device's user agent string
-
-            // Store user data in Firebase under the session ID using proper Firebase methods
-            await set(ref(rtdb, 'wifiLogins/' + sessionID), {
-                name: data.name,
-                email: data.email,
-                table: data.table,
-                phoneNumber: data.phoneNumber || '',
-                macAddress: client_mac,
-                accessPointMAC: node_mac,
-                localTimeStamp: localTimestamp,
-                timeZone: timeZone,
-                deviceType: deviceType,
-                createdAt: Date.now()
-            });
+            // Validate required parameters
+            if (!client_mac) {
+                console.error('WiFi LOGIN DEBUG: Missing client_mac in writeUserData');
+                throw new Error('Missing client MAC address');
+            }
             
+            // Generate a session ID if not already provided
+            const sessionID = data.sessionID || generateSessionID();
+            console.log('WiFi LOGIN DEBUG: Using session ID:', sessionID);
+            
+            // Create wifi login data structure
+            const loginData = {
+                timestamp: data.timestamp || new Date().toISOString(),
+                name: data.name || '',
+                email: data.email || '',
+                phone: data.phone || '',
+                client_mac: client_mac,
+                node_mac: node_mac || '',
+                client_ip: data.client_ip || '',
+                sessionID: sessionID,
+                active: true,
+                message: data.message || ''
+            };
+            console.log('WiFi LOGIN DEBUG: Login data prepared:', loginData);
+            
+            // Create a new entry in the wifiLogins collection
+            console.log('WiFi LOGIN DEBUG: Writing to wifiLogins path...');
+            try {
+                await set(ref(rtdb, `wifiLogins/${sessionID}`), loginData);
+                console.log('WiFi LOGIN DEBUG: Successfully wrote to wifiLogins path');
+            } catch (fbError) {
+                console.error('WiFi LOGIN DEBUG: Error writing to wifiLogins:', fbError);
+                throw fbError;
+            }
+            
+            // Add to active users
+            console.log('WiFi LOGIN DEBUG: Writing to activeUsers path...');
+            try {
+                await set(ref(rtdb, `activeUsers/${client_mac}`), {
+                    sessionID: sessionID,
+                    timestamp: loginData.timestamp,
+                    lastSeen: loginData.timestamp
+                });
+                console.log('WiFi LOGIN DEBUG: Successfully wrote to activeUsers path');
+            } catch (fbError) {
+                console.error('WiFi LOGIN DEBUG: Error writing to activeUsers:', fbError);
+                // Continue even if this fails
+            }
+            
+            console.log('WiFi LOGIN DEBUG: All Firebase writes completed successfully');
             return sessionID;
         } catch (error) {
-            console.error('Database operation failed in writeUserData:', error);
-            throw error; // Rethrow to be handled by the caller
+            console.error('WiFi LOGIN DEBUG: Error in writeUserData:', error);
+            throw error;
         }
     }
 
