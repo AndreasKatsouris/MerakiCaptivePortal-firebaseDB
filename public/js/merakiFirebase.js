@@ -38,13 +38,15 @@ document.addEventListener('DOMContentLoaded', function() {
     if (phoneInputField) {
         phoneInput = window.intlTelInput(phoneInputField, {
             initialCountry: "auto",
+            preferredCountries: ["za"],
+            separateDialCode: true,
+            utilsScript: "https://cdnjs.cloudflare.com/ajax/libs/intl-tel-input/17.0.8/js/utils.js",
             geoIpLookup: function(callback) {
                 fetch('https://ipinfo.io/json')
                     .then(response => response.json())
                     .then(data => callback(data.country))
                     .catch(() => callback('za')); // Default to South Africa if geolocation fails
-            },
-            utilsScript: "https://cdnjs.cloudflare.com/ajax/libs/intl-tel-input/17.0.8/js/utils.js"
+            }
         });
     }
 
