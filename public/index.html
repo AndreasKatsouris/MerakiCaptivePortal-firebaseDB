@@ -3,148 +3,173 @@
   <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
-    <title>Welcome to Ocean Basket Guest Wifi</title>
+    <meta name="description" content="Guest WiFi login for Ocean Basket restaurants">
+    <title>Ocean Basket Guest WiFi</title>
 
     <!-- Firebase SDK -->
-    <script src="/__/firebase/10.12.5/firebase-app-compat.js"></script>
-    <script src="/__/firebase/10.12.5/firebase-auth-compat.js"></script>
-    <script src="/__/firebase/10.12.5/firebase-database-compat.js"></script>
-    <script src="/__/firebase/10.12.5/firebase-firestore-compat.js"></script>
-    <script src="/__/firebase/10.12.5/firebase-functions-compat.js"></script>
-    <script src="/__/firebase/10.12.5/firebase-messaging-compat.js"></script>
-    <script src="/__/firebase/10.12.5/firebase-storage-compat.js"></script>
-    <script src="/__/firebase/10.12.5/firebase-analytics-compat.js"></script>
-    <script src="/__/firebase/10.12.5/firebase-remote-config-compat.js"></script>
-    <script src="/__/firebase/10.12.5/firebase-performance-compat.js"></script>
-    <script src="/__/firebase/init.js?useEmulator=false"></script>
-
-    <link rel="stylesheet" href="css/bootstrap.min.css">
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/4.7.0/css/font-awesome.min.css">
-    <link rel="stylesheet" href="css/style.css">
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/intl-tel-input/17.0.8/css/intlTelInput.css">
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/intl-tel-input/17.0.8/js/intlTelInput.min.js"></script>
-
-    <script>
-        // Redirect to admin dashboard if 'admin' query parameter is present
-        const urlParams = new URLSearchParams(window.location.search);
-        if (urlParams.get('admin') === 'true') {
-            window.location.href = 'admin-dashboard.html';
-        }
-    </script>
-    
- <script>
-    document.addEventListener('DOMContentLoaded', function () {
-        // Initialize Firebase
-        const db = firebase.database();
-
+    <script type="module">
+      // Import Firebase modules directly in the page for customization script
+      import { rtdb, ref, get, set } from './js/config/firebase-config.js';
+      
+      document.addEventListener('DOMContentLoaded', function () {
         // Fetch customization settings from Firebase
-        db.ref('customization/').once('value')
-        .then(function(snapshot) {
+        get(ref(rtdb, 'customization/'))
+          .then(function(snapshot) {
             const settings = snapshot.val();
             if (settings) {
-                // Apply the background color
-                document.body.style.backgroundColor = settings.bgColor || '#ffffff'; // Default to white if not set
-
-                // Apply the font
-                document.body.style.fontFamily = settings.font || 'Arial, sans-serif'; // Default to Arial if not set
-
-                // Apply the font size
-                document.body.style.fontSize = settings.fontSize ? `${settings.fontSize}px` : '16px'; // Default to 16px if not set
-
-                // Apply the logo if it exists
-                if (settings.logoURL) {
-                    document.getElementById('logo').src = settings.logoURL;
-                }
-            } else {
-                console.error('No customization settings found in the database.');
+              // Apply the background color
+              document.body.style.backgroundColor = settings.bgColor || '#ffffff';
+              // Apply the font
+              document.body.style.fontFamily = settings.font || 'Open Sans, sans-serif';
+              // Apply the font size
+              document.body.style.fontSize = settings.fontSize ? `${settings.fontSize}px` : '16px';
+              // Apply the logo if it exists
+              if (settings.logoURL) {
+                document.getElementById('logo').src = settings.logoURL;
+              }
+              // Apply background image if exists
+              if (settings.bgImageUrl) {
+                document.body.style.backgroundImage = `url(${settings.bgImageUrl})`;
+                document.body.style.backgroundSize = 'cover';
+                document.body.style.backgroundPosition = 'center';
+                document.body.style.backgroundRepeat = 'no-repeat';
+              }
             }
-            console.log("Settings: bg colour", document.body.style.backgroundColor);
-            console.log("Settings: font", document.body.style.fontFamily);
-            console.log("Settings: font size", document.body.style.fontSize);
-            console.log("Settings: logo", settings.logoURL);
-            console.log("Settings: bg", settings.bgImageUrl);
-        })
-        .catch(function(error) {
+          })
+          .catch(function(error) {
             console.error('Error fetching customization settings:', error);
-        });
-    });
-</script>  
+          });
+      });
+      
+      // Redirect to admin dashboard if 'admin' query parameter is present
+      const urlParams = new URLSearchParams(window.location.search);
+      if (urlParams.get('admin') === 'true') {
+        window.location.href = 'admin-dashboard.html';
+      }
+    </script>
 
+    <!-- Stylesheets -->
+    <link rel="stylesheet" href="css/bootstrap.min.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.4/css/all.min.css">
+    <link rel="stylesheet" href="css/style.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/intl-tel-input/17.0.8/css/intlTelInput.css">
   </head>
+  
   <body>
     <div class="container">
-      <div class="row cols-md-6">
-          <div class="main-center">
-              <center>
-                  <!-- <img src="img/meraki-logo.png" style="width:100%;" alt="Meraki Logo"/> -->
-                  <img id="logo" src="default-logo.png" alt="Logo" style="width:100%;" />
-                  <hr/>
-              </center>
+      <div class="row justify-content-center">
+        <div class="col-md-8 col-lg-6">
+          <!-- Header with Logo -->
+          <div class="text-center mt-4 mb-3">
+            <img id="logo" src="img/default-logo.png" alt="Restaurant Logo" class="img-fluid mb-2" style="max-width: 200px;">
+            <h1 class="welcome-title">Welcome to Our Guest WiFi</h1>
           </div>
-      </div>
-      <div class="row cols-md-2">
-          <div class="main-login main-center">
-              <form class="form-horizontal" id="loginForm">
-                  <div class="form-group">
-                      <div class="cols-sm-10">
-                          <div class="input-group">
-                              <span class="input-group-addon"><i class="fa fa-user fa" aria-hidden="true"></i></span>
-                              <input type="text" class="form-control" id="username" placeholder="Enter your Name & Surname" required autocomplete="name"/>
-                          </div>
-                          <div class="validation-message" id="nameValidationMessage"></div>
-                      </div>
-                  </div>
-                  <div class="form-group">
-                      <div class="cols-sm-10">
-                          <div class="input-group">
-                              <span class="input-group-addon"><i class="fa fa-envelope fa" aria-hidden="true"></i></span>
-                              <input type="email" class="form-control" id="email" placeholder="Enter your Email" required autocomplete="email"/>
-                          </div>
-                          <div class="validation-message" id="emailValidationMessage"></div>
-                      </div>
-                  </div>
-                  <div class="form-group">
-                    <div class="cols-sm-10">
-                        <div class="input-group">
-                            <span class="input-group-addon"><i class="fa fa-phone" aria-hidden="true"></i></span>
-                            <input id="phone" type="tel" class="form-control" placeholder="Enter your phone number" required autocomplete="tel">
-                        </div>
-                        <div class="validation-message" id="phoneValidationMessage"></div>
-                    </div>
+          
+          <!-- WiFi Instructions -->
+          <div class="wifi-instructions mb-4">
+            <div class="card">
+              <div class="card-body">
+                <h5 class="card-title"><i class="fas fa-wifi me-2"></i>Free WiFi Access</h5>
+                <p class="card-text">Please sign in with your details below to enjoy complimentary WiFi during your visit.</p>
+              </div>
+            </div>
+          </div>
+          
+          <!-- Login Form -->
+          <div class="login-container">
+            <form id="loginForm" class="needs-validation" novalidate>
+              <div class="form-group mb-3">
+                <label for="username" class="form-label">Full Name</label>
+                <div class="input-group">
+                  <span class="input-group-text"><i class="fas fa-user"></i></span>
+                  <input type="text" class="form-control" id="username" placeholder="Enter your full name" required autocomplete="name"/>
                 </div>
-                  <div class="form-group">
-                      <div class="cols-sm-10">
-                          <div class="input-group">
-                              <span class="input-group-addon"><i class="fa fa-building fa" aria-hidden="true"></i></span>
-                              <input type="text" class="form-control" id="table" placeholder="Enter your table number" autocomplete="table"/>
-                          </div>
-                          <div class="validation-message" id="tableValidationMessage"></div>
-                      </div>
-                  </div>
-                  <div class="form-group">
-                      <div class="cols-sm-10">
-                          <div class="input-group">
-                              <input type="checkbox" id="terms"> I agree to the terms and conditions
-                          </div>
-                          <div class="validation-message" id="termsValidationMessage"></div>
-                        </div>
-                  </div>
-                  <div class="form-group">
-                      <button type="submit" class="btn btn-primary btn-lg btn-block login-button">Submit</button>
-                  </div>
-              </form>
+                <div class="invalid-feedback" id="nameValidationMessage"></div>
+              </div>
+              
+              <div class="form-group mb-3">
+                <label for="email" class="form-label">Email Address</label>
+                <div class="input-group">
+                  <span class="input-group-text"><i class="fas fa-envelope"></i></span>
+                  <input type="email" class="form-control" id="email" placeholder="Enter your email" required autocomplete="email"/>
+                </div>
+                <div class="invalid-feedback" id="emailValidationMessage"></div>
+              </div>
+              
+              <div class="form-group mb-3">
+                <label for="phone" class="form-label">Phone Number</label>
+                <div class="input-group">
+                  <span class="input-group-text"><i class="fas fa-phone-alt"></i></span>
+                  <input id="phone" type="tel" class="form-control" placeholder="Enter your phone number" required autocomplete="tel">
+                </div>
+                <div class="invalid-feedback" id="phoneValidationMessage"></div>
+              </div>
+              
+              <div class="form-group mb-3">
+                <label for="table" class="form-label">Table Number</label>
+                <div class="input-group">
+                  <span class="input-group-text"><i class="fas fa-utensils"></i></span>
+                  <input type="text" class="form-control" id="table" placeholder="Enter your table number" autocomplete="off"/>
+                </div>
+                <div class="invalid-feedback" id="tableValidationMessage"></div>
+              </div>
+              
+              <div class="form-group mb-4">
+                <div class="form-check">
+                  <input type="checkbox" class="form-check-input" id="terms" required>
+                  <label class="form-check-label" for="terms">
+                    I agree to the <a href="#" data-bs-toggle="modal" data-bs-target="#termsModal">terms and conditions</a>
+                  </label>
+                  <div class="invalid-feedback" id="termsValidationMessage"></div>
+                </div>
+              </div>
+              
+              <div class="d-grid">
+                <button type="submit" class="btn btn-primary btn-lg login-button">
+                  <i class="fas fa-wifi me-2"></i>Connect to WiFi
+                </button>
+              </div>
+            </form>
           </div>
+          
+          <!-- Error Container -->
+          <div id="error-container" class="alert alert-danger mt-3" style="display: none;"></div>
+          
+          <!-- Admin Link -->
+          <div class="text-center mt-4 mb-5">
+            <a href="admin-login.html" class="btn btn-sm btn-outline-secondary">
+              <i class="fas fa-cog me-1"></i>Admin Login
+            </a>
+          </div>
+        </div>
       </div>
     </div>
-        <!-- Admin Login Link -->
-        <div style="text-align: center; margin-top: 20px;">
-            <a href="admin-login.html" class="btn btn-link">Admin Login</a>
+    
+    <!-- Terms and Conditions Modal -->
+    <div class="modal fade" id="termsModal" tabindex="-1" aria-labelledby="termsModalLabel" aria-hidden="true">
+      <div class="modal-dialog">
+        <div class="modal-content">
+          <div class="modal-header">
+            <h5 class="modal-title" id="termsModalLabel">Terms and Conditions</h5>
+            <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+          </div>
+          <div class="modal-body">
+            <p>By using our guest WiFi service, you agree to:</p>
+            <ul>
+              <li>Use the service responsibly and legally</li>
+              <li>Not abuse network bandwidth or resources</li>
+              <li>Allow us to collect and store your provided information</li>
+              <li>Receive occasional communications about our services</li>
+            </ul>
+          </div>
+          <div class="modal-footer">
+            <button type="button" class="btn btn-primary" data-bs-dismiss="modal">I Understand</button>
+          </div>
         </div>
-    <!-- Error Container -->
-    <div id="error-container" style="display: none; color: red; text-align: center; margin-top: 20px;">
-        <!-- Error messages will be displayed here -->
+      </div>
     </div>
 
+    <!-- Session ID generation -->
     <script>
         // Function to generate a unique session ID
         function generateSessionID() {
@@ -159,14 +184,14 @@
             sessionID = generateSessionID();
             localStorage.setItem('sessionID', sessionID);
         }
-
-        // Output the session ID to the console for debugging purposes
-        console.log("Session ID:", sessionID);
     </script>
     
+    <!-- JavaScript Dependencies -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/intl-tel-input/17.0.8/js/intlTelInput.min.js"></script>
     <script src="js/jquery-3.2.1.min.js"></script>
-    <script src="js/merakiFirebase.js"></script>
-
+    <script src="js/bootstrap.bundle.min.js"></script>
+    
+    <!-- Main App Script -->
+    <script type="module" src="js/merakiFirebase.js"></script>
   </body>
-
 </html>

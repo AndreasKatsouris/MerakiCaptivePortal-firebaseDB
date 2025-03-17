@@ -1,4 +1,17 @@
-@import url('https://fonts.googleapis.com/css2?family=Open+Sans:wght@400;600&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Open+Sans:wght@300;400;600;700&display=swap');
+
+:root {
+  --primary-color: #0074D9;
+  --primary-dark: #0056a6;
+  --secondary-color: #f8f9fa;
+  --text-color: #333;
+  --light-gray: #e9ecef;
+  --border-color: #d1d5db;
+  --error-color: #dc3545;
+  --success-color: #28a745;
+  --box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+  --transition: all 0.3s ease;
+}
 
 * {
   margin: 0;
@@ -12,328 +25,411 @@
 
 body {
   font-family: "Open Sans", Helvetica, Arial, sans-serif;
-  font-weight: 100;
-  font-size: 14px;
-  line-height: 1.6;
-  color: #333;
-  /*background: linear-gradient(135deg, #f0f4f8 0%, #ffffff 100%);*/
-  margin: 50px;
-}
-.iti {
-  position: relative;
-  z-index: 1000; /* Ensure it is above other elements */
-}
-
-.iti__flag-container {
-  top: 10px;
-  left: 10px;
-}
-
-.iti__dropdown {
-  margin-top: 5px;
-  z-index: 1001;
-}
-
-form {
-  max-width: 480px;
-  margin: auto;
-}
-
-.main {
-  margin-top: 70px;
-}
-
-h1.title {
-  font-size: 50px;
-  font-family: 'Open Sans', sans-serif;
   font-weight: 400;
+  font-size: 16px;
+  line-height: 1.6;
+  color: var(--text-color);
+  background-color: #f8f9fa;
+  padding: 20px 0;
 }
 
-h2.title {
-  color: #1D770B;
-  font-weight: 600;
-}
-
-hr {
-  width: 10%;
-  color: #fff;
-}
-
-.form-group {
-  margin-bottom: 20px;
-  position: relative;
-  width: 100%;
-}
-
-label {
-  margin-bottom: 15px;
-}
-
-input,
-input::-webkit-input-placeholder {
-  font-size: 14px;
-  padding-top: 3px;
-}
-
-.main-login {
-  background-color: #ffffff;
-  border-radius: 5px;
-  box-shadow: 0px 4px 6px rgba(0, 0, 0, 0.1);
-  padding: 20px;
-}
-
-.main-center {
-  margin-top: 30px;
+.container {
+  max-width: 1200px;
   margin: 0 auto;
-  max-width: 330px;
-  padding: 40px 40px;
 }
 
-.login-button {
-  background-color: #0074D9; /* Ocean Basket's primary blue */
-  color: #fff;
+/* Logo and Header Styles */
+.welcome-title {
+  font-size: 1.5rem;
+  font-weight: 600;
+  color: var(--primary-color);
+  margin-bottom: 0.5rem;
+}
+
+/* WiFi Instructions Card */
+.wifi-instructions .card {
   border: none;
-  border-radius: 5px;
-  padding: 10px 20px;
-  font-size: 14px;
-  font-weight: bold;
-  text-transform: uppercase;
-  cursor: pointer;
-  transition: background-color 0.3s ease;
-  margin-top: 5px;
+  border-radius: 8px;
+  box-shadow: var(--box-shadow);
+  background-color: rgba(255, 255, 255, 0.9);
+  transition: var(--transition);
 }
 
-.login-button:hover {
-  background-color: #0056a6; /* Darker blue on hover */
+.wifi-instructions .card:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 6px 12px rgba(0, 0, 0, 0.1);
+}
+
+.wifi-instructions .card-title {
+  color: var(--primary-color);
+  font-weight: 600;
+  font-size: 1.1rem;
+}
+
+.wifi-instructions .card-text {
+  color: #666;
+  font-size: 0.95rem;
+}
+
+/* Login Form Container */
+.login-container {
+  background-color: #fff;
+  border-radius: 8px;
+  box-shadow: var(--box-shadow);
+  padding: 25px;
+  margin-bottom: 20px;
+}
+
+/* Form Styling */
+.form-group {
+  margin-bottom: 1.25rem;
+  position: relative;
+}
+
+.form-label {
+  display: block;
+  margin-bottom: 0.5rem;
+  font-weight: 500;
+  color: #495057;
+  font-size: 0.9rem;
 }
 
 .form-control {
+  display: block;
   width: 100%;
-  box-sizing: border-box;
-  padding: 10px;
-  padding-right: 10px; /* Space for placeholder text */
-  font-size: 14px;
-  border: 1px solid #d1d5db;
-  border-radius: 5px;
-  z-index: 1000;
+  padding: 0.5rem 0.75rem;
+  font-size: 1rem;
+  line-height: 1.5;
+  color: #495057;
+  background-color: #fff;
+  background-clip: padding-box;
+  border: 1px solid var(--border-color);
+  border-radius: 4px;
+  transition: var(--transition);
 }
 
 .form-control:focus {
-  border-color: #0074D9; /* Focus state color */
-  box-shadow: 0 0 5px rgba(0, 116, 217, 0.5);
-  outline: none;
+  color: #495057;
+  background-color: #fff;
+  border-color: var(--primary-color);
+  outline: 0;
+  box-shadow: 0 0 0 0.2rem rgba(0, 116, 217, 0.25);
 }
 
-.form-control::placeholder {
-  color: #aaa;
-}
-
-.validation-message {
-  font-size: 0.875em;
-  color: red;
-  position: absolute;
-  left: 0;
-  top: 100%;
-  margin-top: 5px;
-  white-space: nowrap;
-}
-
-#terms {
-  margin-right: 5px; /* Small space between the checkbox and label */
-}
-
-.checkbox-group {
+.input-group {
   position: relative;
-  padding-left: 20px;
-}
-
-.checkbox-group .validation-message {
-  left: 20px;
-  top: 20px;
-}
-
-.validation-message-checkbox {
-  font-size: 0.875em;
-  color: red;
-  margin-top: 5px;
-  position: absolute;
-  top: 20px;
-}
-
-.login-register {
-  font-size: 11px;
-  text-align: center;
-}
-
-.form-group {
-  position: relative; /* Ensure the validation message is positioned relative to the form group */
-  margin-bottom: 20px;
-}
-
-input.form-control:invalid {
-  border-color: red; /* Highlights the border in red when invalid */
-}
-
-input.form-control:focus:invalid {
-  border-color: #0074D9; /* Highlight the border in blue when focused and invalid */
-  box-shadow: none; /* Remove default shadow */
-}
-
-input.form-control:focus:invalid + .validation-message {
-  display: block; /* Show the validation message when the input is focused and invalid */
-}
-
-.validation-message {
-  display: none; /* Hide by default */
-  position: absolute;
-  top: 100%; /* Position below the input field */
-  left: 0;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: stretch;
   width: 100%;
-  background-color: #fff;
-  border: 1px solid #d1d5db;
-  border-radius: 5px;
-  padding: 10px;
-  font-size: 0.875em;
-  color: #333;
-  box-shadow: 0px 4px 8px rgba(0, 0, 0, 0.1);
-  z-index: 10;
 }
 
-.validation-message::before {
-  content: "⚠️"; /* Add an exclamation icon */
-  margin-right: 5px;
-}
-
-.validation-message::after {
-  content: '';
-  position: absolute;
-  top: -6px; /* Adjust to point to the middle of the input field */
-  left: 20px;
-  border-width: 6px;
-  border-style: solid;
-  border-color: transparent transparent #d1d5db transparent; /* Arrow color same as border */
-}
-
-.validation-message strong {
-  font-weight: 600; /* Emphasize certain parts of the message */
-  color: #333;
-}
-
-.checkbox-group {
-  position: relative;
-  padding-left: 20px;
-}
-
-.checkbox-group .validation-message-checkbox {
-  display: none;
-  position: absolute;
-  top: 100%; /* Position below the checkbox */
-  left: 20px;
-  width: auto;
-  background-color: #fff;
-  border: 1px solid #d1d5db;
-  border-radius: 5px;
-  padding: 5px 10px;
-  font-size: 0.875em;
-  color: #333;
-  box-shadow: 0px 4px 8px rgba(0, 0, 0, 0.1);
-  z-index: 10;
-}
-
-.checkbox-group input:focus:invalid + .validation-message-checkbox {
-  display: block;
-}
-
-
-
-/* Adjusting the alignment of the icons */
-.input-group-addon {
+.input-group-text {
   display: flex;
   align-items: center;
-  justify-content: center;
-  height: 44px;
-  padding: 6px 12px;
-  font-size: 14px;
+  padding: 0.5rem 0.75rem;
+  font-size: 1rem;
   font-weight: 400;
-  line-height: 1;
-  color: #555;
+  line-height: 1.5;
+  color: #495057;
   text-align: center;
-  background-color: #eee;
-  border: 1px solid #ccc;
+  white-space: nowrap;
+  background-color: var(--light-gray);
+  border: 1px solid var(--border-color);
   border-radius: 4px;
   border-top-right-radius: 0;
   border-bottom-right-radius: 0;
 }
 
-.input-group {
-  display: flex;
-  align-items: center;
-  width: 100%;
-}
-
 .input-group .form-control {
-  height: 44px; /* Ensures consistency in height */
-  /*padding-left: 55px; /* Adjust to match the icon's space */
+  position: relative;
+  flex: 1 1 auto;
+  width: 1%;
+  margin-bottom: 0;
+  border-top-left-radius: 0;
+  border-bottom-left-radius: 0;
 }
 
-.input-group-addon {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  height: 44px; /* Ensure this matches the input height */
-  background-color: #eee;
-  border: 1px solid #d1d5db;
-  border-radius: 5px 0 0 5px;
-}
-
-.iti input[type="tel"] {
+/* Phone Input Styling */
+.iti {
   width: 100%;
-  padding-left: 55px; /* Ensure padding aligns with the flag and input text */
 }
 
-.form-control::placeholder {
-  color: #aaa; /* Light gray for the placeholder text */
-  opacity: 1; /* Ensure the placeholder is fully visible */
+.iti__flag-container {
+  z-index: 3;
 }
 
-/* Google Reviews Styles */
-.metric-card {
-    background-color: #fff;
-    transition: transform 0.2s;
+/* Checkbox Styling */
+.form-check {
+  position: relative;
+  display: block;
+  padding-left: 1.25rem;
 }
 
-.metric-card:hover {
-    transform: translateY(-2px);
-    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+.form-check-input {
+  position: absolute;
+  margin-top: 0.3rem;
+  margin-left: -1.25rem;
 }
 
-#reviewsTable .fa-star {
-    font-size: 0.875rem;
+.form-check-label {
+  margin-bottom: 0;
+  cursor: pointer;
 }
 
-#reviewsTable .badge {
-    font-size: 0.75rem;
-    padding: 0.25em 0.75em;
+.form-check-label a {
+  color: var(--primary-color);
+  text-decoration: none;
 }
 
-/* Review filters */
-.filters .form-select,
-.filters .form-control {
-    max-width: 150px;
+.form-check-label a:hover {
+  text-decoration: underline;
 }
 
-/* Review text cell */
-#reviewsTable td:nth-child(4) {
-    max-width: 300px;
-    white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
+/* Button Styling */
+.btn {
+  display: inline-block;
+  font-weight: 600;
+  text-align: center;
+  white-space: nowrap;
+  vertical-align: middle;
+  user-select: none;
+  border: 1px solid transparent;
+  padding: 0.5rem 1rem;
+  font-size: 1rem;
+  line-height: 1.5;
+  border-radius: 4px;
+  transition: var(--transition);
 }
 
-/* Response modal */
-#responseText {
-    min-height: 100px;
-    resize: vertical;
+.btn-lg {
+  padding: 0.75rem 1.5rem;
+  font-size: 1.1rem;
+  border-radius: 0.3rem;
 }
 
+.btn-primary {
+  color: #fff;
+  background-color: var(--primary-color);
+  border-color: var(--primary-color);
+}
 
+.btn-primary:hover {
+  background-color: var(--primary-dark);
+  border-color: var(--primary-dark);
+}
+
+.btn-outline-secondary {
+  color: #6c757d;
+  background-color: transparent;
+  border-color: #6c757d;
+}
+
+.btn-outline-secondary:hover {
+  color: #fff;
+  background-color: #6c757d;
+  border-color: #6c757d;
+}
+
+.d-grid {
+  display: grid;
+}
+
+.btn-block {
+  display: block;
+  width: 100%;
+}
+
+/* Invalid Form Feedback */
+.invalid-feedback {
+  display: none;
+  width: 100%;
+  margin-top: 0.25rem;
+  font-size: 80%;
+  color: var(--error-color);
+}
+
+.form-control.is-invalid,
+.was-validated .form-control:invalid {
+  border-color: var(--error-color);
+  padding-right: calc(1.5em + 0.75rem);
+  background-image: url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 12 12' width='12' height='12' fill='none' stroke='%23dc3545'%3e%3ccircle cx='6' cy='6' r='4.5'/%3e%3cpath stroke-linejoin='round' d='M5.8 3.6h.4L6 6.5z'/%3e%3ccircle cx='6' cy='8.2' r='.6' fill='%23dc3545' stroke='none'/%3e%3c/svg%3e");
+  background-repeat: no-repeat;
+  background-position: right calc(0.375em + 0.1875rem) center;
+  background-size: calc(0.75em + 0.375rem) calc(0.75em + 0.375rem);
+}
+
+.form-control.is-invalid:focus,
+.was-validated .form-control:invalid:focus {
+  border-color: var(--error-color);
+  box-shadow: 0 0 0 0.25rem rgba(220, 53, 69, 0.25);
+}
+
+.form-control.is-invalid + .invalid-feedback,
+.was-validated .form-control:invalid + .invalid-feedback,
+.validation-message {
+  display: block;
+}
+
+/* Alert Styling */
+.alert {
+  position: relative;
+  padding: 0.75rem 1.25rem;
+  margin-bottom: 1rem;
+  border: 1px solid transparent;
+  border-radius: 0.25rem;
+}
+
+.alert-danger {
+  color: #721c24;
+  background-color: #f8d7da;
+  border-color: #f5c6cb;
+}
+
+/* Modal Styling */
+.modal {
+  position: fixed;
+  top: 0;
+  left: 0;
+  z-index: 1050;
+  display: none;
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+  outline: 0;
+}
+
+.modal-dialog {
+  position: relative;
+  width: auto;
+  margin: 0.5rem;
+  pointer-events: none;
+}
+
+.modal-content {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+  pointer-events: auto;
+  background-color: #fff;
+  background-clip: padding-box;
+  border: 1px solid rgba(0, 0, 0, 0.2);
+  border-radius: 0.3rem;
+  outline: 0;
+}
+
+.modal-header {
+  display: flex;
+  flex-shrink: 0;
+  align-items: center;
+  justify-content: space-between;
+  padding: 1rem 1rem;
+  border-bottom: 1px solid #dee2e6;
+  border-top-left-radius: calc(0.3rem - 1px);
+  border-top-right-radius: calc(0.3rem - 1px);
+}
+
+.modal-body {
+  position: relative;
+  flex: 1 1 auto;
+  padding: 1rem;
+}
+
+.modal-footer {
+  display: flex;
+  flex-wrap: wrap;
+  flex-shrink: 0;
+  align-items: center;
+  justify-content: flex-end;
+  padding: 0.75rem;
+  border-top: 1px solid #dee2e6;
+  border-bottom-right-radius: calc(0.3rem - 1px);
+  border-bottom-left-radius: calc(0.3rem - 1px);
+}
+
+/* Responsive adjustments */
+@media (min-width: 576px) {
+  .modal-dialog {
+    max-width: 500px;
+    margin: 1.75rem auto;
+  }
+}
+
+@media (max-width: 768px) {
+  body {
+    padding: 10px;
+  }
+  
+  .login-container {
+    padding: 15px;
+  }
+  
+  .welcome-title {
+    font-size: 1.3rem;
+  }
+}
+
+/* Utility Classes */
+.text-center {
+  text-align: center;
+}
+
+.mt-3 {
+  margin-top: 1rem;
+}
+
+.mt-4 {
+  margin-top: 1.5rem;
+}
+
+.mb-2 {
+  margin-bottom: 0.5rem;
+}
+
+.mb-3 {
+  margin-bottom: 1rem;
+}
+
+.mb-4 {
+  margin-bottom: 1.5rem;
+}
+
+.mb-5 {
+  margin-bottom: 3rem;
+}
+
+.me-1 {
+  margin-right: 0.25rem;
+}
+
+.me-2 {
+  margin-right: 0.5rem;
+}
+
+.img-fluid {
+  max-width: 100%;
+  height: auto;
+}
+
+/* Custom animation for form elements */
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.form-group {
+  animation: fadeIn 0.5s ease-out forwards;
+}
+
+.form-group:nth-child(1) { animation-delay: 0.1s; }
+.form-group:nth-child(2) { animation-delay: 0.2s; }
+.form-group:nth-child(3) { animation-delay: 0.3s; }
+.form-group:nth-child(4) { animation-delay: 0.4s; }
+.form-group:nth-child(5) { animation-delay: 0.5s; }
