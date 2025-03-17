@@ -281,166 +281,110 @@ document.addEventListener('DOMContentLoaded', function() {
                         
                         console.log('WiFi LOGIN DEBUG: Original base_grant_url:', base_grant_url);
                         
-                        // IMPORTANT: First decode URL-encoded parameters before using them
-                        const decodedBaseGrantUrl = decodeURIComponent(base_grant_url);
-                        const decodedContinueUrl = decodeURIComponent(user_continue_url);
+                        // Decode the URL parameters first to make sure they're not double-encoded
+                        console.log('WiFi LOGIN DEBUG: Original base_grant_url:', base_grant_url);
                         
-                        console.log('WiFi LOGIN DEBUG: Decoded base_grant_url:', decodedBaseGrantUrl);
-                        console.log('WiFi LOGIN DEBUG: Decoded user_continue_url:', decodedContinueUrl);
+                        // Decode the URLs
+                        let decodedBaseGrantUrl = base_grant_url;
+                        let decodedContinueUrl = user_continue_url;
                         
                         try {
-                            // Parse the decoded base_grant_url
-                            const grantUrl = new URL(decodedBaseGrantUrl);
-                            console.log('WiFi LOGIN DEBUG: URL parsing successful:', grantUrl.toString());
+                            if (decodedBaseGrantUrl.includes('%')) {
+                                decodedBaseGrantUrl = decodeURIComponent(decodedBaseGrantUrl);
+                            }
                             
-                            // Method 1: Use the URL as provided by Meraki, append parameters properly
-                            let loginUrl = decodedBaseGrantUrl;
+                            if (decodedContinueUrl && decodedContinueUrl.includes('%')) {
+                                decodedContinueUrl = decodeURIComponent(decodedContinueUrl);
+                            }
                             
-                            // Use URLSearchParams to properly append to existing URL
-                            const urlObj = new URL(loginUrl);
+                            console.log('WiFi LOGIN DEBUG: Decoded base_grant_url:', decodedBaseGrantUrl);
+                            console.log('WiFi LOGIN DEBUG: Decoded user_continue_url:', decodedContinueUrl);
+                        } catch (e) {
+                            console.error('WiFi LOGIN DEBUG: Error decoding URLs:', e);
+                        }
+                        
+                        // According to Meraki documentation, try both formats
+                        // Format 1: Add parameters directly to the URL
+                        let redirectUrl = '';
+                        try {
+                            const baseUrl = new URL(decodedBaseGrantUrl);
+                            console.log('WiFi LOGIN DEBUG: URL parsing successful:', baseUrl.href);
                             
-                            // Add parameters
-                            if (decodedContinueUrl && decodedContinueUrl !== "undefined") {
-                                urlObj.searchParams.set('continue_url', decodedContinueUrl);
+                            // IMPORTANT: Try duration first, then continue_url - this order matters for Meraki
+                            baseUrl.searchParams.append('duration', duration.toString());
+                            
+                            if (decodedContinueUrl) {
+                                baseUrl.searchParams.append('continue_url', decodedContinueUrl);
                                 console.log('WiFi LOGIN DEBUG: Added continue_url parameter:', decodedContinueUrl);
                             }
                             
-                            urlObj.searchParams.set('duration', duration.toString());
                             console.log('WiFi LOGIN DEBUG: Added duration parameter:', duration);
                             
-                            // Get the final URL
-                            loginUrl = urlObj.toString();
-                            console.log('WiFi LOGIN DEBUG: FINAL Redirect URL:', loginUrl);
-                            
-                            // Prepare a fallback URL with direct string manipulation as a backup
-                            let fallbackUrl;
-                            
-                            // Method 2: Direct format per Meraki documentation (potential formats)
-                            const urlBase = grantUrl.origin + grantUrl.pathname;
-                            
-                            // Format 1: /?param=value (with slash before question mark)
-                            const format1 = `${urlBase}/?duration=${duration}${decodedContinueUrl && decodedContinueUrl !== "undefined" ? `&continue_url=${encodeURIComponent(decodedContinueUrl)}` : ''}`;
-                            
-                            // Format 2: ?param=value (without slash before question mark)
-                            const format2 = `${urlBase}?duration=${duration}${decodedContinueUrl && decodedContinueUrl !== "undefined" ? `&continue_url=${encodeURIComponent(decodedContinueUrl)}` : ''}`;
-                            
-                            // Use format 1 as fallback (based on their documentation example)
-                            fallbackUrl = format1;
-                            console.log('WiFi LOGIN DEBUG: Fallback URL:', fallbackUrl);
-                            
-                            // Also log alternative format for diagnostics
-                            console.log('WiFi LOGIN DEBUG: Alternative format URL:', format2);
-                            
-                            // Log WiFi connection to analytics
-                            try {
-                                console.log('WiFi LOGIN DEBUG: Logging WiFi connection to analytics...');
-                                logWiFiConnection({
-                                    sessionID: sessionID,
-                                    macAddress: client_mac,
-                                    duration: duration
-                                });
-                                console.log('WiFi LOGIN DEBUG: Successfully logged WiFi connection');
-                            } catch (error) {
-                                console.error('WiFi LOGIN DEBUG: Failed to log WiFi connection:', error);
-                                // Continue with the redirect even if analytics fails
-                            }
-                            
-                            // Show success message before redirect
-                            displaySuccess('Login successful! Connecting to WiFi...');
-                            console.log('WiFi LOGIN DEBUG: Success message displayed, redirecting in 1.5 seconds');
-                            
-                            // Redirect after a short delay to show the success message
-                            setTimeout(() => {
-                                console.log('WiFi LOGIN DEBUG: Now redirecting to:', loginUrl);
-                                
-                                // Store fallback URLs in case the first one fails
-                                localStorage.setItem('merakiFallbackUrl1', fallbackUrl);
-                                localStorage.setItem('merakiFallbackUrl2', format2);
-                                
-                                // Add an error handler for the redirect
-                                window.addEventListener('error', function(event) {
-                                    console.log('WiFi LOGIN DEBUG: Error occurred during redirect:', event.message);
-                                    
-                                    if (event.message.includes('ERR_FAILED') || event.message.includes('500')) {
-                                        console.log('WiFi LOGIN DEBUG: Primary URL failed, trying fallback 1...');
-                                        // Try the first fallback URL
-                                        const fallback1 = localStorage.getItem('merakiFallbackUrl1');
-                                        
-                                        // Set up another error handler for the fallback
-                                        window.addEventListener('error', function() {
-                                            console.log('WiFi LOGIN DEBUG: Fallback 1 failed, trying fallback 2...');
-                                            // Try the second fallback URL
-                                            window.location.href = localStorage.getItem('merakiFallbackUrl2');
-                                        }, { once: true });
-                                        
-                                        window.location.href = fallback1;
-                                    }
-                                }, { once: true });
-                                
-                                window.location.href = loginUrl;
-                            }, 1500);
-                            
-                        } catch (urlError) {
-                            // If URL parsing fails, fall back to simple string manipulation
-                            console.error('WiFi LOGIN DEBUG: URL parsing failed:', urlError);
-                            
-                            // Try a different approach - careful string manipulation of the decoded URL
-                            try {
-                                // Extract the base part of the URL
-                                const urlPattern = /^(https?:\/\/[^\/]+\/[^?]+)/i;
-                                const match = decodedBaseGrantUrl.match(urlPattern);
-                                
-                                if (match && match[1]) {
-                                    const cleanBaseUrl = match[1];
-                                    console.log('WiFi LOGIN DEBUG: Extracted clean base URL:', cleanBaseUrl);
-                                    
-                                    // Try both formats
-                                    const directUrl = `${cleanBaseUrl}?duration=${duration}${decodedContinueUrl ? `&continue_url=${encodeURIComponent(decodedContinueUrl)}` : ''}`;
-                                    const slashUrl = `${cleanBaseUrl}/?duration=${duration}${decodedContinueUrl ? `&continue_url=${encodeURIComponent(decodedContinueUrl)}` : ''}`;
-                                    
-                                    console.log('WiFi LOGIN DEBUG: Direct URL format:', directUrl);
-                                    console.log('WiFi LOGIN DEBUG: Slash URL format:', slashUrl);
-                                    
-                                    // Store both formats as fallbacks
-                                    localStorage.setItem('merakiDirectUrl', directUrl);
-                                    localStorage.setItem('merakiSlashUrl', slashUrl);
-                                    
-                                    // Show success message before redirect
-                                    displaySuccess('Login successful! Connecting to WiFi...');
-                                    
-                                    // Redirect after a short delay
-                                    setTimeout(() => {
-                                        console.log('WiFi LOGIN DEBUG: Now redirecting to extracted URL:', directUrl);
-                                        
-                                        // Set up error handler for the redirect
-                                        window.addEventListener('error', function() {
-                                            console.log('WiFi LOGIN DEBUG: Direct format failed, trying slash format');
-                                            window.location.href = localStorage.getItem('merakiSlashUrl');
-                                        }, { once: true });
-                                        
-                                        window.location.href = directUrl;
-                                    }, 1500);
-                                    
-                                    return; // Exit the function after setting up the redirect
-                                }
-                            } catch (extractError) {
-                                console.error('WiFi LOGIN DEBUG: Error extracting URL pattern:', extractError);
-                                // Continue to the final fallback
-                            }
-                            
-                            // Final fallback - most basic approach
-                            const fallbackUrl = `${decodedBaseGrantUrl}?duration=${duration}`;
-                            console.log('WiFi LOGIN DEBUG: Using simple fallback URL:', fallbackUrl);
-                            
-                            // Show success message before redirect
-                            displaySuccess('Login successful! Connecting to WiFi...');
-                            
-                            // Redirect after a short delay
-                            setTimeout(() => {
-                                console.log('WiFi LOGIN DEBUG: Now redirecting to fallback URL:', fallbackUrl);
-                                window.location.href = fallbackUrl;
-                            }, 1500);
+                            redirectUrl = baseUrl.href;
+                            console.log('WiFi LOGIN DEBUG: FINAL Redirect URL:', redirectUrl);
+                        } catch (error) {
+                            console.error('WiFi LOGIN DEBUG: URL parsing failed:', error);
                         }
+                        
+                        // Create fallback URLs with different formats
+                        
+                        // Format 2: Try with slash before query params
+                        const fallbackUrl = decodedBaseGrantUrl.endsWith('/')
+                            ? `${decodedBaseGrantUrl}?duration=${duration}${decodedContinueUrl ? `&continue_url=${encodeURIComponent(decodedContinueUrl)}` : ''}`
+                            : `${decodedBaseGrantUrl}/?duration=${duration}${decodedContinueUrl ? `&continue_url=${encodeURIComponent(decodedContinueUrl)}` : ''}`;
+                        console.log('WiFi LOGIN DEBUG: Fallback URL:', fallbackUrl);
+                        
+                        // Format 3: Try alternative parameter order
+                        const altFormatUrl = `${decodedBaseGrantUrl}?duration=${duration}${decodedContinueUrl ? `&continue_url=${encodeURIComponent(decodedContinueUrl)}` : ''}`;
+                        console.log('WiFi LOGIN DEBUG: Alternative format URL:', altFormatUrl);
+                        
+                        // Format 4: Try another format specific to Meraki captive portal
+                        const merakiFormat = `${decodedBaseGrantUrl}?duration=${duration}${decodedContinueUrl ? `&continue_url=${encodeURIComponent(decodedContinueUrl)}` : ''}`;
+                        
+                        // Store all URLs in localStorage for emergency fallbacks
+                        localStorage.setItem('merakiRedirectUrl', redirectUrl || altFormatUrl);
+                        localStorage.setItem('merakiFallbackUrl', fallbackUrl);
+                        localStorage.setItem('merakiAltFormatUrl', altFormatUrl);
+                        
+                        // Log WiFi connection to analytics
+                        try {
+                            console.log('WiFi LOGIN DEBUG: Logging WiFi connection to analytics...');
+                            logWiFiConnection({
+                                sessionID: sessionID,
+                                macAddress: client_mac,
+                                duration: duration
+                            });
+                            console.log('WiFi LOGIN DEBUG: Successfully logged WiFi connection');
+                        } catch (error) {
+                            console.error('WiFi LOGIN DEBUG: Failed to log WiFi connection:', error);
+                        }
+                        
+                        // Show success message before redirect
+                        displaySuccess('Login successful! Connecting to WiFi...');
+                        console.log('WiFi LOGIN DEBUG: Success message displayed, redirecting in 1.5 seconds');
+                        
+                        // First attempt - Primary URL with a delay for the success message
+                        setTimeout(() => {
+                            // Try our primary redirect URL first
+                            console.log('WiFi LOGIN DEBUG: Now redirecting to:', redirectUrl || altFormatUrl);
+                            window.location.href = redirectUrl || altFormatUrl;
+                            
+                            // Set up fallbacks if the first redirect doesn't work
+                            setTimeout(() => {
+                                console.log('WiFi LOGIN DEBUG: First redirect timed out, trying fallback format...');
+                                // Try fallback URL if the first one fails
+                                console.log('WiFi LOGIN DEBUG: Now trying fallback URL format...');
+                                window.location.href = merakiFormat;
+                                
+                                // Last resort fallback
+                                setTimeout(() => {
+                                    console.log('WiFi LOGIN DEBUG: All redirects failed, trying raw base_grant_url with parameters');
+                                    // Try just the raw base_grant_url with minimal parameters as last resort
+                                    const lastResortUrl = `${decodedBaseGrantUrl}?duration=${duration}`;
+                                    window.location.href = lastResortUrl;
+                                }, 2000);
+                            }, 2000);
+                        }, 1500);
                     })
                     .catch(error => {
                         console.error('WiFi LOGIN DEBUG: Form submission failed:', error);
