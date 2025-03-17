@@ -143,69 +143,49 @@ class AdminDashboard {
     }
 
     setupEventListeners() {
-        // General UI event listeners
-        document.addEventListener('DOMContentLoaded', () => {
-            console.log('DOMContentLoaded: Setting up event listeners');
-
-            // Menu toggle
-            const menuToggle = document.getElementById('menuToggle');
-            if (menuToggle) {
-                menuToggle.addEventListener('click', () => {
-                    document.body.classList.toggle('sidebar-collapsed');
-                });
-            }
-
-            // Logout button
-            const logoutBtn = document.getElementById('logoutBtn');
-            if (logoutBtn) {
-                logoutBtn.addEventListener('click', this.handleLogout.bind(this));
-            }
-
-            // Section-specific buttons and controls
-            const adminSection = document.getElementById('admin-users-section');
-            if (adminSection) {
-                const addAdminBtn = adminSection.querySelector('#addAdminBtn');
-                if (addAdminBtn) {
-                    addAdminBtn.addEventListener('click', this.handleAddAdmin.bind(this));
-                }
-            }
-            
-            // Clear scanning data button
-            console.log('Looking for clearScanningDataBtn');
-            const clearScanningDataBtn = document.getElementById('clearScanningDataBtn');
-            if (clearScanningDataBtn) {
-                console.log('Found clearScanningDataBtn, adding event listener');
-                clearScanningDataBtn.addEventListener('click', () => {
-                    console.log('Clear Scanning Data button clicked');
-                    this.handleClearScanningData();
-                });
-            } else {
-                console.warn('clearScanningDataBtn not found in the DOM');
-            }
-
-            // Add click listeners to all menu items
-            this.sections.forEach((section, name) => {
-                const menuElement = document.getElementById(section.menuId);
-                if (menuElement) {
-                    menuElement.addEventListener('click', (e) => {
-                        e.preventDefault();
-                        if (!section.hasSubmenu) {
-                            this.showSection(section.contentId);
-                        }
-                    });
-                }
-            });
-
-            // Handle sidebar collapse
-            const sidebarCollapse = document.getElementById('sidebarCollapse');
-            const sidebar = document.getElementById('sidebar');
-            if (sidebarCollapse && sidebar) {
-                sidebarCollapse.addEventListener('click', () => {
-                    sidebar.classList.toggle('collapsed');
-                    document.getElementById('content').classList.toggle('expanded');
+        console.log('Setting up event listeners');
+        
+        // Add click listeners to all menu items
+        this.sections.forEach((section, name) => {
+            const menuElement = document.getElementById(section.menuId);
+            if (menuElement) {
+                menuElement.addEventListener('click', (e) => {
+                    e.preventDefault();
+                    if (!section.hasSubmenu) {
+                        this.showSection(section.contentId);
+                    }
                 });
             }
         });
+
+        // Handle logout
+        const logoutBtn = document.getElementById('logoutBtn');
+        if (logoutBtn) {
+            logoutBtn.addEventListener('click', () => this.handleLogout());
+        }
+
+        // Handle sidebar collapse
+        const sidebarCollapse = document.getElementById('sidebarCollapse');
+        const sidebar = document.getElementById('sidebar');
+        if (sidebarCollapse && sidebar) {
+            sidebarCollapse.addEventListener('click', () => {
+                sidebar.classList.toggle('collapsed');
+                document.getElementById('content').classList.toggle('expanded');
+            });
+        }
+        
+        // Clear scanning data button - add specific handler for this button
+        console.log('Looking for clearScanningDataBtn');
+        const clearScanningDataBtn = document.getElementById('clearScanningDataBtn');
+        if (clearScanningDataBtn) {
+            console.log('Found clearScanningDataBtn, adding event listener');
+            clearScanningDataBtn.addEventListener('click', () => {
+                console.log('Clear Scanning Data button clicked');
+                this.handleClearScanningData();
+            });
+        } else {
+            console.warn('clearScanningDataBtn not found in the DOM');
+        }
     }
 
     setupSubmenuListeners() {
