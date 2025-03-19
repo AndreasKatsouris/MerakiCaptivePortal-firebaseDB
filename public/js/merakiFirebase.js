@@ -80,18 +80,39 @@ document.addEventListener('DOMContentLoaded', function() {
     let phoneInput;
     
     if (phoneInputField) {
-        phoneInput = window.intlTelInput(phoneInputField, {
-            initialCountry: "auto",
-            preferredCountries: ["za"],
-            separateDialCode: true,
-            utilsScript: "https://cdnjs.cloudflare.com/ajax/libs/intl-tel-input/17.0.8/js/utils.js",
-            geoIpLookup: function(callback) {
-                fetch('https://ipinfo.io/json')
-                    .then(response => response.json())
-                    .then(data => callback(data.country))
-                    .catch(() => callback('za')); // Default to South Africa if geolocation fails
+        try {
+            if (typeof window.intlTelInput === 'function') {
+                console.log('WiFi LOGIN DEBUG: Initializing phone input with intlTelInput');
+                phoneInput = window.intlTelInput(phoneInputField, {
+                    initialCountry: "auto",
+                    preferredCountries: ["za"],
+                    separateDialCode: true,
+                    utilsScript: "js/utils.js", // Use local file first
+                    geoIpLookup: function(callback) {
+                        try {
+                            fetch('https://ipinfo.io/json')
+                                .then(response => response.json())
+                                .then(data => callback(data.country))
+                                .catch(error => {
+                                    console.warn('WiFi LOGIN DEBUG: GeoIP lookup failed:', error);
+                                    callback('za'); // Default to South Africa if lookup fails
+                                });
+                        } catch (error) {
+                            console.warn('WiFi LOGIN DEBUG: GeoIP lookup error:', error);
+                            callback('za'); // Default to South Africa
+                        }
+                    }
+                });
+            } else {
+                console.warn('WiFi LOGIN DEBUG: intlTelInput not available, using basic input');
+                // Just use the basic input field
+                phoneInputField.placeholder = "Enter your phone number";
             }
-        });
+        } catch (error) {
+            console.error('WiFi LOGIN DEBUG: Error initializing phone input:', error);
+            // Just use the basic input field
+            phoneInputField.placeholder = "Enter your phone number";
+        }
     }
 
     // Form element selectors
@@ -351,27 +372,59 @@ document.addEventListener('DOMContentLoaded', function() {
                         displaySuccess('Login successful! Connecting to WiFi...');
                         console.log('WiFi LOGIN DEBUG: Success message displayed, redirecting in 1.5 seconds');
                         
+                        // Create a more reliable redirection function
+                        function safeRedirect(url) {
+                            console.log('WiFi LOGIN DEBUG: Redirecting to:', url);
+                            
+                            // Try multiple methods for redirection (some may work better in certain browsers)
+                            try {
+                                // Method 1: Create and click a link (works better in some captive portals)
+                                const link = document.createElement('a');
+                                link.href = url;
+                                link.target = '_self';
+                                link.style.display = 'none';
+                                document.body.appendChild(link);
+                                link.click();
+                                document.body.removeChild(link);
+                                
+                                // Method 2: Direct location change (backup)
+                                setTimeout(() => {
+                                    window.location.href = url;
+                                }, 100);
+                                
+                                // Method 3: Try window.open (another backup)
+                                setTimeout(() => {
+                                    window.open(url, '_self');
+                                }, 200);
+                            } catch (error) {
+                                console.error('WiFi LOGIN DEBUG: Redirect error:', error);
+                                // Final fallback
+                                window.location.replace(url);
+                            }
+                        }
+                        
                         // First attempt - Primary URL with a delay for the success message
                         setTimeout(() => {
-                            // Try our primary redirect URL first
-                            console.log('WiFi LOGIN DEBUG: Now redirecting to:', redirectUrl);
-                            window.location.href = redirectUrl;
-                            
-                            // Set up fallbacks if the first redirect doesn't work
-                            setTimeout(() => {
-                                console.log('WiFi LOGIN DEBUG: First redirect timed out, trying fallback format...');
-                                // Try fallback URL if the first one fails
-                                console.log('WiFi LOGIN DEBUG: Now trying fallback URL format...');
-                                window.location.href = docFormat;
+                            try {
+                                // Use the main URL format as first try
+                                safeRedirect(redirectUrl);
                                 
-                                // Last resort fallback
+                                // Set up fallbacks in case the first redirect doesn't work
                                 setTimeout(() => {
-                                    console.log('WiFi LOGIN DEBUG: All redirects failed, trying raw base_grant_url with parameters');
-                                    // Try just the raw base_grant_url with minimal parameters as last resort
-                                    const lastResortUrl = `${decodedBaseGrantUrl}?continue_url=${encodeURIComponent(decodedContinueUrl)}`;
-                                    window.location.href = lastResortUrl;
+                                    console.log('WiFi LOGIN DEBUG: First redirect may have failed, trying fallback format...');
+                                    safeRedirect(docFormat);
+                                    
+                                    // Last resort fallback
+                                    setTimeout(() => {
+                                        console.log('WiFi LOGIN DEBUG: All redirects may have failed, trying base grant URL directly');
+                                        safeRedirect(decodedBaseGrantUrl);
+                                    }, 2000);
                                 }, 2000);
-                            }, 2000);
+                            } catch (redirectError) {
+                                console.error('WiFi LOGIN DEBUG: Error during redirect:', redirectError);
+                                // Try direct redirection as last resort
+                                window.location.href = decodedBaseGrantUrl || base_grant_url;
+                            }
                         }, 1500);
                     })
                     .catch(error => {

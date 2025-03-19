@@ -53,9 +53,9 @@
 
     <!-- Stylesheets -->
     <link rel="stylesheet" href="css/bootstrap.min.css">
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.4/css/all.min.css">
+    <link rel="stylesheet" href="css/all.min.css" onerror="this.onerror=null;this.href='https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.4/css/all.min.css';">
     <link rel="stylesheet" href="css/style.css">
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/intl-tel-input/17.0.8/css/intlTelInput.css">
+    <link rel="stylesheet" href="css/intlTelInput.css" onerror="this.onerror=null;this.href='https://cdnjs.cloudflare.com/ajax/libs/intl-tel-input/17.0.8/css/intlTelInput.css';">
     <style>
       /* Additional styles for phone input */
       .iti {
@@ -194,13 +194,39 @@
     </script>
     
     <!-- JavaScript Dependencies -->
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/intl-tel-input/17.0.8/js/intlTelInput.min.js"></script>
-    <script src="js/jquery-3.2.1.min.js"></script>
-    <script src="js/bootstrap.bundle.min.js"></script>
-    
-    <!-- Main App Script -->
-    <script type="module" src="js/merakiFirebase.js"></script>
+    <script>
+        // Load IntlTelInput from local or CDN with fallback
+        function loadScript(src, fallbackSrc, callback) {
+            var script = document.createElement('script');
+            script.src = src;
+            script.onload = callback;
+            script.onerror = function() {
+                console.log('Failed to load script from primary source, trying fallback: ' + fallbackSrc);
+                var fallbackScript = document.createElement('script');
+                fallbackScript.src = fallbackSrc;
+                fallbackScript.onload = callback;
+                fallbackScript.onerror = function() {
+                    console.error('Failed to load script from fallback source: ' + fallbackSrc);
+                };
+                document.head.appendChild(fallbackScript);
+            };
+            document.head.appendChild(script);
+        }
 
+        // Load scripts in sequence with fallbacks
+        loadScript('js/intlTelInput.min.js', 'https://cdnjs.cloudflare.com/ajax/libs/intl-tel-input/17.0.8/js/intlTelInput.min.js', function() {
+            loadScript('js/jquery-3.2.1.min.js', 'https://code.jquery.com/jquery-3.2.1.min.js', function() {
+                loadScript('js/bootstrap.bundle.min.js', 'https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/js/bootstrap.bundle.min.js', function() {
+                    // All scripts loaded, now load the main app script
+                    var mainScript = document.createElement('script');
+                    mainScript.type = 'module';
+                    mainScript.src = 'js/merakiFirebase.js';
+                    document.head.appendChild(mainScript);
+                });
+            });
+        });
+    </script>
+    
     <!-- Service Worker Registration -->
     <script>
       if ('serviceWorker' in navigator) {
