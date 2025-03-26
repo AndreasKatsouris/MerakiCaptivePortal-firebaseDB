@@ -89,38 +89,56 @@ class AdminDashboard {
             menuId: 'campaignsMenu',
             contentId: 'campaignsContent',
             init: initializeCampaignManagement,
-            willDestroy: cleanupCampaignManagement
+            willDestroy: cleanupCampaignManagement,
+            parent: 'engageSubmenu'
         });
 
         this.sections.set('guestManagementContent', {
             menuId: 'guestManagementMenu',
             contentId: 'guestManagementContent',
             init: initializeGuestManagement,
-            cleanup: cleanupGuestManagement
+            cleanup: cleanupGuestManagement,
+            parent: 'engageSubmenu'
         });
 
         this.sections.set('analyticsContent', {
             menuId: 'analyticsMenu',
-            contentId: 'analyticsContent'
+            contentId: 'analyticsContent',
+            parent: 'driversSubmenu'
         });
 
         this.sections.set('adminUsersContent', {
             menuId: 'adminUsersMenu',
             contentId: 'adminUsersContent',
-            init: () => this.initializeAdminUsersSection()
+            init: () => this.initializeAdminUsersSection(),
+            parent: 'settingsSubmenu'
         });
 
         this.sections.set('projectManagementContent', {
             menuId: 'projectManagementMenu',
             contentId: 'projectManagementContent',
-            init: initializeProjectManagement
+            init: initializeProjectManagement,
+            parent: 'driversSubmenu'
         });
 
         this.sections.set('receiptManagementContent', {
             menuId: 'receiptManagementMenu',
             contentId: 'receiptManagementContent',
             init: initializeReceiptManagement,
-            cleanup: cleanupReceiptManagement
+            cleanup: cleanupReceiptManagement,
+            parent: 'engageSubmenu'
+        });
+
+        this.sections.set('foodCostContent', {
+            menuId: 'foodCostMenu',
+            contentId: 'foodCostContent',
+            init: () => {
+                // Create a new Vue instance for the Food Cost module
+                console.log('Creating Food Cost Vue instance');
+                return window.initializeFoodCostModule();
+            },
+            cleanup: window.cleanupFoodCostModule,
+            parent: 'driversSubmenu'
         });
 
         this.sections.set('settingsContent', {
@@ -202,15 +220,44 @@ class AdminDashboard {
             });
         }
 
-        // Handle submenu items
-        document.querySelectorAll('.submenu .nav-link').forEach(link => {
-            link.addEventListener('click', (e) => {
+        // Handle engage submenu
+        const engageLink = document.querySelector('[href="#engageSubmenu"]');
+        if (engageLink) {
+            engageLink.addEventListener('click', (e) => {
                 e.preventDefault();
-                const sectionName = this.getSectionNameFromMenuId(link.id);
-                if (sectionName) {
-                    this.showSection(sectionName);
+                const submenu = document.getElementById('engageSubmenu');
+                if (submenu) {
+                    submenu.classList.toggle('show');
+                    engageLink.querySelector('.fa-chevron-down')?.classList.toggle('rotate');
                 }
             });
+        }
+
+        // Handle drivers submenu
+        const driversLink = document.querySelector('[href="#driversSubmenu"]');
+        if (driversLink) {
+            driversLink.addEventListener('click', (e) => {
+                e.preventDefault();
+                const submenu = document.getElementById('driversSubmenu');
+                if (submenu) {
+                    submenu.classList.toggle('show');
+                    driversLink.querySelector('.fa-chevron-down')?.classList.toggle('rotate');
+                }
+            });
+        }
+
+        // Handle submenu item clicks
+        this.sections.forEach((section, sectionId) => {
+            if (section.parent) {
+                const menuItem = document.getElementById(section.menuId);
+                if (menuItem) {
+                    menuItem.addEventListener('click', (e) => {
+                        e.preventDefault();
+                        e.stopPropagation(); // Prevent triggering parent click
+                        this.showSection(sectionId);
+                    });
+                }
+            }
         });
     }
 
@@ -285,6 +332,12 @@ class AdminDashboard {
                     break;
                 case 'projectManagementContent':
                     await initializeProjectManagement();
+                    break;
+                case 'foodCostContent':
+                    console.log('Initializing food cost module...');
+                    // Explicitly show the content section first
+                    document.getElementById('foodCostContent').style.display = 'block';
+                    await window.initializeFoodCostModule();
                     break;
             }
         } catch (error) {

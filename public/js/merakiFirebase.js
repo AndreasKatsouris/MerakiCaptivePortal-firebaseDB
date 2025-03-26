@@ -3,6 +3,20 @@ This script collects guest WiFi login form data, processes the parameters sent b
 stores the results in a Firebase database, and authenticates the user with the Meraki WiFi network.
 */
 
+/**
+ * Laki Sparks - Meraki Captive Portal
+ * Version: 1.1
+ * Last Updated: 2025-03-26
+ * 
+ * CHANGELOG:
+ * v1.1 (2025-03-26):
+ * - Fixed WiFi login redirect flow
+ * - Implemented offline data storage via localStorage
+ * - Fixed phone number collection with intlTelInput
+ * - Added resource files for better UI experience
+ * - Added fallback redirect methods for better reliability
+ */
+
 // Import Firebase modules from the centralized config file
 import { rtdb, ref, set, update, push, get } from './config/firebase-config.js';
 import { logPageView, logFormSubmission, logWiFiConnection } from './config/firebase-analytics.js';
@@ -268,198 +282,84 @@ document.addEventListener('DOMContentLoaded', function() {
                     name: nameInput ? nameInput.value : '',
                     email: emailInput ? emailInput.value : '',
                     table: tableInput ? tableInput.value : '',
-                    phoneNumber: phoneInput ? phoneInput.value : '' // Ensure we use phoneNumber consistently
+                    phoneNumber: phoneInput ? phoneInput.getNumber() : '' // Correctly get phone number using getNumber() method
                 };
                 
-                // Log the form submission to analytics
+                // Store form data in localStorage for offline resilience
                 try {
-                    logFormSubmission(formData);
-                    console.log('Analytics event logged');
-                } catch (error) {
-                    console.error('Failed to log form submission:', error);
-                    // Continue with the rest of the process even if analytics fails
-                }
-                
-                // Process form and save data to Firebase
-                processFormData(formData, client_mac, node_mac)
-                    .then(sessionID => {
-                        // DEBUGGING: Log the session ID
-                        console.log('WiFi LOGIN DEBUG: Generated session ID:', sessionID);
-                        
-                        // Get the Meraki parameters for redirection
-                        let redirectUrl = '';
-                        
-                        try {
-                            // First, ensure we have properly decoded base_grant_url and user_continue_url
-                            // For maximum compatibility, try to use the format directly from Meraki documentation
-                            
-                            console.log('WiFi LOGIN DEBUG: Original base_grant_url:', base_grant_url);
-                            console.log('WiFi LOGIN DEBUG: Original user_continue_url:', user_continue_url);
-                            
-                            // Remove URL encoding if present
-                            let decodedBaseGrantUrl = base_grant_url;
-                            let decodedContinueUrl = user_continue_url;
-                            
-                            try {
-                                if (decodedBaseGrantUrl.includes('%')) {
-                                    decodedBaseGrantUrl = decodeURIComponent(decodedBaseGrantUrl);
-                                }
-                                if (decodedContinueUrl && decodedContinueUrl.includes('%')) {
-                                    decodedContinueUrl = decodeURIComponent(decodedContinueUrl);
-                                }
-                            } catch (e) {
-                                console.error('WiFi LOGIN DEBUG: Error decoding URLs:', e);
-                            }
-                            
-                            console.log('WiFi LOGIN DEBUG: Decoded base_grant_url:', decodedBaseGrantUrl);
-                            console.log('WiFi LOGIN DEBUG: Decoded user_continue_url:', decodedContinueUrl);
-                            
-                            // Try multiple formats of the URL to ensure compatibility
-                            
-                            // Format 1: Standard format per Meraki documentation
-                            const format1 = `${decodedBaseGrantUrl}?continue_url=${encodeURIComponent(decodedContinueUrl)}&duration=3600`;
-                            console.log('WiFi LOGIN DEBUG: Format 1 URL:', format1);
-                            
-                            // Format 2: Using base_grant_url directly (some deployments need this)
-                            const format2 = decodedBaseGrantUrl;
-                            console.log('WiFi LOGIN DEBUG: Format 2 URL:', format2);
-                            
-                            // Format 3: With only continue_url parameter
-                            const format3 = `${decodedBaseGrantUrl}?continue_url=${encodeURIComponent(decodedContinueUrl)}`;
-                            console.log('WiFi LOGIN DEBUG: Format 3 URL:', format3);
-                            
-                            // Format 4: Alternative parameter order
-                            const format4 = `${decodedBaseGrantUrl}?duration=3600&continue_url=${encodeURIComponent(decodedContinueUrl)}`;
-                            console.log('WiFi LOGIN DEBUG: Format 4 URL:', format4);
-                            
-                            // Store the URLs for redirection
-                            redirectUrl = format1; // Use the standard format as the primary URL
-                            
-                            // Store all formats in localStorage for emergency recovery
-                            localStorage.setItem('merakiFormat1', format1);
-                            localStorage.setItem('merakiFormat2', format2);
-                            localStorage.setItem('merakiFormat3', format3);
-                            localStorage.setItem('merakiFormat4', format4);
-                            
-                        } catch (urlError) {
-                            console.error('WiFi LOGIN DEBUG: Error constructing URLs:', urlError);
-                            // Fallback to basic format
-                            redirectUrl = base_grant_url;
-                        }
-                        
-                        // Show success message before redirect
-                        displaySuccess('Login successful! Connecting to WiFi...');
-                        console.log('WiFi LOGIN DEBUG: Success message displayed, redirecting in 1.5 seconds');
-                        
-                        // Create a more reliable redirection function with multiple fallbacks
-                        function safeRedirect(url, attempts) {
-                            console.log(`WiFi LOGIN DEBUG: Trying redirect attempt ${attempts} to:`, url);
-                            
-                            // Create a popup message to inform the user
-                            const popupDiv = document.createElement('div');
-                            popupDiv.style.position = 'fixed';
-                            popupDiv.style.bottom = '10px';
-                            popupDiv.style.left = '10px';
-                            popupDiv.style.right = '10px';
-                            popupDiv.style.padding = '10px';
-                            popupDiv.style.backgroundColor = '#ffeb3b';
-                            popupDiv.style.color = '#000';
-                            popupDiv.style.borderRadius = '5px';
-                            popupDiv.style.boxShadow = '0 2px 4px rgba(0,0,0,0.2)';
-                            popupDiv.style.zIndex = '9999';
-                            popupDiv.innerHTML = `
-                                <div style="display:flex;justify-content:space-between;align-items:center;">
-                                <span>If not redirected automatically, <a href="${url}" style="color:#0066cc;font-weight:bold;">click here</a> to connect.</span>
-                                <button style="background:transparent;border:none;font-size:20px;cursor:pointer;" onclick="this.parentNode.parentNode.remove()">×</button>
-                                </div>
-                            `;
-                            document.body.appendChild(popupDiv);
-                            
-                            // Try multiple redirection methods
-                            try {
-                                // Method 1: window.location.href (most compatible)
-                                window.location.href = url;
-                                
-                                // Add some fallback methods with timeouts
-                                setTimeout(() => {
-                                    try {
-                                        // Method 2: Create and click a link
-                                        const link = document.createElement('a');
-                                        link.setAttribute('href', url);
-                                        link.style.display = 'none';
-                                        document.body.appendChild(link);
-                                        link.click();
-                                    } catch (e) {
-                                        console.warn('WiFi LOGIN DEBUG: Link click method failed:', e);
-                                    }
-                                }, 300);
-                                
-                                setTimeout(() => {
-                                    try {
-                                        // Method 3: Try window.location.replace
-                                        window.location.replace(url);
-                                    } catch (e) {
-                                        console.warn('WiFi LOGIN DEBUG: Replace method failed:', e);
-                                    }
-                                }, 600);
-                                
-                                setTimeout(() => {
-                                    try {
-                                        // Method 4: Try window.open
-                                        window.open(url, '_self');
-                                    } catch (e) {
-                                        console.warn('WiFi LOGIN DEBUG: Window open method failed:', e);
-                                    }
-                                }, 900);
-                                
-                            } catch (error) {
-                                console.error('WiFi LOGIN DEBUG: All redirect methods failed:', error);
-                            }
-                        }
-                        
-                        // Attempt redirects with multiple URL formats
+                    const sessionID = generateSessionID();
+                    const storedData = {
+                        sessionID: sessionID,
+                        formData: formData,
+                        client_mac: client_mac,
+                        node_mac: node_mac,
+                        timestamp: new Date().toISOString(),
+                        base_grant_url: base_grant_url,
+                        user_continue_url: user_continue_url
+                    };
+                    localStorage.setItem('pendingWifiLogin', JSON.stringify(storedData));
+                    console.log('WiFi LOGIN DEBUG: Form data saved to localStorage with sessionID:', sessionID);
+
+                    // Show success message
+                    displaySuccess("Connecting to WiFi network...");
+
+                    // Immediately redirect to Meraki auth URL
+                    if (base_grant_url) {
+                        const redirectURL = constructRedirectURL(base_grant_url, user_continue_url);
+                        console.log('WiFi LOGIN DEBUG: Redirecting to Meraki auth URL:', redirectURL);
                         setTimeout(() => {
+                            // Direct redirect instead of using the removed safeRedirect function
                             try {
-                                // Get URLs from localStorage (in case they've been updated)
-                                const format1 = localStorage.getItem('merakiFormat1') || redirectUrl;
-                                const format2 = localStorage.getItem('merakiFormat2') || decodedBaseGrantUrl;
-                                const format3 = localStorage.getItem('merakiFormat3');
-                                const format4 = localStorage.getItem('merakiFormat4');
+                                // Attempt primary redirect method
+                                window.location.href = redirectURL;
                                 
-                                // First attempt with format 1 (standard)
-                                safeRedirect(format1, 1);
-                                
-                                // Set up fallbacks with different formats
+                                // Fallback methods
                                 setTimeout(() => {
                                     if (document.visibilityState !== 'hidden') {
-                                        console.log('WiFi LOGIN DEBUG: User still here, trying format 2...');
-                                        safeRedirect(format2, 2);
-                                        
-                                        setTimeout(() => {
-                                            if (document.visibilityState !== 'hidden') {
-                                                console.log('WiFi LOGIN DEBUG: User still here, trying format 3...');
-                                                safeRedirect(format3, 3);
-                                                
-                                                setTimeout(() => {
-                                                    if (document.visibilityState !== 'hidden') {
-                                                        console.log('WiFi LOGIN DEBUG: Final attempt with format 4...');
-                                                        safeRedirect(format4, 4);
-                                                    }
-                                                }, 2000);
-                                            }
-                                        }, 2000);
+                                        // Try alternative redirect if first one didn't work
+                                        const link = document.createElement('a');
+                                        link.href = redirectURL;
+                                        link.target = '_self';
+                                        document.body.appendChild(link);
+                                        link.click();
                                     }
-                                }, 2000);
-                                
-                            } catch (redirectError) {
-                                console.error('WiFi LOGIN DEBUG: Error during redirect sequence:', redirectError);
-                                alert('Connection issue detected. Please click the link in the yellow box to connect.');
+                                }, 300);
+                            } catch (error) {
+                                console.error('WiFi LOGIN DEBUG: Redirect error:', error);
+                                // Show manual link option
+                                const manualDiv = document.createElement('div');
+                                manualDiv.style.position = 'fixed';
+                                manualDiv.style.bottom = '10px';
+                                manualDiv.style.left = '10px';
+                                manualDiv.style.right = '10px';
+                                manualDiv.style.padding = '10px';
+                                manualDiv.style.backgroundColor = '#ffeb3b';
+                                manualDiv.style.color = '#000';
+                                manualDiv.style.borderRadius = '5px';
+                                manualDiv.style.zIndex = '9999';
+                                manualDiv.innerHTML = `<p>If not redirected automatically, <a href="${redirectURL}" style="color:#0066cc;font-weight:bold;">click here</a> to connect.</p>`;
+                                document.body.appendChild(manualDiv);
                             }
-                        }, 1500);
+                        }, 500);
+                    } else {
+                        console.error('WiFi LOGIN DEBUG: Cannot redirect - missing base_grant_url');
+                        displayError("Connection information is missing. Please refresh and try again.");
+                    }
+                } catch (error) {
+                    console.error('WiFi LOGIN DEBUG: Error saving data:', error);
+                    displayError("An error occurred. Please try again.");
+                }
+
+                // Attempt to process the form data in background, but don't wait for it
+                processFormData(formData, client_mac, node_mac)
+                    .then(sessionID => {
+                        // Success handling moved to redirect function
+                        console.log('WiFi LOGIN DEBUG: Background process completed with sessionID:', sessionID);
                     })
                     .catch(error => {
-                        console.error('WiFi LOGIN DEBUG: Form submission failed:', error);
-                        displayError('Error: ' + error.message);
+                        // Error already logged in processFormData, no need to display to user
+                        // since we've already redirected
+                        console.error('WiFi LOGIN DEBUG: Background process error:', error);
                     });
             } else {
                 console.warn('WiFi LOGIN DEBUG: Form validation failed');
@@ -742,5 +642,78 @@ document.addEventListener('DOMContentLoaded', function() {
             }
         }
         return null;
+    }
+
+    // Function to construct the proper redirect URL
+    function constructRedirectURL(base_grant_url, user_continue_url) {
+        try {
+            // Make sure the base_grant_url is properly decoded
+            const decodedBaseGrantUrl = decodeURIComponent(base_grant_url);
+            
+            // Check if we have a user_continue_url
+            let continueUrl = '';
+            if (user_continue_url) {
+                continueUrl = decodeURIComponent(user_continue_url);
+            }
+            
+            // Build the full redirect URL
+            // If the base_grant_url already has parameters, add continue_url as &continue_url=
+            // Otherwise, add it as ?continue_url=
+            const separator = decodedBaseGrantUrl.includes('?') ? '&' : '?';
+            const redirectUrl = continueUrl 
+                ? `${decodedBaseGrantUrl}${separator}continue_url=${encodeURIComponent(continueUrl)}`
+                : decodedBaseGrantUrl;
+            
+            console.log('WiFi LOGIN DEBUG: Constructed redirect URL:', redirectUrl);
+            return redirectUrl;
+        } catch (error) {
+            console.error('WiFi LOGIN DEBUG: Error constructing redirect URL:', error);
+            // Return the base_grant_url as a fallback
+            return base_grant_url;
+        }
+    }
+
+    // Add event listener to try uploading saved data after page loads
+    window.addEventListener('load', function() {
+        setTimeout(checkAndUploadOfflineData, 2000);
+    });
+
+    // Function to check for and upload offline data
+    function checkAndUploadOfflineData() {
+        try {
+            const savedData = localStorage.getItem('pendingWifiLogin');
+            if (savedData) {
+                console.log('WiFi LOGIN DEBUG: Found saved login data, attempting to upload');
+                const parsedData = JSON.parse(savedData);
+                
+                // Check if this is a post-authentication page load
+                const currentUrl = window.location.href;
+                if (currentUrl.includes('success=true') || 
+                    currentUrl.includes(parsedData.user_continue_url) || 
+                    !currentUrl.includes('captive-portal')) {
+                    
+                    console.log('WiFi LOGIN DEBUG: Detected successful authentication, uploading saved data');
+                    
+                    // Try to upload the saved data
+                    writeUserData({
+                        sessionID: parsedData.sessionID,
+                        timestamp: parsedData.timestamp,
+                        ...parsedData.formData,
+                        client_mac: parsedData.client_mac,
+                        node_mac: parsedData.node_mac
+                    }, parsedData.client_mac, parsedData.node_mac)
+                    .then(() => {
+                        console.log('WiFi LOGIN DEBUG: Successfully uploaded saved data');
+                        localStorage.removeItem('pendingWifiLogin');
+                    })
+                    .catch(error => {
+                        console.error('WiFi LOGIN DEBUG: Failed to upload saved data:', error);
+                        // Keep the data for later retry
+                    });
+                }
+            }
+        } catch (error) {
+            console.error('WiFi LOGIN DEBUG: Error in checkAndUploadOfflineData:', error);
+        }
     }
 });
