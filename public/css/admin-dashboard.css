@@ -95,6 +95,8 @@ body {
     box-shadow: 0 2px 4px rgba(0,0,0,0.1);
     margin-bottom: 20px;
     transition: transform 0.2s;
+    z-index: 1 !important;
+    position: relative;
 }
 
 .card:hover {

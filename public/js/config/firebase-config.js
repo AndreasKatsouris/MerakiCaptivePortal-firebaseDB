@@ -3,7 +3,7 @@ import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.12.5/fireba
 import { getAuth, signInWithEmailAndPassword, signOut } from 'https://www.gstatic.com/firebasejs/10.12.5/firebase-auth.js';
 import { getFirestore } from 'https://www.gstatic.com/firebasejs/10.12.5/firebase-firestore.js';
 import { getFunctions, httpsCallable } from 'https://www.gstatic.com/firebasejs/10.12.5/firebase-functions.js';
-import { getDatabase, ref, push, set, get, update, remove } from 'https://www.gstatic.com/firebasejs/10.12.5/firebase-database.js';
+import { getDatabase, ref, push, set, get, update, remove, query, orderByChild, orderByKey, orderByValue, limitToFirst, limitToLast, startAt, endAt, equalTo } from 'https://www.gstatic.com/firebasejs/10.12.5/firebase-database.js';
 import { getStorage, ref as storageRef, uploadBytesResumable, getDownloadURL } from 'https://www.gstatic.com/firebasejs/10.12.5/firebase-storage.js';
 
 // Firebase configuration
@@ -43,3 +43,36 @@ export {
     update,
     remove
 };
+
+// Export all the Firebase instances and methods to the window object
+// This ensures that non-module scripts can access Firebase functions
+window.firebaseExports = {
+    rtdb,
+    auth,
+    db,
+    functions,
+    ref,
+    get,
+    set,
+    update,
+    push,
+    remove,
+    query,
+    orderByChild,
+    orderByKey,
+    orderByValue,
+    limitToFirst,
+    limitToLast,
+    startAt,
+    endAt,
+    equalTo
+};
+
+// Also provide an initialization function that can be called to get these exports
+window.initializeFirebase = function() {
+    return window.firebaseExports;
+};
+
+// Dispatch an event to signal Firebase is ready - for scripts that load before this one
+document.dispatchEvent(new Event('firebaseReady'));
+console.log('Firebase config loaded and ready for use');

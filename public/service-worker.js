@@ -3,32 +3,48 @@
  * Provides caching and offline capabilities
  */
 
-const CACHE_NAME = 'ob-wifi-cache-v1';
-const ASSETS_TO_CACHE = [
+const CACHE_NAME = 'ob-wifi-cache-v1.2';
+const CACHE_ASSETS = [
   '/',
   '/index.html',
-  '/css/style.css',
-  '/css/bootstrap.min.css',
-  '/js/jquery-3.2.1.min.js',
-  '/js/bootstrap.bundle.min.js',
-  '/js/merakiFirebase.js',
+  '/admin-dashboard.html',
   '/js/config/firebase-config.js',
-  '/js/config/firebase-analytics.js',
-  '/img/default-logo.png',
-  'https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.4/css/all.min.css',
-  'https://cdnjs.cloudflare.com/ajax/libs/intl-tel-input/17.0.8/css/intlTelInput.css',
-  'https://cdnjs.cloudflare.com/ajax/libs/intl-tel-input/17.0.8/js/intlTelInput.min.js',
-  'https://cdnjs.cloudflare.com/ajax/libs/intl-tel-input/17.0.8/js/utils.js'
+  '/js/service-worker-registration.js',
+  '/js/food-cost.js',
+  '/js/food-cost-standalone.js',
+  '/js/admin-dashboard.js',
+  // '/css/styles.css', // Removed - file does not exist
+  // The default-logo.png may not exist, so we'll handle it specially
+  // '/img/default-logo.png',
+  '/manifest.json'
 ];
 
-// Install event - cache static assets
+// Install event - cache assets
 self.addEventListener('install', event => {
   console.log('[Service Worker] Installing...');
+  
   event.waitUntil(
     caches.open(CACHE_NAME)
       .then(cache => {
         console.log('[Service Worker] Caching app shell...');
-        return cache.addAll(ASSETS_TO_CACHE);
+        
+        // Use Promise.allSettled to continue even if some assets fail to cache
+        const cachePromises = CACHE_ASSETS.map(url => {
+          return fetch(url)
+            .then(response => {
+              if (!response.ok) {
+                throw new Error(`Failed to fetch ${url}: ${response.status} ${response.statusText}`);
+              }
+              return cache.put(url, response);
+            })
+            .catch(error => {
+              console.warn(`[Service Worker] Failed to cache: ${url}`, error);
+              // Return resolved promise to allow other assets to be cached
+              return Promise.resolve();
+            });
+        });
+        
+        return Promise.allSettled(cachePromises);
       })
       .then(() => {
         console.log('[Service Worker] Install completed');
@@ -36,6 +52,8 @@ self.addEventListener('install', event => {
       })
       .catch(error => {
         console.error('[Service Worker] Install failed:', error);
+        // Still complete installation even if caching failed
+        return self.skipWaiting();
       })
   );
 });
@@ -75,21 +93,32 @@ self.addEventListener('fetch', event => {
   }
 
   // For HTML files, use network-first strategy
-  if (event.request.headers.get('accept').includes('text/html')) {
+  if (event.request.headers.get('accept') && 
+      event.request.headers.get('accept').includes('text/html')) {
     event.respondWith(
       fetch(event.request)
         .then(response => {
           const responseClone = response.clone();
           caches.open(CACHE_NAME)
             .then(cache => {
-              cache.put(event.request, responseClone);
-            });
+              cache.put(event.request, responseClone)
+                .catch(err => console.warn('Failed to cache HTML response:', err));
+            })
+            .catch(err => console.warn('Failed to open cache for HTML:', err));
           return response;
         })
         .catch(() => {
           return caches.match(event.request)
             .then(response => {
               return response || caches.match('/index.html');
+            })
+            .catch(err => {
+              console.error('Failed to fetch from cache:', err);
+              // Return a simple offline page as a last resort
+              return new Response(
+                '<html><body><h1>You are offline</h1><p>Please check your internet connection.</p></body></html>',
+                { headers: {'Content-Type': 'text/html'} }
+              );
             });
         })
     );
@@ -100,34 +129,57 @@ self.addEventListener('fetch', event => {
   event.respondWith(
     caches.match(event.request)
       .then(response => {
+        // Return cached response if found
         if (response) {
           return response;
         }
         
-        // Clone the request because it's a one-time use stream
-        const fetchRequest = event.request.clone();
-        
-        return fetch(fetchRequest)
-          .then(response => {
-            // Check if we received a valid response
-            if (!response || response.status !== 200 || response.type !== 'basic') {
-              return response;
-            }
+        // Otherwise, fetch from network
+        return fetch(event.request)
+          .then(networkResponse => {
+            // Clone the response as it can only be consumed once
+            const responseToCache = networkResponse.clone();
             
-            // Clone the response because it's a one-time use stream
-            const responseToCache = response.clone();
-            
+            // Cache the fetched response for future use
             caches.open(CACHE_NAME)
               .then(cache => {
-                cache.put(event.request, responseToCache);
-              });
+                cache.put(event.request, responseToCache)
+                  .catch(err => console.warn(`Failed to cache response for ${event.request.url}:`, err));
+              })
+              .catch(err => console.warn('Failed to open cache:', err));
             
-            return response;
+            // Return the network response
+            return networkResponse;
           })
           .catch(error => {
-            console.error('[Service Worker] Fetch failed:', error);
-            // You could return a custom offline page here
+            console.error('Fetch failed for asset:', error);
+            
+            // For image requests, return a placeholder
+            if (event.request.url.match(/\.(jpg|jpeg|png|gif|svg)$/)) {
+              return caches.match('/img/placeholder.png')
+                .catch(() => {
+                  // If placeholder doesn't exist, return a dummy transparent 1x1 gif
+                  return new Response(
+                    new Blob([
+                      'R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7'
+                    ], {type: 'image/gif'}),
+                    {status: 200}
+                  );
+                });
+            }
+            
+            // For JavaScript, CSS or other files, return an empty response
+            // This prevents errors in the console without breaking the page
+            return new Response('', {
+              status: 499,
+              statusText: 'Offline - Resource unavailable'
+            });
           });
+      })
+      .catch(err => {
+        console.error('Cache match failed:', err);
+        // Return a default response instead of failing
+        return fetch(event.request).catch(() => new Response('', {status: 499}));
       })
   );
 });

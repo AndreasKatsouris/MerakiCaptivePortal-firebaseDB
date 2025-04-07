@@ -135,7 +135,7 @@ class AdminDashboard {
             init: () => {
                 // Create a new Vue instance for the Food Cost module
                 console.log('Creating Food Cost Vue instance');
-                return window.initializeFoodCostModule();
+                return window.initializeFoodCostModule('foodCostContent');
             },
             cleanup: window.cleanupFoodCostModule,
             parent: 'driversSubmenu'
@@ -337,7 +337,56 @@ class AdminDashboard {
                     console.log('Initializing food cost module...');
                     // Explicitly show the content section first
                     document.getElementById('foodCostContent').style.display = 'block';
-                    await window.initializeFoodCostModule();
+                    
+                    try {
+                        // Check if the initialization function exists
+                        if (typeof window.initializeFoodCostModule !== 'function') {
+                            console.error('Food Cost Module initialization function not found. Checking scripts loading...');
+                            
+                            // Check if the script is loaded
+                            const foodCostScript = Array.from(document.scripts).find(script => 
+                                script.src.includes('food-cost-standalone.js'));
+                                
+                            if (!foodCostScript) {
+                                console.error('Food Cost Module script not loaded properly');
+                                
+                                // Create an error message in the container
+                                const container = document.getElementById('food-cost-app');
+                                if (container) {
+                                    container.innerHTML = `
+                                        <div class="alert alert-danger">
+                                            <h4>Module Loading Error</h4>
+                                            <p>The Food Cost Module failed to load properly. Please refresh the page and try again.</p>
+                                        </div>
+                                    `;
+                                }
+                                return;
+                            } else {
+                                console.log('Food Cost script found but function not available. Script status:', 
+                                    foodCostScript.readyState);
+                            }
+                        } else {
+                            console.log('Food Cost Module initialization function found');
+                        }
+                        
+                        // Try to initialize the module
+                        await window.initializeFoodCostModule('food-cost-app');
+                        console.log('Food Cost Module successfully initialized');
+                    } catch (foodCostError) {
+                        console.error('Error initializing Food Cost Module:', foodCostError);
+                        
+                        // Create an error message in the container
+                        const container = document.getElementById('food-cost-app');
+                        if (container) {
+                            container.innerHTML = `
+                                <div class="alert alert-danger">
+                                    <h4>Module Initialization Error</h4>
+                                    <p>Failed to initialize the Food Cost Module: ${foodCostError.message}</p>
+                                    <button class="btn btn-primary mt-2" onclick="location.reload()">Refresh Page</button>
+                                </div>
+                            `;
+                        }
+                    }
                     break;
             }
         } catch (error) {
