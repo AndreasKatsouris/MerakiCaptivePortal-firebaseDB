@@ -10,8 +10,9 @@ const CACHE_ASSETS = [
   '/admin-dashboard.html',
   '/js/config/firebase-config.js',
   '/js/service-worker-registration.js',
-  '/js/food-cost.js',
-  '/js/food-cost-standalone.js',
+  // Removed incorrect paths for Vite dev server
+  // '/js/food-cost.js',
+  // '/js/food-cost-standalone.js',
   '/js/admin-dashboard.js',
   // '/css/styles.css', // Removed - file does not exist
   // The default-logo.png may not exist, so we'll handle it specially

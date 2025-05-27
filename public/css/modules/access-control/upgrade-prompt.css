@@ -1,0 +1,186 @@
+/**
+ * Upgrade Prompt Component Styles
+ * Version: 1.0.0-2025-04-24
+ * 
+ * Styles for the upgrade prompt component used throughout the platform
+ * These styles maintain consistent appearance for upgrade opportunities
+ */
+
+.upgrade-prompt {
+  border-radius: 8px;
+  margin: 16px 0;
+  overflow: hidden;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+  transition: all 0.3s ease;
+}
+
+.upgrade-prompt:hover {
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+  transform: translateY(-2px);
+}
+
+/* Theme variants */
+.upgrade-prompt--light {
+  background-color: #f8f9fa;
+  border: 1px solid #e9ecef;
+  color: #212529;
+}
+
+.upgrade-prompt--dark {
+  background-color: #343a40;
+  border: 1px solid #495057;
+  color: #f8f9fa;
+}
+
+.upgrade-prompt--accent {
+  background-color: #e6f7ff;
+  border: 1px solid #91d5ff;
+  color: #0056b3;
+}
+
+/* Size variants */
+.upgrade-prompt--small {
+  padding: 12px;
+  max-width: 300px;
+}
+
+.upgrade-prompt--medium {
+  padding: 16px;
+  max-width: 450px;
+}
+
+.upgrade-prompt--large {
+  padding: 24px;
+  max-width: 600px;
+}
+
+/* Inner content */
+.upgrade-prompt__content {
+  display: flex;
+  flex-direction: column;
+}
+
+.upgrade-prompt__title {
+  font-size: 1.25rem;
+  margin-top: 0;
+  margin-bottom: 8px;
+  font-weight: 600;
+}
+
+.upgrade-prompt--small .upgrade-prompt__title {
+  font-size: 1rem;
+}
+
+.upgrade-prompt--large .upgrade-prompt__title {
+  font-size: 1.5rem;
+}
+
+.upgrade-prompt__description {
+  margin-bottom: 16px;
+  line-height: 1.5;
+}
+
+.upgrade-prompt--small .upgrade-prompt__description {
+  font-size: 0.875rem;
+}
+
+/* Action buttons */
+.upgrade-prompt__actions {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.upgrade-prompt__button {
+  background-color: #0d6efd;
+  border-color: #0d6efd;
+  color: white;
+  font-weight: 500;
+  border-radius: 4px;
+  padding: 8px 16px;
+  transition: all 0.2s ease;
+}
+
+.upgrade-prompt__button:hover {
+  background-color: #0b5ed7;
+  border-color: #0a58ca;
+}
+
+.upgrade-prompt--dark .upgrade-prompt__button {
+  background-color: #f8f9fa;
+  border-color: #f8f9fa;
+  color: #212529;
+}
+
+.upgrade-prompt--dark .upgrade-prompt__button:hover {
+  background-color: #e2e6ea;
+  border-color: #dae0e5;
+}
+
+.upgrade-prompt--accent .upgrade-prompt__button {
+  background-color: #1890ff;
+  border-color: #1890ff;
+}
+
+.upgrade-prompt--accent .upgrade-prompt__button:hover {
+  background-color: #096dd9;
+  border-color: #096dd9;
+}
+
+.upgrade-prompt__link {
+  color: #6c757d;
+  background: none;
+  border: none;
+  padding: 8px 0;
+  font-size: 0.875rem;
+  text-decoration: underline;
+  cursor: pointer;
+}
+
+.upgrade-prompt__link:hover {
+  color: #495057;
+}
+
+.upgrade-prompt--dark .upgrade-prompt__link {
+  color: #adb5bd;
+}
+
+.upgrade-prompt--dark .upgrade-prompt__link:hover {
+  color: #ced4da;
+}
+
+.upgrade-prompt--accent .upgrade-prompt__link {
+  color: #1890ff;
+}
+
+.upgrade-prompt--accent .upgrade-prompt__link:hover {
+  color: #096dd9;
+}
+
+/* Loading state */
+.upgrade-prompt-loading {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  padding: 16px;
+  color: #6c757d;
+  font-style: italic;
+}
+
+/* Responsive adjustments */
+@media (max-width: 576px) {
+  .upgrade-prompt--medium,
+  .upgrade-prompt--large {
+    max-width: 100%;
+    padding: 16px;
+  }
+  
+  .upgrade-prompt__actions {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+  
+  .upgrade-prompt__button {
+    width: 100%;
+  }
+}

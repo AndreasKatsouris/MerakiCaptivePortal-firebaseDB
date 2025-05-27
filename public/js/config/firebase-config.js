@@ -3,7 +3,7 @@ import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.12.5/fireba
 import { getAuth, signInWithEmailAndPassword, signOut } from 'https://www.gstatic.com/firebasejs/10.12.5/firebase-auth.js';
 import { getFirestore } from 'https://www.gstatic.com/firebasejs/10.12.5/firebase-firestore.js';
 import { getFunctions, httpsCallable } from 'https://www.gstatic.com/firebasejs/10.12.5/firebase-functions.js';
-import { getDatabase, ref, push, set, get, update, remove, query, orderByChild, orderByKey, orderByValue, limitToFirst, limitToLast, startAt, endAt, equalTo } from 'https://www.gstatic.com/firebasejs/10.12.5/firebase-database.js';
+import { getDatabase, ref, push, set, get, update, remove, query, onValue, serverTimestamp, orderByChild, orderByKey, orderByValue, limitToFirst, limitToLast, startAt, endAt, equalTo } from 'https://www.gstatic.com/firebasejs/10.12.5/firebase-database.js';
 import { getStorage, ref as storageRef, uploadBytesResumable, getDownloadURL } from 'https://www.gstatic.com/firebasejs/10.12.5/firebase-storage.js';
 
 // Firebase configuration
@@ -41,7 +41,18 @@ export {
     set,
     get,
     update,
-    remove
+    remove,
+    query,
+    onValue,
+    orderByChild,
+    orderByKey,
+    orderByValue,
+    limitToFirst,
+    limitToLast,
+    startAt,
+    endAt,
+    equalTo,
+    serverTimestamp
 };
 
 // Export all the Firebase instances and methods to the window object
@@ -58,6 +69,7 @@ window.firebaseExports = {
     push,
     remove,
     query,
+    onValue,
     orderByChild,
     orderByKey,
     orderByValue,
@@ -65,7 +77,8 @@ window.firebaseExports = {
     limitToLast,
     startAt,
     endAt,
-    equalTo
+    equalTo,
+    serverTimestamp
 };
 
 // Also provide an initialization function that can be called to get these exports

@@ -11,9 +11,11 @@
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
     <!-- Custom CSS -->
     <link href="css/admin-dashboard.css" rel="stylesheet">
+    <link href="css/food-cost-dashboard.css" rel="stylesheet">
     
-    <!-- Vue.js -->
-    <script src="https://unpkg.com/vue@3/dist/vue.global.js"></script>
+    <!-- Vue.js - Use production version -->
+    <script src="https://unpkg.com/vue@3/dist/vue.global.prod.js"></script>
+    
     <!-- SweetAlert2 -->
     <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
     <!-- Lodash -->
@@ -29,11 +31,12 @@
     <!-- Custom Scripts - Load in proper order -->
     <script type="module" src="js/config/firebase-config.js"></script>
     
-    <!-- IMPORTANT: Load food-cost-standalone.js as a regular script (NOT module type) so it can properly expose global window functions -->
-    <script src="js/food-cost-standalone.js"></script>
-    
-    <!-- Load admin-dashboard.js as module after the standalone scripts -->
+    <!-- Load admin-dashboard.js as module after firebase is loaded -->
     <script type="module" src="js/admin-dashboard.js"></script>
+
+    <!-- Access Control Admin Modules -->
+    <script type="module" src="js/modules/access-control/admin/tier-management.js"></script>
+    <script type="module" src="js/modules/access-control/admin/user-subscription-manager.js"></script>
     
     <style>
         /* Vue.js related styles */
@@ -84,24 +87,20 @@
             max-width: 90%;
             max-height: 80vh;
             overflow-y: auto;
-            box-shadow: 0 5px 15px rgba(0,0,0,0.3);
-            z-index: 10001;
         }
         
-        .filter-popup h4 {
-            margin-top: 0;
-            margin-bottom: 15px;
+        /* Modal Overlay for Vue components */
+        .modal-overlay {
+            position: fixed;
+            z-index: 9999;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0, 0, 0, 0.5);
             display: flex;
-            justify-content: space-between;
-        }
-        
-        .filter-popup .close-btn {
-            background: none;
-            border: none;
-            font-size: 1.5rem;
-            cursor: pointer;
-            padding: 0;
-            line-height: 1;
+            justify-content: center;
+            align-items: center;
         }
     </style>
 </head>
@@ -199,6 +198,19 @@
                                     Admin Users
                                 </a>
                             </li>
+                            <!-- Access Control Submenu Items -->
+                            <li class="nav-item">
+                                <a href="#" class="nav-link" id="tierManagementMenu" data-section="tierManagementContent">
+                                    <i class="fas fa-layer-group"></i>
+                                    Tier Management
+                                </a>
+                            </li>
+                            <li class="nav-item">
+                                <a href="#" class="nav-link" id="userSubscriptionManagementMenu" data-section="userSubscriptionManagementContent">
+                                    <i class="fas fa-user-tag"></i>
+                                    User Subscriptions
+                                </a>
+                            </li>
                         </ul>
                     </div>
                 </li>
@@ -226,7 +238,7 @@
             </nav>
 
             <!-- Dashboard Section -->
-            <div id="dashboardContent" class="content-section">
+            <div id="dashboardContent" class="content-section dashboard-content">
                 <div class="row">
                     <div class="col-md-3">
                         <div class="card">
@@ -272,7 +284,7 @@
             </div>
 
             <!-- Campaigns Section -->
-            <div id="campaignsContent" class="content-section" style="display: none;">
+            <div id="campaignsContent" class="content-section dashboard-content d-none">
                 <div id="campaign-management-app">
                     <h2>Campaigns</h2>
                     <div v-if="loading" class="text-center">
@@ -300,36 +312,104 @@
             </div>
 
                 <!-- Guest Management Section -->
-                <div id="guestManagementContent" class="content-section" style="display: none;">
+                <div id="guestManagementContent" class="content-section dashboard-content d-none">
                     <div id="guest-management-app">
                         <!-- Vue will mount here -->
                     </div>
                 </div>
 
             <!-- Analytics Section -->
-            <div id="analyticsContent" class="content-section" style="display: none;">
+            <div id="analyticsContent" class="content-section dashboard-content d-none">
                 <div class="section-header">
                     <h2>Analytics</h2>
-                    <div class="date-range-picker">
-                        <input type="date" id="startDate" class="form-control">
-                        <input type="date" id="endDate" class="form-control">
-                        <button id="updateAnalytics" class="btn btn-primary">Update</button>
-                    </div>
                 </div>
-                <div class="analytics-charts">
-                    <div class="row">
-                        <div class="col-md-6">
-                            <canvas id="usersChart"></canvas>
+                
+                <!-- Analytics Navigation -->
+                <div class="nav-tabs-container mb-4">
+                    <ul class="nav nav-tabs" id="analyticsNavTabs" role="tablist">
+                        <li class="nav-item" role="presentation">
+                            <button class="nav-link active" id="overviewTab" data-bs-toggle="tab" 
+                                    data-bs-target="#overviewContent" type="button" role="tab">Overview</button>
+                        </li>
+                        <li class="nav-item" role="presentation">
+                            <button class="nav-link" id="foodCostAnalyticsTab" data-bs-toggle="tab" 
+                                    data-bs-target="#foodCostAnalyticsContent" type="button" role="tab">Food Cost Analytics</button>
+                        </li>
+                        <li class="nav-item" role="presentation">
+                            <button class="nav-link disabled" id="guestAnalyticsTab" data-bs-toggle="tab" 
+                                    data-bs-target="#guestAnalyticsContent" type="button" role="tab">Guest Analytics <span class="badge bg-secondary">Coming Soon</span></button>
+                        </li>
+                        <li class="nav-item" role="presentation">
+                            <button class="nav-link disabled" id="campaignAnalyticsTab" data-bs-toggle="tab" 
+                                    data-bs-target="#campaignAnalyticsContent" type="button" role="tab">Campaign Analytics <span class="badge bg-secondary">Coming Soon</span></button>
+                        </li>
+                    </ul>
+                </div>
+                
+                <!-- Analytics Content -->
+                <div class="tab-content" id="analyticsTabContent">
+                    <!-- Overview Tab -->
+                    <div class="tab-pane fade show active" id="overviewContent" role="tabpanel">
+                        <div class="date-range-picker mb-3">
+                            <div class="row">
+                                <div class="col-md-4">
+                                    <div class="input-group">
+                                        <span class="input-group-text">From</span>
+                                        <input type="date" id="startDate" class="form-control">
+                                        <span class="input-group-text">To</span>
+                                        <input type="date" id="endDate" class="form-control">
+                                        <button id="updateAnalytics" class="btn btn-primary">Update</button>
+                                    </div>
+                                </div>
+                            </div>
                         </div>
-                        <div class="col-md-6">
-                            <canvas id="campaignsChart"></canvas>
+                        <div class="analytics-charts">
+                            <div class="row">
+                                <div class="col-md-6">
+                                    <div class="card mb-3">
+                                        <div class="card-body">
+                                            <h5 class="card-title">User Engagement</h5>
+                                            <canvas id="usersChart"></canvas>
+                                        </div>
+                                    </div>
+                                </div>
+                                <div class="col-md-6">
+                                    <div class="card mb-3">
+                                        <div class="card-body">
+                                            <h5 class="card-title">Campaign Performance</h5>
+                                            <canvas id="campaignsChart"></canvas>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- Food Cost Analytics Tab -->
+                    <div class="tab-pane fade" id="foodCostAnalyticsContent" role="tabpanel">
+                        <!-- This container will be populated by the Analytics module -->
+                    </div>
+                    
+                    <!-- Guest Analytics Tab (Coming Soon) -->
+                    <div class="tab-pane fade" id="guestAnalyticsContent" role="tabpanel">
+                        <div class="alert alert-info">
+                            <h4><i class="fas fa-info-circle me-2"></i> Coming Soon</h4>
+                            <p>Guest Analytics features are currently under development.</p>
+                        </div>
+                    </div>
+                    
+                    <!-- Campaign Analytics Tab (Coming Soon) -->
+                    <div class="tab-pane fade" id="campaignAnalyticsContent" role="tabpanel">
+                        <div class="alert alert-info">
+                            <h4><i class="fas fa-info-circle me-2"></i> Coming Soon</h4>
+                            <p>Campaign Analytics features are currently under development.</p>
                         </div>
                     </div>
                 </div>
             </div>
 
             <!-- Admin Users Section -->
-            <div id="adminUsersContent" class="content-section" style="display: none;">
+            <div id="adminUsersContent" class="content-section dashboard-content d-none">
                 <div class="section-header">
                     <h2>Admin User Management</h2>
                     <button id="add-admin-btn" class="btn btn-primary">
@@ -352,7 +432,7 @@
             </div>
 
             <!-- Project Management Section -->
-            <div id="projectManagementContent" class="content-section" style="display: none;">
+            <div id="projectManagementContent" class="content-section dashboard-content d-none">
                 <div class="section-header">
                     <h2>Project Management</h2>
                     <button id="add-project-btn" class="btn btn-primary">
@@ -371,26 +451,132 @@
             </div>
 
             <!-- Food Cost Section -->
-            <div id="foodCostContent" class="content-section" style="display: none;">
-                <!-- Food Cost Module Header -->
-                <div class="section-header mb-4">
+            <div id="foodCostContent" class="content-section dashboard-content d-none">
+                <div class="section-header">
                     <h2>Food Cost Management</h2>
+                    <p class="text-muted">Track and analyze stock usage across multiple locations</p>
+                    <small class="text-muted" id="food-cost-version">Loading version...</small>
                 </div>
+                <script>
+                    // More robust method to get the Food Cost module version
+                    (function() {
+                        // Initialize with direct reference to the global module version
+                        function updateVersionDisplay() {
+                            // Try multiple possible global references
+                            if (window.MODULE_VERSION) {
+                                document.getElementById('food-cost-version').textContent = 'Version ' + window.MODULE_VERSION;
+                                return true;
+                            } else if (window.FoodCost && window.FoodCost.version) {
+                                document.getElementById('food-cost-version').textContent = 'Version ' + window.FoodCost.version;
+                                return true;
+                            } else if (window.FoodCostApp && window.FoodCostApp.version) {
+                                document.getElementById('food-cost-version').textContent = 'Version ' + window.FoodCostApp.version;
+                                return true;
+                            }
+                            return false;
+                        }
+                        
+                        // First try immediate update (in case module is already loaded)
+                        if (!updateVersionDisplay()) {
+                            // Set up periodic checks instead of relying on a mutation observer
+                            // This is more reliable since the food-cost-app element might not exist yet
+                            const observer = (function() {
+                                let observerInstance = null;
+                                let isObserving = false;
+                                
+                                function setupObserver() {
+                                    // If we already have an observer set up, no need to create another one
+                                    if (isObserving) return;
+                                    
+                                    // Only set up the observer if the target element exists
+                                    const targetNode = document.getElementById('food-cost-app');
+                                    if (!targetNode) return;
+                                    
+                                    // Create and setup the observer
+                                    observerInstance = new MutationObserver(function(mutations) {
+                                        if (updateVersionDisplay()) {
+                                            if (observerInstance) {
+                                                observerInstance.disconnect();
+                                                isObserving = false;
+                                            }
+                                        }
+                                    });
+                                    
+                                    // Start observing
+                                    observerInstance.observe(targetNode, { childList: true, subtree: true });
+                                    isObserving = true;
+                                }
+                                
+                                // Try to set up initially
+                                setupObserver();
+                                
+                                return {
+                                    retry: setupObserver,
+                                    disconnect: function() {
+                                        if (observerInstance) {
+                                            observerInstance.disconnect();
+                                            isObserving = false;
+                                        }
+                                    }
+                                };
+                            })();
+                            
+                            // Also set up a periodic check as a fallback
+                            const versionCheckInterval = setInterval(function() {
+                                if (updateVersionDisplay()) {
+                                    clearInterval(versionCheckInterval);
+                                } else {
+                                    // Try to set up the observer again in case the element exists now
+                                    observer.retry();
+                                }
+                            }, 500);
+                            
+                            // Fallback after 8 seconds
+                            setTimeout(function() {
+                                clearInterval(versionCheckInterval);
+                                observer.disconnect();
+                                
+                                // Check if we already have the version
+                                if (document.getElementById('food-cost-version').textContent === 'Loading version...') {
+                                    // Last attempt - try to extract version from the module's file directly
+                                    console.log('Attempting to fetch version from module file directly');
+                                    fetch('./js/modules/food-cost/index.js')
+                                        .then(response => response.text())
+                                        .then(text => {
+                                            const versionMatch = text.match(/MODULE_VERSION\s*=\s*['"](.*?)['"]/);
+                                            if (versionMatch && versionMatch[1]) {
+                                                document.getElementById('food-cost-version').textContent = 'Version ' + versionMatch[1];
+                                                console.log('Version extracted from file: ' + versionMatch[1]);
+                                            } else {
+                                                document.getElementById('food-cost-version').textContent = 'Version information unavailable';
+                                            }
+                                        })
+                                        .catch(error => {
+                                            console.error('Error fetching module file:', error);
+                                            document.getElementById('food-cost-version').textContent = 'Version information unavailable';
+                                        });
+                                }
+                            }, 8000);
+                        }
+                    })();
+                </script>
                 
-                <!-- Food Cost App Container - This is where the Vue component will mount -->
-                <div id="food-cost-app">
-                    <!-- Loading indicator shown until the module is initialized -->
-                    <div class="text-center py-4">
-                        <div class="spinner-border text-primary" role="status">
-                            <span class="visually-hidden">Loading Food Cost Module...</span>
+                <!-- Food Cost App Container -->
+                <div id="food-cost-app" class="mt-3">
+                    <!-- Vue app will mount here -->
+                    <div class="d-flex justify-content-center align-items-center" style="min-height: 300px;">
+                        <div class="text-center">
+                            <div class="spinner-border text-primary mb-3" role="status">
+                                <span class="visually-hidden">Loading...</span>
+                            </div>
+                            <p>Loading Food Cost Dashboard...</p>
                         </div>
-                        <p class="mt-2">Loading Food Cost Management Module...</p>
                     </div>
                 </div>
             </div>
 
             <!-- Receipt Management Section -->
-            <div id="receiptManagementContent" class="content-section" style="display: none;">
+            <div id="receiptManagementContent" class="content-section dashboard-content d-none">
                 <div class="section-header">
                     <h2>Receipt Management</h2>
                 </div>
@@ -498,7 +684,7 @@
             </div>
 
             <!-- Settings Section -->
-            <div id="settingsContent" class="content-section" style="display: none;">
+            <div id="settingsContent" class="content-section dashboard-content d-none">
                 <div class="section-header">
                     <h2>Settings</h2>
                 </div>
@@ -519,7 +705,7 @@
             </div>
 
             <!-- Database Management Section -->
-            <div id="databaseManagementContent" class="content-section" style="display: none;">
+            <div id="databaseManagementContent" class="content-section dashboard-content d-none">
                 <div class="section-header">
                     <h2>Database Management</h2>
                 </div>
@@ -537,133 +723,215 @@
                     </div>
                 </div>
             </div>
-        </div>
-    </div>
 
-    <!-- Modals -->
-    <!-- Add Admin Modal -->
-    <div id="add-admin-modal" class="modal fade" tabindex="-1">
-        <div class="modal-dialog">
-            <div class="modal-content">
-                <div class="modal-header">
-                    <h5 class="modal-title">Add Admin User</h5>
-                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            <!-- Tier Management Section (Added) -->
+            <div id="tierManagementContent" class="content-section dashboard-content d-none">
+                <div class="section-header">
+                    <h2>Subscription Tier Management</h2>
                 </div>
-                <div class="modal-body">
-                    <form id="add-admin-form">
-                        <div class="mb-3">
-                            <label for="admin-email" class="form-label">User Email</label>
-                            <input type="email" class="form-control" id="admin-email" required>
-                        </div>
-                    </form>
-                </div>
-                <div class="modal-footer">
-                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
-                    <button type="button" class="btn btn-primary" id="confirm-add-admin">Add Admin</button>
+                <div id="tier-management-container">
+                    <!-- Vue component will mount here -->
                 </div>
             </div>
-        </div>
-    </div>
 
-    <!-- Create Campaign Modal -->
-    <div id="create-campaign-modal" class="modal fade" tabindex="-1">
-        <div class="modal-dialog">
-            <div class="modal-content">
-                <div class="modal-header">
-                    <h5 class="modal-title">Create Campaign</h5>
-                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
-                </div>
-                <div class="modal-body">
-                    <form id="campaign-form">
-                        <div class="mb-3">
-                            <label for="campaignName" class="form-label">Campaign Name</label>
-                            <input type="text" class="form-control" id="campaignName" required>
+            <!-- User Subscription Management Section -->
+            <div id="userSubscriptionManagementContent" class="admin-section" style="display: none;">
+                <!-- Vue component will mount here -->
+            </div>
+
+            <!-- Modals -->
+            <!-- Add Admin Modal -->
+            <div id="add-admin-modal" class="modal fade" tabindex="-1">
+                <div class="modal-dialog">
+                    <div class="modal-content">
+                        <div class="modal-header">
+                            <h5 class="modal-title">Add Admin User</h5>
+                            <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
                         </div>
-                        <div class="mb-3">
-                            <label for="campaignDescription" class="form-label">Description</label>
-                            <textarea class="form-control" id="campaignDescription" rows="3"></textarea>
+                        <div class="modal-body">
+                            <form id="add-admin-form">
+                                <div class="mb-3">
+                                    <label for="admin-email" class="form-label">User Email</label>
+                                    <input type="email" class="form-control" id="admin-email" required>
+                                </div>
+                            </form>
                         </div>
-                        <div class="mb-3">
-                            <label for="startDate" class="form-label">Start Date</label>
-                            <input type="date" class="form-control" id="campaignStartDate" required>
+                        <div class="modal-footer">
+                            <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                            <button type="button" class="btn btn-primary" id="confirm-add-admin">Add Admin</button>
                         </div>
-                        <div class="mb-3">
-                            <label for="endDate" class="form-label">End Date</label>
-                            <input type="date" class="form-control" id="campaignEndDate" required>
-                        </div>
-                    </form>
-                </div>
-                <div class="modal-footer">
-                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
-                    <button type="button" class="btn btn-primary" id="save-campaign">Create</button>
+                    </div>
                 </div>
             </div>
-        </div>
-    </div>
 
-    <!-- Loading Spinner -->
-    <div id="loading-overlay" style="display: none;">
-        <div class="spinner-border text-primary" role="status">
-            <span class="visually-hidden">Loading...</span>
-        </div>
-    </div>
+            <!-- Create Campaign Modal -->
+            <div id="create-campaign-modal" class="modal fade" tabindex="-1">
+                <div class="modal-dialog">
+                    <div class="modal-content">
+                        <div class="modal-header">
+                            <h5 class="modal-title">Create Campaign</h5>
+                            <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                        </div>
+                        <div class="modal-body">
+                            <form id="campaign-form">
+                                <div class="mb-3">
+                                    <label for="campaignName" class="form-label">Campaign Name</label>
+                                    <input type="text" class="form-control" id="campaignName" required>
+                                </div>
+                                <div class="mb-3">
+                                    <label for="campaignDescription" class="form-label">Description</label>
+                                    <textarea class="form-control" id="campaignDescription" rows="3"></textarea>
+                                </div>
+                                <div class="mb-3">
+                                    <label for="startDate" class="form-label">Start Date</label>
+                                    <input type="date" class="form-control" id="campaignStartDate" required>
+                                </div>
+                                <div class="mb-3">
+                                    <label for="endDate" class="form-label">End Date</label>
+                                    <input type="date" class="form-control" id="campaignEndDate" required>
+                                </div>
+                            </form>
+                        </div>
+                        <div class="modal-footer">
+                            <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                            <button type="button" class="btn btn-primary" id="save-campaign">Create</button>
+                        </div>
+                    </div>
+                </div>
+            </div>
 
-    <!-- Scripts -->
-    <!-- Bootstrap Bundle with Popper -->
-    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
-    
-    <!-- Dropdown Fix Script -->
-    <script>
-        // Fix for dropdowns being hidden behind cards
-        document.addEventListener('DOMContentLoaded', function() {
-            // Override Bootstrap's dropdown positioning to use the 'fixed' strategy
-            document.addEventListener('show.bs.dropdown', function(e) {
-                setTimeout(function() {
-                    const dropdown = e.target.querySelector('.dropdown-menu');
-                    if (dropdown) {
-                        // Backup the original dropdown styles
-                        const originalStyles = {
-                            position: dropdown.style.position,
-                            top: dropdown.style.top,
-                            left: dropdown.style.left,
-                            transform: dropdown.style.transform,
-                            zIndex: dropdown.style.zIndex
-                        };
-                        
-                        // Store the original styles on the element
-                        dropdown.dataset.originalStyles = JSON.stringify(originalStyles);
-                        
-                        // Get the button position
-                        const button = e.target.querySelector('.dropdown-toggle');
-                        const rect = button.getBoundingClientRect();
-                        
-                        // Apply fixed positioning with high z-index
-                        dropdown.style.position = 'fixed';
-                        dropdown.style.top = rect.bottom + 'px';
-                        dropdown.style.left = rect.left + 'px';
-                        dropdown.style.transform = 'none';
-                        dropdown.style.zIndex = '9999';
-                        dropdown.style.width = rect.width + 'px';
-                    }
-                }, 0);
-            });
+            <!-- Loading Spinner -->
+            <div id="loading-overlay" style="display: none;">
+                <div class="spinner-border text-primary" role="status">
+                    <span class="visually-hidden">Loading...</span>
+                </div>
+            </div>
+
+            <!-- Scripts -->
+            <!-- Bootstrap Bundle with Popper -->
+            <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
             
-            // Restore original positioning when dropdown is hidden
-            document.addEventListener('hidden.bs.dropdown', function(e) {
-                const dropdown = e.target.querySelector('.dropdown-menu');
-                if (dropdown && dropdown.dataset.originalStyles) {
-                    try {
-                        const originalStyles = JSON.parse(dropdown.dataset.originalStyles);
-                        Object.keys(originalStyles).forEach(key => {
-                            dropdown.style[key] = originalStyles[key];
-                        });
-                    } catch (err) {
-                        console.error('Error restoring dropdown styles:', err);
-                    }
-                }
-            });
-        });
-    </script>
-    <script src="js/service-worker-registration.js"></script>
+            <!-- Dropdown Fix Script -->
+            <script>
+                // Fix for dropdowns being hidden behind cards
+                document.addEventListener('DOMContentLoaded', function() {
+                    // Override Bootstrap's dropdown positioning to use the 'fixed' strategy
+                    document.addEventListener('show.bs.dropdown', function(e) {
+                        setTimeout(function() {
+                            const dropdown = e.target.querySelector('.dropdown-menu');
+                            if (dropdown) {
+                                // Backup the original dropdown styles
+                                const originalStyles = {
+                                    position: dropdown.style.position,
+                                    top: dropdown.style.top,
+                                    left: dropdown.style.left,
+                                    transform: dropdown.style.transform,
+                                    zIndex: dropdown.style.zIndex
+                                };
+                                
+                                // Store the original styles on the element
+                                dropdown.dataset.originalStyles = JSON.stringify(originalStyles);
+                                
+                                // Get the button position
+                                const button = e.target.querySelector('.dropdown-toggle');
+                                const rect = button.getBoundingClientRect();
+                                
+                                // Apply fixed positioning with high z-index
+                                dropdown.style.position = 'fixed';
+                                dropdown.style.top = rect.bottom + 'px';
+                                dropdown.style.left = rect.left + 'px';
+                                dropdown.style.transform = 'none';
+                                dropdown.style.zIndex = '9999';
+                                dropdown.style.width = rect.width + 'px';
+                            }
+                        }, 0);
+                    });
+                    
+                    // Restore original positioning when dropdown is hidden
+                    document.addEventListener('hidden.bs.dropdown', function(e) {
+                        const dropdown = e.target.querySelector('.dropdown-menu');
+                        if (dropdown && dropdown.dataset.originalStyles) {
+                            try {
+                                const originalStyles = JSON.parse(dropdown.dataset.originalStyles);
+                                Object.keys(originalStyles).forEach(key => {
+                                    dropdown.style[key] = originalStyles[key];
+                                });
+                            } catch (err) {
+                                console.error('Error restoring dropdown styles:', err);
+                            }
+                        }
+                    });
+                });
+            </script>
+            <script src="js/service-worker-registration.js"></script>
+        </div>
+    </div>
+
+    <!-- MODAL FOR EDITING/ADDING TIERS (Managed by tier-management.js) -->
+    <div class="modal fade" id="editTierModal" tabindex="-1" aria-labelledby="editTierModalLabel" aria-hidden="true">
+      <div class="modal-dialog modal-lg"> 
+        <div class="modal-content">
+          <div class="modal-header">
+            <h5 class="modal-title" id="editTierModalLabel">{{ isAddingNewTier ? 'Add New Tier' : 'Edit Tier' }}</h5>
+            <button type="button" class="btn-close" @click="cancelEdit" aria-label="Close"></button>
+          </div>
+          <div class="modal-body">
+            <!-- Form managed by AdminTierManagement component -->
+            <form @submit.prevent="saveChanges">
+              <!-- Tier Name, Description, Prices -->
+              <div class="mb-3">
+                <label for="tierName" class="form-label">Tier Name</label>
+                <input type="text" class="form-control" id="tierName" v-model="editFormData.name" required>
+              </div>
+              <div class="mb-3">
+                <label for="tierDescription" class="form-label">Description</label>
+                <textarea class="form-control" id="tierDescription" rows="3" v-model="editFormData.description" required></textarea>
+              </div>
+              <div class="row mb-3">
+                <div class="col">
+                   <label for="tierMonthlyPrice" class="form-label">Monthly Price ($)</label>
+                   <input type="number" step="0.01" class="form-control" id="tierMonthlyPrice" v-model.number="editFormData.monthlyPrice">
+                </div>
+                <div class="col">
+                   <label for="tierAnnualPrice" class="form-label">Annual Price ($)</label>
+                   <input type="number" step="0.01" class="form-control" id="tierAnnualPrice" v-model.number="editFormData.annualPrice">
+                </div>
+              </div>
+
+              <hr>
+
+              <!-- Features -->
+              <h6>Features</h6>
+              <div v-if="editFormData.features" v-for="feature in availableFeatures" :key="feature" class="form-check form-switch mb-2">
+                <input class="form-check-input" type="checkbox" :id="'feature_' + feature" v-model="editFormData.features[feature]">
+                <label class="form-check-label" :for="'feature_' + feature">{{ getFeatureDisplay(feature) }}</label>
+              </div>
+              <div v-else class="text-muted small mb-2">Initializing features...</div>
+              <button type="button" class="btn btn-sm btn-outline-secondary mb-3" @click="addNewFeature">Add New Feature</button>
+
+              <hr>
+
+              <!-- Limits -->
+              <h6>Limits</h6>
+              <div v-for="limit in availableLimits" :key="limit" class="row mb-2 align-items-center">
+                <label :for="'limit_' + limit" class="col-sm-4 col-form-label">{{ getLimitDisplay(limit) }}</label>
+                <div v-if="editFormData.limits" class="col-sm-8">
+                  <input type="number" step="1" class="form-control" :id="'limit_' + limit" v-model.number="editFormData.limits[limit]" placeholder="0 or leave empty (Infinity)">
+                  <small class="text-muted">Use 0 or empty for Infinity/Unlimited</small>
+                </div>
+                <div v-else class="col-sm-8 text-muted small">Initializing limits...</div>
+              </div>
+              <button type="button" class="btn btn-sm btn-outline-secondary" @click="addNewLimit">Add New Limit</button>
+
+           </form>
+          </div>
+          <div class="modal-footer">
+            <button type="button" class="btn btn-secondary" @click="cancelEdit">Cancel</button>
+            <button type="button" class="btn btn-primary" @click="saveChanges">Save Changes</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
 </body>
 </html>

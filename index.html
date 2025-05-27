@@ -1,0 +1,66 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Food Cost Module Tests Redirect</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 20px;
+            line-height: 1.6;
+        }
+        .container {
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+        }
+        h1 {
+            color: #0056b3;
+        }
+        .links {
+            margin-top: 20px;
+        }
+        .links a {
+            display: block;
+            margin-bottom: 10px;
+            color: #0056b3;
+            text-decoration: none;
+        }
+        .links a:hover {
+            text-decoration: underline;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Food Cost Module Test Links</h1>
+        <p>Select the appropriate link based on where you started your Python HTTP server:</p>
+        
+        <div class="links">
+            <h3>From project root (MerakiCaptivePortal-firebaseDB):</h3>
+            <a href="/public/js/modules/food-cost/tests/run-enhanced-tests.html">Enhanced Tests (from project root)</a>
+            
+            <h3>From public directory:</h3>
+            <a href="/js/modules/food-cost/tests/run-enhanced-tests.html">Enhanced Tests (from public dir)</a>
+            
+            <h3>From js directory:</h3>
+            <a href="/modules/food-cost/tests/run-enhanced-tests.html">Enhanced Tests (from js dir)</a>
+            
+            <h3>From modules directory:</h3>
+            <a href="/food-cost/tests/run-enhanced-tests.html">Enhanced Tests (from modules dir)</a>
+            
+            <h3>From food-cost directory:</h3>
+            <a href="/tests/run-enhanced-tests.html">Enhanced Tests (from food-cost dir)</a>
+        </div>
+        
+        <h2>Or Run the Node.js Server</h2>
+        <p>Alternatively, run the provided Node.js server from the food-cost directory:</p>
+        <pre>cd public/js/modules/food-cost
+node tests/test-server.js</pre>
+        <p>Then access: <a href="http://localhost:8080/">http://localhost:8080/</a></p>
+    </div>
+</body>
+</html>

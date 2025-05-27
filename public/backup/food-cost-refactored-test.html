@@ -1,0 +1,296 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Food Cost Management - Refactored Module Test</title>
+    
+    <!-- Simple CSS -->
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Arial, sans-serif;
+            line-height: 1.6;
+            color: #333;
+            margin: 0;
+            padding: 20px;
+            background-color: #f8f9fc;
+        }
+        .container {
+            max-width: 1140px;
+            margin: 0 auto;
+            padding: 15px;
+        }
+        .header {
+            background-color: #fff;
+            padding: 15px;
+            box-shadow: 0 0.15rem 1.75rem 0 rgba(58, 59, 69, 0.15);
+            margin-bottom: 20px;
+            display: flex;
+            align-items: center;
+        }
+        .card {
+            background-color: #fff;
+            border-radius: 5px;
+            box-shadow: 0 0.15rem 1.75rem 0 rgba(58, 59, 69, 0.15);
+            margin-bottom: 20px;
+        }
+        .card-header {
+            border-bottom: 1px solid #e3e6f0;
+            padding: 15px;
+            background-color: #f8f9fc;
+            color: #4e73df;
+            font-weight: bold;
+        }
+        .card-body {
+            padding: 15px;
+        }
+        .btn {
+            display: inline-block;
+            padding: 10px 20px;
+            background-color: #4e73df;
+            color: white;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 14px;
+        }
+        .btn:hover {
+            background-color: #2e59d9;
+        }
+        .alert {
+            padding: 15px;
+            border-radius: 5px;
+            margin-bottom: 15px;
+        }
+        .alert-info {
+            background-color: #e3f2fd;
+            border-left: 4px solid #2196f3;
+        }
+        .alert-success {
+            background-color: #e8f5e9;
+            border-left: 4px solid #4caf50;
+        }
+        .alert-danger {
+            background-color: #ffebee;
+            border-left: 4px solid #f44336;
+        }
+        .test-panel {
+            margin-top: 20px;
+            padding: 15px;
+            background-color: #f8f9fc;
+            border-left: 4px solid #4e73df;
+        }
+        .version-badge {
+            display: inline-block;
+            padding: 5px 10px;
+            background-color: #4e73df;
+            color: white;
+            border-radius: 15px;
+            font-size: 12px;
+            margin-left: 10px;
+        }
+        .progress {
+            height: 20px;
+            background-color: #e9ecef;
+            border-radius: 5px;
+            margin: 10px 0;
+            overflow: hidden;
+        }
+        .progress-bar {
+            height: 100%;
+            background-color: #4e73df;
+            width: 100%;
+            animation: progress-animation 2s linear infinite;
+        }
+        @keyframes progress-animation {
+            0% { background-position: 0 0; }
+            100% { background-position: 50px 0; }
+        }
+        .progress-bar-animated {
+            background-image: linear-gradient(45deg, rgba(255,255,255,.15) 25%, transparent 25%, transparent 50%, rgba(255,255,255,.15) 50%, rgba(255,255,255,.15) 75%, transparent 75%, transparent);
+            background-size: 1rem 1rem;
+        }
+    </style>
+</head>
+<body>
+    <!-- Page Wrapper -->
+    <div class="container">
+        <!-- Header -->
+        <div class="header">
+            <h2>Food Cost Management <span class="version-badge" id="version-badge">Loading...</span></h2>
+        </div>
+
+        <!-- Test Cards -->
+        <div class="card">
+            <div class="card-header">
+                Refactored Module Test
+            </div>
+            <div class="card-body">
+                <p>
+                    This page tests the initialization of the refactored Food Cost Management module.
+                    The module should load below if it has been successfully integrated.
+                </p>
+                
+                <div class="test-panel">
+                    <h5>Integration Status</h5>
+                    <div id="integration-status">Running integration test...</div>
+                </div>
+                
+                <button class="btn" id="initialize-btn">
+                    Initialize Module
+                </button>
+            </div>
+        </div>
+        
+        <!-- Food Cost Module Container -->
+        <div class="card">
+            <div class="card-header">
+                Food Cost Module
+            </div>
+            <div class="card-body">
+                <div id="food-cost-container"></div>
+            </div>
+        </div>
+
+        <!-- Footer -->
+        <div style="text-align: center; margin-top: 20px; color: #666;">
+            <p>Food Cost Management Module - Refactored Test</p>
+        </div>
+    </div>
+
+    <!-- Firebase -->
+    <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-app.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-auth.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-database.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-firestore.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-functions.js"></script>
+    
+    <!-- Vue.js -->
+    <script src="https://unpkg.com/vue@3.0.11/dist/vue.global.js"></script>
+    
+    <!-- Chart.js -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@3.7.1/dist/chart.min.js"></script>
+    
+    <!-- Firebase Config -->
+    <script src="/js/config/firebase-config.js" type="module"></script>
+    
+    <!-- Food Cost Module -->
+    <script src="/js/food-cost-standalone.js" type="module"></script>
+    
+    <!-- SweetAlert fallback implementation -->
+    <script>
+        // Create a basic implementation of SweetAlert if not available
+        if (typeof Swal === 'undefined') {
+            window.Swal = {
+                fire: function(options) {
+                    const title = options.title || '';
+                    const text = options.text || '';
+                    const icon = options.icon || 'info';
+                    
+                    console.log(`[SweetAlert] ${icon.toUpperCase()}: ${title} - ${text}`);
+                    
+                    // Create a simple alert dialog
+                    if (options.didOpen) {
+                        options.didOpen();
+                    } else {
+                        alert(`${title}\n${text}`);
+                    }
+                    
+                    // Return a promise-like object
+                    return {
+                        then: function(callback) {
+                            if (callback) {
+                                callback({ isConfirmed: true });
+                            }
+                            return this;
+                        }
+                    };
+                },
+                close: function() {
+                    console.log('[SweetAlert] Closed');
+                },
+                showLoading: function() {
+                    console.log('[SweetAlert] Loading...');
+                }
+            };
+        }
+    </script>
+    
+    <!-- Test Script -->
+    <script type="module">
+        import { testModuleIntegration } from '/js/modules/food-cost/integration-test.js';
+        
+        // Wait for DOM to be fully loaded
+        document.addEventListener('DOMContentLoaded', async () => {
+            // Get elements
+            const initializeBtn = document.getElementById('initialize-btn');
+            const integrationStatus = document.getElementById('integration-status');
+            const versionBadge = document.getElementById('version-badge');
+            
+            // Set version badge
+            versionBadge.textContent = window.MODULE_VERSION || 'Unknown';
+            
+            // Run integration test
+            try {
+                const result = await testModuleIntegration();
+                integrationStatus.innerHTML = `
+                    <div class="alert alert-success">
+                        <strong>✓ Integration test passed!</strong>
+                        <br>
+                        <small>${result.message}</small>
+                    </div>
+                `;
+            } catch (error) {
+                integrationStatus.innerHTML = `
+                    <div class="alert alert-danger">
+                        <strong>✗ Integration test failed!</strong>
+                        <br>
+                        <small>${error?.message || 'Unknown error'}</small>
+                    </div>
+                `;
+                console.error('Integration test error:', error);
+            }
+            
+            // Initialize module on button click
+            initializeBtn.addEventListener('click', async () => {
+                try {
+                    // Show loading
+                    Swal.fire({
+                        title: 'Initializing...',
+                        text: 'Please wait while the module initializes',
+                        allowOutsideClick: false,
+                        didOpen: () => {
+                            Swal.showLoading();
+                        }
+                    });
+                    
+                    // Initialize module
+                    await window.initializeFoodCostModule('food-cost-container');
+                    
+                    // Close loading
+                    Swal.close();
+                    
+                    // Show success message
+                    Swal.fire({
+                        title: 'Success!',
+                        text: 'Food Cost Module initialized successfully',
+                        icon: 'success'
+                    });
+                } catch (error) {
+                    // Close loading
+                    Swal.close();
+                    
+                    // Show error message
+                    Swal.fire({
+                        title: 'Error',
+                        text: `Failed to initialize module: ${error?.message || 'Unknown error'}`,
+                        icon: 'error'
+                    });
+                    
+                    console.error('Initialization error:', error);
+                }
+            });
+        });
+    </script>
+</body>
+</html>

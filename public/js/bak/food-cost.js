@@ -410,9 +410,14 @@ const FoodCostApp = {
                     
                     <div v-if="isDataUploaded">
                         <div class="d-flex justify-content-between mb-3">
-                            <button class="btn btn-sm btn-outline-primary" @click="showUploadArea = !showUploadArea">
-                                {{ showUploadArea ? 'Hide Upload Area' : 'Show Upload Area' }}
-                            </button>
+                            <div>
+                                <button class="btn btn-sm btn-outline-primary" @click="showUploadArea = !showUploadArea">
+                                    {{ showUploadArea ? 'Hide Upload Area' : 'Show Upload Area' }}
+                                </button>
+                                <button class="btn btn-sm btn-outline-secondary ml-2" @click="loadHistoricalData">
+                                    <i class="fas fa-history mr-1"></i> Historical Data
+                                </button>
+                            </div>
                             <button class="btn btn-sm btn-success" @click="saveStockDataToDatabase" :disabled="isSaving || dataSaved">
                                 <i class="fas" :class="{'fa-save': !isSaving && !dataSaved, 'fa-spinner fa-spin': isSaving, 'fa-check': dataSaved && !isSaving}"></i>
                                 {{ isSaving ? 'Saving...' : (dataSaved ? 'Saved' : 'Save Data') }}
@@ -1883,16 +1888,40 @@ const FoodCostApp = {
                 stockItems: this.stockData
             };
             
-            // Save to Firebase using direct Firebase API calls
-            const database = getDatabase();
-            if (!database) {
-                console.error('Failed to get database instance for saving data');
-                this.savingError = 'Could not connect to database.';
+            // Ensure Firebase is properly initialized
+            if (!ensureFirebaseInitialized()) {
+                console.error('Failed to initialize Firebase for saving data');
                 this.isSaving = false;
+                this.savingError = 'Could not connect to Firebase.';
+                
+                // Try to save to local storage as fallback
+                try {
+                    localStorage.setItem('foodCostData', JSON.stringify(dataToSave));
+                    this.dataSaved = true;
+                    console.log('Stock data saved to local storage as fallback');
+                    
+                    Swal.fire({
+                        title: 'Saved Locally',
+                        text: 'Unable to connect to database, but data has been saved locally.',
+                        icon: 'info'
+                    });
+                } catch (storageError) {
+                    console.error('Could not save to local storage:', storageError);
+                    
+                    Swal.fire({
+                        title: 'Save Failed',
+                        text: 'Could not save data to database or local storage.',
+                        icon: 'error'
+                    });
+                }
                 return;
             }
             
-            const stockUsageRef = _ref(database, `stockUsage/${uniqueKey}`);
+            // Use the proper database reference pattern following project guidelines
+            // _ref and _rtdb are initialized in ensureFirebaseInitialized
+            console.log('Saving stock data to path:', `stockUsage/${uniqueKey}`);
+            const stockUsageRef = _ref(_rtdb, `stockUsage/${uniqueKey}`);
+            
             _set(stockUsageRef, dataToSave)
                 .then(() => {
                     this.isSaving = false;
@@ -1908,6 +1937,12 @@ const FoodCostApp = {
                     }
                     
                     console.log('Stock data saved successfully to Firebase');
+                    
+                    Swal.fire({
+                        title: 'Success',
+                        text: 'Stock data saved successfully.',
+                        icon: 'success'
+                    });
                 })
                 .catch((error) => {
                     console.error('Error saving stock data to Firebase:', error);
@@ -1919,43 +1954,23 @@ const FoodCostApp = {
                         localStorage.setItem('foodCostData', JSON.stringify(dataToSave));
                         this.dataSaved = true;
                         console.log('Stock data saved to local storage as fallback');
+                        
+                        Swal.fire({
+                            title: 'Saved Locally',
+                            text: 'Unable to save to database, but data has been saved locally.',
+                            icon: 'info'
+                        });
                     } catch (storageError) {
                         console.error('Could not save to local storage:', storageError);
+                        
+                        Swal.fire({
+                            title: 'Save Failed',
+                            text: 'Could not save data to database or local storage.',
+                            icon: 'error'
+                        });
                     }
                 });
         },
-        
-        /**
-         * Check if stock data already exists for current dataset
-         */
-        checkExistingStockData() {
-            if (this.lastSaveTimestamp) {
-                const dateKey = this.lastSaveTimestamp.split('T')[0];
-                const timeKey = this.lastSaveTimestamp.split('T')[1].split('.')[0].replace(/:/g, '');
-                const uniqueKey = `${dateKey}_${timeKey}`;
-                
-                const stockUsageRef = _ref(getDatabase(), `stockUsage/${uniqueKey}`);
-                _get(stockUsageRef)
-                    .then((snapshot) => {
-                        if (snapshot.exists()) {
-                            this.dataSaved = true;
-                            
-                            // Load additional metadata if available
-                            const data = snapshot.val();
-                            if (data.storeName) this.storeName = data.storeName;
-                            if (data.openingDate) this.openingDate = data.openingDate;
-                            if (data.closingDate) this.closingDate = data.closingDate;
-                            if (data.daysToNextDelivery) this.daysToNextDelivery = data.daysToNextDelivery;
-                            if (data.safetyStockPercentage) this.safetyStockPercentage = data.safetyStockPercentage;
-                            if (data.criticalItemBuffer) this.criticalItemBuffer = data.criticalItemBuffer;
-                            if (data.defaultLeadTimeDays) this.defaultLeadTimeDays = data.defaultLeadTimeDays;
-                        }
-                    })
-                    .catch((error) => {
-                        console.error('Error checking existing data:', error);
-                    });
-                }
-            },
         
         /**
          * Check for previously uploaded data
@@ -3314,107 +3329,449 @@ const FoodCostApp = {
         },
         
         /**
-         * Show calculation details for an item in a popup
-         * @param {Object} item - The purchase order item to show details for
+         * Load historical stock data
+         * Shows a list of available historical data entries and allows loading a specific one
          */
-        showCalculationDetails(item) {
-            if (!item || !item.calculationDetails) {
+        loadHistoricalData() {
+            if (!ensureFirebaseInitialized()) {
                 Swal.fire({
-                    title: 'Calculation Details Not Available',
-                    text: 'No calculation data is available for this item.',
-                    icon: 'info'
+                    title: 'Error',
+                    text: 'Could not connect to database to load historical data.',
+                    icon: 'error'
                 });
                 return;
             }
             
-            const details = item.calculationDetails;
+            Swal.fire({
+                title: 'Loading',
+                text: 'Loading historical stock data...',
+                allowOutsideClick: false,
+                didOpen: () => {
+                    Swal.showLoading();
+                }
+            });
             
-            // Create a formatted HTML representation of the calculation steps
-            let stepsHtml = '';
+            const stockUsageRef = _ref(_rtdb, 'stockUsage');
             
-            if (details.steps && details.steps.length > 0) {
-                stepsHtml = `<div class="calculation-steps">`;
-                details.steps.forEach((step, index) => {
-                    const stepNum = index + 1;
-                    stepsHtml += `
-                        <div class="step-item mb-3">
-                            <h5 class="step-title"><span class="badge badge-primary">${stepNum}</span> ${step.description}</h5>
-                            ${step.condition ? `<div class="step-condition"><strong>Condition:</strong> ${step.condition}</div>` : ''}
-                            ${step.formula ? `<div class="step-formula"><strong>Formula:</strong> ${step.formula}</div>` : ''}
-                            ${step.inputs ? `<div class="step-inputs"><strong>Inputs:</strong> ${JSON.stringify(step.inputs, null, 2).replace(/[{}"]/g, '').replace(/,/g, ', ')}</div>` : ''}
-                            <div class="step-result ${step.result > 0 ? 'text-success' : ''}">
-                                <strong>Result:</strong> ${typeof step.result === 'number' ? step.result.toFixed(3) : step.result}
+            _get(stockUsageRef)
+                .then((snapshot) => {
+                    if (!snapshot.exists()) {
+                        Swal.fire({
+                            title: 'No Data',
+                            text: 'No historical stock data found.',
+                            icon: 'info'
+                        });
+                        return;
+                    }
+                    
+                    const data = snapshot.val();
+                    const entries = Object.entries(data);
+                    
+                    if (entries.length === 0) {
+                        Swal.fire({
+                            title: 'No Data',
+                            text: 'No historical stock data entries found.',
+                            icon: 'info'
+                        });
+                        return;
+                    }
+                    
+                    // Sort entries by key (timestamp) in descending order (newest first)
+                    entries.sort((a, b) => b[0].localeCompare(a[0]));
+                    
+                    // Format the entries for display
+                    const options = entries.map(([key, value]) => {
+                        // Format the date in a human-readable way
+                        const datePart = key.split('_')[0];
+                        const timePart = key.split('_')[1];
+                        const formattedDate = `${datePart.substring(0, 4)}-${datePart.substring(4, 6)}-${datePart.substring(6, 8)}`;
+                        const formattedTime = `${timePart.substring(0, 2)}:${timePart.substring(2, 4)}:${timePart.substring(4, 6)}`;
+                        
+                        return {
+                            key,
+                            storeName: value.storeName || 'Unknown Store',
+                            openingDate: value.openingDate || 'N/A',
+                            closingDate: value.closingDate || 'N/A',
+                            timestamp: `${formattedDate} ${formattedTime}`,
+                            itemCount: value.stockItems ? value.stockItems.length : 0
+                        };
+                    });
+                    
+                    // Create the HTML for the selection list
+                    const optionsHtml = options.map((option, index) => `
+                        <div class="historical-data-entry" data-key="${option.key}">
+                            <div class="row align-items-center py-2 border-bottom">
+                                <div class="col-md-8">
+                                    <h6 class="mb-0">${option.storeName}</h6>
+                                    <div class="small text-muted">Saved: ${option.timestamp}</div>
+                                    <div class="small">Period: ${option.openingDate} to ${option.closingDate}</div>
+                                    <div class="small">Items: ${option.itemCount}</div>
+                                </div>
+                                <div class="col-md-4 text-right">
+                                    <button class="btn btn-sm btn-primary load-entry-btn" data-index="${index}">
+                                        <i class="fas fa-download mr-1"></i> Load
+                                    </button>
+                                    <button class="btn btn-sm btn-danger ml-2 delete-entry-btn" data-index="${index}">
+                                        <i class="fas fa-trash-alt"></i>
+                                    </button>
+                                </div>
                             </div>
-                            <div class="step-details font-italic">${step.details}</div>
                         </div>
-                    `;
+                    `).join('');
+                    
+                    Swal.fire({
+                        title: 'Historical Stock Data',
+                        html: `
+                            <div class="historical-data-container" style="max-height: 400px; overflow-y: auto;">
+                                ${options.length > 0 ? optionsHtml : '<p class="text-center">No historical data available</p>'}
+                            </div>
+                        `,
+                        showConfirmButton: false,
+                        showCancelButton: true,
+                        cancelButtonText: 'Close',
+                        width: '650px',
+                        didOpen: () => {
+                            // Add event listeners to the load buttons
+                            document.querySelectorAll('.load-entry-btn').forEach(button => {
+                                button.addEventListener('click', () => {
+                                    const index = parseInt(button.getAttribute('data-index'));
+                                    const entry = options[index];
+                                    this.loadSpecificHistoricalData(entry.key);
+                                    Swal.close();
+                                });
+                            });
+                            
+                            // Add event listeners to the delete buttons
+                            document.querySelectorAll('.delete-entry-btn').forEach(button => {
+                                button.addEventListener('click', () => {
+                                    const index = parseInt(button.getAttribute('data-index'));
+                                    const entry = options[index];
+                                    this.deleteHistoricalData(entry.key, entry.timestamp, entry.storeName);
+                                });
+                            });
+                        }
+                    });
+                })
+                .catch((error) => {
+                    console.error('Error loading historical data:', error);
+                    Swal.fire({
+                        title: 'Error',
+                        text: `Could not load historical data: ${error.message}`,
+                        icon: 'error'
+                    });
                 });
-                stepsHtml += `</div>`;
-            } else {
-                stepsHtml = '<p>No calculation steps recorded.</p>';
+        },
+        
+        /**
+         * Load a specific historical data entry
+         * @param {string} key - The unique key of the historical data entry
+         */
+        loadSpecificHistoricalData(key) {
+            if (!ensureFirebaseInitialized()) {
+                Swal.fire({
+                    title: 'Error',
+                    text: 'Could not connect to database to load historical data.',
+                    icon: 'error'
+                });
+                return;
             }
             
-            // Create a summary section
-            let summaryHtml = `
-                <div class="calculation-summary mb-4">
-                    <h4>Calculation Summary</h4>
-                    <div class="row">
-                        <div class="col-md-6">
-                            <table class="table table-sm">
-                                <tr>
-                                    <th>Item:</th>
-                                    <td>${item.itemCode} - ${item.description}</td>
-                                </tr>
-                                <tr>
-                                    <th>Current Stock:</th>
-                                    <td>${parseFloat(item.currentStock).toFixed(2)} ${item.unit}</td>
-                                </tr>
-                                <tr>
-                                    <th>Usage Per Day:</th>
-                                    <td>${parseFloat(item.usagePerDay).toFixed(3)} ${item.unit}</td>
-                                </tr>
-                            </table>
-                        </div>
-                        <div class="col-md-6">
-                            <table class="table table-sm">
-                                <tr>
-                                    <th>Parameters:</th>
-                                    <td>
-                                        ${details.parameters ? Object.entries(details.parameters).map(([key, value]) => 
-                                            `${key.replace(/([A-Z])/g, ' $1').replace(/^./, str => str.toUpperCase())}: ${value}`
-                                        ).join('<br>') : 'None'}
-                                    </td>
-                                </tr>
-                                <tr>
-                                    <th>Final Result:</th>
-                                    <td>
-                                        <strong class="text-primary">${details.result ? details.result.orderQuantity : 'N/A'} ${item.unit}</strong>
-                                        ${details.result && details.result.reason ? `<br><small>${details.result.reason}</small>` : ''}
-                                    </td>
-                                </tr>
-                            </table>
-                        </div>
-                    </div>
-                </div>
-            `;
-            
-            // Show the detailed calculation in a modal
             Swal.fire({
-                title: `Calculation Details: ${item.itemCode}`,
+                title: 'Loading',
+                text: 'Loading historical stock data...',
+                allowOutsideClick: false,
+                didOpen: () => {
+                    Swal.showLoading();
+                }
+            });
+            
+            const stockUsageRef = _ref(_rtdb, `stockUsage/${key}`);
+            
+            _get(stockUsageRef)
+                .then((snapshot) => {
+                    if (!snapshot.exists()) {
+                        Swal.fire({
+                            title: 'Not Found',
+                            text: 'The selected historical data entry was not found.',
+                            icon: 'error'
+                        });
+                        return;
+                    }
+                    
+                    const data = snapshot.val();
+                    
+                    // Load the data into the app
+                    if (data.storeName) this.storeName = data.storeName;
+                    if (data.openingDate) this.openingDate = data.openingDate;
+                    if (data.closingDate) this.closingDate = data.closingDate;
+                    if (data.daysToNextDelivery) this.daysToNextDelivery = parseInt(data.daysToNextDelivery) || 0;
+                    if (data.safetyStockPercentage) this.safetyStockPercentage = parseFloat(data.safetyStockPercentage) || 0;
+                    if (data.criticalItemBuffer) this.criticalItemBuffer = parseFloat(data.criticalItemBuffer) || 0;
+                    if (data.defaultLeadTimeDays) this.defaultLeadTimeDays = parseInt(data.defaultLeadTimeDays) || 0;
+                    
+                    if (data.stockItems && Array.isArray(data.stockItems)) {
+                        this.stockData = data.stockItems;
+                        this.lastSaveTimestamp = data.timestamp || '';
+                        this.isDataUploaded = true;
+                        
+                        // Extract categories and cost centers
+                        this.filterOptions.availableCategories = [];
+                        this.filterOptions.availableCostCenters = [];
+                        this.stockData.forEach(item => {
+                            if (item.category && !this.filterOptions.availableCategories.includes(item.category)) {
+                                this.filterOptions.availableCategories.push(item.category);
+                            }
+                            if (item.costCenter && !this.filterOptions.availableCostCenters.includes(item.costCenter)) {
+                                this.filterOptions.availableCostCenters.push(item.costCenter);
+                            }
+                        });
+                        
+                        // Sort categories and cost centers
+                        this.filterOptions.availableCategories.sort();
+                        this.filterOptions.availableCostCenters.sort();
+                        
+                        // Apply all selected by default
+                        this.filterOptions.selectedCategories = [...this.filterOptions.availableCategories];
+                        this.filterOptions.selectedCostCenters = [...this.filterOptions.availableCostCenters];
+                        
+                        // Apply filters and update UI
+                        this.applyFilters();
+                        this.updateUI();
+                        
+                        // Update date fields if needed
+                        if (data.openingDate) this.openingStockDate = data.openingDate;
+                        if (data.closingDate) this.closingStockDate = data.closingDate;
+                        this.updateStockPeriodDays();
+                        
+                        Swal.fire({
+                            title: 'Success',
+                            text: `Loaded historical data from ${data.storeName}`,
+                            icon: 'success'
+                        });
+                    } else {
+                        Swal.fire({
+                            title: 'Invalid Data',
+                            text: 'The historical data entry does not contain valid stock data.',
+                            icon: 'error'
+                        });
+                    }
+                })
+                .catch((error) => {
+                    console.error('Error loading specific historical data:', error);
+                    Swal.fire({
+                        title: 'Error',
+                        text: `Could not load historical data: ${error.message}`,
+                        icon: 'error'
+                    });
+                });
+        },
+        
+        /**
+         * Delete a specific historical data entry
+         * @param {string} key - The unique key of the historical data entry to delete
+         * @param {string} timestamp - The formatted timestamp for display
+         * @param {string} storeName - The store name for display
+         */
+        deleteHistoricalData(key, timestamp, storeName) {
+            if (!ensureFirebaseInitialized()) {
+                Swal.fire({
+                    title: 'Error',
+                    text: 'Could not connect to database to delete historical data.',
+                    icon: 'error'
+                });
+                return;
+            }
+            
+            Swal.fire({
+                title: 'Confirm Deletion',
                 html: `
-                    <div class="calculation-details" style="text-align: left; max-height: 70vh; overflow-y: auto;">
-                        ${summaryHtml}
-                        <h4>Calculation Steps</h4>
-                        ${stepsHtml}
-                    </div>
+                    <p>Are you sure you want to delete this historical data entry?</p>
+                    <p><strong>Store:</strong> ${storeName}</p>
+                    <p><strong>Date:</strong> ${timestamp}</p>
                 `,
-                width: '80%',
-                confirmButtonText: 'Close',
-                customClass: {
-                    content: 'swal-wide-content'
+                icon: 'warning',
+                showCancelButton: true,
+                confirmButtonColor: '#d33',
+                cancelButtonColor: '#3085d6',
+                confirmButtonText: 'Yes, delete it!',
+                cancelButtonText: 'Cancel'
+            }).then((result) => {
+                if (result.isConfirmed) {
+                    const stockUsageRef = _ref(_rtdb, `stockUsage/${key}`);
+                    
+                    Swal.fire({
+                        title: 'Deleting',
+                        text: 'Deleting historical data...',
+                        allowOutsideClick: false,
+                        didOpen: () => {
+                            Swal.showLoading();
+                        }
+                    });
+                    
+                    _remove(stockUsageRef)
+                        .then(() => {
+                            console.log(`Deleted historical data entry: ${key}`);
+                            
+                            // Refresh the historical data list
+                            this.loadHistoricalData();
+                            
+                            Swal.fire({
+                                title: 'Deleted',
+                                text: 'Historical data entry has been deleted.',
+                                icon: 'success'
+                            });
+                        })
+                        .catch((error) => {
+                            console.error('Error deleting historical data:', error);
+                            
+                            Swal.fire({
+                                title: 'Error',
+                                text: `Could not delete historical data: ${error.message}`,
+                                icon: 'error'
+                            });
+                        });
                 }
             });
         },
+        
+        /**
+ * Show calculation details for the selected item
+ * @param {Object} item - The stock item to show calculation details for
+ */
+showCalculationDetails(item) {
+    console.log('Showing calculation details for item:', item);
+    
+    // Format function to handle undefined values and standardize number display
+    const formatValue = (value) => {
+        if (value === undefined || value === null || isNaN(value)) {
+            return '0';
+        }
+        return typeof value === 'number' ? Number(value).toFixed(2) : value;
+    };
+    
+    // Find the corresponding stock item in the full stock data array if available
+    let stockItem = item;
+    
+    // If we have a stockData array with items, try to find a matching item by code
+    if (this.stockData && this.stockData.length > 0 && item.itemCode) {
+        const matchingItem = this.stockData.find(i => i.itemCode === item.itemCode);
+        if (matchingItem) {
+            console.log('Found matching item in stockData:', matchingItem);
+            stockItem = matchingItem;
+        }
+    }
+    
+    // Create a formatted details object with all calculation components
+    const details = {
+        itemCode: stockItem.itemCode || '',
+        description: stockItem.description || '',
+        category: stockItem.category || '',
+        usageDetails: {
+            openingQty: formatValue(stockItem.openingBalance),
+            purchases: formatValue(stockItem.purchases),
+            closingQty: formatValue(stockItem.closingBalance),
+            usage: formatValue(stockItem.usage),
+            periodDays: this.stockPeriodDays || 0,
+            usagePerDay: formatValue(stockItem.usagePerDay)
+        },
+        orderCalculation: {
+            daysToNextDelivery: this.daysToNextDelivery || 0,
+            forecastUsage: formatValue((stockItem.usagePerDay || 0) * (this.daysToNextDelivery || 0)),
+            safetyStock: formatValue((stockItem.usagePerDay || 0) * 2),
+            currentStock: formatValue(stockItem.closingBalance),
+            recommendedOrderQty: formatValue(stockItem.orderQty || 0)
+        }
+    };
+    
+    // Add debug information to the console
+    console.log('Calculation details object:', details);
+    
+    // Show calculation details in a SweetAlert modal
+    Swal.fire({
+        title: `Calculation Details: ${stockItem.description}`,
+        html: `
+            <div class="text-left">
+                <div class="card mb-3">
+                    <div class="card-header bg-primary text-white">
+                        <strong>Item Information</strong>
+                    </div>
+                    <div class="card-body">
+                        <p><strong>Item Code:</strong> ${details.itemCode}</p>
+                        <p><strong>Description:</strong> ${details.description}</p>
+                        <p><strong>Category:</strong> ${details.category}</p>
+                    </div>
+                </div>
+                
+                <div class="card mb-3">
+                    <div class="card-header bg-info text-white">
+                        <strong>Usage Details</strong>
+                    </div>
+                    <div class="card-body">
+                        <table class="table table-sm">
+                            <tr>
+                                <td>Opening Quantity:</td>
+                                <td>${details.usageDetails.openingQty}</td>
+                            </tr>
+                            <tr>
+                                <td>Purchases:</td>
+                                <td>${details.usageDetails.purchases}</td>
+                            </tr>
+                            <tr>
+                                <td>Closing Quantity:</td>
+                                <td>${details.usageDetails.closingQty}</td>
+                            </tr>
+                            <tr>
+                                <td>Usage:</td>
+                                <td>${details.usageDetails.usage}</td>
+                            </tr>
+                            <tr>
+                                <td>Period Days:</td>
+                                <td>${details.usageDetails.periodDays}</td>
+                            </tr>
+                            <tr>
+                                <td>Usage Per Day:</td>
+                                <td>${details.usageDetails.usagePerDay}</td>
+                            </tr>
+                        </table>
+                    </div>
+                </div>
+                
+                <div class="card">
+                    <div class="card-header bg-success text-white">
+                        <strong>Order Calculation</strong>
+                    </div>
+                    <div class="card-body">
+                        <table class="table table-sm">
+                            <tr>
+                                <td>Days to Next Delivery:</td>
+                                <td>${details.orderCalculation.daysToNextDelivery}</td>
+                            </tr>
+                            <tr>
+                                <td>Forecast Usage:</td>
+                                <td>${details.orderCalculation.forecastUsage}</td>
+                            </tr>
+                            <tr>
+                                <td>Safety Stock:</td>
+                                <td>${details.orderCalculation.safetyStock}</td>
+                            </tr>
+                            <tr>
+                                <td>Current Stock:</td>
+                                <td>${details.orderCalculation.currentStock}</td>
+                            </tr>
+                            <tr class="table-primary">
+                                <td><strong>Recommended Order Quantity:</strong></td>
+                                <td><strong>${details.orderCalculation.recommendedOrderQty}</strong></td>
+                            </tr>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        `,
+        width: '600px',
+        confirmButtonText: 'Close',
+        confirmButtonColor: '#3085d6'
+    });
+},
     }
 };
 

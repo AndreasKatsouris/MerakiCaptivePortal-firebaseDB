@@ -47,6 +47,102 @@ exports.merakiWebhook = onRequest((req, res) => {
         });
 });
 
+/**
+ * Cloud Function for user registration
+ * This function securely creates user data in the database when a new user signs up
+ */
+exports.registerUser = functions.https.onCall(async (data, context) => {
+    // Ensure user is authenticated
+    if (!context.auth) {
+        throw new functions.https.HttpsError(
+            'unauthenticated',
+            'You must be logged in to register.'
+        );
+    }
+
+    try {
+        const userId = context.auth.uid;
+        const {
+            firstName,
+            lastName,
+            businessName,
+            businessAddress,
+            businessPhone,
+            businessType,
+            selectedTier,
+            tierData
+        } = data;
+
+        // Create user data
+        const userData = {
+            uid: userId,
+            email: context.auth.token.email,
+            firstName: firstName,
+            lastName: lastName,
+            displayName: `${firstName} ${lastName}`,
+            businessInfo: {
+                name: businessName,
+                address: businessAddress,
+                phone: businessPhone,
+                type: businessType
+            },
+            createdAt: admin.database.ServerValue.TIMESTAMP,
+            updatedAt: admin.database.ServerValue.TIMESTAMP,
+            status: 'active',
+            role: 'user'
+        };
+
+        // Create subscription data
+        const subscriptionData = {
+            userId: userId,
+            tier: selectedTier,
+            status: 'trial', // Start with trial
+            startDate: admin.database.ServerValue.TIMESTAMP,
+            trialEndDate: Date.now() + (14 * 24 * 60 * 60 * 1000), // 14-day trial
+            features: tierData.features || {},
+            limits: tierData.limits || {},
+            metadata: {
+                signupSource: 'web',
+                initialTier: selectedTier
+            }
+        };
+
+        // Save user data to database
+        await admin.database().ref(`users/${userId}`).set(userData);
+        await admin.database().ref(`subscriptions/${userId}`).set(subscriptionData);
+
+        // Create initial location for the user
+        const locationData = {
+            name: businessName,
+            address: businessAddress,
+            phone: businessPhone,
+            type: businessType,
+            ownerId: userId,
+            createdAt: admin.database.ServerValue.TIMESTAMP,
+            status: 'active',
+            settings: {
+                timezone: 'UTC',
+                currency: 'USD',
+                language: 'en'
+            }
+        };
+
+        // Create a location and link it to the user
+        const locationRef = await admin.database().ref('locations').push();
+        await locationRef.set(locationData);
+        await admin.database().ref(`userLocations/${userId}/${locationRef.key}`).set(true);
+
+        return { success: true, userId: userId };
+
+    } catch (error) {
+        console.error('Error in registerUser function:', error);
+        throw new functions.https.HttpsError(
+            'internal',
+            'An error occurred during registration.'
+        );
+    }
+});
+
 exports.getGoogleConfig = onRequest(async (req, res) => {
     res.json({
         apiKey: functions.config.google.places_api_key,
