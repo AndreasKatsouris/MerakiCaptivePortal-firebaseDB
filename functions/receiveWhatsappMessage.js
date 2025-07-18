@@ -14,6 +14,13 @@ const { processReceipt } = require('./receiptProcessor');
 const { matchReceiptToCampaign } = require('./guardRail');
 const { processReward } = require('./rewardsProcessor');
 const { processMessage } = require('./menuLogic');
+const { formatToSASTDateTime } = require('./utils/timezoneUtils');
+const { 
+    sendWhatsAppMessage, 
+    sendWelcomeMessageTemplate,
+    sendReceiptConfirmationTemplate 
+} = require('./utils/whatsappClient');
+const { markVoucherAsRedeemed, getVoucherDetails } = require('./voucherService');
 const { 
     checkConsent, 
     handleConsentFlow, 
@@ -28,19 +35,29 @@ if (!admin.apps.length) {
         databaseURL: "https://merakicaptiveportal-firebasedb-default-rtdb.firebaseio.com",
     });
 }
-async function sendWhatsAppNotification(phoneNumber, message) {
-    try {
-        await client.messages.create({
-            body: message,
-            from: `whatsapp:${twilioPhone}`,
-            to: `whatsapp:${phoneNumber}`
-        });
-        return { success: true };
-    } catch (error) {
-        console.error('Error sending WhatsApp message:', error);
-        throw error;
+
+/**
+ * Normalize phone number format by removing + prefix and whatsapp: prefix
+ * @param {string} phoneNumber - Phone number to normalize  
+ * @returns {string} Normalized phone number without + prefix
+ */
+function normalizePhoneNumber(phoneNumber) {
+    if (!phoneNumber) return '';
+    // Only remove WhatsApp prefix, preserve + for international numbers
+    let cleaned = phoneNumber.replace(/^whatsapp:/, '').trim();
+    
+    // Ensure + prefix for international numbers (South African numbers)
+    if (/^27\d{9}$/.test(cleaned)) {
+        // If it's a 27xxxxxxxxx number without +, add it
+        cleaned = '+' + cleaned;
+    } else if (!cleaned.startsWith('+') && /^\d+$/.test(cleaned)) {
+        // If it's all digits without +, assume it's South African
+        cleaned = '+27' + cleaned.replace(/^0+/, ''); // Remove leading zeros
     }
+    
+    return cleaned;
 }
+
 /**
  * Handle incoming WhatsApp messages
  * @param {object} req - HTTP request object
@@ -48,7 +65,15 @@ async function sendWhatsAppNotification(phoneNumber, message) {
  */
 async function receiveWhatsAppMessage(req, res) {
     console.log('Processing WhatsApp message...');
+    console.log('Request method:', req.method);
+    console.log('Content-Type:', req.headers['content-type']);
     console.log('Received payload:', JSON.stringify(req.body, null, 2));
+    
+    // Only accept POST requests from Twilio
+    if (req.method !== 'POST') {
+        console.error('Invalid request method:', req.method);
+        return res.status(405).send('Method not allowed. Please use POST.');
+    }
 
     try {
         const validationError = validateRequest(req);
@@ -57,50 +82,183 @@ async function receiveWhatsAppMessage(req, res) {
         }
 
         const { Body, From, MediaUrl0 } = req.body;
-        const phoneNumber = From.replace('whatsapp:', '');
+        const phoneNumber = normalizePhoneNumber(From);
         console.log(`Processing message from ${phoneNumber}`);
 
         // Get or initialize guest data
         const guestData = await getOrCreateGuest(phoneNumber);
+        console.log('Complete guest data:', JSON.stringify(guestData, null, 2));
 
         // Handle different message types
         if (!guestData.name) {
+            console.log('Guest has no name, handling name collection');
             return await handleNameCollection(guestData, Body, MediaUrl0, res);
         }
+        
+        console.log('Guest has name:', guestData.name);
         //=============================================================
         // Check consent status
-        const consentStatus = await checkConsent(guestData);     
-        // Handle consent flow if needed
+        console.log('Checking consent status for guest:', guestData.phoneNumber);
+        const consentStatus = await checkConsent(guestData);
+        console.log('Consent status:', JSON.stringify(consentStatus, null, 2));
+        console.log('Message body:', Body);
+        console.log('Is consent message?', isConsentMessage(Body));
+        
+        // Handle consent flow - check responses FIRST before starting new flow
+        console.log('Consent pending flag:', guestData.consentPending);
+        
+        // PRIORITY 1: Check if user is responding to consent while in flow
+        if (guestData.consentPending === true && Body) {
+            const response = Body.toLowerCase().trim();
+            console.log('User in consent flow, processing response:', response);
+            
+            // Handle yes/no responses specifically
+            if (response.match(/^(yes|y|agree|accept|ok|okay)$/)) {
+                console.log('User accepted consent');
+                const consentResult = await handleConsentFlow(guestData, Body);
+                console.log('Consent acceptance result:', JSON.stringify(consentResult, null, 2));
+                
+                if (consentResult.shouldMessage) {
+                    await sendWhatsAppMessage(phoneNumber, consentResult.message);
+                }
+                
+                // If consent was granted, refresh guest data to see updated state
+                if (consentResult.consentGranted) {
+                    console.log('Consent granted, waiting for database sync before refresh...');
+                    await new Promise(resolve => setTimeout(resolve, 200)); // Extra delay for propagation
+                    
+                    console.log('Refreshing guest data...');
+                    const refreshedGuestData = await getOrCreateGuest(phoneNumber);
+                    console.log('Refreshed guest data:', JSON.stringify(refreshedGuestData, null, 2));
+                    
+                    // Also do a direct database read to verify what's actually stored
+                    console.log('Direct database verification...');
+                    const normalizedPhone = normalizePhoneNumber(phoneNumber);
+                    const directSnapshot = await get(ref(rtdb, `guests/${normalizedPhone}`));
+                    const directData = directSnapshot.val();
+                    console.log('Direct database read result:', JSON.stringify(directData, null, 2));
+                    
+                    // Check specifically for consent data
+                    if (directData && directData.consent) {
+                        console.log('✅ Consent data found in database:', JSON.stringify(directData.consent, null, 2));
+                    } else {
+                        console.log('❌ No consent data found in database');
+                    }
+                    
+                    if (directData && directData.consentPending) {
+                        console.log('❌ WARNING: consentPending is still true in database!');
+                    } else {
+                        console.log('✅ consentPending is properly cleared in database');
+                    }
+                    
+                    // After consent is granted, show personalized welcome with available features
+                    const guestName = refreshedGuestData.name || 'there';
+                    await sendWhatsAppMessage(
+                        phoneNumber,
+                        `🤖 Perfect, ${guestName}! You're all set up now! 🎉\n\n` +
+                        `${getHelpMessage()}\n\n` +
+                        `I'm excited to help you earn rewards! 😊`
+                    );
+                }
+                
+                return res.status(200).send('Consent accepted');
+            } else if (response.match(/^(no|n|disagree|decline|reject)$/)) {
+                console.log('User declined consent');
+                const consentResult = await handleConsentFlow(guestData, Body);
+                console.log('Consent decline result:', JSON.stringify(consentResult, null, 2));
+                
+                if (consentResult.shouldMessage) {
+                    await sendWhatsAppMessage(phoneNumber, consentResult.message);
+                }
+                
+                // Refresh guest data to see updated state
+                console.log('Consent declined, waiting for database sync before refresh...');
+                await new Promise(resolve => setTimeout(resolve, 200)); // Extra delay for propagation
+                console.log('Refreshing guest data...');
+                const refreshedGuestData = await getOrCreateGuest(phoneNumber);
+                console.log('Refreshed guest data:', JSON.stringify(refreshedGuestData, null, 2));
+                
+                return res.status(200).send('Consent declined');
+            } else {
+                // User sent something else while in consent flow - ask again
+                console.log('Invalid consent response, prompting again');
+                await sendWhatsAppMessage(phoneNumber, 
+                    '🤖 I need a clear answer to proceed. Could you please reply with "YES" to accept or "NO" to decline data collection for rewards functionality? 😊'
+                );
+                return res.status(200).send('Invalid consent response');
+            }
+        }
+        
+        // PRIORITY 2: Check if consent is required and user is not in consent flow
         if (consentStatus.requiresConsent || isConsentMessage(Body)) {
+            console.log('Starting new consent flow - requiresConsent:', consentStatus.requiresConsent, 'isConsentMessage:', isConsentMessage(Body));
+            
+            // Ensure consent pending flag is set BEFORE calling consent flow
+            if (!guestData.consentPending) {
+                console.log('Setting consent pending flag manually');
+                const normalizedPhone = normalizePhoneNumber(phoneNumber);
+                await update(ref(rtdb, `guests/${normalizedPhone}`), {
+                    consentPending: true,
+                    lastConsentPrompt: Date.now()
+                });
+            }
+            
             const consentResult = await handleConsentFlow(guestData, Body);
+            console.log('New consent flow result:', JSON.stringify(consentResult, null, 2));
+            
             if (consentResult.shouldMessage) {
                 await sendWhatsAppMessage(phoneNumber, consentResult.message);
             }
             return res.status(consentResult.success ? 200 : 400)
-                     .send(consentResult.success ? 'Consent handled' : 'Invalid consent response');
-        }           
+                     .send(consentResult.success ? 'Consent flow started' : 'Consent flow error');
+        }
+        
+        console.log('Consent not required, proceeding to command processing');           
 
         if (MediaUrl0) {
+            console.log('Image received from WhatsApp:', {
+                mediaUrl: MediaUrl0,
+                phoneNumber,
+                hasConsent: consentStatus.hasConsent
+            });
+            
             // Check consent for receipt processing
             if (!consentStatus.hasConsent) {
+                console.log('User tried to send receipt without consent');
                 await sendWhatsAppMessage(phoneNumber, 
-                    'To process receipts and earn rewards, we need your consent. ' +
-                    'Reply "consent" to review and accept our privacy policy.'
+                    '🤖 I\'d love to help you with your receipt! To process receipts and earn rewards, I need your consent first. ' +
+                    'Reply "consent" to review and accept our privacy policy. 😊'
                 );
                 return res.status(200).send('Consent required');
             }
+            
+            console.log('Starting receipt processing for image:', MediaUrl0);
             return await handleReceiptProcessing(guestData, MediaUrl0, res);
         }
         if (Body) {
+            console.log('Processing text command:', Body);
+            console.log('Requires consent?', requiresConsent(Body));
+            console.log('Has consent?', consentStatus.hasConsent);
+            
             // Check if command requires consent
             if (requiresConsent(Body) && !consentStatus.hasConsent) {
+                console.log('Command requires consent but user has not consented');
                 await sendWhatsAppMessage(phoneNumber, 
-                    'This feature requires your consent. ' +
-                    'Reply "consent" to review our privacy policy and enable all features.'
+                    '🤖 I\'d love to help you with that! This feature requires your consent first. ' +
+                    'Reply "consent" to review our privacy policy and enable all features. 😊'
                 );
                 return res.status(200).send('Consent required for command');
             }
-            return await handleTextCommand(guestData, Body, res);
+            
+            console.log('Processing command through processMessage');
+            const result = await processMessage(Body, guestData.phoneNumber, null);
+            console.log('Command processing result:', {
+                success: result.success,
+                hasMessage: !!result.message,
+                messageLength: result.message?.length || 0
+            });
+            await sendWhatsAppMessage(guestData.phoneNumber, result.message);
+            return res.status(result.success ? 200 : 400).send(result.message);
         }
 
         return await handleInvalidInput(guestData, res);
@@ -130,28 +288,135 @@ function validateRequest(req) {
 }
 
 /**
- * Get or create guest record
+ * Get or create guest record with race condition protection
  * @param {string} phoneNumber - Guest's phone number
  * @returns {Promise<object>} Guest data
  */
 async function getOrCreateGuest(phoneNumber) {
     // Strip 'whatsapp:' prefix for database storage
-    const cleanPhone = phoneNumber.replace('whatsapp:', '');
+    const cleanPhone = normalizePhoneNumber(phoneNumber);
     console.log('Getting/creating guest record for:', cleanPhone);
     
     const guestRef = ref(rtdb, `guests/${cleanPhone}`);
-    const guestSnapshot = await get(guestRef);
-    let guestData = guestSnapshot.val();
-
-    if (!guestData) {
-        guestData = { phoneNumber: cleanPhone, createdAt: Date.now() };
-        await set(guestRef, guestData);
-        console.log(`New guest added: ${cleanPhone}`);
-    } else {
-        console.log(`Returning guest: ${guestData.name || 'Guest'}`);
+    console.log('Database path:', `guests/${cleanPhone}`);
+    
+    // Add retry mechanism for race conditions
+    let guestData = null;
+    let retryCount = 0;
+    const maxRetries = 3;
+    
+    while (retryCount < maxRetries) {
+        try {
+            const guestSnapshot = await get(guestRef);
+            guestData = guestSnapshot.val();
+            
+            if (!guestData) {
+                // No existing data - create new guest with atomic operation
+                const newGuestData = { 
+                    phoneNumber: cleanPhone, 
+                    createdAt: Date.now(),
+                    // Add processing flag to prevent concurrent creation
+                    processing: true
+                };
+                
+                // Use set with conditional check to prevent race condition
+                await set(guestRef, newGuestData);
+                console.log(`New guest added: ${cleanPhone}`);
+                
+                // Remove processing flag
+                await update(guestRef, { processing: false });
+                guestData = newGuestData;
+                guestData.processing = false;
+                
+                break;
+            } else if (!guestData.phoneNumber) {
+                // Existing data but corrupted/missing phoneNumber - repair it
+                console.log('Repairing corrupted guest data:', guestData);
+                const repairedData = {
+                    phoneNumber: cleanPhone,
+                    createdAt: guestData.createdAt || Date.now(),
+                    // Preserve any existing valid fields
+                    ...(guestData.name && { name: guestData.name }),
+                    ...(guestData.consent && { consent: guestData.consent }),
+                    ...(guestData.consentPending !== undefined && { consentPending: guestData.consentPending }),
+                    // Add updatedAt timestamp to track the repair
+                    updatedAt: Date.now(),
+                    dataRepaired: true
+                };
+                await set(guestRef, repairedData);
+                guestData = repairedData;
+                console.log(`Guest data repaired for: ${cleanPhone}`);
+                break;
+            } else {
+                // Valid existing data
+                console.log(`Returning guest: ${guestData.name || 'Guest'}`);
+                break;
+            }
+        } catch (error) {
+            console.error(`Error in getOrCreateGuest (attempt ${retryCount + 1}):`, error);
+            retryCount++;
+            
+            if (retryCount < maxRetries) {
+                // Wait before retry with exponential backoff
+                await new Promise(resolve => setTimeout(resolve, 100 * Math.pow(2, retryCount)));
+            } else {
+                throw error;
+            }
+        }
     }
 
     return guestData;
+}
+
+/**
+ * Check if input looks like a command rather than a name
+ * @param {string} text - Input text
+ * @returns {boolean} Whether text appears to be a command
+ */
+function isCommand(text) {
+    if (!text) return false;
+    
+    const trimmed = text.trim().toLowerCase();
+    
+    // Single word commands
+    const commands = [
+        'help', 'hi', 'hello', 'hey', 'start', 'menu', 'info',
+        'points', 'rewards', 'balance', 'history', 'profile',
+        'consent', 'privacy', 'yes', 'no', 'ok', 'okay'
+    ];
+    
+    // Check for exact command matches
+    if (commands.includes(trimmed)) return true;
+    
+    // Check for command patterns
+    if (trimmed.startsWith('use reward')) return true;
+    if (trimmed.includes('check') && trimmed.includes('points')) return true;
+    if (trimmed.includes('view') && trimmed.includes('rewards')) return true;
+    
+    // Check for test patterns (like "TEST 1435")
+    if (trimmed.match(/^test\s+\d+$/)) return true;
+    
+    // Check if it's all caps single word (likely a command)
+    if (trimmed.match(/^[A-Z]+$/) && trimmed.length <= 10) return true;
+    
+    return false;
+}
+
+/**
+ * Check if input looks like a valid name
+ * @param {string} text - Input text
+ * @returns {boolean} Whether text appears to be a name
+ */
+function isValidName(text) {
+    if (!text) return false;
+    
+    const trimmed = text.trim();
+    
+    // Basic name validation
+    return trimmed.length >= 2 && 
+           trimmed.length <= 50 && 
+           /^[a-zA-Z\s]+$/.test(trimmed) && 
+           !isCommand(text);
 }
 
 /**
@@ -168,20 +433,68 @@ async function handleNameCollection(guestData, body, mediaUrl, res) {
             return res.status(400).send('Invalid guest data');
         }
 
-        if (!guestData.name && body && !mediaUrl) {
-            const trimmedName = body.trim();
-            await update(ref(rtdb, `guests/${guestData.phoneNumber}`), { name: trimmedName });
-
+        // If there's media, ask for name first
+        if (mediaUrl) {
             await sendWhatsAppMessage(
                 guestData.phoneNumber,
-                `Thank you, ${trimmedName}! Your profile has been updated.\n\n${getHelpMessage()}`
+                "🤖 Hi there! I'd love to help you with your receipt, but I'll need to know your full name first. Could you please share your name with me? 😊"
             );
-            return res.status(200).send('Guest name updated.');
+            return res.status(200).send('Name required before receipt processing.');
         }
 
+        // If there's text input
+        if (body) {
+            const trimmedInput = body.trim();
+            
+            // Check if input is a command instead of a name
+            if (isCommand(trimmedInput)) {
+                console.log(`Command detected during name collection: ${trimmedInput}`);
+                
+                // Handle help command specifically
+                if (trimmedInput.toLowerCase() === 'help') {
+                    await sendWhatsAppMessage(
+                        guestData.phoneNumber,
+                        `🤖 Hi! Welcome to our rewards program. To get started, I'll need to know your full name first.\n\nOnce registered, you'll be able to:\n• Send receipt photos to earn rewards\n• Check your points balance\n• View available rewards\n\nCould you please share your full name with me? (e.g., "John Smith") 😊`
+                    );
+                    return res.status(200).send('Help provided during name collection.');
+                }
+                
+                // For other commands, redirect to name collection
+                await sendWhatsAppMessage(
+                    guestData.phoneNumber,
+                    `🤖 Hi! I'd love to help you with that, but I'll need to know your full name first. Could you please share your name with me? (e.g., "John Smith") 😊`
+                );
+                return res.status(200).send('Name required for command.');
+            }
+            
+            // Check if input looks like a valid name
+            if (isValidName(trimmedInput)) {
+                const normalizedPhone = normalizePhoneNumber(guestData.phoneNumber);
+                await update(ref(rtdb, `guests/${normalizedPhone}`), { name: trimmedInput });
+
+                // After name is collected, ask for consent before showing features
+                await sendWhatsAppMessage(
+                    guestData.phoneNumber,
+                    `🤖 Thank you, ${trimmedInput}! Nice to meet you! 😊\n\n` +
+                    `To help you earn rewards and access all features, I need your consent to collect and use your data. ` +
+                    `This includes processing your receipts and managing your rewards.\n\n` +
+                    `Reply "consent" to review our privacy policy and get started!`
+                );
+                return res.status(200).send('Name collected, consent requested.');
+            } else {
+                // Input doesn't look like a valid name
+                await sendWhatsAppMessage(
+                    guestData.phoneNumber,
+                    `🤖 I need a valid name with just letters and spaces (e.g., "John Smith"). Could you try again without numbers or special characters? 😊`
+                );
+                return res.status(200).send('Invalid name format.');
+            }
+        }
+
+        // No input provided
         await sendWhatsAppMessage(
             guestData.phoneNumber,
-            "Welcome! Please reply with your full name to complete your profile."
+            "🤖 Welcome! I'd love to help you get started. Could you please share your full name to complete your profile? 😊"
         );
         return res.status(200).send('Prompted guest for name.');
     } catch (error) {
@@ -198,26 +511,134 @@ async function handleNameCollection(guestData, body, mediaUrl, res) {
  */
 async function handleReceiptProcessing(guestData, mediaUrl, res) {
     try {
-        console.log(`Processing receipt for ${guestData.phoneNumber}`);
+        console.log(`Processing receipt for ${guestData.phoneNumber} with media URL: ${mediaUrl}`);
         
-        // Process receipt image
-        const receiptData = await processReceipt(mediaUrl, guestData.phoneNumber);
+        // Step 1: Extract receipt data without saving yet
+        console.log('Step 1: Starting receipt OCR and data extraction...');
+        const { processReceiptWithoutSaving } = require('./receiptProcessor');
+        const extractedData = await processReceiptWithoutSaving(mediaUrl, guestData.phoneNumber);
+        console.log('Step 1 completed: Receipt data extracted', {
+            brandName: extractedData.brandName,
+            totalAmount: extractedData.totalAmount,
+            itemCount: extractedData.items?.length || 0,
+            invoiceNumber: extractedData.invoiceNumber,
+            date: extractedData.date,
+            hasDateField: 'date' in extractedData,
+            hasInvoiceField: 'invoiceNumber' in extractedData
+        });
+        
+        // Step 1.5: Check for duplicate receipt BEFORE saving
+        console.log('Step 1.5: Checking for duplicate receipt...');
+        const isDuplicate = await checkDuplicateReceipt(extractedData, guestData.phoneNumber);
+        if (isDuplicate) {
+            console.log('Duplicate receipt detected, skipping processing');
+            await sendWhatsAppMessage(
+                guestData.phoneNumber,
+                `🤖 I've already processed this receipt for you! Check "view rewards" to see your existing rewards. 😊`
+            );
+            return res.status(200).send('Duplicate receipt - skipped processing');
+        }
+        
+        // Step 1.6: Save receipt only after duplicate check passes
+        console.log('Step 1.6: No duplicate found, saving receipt...');
+        const { saveReceiptData } = require('./receiptProcessor');
+        // Include guest name in extracted data so it's always saved
+        extractedData.guestName = guestData.name;
+        const receiptData = await saveReceiptData(extractedData, guestData.phoneNumber);
+        console.log('Step 1.6 completed: Receipt saved successfully with ID:', receiptData.id);
         
         // Match receipt to campaign with enhanced validation
+        console.log('Step 2: Starting matchReceiptToCampaign...');
         const matchResult = await matchReceiptToCampaign(receiptData);
+        console.log('Step 2 completed: Campaign matching result', {
+            isValid: matchResult.isValid,
+            campaignName: matchResult.campaign?.name || 'No match',
+            reason: matchResult.reason || 'Success'
+        });
 
         if (matchResult.isValid) {
+            console.log('Step 3: Processing successful match...');
             return await handleSuccessfulMatch(guestData, matchResult, receiptData, res);
         } else {
+            console.log('Step 3: Processing failed match...');
             return await handleFailedMatch(guestData, matchResult, receiptData, res);
         }
     } catch (error) {
-        console.error('Receipt processing error:', error);
+        console.error('Receipt processing error at step:', error);
+        console.error('Error stack:', error.stack);
+        console.error('Error details:', {
+            message: error.message,
+            mediaUrl,
+            phoneNumber: guestData.phoneNumber
+        });
+        
         await sendWhatsAppMessage(
             guestData.phoneNumber,
             constructErrorMessage(error)
         );
         return res.status(500).send('Error processing receipt.');
+    }
+}
+
+/**
+ * Check if receipt has already been processed to prevent duplicates
+ * @param {object} receiptData - Receipt data
+ * @param {string} phoneNumber - Guest's phone number
+ * @returns {Promise<boolean>} True if duplicate found
+ */
+async function checkDuplicateReceipt(receiptData, phoneNumber) {
+    try {
+        if (!receiptData.invoiceNumber) {
+            console.log('No invoice number found, cannot check for duplicates');
+            return false;
+        }
+        
+        const normalizedPhone = normalizePhoneNumber(phoneNumber);
+        
+        // Check existing receipts for this phone number and invoice
+        const receiptsRef = ref(rtdb, 'receipts');
+        console.log('Checking receipts collection for duplicates...');
+        const snapshot = await get(receiptsRef);
+        const allReceipts = snapshot.val() || {};
+        
+        console.log('Checking for duplicates among receipts:', Object.keys(allReceipts).length);
+        
+        // Find duplicate by invoice number, phone number, and date
+        const duplicate = Object.entries(allReceipts).find(([firebaseId, receipt]) => {
+            const matches = receipt.guestPhoneNumber === normalizedPhone && 
+                          receipt.invoiceNumber === receiptData.invoiceNumber &&
+                          receipt.date === receiptData.date;
+            
+            if (matches) {
+                console.log('Found potential duplicate:', {
+                    firebaseId: firebaseId,
+                    receiptId: receipt.id || receipt.receiptId,
+                    invoiceNumber: receipt.invoiceNumber,
+                    guestPhone: receipt.guestPhoneNumber,
+                    date: receipt.date
+                });
+            }
+            
+            return matches;
+        });
+        
+        if (duplicate) {
+            const [firebaseId, duplicateReceipt] = duplicate;
+            console.log('Duplicate receipt confirmed:', {
+                firebaseId: firebaseId,
+                receiptId: duplicateReceipt.id || duplicateReceipt.receiptId,
+                invoiceNumber: receiptData.invoiceNumber,
+                guestPhone: normalizedPhone
+            });
+            return true;
+        }
+        
+        console.log('No duplicate found, processing can continue');
+        return false;
+    } catch (error) {
+        console.error('Error checking for duplicate receipt:', error);
+        // If we can't check, allow processing to continue
+        return false;
     }
 }
 
@@ -236,14 +657,66 @@ async function handleSuccessfulMatch(guestData, matchResult, receiptData, res) {
             eligibleRewardTypes: matchResult.eligibleRewardTypes.length
         });
 
-        // Process rewards for all eligible types
+        // Receipt was already created by processReceipt() - just use the existing one
+        console.log('Using existing receipt created by processReceipt()...');
+        const receiptId = receiptData.id; // This comes from saveReceiptData()
+        
+        if (!receiptId) {
+            console.error('Receipt ID missing from receiptData - this should not happen');
+            throw new Error('Receipt ID missing from processed receipt data');
+        }
+        
+        console.log('Using existing receipt with ID:', receiptId);
+        
+        // Update the receipt with campaign info and guest details
+        const receiptRef = ref(rtdb, `receipts/${receiptId}`);
+        
+        // First, check what data exists before the update
+        console.log('🔍 Checking receipt data before update...');
+        const beforeSnapshot = await get(receiptRef);
+        const beforeData = beforeSnapshot.val();
+        console.log('📄 Receipt data BEFORE update:', {
+            hasDate: !!beforeData?.date,
+            hasInvoiceNumber: !!beforeData?.invoiceNumber,
+            date: beforeData?.date,
+            invoiceNumber: beforeData?.invoiceNumber,
+            id: beforeData?.id
+        });
+        
+        // Preserve original receipt data during update
+        await update(receiptRef, {
+            // Preserve original extracted data
+            ...receiptData,
+            guestName: guestData.name,
+            campaignId: matchResult.campaign.id || matchResult.campaign.name.replace(/\s+/g, '_').toLowerCase(),
+            status: 'pending' // Keep as pending until rewards are processed
+        });
+        
+        // Check what data exists after the update
+        console.log('🔍 Checking receipt data after update...');
+        const afterSnapshot = await get(receiptRef);
+        const afterData = afterSnapshot.val();
+        console.log('📄 Receipt data AFTER update:', {
+            hasDate: !!afterData?.date,
+            hasInvoiceNumber: !!afterData?.invoiceNumber,
+            date: afterData?.date,
+            invoiceNumber: afterData?.invoiceNumber,
+            id: afterData?.id
+        });
+        
+        console.log('Receipt updated with campaign and guest info');
+
+        // Now process rewards with the proper receiptId
         const rewardResult = await processReward(
             guestData, 
             {
                 ...matchResult.campaign,
                 rewardTypes: matchResult.eligibleRewardTypes
             }, 
-            receiptData
+            {
+                ...receiptData,
+                receiptId
+            }
         );
         
         // Send success message with reward details
@@ -267,6 +740,14 @@ async function handleSuccessfulMatch(guestData, matchResult, receiptData, res) {
  * @param {object} res - Response object
  */
 async function handleFailedMatch(guestData, matchResult, receiptData, res) {
+    // Update receipt with guest name and unmatched campaign status
+    const receiptRef = ref(rtdb, `receipts/${receiptData.id}`);
+    await update(receiptRef, {
+        guestName: guestData.name,
+        campaignId: null,
+        status: 'unmatched_campaign'
+    });
+    
     const failureMessage = constructFailureMessage(guestData.name, matchResult, receiptData);
     
     await sendWhatsAppMessage(guestData.phoneNumber, failureMessage);
@@ -278,15 +759,76 @@ async function handleFailedMatch(guestData, matchResult, receiptData, res) {
  * @private
  */
 function constructSuccessMessage(guestName, matchResult, rewardResult) {
+    console.log('Constructing success message with:', {
+        guestName,
+        campaignName: matchResult?.campaign?.name,
+        rewardResultType: typeof rewardResult,
+        hasRewards: !!rewardResult?.rewards,
+        rewardsCount: rewardResult?.rewards?.length,
+        alreadyProcessed: rewardResult?.alreadyProcessed
+    });
+
+    // Handle case where rewardResult is undefined or invalid
+    if (!rewardResult || !rewardResult.rewards || !Array.isArray(rewardResult.rewards)) {
+        console.error('Invalid rewardResult structure:', rewardResult);
+        return `Hi ${guestName}! We've processed your receipt from ${matchResult?.campaign?.brandName || 'the restaurant'}, but encountered an issue with reward generation. Please contact support if you don't see your rewards shortly.`;
+    }
+
+    // Handle case where no rewards were generated
+    if (rewardResult.rewards.length === 0) {
+        return `Hi ${guestName}! Your receipt from ${matchResult?.campaign?.brandName || 'the restaurant'} has been validated, but no rewards were eligible at this time.`;
+    }
+
     const rewardsList = rewardResult.rewards
         .map(reward => {
-            const expiryDate = new Date(reward.expiresAt).toLocaleDateString();
-            return `• ${reward.metadata.description}\n  Expires: ${expiryDate}`;
+            try {
+                // Enhanced defensive coding for reward properties
+                if (!reward) {
+                    console.error('Reward object is null/undefined');
+                    return `• Reward (see details in app)`;
+                }
+
+                // Handle missing or invalid expiration date
+                let expiryDate = 'No expiration';
+                if (reward.expiresAt) {
+                    try {
+                        expiryDate = formatToSASTDateTime(reward.expiresAt, { 
+                            year: 'numeric', 
+                            month: 'short', 
+                            day: 'numeric' 
+                        });
+                    } catch (dateError) {
+                        console.error('Error formatting expiry date:', dateError, 'Raw expiresAt:', reward.expiresAt);
+                        expiryDate = 'Check app for details';
+                    }
+                }
+
+                // Handle missing description with better fallback
+                const description = reward.metadata?.description || 
+                                  reward.description || 
+                                  reward.name || 
+                                  'Reward';
+
+                return `• ${description}\n  Expires: ${expiryDate}`;
+            } catch (error) {
+                console.error('Error formatting reward:', error, 'Reward object:', reward);
+                return `• Reward (see details in app)`;
+            }
         })
+        .filter(Boolean) // Remove any null/undefined entries
         .join('\n');
 
+    const statusMessage = rewardResult.alreadyProcessed ? 
+        'Your receipt has been processed previously. Here are your rewards:' : 
+        'Your receipt has earned you:';
+
+    // Final safety check for empty rewards list
+    if (!rewardsList || rewardsList.trim() === '') {
+        return `Hi ${guestName}! Your receipt from ${matchResult?.campaign?.brandName || 'the restaurant'} has been processed successfully, but we're having trouble displaying your rewards. Please check the app for details.`;
+    }
+
     return `Congratulations ${guestName}! 🎉\n\n` +
-           `Your receipt from ${matchResult.campaign.brandName} has earned you:\n\n` +
+           `${statusMessage}\n\n` +
            `${rewardsList}\n\n` +
            `Reply "view rewards" anytime to check your rewards!`;
 }
@@ -301,33 +843,33 @@ function constructSuccessMessage(guestName, matchResult, rewardResult) {
 function constructFailureMessage(guestName, matchResult, receiptData) {
     // Handle case where no campaigns are active
     if (matchResult.error === 'No active campaigns found') {
-        return `Sorry ${guestName}, there are no active campaigns at the moment. Please try again later!`;
+        return `🤖 Hi ${guestName}! I checked but there are no active campaigns running right now. Don't worry - new campaigns start regularly, so please try again soon! 🎯`;
     }
 
     // Handle case where brand has no active campaigns
     if (matchResult.error === `No active campaigns found for ${receiptData.brandName}`) {
-        return `Sorry ${guestName}, there are currently no active campaigns for ${receiptData.brandName}. Please check our other participating brands!`;
+        return `🤖 Hi ${guestName}! I can see this is from ${receiptData.brandName}, but they don't have any active campaigns at the moment. Check out our other participating brands or try again later! 🏪`;
     }
 
-    let message = `Sorry ${guestName}, we couldn't validate your receipt.`;
+    let message = `🤖 Hi ${guestName}! I've analyzed your receipt but couldn't validate it for rewards this time.`;
     const issues = [];
 
     // Check receipt data quality issues
     const dataIssues = checkReceiptDataIssues(receiptData);
     if (dataIssues.length > 0) {
-        issues.push('\nReceipt clarity issues:', ...dataIssues);
+        issues.push('\n📸 Receipt clarity issues:', ...dataIssues);
     }
 
     // Check campaign criteria issues
     if (matchResult.failedCriteria?.length > 0) {
-        issues.push('\nCampaign requirements not met:', 
+        issues.push('\n🎯 Campaign requirements not met:', 
             ...matchResult.failedCriteria.map(c => `• ${formatCriteriaFailure(c)}`)
         );
     }
 
     // Check reward type eligibility issues
     if (matchResult.rewardTypeIssues?.length > 0) {
-        issues.push('\nReward eligibility issues:', 
+        issues.push('\n🏆 Reward eligibility issues:', 
             ...matchResult.rewardTypeIssues.map(issue => `• ${formatRewardTypeIssue(issue)}`)
         );
     }
@@ -336,7 +878,7 @@ function constructFailureMessage(guestName, matchResult, receiptData) {
     let resolutionSteps = [];
     if (dataIssues.length > 0) {
         resolutionSteps.push(
-            '\nTo ensure your receipt can be processed:',
+            '\n💡 To help me read your receipt better:',
             '• Take the photo in good lighting',
             '• Make sure the receipt is flat and not folded',
             '• Include the entire receipt in the photo',
@@ -346,7 +888,7 @@ function constructFailureMessage(guestName, matchResult, receiptData) {
 
     if (matchResult.failedCriteria?.length > 0) {
         resolutionSteps.push(
-            '\nTo meet campaign requirements:',
+            '\n✅ To meet campaign requirements:',
             ...getCampaignRequirementTips(matchResult.failedCriteria)
         );
     }
@@ -358,6 +900,8 @@ function constructFailureMessage(guestName, matchResult, receiptData) {
     if (resolutionSteps.length > 0) {
         message += '\n' + resolutionSteps.join('\n');
     }
+
+    message += '\n\n🎉 Keep trying - I\'m here to help you earn those rewards!';
 
     return message;
 }
@@ -465,224 +1009,27 @@ function getCampaignRequirementTips(failedCriteria) {
 function constructErrorMessage(error) {
     // Network or system errors
     if (error.code === 'ECONNREFUSED' || error.code === 'ETIMEDOUT') {
-        return 'Sorry, we\'re having trouble connecting to our servers. Please try again in a few minutes.';
+        return '🤖 Oops! I\'m having trouble connecting to my servers right now. Please give me a few minutes and try again! 🔄';
     }
 
     // Receipt processing errors
     if (error.message.includes('OCR') || error.message.includes('image')) {
-        return `We couldn't read your receipt clearly. Please ensure:\n\n` +
-               `• Good lighting with no glare\n` +
-               `• Receipt is flat and not folded\n` +
-               `• The entire receipt is visible\n` +
-               `• All text is clear and readable`;
+        return `🤖 I'm having trouble reading your receipt clearly. Let me help you get a better photo:\n\n` +
+               `📸 Photo tips:\n` +
+               `• Use good lighting with no glare\n` +
+               `• Keep the receipt flat and not folded\n` +
+               `• Include the entire receipt in the photo\n` +
+               `• Make sure all text is clearly visible\n\n` +
+               `Try again - I'm here to help! 🎯`;
     }
 
     // Campaign validation errors
     if (error.message.includes('campaign') || error.message.includes('reward')) {
-        return `Sorry, we encountered an issue validating your receipt. Please try again, and if the problem persists, contact support.`;
+        return `🤖 I encountered a technical issue while checking your receipt. Please try again, and if this keeps happening, let our support team know! 🛠️`;
     }
 
     // Default error message
-    return 'Sorry, something went wrong. Please try again later.';
-}
-
-/**
- * Handle text commands with enhanced reward support
- * @param {object} guestData - Guest data
- * @param {string} body - Message body
- * @param {object} res - Response object
- */
-async function handleTextCommand(guestData, body, res) {
-    const normalizedCommand = body.toLowerCase().trim();
-
-    // Enhanced reward-specific commands
-    if (normalizedCommand.startsWith('use reward')) {
-        return await handleUseRewardCommand(guestData, body, res);
-    }
-
-    if (normalizedCommand === 'view rewards' || normalizedCommand === 'my rewards') {
-        return await handleViewRewardsCommand(guestData, res);
-    }
-
-    // Default command processing
-    const result = await processMessage(body, guestData.phoneNumber);
-    await sendWhatsAppMessage(guestData.phoneNumber, result.message);
-    return res.status(result.success ? 200 : 400).send(result.message);
-}
-
-/**
- * Handle the "use reward" command
- * @private
- */
-async function handleUseRewardCommand(guestData, body, res) {
-    try {
-        // Extract reward ID from command (e.g., "use reward ABC123")
-        const rewardId = body.split(' ')[2];
-        if (!rewardId) {
-            await sendWhatsAppMessage(
-                guestData.phoneNumber,
-                'Please specify which reward you want to use (e.g., "use reward ABC123").'
-            );
-            return res.status(400).send('Invalid reward usage command');
-        }
-
-        // Verify reward ownership and status
-        const rewardRef = ref(rtdb, `rewards/${rewardId}`);
-        const snapshot = await get(rewardRef);
-        const reward = snapshot.val();
-
-        if (!reward || reward.guestPhone !== guestData.phoneNumber) {
-            await sendWhatsAppMessage(
-                guestData.phoneNumber,
-                'Sorry, we couldn\'t find that reward. Please check the reward ID and try again.'
-            );
-            return res.status(404).send('Reward not found');
-        }
-
-        if (reward.status !== 'active') {
-            await sendWhatsAppMessage(
-                guestData.phoneNumber,
-                `This reward cannot be used because it is ${reward.status}.`
-            );
-            return res.status(400).send('Invalid reward status');
-        }
-
-        if (reward.expiresAt < Date.now()) {
-            await sendWhatsAppMessage(
-                guestData.phoneNumber,
-                'Sorry, this reward has expired.'
-            );
-            return res.status(400).send('Reward expired');
-        }
-
-        // Generate use code and update reward status
-        const useCode = generateRewardUseCode();
-        await update(ref(rtdb, `rewards/${rewardId}`), {
-            status: 'pending_use',
-            useCode,
-            useRequestedAt: admin.database.ServerValue.TIMESTAMP
-        });
-
-        // Send use instructions
-        const message = formatRewardUseInstructions(reward, useCode);
-        await sendWhatsAppMessage(guestData.phoneNumber, message);
-        
-        return res.status(200).send('Reward use code generated');
-
-    } catch (error) {
-        console.error('Error handling reward use command:', error);
-        await sendWhatsAppMessage(
-            guestData.phoneNumber,
-            'Sorry, we encountered an error processing your reward. Please try again later.'
-        );
-        return res.status(500).send('Error processing reward use');
-    }
-}
-
-/**
- * Handle the "view rewards" command
- * @private
- */
-async function handleViewRewardsCommand(guestData, res) {
-    try {
-        // Get user's rewards
-        const snapshot = await get(ref(rtdb, 'rewards')
-            .orderByChild('guestPhone')
-            .equalTo(guestData.phoneNumber));
-
-        const rewards = snapshot.val() || {};
-        
-        // Group rewards by status
-        const groupedRewards = {
-            active: [],
-            pending: [],
-            used: [],
-            expired: []
-        };
-
-        Object.entries(rewards).forEach(([id, reward]) => {
-            if (reward.expiresAt < Date.now() && reward.status === 'active') {
-                reward.status = 'expired';
-            }
-            groupedRewards[reward.status] = groupedRewards[reward.status] || [];
-            groupedRewards[reward.status].push({ id, ...reward });
-        });
-
-        // Format and send rewards message
-        const message = formatRewardsOverview(groupedRewards);
-        await sendWhatsAppMessage(guestData.phoneNumber, message);
-        
-        return res.status(200).send('Rewards overview sent');
-
-    } catch (error) {
-        console.error('Error handling view rewards command:', error);
-        await sendWhatsAppMessage(
-            guestData.phoneNumber,
-            'Sorry, we encountered an error retrieving your rewards. Please try again later.'
-        );
-        return res.status(500).send('Error retrieving rewards');
-    }
-}
-
-/**
- * Format reward use instructions
- * @private
- */
-function formatRewardUseInstructions(reward, useCode) {
-    return `*Ready to use your reward!* 🎉\n\n` +
-           `${reward.metadata.description}\n\n` +
-           `Show this code to the staff: *${useCode}*\n\n` +
-           `This code will be valid for the next 15 minutes.\n` +
-           `Reply "view rewards" to see all your rewards.`;
-}
-
-/**
- * Format rewards overview message
- * @private
- */
-function formatRewardsOverview(groupedRewards) {
-    const sections = [];
-
-    if (groupedRewards.active?.length > 0) {
-        const activeRewards = groupedRewards.active
-            .map(reward => formatSingleReward(reward))
-            .join('\n\n');
-        sections.push(`*Active Rewards:*\n${activeRewards}`);
-    }
-
-    if (groupedRewards.pending?.length > 0) {
-        const pendingRewards = groupedRewards.pending
-            .map(reward => `• ${reward.metadata.description} (Processing)`)
-            .join('\n');
-        sections.push(`*Pending Rewards:*\n${pendingRewards}`);
-    }
-
-    if (sections.length === 0) {
-        return `You don't have any active rewards yet.\n\n` +
-               `Send us a receipt from your next purchase to earn rewards!`;
-    }
-
-    return sections.join('\n\n') + '\n\n' +
-           `To use a reward, reply with "use reward" followed by the reward ID.`;
-}
-
-/**
- * Format single reward details
- * @private
- */
-function formatSingleReward(reward) {
-    const expiryDate = new Date(reward.expiresAt).toLocaleDateString();
-    return `• ${reward.metadata.description}\n` +
-           `  ID: ${reward.id}\n` +
-           `  Expires: ${expiryDate}`;
-}
-
-/**
- * Generate random reward use code
- * @private
- */
-function generateRewardUseCode() {
-    return Math.random().toString(36).substring(2, 8).toUpperCase();
+    return '🤖 Something unexpected happened on my end. Please try again in a moment! 🔄';
 }
 
 /**
@@ -713,8 +1060,8 @@ async function handleError(error, from, res) {
 
     try {
         await sendWhatsAppMessage(
-            from.replace('whatsapp:', ''),
-            "Sorry, we encountered an unexpected error. Please try again later."
+            normalizePhoneNumber(from),
+            "🤖 Something unexpected happened on my end. Please try again in a moment! 🔄"
         );
     } catch (sendError) {
         console.error('Error sending error message:', sendError);
@@ -724,48 +1071,24 @@ async function handleError(error, from, res) {
 }
 
 /**
- * Send WhatsApp message
- * @param {string} to - Recipient phone number (E.164 format without whatsapp: prefix)
- * @param {string} message - Message to send
- */
-async function sendWhatsAppMessage(to, message) {
-    try {
-        if (!to) {
-            throw new Error('Phone number is required');
-        }
-
-        // Ensure proper WhatsApp format
-        const whatsappTo = to.startsWith('whatsapp:') ? to : `whatsapp:${to}`;
-        
-        console.log('Sending WhatsApp message to:', whatsappTo);
-        await client.messages.create({
-            body: message,
-            from: `whatsapp:${twilioPhone}`,
-            to: whatsappTo
-        });
-    } catch (error) {
-        console.error('Error sending WhatsApp message:', error);
-        throw error;
-    }
-}
-
-/**
  * Get help message
  * @returns {string} Formatted help message
  */
 function getHelpMessage() {
-    return `Here's what you can do:\n
-• Send a photo of your receipt to earn rewards
-• "Check my points" to see your point balance
-• "View my rewards" to see your available rewards
-• "Delete my data" to remove your information
-• "Help" to see this menu again`;
+    return `👋 Hi there! I'm your rewards bot assistant.
+
+Here's how I can help you:
+• 📸 Send a photo of your receipt to earn rewards
+• 🎁 Type "check my points" to see your point balance
+• 🏆 Type "view my rewards" to see your available rewards
+• 🗑️ Type "delete my data" to remove your information
+• ❓ Type "help" to see this menu again
+
+Just send me a clear photo of your receipt and I'll check if it qualifies for rewards! 🎉`;
 }
 
 module.exports = {
     receiveWhatsAppMessage,
     handleReceiptProcessing,
-    handleTextCommand,
-    constructFailureMessage,
-    sendWhatsAppMessage
+    constructFailureMessage
 };
