@@ -83,12 +83,37 @@ async function getLocationContext(toNumber) {
     try {
         const receivingNumber = normalizePhoneNumber(toNumber);
         console.log(`🔍 Looking up location for receiving number: ${receivingNumber}`);
+        console.log(`🔍 Original toNumber: ${toNumber}`);
+        console.log(`🔍 Normalized receiving number: ${receivingNumber}`);
+        
+        // Debug: Let's see what's in the database first
+        console.log(`🔍 DEBUG: Checking database for location mappings...`);
+        const mappingRef = ref(rtdb, 'location-whatsapp-mapping');
+        const mappingSnapshot = await get(mappingRef);
+        
+        if (mappingSnapshot.exists()) {
+            const mappings = mappingSnapshot.val();
+            console.log(`🔍 DEBUG: Found ${Object.keys(mappings).length} location mappings in database:`);
+            Object.entries(mappings).forEach(([locationId, mapping]) => {
+                console.log(`🔍 DEBUG: Location ${locationId}: ${mapping.phoneNumber} (active: ${mapping.isActive}) (locationName: ${mapping.locationName})`);
+                console.log(`🔍 DEBUG: Comparison - Looking for: "${receivingNumber}" vs Found: "${mapping.phoneNumber}" (match: ${receivingNumber === mapping.phoneNumber})`);
+            });
+        } else {
+            console.log(`❌ DEBUG: No location mappings found in database at all!`);
+        }
         
         // Get location by WhatsApp number
+        console.log(`🔍 DEBUG: Calling getLocationByWhatsApp with: ${receivingNumber}`);
         const locationData = await getLocationByWhatsApp(receivingNumber);
+        console.log(`🔍 DEBUG: getLocationByWhatsApp returned:`, locationData);
         
         if (!locationData) {
             console.log(`⚠️ No location found for WhatsApp number: ${receivingNumber}`);
+            console.log(`⚠️ DEBUG: This could be because:`);
+            console.log(`⚠️ DEBUG: 1. No mapping exists for this number`);
+            console.log(`⚠️ DEBUG: 2. The mapping is not active`);
+            console.log(`⚠️ DEBUG: 3. Phone number format mismatch`);
+            console.log(`⚠️ DEBUG: 4. Database query failed`);
             return null;
         }
         
@@ -97,11 +122,18 @@ async function getLocationContext(toNumber) {
             locationName: locationData.mapping.locationName,
             whatsappNumber: locationData.mapping.phoneNumber
         });
+        console.log(`✅ DEBUG: Full location data:`, JSON.stringify(locationData, null, 2));
         
         return locationData;
         
     } catch (error) {
         console.error('❌ Error getting location context:', error);
+        console.error('❌ DEBUG: Error details:', {
+            message: error.message,
+            stack: error.stack,
+            toNumber: toNumber,
+            receivingNumber: normalizePhoneNumber(toNumber)
+        });
         return null;
     }
 }
@@ -227,9 +259,10 @@ async function getOrCreateGuestWithLocation(phoneNumber, locationId) {
  * @param {string} imageUrl - Receipt image URL
  * @param {string} phoneNumber - Guest phone number
  * @param {Object} locationContext - Location context information
+ * @param {Object} guestData - Guest data object
  * @returns {Promise<Object>} Processing result
  */
-async function processReceiptWithLocationContext(imageUrl, phoneNumber, locationContext) {
+async function processReceiptWithLocationContext(imageUrl, phoneNumber, locationContext, guestData) {
     try {
         console.log(`📸 Processing receipt with location context: ${locationContext.mapping.locationName}`);
         
@@ -237,7 +270,7 @@ async function processReceiptWithLocationContext(imageUrl, phoneNumber, location
         const extractedData = await processReceipt(imageUrl, phoneNumber);
         
         // Enhance the extracted data with location context
-        if (extractedData && extractedData.success) {
+        if (extractedData && extractedData.id && extractedData.totalAmount) {
             // Add location information to the receipt data
             const locationEnhancedData = {
                 ...extractedData,
@@ -260,23 +293,29 @@ async function processReceiptWithLocationContext(imageUrl, phoneNumber, location
             const matchResult = await matchReceiptToCampaign(locationEnhancedData);
             console.log('📊 Campaign matching result:', matchResult);
             
-            if (matchResult.success) {
+            if (matchResult.isValid) {
                 console.log('🎁 Processing rewards for matched campaign...');
-                const { processReward } = require('./rewardsProcessor');
-                const rewardResult = await processReward(phoneNumber, locationEnhancedData, matchResult);
-                console.log('💰 Reward processing result:', rewardResult);
                 
-                // Get guest data for success message
-                const { checkConsent } = require('./consent/consent-handler');
-                const guestData = await checkConsent(phoneNumber, 'whatsapp');
+                // Use existing guest data (already available from function parameter)
+                
+                // Prepare guest object with required properties for processReward
+                const guestObject = {
+                    phoneNumber: phoneNumber, // Use the original phoneNumber parameter
+                    name: guestData.name || 'Guest'
+                };
+                
+                const { processReward } = require('./rewardsProcessor');
+                const rewardResult = await processReward(guestObject, matchResult.campaign, locationEnhancedData);
+                console.log('💰 Reward processing result:', rewardResult);
                 
                 if (rewardResult.success) {
                     // Import the constructSuccessMessage function
                     const { constructSuccessMessage } = require('./receiveWhatsappMessage');
-                    const successMessage = constructSuccessMessage(guestData.name, matchResult, rewardResult);
+                    const guestName = guestData.name || guestData.firstName || 'Guest';
+                    const successMessage = constructSuccessMessage(guestName, matchResult, rewardResult);
                     
                     // Send success message
-                    const { sendWhatsAppMessage } = require('./whatsappClient');
+                    const { sendWhatsAppMessage } = require('./utils/whatsappClient');
                     await sendWhatsAppMessage(phoneNumber, successMessage);
                     
                     return {
@@ -298,7 +337,7 @@ async function processReceiptWithLocationContext(imageUrl, phoneNumber, location
                 }
             } else {
                 // Handle campaign matching failure
-                const { sendWhatsAppMessage } = require('./whatsappClient');
+                const { sendWhatsAppMessage } = require('./utils/whatsappClient');
                 const noMatchMessage = `Thank you for your receipt! Unfortunately, this receipt doesn't match any of our current reward campaigns. Keep sending your receipts to earn rewards!`;
                 await sendWhatsAppMessage(phoneNumber, noMatchMessage);
                 
@@ -367,11 +406,28 @@ async function processMessageInLocationContext(guestData, messageBody, mediaUrl,
             const receiptResult = await processReceiptWithLocationContext(
                 mediaUrl,  // imageUrl parameter
                 enhancedGuestData.phoneNumber,  // phoneNumber parameter
-                locationContext  // location context
+                locationContext,  // location context
+                enhancedGuestData  // guest data
             );
             
             console.log('📸 Receipt processing result:', receiptResult);
-            return receiptResult;
+            
+            // Return receipt processing result (HTTP response handled by main function)
+            if (receiptResult && receiptResult.success) {
+                console.log('✅ Receipt processed successfully');
+                return {
+                    success: true,
+                    message: receiptResult.message || 'Receipt processed successfully',
+                    data: receiptResult
+                };
+            } else {
+                console.log('❌ Receipt processing failed');
+                return {
+                    success: false,
+                    message: receiptResult?.message || 'Receipt processing failed',
+                    data: receiptResult
+                };
+            }
         }
         
         // This will use the existing message processing logic but with location awareness
@@ -540,18 +596,38 @@ async function receiveWhatsAppMessageEnhanced(req, res) {
         
         if (!locationContext) {
             console.log(`⚠️ No location context found for ${toNumber}`);
+            console.log('🔧 TEMPORARY FIX: Processing without location context using enhanced handler');
             
-            // Check if this is the platform default number - simplified check
-            console.log('📞 Step 6: Attempting to fall back to original processing');
-            try {
-                // Fall back to original processing without location context
-                const originalProcessing = require('./receiveWhatsappMessage');
-                console.log('✅ Step 6: Original processing module loaded');
-                return await originalProcessing.receiveWhatsAppMessage(req, res);
-            } catch (fallbackError) {
-                console.error('❌ Step 6: Fallback to original processing failed:', fallbackError);
-                throw fallbackError;
-            }
+            // Instead of falling back, process with default location context
+            const defaultLocationContext = {
+                locationId: 'default-location',
+                mapping: {
+                    locationName: 'Default Location',
+                    phoneNumber: toNumber,
+                    isActive: true
+                }
+            };
+            
+            console.log('📍 Using default location context for processing');
+            
+            // Get or create guest data without location context
+            const guestData = await getOrCreateGuestWithLocation(fromNumber, 'default-location');
+            console.log('👤 Guest data created with default location:', {
+                name: guestData.name,
+                phoneNumber: guestData.phoneNumber,
+                locationId: 'default-location'
+            });
+            
+            // Process message with default location context
+            const result = await processMessageInLocationContext(
+                guestData, 
+                Body, 
+                MediaUrl0, 
+                defaultLocationContext
+            );
+            
+            console.log('✅ Message processed with default location context');
+            return res.status(200).send(result.message || 'Message processed successfully');
         }
         
         // Get or create guest data with location context
