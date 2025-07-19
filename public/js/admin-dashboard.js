@@ -2408,7 +2408,7 @@ class WhatsAppManager {
             this.whatsappNumbers.clear();
             
             // Import Firebase functions
-            const { rtdb, ref, get } = await import('../config/firebase-config.js');
+            const { rtdb, ref, get } = await import('./config/firebase-config.js');
             
             // Get reference to whatsapp-numbers collection
             const numbersRef = ref(rtdb, 'whatsapp-numbers');
@@ -2454,7 +2454,7 @@ class WhatsAppManager {
             this.locations.clear();
             
             // Import Firebase functions
-            const { rtdb, ref, get } = await import('../config/firebase-config.js');
+            const { rtdb, ref, get } = await import('./config/firebase-config.js');
             
             // Load location mappings
             const mappingsRef = ref(rtdb, 'location-whatsapp-mapping');
@@ -2524,7 +2524,7 @@ class WhatsAppManager {
             this.recentActivity = [];
             
             // Import Firebase functions
-            const { rtdb, ref, get, query, orderByChild, limitToLast } = await import('../config/firebase-config.js');
+            const { rtdb, ref, get, query, orderByChild, limitToLast } = await import('./config/firebase-config.js');
             
             // Get today's date range
             const today = new Date();
@@ -2934,8 +2934,8 @@ class WhatsAppManager {
             }
             
             // Import Firebase functions
-            const { rtdb, ref, push } = await import('../config/firebase-config.js');
-            const { auth } = await import('../config/firebase-config.js');
+            const { rtdb, ref, push } = await import('./config/firebase-config.js');
+            const { auth } = await import('./config/firebase-config.js');
             
             const currentUser = auth.currentUser;
             if (!currentUser) {
@@ -3288,8 +3288,8 @@ class WhatsAppManager {
             console.log('Assigning number', phoneNumber, 'to location', locationName);
             
             // Import Firebase functions
-            const { rtdb, ref, set, get, push } = await import('../config/firebase-config.js');
-            const { auth } = await import('../config/firebase-config.js');
+            const { rtdb, ref, set, get, push } = await import('./config/firebase-config.js');
+            const { auth } = await import('./config/firebase-config.js');
             
             const currentUser = auth.currentUser;
             if (!currentUser) {
@@ -3307,16 +3307,71 @@ class WhatsAppManager {
             }
             
             // Create or update location mapping
-            const mappingData = {\n                locationId: location.id,\n                whatsappNumberId: whatsappNumber.id,\n                phoneNumber: phoneNumber,\n                userId: currentUser.uid,\n                assignedAt: new Date().toISOString(),\n                status: 'active'\n            };\n            \n            // Use location ID as the key for mapping\n            const mappingRef = ref(rtdb, `location-whatsapp-mapping/${location.id}`);\n            await set(mappingRef, mappingData);\n            \n            // Update local data\n            location.whatsappNumber = phoneNumber;\n            location.whatsappNumberId = whatsappNumber.id;\n            location.status = 'active';\n            location.assignedAt = mappingData.assignedAt;\n            \n            // Update UI\n            this.updateLocationMappingTable();\n            this.updateOverviewStats();\n            \n            alert(`Successfully assigned ${phoneNumber} to ${locationName}`);\n            \n        } catch (error) {\n            console.error('Error assigning number to location:', error);\n            throw error;\n        }\n    }\n\n    /**\n     * Unassign WhatsApp number from location\n     */\n    async unassignNumberFromLocation(locationName) {\n        try {\n            console.log('Unassigning number from location', locationName);\n            \n            // Import Firebase functions\n            const { rtdb, ref, remove } = await import('../config/firebase-config.js');\n            \n            const location = this.locations.get(locationName);\n            if (!location) {\n                throw new Error('Location not found');\n            }\n            \n            // Remove from Firebase\n            const mappingRef = ref(rtdb, `location-whatsapp-mapping/${location.id}`);\n            await remove(mappingRef);\n            \n            // Update local data\n            location.whatsappNumber = 'Not assigned';\n            location.whatsappNumberId = '';\n            location.status = 'inactive';\n            location.assignedAt = null;\n            \n            // Update UI\n            this.updateLocationMappingTable();\n            this.updateOverviewStats();\n            \n            alert(`Successfully unassigned WhatsApp number from ${locationName}`);\n            \n        } catch (error) {\n            console.error('Error unassigning number from location:', error);\n            throw error;\n        }
+            const mappingData = {
+                locationId: location.id,
+                whatsappNumberId: whatsappNumber.id,
+                phoneNumber: phoneNumber,
+                userId: currentUser.uid,
+                assignedAt: new Date().toISOString(),
+                status: 'active'
+            };
             
-            // Update the table
+            // Use location ID as the key for mapping
+            const mappingRef = ref(rtdb, `location-whatsapp-mapping/${location.id}`);
+            await set(mappingRef, mappingData);
+            
+            // Update local data
+            location.whatsappNumber = phoneNumber;
+            location.whatsappNumberId = whatsappNumber.id;
+            location.status = 'active';
+            location.assignedAt = mappingData.assignedAt;
+            
+            // Update UI
             this.updateLocationMappingTable();
+            this.updateOverviewStats();
             
-            // Update stats
-            this.loadStats().then(() => {
-                this.updateOverviewStats();
-                this.updateMigrationStatus();
-            });
+            alert(`Successfully assigned ${phoneNumber} to ${locationName}`);
+            
+        } catch (error) {
+            console.error('Error assigning number to location:', error);
+            throw error;
+        }
+    }
+
+    /**
+     * Unassign WhatsApp number from location
+     */
+    async unassignNumberFromLocation(locationName) {
+        try {
+            console.log('Unassigning number from location', locationName);
+            
+            // Import Firebase functions
+            const { rtdb, ref, remove } = await import('./config/firebase-config.js');
+            
+            const location = this.locations.get(locationName);
+            if (!location) {
+                throw new Error('Location not found');
+            }
+            
+            // Remove from Firebase
+            const mappingRef = ref(rtdb, `location-whatsapp-mapping/${location.id}`);
+            await remove(mappingRef);
+            
+            // Update local data
+            location.whatsappNumber = 'Not assigned';
+            location.whatsappNumberId = '';
+            location.status = 'inactive';
+            location.assignedAt = null;
+            
+            // Update UI
+            this.updateLocationMappingTable();
+            this.updateOverviewStats();
+            
+            alert(`Successfully unassigned WhatsApp number from ${locationName}`);
+            
+        } catch (error) {
+            console.error('Error unassigning number from location:', error);
+            throw error;
         }
     }
 }
