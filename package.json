@@ -10,7 +10,11 @@
     "serve": "vite preview",
     "build-css-v2": "tailwindcss -c tailwind-v2.config.js -i PUBLIC/css/dashboard-v2.css -o PUBLIC/css/dashboard-v2-compiled.css",
     "watch-css-v2": "tailwindcss -c tailwind-v2.config.js -i PUBLIC/css/dashboard-v2.css -o PUBLIC/css/dashboard-v2-compiled.css --watch",
-    "dev-v2": "npm run build-css-v2 && vite dev"
+    "dev-v2": "npm run build-css-v2 && vite dev",
+    "lint": "eslint .",
+    "lint:fix": "eslint . --fix",
+    "format": "prettier --write \"**/*.{js,vue,css,md,json}\"",
+    "format:check": "prettier --check \"**/*.{js,vue,css,md,json}\""
   },
   "dependencies": {
     "@fortawesome/fontawesome-free": "^6.0.0",
@@ -38,10 +42,17 @@
     "vue": "^3.3.0"
   },
   "devDependencies": {
+    "@eslint/js": "^9.39.2",
     "@tailwindcss/forms": "^0.5.10",
     "@vitejs/plugin-vue": "^5.0.0",
     "autoprefixer": "^10.4.21",
+    "eslint": "^9.39.2",
+    "eslint-config-prettier": "^10.1.8",
+    "eslint-plugin-vue": "^10.6.2",
+    "husky": "^9.1.7",
+    "lint-staged": "^16.2.7",
     "postcss": "^8.5.6",
+    "prettier": "^3.7.4",
     "tailwindcss": "^4.1.11",
     "vite": "^6.0.0"
   }
