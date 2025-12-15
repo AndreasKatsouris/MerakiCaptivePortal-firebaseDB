@@ -5,13 +5,13 @@
  */
 
 // Local Firebase references to avoid global conflicts
-let _rtdb, _auth, _ref, _get, _set, _update, _push, _remove;
+let _rtdb, _auth, _ref, _get, _set, _update, _push, _remove, _query, _orderByChild, _startAt, _endAt;
 
 /**
  * Ensures Firebase is initialized for the Food Cost module
- * @returns {boolean} - True if Firebase is successfully initialized
+ * @returns {Promise<boolean>} - True if Firebase is successfully initialized
  */
-export function ensureFirebaseInitialized() {
+export async function ensureFirebaseInitialized() {
     // If Firebase is already initialized, return true
     if (_rtdb && _ref && _get && _set) {
         return true;
@@ -19,28 +19,63 @@ export function ensureFirebaseInitialized() {
     
     console.log('Attempting to initialize Firebase for Food Cost module...');
     
-    try {
-        // Try to get Firebase from global exports - PRIMARY METHOD
-        // This follows the project standard of importing from firebase-config.js
-        if (window.firebaseExports) {
-            console.log('Found window.firebaseExports, using it for Firebase initialization');
-            _rtdb = window.firebaseExports.rtdb;
-            _auth = window.firebaseExports.auth;
-            _ref = window.firebaseExports.ref;
-            _get = window.firebaseExports.get;
-            _set = window.firebaseExports.set;
-            _update = window.firebaseExports.update;
-            _push = window.firebaseExports.push;
-            _remove = window.firebaseExports.remove;
-            
-            // Verify initialization was successful
-            if (_rtdb && _ref && _get && _set) {
-                console.log('Firebase initialized successfully from firebaseExports');
-                return true;
+    // CRITICAL FIX: Wait for Firebase config to be loaded if not yet available
+    let attempts = 0;
+    const maxAttempts = 10;
+    
+    while (attempts < maxAttempts) {
+        try {
+            // RACE CONDITION FIX: Wait for firebaseReady event if needed
+            if (!window.firebaseExports) {
+                console.log('Waiting for Firebase config to load...');
+                await new Promise((resolve) => {
+                    if (window.firebaseExports) {
+                        resolve();
+                    } else {
+                        const handleFirebaseReady = () => {
+                            document.removeEventListener('firebaseReady', handleFirebaseReady);
+                            resolve();
+                        };
+                        document.addEventListener('firebaseReady', handleFirebaseReady);
+                        // Fallback timeout
+                        setTimeout(resolve, 1000);
+                    }
+                });
             }
+            
+            // Try to get Firebase from global exports - PRIMARY METHOD
+            // This follows the project standard of importing from firebase-config.js
+            if (window.firebaseExports) {
+                console.log('Found window.firebaseExports, using it for Firebase initialization');
+                _rtdb = window.firebaseExports.rtdb;
+                _auth = window.firebaseExports.auth;
+                _ref = window.firebaseExports.ref;
+                _get = window.firebaseExports.get;
+                _set = window.firebaseExports.set;
+                _update = window.firebaseExports.update;
+                _push = window.firebaseExports.push;
+                _remove = window.firebaseExports.remove;
+                _query = window.firebaseExports.query;
+                _orderByChild = window.firebaseExports.orderByChild;
+                _startAt = window.firebaseExports.startAt;
+                _endAt = window.firebaseExports.endAt;
+                
+                // Verify initialization was successful
+                if (_rtdb && _ref && _get && _set) {
+                    console.log('✅ Firebase initialized successfully for Food Cost module');
+                    return true;
+                }
+            }
+            
+            // If still not available, wait a bit and try again
+            if (attempts < maxAttempts - 1) {
+                console.log(`Firebase not ready, waiting... (attempt ${attempts + 1}/${maxAttempts})`);
+                await new Promise(resolve => setTimeout(resolve, 200));
+            }
+        } catch (error) {
+            console.error('Error initializing Firebase:', error);
         }
-    } catch (error) {
-        console.error('Error initializing Firebase:', error);
+        attempts++;
     }
     
     // Another fallback: try to get directly from window object
@@ -52,13 +87,24 @@ export function ensureFirebaseInitialized() {
     if (!_update && window.update) _update = window.update;
     if (!_push && window.push) _push = window.push;
     if (!_remove && window.remove) _remove = window.remove;
+    if (!_query && window.query) _query = window.query;
+    if (!_orderByChild && window.orderByChild) _orderByChild = window.orderByChild;
+    if (!_startAt && window.startAt) _startAt = window.startAt;
+    if (!_endAt && window.endAt) _endAt = window.endAt;
     
     // Verify if all essential Firebase functions are available
     if (_rtdb && _ref && _get && _set) {
-        console.log('Firebase initialized successfully for Food Cost module');
+        console.log('✅ Firebase initialized successfully for Food Cost module');
         return true;
     } else {
-        console.error('Failed to initialize Firebase for Food Cost module');
+        console.error('❌ Failed to initialize Firebase for Food Cost module after', maxAttempts, 'attempts');
+        console.error('Available Firebase functions:', {
+            rtdb: !!_rtdb,
+            ref: !!_ref,
+            get: !!_get,
+            set: !!_set,
+            auth: !!_auth
+        });
         return false;
     }
 }
@@ -66,17 +112,17 @@ export function ensureFirebaseInitialized() {
 /**
  * Initialize Firebase references
  */
-export function initFirebaseReferences() {
-    ensureFirebaseInitialized();
+export async function initFirebaseReferences() {
+    await ensureFirebaseInitialized();
 }
 
 /**
  * Get the database instance
- * @returns {object} - The Firebase Realtime Database instance
+ * @returns {Promise<object>} - The Firebase Realtime Database instance
  */
-export function getDatabase() {
+export async function getDatabase() {
     // Make sure Firebase is initialized
-    ensureFirebaseInitialized();
+    await ensureFirebaseInitialized();
     // Return the database instance
     return _rtdb;
 }
@@ -84,20 +130,22 @@ export function getDatabase() {
 /**
  * Get a reference to a specific path in the database
  * @param {string} path - The path to reference
- * @returns {object} - The Firebase reference
+ * @returns {Promise<object>} - The Firebase reference
  */
-export function getRef(path) {
+export async function getRef(path) {
     // Make sure Firebase is initialized
-    ensureFirebaseInitialized();
+    await ensureFirebaseInitialized();
     
     // Check if path is a valid string
     if (typeof path !== 'string') {
         console.error('getRef error: Path must be a string', path);
-        return _ref(getDatabase(), ''); // Return a reference to the root as a fallback
+        const db = await getDatabase();
+        return _ref(db, ''); // Return a reference to the root as a fallback
     }
     
     // Return a reference to the specified path
-    return _ref(getDatabase(), path);
+    const db = await getDatabase();
+    return _ref(db, path);
 }
 
 /**
@@ -105,13 +153,14 @@ export function getRef(path) {
  * @param {object|string} refOrPath - The reference or path to get data from
  * @returns {Promise} - Promise resolving to the data
  */
-export function getData(refOrPath) {
+export async function getData(refOrPath) {
     // If refOrPath is already a reference (from getRef), use it directly
     if (typeof refOrPath === 'object' && refOrPath !== null) {
         return _get(refOrPath);
     }
     // Otherwise, treat it as a path string and get a reference
-    return _get(getRef(refOrPath));
+    const ref = await getRef(refOrPath);
+    return _get(ref);
 }
 
 /**
@@ -120,13 +169,14 @@ export function getData(refOrPath) {
  * @param {any} data - The data to set
  * @returns {Promise} - Promise resolving when the data is set
  */
-export function setData(refOrPath, data) {
+export async function setData(refOrPath, data) {
     // If refOrPath is already a reference (from getRef), use it directly
     if (typeof refOrPath === 'object' && refOrPath !== null) {
         return _set(refOrPath, data);
     }
     // Otherwise, treat it as a path string and get a reference
-    return _set(getRef(refOrPath), data);
+    const ref = await getRef(refOrPath);
+    return _set(ref, data);
 }
 
 /**
@@ -135,13 +185,14 @@ export function setData(refOrPath, data) {
  * @param {any} data - The data to update
  * @returns {Promise} - Promise resolving when the data is updated
  */
-export function updateData(refOrPath, data) {
+export async function updateData(refOrPath, data) {
     // If refOrPath is already a reference (from getRef), use it directly
     if (typeof refOrPath === 'object' && refOrPath !== null) {
         return _update(refOrPath, data);
     }
     // Otherwise, treat it as a path string and get a reference
-    return _update(getRef(refOrPath), data);
+    const ref = await getRef(refOrPath);
+    return _update(ref, data);
 }
 
 /**
@@ -150,13 +201,14 @@ export function updateData(refOrPath, data) {
  * @param {any} data - The data to push
  * @returns {Promise} - Promise resolving with the new reference
  */
-export function pushData(refOrPath, data) {
+export async function pushData(refOrPath, data) {
     // If refOrPath is already a reference (from getRef), use it directly
     if (typeof refOrPath === 'object' && refOrPath !== null) {
         return _push(refOrPath, data);
     }
     // Otherwise, treat it as a path string and get a reference
-    return _push(getRef(refOrPath), data);
+    const ref = await getRef(refOrPath);
+    return _push(ref, data);
 }
 
 /**
@@ -164,14 +216,33 @@ export function pushData(refOrPath, data) {
  * @param {object|string} refOrPath - The reference or path to remove data from
  * @returns {Promise} - Promise resolving when the data is removed
  */
-export function removeData(refOrPath) {
+export async function removeData(refOrPath) {
     // If refOrPath is already a reference (from getRef), use it directly
     if (typeof refOrPath === 'object' && refOrPath !== null) {
         return _remove(refOrPath);
     }
     // Otherwise, treat it as a path string and get a reference
-    return _remove(getRef(refOrPath));
+    const ref = await getRef(refOrPath);
+    return _remove(ref);
 }
 
-// Export Firebase functions for use in the Food Cost module
-export { _rtdb as rtdb, _auth as auth, _ref as ref, _get as get, _set as set, _update as update, _push as push, _remove as remove };
+/**
+ * Export Firebase services
+ * These are exposed as getters to ensure they're always initialized
+ */
+export function getRtdb() {
+    ensureFirebaseInitialized();
+    return _rtdb;
+}
+
+export function getAuth() {
+    ensureFirebaseInitialized();
+    return _auth;
+}
+
+// Export as constants for backward compatibility
+export const rtdb = getRtdb();
+export const auth = getAuth();
+
+// Also export the Firebase functions directly for convenience
+export { _ref as ref, _get as get, _set as set, _update as update, _push as push, _remove as remove, _query as query, _orderByChild as orderByChild, _startAt as startAt, _endAt as endAt };

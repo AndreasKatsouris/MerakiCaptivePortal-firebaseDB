@@ -12,7 +12,7 @@ import {
     filterStockData, 
     getItemCalculationDetails, 
     downloadCSV 
-} from './services/data-service.js';
+} from './services/data-service.js?v=2.1.5-20250606';
 
 import { 
     processStockData,
@@ -20,47 +20,60 @@ import {
     calculateReorderPoints, 
     calculateUsagePerDay,
     calculateTotals
-} from './data-processor.js';
+} from './data-processor.js?v=2.1.5-20250606';
 
 import { 
     initCharts, 
     updateCharts, 
     destroyCharts,
     resetChartInitialization
-} from './chart-manager.js';
+} from './chart-manager.js?v=2.1.5-20250606';
 
-import { 
-    saveStockDataToDatabase,
+import {
+    saveStockData,
+    updateStockUsage,
     loadHistoricalData,
-    loadSpecificHistoricalData,
     deleteHistoricalData,
-    getItemHistoricalData
-} from './database-operations.js';
+    getItemHistoricalData,
+    checkForExistingData
+} from './database-operations.js?v=2.1.5-20250606';
+
+import { auth, getAuth, ensureFirebaseInitialized } from './firebase-helpers.js?v=2.1.5-20250606';
+
+// Order calculator functions not available yet - commented out for now
+// import { 
+//     calculateOrderQuantities, 
+//     previewOrderCalculations,
+//     formatOrderCalculation,
+//     calculateOrderValues
+// } from './order-calculator.js?v=2.1.5-20250606';
+
+// Import location service
+import { LocationService } from './services/location-service.js?v=2.1.5-20250606';
+
+import { generateTimestampKey, formatDate, formatCurrency } from './utilities.js?v=2.1.5-20250606';
 
 // Import Firebase service for store context
-import { getRecentStoreContext } from './services/firebase-service.js';
+import { getRecentStoreContext } from './services/firebase-service.js?v=2.1.5-20250606';
 
 // Import mixins
-import { UIMixin } from './mixins/ui-mixin.js';
-import { ShadcnUIMixin } from './mixins/shadcn-ui-mixin.js';
+import { UIMixin } from './mixins/ui-mixin.js?v=2.1.5-20250606';
+import { ShadcnUIMixin } from './mixins/shadcn-ui-mixin.js?v=2.1.5-20250606';
 
 // Import modular components
-import { PurchaseOrderModal } from './components/purchase-order/po-modal.js';
-import { HeaderMappingModal } from './components/header-mapping-modal/header-mapping-modal.js';
-import { HistoricalDataModal } from './components/historical-data-modal/historical-data-modal.js';
-import { DeleteConfirmationModal } from './components/delete-confirmation-modal/delete-confirmation-modal.js';
-import { ItemCalculationDetailsModal } from './components/item-calculation-details/item-calculation-details.js';
-import { CategoryFilter } from './components/filters/CategoryFilter.js';
-import { CostCenterFilter } from './components/filters/CostCenterFilter.js';
-import { StockDataTable } from './components/tables/StockDataTable.js';
-import { EditableStockDataTable } from './components/tables/EditableStockDataTable.js';
-import { DataSummary } from './components/analytics/DataSummary.js';
+import { PurchaseOrderModal } from './components/purchase-order/po-modal.js?v=2.1.8-20250610-tooltips';
+import { HeaderMappingModal } from './components/header-mapping-modal/header-mapping-modal.js?v=2.1.5-20250606';
+import { HistoricalDataModal } from './components/historical-data-modal/historical-data-modal.js?v=2.1.5-20250606';
+import { DeleteConfirmationModal } from './components/delete-confirmation-modal/delete-confirmation-modal.js?v=2.1.5-20250606';
+import { ItemCalculationDetailsModal } from './components/item-calculation-details/item-calculation-details.js?v=2.1.5-20250606';
+import { CategoryFilter } from './components/filters/CategoryFilter.js?v=2.1.5-20250606';
+import { CostCenterFilter } from './components/filters/CostCenterFilter.js?v=2.1.5-20250606';
+import { StockDataTable } from './components/tables/StockDataTable.js?v=2.1.5-20250606';
+import { EditableStockDataTable } from './components/tables/EditableStockDataTable.js?v=2.1.5-20250606';
+import { DataSummary } from './components/analytics/DataSummary.js?v=2.1.5-20250606';
 
 // Import all database operations
-import * as DatabaseOperations from './database-operations.js';
-
-// Import Firebase auth
-import { auth } from './firebase-helpers.js';
+import * as DatabaseOperations from './database-operations.js?v=2.1.5-20250606';
 
 // Add styles for filter popups
 const filterStyles = `
@@ -156,7 +169,9 @@ var FoodCostApp = {
             lastEditMetadata: null,
             
             // Store context
-            storeName: 'Default Store',
+            selectedLocationId: null,
+            userLocations: [],
+            
             openingStockDate: this.getYesterdayDate(),
             closingStockDate: this.getTodayDate(),
             stockPeriodDays: 1,
@@ -205,6 +220,7 @@ var FoodCostApp = {
             historicalData: [],
             isLoadingHistorical: false,
             currentHistoricalRecord: null,
+            currentData: {}, // Store the complete current record data
             
             // Delete Historical Data
             showDeleteHistoricalDataModal: false,
@@ -245,6 +261,21 @@ var FoodCostApp = {
         lowStockItems() {
             if (!this.stockData) return [];
             return this.stockData.filter(item => item.belowReorderPoint);
+        },
+        
+        /**
+         * Get the current selected location name for display and data saving
+         */
+        selectedLocationName() {
+            const selectedLocation = this.userLocations.find(loc => loc.id === this.selectedLocationId);
+            return selectedLocation ? (selectedLocation.displayName || selectedLocation.name) : 'Unknown Location';
+        },
+        
+        /**
+         * Check if a location is selected and valid
+         */
+        isLocationSelected() {
+            return this.selectedLocationId && this.userLocations.some(loc => loc.id === this.selectedLocationId);
         }
     },
     
@@ -309,6 +340,9 @@ var FoodCostApp = {
         
         // Load recent store context
         this.loadRecentStoreContext();
+        
+        // Load user locations
+        this.loadUserLocations();
     },
     
     beforeDestroy() {
@@ -474,18 +508,32 @@ var FoodCostApp = {
          * Get current user data for edit tracking
          */
         getUserData() {
-            // Use the imported auth object instead of global firebase
-            const user = auth.currentUser;
-            
-            if (!user) {
+            try {
+                // Ensure Firebase is initialized and get auth
+                const authInstance = getAuth();
+                
+                if (!authInstance) {
+                    console.warn('Auth instance not available');
+                    return { uid: 'unknown', displayName: 'Unknown User', email: 'unknown' };
+                }
+                
+                // Get current user from the auth instance
+                const user = authInstance.currentUser;
+                
+                if (!user) {
+                    console.warn('No current user found');
+                    return { uid: 'unknown', displayName: 'Unknown User', email: 'unknown' };
+                }
+                
+                return {
+                    uid: user.uid || 'unknown',
+                    displayName: user.displayName || user.email || 'Unknown User',
+                    email: user.email || 'unknown'
+                };
+            } catch (error) {
+                console.error('Error getting user data:', error);
                 return { uid: 'unknown', displayName: 'Unknown User', email: 'unknown' };
             }
-            
-            return {
-                uid: user.uid,
-                displayName: user.displayName || user.email,
-                email: user.email
-            };
         },
         
         /**
@@ -551,6 +599,7 @@ var FoodCostApp = {
                 const saveData = {
                     ...this.currentData,
                     stockItems: updatedStockData,
+                    selectedLocationId: this.selectedLocationId || this.currentData.selectedLocationId,
                     // Recalculate totals based on the updated data
                     totalOpeningValue: this.calculateTotalOpeningValue(updatedStockData),
                     totalPurchases: this.calculateTotalPurchases(updatedStockData),
@@ -562,8 +611,15 @@ var FoodCostApp = {
                 // Get the user data for tracking edits
                 const userData = this.getUserData();
                 
-                // Update the record in Firebase
-                const result = await DatabaseOperations.updateStockUsage(this.currentHistoricalRecord, saveData, userData);
+                // Get the location ID from the current data or selected location
+                const locationId = this.selectedLocationId || saveData.selectedLocationId;
+                
+                if (!locationId) {
+                    throw new Error('No location ID available. Please select a location.');
+                }
+                
+                // Update the record in Firebase - now with all 4 required parameters
+                const result = await updateStockUsage(this.currentHistoricalRecord, saveData, userData, locationId);
                 
                 if (result.success) {
                     // Update the last edit metadata
@@ -771,9 +827,15 @@ var FoodCostApp = {
             try {
                 // Delete each selected record
                 for (const recordId of this.selectedRecordsForDeletion) {
-                    // Use the imported deleteHistoricalData function from database-operations.js
-                    await deleteHistoricalData(recordId);
-                    console.log(`Deleted historical record ${recordId}`);
+                    // Find the record to get its location ID
+                    const record = this.historicalData.find(r => r.key === recordId);
+                    if (record && record.locationId) {
+                        // Use the imported deleteHistoricalData function from database-operations.js
+                        await deleteHistoricalData(recordId, record.locationId);
+                        console.log(`Deleted historical record ${recordId} from location ${record.locationId}`);
+                    } else {
+                        console.warn(`Could not find location ID for record ${recordId}, skipping deletion`);
+                    }
                 }
                 
                 // Show success message
@@ -868,7 +930,7 @@ var FoodCostApp = {
                 
                 // Check if context exists before accessing properties
                 if (context) {
-                    this.storeName = context.storeName || this.storeName;
+                    this.selectedLocationId = context.selectedLocationId || this.selectedLocationId;
                     this.daysToNextDelivery = context.daysToNextDelivery || this.daysToNextDelivery;
                     this.safetyStockPercentage = context.safetyStockPercentage || this.safetyStockPercentage;
                     this.criticalItemBuffer = context.criticalItemBuffer || this.criticalItemBuffer;
@@ -1136,12 +1198,10 @@ var FoodCostApp = {
                     if (item.costOfUsage !== undefined && item.costOfUsage !== null) {
                         costOfUsage = parseFloat(item.costOfUsage);
                     } else {
-                        // Calculate based on usage and unit cost
+                        // Calculate based on usage and unitCost
                         const usage = parseFloat(item.usage) || 0;
                         const unitCost = parseFloat(item.unitCost) || 0;
                         costOfUsage = usage * unitCost;
-                        // Update the item for future calculations
-                        item.costOfUsage = costOfUsage;
                     }
                     
                     return isNaN(costOfUsage) ? total : total + costOfUsage;
@@ -1370,9 +1430,7 @@ var FoodCostApp = {
          * Select all categories
          */
         selectAllCategories() {
-            this.selectedCategories = this.availableCategories
-                .filter(cat => cat !== 'All Categories');
-            this.applyFilters();
+            this.selectedCategories = [...this.availableCategories.filter(c => c !== 'All Categories')];
         },
         
         /**
@@ -1401,9 +1459,7 @@ var FoodCostApp = {
          * Select all cost centers
          */
         selectAllCostCenters() {
-            this.selectedCostCenters = this.availableCostCenters
-                .filter(center => center !== 'All Cost Centers');
-            this.applyFilters();
+            this.selectedCostCenters = [...this.availableCostCenters.filter(c => c !== 'All Cost Centers')];
         },
         
         /**
@@ -1600,6 +1656,16 @@ var FoodCostApp = {
                 return;
             }
             
+            if (!this.isLocationSelected) {
+                Swal.fire({
+                    icon: 'error',
+                    title: 'No Location Selected',
+                    text: 'Please select a location before saving stock data.',
+                    confirmButtonColor: '#3085d6'
+                });
+                return;
+            }
+            
             // Show saving indicator
             this.isSaving = true;
             
@@ -1612,10 +1678,16 @@ var FoodCostApp = {
                     this.stockPeriodDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24)) || 1;
                 }
                 
+                // Get the actual location name using computed property
+                const locationName = this.selectedLocationName;
+                
                 // Prepare data for saving
                 const dataToSave = {
+                    // Location info - REQUIRED for Firebase security rules
+                    selectedLocationId: this.selectedLocationId,
+                    
                     // Store context
-                    storeName: this.storeName,
+                    storeName: locationName, // Use actual location name for proper historical matching
                     openingDate: this.openingStockDate,
                     closingDate: this.closingStockDate,
                     stockPeriodDays: this.stockPeriodDays,
@@ -1642,7 +1714,7 @@ var FoodCostApp = {
                 };
                 
                 // Save to Firebase using database-operations.js
-                const result = await saveStockDataToDatabase(dataToSave);
+                const result = await saveStockData(dataToSave);
                 
                 // Show success message
                 Swal.fire({
@@ -1707,11 +1779,20 @@ var FoodCostApp = {
                     const closingDate = record.closingDate || 'Unknown Date';
                     const openingDate = record.openingDate || '';
                     const dateRange = openingDate ? `${openingDate} → ${closingDate}` : closingDate;
-                    const store = record.storeName || 'Default Store';
+                    
+                    // Get location display name
+                    let locationDisplay = 'Default Location';
+                    if (record.selectedLocationId) {
+                        const location = this.userLocations.find(loc => loc.id === record.selectedLocationId);
+                        locationDisplay = location ? location.displayName : record.selectedLocationId;
+                    } else if (record.storeName) {
+                        locationDisplay = record.storeName; // Fallback for old data
+                    }
+                    
                     const itemCount = record.totalItems || (record.stockItems ? record.stockItems.length : 0);
                     return {
                         value: index.toString(),
-                        text: `${dateRange} - ${store} (${itemCount} items)`
+                        text: `${dateRange} - ${locationDisplay} (${itemCount} items)`
                     };
                 });
                 
@@ -1727,13 +1808,22 @@ var FoodCostApp = {
                     const closingDate = record.closingDate || 'Unknown Date';
                     const openingDate = record.openingDate || '';
                     const dateRange = openingDate ? `${openingDate} → ${closingDate}` : closingDate;
-                    const store = record.storeName || 'Default Store';
+                    
+                    // Get location display name
+                    let locationDisplay = 'Default Location';
+                    if (record.selectedLocationId) {
+                        const location = this.userLocations.find(loc => loc.id === record.selectedLocationId);
+                        locationDisplay = location ? location.displayName : record.selectedLocationId;
+                    } else if (record.storeName) {
+                        locationDisplay = record.storeName; // Fallback for old data
+                    }
+                    
                     const itemCount = record.totalItems || (record.stockItems ? record.stockItems.length : 0);
                     
                     customHtml += `
                     <div class="data-item" data-index="${index}" style="padding: 10px; border-bottom: 1px solid #eee; cursor: pointer;">
                         <strong>${dateRange}</strong><br>
-                        ${store} <span class="badge badge-info">${itemCount} items</span>
+                        ${locationDisplay} <span class="badge badge-info">${itemCount} items</span>
                     </div>
                     `;
                 });
@@ -1749,6 +1839,7 @@ var FoodCostApp = {
                     html: customHtml,
                     showCancelButton: true,
                     confirmButtonText: 'Load Selected',
+                    cancelButtonText: 'Cancel',
                     confirmButtonColor: '#3085d6',
                     cancelButtonColor: '#d33',
                     allowOutsideClick: true,
@@ -1862,8 +1953,9 @@ var FoodCostApp = {
             this.isLoading = true;
             
             try {
-                // Load the specific record using database-operations.js
-                const record = await loadSpecificHistoricalData(recordId);
+                // Load all historical data and find the specific record
+                const records = await loadHistoricalData();
+                const record = records.find(r => r.key === recordId);
                 
                 if (!record) {
                     Swal.fire({
@@ -1892,7 +1984,7 @@ var FoodCostApp = {
                 this.costCenters = ['All Cost Centers', ...(record.costCenters || [])];
                 
                 // Update store settings
-                this.storeName = record.storeName || this.storeName;
+                this.selectedLocationId = record.selectedLocationId || this.selectedLocationId;
                 this.openingStockDate = record.openingDate || this.openingStockDate;
                 this.closingStockDate = record.closingDate || this.closingStockDate;
                 this.stockPeriodDays = record.stockPeriodDays || this.stockPeriodDays;
@@ -1919,6 +2011,13 @@ var FoodCostApp = {
                 
                 // Store the current historical record ID
                 this.currentHistoricalRecord = recordId;
+                
+                // Store the complete record data for editing
+                this.currentData = {
+                    ...record,
+                    selectedLocationId: record.selectedLocationId || record.locationId,
+                    storeName: record.storeName || 'Unknown Store'
+                };
                 
                 // Apply filters and calculate totals
                 this.filterData();
@@ -1971,8 +2070,14 @@ var FoodCostApp = {
             this.isLoading = true;
             
             try {
-                // Delete the record using database-operations.js
-                const result = await deleteHistoricalData(recordId);
+                // Find the record to get its location ID
+                const record = this.historicalData.find(r => r.key === recordId);
+                if (!record || !record.locationId) {
+                    throw new Error('Could not find location ID for this record');
+                }
+                
+                // Delete the record using database-operations.js with both recordId and locationId
+                const result = await deleteHistoricalData(recordId, record.locationId);
                 
                 // Remove from the historicalData array
                 this.historicalData = this.historicalData.filter(record => record.key !== recordId);
@@ -1980,6 +2085,7 @@ var FoodCostApp = {
                 // If we deleted the current record, clear it
                 if (this.currentHistoricalRecord === recordId) {
                     this.currentHistoricalRecord = null;
+                    this.currentData = {};
                 }
                 
                 this.showToast('success', 'Record Deleted', 'Historical record was deleted successfully.');
@@ -2185,7 +2291,7 @@ var FoodCostApp = {
                 orderCycle: 7, // How often delivery occurs
                 daysToNextDelivery: this.daysToNextDelivery || 7,
                 leadTimeDays: 2,
-                safetyStockPercentage: this.safetyStockPercentage || 20,
+                safetyStockPercentage: this.safetyStockPercentage || 15,
                 criticalItemBuffer: 30,
                 stockPeriodDays: this.stockPeriodDays || 7
             });
@@ -2314,7 +2420,6 @@ var FoodCostApp = {
             // Load recent store context
             try {
                 const storeContext = await getRecentStoreContext();
-                this.storeName = storeContext.storeName;
                 this.daysToNextDelivery = storeContext.daysToNextDelivery;
                 this.safetyStockPercentage = storeContext.safetyStockPercentage;
                 this.criticalItemBuffer = storeContext.criticalItemBuffer;
@@ -2329,6 +2434,34 @@ var FoodCostApp = {
                     this.calculateTotals();
                 }
             });
+        },
+        
+        /**
+         * Load user locations
+         */
+        async loadUserLocations() {
+            try {
+                const locations = await LocationService.getUserLocations();
+                this.userLocations = locations;
+                
+                // Auto-select first location if only one exists
+                if (locations.length === 1) {
+                    this.selectedLocationId = locations[0].id;
+                }
+            } catch (error) {
+                console.error('Error loading user locations:', error);
+            }
+        },
+        
+        /**
+         * Handle location change
+         */
+        onLocationChange() {
+            const selectedLocation = this.userLocations.find(loc => loc.id === this.selectedLocationId);
+            if (selectedLocation) {
+                console.log('Selected location:', selectedLocation);
+                // Can add additional logic here like loading location-specific data
+            }
         },
     },
     
@@ -2345,7 +2478,8 @@ var FoodCostApp = {
                         <div class="dropdown-menu dropdown-menu-right shadow animated--fade-in" aria-labelledby="dropdownMenuLink">
                             <div class="dropdown-header">Actions:</div>
                             <a class="dropdown-item" href="#" @click.prevent="saveStockUsage" :disabled="!isDataUploaded || isSaving">
-                                <i class="fas fa-save fa-sm fa-fw mr-2 text-gray-400"></i> Save to Database
+                                <i class="fas" :class="isSaving ? 'fa-spinner fa-spin' : 'fa-save'"></i>
+                                {{ isSaving ? 'Saving...' : 'Save to Database' }}
                             </a>
                             <a class="dropdown-item" href="#" @click.prevent="loadHistoricalData" :disabled="isLoadingHistorical">
                                 <i class="fas fa-history fa-sm fa-fw mr-2 text-gray-400"></i> Load Historical Data
@@ -2357,6 +2491,9 @@ var FoodCostApp = {
                                 <i class="fas fa-file-invoice fa-sm fa-fw mr-2 text-gray-400"></i> Generate Purchase Order
                             </a>
                             <div class="dropdown-divider"></div>
+                            <a class="dropdown-item" href="/public/food-cost-analytics.html" target="_blank">
+                                <i class="fas fa-chart-line fa-sm fa-fw mr-2 text-gray-400"></i> Analytics Dashboard
+                            </a>
                             <a class="dropdown-item" href="#" @click.prevent="exportToCsv" :disabled="!isDataUploaded">
                                 <i class="fas fa-file-csv fa-sm fa-fw mr-2 text-gray-400"></i> Export to CSV
                             </a>
@@ -2367,11 +2504,16 @@ var FoodCostApp = {
                 <!-- Store Information -->
                 <div class="card-body">
                     <div class="row">
-                        <!-- Store Name -->
+                        <!-- Location Selection -->
                         <div class="col-md-3">
                             <div class="form-group">
-                                <label>Store Name:</label>
-                                <input type="text" class="form-control" v-model="storeName">
+                                <label>Location:</label>
+                                <select class="form-control" v-model="selectedLocationId" @change="onLocationChange">
+                                    <option :value="null">Select a location</option>
+                                    <option v-for="location in userLocations" :key="location.id" :value="location.id">
+                                        {{ location.displayName }}
+                                    </option>
+                                </select>
                             </div>
                         </div>
                         
@@ -2434,6 +2576,7 @@ var FoodCostApp = {
                         :stock-period-days="stockPeriodDays"
                         :stock-data="filteredData"
                         :editable="true"
+                        :show-charts="!isEditMode"
                         @update:sales-amount="updateSalesAmount"
                     ></data-summary>
                     
@@ -2500,8 +2643,12 @@ var FoodCostApp = {
                         </a>
                         <div class="dropdown-menu dropdown-menu-right shadow animated--fade-in" aria-labelledby="dropdownMenuLink">
                             <div class="dropdown-header">Actions:</div>
-                            <a class="dropdown-item" href="#" @click.prevent="exportToCsv"><i class="fas fa-file-csv mr-1"></i> Export to CSV</a>
-                            <a class="dropdown-item" href="#" @click.prevent="toggleEditMode" v-if="hasEditPermission"><i class="fas fa-edit mr-1"></i> {{ isEditMode ? 'Exit Edit Mode' : 'Edit Stock Data' }}</a>
+                            <a class="dropdown-item" href="#" @click.prevent="exportToCsv" :disabled="!isDataUploaded">
+                                <i class="fas fa-file-csv mr-1"></i> Export to CSV
+                            </a>
+                            <a class="dropdown-item" href="#" @click.prevent="toggleEditMode" v-if="hasEditPermission">
+                                <i class="fas fa-edit mr-1"></i> {{ isEditMode ? 'Exit Edit Mode' : 'Edit Stock Data' }}
+                            </a>
                             <!-- Debug info -->
                             <div class="dropdown-item text-muted" style="font-size: 10px;">Debug: Edit permission = {{ hasEditPermission ? 'YES' : 'NO' }}</div>
                         </div>
@@ -2629,7 +2776,8 @@ var FoodCostApp = {
                 :days-to-next-delivery="daysToNextDelivery"
                 :safety-stock-percentage="safetyStockPercentage || 15"
                 :critical-item-buffer="30"
-                :store-name="storeName"
+                :store-name="selectedLocationName"
+                :selected-location-id="selectedLocationId"
                 @close="closePurchaseOrder"
             ></purchase-order-modal>
             

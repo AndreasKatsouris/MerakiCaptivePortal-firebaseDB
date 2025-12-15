@@ -159,11 +159,11 @@ export function calculateCriticalityScore(item, historicalData = null, params = 
 export function calculateOrderDetails(item, params = {}) {
     // Default parameters
     const context = {
-        orderCycle: 7, // Default order cycle in days (how often delivery occurs)
-        daysToNextDelivery: 7, // Days until next delivery
-        safetyStockPercentage: 20, // Percentage for safety stock
-        criticalItemBuffer: 30, // Additional buffer for critical items
-        coveringDays: 2, // Days the order is intended to cover
+        orderCycle: 7, // Default order cycle in days (deprecated - use coveringDays instead)
+        daysToNextDelivery: params.daysToNextDelivery || 7, // Days until next delivery
+        safetyStockPercentage: params.safetyStockPercentage || 20, // Percentage for safety stock
+        criticalItemBuffer: params.criticalItemBuffer || 30, // Additional buffer for critical items
+        coveringDays: params.coveringDays || params.leadTimeDays || 2, // Days the order is intended to cover after delivery
         ...params
     };
     
@@ -175,8 +175,9 @@ export function calculateOrderDetails(item, params = {}) {
     // STEP 1: Calculate reorder point (theoretical stock at delivery)
     const reOrderPoint = closingQty - (usagePerDay * context.daysToNextDelivery);
     
-    // STEP 2: Calculate base usage for order cycle
-    const baseUsage = usagePerDay * context.orderCycle;
+    // STEP 2: Calculate base usage for forecast period (days to next delivery + covering days)
+    const forecastPeriod = context.daysToNextDelivery + context.coveringDays;
+    const baseUsage = usagePerDay * forecastPeriod;
     
     // STEP 3: Calculate safety stock
     const safetyStock = baseUsage * (context.safetyStockPercentage / 100);

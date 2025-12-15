@@ -53,7 +53,8 @@ class GuestAnalytics extends React.Component {
         try {
             const [guestSnapshot, receiptSnapshot] = await Promise.all([
                 firebase.database().ref(`guests/${phoneNumber}`).once('value'),
-                firebase.database().ref('guest-receipts').child(phoneNumber).once('value')
+                // Query main receipts collection filtered by phone number
+            firebase.database().ref('receipts').orderByChild('guestPhoneNumber').equalTo(phoneNumber).once('value')
             ]);
             console.log('Loaded guest data:', guestSnapshot.val()); // Debug log
             console.log('Loaded receipts:', receiptSnapshot.val()); // Debug log

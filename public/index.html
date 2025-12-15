@@ -1,304 +1,332 @@
 <!DOCTYPE html>
 <html lang="en">
   <head>
-    <meta charset="utf-utf">
-    <meta name="viewport" content="width=device-width, initial-scale=1">
-    <meta name="description" content="Guest WiFi login for Ocean Basket Restaurants V1.1">
-    <title>Ocean Basket Guest WiFi</title>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="description" content="Sparks Hospitality - Transform your restaurant operations with intelligent management tools. Inspired by a lifetime of service.">
+    <title>Sparks Hospitality - Restaurant Management, Infinite Scale</title>
+    
+    <!-- Favicon -->
+    <link rel="icon" type="image/png" href="img/platfrm_logo.png">
+    <link rel="apple-touch-icon" href="img/platfrm_logo.png">
+    
+    <!-- Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+    
+    <!-- Icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    
+    <!-- Custom CSS -->
+    <link rel="stylesheet" href="css/landing-page.css">
+    
     <!-- PWA Support -->
-    <meta name="theme-color" content="#0074D9">
+    <meta name="theme-color" content="#FF6B6B">
     <link rel="manifest" href="manifest.json">
-
-    <!-- Firebase SDK -->
-    <script type="module">
-      // Import Firebase modules directly in the page for customization script
-      import { rtdb, ref, get, set } from './js/config/firebase-config.js';
-      
-      document.addEventListener('DOMContentLoaded', function () {
-        // Fetch customization settings from Firebase
-        get(ref(rtdb, 'customization/'))
-          .then(function(snapshot) {
-            const settings = snapshot.val();
-            if (settings) {
-              // Apply the background color
-              document.body.style.backgroundColor = settings.bgColor || '#ffffff';
-              // Apply the font
-              document.body.style.fontFamily = settings.font || 'Open Sans, sans-serif';
-              // Apply the font size
-              document.body.style.fontSize = settings.fontSize ? `${settings.fontSize}px` : '16px';
-              // Apply the logo if it exists
-              if (settings.logoURL) {
-                document.getElementById('logo').src = settings.logoURL;
-              }
-              // Apply background image if exists
-              if (settings.bgImageUrl) {
-                document.body.style.backgroundImage = `url(${settings.bgImageUrl})`;
-                document.body.style.backgroundSize = 'cover';
-                document.body.style.backgroundPosition = 'center';
-                document.body.style.backgroundRepeat = 'no-repeat';
-              }
-            }
-          })
-          .catch(function(error) {
-            console.error('Error fetching customization settings:', error);
-          });
-      });
-      
-      // Redirect to admin dashboard if 'admin' query parameter is present
-      const urlParams = new URLSearchParams(window.location.search);
-      if (urlParams.get('admin') === 'true') {
-        window.location.href = 'admin-dashboard.html';
-      }
-    </script>
-
-    <!-- Stylesheets -->
-    <link rel="stylesheet" href="css/bootstrap.min.css" onerror="this.onerror=null;this.href='https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css';">
-    <link rel="stylesheet" href="css/all.min.css" onerror="this.onerror=null;this.href='https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.4/css/all.min.css';">
-    <link rel="stylesheet" href="css/style.css">
-    <link rel="stylesheet" href="css/intlTelInput.css" onerror="this.onerror=null;this.href='https://cdnjs.cloudflare.com/ajax/libs/intl-tel-input/17.0.8/css/intlTelInput.css';">
+    
+    <!-- Logo fix -->
     <style>
-      /* Additional styles for phone input */
-      .iti {
-        width: 100%;
-        display: block;
-      }
+        /* Ensure logo doesn't overflow */
+        .logo-img {
+            height: 32px !important;
+            max-height: 32px !important;
+            width: auto !important;
+            max-width: 150px !important;
+            object-fit: contain !important;
+        }
+        
+        /* Ensure images don't break layout */
+        img {
+            max-width: 100%;
+            height: auto;
+        }
     </style>
-    <!-- Google tag (gtag.js) -->
-    <script async src="https://www.googletagmanager.com/gtag/js?id=AW-859260392">
-    </script>
-    <script>
-      window.dataLayer = window.dataLayer || [];
-      function gtag(){dataLayer.push(arguments);}
-      gtag('js', new Date());
-
-      gtag('config', 'AW-859260392');
-    </script>
   </head>
   
   <body>
-    <div class="container">
-      <div class="row justify-content-center">
-        <div class="col-md-8 col-lg-6">
-          <!-- Header with Logo -->
-          <div class="text-center mt-4 mb-3">
-            <img id="logo" src="img/ocean-basket-logo.png" alt="Restaurant Logo" class="img-fluid mb-2" style="max-width: 200px;">
-            <h1 class="welcome-title">Welcome to Our Guest WiFi</h1>
-          </div>
-          
-          <!-- WiFi Instructions -->
-          <div class="wifi-instructions mb-4">
-            <div class="card">
-              <div class="card-body">
-                <h5 class="card-title"><i class="fas fa-wifi me-2"></i>Free WiFi Access</h5>
-                <p class="card-text">Please sign in with your details below to enjoy complimentary WiFi during your visit.</p>
-              </div>
-            </div>
-          </div>
-          
-          <!-- Login Form -->
-          <div class="login-container">
-            <form id="loginForm" class="needs-validation" novalidate>
-              <div class="form-group mb-3">
-                <label for="username" class="form-label">Full Name</label>
-                <div class="input-group">
-                  <span class="input-group-text"><i class="fas fa-user"></i></span>
-                  <input type="text" class="form-control" id="username" placeholder="Enter your full name" required autocomplete="name"/>
-                </div>
-                <div class="invalid-feedback" id="nameValidationMessage"></div>
-              </div>
-              
-              <div class="form-group mb-3">
-                <label for="email" class="form-label">Email Address</label>
-                <div class="input-group">
-                  <span class="input-group-text"><i class="fas fa-envelope"></i></span>
-                  <input type="email" class="form-control" id="email" placeholder="Enter your email" required autocomplete="email"/>
-                </div>
-                <div class="invalid-feedback" id="emailValidationMessage"></div>
-              </div>
-              
-              <div class="form-group mb-3">
-                <label for="phone" class="form-label">Phone Number</label>
-                <input id="phone" type="tel" class="form-control" placeholder="Enter your phone number" required autocomplete="tel">
-                <div class="invalid-feedback" id="phoneValidationMessage"></div>
-              </div>
-              
-              <div class="form-group mb-3">
-                <label for="table" class="form-label">Table Number</label>
-                <div class="input-group">
-                  <span class="input-group-text"><i class="fas fa-utensils"></i></span>
-                  <input type="text" class="form-control" id="table" placeholder="Enter your table number" autocomplete="off"/>
-                </div>
-                <div class="invalid-feedback" id="tableValidationMessage"></div>
-              </div>
-              
-              <div class="form-group mb-4">
-                <div class="form-check">
-                  <input type="checkbox" class="form-check-input" id="terms" required>
-                  <label class="form-check-label" for="terms">
-                    I agree to the <a href="#" data-bs-toggle="modal" data-bs-target="#termsModal">terms and conditions</a>
-                  </label>
-                  <div class="invalid-feedback" id="termsValidationMessage"></div>
-                </div>
-              </div>
-              
-              <div class="d-grid">
-                <button type="submit" class="btn btn-primary btn-lg login-button">
-                  <i class="fas fa-wifi me-2"></i>Connect to WiFi
-                </button>
-              </div>
-            </form>
-          </div>
-          
-          <!-- Error Container -->
-          <div id="error-container" class="alert alert-danger mt-3" style="display: none;"></div>
-          
-          <!-- Admin Link -->
-          <div class="text-center mt-4 mb-5">
-            <a href="admin-login.html" class="btn btn-sm btn-outline-secondary">
-              <i class="fas fa-cog me-1"></i>Admin Login
+    <!-- Navigation -->
+    <nav class="navbar">
+      <div class="nav-container">
+        <a href="#" class="logo">
+          <img src="img/platfrm_logo.png" alt="Sparks Hospitality" class="logo-img">
+          <span>Sparks Hospitality</span>
+        </a>
+        <ul class="nav-menu">
+          <li><a href="#features" class="nav-link">Platform</a></li>
+          <li><a href="#about" class="nav-link">Our Story</a></li>
+          <li><a href="#testimonials" class="nav-link">Case Studies</a></li>
+          <li><a href="/user-login.html" class="nav-link">Login</a></li>
+          <li><a href="/signup.html" class="nav-cta">Get Started</a></li>
+        </ul>
+      </div>
+    </nav>
+
+    <!-- Hero Section -->
+    <section class="hero">
+      <div class="hero-container">
+        <div class="hero-content fade-in-up">
+          <h1 class="balance">
+            Restaurant management,
+            <span class="gradient-text">infinite scale.</span>
+          </h1>
+          <p>
+            Sparks Hospitality amplifies what your team can do by effortlessly scaling your restaurant operations. 
+            So you can focus on what matters most - creating exceptional guest experiences.
+          </p>
+          <div class="hero-buttons">
+            <a href="/signup.html" class="btn-primary">
+              Get Started <i class="fas fa-arrow-right"></i>
+            </a>
+            <a href="#demo" class="btn-secondary">
+              Watch Demo
             </a>
           </div>
         </div>
+        <div class="hero-image fade-in">
+          <img src="img/ob-bg.jpg" alt="Restaurant Management Dashboard">
+        </div>
       </div>
-    </div>
-    
-    <!-- Version Footer -->
-    <footer class="text-center py-3 mt-3">
-      <div class="container">
-        <small class="text-muted">Laki Sparks WiFi Portal v1.1</small>
-      </div>
-    </footer>
-    
-    <!-- Terms and Conditions Modal -->
-    <div class="modal fade" id="termsModal" tabindex="-1" aria-labelledby="termsModalLabel" aria-hidden="true">
-      <div class="modal-dialog">
-        <div class="modal-content">
-          <div class="modal-header">
-            <h5 class="modal-title" id="termsModalLabel">Terms and Conditions</h5>
-            <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+    </section>
+
+    <!-- Stats Section -->
+    <section class="stats">
+      <div class="stats-container">
+        <div class="section-header">
+          <h2>Scaling your operations</h2>
+          <p>Our platform provides you with extra capacity at superhuman scale, enabling your team to go further, faster.</p>
+        </div>
+        <div class="stats-grid">
+          <div class="stat-card">
+            <div class="stat-number">10x</div>
+            <div class="stat-label">Efficiency increase</div>
           </div>
-          <div class="modal-body">
-            <p>By using our guest WiFi service, you agree to:</p>
-            <ul>
-              <li>Use the service responsibly and legally</li>
-              <li>Not abuse network bandwidth or resources</li>
-              <li>Allow us to collect and store your provided information</li>
-              <li>Receive occasional communications about our services</li>
-            </ul>
+          <div class="stat-card">
+            <div class="stat-number">83%</div>
+            <div class="stat-label">Reduction in waste</div>
           </div>
-          <div class="modal-footer">
-            <button type="button" class="btn btn-primary" data-bs-dismiss="modal">I Understand</button>
+          <div class="stat-card">
+            <div class="stat-number">4.8</div>
+            <div class="stat-label">Customer rating</div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-number">52%</div>
+            <div class="stat-label">Increase in revenue</div>
           </div>
         </div>
       </div>
-    </div>
+    </section>
 
-    <!-- Session ID generation -->
-    <script>
-        // Function to generate a unique session ID
-        function generateSessionID() {
-            return 'session-' + Math.random().toString(36).substr(2, 9);
-        }
+    <!-- Features Section -->
+    <section class="features" id="features">
+      <div class="features-container">
+        <div class="section-header">
+          <h2>The Sparks Hospitality stack</h2>
+          <p>Our platform sits at the heart of your operations, providing unprecedented management power at unlimited scale.</p>
+        </div>
+        <div class="features-grid">
+          <div class="feature-card">
+            <div class="feature-icon">
+              <i class="fas fa-wifi"></i>
+            </div>
+            <h3>Smart Guest WiFi</h3>
+            <p>Transform your WiFi into a powerful engagement tool. Capture guest data, build relationships, and drive repeat visits automatically.</p>
+          </div>
+          <div class="feature-card">
+            <div class="feature-icon">
+              <i class="fas fa-chart-line"></i>
+            </div>
+            <h3>Real-Time Analytics</h3>
+            <p>Make data-driven decisions with instant insights into guest behavior, peak hours, and revenue trends.</p>
+          </div>
+          <div class="feature-card">
+            <div class="feature-icon">
+              <i class="fas fa-calculator"></i>
+            </div>
+            <h3>Food Cost Control</h3>
+            <p>Optimize inventory, reduce waste, and maximize profits with AI-powered cost management and predictive ordering.</p>
+          </div>
+          <div class="feature-card">
+            <div class="feature-icon">
+              <i class="fas fa-bullhorn"></i>
+            </div>
+            <h3>Marketing Automation</h3>
+            <p>Engage guests with personalized campaigns, loyalty programs, and targeted offers based on their preferences.</p>
+          </div>
+          <div class="feature-card">
+            <div class="feature-icon">
+              <i class="fas fa-users"></i>
+            </div>
+            <h3>Team Management</h3>
+            <p>Streamline scheduling, track performance, and empower your staff with the tools they need to excel.</p>
+          </div>
+          <div class="feature-card">
+            <div class="feature-icon">
+              <i class="fas fa-mobile-alt"></i>
+            </div>
+            <h3>Mobile Dashboard</h3>
+            <p>Monitor and manage your restaurant from anywhere with our intuitive mobile-first design.</p>
+          </div>
+        </div>
+      </div>
+    </section>
 
-        // Retrieve the existing session ID from local storage if it exists
-        let sessionID = localStorage.getItem('sessionID');
-        
-        // If no session ID is found, generate a new one and store it in local storage
-        if (!sessionID) {
-            sessionID = generateSessionID();
-            localStorage.setItem('sessionID', sessionID);
-        }
-    </script>
-    
-    <!-- JavaScript Dependencies -->
-    <script src="js/bootstrap.bundle.min.js" onerror="this.onerror=null;this.src='https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/js/bootstrap.bundle.min.js';"></script>
-    <script src="js/intlTelInput.min.js" onerror="this.onerror=null;this.src='https://cdnjs.cloudflare.com/ajax/libs/intl-tel-input/17.0.8/js/intlTelInput.min.js';"></script>
-    
-    <!-- Custom Scripts -->
-    <script type="module" src="js/merakiFirebase.js"></script>
-    
-    <!-- Fallback script loader - ensures all scripts are loaded -->
+    <!-- About Section -->
+    <section class="testimonials" id="about">
+      <div class="testimonials-container">
+        <div class="section-header">
+          <h2>Inspired by service</h2>
+          <p>A legacy that continues to guide everything we do</p>
+        </div>
+        <div class="testimonials-grid">
+          <div class="testimonial-card">
+            <div class="testimonial-quote">
+              "My father, Lakis Katsouris, served people all his life from a young age. As an entrepreneur, he understood that hospitality is about creating moments that matter. Sparks Hospitality carries forward his belief that technology should amplify human connection, not replace it."
+            </div>
+            <div class="testimonial-author">
+              <div class="author-avatar">LK</div>
+              <div class="author-info">
+                <h4>Founder's Story</h4>
+                <p>The Katsouris Legacy</p>
+              </div>
+            </div>
+          </div>
+          <div class="testimonial-card">
+            <div class="testimonial-quote">
+              "Sparks transformed how we operate. The WiFi engagement alone increased our repeat visits by 40%. It's like having a dedicated team working around the clock."
+            </div>
+            <div class="testimonial-author">
+              <div class="author-avatar">MR</div>
+              <div class="author-info">
+                <h4>Maria Rodriguez</h4>
+                <p>Owner, Bella Vista</p>
+              </div>
+            </div>
+          </div>
+          <div class="testimonial-card">
+            <div class="testimonial-quote">
+              "The food cost system is a game-changer. We've reduced waste by 30% and our margins have never been better. The predictive ordering is incredibly accurate."
+            </div>
+            <div class="testimonial-author">
+              <div class="author-avatar">JC</div>
+              <div class="author-info">
+                <h4>James Chen</h4>
+                <p>Executive Chef</p>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- Success Stories Section -->
+    <section class="features" id="testimonials">
+      <div class="features-container">
+        <div class="section-header">
+          <h2>Success at scale</h2>
+          <p>Real results from restaurants transforming their operations</p>
+        </div>
+        <div class="features-grid">
+          <div class="feature-card">
+            <div class="feature-icon">
+              <i class="fas fa-chart-up"></i>
+            </div>
+            <h3>Ocean Basket Group</h3>
+            <p>15 locations saw 25% increase in retention and 35% boost in campaign effectiveness within 3 months.</p>
+          </div>
+          <div class="feature-card">
+            <div class="feature-icon">
+              <i class="fas fa-award"></i>
+            </div>
+            <h3>The Garden Bistro</h3>
+            <p>Menu optimization based on guest insights led to 28% revenue increase in just 90 days.</p>
+          </div>
+          <div class="feature-card">
+            <div class="feature-icon">
+              <i class="fas fa-heart"></i>
+            </div>
+            <h3>Mama's Kitchen</h3>
+            <p>Built a community of 5,000+ loyal guests with automated engagement and personalized rewards.</p>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- CTA Section -->
+    <section class="cta">
+      <div class="cta-container">
+        <h2>Give your team superhuman powers</h2>
+        <p>Join the hospitality revolution with a 30-day free trial.</p>
+        <a href="/signup.html" class="btn-primary">
+          Get Started Free <i class="fas fa-arrow-right"></i>
+        </a>
+      </div>
+    </section>
+
+    <!-- Footer -->
+    <footer class="footer">
+      <div class="footer-container">
+        <div class="footer-links">
+          <a href="#features">Platform</a>
+          <a href="#about">Our Story</a>
+          <a href="#testimonials">Case Studies</a>
+          <a href="/terms.html">Terms</a>
+          <a href="/privacy">Privacy</a>
+          <a href="/admin-login.html">Admin</a>
+        </div>
+        <div class="footer-social">
+          <a href="#" class="social-icon"><i class="fab fa-facebook-f"></i></a>
+          <a href="#" class="social-icon"><i class="fab fa-twitter"></i></a>
+          <a href="#" class="social-icon"><i class="fab fa-linkedin-in"></i></a>
+          <a href="#" class="social-icon"><i class="fab fa-instagram"></i></a>
+        </div>
+        <p>&copy; 2024 Sparks Hospitality. Built with ❤️ in honor of Lakis Katsouris.</p>
+      </div>
+    </footer>
+
+    <!-- Scripts -->
     <script>
-      // Function to load scripts with fallbacks
-      function loadScript(src, fallbackSrc, callback) {
-        const script = document.createElement('script');
-        script.src = src;
-        script.onload = callback;
-        script.onerror = function() {
-          console.warn('Failed to load script from primary source:', src);
-          if (fallbackSrc) {
-            console.log('Trying fallback source:', fallbackSrc);
-            const fallbackScript = document.createElement('script');
-            fallbackScript.src = fallbackSrc;
-            fallbackScript.onload = callback;
-            fallbackScript.onerror = function() {
-              console.error('Failed to load script from fallback source:', fallbackSrc);
-            };
-            document.head.appendChild(fallbackScript);
+      // Navbar scroll effect
+      window.addEventListener('scroll', function() {
+        const navbar = document.querySelector('.navbar');
+        if (window.scrollY > 50) {
+          navbar.classList.add('scrolled');
+        } else {
+          navbar.classList.remove('scrolled');
+        }
+      });
+
+      // Smooth scrolling for anchor links
+      document.querySelectorAll('a[href^="#"]').forEach(anchor => {
+        anchor.addEventListener('click', function (e) {
+          e.preventDefault();
+          const target = document.querySelector(this.getAttribute('href'));
+          if (target) {
+            target.scrollIntoView({
+              behavior: 'smooth',
+              block: 'start'
+            });
           }
-        };
-        document.head.appendChild(script);
-      }
-      
-      // Check if critical scripts are loaded
-      if (typeof window.intlTelInput !== 'function') {
-        console.warn('intlTelInput not loaded, trying to load it manually');
-        loadScript(
-          'js/intlTelInput.min.js', 
-          'https://cdnjs.cloudflare.com/ajax/libs/intl-tel-input/17.0.8/js/intlTelInput.min.js',
-          function() {
-            // Load utils.js after intlTelInput
-            loadScript(
-              'js/utils.js',
-              'https://cdnjs.cloudflare.com/ajax/libs/intl-tel-input/17.0.8/js/utils.js',
-              function() {
-                console.log('intlTelInput and utils loaded successfully');
-                // Reinitialize phone input if the page has already loaded
-                if (document.readyState === 'complete' && window.intlTelInput) {
-                  const phoneField = document.getElementById('phone');
-                  if (phoneField && typeof window.intlTelInput === 'function') {
-                    try {
-                      window.intlTelInput(phoneField, {
-                        initialCountry: "auto",
-                        preferredCountries: ["za"],
-                        separateDialCode: true,
-                        utilsScript: "js/utils.js",
-                        geoIpLookup: function(callback) {
-                          try {
-                            fetch('https://ipinfo.io/json')
-                              .then(response => response.json())
-                              .then(data => callback(data.country))
-                              .catch(() => callback('za'));
-                          } catch (error) {
-                            callback('za');
-                          }
-                        }
-                      });
-                    } catch (e) {
-                      console.error('Failed to initialize phone input:', e);
-                    }
-                  }
-                }
-              }
-            );
+        });
+      });
+
+      // Add fade-in animation on scroll
+      const observerOptions = {
+        threshold: 0.1,
+        rootMargin: '0px 0px -100px 0px'
+      };
+
+      const observer = new IntersectionObserver(function(entries) {
+        entries.forEach(entry => {
+          if (entry.isIntersecting) {
+            entry.target.classList.add('fade-in-up');
           }
-        );
-      }
-      
-      // Check if Bootstrap is loaded
-      if (typeof bootstrap === 'undefined') {
-        console.warn('Bootstrap not loaded, trying to load it manually');
-        loadScript(
-          'js/bootstrap.bundle.min.js',
-          'https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/js/bootstrap.bundle.min.js',
-          function() {
-            console.log('Bootstrap loaded successfully');
-          }
-        );
-      }
+        });
+      }, observerOptions);
+
+      document.querySelectorAll('.stat-card, .feature-card, .testimonial-card').forEach(el => {
+        observer.observe(el);
+      });
     </script>
-    
-    <!-- Service Worker Registration -->
-    <script src="js/service-worker-registration.js"></script>
   </body>
 </html>

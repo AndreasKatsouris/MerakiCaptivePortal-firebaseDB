@@ -89,9 +89,9 @@ async function receiveWhatsAppMessage(req, res) {
         const guestData = await getOrCreateGuest(phoneNumber);
         console.log('Complete guest data:', JSON.stringify(guestData, null, 2));
 
-        // Handle different message types
-        if (!guestData.name) {
-            console.log('Guest has no name, handling name collection');
+        // Handle different message types - but check if guest has a valid name
+        if (!guestData.name || guestData.name === 'N/A' || guestData.name === '') {
+            console.log('Guest has no valid name, handling name collection');
             return await handleNameCollection(guestData, Body, MediaUrl0, res);
         }
         
@@ -103,6 +103,27 @@ async function receiveWhatsAppMessage(req, res) {
         console.log('Consent status:', JSON.stringify(consentStatus, null, 2));
         console.log('Message body:', Body);
         console.log('Is consent message?', isConsentMessage(Body));
+        
+        // Check if existing user requires consent before processing any messages
+        if (!consentStatus.hasConsent && guestData.name) {
+            console.log('📋 Existing user requires consent - triggering consent flow');
+            
+            // Set consent pending flag for existing user
+            await update(ref(rtdb, `guests/${guestData.phoneNumber}`), {
+                consentPending: true,
+                lastConsentPrompt: Date.now(),
+                updatedAt: Date.now()
+            });
+
+            // Trigger consent flow for existing user
+            const consentResult = await handleConsentFlow(guestData, 'consent');
+            
+            if (consentResult.shouldMessage) {
+                await sendWhatsAppMessage(guestData.phoneNumber, consentResult.message);
+                console.log(`✅ Consent flow triggered for existing user ${guestData.name}`);
+                return res.status(200).send('Consent prompt sent to existing user');
+            }
+        }
         
         // Handle consent flow - check responses FIRST before starting new flow
         console.log('Consent pending flag:', guestData.consentPending);
@@ -190,8 +211,9 @@ async function receiveWhatsAppMessage(req, res) {
         }
         
         // PRIORITY 2: Check if consent is required and user is not in consent flow
-        if (consentStatus.requiresConsent || isConsentMessage(Body)) {
-            console.log('Starting new consent flow - requiresConsent:', consentStatus.requiresConsent, 'isConsentMessage:', isConsentMessage(Body));
+        // Also handle consent responses when user is in consent flow
+        if (consentStatus.requiresConsent || isConsentMessage(Body) || (guestData.consentPending && Body && ['yes', 'no', 'y', 'n', 'agree', 'accept', 'decline', 'reject'].includes(Body.toLowerCase().trim()))) {
+            console.log('Starting consent flow - requiresConsent:', consentStatus.requiresConsent, 'isConsentMessage:', isConsentMessage(Body), 'consentResponse:', (guestData.consentPending && Body && ['yes', 'no', 'y', 'n', 'agree', 'accept', 'decline', 'reject'].includes(Body.toLowerCase().trim())));
             
             // Ensure consent pending flag is set BEFORE calling consent flow
             if (!guestData.consentPending) {
@@ -204,13 +226,22 @@ async function receiveWhatsAppMessage(req, res) {
             }
             
             const consentResult = await handleConsentFlow(guestData, Body);
-            console.log('New consent flow result:', JSON.stringify(consentResult, null, 2));
+            console.log('Consent flow result:', JSON.stringify(consentResult, null, 2));
             
-            if (consentResult.shouldMessage) {
+            // Send acknowledgment message if consent handler provides one
+            if (consentResult.shouldMessage && consentResult.message) {
                 await sendWhatsAppMessage(phoneNumber, consentResult.message);
+                console.log('✅ Consent acknowledgment sent:', consentResult.message);
             }
+            
+            // If consent was granted, acknowledge and continue
+            if (consentResult.consentGranted) {
+                console.log('✅ Consent granted, user can now use full features');
+                return res.status(200).send('Consent granted successfully');
+            }
+            
             return res.status(consentResult.success ? 200 : 400)
-                     .send(consentResult.success ? 'Consent flow started' : 'Consent flow error');
+                     .send(consentResult.success ? 'Consent flow handled' : 'Consent flow error');
         }
         
         console.log('Consent not required, proceeding to command processing');           
@@ -315,6 +346,7 @@ async function getOrCreateGuest(phoneNumber) {
                 const newGuestData = { 
                     phoneNumber: cleanPhone, 
                     createdAt: Date.now(),
+                    name: null, // Explicitly set to null instead of undefined
                     // Add processing flag to prevent concurrent creation
                     processing: true
                 };
@@ -470,17 +502,38 @@ async function handleNameCollection(guestData, body, mediaUrl, res) {
             // Check if input looks like a valid name
             if (isValidName(trimmedInput)) {
                 const normalizedPhone = normalizePhoneNumber(guestData.phoneNumber);
-                await update(ref(rtdb, `guests/${normalizedPhone}`), { name: trimmedInput });
+                
+                // Clean and format the name properly
+                const cleanedName = trimmedInput.toLowerCase()
+                    .split(' ')
+                    .map(word => word.charAt(0).toUpperCase() + word.slice(1))
+                    .join(' ');
+                
+                console.log(`Setting name for ${normalizedPhone}: "${cleanedName}"`);
+                await update(ref(rtdb, `guests/${normalizedPhone}`), { 
+                    name: cleanedName,
+                    nameCollectedAt: Date.now(),
+                    updatedAt: Date.now(),
+                    consentPending: true,
+                    lastConsentPrompt: Date.now()
+                });
 
-                // After name is collected, ask for consent before showing features
-                await sendWhatsAppMessage(
-                    guestData.phoneNumber,
-                    `🤖 Thank you, ${trimmedInput}! Nice to meet you! 😊\n\n` +
-                    `To help you earn rewards and access all features, I need your consent to collect and use your data. ` +
-                    `This includes processing your receipts and managing your rewards.\n\n` +
-                    `Reply "consent" to review our privacy policy and get started!`
-                );
-                return res.status(200).send('Name collected, consent requested.');
+                // Automatically start consent flow after name collection
+                const guestDataWithName = {
+                    ...guestData,
+                    name: cleanedName,
+                    phoneNumber: guestData.phoneNumber,
+                    consentPending: true
+                };
+
+                console.log('Starting consent flow automatically after name collection');
+                const consentResult = await handleConsentFlow(guestDataWithName, 'consent');
+
+                if (consentResult.shouldMessage) {
+                    await sendWhatsAppMessage(guestData.phoneNumber, consentResult.message);
+                }
+
+                return res.status(200).send('Name collected, consent flow started automatically.');
             } else {
                 // Input doesn't look like a valid name
                 await sendWhatsAppMessage(
@@ -1090,5 +1143,6 @@ Just send me a clear photo of your receipt and I'll check if it qualifies for re
 module.exports = {
     receiveWhatsAppMessage,
     handleReceiptProcessing,
-    constructFailureMessage
+    constructFailureMessage,
+    constructSuccessMessage
 };

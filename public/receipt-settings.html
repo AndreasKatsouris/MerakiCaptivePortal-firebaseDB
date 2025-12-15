@@ -1,0 +1,648 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Receipt Settings - Admin Dashboard</title>
+    <link rel="icon" type="image/svg+xml" href="favicon.svg">
+    <link rel="alternate icon" href="favicon.ico">
+
+    <!-- Bootstrap CSS -->
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <!-- Font Awesome -->
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <!-- Custom CSS -->
+    <link href="css/admin-dashboard.css" rel="stylesheet">
+
+    <!-- Vue.js - Use production version -->
+    <script src="https://unpkg.com/vue@3/dist/vue.global.prod.js"></script>
+
+    <!-- SweetAlert2 -->
+    <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+
+    <!-- Chart.js for performance metrics -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
+    <!-- Load Firebase SDK -->
+    <script src="https://www.gstatic.com/firebasejs/10.12.5/firebase-app.js" type="module"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.12.5/firebase-auth.js" type="module"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.12.5/firebase-database.js" type="module"></script>
+
+    <!-- Custom Scripts -->
+    <script type="module" src="js/config/firebase-config.js"></script>
+
+    <style>
+        .template-card {
+            transition: all 0.3s ease;
+            border-left: 4px solid transparent;
+        }
+
+        .template-card.status-active {
+            border-left-color: #28a745;
+        }
+
+        .template-card.status-testing {
+            border-left-color: #ffc107;
+        }
+
+        .template-card.status-deprecated {
+            border-left-color: #dc3545;
+            opacity: 0.6;
+        }
+
+        .template-card:hover {
+            box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+            transform: translateY(-2px);
+        }
+
+        .priority-badge {
+            font-size: 0.9em;
+            padding: 0.25rem 0.5rem;
+        }
+
+        .priority-high {
+            background-color: #dc3545;
+        }
+
+        .priority-medium {
+            background-color: #ffc107;
+        }
+
+        .priority-low {
+            background-color: #28a745;
+        }
+
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+            gap: 1rem;
+            margin-top: 1rem;
+        }
+
+        .stat-item {
+            background: #f8f9fa;
+            padding: 1rem;
+            border-radius: 0.5rem;
+            text-align: center;
+        }
+
+        .stat-value {
+            font-size: 1.5rem;
+            font-weight: bold;
+            color: #2c3e50;
+        }
+
+        .stat-label {
+            font-size: 0.85rem;
+            color: #6c757d;
+            margin-top: 0.25rem;
+        }
+
+        .filter-section {
+            background: white;
+            padding: 1.5rem;
+            border-radius: 0.5rem;
+            margin-bottom: 1.5rem;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+
+        .empty-state {
+            text-align: center;
+            padding: 3rem;
+            background: white;
+            border-radius: 0.5rem;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+
+        .empty-state i {
+            font-size: 4rem;
+            color: #dee2e6;
+            margin-bottom: 1rem;
+        }
+
+        .loading-spinner {
+            text-align: center;
+            padding: 3rem;
+        }
+
+        .pattern-preview {
+            background: #f8f9fa;
+            padding: 0.5rem;
+            border-radius: 0.25rem;
+            font-family: monospace;
+            font-size: 0.85rem;
+            margin-top: 0.5rem;
+            max-height: 100px;
+            overflow-y: auto;
+        }
+
+        .performance-chart-container {
+            height: 300px;
+            margin-top: 1rem;
+        }
+
+        .template-actions {
+            display: flex;
+            gap: 0.5rem;
+            margin-top: 1rem;
+        }
+
+        .modal-body-scroll {
+            max-height: 70vh;
+            overflow-y: auto;
+        }
+    </style>
+</head>
+<body>
+    <div id="app" class="container-fluid mt-4">
+        <!-- Header -->
+        <div class="row mb-4">
+            <div class="col">
+                <div class="d-flex justify-content-between align-items-center">
+                    <div>
+                        <h1 class="h2 mb-1">
+                            <i class="fas fa-receipt me-2"></i>
+                            Receipt Settings
+                        </h1>
+                        <p class="text-muted mb-0">
+                            Manage receipt extraction templates and patterns
+                        </p>
+                    </div>
+                    <div>
+                        <button
+                            class="btn btn-primary"
+                            @click="openCreateTemplateModal"
+                            :disabled="loading"
+                        >
+                            <i class="fas fa-plus me-2"></i>
+                            Create Template
+                        </button>
+                        <button
+                            class="btn btn-outline-secondary ms-2"
+                            @click="refreshTemplates"
+                            :disabled="loading"
+                        >
+                            <i class="fas fa-sync-alt" :class="{ 'fa-spin': loading }"></i>
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Overall Statistics -->
+        <div class="row mb-4">
+            <div class="col-md-3">
+                <div class="card">
+                    <div class="card-body text-center">
+                        <i class="fas fa-file-alt fa-2x text-primary mb-2"></i>
+                        <h3 class="mb-0">{{ statistics.totalTemplates }}</h3>
+                        <p class="text-muted mb-0">Total Templates</p>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-3">
+                <div class="card">
+                    <div class="card-body text-center">
+                        <i class="fas fa-check-circle fa-2x text-success mb-2"></i>
+                        <h3 class="mb-0">{{ statistics.activeTemplates }}</h3>
+                        <p class="text-muted mb-0">Active Templates</p>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-3">
+                <div class="card">
+                    <div class="card-body text-center">
+                        <i class="fas fa-chart-line fa-2x text-info mb-2"></i>
+                        <h3 class="mb-0">{{ statistics.avgSuccessRate }}%</h3>
+                        <p class="text-muted mb-0">Avg Success Rate</p>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-3">
+                <div class="card">
+                    <div class="card-body text-center">
+                        <i class="fas fa-bolt fa-2x text-warning mb-2"></i>
+                        <h3 class="mb-0">{{ statistics.totalUsage }}</h3>
+                        <p class="text-muted mb-0">Total Usage</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Filters -->
+        <div class="filter-section">
+            <div class="row g-3">
+                <div class="col-md-3">
+                    <label class="form-label">Filter by Brand</label>
+                    <input
+                        type="text"
+                        class="form-control"
+                        v-model="filters.brandName"
+                        placeholder="Search brand name..."
+                        @input="applyFilters"
+                    >
+                </div>
+                <div class="col-md-3">
+                    <label class="form-label">Status</label>
+                    <select
+                        class="form-select"
+                        v-model="filters.status"
+                        @change="applyFilters"
+                    >
+                        <option value="">All Statuses</option>
+                        <option value="active">Active</option>
+                        <option value="testing">Testing</option>
+                        <option value="deprecated">Deprecated</option>
+                    </select>
+                </div>
+                <div class="col-md-3">
+                    <label class="form-label">Sort By</label>
+                    <select
+                        class="form-select"
+                        v-model="filters.sortBy"
+                        @change="applyFilters"
+                    >
+                        <option value="priority">Priority</option>
+                        <option value="successRate">Success Rate</option>
+                        <option value="usageCount">Usage Count</option>
+                        <option value="createdAt">Created Date</option>
+                    </select>
+                </div>
+                <div class="col-md-3">
+                    <label class="form-label">Min Success Rate</label>
+                    <input
+                        type="number"
+                        class="form-control"
+                        v-model.number="filters.minSuccessRate"
+                        min="0"
+                        max="100"
+                        placeholder="0"
+                        @input="applyFilters"
+                    >
+                </div>
+            </div>
+        </div>
+
+        <!-- Loading State -->
+        <div v-if="loading && templates.length === 0" class="loading-spinner">
+            <div class="spinner-border text-primary" role="status">
+                <span class="visually-hidden">Loading...</span>
+            </div>
+            <p class="text-muted mt-2">Loading templates...</p>
+        </div>
+
+        <!-- Empty State -->
+        <div v-else-if="!loading && filteredTemplates.length === 0" class="empty-state">
+            <i class="fas fa-inbox"></i>
+            <h4>No Templates Found</h4>
+            <p class="text-muted">
+                {{ templates.length === 0
+                    ? 'Get started by creating your first receipt template.'
+                    : 'No templates match your current filters.'
+                }}
+            </p>
+            <button
+                v-if="templates.length === 0"
+                class="btn btn-primary"
+                @click="openCreateTemplateModal"
+            >
+                <i class="fas fa-plus me-2"></i>
+                Create First Template
+            </button>
+        </div>
+
+        <!-- Templates List -->
+        <div v-else class="row">
+            <div
+                v-for="template in filteredTemplates"
+                :key="template.id"
+                class="col-md-6 col-lg-4 mb-4"
+            >
+                <div
+                    class="card template-card h-100"
+                    :class="`status-${template.status}`"
+                >
+                    <div class="card-header d-flex justify-content-between align-items-center">
+                        <div>
+                            <h5 class="mb-0">{{ template.templateName }}</h5>
+                            <small class="text-muted">{{ template.brandName }}</small>
+                        </div>
+                        <span
+                            class="badge priority-badge"
+                            :class="getPriorityClass(template.priority)"
+                        >
+                            Priority {{ template.priority }}
+                        </span>
+                    </div>
+                    <div class="card-body">
+                        <!-- Status Badge -->
+                        <div class="mb-3">
+                            <span
+                                class="badge"
+                                :class="getStatusBadgeClass(template.status)"
+                            >
+                                {{ template.status.toUpperCase() }}
+                            </span>
+                            <span
+                                v-if="template.storeName"
+                                class="badge bg-secondary ms-2"
+                            >
+                                {{ template.storeName }}
+                            </span>
+                        </div>
+
+                        <!-- Statistics -->
+                        <div class="stats-grid">
+                            <div class="stat-item">
+                                <div class="stat-value">
+                                    {{ template.statistics?.successRate || 0 }}%
+                                </div>
+                                <div class="stat-label">Success Rate</div>
+                            </div>
+                            <div class="stat-item">
+                                <div class="stat-value">
+                                    {{ template.statistics?.usageCount || 0 }}
+                                </div>
+                                <div class="stat-label">Uses</div>
+                            </div>
+                            <div class="stat-item">
+                                <div class="stat-value">
+                                    {{ (template.statistics?.avgConfidence * 100 || 0).toFixed(0) }}%
+                                </div>
+                                <div class="stat-label">Avg Confidence</div>
+                            </div>
+                        </div>
+
+                        <!-- Description -->
+                        <p
+                            v-if="template.description"
+                            class="text-muted mt-3 mb-0"
+                            style="font-size: 0.9em;"
+                        >
+                            {{ template.description }}
+                        </p>
+
+                        <!-- Actions -->
+                        <div class="template-actions">
+                            <button
+                                class="btn btn-sm btn-primary flex-fill"
+                                @click="viewTemplate(template)"
+                            >
+                                <i class="fas fa-eye me-1"></i>
+                                View
+                            </button>
+                            <button
+                                class="btn btn-sm btn-outline-secondary"
+                                @click="editTemplate(template)"
+                            >
+                                <i class="fas fa-edit"></i>
+                            </button>
+                            <button
+                                class="btn btn-sm btn-outline-info"
+                                @click="viewPerformance(template)"
+                            >
+                                <i class="fas fa-chart-bar"></i>
+                            </button>
+                            <button
+                                v-if="template.status !== 'deprecated'"
+                                class="btn btn-sm btn-outline-danger"
+                                @click="confirmDelete(template)"
+                            >
+                                <i class="fas fa-trash"></i>
+                            </button>
+                        </div>
+                    </div>
+                    <div class="card-footer text-muted" style="font-size: 0.85em;">
+                        <div>
+                            <i class="fas fa-calendar-alt me-1"></i>
+                            Created {{ formatDate(template.createdAt) }}
+                        </div>
+                        <div v-if="template.statistics?.lastUsed">
+                            <i class="fas fa-clock me-1"></i>
+                            Last used {{ formatDate(template.statistics.lastUsed) }}
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- View Template Modal -->
+        <div
+            class="modal fade"
+            id="viewTemplateModal"
+            tabindex="-1"
+            ref="viewTemplateModal"
+        >
+            <div class="modal-dialog modal-lg modal-dialog-scrollable">
+                <div class="modal-content">
+                    <div class="modal-header">
+                        <h5 class="modal-title">
+                            <i class="fas fa-eye me-2"></i>
+                            {{ selectedTemplate?.templateName }}
+                        </h5>
+                        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                    </div>
+                    <div class="modal-body modal-body-scroll" v-if="selectedTemplate">
+                        <!-- Template Info -->
+                        <div class="mb-4">
+                            <h6 class="border-bottom pb-2">Template Information</h6>
+                            <table class="table table-sm">
+                                <tr>
+                                    <th style="width: 30%;">Brand Name:</th>
+                                    <td>{{ selectedTemplate.brandName }}</td>
+                                </tr>
+                                <tr v-if="selectedTemplate.storeName">
+                                    <th>Store Name:</th>
+                                    <td>{{ selectedTemplate.storeName }}</td>
+                                </tr>
+                                <tr>
+                                    <th>Status:</th>
+                                    <td>
+                                        <span
+                                            class="badge"
+                                            :class="getStatusBadgeClass(selectedTemplate.status)"
+                                        >
+                                            {{ selectedTemplate.status }}
+                                        </span>
+                                    </td>
+                                </tr>
+                                <tr>
+                                    <th>Priority:</th>
+                                    <td>{{ selectedTemplate.priority }}</td>
+                                </tr>
+                                <tr v-if="selectedTemplate.description">
+                                    <th>Description:</th>
+                                    <td>{{ selectedTemplate.description }}</td>
+                                </tr>
+                            </table>
+                        </div>
+
+                        <!-- Extraction Patterns -->
+                        <div class="mb-4">
+                            <h6 class="border-bottom pb-2">Extraction Patterns</h6>
+                            <div
+                                v-for="(pattern, fieldName) in selectedTemplate.patterns"
+                                :key="fieldName"
+                                class="mb-3"
+                            >
+                                <strong>{{ fieldName }}:</strong>
+                                <div class="pattern-preview">
+                                    <div><strong>Regex:</strong> {{ pattern.regex }}</div>
+                                    <div v-if="pattern.lineRange">
+                                        <strong>Line Range:</strong> {{ pattern.lineRange.join(' - ') }}
+                                    </div>
+                                    <div v-if="pattern.confidence">
+                                        <strong>Confidence:</strong> {{ (pattern.confidence * 100).toFixed(0) }}%
+                                    </div>
+                                    <div v-if="pattern.contextRequired">
+                                        <strong>Context:</strong> {{ pattern.contextRequired }}
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Example Receipt -->
+                        <div v-if="selectedTemplate.exampleImageUrl" class="mb-4">
+                            <h6 class="border-bottom pb-2">Example Receipt</h6>
+                            <img
+                                :src="selectedTemplate.exampleImageUrl"
+                                class="img-fluid rounded"
+                                alt="Example receipt"
+                            >
+                        </div>
+                    </div>
+                    <div class="modal-footer">
+                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">
+                            Close
+                        </button>
+                        <button
+                            type="button"
+                            class="btn btn-primary"
+                            @click="editTemplate(selectedTemplate)"
+                        >
+                            <i class="fas fa-edit me-2"></i>
+                            Edit Template
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Performance Modal -->
+        <div
+            class="modal fade"
+            id="performanceModal"
+            tabindex="-1"
+            ref="performanceModal"
+        >
+            <div class="modal-dialog modal-xl modal-dialog-scrollable">
+                <div class="modal-content">
+                    <div class="modal-header">
+                        <h5 class="modal-title">
+                            <i class="fas fa-chart-bar me-2"></i>
+                            Performance Metrics: {{ selectedTemplate?.templateName }}
+                        </h5>
+                        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                    </div>
+                    <div class="modal-body" v-if="selectedTemplate && performanceLogs">
+                        <!-- Summary Stats -->
+                        <div class="row mb-4">
+                            <div class="col-md-3">
+                                <div class="card">
+                                    <div class="card-body text-center">
+                                        <h4>{{ selectedTemplate.statistics?.usageCount || 0 }}</h4>
+                                        <p class="text-muted mb-0">Total Uses</p>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="col-md-3">
+                                <div class="card">
+                                    <div class="card-body text-center">
+                                        <h4 class="text-success">
+                                            {{ selectedTemplate.statistics?.successCount || 0 }}
+                                        </h4>
+                                        <p class="text-muted mb-0">Successes</p>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="col-md-3">
+                                <div class="card">
+                                    <div class="card-body text-center">
+                                        <h4 class="text-danger">
+                                            {{ selectedTemplate.statistics?.failureCount || 0 }}
+                                        </h4>
+                                        <p class="text-muted mb-0">Failures</p>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="col-md-3">
+                                <div class="card">
+                                    <div class="card-body text-center">
+                                        <h4>{{ selectedTemplate.statistics?.successRate || 0 }}%</h4>
+                                        <p class="text-muted mb-0">Success Rate</p>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Performance Chart -->
+                        <div class="performance-chart-container mb-4">
+                            <canvas ref="performanceChart"></canvas>
+                        </div>
+
+                        <!-- Recent Logs -->
+                        <h6 class="border-bottom pb-2">Recent Activity (Last 20)</h6>
+                        <div class="table-responsive">
+                            <table class="table table-sm table-hover">
+                                <thead>
+                                    <tr>
+                                        <th>Timestamp</th>
+                                        <th>Result</th>
+                                        <th>Confidence</th>
+                                        <th>Processing Time</th>
+                                        <th>Receipt ID</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    <tr
+                                        v-for="log in performanceLogs.slice(0, 20)"
+                                        :key="log.id"
+                                    >
+                                        <td>{{ formatDate(log.timestamp) }}</td>
+                                        <td>
+                                            <span
+                                                class="badge"
+                                                :class="log.success ? 'bg-success' : 'bg-danger'"
+                                            >
+                                                {{ log.success ? 'Success' : 'Failed' }}
+                                            </span>
+                                        </td>
+                                        <td>{{ (log.confidence * 100).toFixed(0) }}%</td>
+                                        <td>{{ log.processingTimeMs }}ms</td>
+                                        <td>
+                                            <small class="text-muted">
+                                                {{ log.receiptId || 'N/A' }}
+                                            </small>
+                                        </td>
+                                    </tr>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                    <div class="modal-footer">
+                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">
+                            Close
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Bootstrap JS -->
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+
+    <!-- Receipt Settings Module -->
+    <script type="module" src="js/modules/receipt-settings.js?v=1.0.0"></script>
+</body>
+</html>

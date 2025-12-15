@@ -1,35 +1,62 @@
 const admin = require('firebase-admin');
 
 /**
+ * Normalize phone number format by removing + prefix and whatsapp: prefix
+ * @param {string} phoneNumber - Phone number to normalize  
+ * @returns {string} Normalized phone number without + prefix
+ */
+function normalizePhoneNumber(phoneNumber) {
+    if (!phoneNumber) return '';
+    // Only remove WhatsApp prefix, preserve + for international numbers
+    let cleaned = phoneNumber.replace(/^whatsapp:/, '').trim();
+
+    // Ensure + prefix for international numbers (South African numbers)
+    if (/^27\d{9}$/.test(cleaned)) {
+        // If it's a 27xxxxxxxxx number without +, add it
+        cleaned = '+' + cleaned;
+    } else if (!cleaned.startsWith('+') && /^\d+$/.test(cleaned)) {
+        // If it's all digits without +, assume it's South African
+        cleaned = '+27' + cleaned.replace(/^0+/, ''); // Remove leading zeros
+    }
+
+    return cleaned;
+}
+
+/**
  * Delete all data associated with a guest
  * @param {string} phoneNumber - Guest's phone number
  * @returns {Promise<Object>} Result of deletion operation
  */
 async function deleteUserData(phoneNumber) {
-    console.log(`Starting data deletion for user: ${phoneNumber}`);
-    
+    // Normalize phone number for consistent database operations
+    const normalizedPhone = normalizePhoneNumber(phoneNumber);
+    console.log(`Starting data deletion for user: ${normalizedPhone} (original: ${phoneNumber})`);
+
     try {
         // Get guest rewards to clean up campaign indices
-        const rewardsSnapshot = await admin.database().ref(`guest-rewards/${phoneNumber}`).once('value');
+        const rewardsSnapshot = await admin.database().ref(`guest-rewards/${normalizedPhone}`).once('value');
         const rewards = rewardsSnapshot.val() || {};
 
-        // Get guest receipts to clean up related data
-        const receiptsSnapshot = await admin.database().ref(`guest-receipts/${phoneNumber}`).once('value');
+        // Get guest receipts from main receipts collection
+        const receiptsSnapshot = await admin.database().ref('receipts')
+            .orderByChild('guestPhoneNumber')
+            .equalTo(normalizedPhone)
+            .once('value');
         const receipts = receiptsSnapshot.val() || {};
 
-        // Prepare deletion operations
+        // Prepare deletion operations using normalized phone number
         const updates = {
             // Delete main user profile
-            [`guests/${phoneNumber}`]: null,
-            
+            [`guests/${normalizedPhone}`]: null,
+
             // Delete user indices
-            [`guest-receipts/${phoneNumber}`]: null,
-            [`guest-rewards/${phoneNumber}`]: null,
-            [`guest-points/${phoneNumber}`]: null,
-            
+            [`guest-receipts/${normalizedPhone}`]: null,
+            [`guest-rewards/${normalizedPhone}`]: null,
+            [`guest-points/${normalizedPhone}`]: null,
+
             // Delete user preferences/settings if any
-            [`guest-preferences/${phoneNumber}`]: null,
-            [`guest-notifications/${phoneNumber}`]: null
+            [`guest-preferences/${normalizedPhone}`]: null,
+            [`guest-notifications/${normalizedPhone}`]: null
         };
 
         // Clean up rewards references
@@ -49,8 +76,8 @@ async function deleteUserData(phoneNumber) {
         // Execute all deletions in a single transaction
         await admin.database().ref().update(updates);
 
-        console.log(`Successfully deleted all data for ${phoneNumber}`);
-        
+        console.log(`Successfully deleted all data for ${normalizedPhone}`);
+
         return {
             success: true,
             message: "Your personal information has been deleted from our system. If you wish to use our services again in the future, you'll need to provide your details again."
@@ -71,18 +98,22 @@ async function deleteUserData(phoneNumber) {
  * @returns {Promise<Object>} Exported data
  */
 async function exportUserData(phoneNumber) {
+    // Normalize phone number for consistent database operations
+    const normalizedPhone = normalizePhoneNumber(phoneNumber);
+    console.log(`Exporting data for user: ${normalizedPhone} (original: ${phoneNumber})`);
+
     try {
         const exportData = {};
-        
-        // Gather all user data
+
+        // Gather all user data using normalized phone number
         const [
             profileSnapshot,
             rewardsSnapshot,
             receiptsSnapshot
         ] = await Promise.all([
-            admin.database().ref(`guests/${phoneNumber}`).once('value'),
-            admin.database().ref(`guest-rewards/${phoneNumber}`).once('value'),
-            admin.database().ref(`guest-receipts/${phoneNumber}`).once('value')
+            admin.database().ref(`guests/${normalizedPhone}`).once('value'),
+            admin.database().ref(`guest-rewards/${normalizedPhone}`).once('value'),
+            admin.database().ref('receipts').orderByChild('guestPhoneNumber').equalTo(normalizedPhone).once('value')
         ]);
 
         exportData.profile = profileSnapshot.val();
@@ -112,7 +143,7 @@ async function exportUserData(phoneNumber) {
 async function anonymizeInactiveUsers(inactiveDays = 365) {
     try {
         const cutoffTime = Date.now() - (inactiveDays * 24 * 60 * 60 * 1000);
-        
+
         // Find inactive users
         const usersSnapshot = await admin.database()
             .ref('guests')
@@ -126,9 +157,11 @@ async function anonymizeInactiveUsers(inactiveDays = 365) {
         usersSnapshot.forEach(userSnapshot => {
             const userData = userSnapshot.val();
             if (userData && userData.lastActivity < cutoffTime) {
-                updates[`guests/${userSnapshot.key}/name`] = null;
-                updates[`guests/${userSnapshot.key}/email`] = null;
-                updates[`guests/${userSnapshot.key}/personalData`] = null;
+                // Use the phone number key as-is since it's already stored in normalized format
+                const phoneKey = userSnapshot.key;
+                updates[`guests/${phoneKey}/name`] = null;
+                updates[`guests/${phoneKey}/email`] = null;
+                updates[`guests/${phoneKey}/personalData`] = null;
                 count++;
             }
         });
@@ -136,6 +169,8 @@ async function anonymizeInactiveUsers(inactiveDays = 365) {
         if (count > 0) {
             await admin.database().ref().update(updates);
         }
+
+        console.log(`Anonymized ${count} inactive users older than ${inactiveDays} days`);
 
         return {
             success: true,
@@ -154,5 +189,6 @@ async function anonymizeInactiveUsers(inactiveDays = 365) {
 module.exports = {
     deleteUserData,
     exportUserData,
-    anonymizeInactiveUsers
+    anonymizeInactiveUsers,
+    normalizePhoneNumber
 };

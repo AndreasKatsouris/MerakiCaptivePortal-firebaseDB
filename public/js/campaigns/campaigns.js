@@ -6,11 +6,7 @@ const campaignManagement = {
 };
 
 export function initializeCampaignManagement() {
-    const container = document.getElementById('campaign-management-app');
-    if (!container) {
-        console.error('Campaign management container not found');
-        return;
-    }
+    console.log('Initializing campaign management...');
 
     // Check if Vue is available
     if (typeof Vue === 'undefined') {
@@ -18,13 +14,120 @@ export function initializeCampaignManagement() {
         return;
     }
 
-    // Cleanup existing app if any
+    // Clean up any existing instance
     if (campaignManagement.app) {
-        campaignManagement.app.unmount();
+        console.log('Cleaning up existing campaign management app...');
+        try {
+            campaignManagement.app.unmount();
+        } catch (error) {
+            console.warn('Error unmounting existing app:', error);
+        }
         campaignManagement.app = null;
     }
 
+    // Ensure the mount point exists and is clean
+    const container = document.getElementById('campaign-management-app');
+    if (!container) {
+        console.error('Campaign management container not found');
+        return null;
+    }
+
+    // Clear any existing content to prevent conflicts
+    container.innerHTML = '';
+
     campaignManagement.app = Vue.createApp({
+        template: `
+            <div class="campaign-management">
+                <div class="section-header mb-4">
+                    <h2><i class="fas fa-bullhorn me-2"></i>Campaign Management</h2>
+                    <button @click="showAddCampaignModal" class="btn btn-primary">
+                        <i class="fas fa-plus"></i> Add Campaign
+                    </button>
+                </div>
+
+                <!-- Filters -->
+                <div class="card mb-4">
+                    <div class="card-body">
+                        <h5 class="card-title">Filters</h5>
+                        <div class="row g-3">
+                            <div class="col-md-4">
+                                <label class="form-label">Brand Name</label>
+                                <input type="text" v-model="filters.brandName" class="form-control" placeholder="Search by brand...">
+                            </div>
+                            <div class="col-md-4">
+                                <label class="form-label">Status</label>
+                                <select v-model="filters.status" class="form-select">
+                                    <option value="">All Status</option>
+                                    <option value="active">Active</option>
+                                    <option value="inactive">Inactive</option>
+                                    <option value="draft">Draft</option>
+                                </select>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Loading State -->
+                <div v-if="loading" class="text-center py-4">
+                    <div class="spinner-border text-primary" role="status">
+                        <span class="visually-hidden">Loading...</span>
+                    </div>
+                </div>
+
+                <!-- Error State -->
+                <div v-else-if="error" class="alert alert-danger" role="alert">
+                    {{ error }}
+                </div>
+
+                <!-- Campaigns Grid -->
+                <div v-else>
+                    <div v-if="filteredCampaigns.length === 0" class="alert alert-info">
+                        <i class="fas fa-info-circle me-2"></i>
+                        No campaigns found matching the current filters.
+                    </div>
+                    <div v-else class="row">
+                        <div v-for="campaign in filteredCampaigns" :key="campaign.id" class="col-md-6 col-lg-4 mb-4">
+                            <div class="card h-100">
+                                <div class="card-body">
+                                    <div class="d-flex justify-content-between align-items-start mb-2">
+                                        <h5 class="card-title">{{ campaign.name }}</h5>
+                                        <span :class="getStatusBadgeClass(campaign.status)">
+                                            {{ campaign.status }}
+                                        </span>
+                                    </div>
+                                    <h6 class="card-subtitle mb-2 text-muted">{{ campaign.brandName }}</h6>
+                                    <p class="card-text" v-if="campaign.storeName">
+                                        <i class="fas fa-store me-1"></i>{{ campaign.storeName }}
+                                    </p>
+                                    <p class="card-text" v-if="campaign.minPurchaseAmount">
+                                        <i class="fas fa-dollar-sign me-1"></i>Min Purchase: R{{ campaign.minPurchaseAmount }}
+                                    </p>
+                                    <p class="card-text" v-if="campaign.startDate && campaign.endDate">
+                                        <i class="fas fa-calendar me-1"></i>{{ formatDate(campaign.startDate) }} - {{ formatDate(campaign.endDate) }}
+                                    </p>
+                                    <p class="card-text" v-if="campaign.activeDays && campaign.activeDays.length > 0">
+                                        <i class="fas fa-clock me-1"></i>{{ formatActiveDays(campaign.activeDays) }}
+                                    </p>
+                                </div>
+                                <div class="card-footer">
+                                    <div class="btn-group w-100">
+                                        <button @click="viewCampaign(campaign)" class="btn btn-outline-primary btn-sm">
+                                            <i class="fas fa-eye"></i> View
+                                        </button>
+                                        <button @click="editCampaign(campaign)" class="btn btn-outline-warning btn-sm">
+                                            <i class="fas fa-edit"></i> Edit
+                                        </button>
+                                        <button @click="deleteCampaign(campaign)" class="btn btn-outline-danger btn-sm">
+                                            <i class="fas fa-trash"></i> Delete
+                                        </button>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        `,
         data() {
             return {
                 campaigns: [],
@@ -35,13 +138,13 @@ export function initializeCampaignManagement() {
                     status: ''
                 },
                 daysOfWeek: [
-                    { value: 0, label: 'Sunday' },
-                    { value: 1, label: 'Monday' },
-                    { value: 2, label: 'Tuesday' },
-                    { value: 3, label: 'Wednesday' },
-                    { value: 4, label: 'Thursday' },
-                    { value: 5, label: 'Friday' },
-                    { value: 6, label: 'Saturday' }
+                    { value: 0, label: 'Sunday', short: 'Sun' },
+                    { value: 1, label: 'Monday', short: 'Mon' },
+                    { value: 2, label: 'Tuesday', short: 'Tue' },
+                    { value: 3, label: 'Wednesday', short: 'Wed' },
+                    { value: 4, label: 'Thursday', short: 'Thu' },
+                    { value: 5, label: 'Friday', short: 'Fri' },
+                    { value: 6, label: 'Saturday', short: 'Sat' }
                 ],
                 selectedRewardTypes: [],
                 rewardCriteria: {},
@@ -227,125 +330,196 @@ export function initializeCampaignManagement() {
                 return classes[status] || classes.default;
             },
             async showAddCampaignModal() {
-                const itemRowTemplate = `
-                    <div class="required-item-row mb-2">
-                        <div class="input-group">
-                            <input type="number" class="form-control item-quantity" placeholder="Qty" min="1">
-                            <input type="text" class="form-control item-name" placeholder="Item Name">
-                            <button type="button" class="btn btn-danger remove-item">-</button>
-                            <button type="button" class="btn btn-success add-item">+</button>
-                        </div>
-                    </div>
-                `;
-            
+                // Better organized modal with tabs and progressive disclosure
                 const { value: formValues } = await Swal.fire({
-                    title: 'Create New Campaign',
-                    width: 800,
+                    title: '<i class="fas fa-bullhorn me-2"></i>Create New Campaign',
+                    width: '900px',
                     html: `
-                        <form id="campaignForm">
-                            <div class="container">
-                                <div class="row mb-3">
-                                    <div class="col">
-                                        <input 
-                                            id="campaignName" 
-                                            name="campaignName"
-                                            type="text" 
-                                            class="form-control swal2-input" 
-                                            placeholder="Campaign Name"
-                                            required
-                                            autocomplete="off"
-                                        >
-                                    </div>
-                                </div>
-                                <div class="row mb-3">
-                                    <div class="col">
-                                        <input 
-                                            id="brandName" 
-                                            name="brandName"
-                                            type="text" 
-                                            class="form-control swal2-input" 
-                                            placeholder="Brand Name"
-                                            required
-                                            autocomplete="off"
-                                        >
-                                    </div>
-                                    <div class="col">
-                                        <input 
-                                            id="storeName" 
-                                            name="storeName"
-                                            type="text" 
-                                            class="form-control swal2-input" 
-                                            placeholder="Store Name (optional)"
-                                            autocomplete="off"
-                                        >
-                                    </div>
-                                </div>
-                                <div class="row mb-3">
-                                    <div class="col">
-                                        <input id="minPurchase" class="form-control" type="number" placeholder="Minimum Purchase Amount">
-                                    </div>
-                                </div>
-                                <div class="row mb-3">
-                                    <div class="col">
-                                        <input id="startDate" class="form-control" type="date">
-                                    </div>
-                                    <div class="col">
-                                        <input id="endDate" class="form-control" type="date">
-                                    </div>
-                                </div>
-                                <div class="row mb-3">
-                                    <div class="col">
-                                        <h6>Required Items</h6>
-                                        <div id="requiredItems">
-                                            ${itemRowTemplate}
+                        <div class="campaign-modal-container">
+                            <!-- Tab Navigation -->
+                            <ul class="nav nav-tabs nav-fill mb-4" id="campaignTabs" role="tablist">
+                                <li class="nav-item" role="presentation">
+                                    <button class="nav-link active" id="basic-tab" data-bs-toggle="tab" 
+                                            data-bs-target="#basic-info" type="button" role="tab">
+                                        <i class="fas fa-info-circle me-1"></i>Basic Info
+                                    </button>
+                                </li>
+                                <li class="nav-item" role="presentation">
+                                    <button class="nav-link" id="requirements-tab" data-bs-toggle="tab" 
+                                            data-bs-target="#requirements" type="button" role="tab">
+                                        <i class="fas fa-list-check me-1"></i>Requirements
+                                    </button>
+                                </li>
+                                <li class="nav-item" role="presentation">
+                                    <button class="nav-link" id="rewards-tab" data-bs-toggle="tab" 
+                                            data-bs-target="#rewards" type="button" role="tab">
+                                        <i class="fas fa-gift me-1"></i>Rewards
+                                    </button>
+                                </li>
+                            </ul>
+
+                            <!-- Tab Content -->
+                            <div class="tab-content" id="campaignTabContent">
+                                <!-- Basic Info Tab -->
+                                <div class="tab-pane fade show active" id="basic-info" role="tabpanel">
+                                    <div class="row g-3">
+                                        <div class="col-12">
+                                            <label class="form-label fw-bold">Campaign Name *</label>
+                                            <input id="newCampaignName" type="text" class="form-control form-control-lg" 
+                                                   placeholder="Enter campaign name" required>
+                                            <div class="invalid-feedback" id="newCampaignName-feedback"></div>
+                                        </div>
+                                        <div class="col-md-6">
+                                            <label class="form-label fw-bold">Brand Name *</label>
+                                            <input id="newBrandName" type="text" class="form-control" 
+                                                   placeholder="Enter brand name" required>
+                                            <div class="invalid-feedback" id="newBrandName-feedback"></div>
+                                        </div>
+                                        <div class="col-md-6">
+                                            <label class="form-label">Store Name</label>
+                                            <input id="newStoreName" type="text" class="form-control" 
+                                                   placeholder="Specific store (optional)">
+                                            <small class="form-text text-muted">Leave empty to apply to all stores</small>
+                                        </div>
+                                        <div class="col-md-6">
+                                            <label class="form-label">Minimum Purchase</label>
+                                            <div class="input-group">
+                                                <span class="input-group-text">R</span>
+                                                <input id="newMinPurchase" type="number" class="form-control" 
+                                                       placeholder="0.00" min="0" step="0.01">
+                                            </div>
+                                        </div>
+                                        <div class="col-md-6">
+                                            <label class="form-label">Campaign Status</label>
+                                            <select id="newCampaignStatus" class="form-select">
+                                                <option value="active">Active</option>
+                                                <option value="draft">Draft</option>
+                                                <option value="inactive">Inactive</option>
+                                            </select>
+                                        </div>
+                                        <div class="col-md-6">
+                                            <label class="form-label fw-bold">Start Date *</label>
+                                            <input id="newStartDate" type="date" class="form-control" required>
+                                            <div class="invalid-feedback" id="newStartDate-feedback"></div>
+                                        </div>
+                                        <div class="col-md-6">
+                                            <label class="form-label fw-bold">End Date *</label>
+                                            <input id="newEndDate" type="date" class="form-control" required>
+                                            <div class="invalid-feedback" id="newEndDate-feedback"></div>
                                         </div>
                                     </div>
                                 </div>
-                                <div class="row">
-                                    <div class="col">
-                                        <h6>Active Days</h6>
-                                        <div id="activeDays" class="weekday-selector-grid">
-                                            ${this.daysOfWeek.map(day => `
-                                                <div class="weekday-item">
-                                                    <input 
-                                                        type="checkbox" 
-                                                        class="form-check-input day-checkbox" 
-                                                        id="day${day.value}" 
-                                                        value="${day.value}"
-                                                        checked
-                                                    >
-                                                    <label 
-                                                        class="form-check-label" 
-                                                        for="day${day.value}"
-                                                    >
+
+                                <!-- Requirements Tab -->
+                                <div class="tab-pane fade" id="requirements" role="tabpanel">
+                                    <div class="row g-4">
+                                        <!-- Active Days Section -->
+                                        <div class="col-12">
+                                            <div class="card">
+                                                <div class="card-header">
+                                                    <h6 class="mb-0"><i class="fas fa-calendar-days me-2"></i>Active Days</h6>
+                                                </div>
+                                                <div class="card-body">
+                                                                                        <div class="row g-2" id="newActiveDays">
+                                        ${this.daysOfWeek.map(day => `
+                                            <div class="col-md-3">
+                                                <div class="form-check form-check-card">
+                                                    <input type="checkbox" class="form-check-input day-checkbox" 
+                                                           id="newDay${day.value}" value="${day.value}" checked>
+                                                    <label class="form-check-label fw-semibold" for="newDay${day.value}">
                                                         ${day.label}
                                                     </label>
                                                 </div>
-                                            `).join('')}
+                                            </div>
+                                        `).join('')}
+                                    </div>
+                                                    <small class="form-text text-muted">Select which days the campaign is active</small>
+                                                </div>
+                                            </div>
+                                        </div>
+
+                                        <!-- Required Items Section -->
+                                        <div class="col-12">
+                                            <div class="card">
+                                                <div class="card-header d-flex justify-content-between align-items-center">
+                                                    <h6 class="mb-0"><i class="fas fa-shopping-list me-2"></i>Required Items</h6>
+                                                    <button type="button" class="btn btn-sm btn-success" id="addItemBtn">
+                                                        <i class="fas fa-plus"></i> Add Item
+                                                    </button>
+                                                </div>
+                                                <div class="card-body">
+                                                    <div id="newRequiredItems">
+                                                        <div class="required-item-row mb-3">
+                                                            <div class="row g-2 align-items-end">
+                                                                <div class="col-md-3">
+                                                                    <label class="form-label">Quantity</label>
+                                                                    <input type="number" class="form-control item-quantity" 
+                                                                           placeholder="1" min="1">
+                                                                </div>
+                                                                <div class="col-md-7">
+                                                                    <label class="form-label">Item Name</label>
+                                                                    <input type="text" class="form-control item-name" 
+                                                                           placeholder="Enter item name">
+                                                                </div>
+                                                                <div class="col-md-2">
+                                                                    <button type="button" class="btn btn-outline-danger remove-item w-100">
+                                                                        <i class="fas fa-trash"></i>
+                                                                    </button>
+                                                                </div>
+                                                            </div>
+                                                        </div>
+                                                    </div>
+                                                    <small class="form-text text-muted">Specify items that must be present in receipts (optional)</small>
+                                                </div>
+                                            </div>
                                         </div>
                                     </div>
                                 </div>
-                                <div class="row mt-4">
-                                    <div class="col">
-                                        <h6>Reward Types</h6>
-                                        <div id="rewardTypesSection">
-                                            ${this.availableRewardTypes.map(type => `
-                                                <div class="reward-type-item mb-3">
-                                                    <div class="form-check">
-                                                        <input type="checkbox" 
-                                                            class="form-check-input" 
-                                                            id="reward-type-${type.id}" 
-                                                            value="${type.id}">
-                                                        <label class="form-check-label" 
-                                                            for="reward-type-${type.id}">
-                                                            ${type.name}
-                                                        </label>
-                                                    </div>
-                                                    <div class="reward-criteria mt-2" style="display: none">
-                                                        <input type="text" 
-                                                            class="form-control" 
-                                                            id="criteria-${type.id}" 
-                                                            placeholder="Enter criteria for ${type.name}">
+
+                                <!-- Rewards Tab -->
+                                <div class="tab-pane fade" id="rewards" role="tabpanel">
+                                    <div class="reward-types-section">
+                                        <div class="d-flex justify-content-between align-items-center mb-3">
+                                            <h6 class="mb-0"><i class="fas fa-gift me-2"></i>Available Reward Types</h6>
+                                            <button type="button" class="btn btn-sm btn-outline-primary" id="manageRewardTypesBtn">
+                                                <i class="fas fa-cog"></i> Manage Types
+                                            </button>
+                                        </div>
+                                        
+                                        <div id="newRewardTypesSection">
+                                            ${this.availableRewardTypes.length === 0 ? `
+                                                <div class="alert alert-info">
+                                                    <i class="fas fa-info-circle me-2"></i>
+                                                    No reward types available. Create some reward types first.
+                                                </div>
+                                            ` : this.availableRewardTypes.map(type => `
+                                                <div class="card mb-3 reward-type-card">
+                                                    <div class="card-body">
+                                                        <div class="form-check">
+                                                            <input type="checkbox" class="form-check-input reward-type-checkbox" 
+                                                                   id="new-reward-type-${type.id}" value="${type.id}">
+                                                            <label class="form-check-label fw-semibold" for="new-reward-type-${type.id}">
+                                                                ${type.name}
+                                                            </label>
+                                                        </div>
+                                                        <p class="text-muted mb-2">${type.description || 'No description'}</p>
+                                                        <div class="reward-criteria mt-3" style="display: none">
+                                                            <div class="row g-2">
+                                                                <div class="col-md-6">
+                                                                    <label class="form-label">Min Purchase for this Reward</label>
+                                                                    <div class="input-group">
+                                                                        <span class="input-group-text">R</span>
+                                                                        <input type="number" class="form-control reward-min-purchase" 
+                                                                               placeholder="0.00" step="0.01">
+                                                                    </div>
+                                                                </div>
+                                                                <div class="col-md-6">
+                                                                    <label class="form-label">Max Rewards per Receipt</label>
+                                                                    <input type="number" class="form-control reward-max-count" 
+                                                                           placeholder="1" min="1">
+                                                                </div>
+                                                            </div>
+                                                        </div>
                                                     </div>
                                                 </div>
                                             `).join('')}
@@ -353,125 +527,124 @@ export function initializeCampaignManagement() {
                                     </div>
                                 </div>
                             </div>
-                        </form>
+                        </div>
+
+                        <style>
+                            .campaign-modal-container .nav-tabs {
+                                border-bottom: 2px solid #e9ecef;
+                            }
+                            .campaign-modal-container .nav-link {
+                                border: none;
+                                color: #6c757d;
+                                font-weight: 500;
+                                padding: 12px 20px;
+                            }
+                            .campaign-modal-container .nav-link.active {
+                                color: #0d6efd;
+                                border-bottom: 2px solid #0d6efd;
+                                background: none;
+                            }
+                            .form-check-card {
+                                padding: 8px 12px;
+                                border: 1px solid #dee2e6;
+                                border-radius: 6px;
+                                transition: all 0.2s;
+                            }
+                            .form-check-card:has(.form-check-input:checked) {
+                                background-color: #e7f3ff;
+                                border-color: #0d6efd;
+                            }
+                            .reward-type-card {
+                                transition: all 0.2s;
+                                border: 1px solid #dee2e6;
+                            }
+                            .reward-type-card:has(.reward-type-checkbox:checked) {
+                                border-color: #198754;
+                                background-color: #f8fff9;
+                            }
+                            .invalid-feedback {
+                                display: block;
+                            }
+                        </style>
                     `,
                     didOpen: () => {
-                        // Set up event handlers for reward type checkboxes
-                        const modal = Swal.getHtmlContainer();
-                        const rewardTypeCheckboxes = modal.querySelectorAll('.reward-type-item input[type="checkbox"]');
-                        rewardTypeCheckboxes.forEach(checkbox => {
-                            checkbox.addEventListener('change', (e) => {
-                                const typeId = e.target.value;
-                                const criteriaDiv = modal.querySelector(`#criteria-${typeId}`).parentElement;
-                                criteriaDiv.style.display = e.target.checked ? 'block' : 'none';
+                        // Initialize Bootstrap tabs if available
+                        if (typeof bootstrap !== 'undefined') {
+                            const tabElements = document.querySelectorAll('#campaignTabs button[data-bs-toggle="tab"]');
+                            tabElements.forEach(tab => {
+                                new bootstrap.Tab(tab);
                             });
+                        }
+
+                        // Add Item button handler
+                        document.getElementById('addItemBtn').addEventListener('click', () => {
+                            const container = document.getElementById('newRequiredItems');
+                            const newRow = document.createElement('div');
+                            newRow.className = 'required-item-row mb-3';
+                            newRow.innerHTML = `
+                                <div class="row g-2 align-items-end">
+                                    <div class="col-md-3">
+                                        <label class="form-label">Quantity</label>
+                                        <input type="number" class="form-control item-quantity" 
+                                               placeholder="1" min="1">
+                                    </div>
+                                    <div class="col-md-7">
+                                        <label class="form-label">Item Name</label>
+                                        <input type="text" class="form-control item-name" 
+                                               placeholder="Enter item name">
+                                    </div>
+                                    <div class="col-md-2">
+                                        <button type="button" class="btn btn-outline-danger remove-item w-100">
+                                            <i class="fas fa-trash"></i>
+                                        </button>
+                                    </div>
+                                </div>
+                            `;
+                            container.appendChild(newRow);
                         });
 
-                        // Add event listener for adding new item rows
-                        document.querySelectorAll('.add-item').forEach(button => {
-                            button.addEventListener('click', (e) => {
-                                const newRow = document.createElement('div');
-                                newRow.innerHTML = itemRowTemplate;
-                                e.target.closest('.required-item-row').insertAdjacentElement('afterend', newRow.firstElementChild);
-                            });
-                        });
-            
-                        // Add event listener for removing item rows
-                        document.querySelectorAll('.remove-item').forEach(button => {
-                            button.addEventListener('click', (e) => {
+                        // Remove item handlers (event delegation)
+                        document.getElementById('newRequiredItems').addEventListener('click', (e) => {
+                            if (e.target.closest('.remove-item')) {
                                 const rows = document.querySelectorAll('.required-item-row');
                                 if (rows.length > 1) {
                                     e.target.closest('.required-item-row').remove();
                                 }
-                            });
+                            }
                         });
-                        document.querySelectorAll('#rewardTypesSection input[type="checkbox"]').forEach(checkbox => {
+
+                        // Reward type checkbox handlers
+                        document.querySelectorAll('.reward-type-checkbox').forEach(checkbox => {
                             checkbox.addEventListener('change', (e) => {
-                                const criteriaDiv = e.target.closest('.reward-type-item').querySelector('.reward-criteria');
+                                const criteriaDiv = e.target.closest('.reward-type-card').querySelector('.reward-criteria');
                                 criteriaDiv.style.display = e.target.checked ? 'block' : 'none';
                             });
                         });
+
+                        // Manage Reward Types button
+                        document.getElementById('manageRewardTypesBtn').addEventListener('click', () => {
+                            // Open reward types management in a new modal
+                            this.showRewardTypeManagementModal();
+                        });
+
+                        // Real-time validation with new field IDs
+                        ['newCampaignName', 'newBrandName', 'newStartDate', 'newEndDate'].forEach(fieldId => {
+                            const field = document.getElementById(fieldId);
+                            field.addEventListener('blur', () => this.validateNewField(fieldId));
+                            field.addEventListener('input', () => this.clearNewFieldError(fieldId));
+                        });
                     },
+                    showCancelButton: true,
+                    confirmButtonText: '<i class="fas fa-plus me-1"></i>Create Campaign',
+                    cancelButtonText: '<i class="fas fa-times me-1"></i>Cancel',
+                    confirmButtonColor: '#198754',
                     preConfirm: () => {
-                        const modal = Swal.getHtmlContainer();
-                        
-                        const campaignNameInput = modal.querySelector('#campaignName');
-                        const brandNameInput = modal.querySelector('#brandName');
-                        const storeNameInput = modal.querySelector('#storeName');
-                        const minPurchaseInput = modal.querySelector('#minPurchase');
-                        const startDateInput = modal.querySelector('#startDate');
-                        const endDateInput = modal.querySelector('#endDate');
-                        
-                        // Get reward types
-                        const selectedRewardTypes = [];
-                        const rewardTypeCheckboxes = modal.querySelectorAll('.reward-type-item input[type="checkbox"]');
-                        rewardTypeCheckboxes.forEach(checkbox => {
-                            if (checkbox.checked) {
-                                const typeId = checkbox.value;
-                                const criteriaInput = modal.querySelector(`#criteria-${typeId}`);
-                                selectedRewardTypes.push({
-                                    typeId,
-                                    criteria: criteriaInput ? criteriaInput.value : ''
-                                });
-                            }
-                        });
-                        
-                        // Trim values
-                        const campaignName = campaignNameInput?.value?.trim();
-                        const brandName = brandNameInput?.value?.trim();
-                        const storeName = storeNameInput?.value?.trim();
-                        const minPurchaseAmount = parseFloat(minPurchaseInput?.value) || 0;
-                        const startDate = startDateInput?.value?.trim();
-                        const endDate = endDateInput?.value?.trim();
-                        
-                        console.log('Form Values:', {
-                            campaignName,
-                            brandName,
-                            storeName,
-                            minPurchaseAmount,
-                            startDate,
-                            endDate
-                        });
-                        
-                        // Get and trim input values
-                        const requiredItems = this.getRequiredItemsFromForm();
-                        const activeDays = this.getActiveDaysFromForm();
-                        
-                        // Validate required fields
-                        let validationErrors = [];
-                        if (!campaignName) {
-                            validationErrors.push('Campaign name is required');
-                        }
-                        if (!brandName) {
-                            validationErrors.push('Brand name is required');
-                        }
-                        if (!startDate || !endDate) {
-                            validationErrors.push('Start and end dates are required');
-                        }
-
-                        if (validationErrors.length > 0) {
-                            Swal.showValidationMessage(validationErrors.join('<br>'));
-                            return false;
-                        }
-
-                        // Return the complete campaign data
-                        return {
-                            name: campaignName,  // Map to database field name
-                            brandName,
-                            storeName,
-                            minPurchaseAmount,
-                            startDate,
-                            endDate,
-                            requiredItems,
-                            activeDays,
-                            rewardTypes: selectedRewardTypes,
-                            status: 'active'
-                        };
+                        return this.validateAndCollectNewCampaignData();
                     },
                     showLoaderOnConfirm: true,
                     allowOutsideClick: () => !Swal.isLoading()
                 });
-            
+
                 if (formValues) {
                     try {
                         console.log('Creating campaign with data:', formValues);
@@ -479,8 +652,9 @@ export function initializeCampaignManagement() {
                         
                         await Swal.fire({
                             icon: 'success',
-                            title: 'Success',
-                            text: 'Campaign created successfully!'
+                            title: 'Campaign Created!',
+                            text: 'Your campaign has been created successfully.',
+                            confirmButtonColor: '#198754'
                         });
                         
                         await this.loadCampaigns();
@@ -488,8 +662,438 @@ export function initializeCampaignManagement() {
                         console.error('Error creating campaign:', error);
                         await Swal.fire({
                             icon: 'error',
-                            title: 'Error',
-                            text: 'Failed to create campaign. Please try again.'
+                            title: 'Creation Failed',
+                            text: 'Failed to create campaign. Please try again.',
+                            confirmButtonColor: '#dc3545'
+                        });
+                    }
+                }
+            },
+
+            // New helper methods for validation and data collection
+            validateField(fieldId) {
+                const field = document.getElementById(fieldId);
+                const feedback = document.getElementById(`${fieldId}-feedback`);
+                let isValid = true;
+                let message = '';
+
+                switch (fieldId) {
+                    case 'campaignName':
+                        if (!field.value.trim()) {
+                            isValid = false;
+                            message = 'Campaign name is required';
+                        }
+                        break;
+                    case 'brandName':
+                        if (!field.value.trim()) {
+                            isValid = false;
+                            message = 'Brand name is required';
+                        }
+                        break;
+                    case 'startDate':
+                        if (!field.value) {
+                            isValid = false;
+                            message = 'Start date is required';
+                        }
+                        break;
+                    case 'endDate':
+                        if (!field.value) {
+                            isValid = false;
+                            message = 'End date is required';
+                        } else if (field.value && document.getElementById('startDate').value && 
+                                  new Date(field.value) <= new Date(document.getElementById('startDate').value)) {
+                            isValid = false;
+                            message = 'End date must be after start date';
+                        }
+                        break;
+                }
+
+                field.classList.toggle('is-invalid', !isValid);
+                field.classList.toggle('is-valid', isValid && field.value.trim());
+                if (feedback) feedback.textContent = message;
+
+                return isValid;
+            },
+
+            validateEditField(fieldId) {
+                const field = document.getElementById(fieldId);
+                if (!field) {
+                    console.warn(`Field with ID ${fieldId} not found`);
+                    return false;
+                }
+
+                const feedback = field.parentElement.querySelector('.invalid-feedback');
+                let isValid = true;
+                let message = '';
+
+                switch (fieldId) {
+                    case 'editCampaignName':
+                        if (!field.value.trim()) {
+                            isValid = false;
+                            message = 'Campaign name is required';
+                        }
+                        break;
+                    case 'editBrandName':
+                        if (!field.value.trim()) {
+                            isValid = false;
+                            message = 'Brand name is required';
+                        }
+                        break;
+                    case 'editStartDate':
+                        if (!field.value) {
+                            isValid = false;
+                            message = 'Start date is required';
+                        }
+                        break;
+                    case 'editEndDate':
+                        if (!field.value) {
+                            isValid = false;
+                            message = 'End date is required';
+                        } else if (field.value && document.getElementById('editStartDate').value && 
+                                  new Date(field.value) <= new Date(document.getElementById('editStartDate').value)) {
+                            isValid = false;
+                            message = 'End date must be after start date';
+                        }
+                        break;
+                }
+
+                field.classList.toggle('is-invalid', !isValid);
+                field.classList.toggle('is-valid', isValid && field.value.trim());
+                if (feedback) feedback.textContent = message;
+
+                return isValid;
+            },
+
+            clearFieldError(fieldId) {
+                const field = document.getElementById(fieldId);
+                field.classList.remove('is-invalid');
+                if (field.value.trim()) {
+                    field.classList.add('is-valid');
+                } else {
+                    field.classList.remove('is-valid');
+                }
+            },
+
+            clearNewFieldError(fieldId) {
+                const field = document.getElementById(fieldId);
+                field.classList.remove('is-invalid');
+                if (field.value.trim()) {
+                    field.classList.add('is-valid');
+                } else {
+                    field.classList.remove('is-valid');
+                }
+            },
+
+            clearEditFieldError(fieldId) {
+                const field = document.getElementById(fieldId);
+                if (field) {
+                    field.classList.remove('is-invalid');
+                    if (field.value.trim()) {
+                        field.classList.add('is-valid');
+                    } else {
+                        field.classList.remove('is-valid');
+                    }
+                }
+            },
+
+            validateAndCollectCampaignData() {
+                // Validate all required fields
+                const requiredFields = ['editCampaignName', 'editBrandName', 'editStartDate', 'editEndDate'];
+                let isFormValid = true;
+
+                requiredFields.forEach(fieldId => {
+                    if (!this.validateEditField(fieldId)) {
+                        isFormValid = false;
+                    }
+                });
+
+                if (!isFormValid) {
+                    Swal.showValidationMessage('Please fix the errors above');
+                    return false;
+                }
+
+                // Collect form data
+                const formData = {
+                    name: document.getElementById('editCampaignName').value.trim(),
+                    brandName: document.getElementById('editBrandName').value.trim(),
+                    storeName: document.getElementById('editStoreName').value.trim(),
+                    minPurchaseAmount: parseFloat(document.getElementById('editMinPurchase').value) || 0,
+                    startDate: document.getElementById('editStartDate').value,
+                    endDate: document.getElementById('editEndDate').value,
+                    status: document.getElementById('editCampaignStatus').value,
+                    requiredItems: this.getEditRequiredItemsFromForm(),
+                    activeDays: this.getEditActiveDaysFromForm(),
+                    rewardTypes: this.getEditSelectedRewardTypes()
+                };
+
+                return formData;
+            },
+
+            validateAndCollectNewCampaignData() {
+                // Validate all required fields with new prefixes
+                const requiredFields = ['newCampaignName', 'newBrandName', 'newStartDate', 'newEndDate'];
+                let isFormValid = true;
+
+                requiredFields.forEach(fieldId => {
+                    if (!this.validateNewField(fieldId)) {
+                        isFormValid = false;
+                    }
+                });
+
+                if (!isFormValid) {
+                    Swal.showValidationMessage('Please fix the errors above');
+                    return false;
+                }
+
+                // Collect form data with new field IDs
+                const formData = {
+                    name: document.getElementById('newCampaignName').value.trim(),
+                    brandName: document.getElementById('newBrandName').value.trim(),
+                    storeName: document.getElementById('newStoreName').value.trim(),
+                    minPurchaseAmount: parseFloat(document.getElementById('newMinPurchase').value) || 0,
+                    startDate: document.getElementById('newStartDate').value,
+                    endDate: document.getElementById('newEndDate').value,
+                    status: document.getElementById('newCampaignStatus').value,
+                    requiredItems: this.getNewRequiredItemsFromForm(),
+                    activeDays: this.getNewActiveDaysFromForm(),
+                    rewardTypes: this.getNewSelectedRewardTypes()
+                };
+
+                return formData;
+            },
+
+            validateNewField(fieldId) {
+                const field = document.getElementById(fieldId);
+                if (!field) {
+                    console.warn(`Field with ID ${fieldId} not found`);
+                    return false;
+                }
+                
+                const feedback = document.getElementById(`${fieldId}-feedback`);
+                let isValid = true;
+                let message = '';
+
+                const baseFieldId = fieldId.replace('new', '').toLowerCase();
+
+                switch (baseFieldId) {
+                    case 'campaignname':
+                        if (!field.value.trim()) {
+                            isValid = false;
+                            message = 'Campaign name is required';
+                        }
+                        break;
+                    case 'brandname':
+                        if (!field.value.trim()) {
+                            isValid = false;
+                            message = 'Brand name is required';
+                        }
+                        break;
+                    case 'startdate':
+                        if (!field.value) {
+                            isValid = false;
+                            message = 'Start date is required';
+                        }
+                        break;
+                    case 'enddate':
+                        if (!field.value) {
+                            isValid = false;
+                            message = 'End date is required';
+                        } else if (field.value && document.getElementById('newStartDate').value && 
+                                  new Date(field.value) <= new Date(document.getElementById('newStartDate').value)) {
+                            isValid = false;
+                            message = 'End date must be after start date';
+                        }
+                        break;
+                }
+
+                field.classList.toggle('is-invalid', !isValid);
+                field.classList.toggle('is-valid', isValid && field.value.trim());
+                if (feedback) feedback.textContent = message;
+
+                return isValid;
+            },
+
+            getNewRequiredItemsFromForm() {
+                const items = [];
+                document.querySelectorAll('#newRequiredItems .required-item-row').forEach(row => {
+                    const quantity = row.querySelector('.item-quantity').value;
+                    const itemName = row.querySelector('.item-name').value.trim();
+                    
+                    if (quantity && itemName) {
+                        items.push({
+                            quantity: parseInt(quantity),
+                            itemName: itemName
+                        });
+                    }
+                });
+                return items;
+            },
+
+            getNewActiveDaysFromForm() {
+                const activeDays = [];
+                document.querySelectorAll('#newActiveDays .day-checkbox:checked').forEach(checkbox => {
+                    activeDays.push(checkbox.value);
+                });
+                return activeDays;
+            },
+
+            getNewSelectedRewardTypes() {
+                const selectedTypes = [];
+                document.querySelectorAll('#newRewardTypesSection .reward-type-checkbox:checked').forEach(checkbox => {
+                    const card = checkbox.closest('.reward-type-card');
+                    const minPurchase = card.querySelector('.reward-min-purchase').value;
+                    const maxCount = card.querySelector('.reward-max-count').value;
+                    
+                    selectedTypes.push({
+                        typeId: checkbox.value,
+                        criteria: {
+                            minPurchaseAmount: parseFloat(minPurchase) || 0,
+                            maxRewards: parseInt(maxCount) || 1
+                        }
+                    });
+                });
+                return selectedTypes;
+            },
+
+            getSelectedRewardTypes() {
+                const selectedTypes = [];
+                document.querySelectorAll('.reward-type-checkbox:checked').forEach(checkbox => {
+                    const card = checkbox.closest('.reward-type-card');
+                    const minPurchase = card.querySelector('.reward-min-purchase').value;
+                    const maxCount = card.querySelector('.reward-max-count').value;
+                    
+                    selectedTypes.push({
+                        typeId: checkbox.value,
+                        criteria: {
+                            minPurchaseAmount: parseFloat(minPurchase) || 0,
+                            maxRewards: parseInt(maxCount) || 1
+                        }
+                    });
+                });
+                return selectedTypes;
+            },
+
+            getEditRequiredItemsFromForm() {
+                const requiredItems = [];
+                document.querySelectorAll('#requiredItems .required-item-row').forEach(row => {
+                    const itemQuantity = row.querySelector('.item-quantity').value;
+                    const itemName = row.querySelector('.item-name').value;
+                    if (itemQuantity && itemName) {
+                        requiredItems.push({
+                            quantity: parseInt(itemQuantity),
+                            itemName: itemName.trim()
+                        });
+                    }
+                });
+                return requiredItems;
+            },
+
+            getEditActiveDaysFromForm() {
+                const activeDays = [];
+                document.querySelectorAll('#activeDays .day-checkbox:checked').forEach(checkbox => {
+                    activeDays.push(parseInt(checkbox.value));
+                });
+                return activeDays;
+            },
+
+            getEditSelectedRewardTypes() {
+                const selectedTypes = [];
+                document.querySelectorAll('#rewardTypesSection .reward-type-checkbox:checked').forEach(checkbox => {
+                    const card = checkbox.closest('.reward-type-card');
+                    const minPurchase = card.querySelector('.reward-min-purchase').value;
+                    const maxCount = card.querySelector('.reward-max-count').value;
+                    
+                    selectedTypes.push({
+                        typeId: checkbox.value,
+                        criteria: {
+                            minPurchaseAmount: parseFloat(minPurchase) || 0,
+                            maxRewards: parseInt(maxCount) || 1
+                        }
+                    });
+                });
+                return selectedTypes;
+            },
+
+            async showRewardTypeManagementModal() {
+                // Quick reward type creation modal
+                const { value: rewardTypeData } = await Swal.fire({
+                    title: 'Create Reward Type',
+                    html: `
+                        <div class="row g-3">
+                            <div class="col-12">
+                                <label class="form-label">Reward Name</label>
+                                <input id="rewardName" type="text" class="form-control" placeholder="e.g., 10% Discount">
+                            </div>
+                            <div class="col-md-6">
+                                <label class="form-label">Category</label>
+                                <select id="rewardCategory" class="form-select">
+                                    <option value="discount">Discount (%)</option>
+                                    <option value="voucher">Voucher (R)</option>
+                                    <option value="points">Points</option>
+                                    <option value="freeItem">Free Item</option>
+                                </select>
+                            </div>
+                            <div class="col-md-6">
+                                <label class="form-label">Value</label>
+                                <input id="rewardValue" type="text" class="form-control" placeholder="10">
+                            </div>
+                            <div class="col-12">
+                                <label class="form-label">Description</label>
+                                <textarea id="rewardDescription" class="form-control" rows="2" 
+                                          placeholder="Brief description of the reward"></textarea>
+                            </div>
+                        </div>
+                    `,
+                    showCancelButton: true,
+                    confirmButtonText: 'Create & Use',
+                    preConfirm: () => {
+                        const name = document.getElementById('rewardName').value.trim();
+                        const category = document.getElementById('rewardCategory').value;
+                        const value = document.getElementById('rewardValue').value.trim();
+                        const description = document.getElementById('rewardDescription').value.trim();
+
+                        if (!name || !value) {
+                            Swal.showValidationMessage('Name and value are required');
+                            return false;
+                        }
+
+                        return { name, category, value, description };
+                    }
+                });
+
+                if (rewardTypeData) {
+                    // Create the reward type and refresh the list
+                    try {
+                        const rewardRef = push(ref(rtdb, 'rewardTypes'));
+                        await set(rewardRef, {
+                            ...rewardTypeData,
+                            status: 'active',
+                            validityDays: 30,
+                            createdAt: new Date().toISOString()
+                        });
+
+                        // Reload reward types and refresh the campaign modal
+                        await this.loadRewardTypes();
+                        
+                        Swal.fire({
+                            icon: 'success',
+                            title: 'Reward Type Created!',
+                            text: 'You can now select it in your campaign.',
+                            timer: 2000,
+                            showConfirmButton: false
+                        });
+
+                        // Close this modal and reopen the campaign modal with updated data
+                        setTimeout(() => {
+                            this.showAddCampaignModal();
+                        }, 2000);
+
+                    } catch (error) {
+                        console.error('Error creating reward type:', error);
+                        Swal.fire({
+                            icon: 'error',
+                            title: 'Creation Failed',
+                            text: 'Failed to create reward type. Please try again.'
                         });
                     }
                 }
@@ -523,300 +1127,396 @@ export function initializeCampaignManagement() {
                 });
             },
             async editCampaign(campaign) {
+                let currentTab = 'basic';
                 let selectedRewardTypes = campaign.rewardTypes ? [...campaign.rewardTypes] : [];
+                
                 const itemRowTemplate = `
                     <div class="required-item-row mb-2">
                         <div class="input-group">
                             <input type="number" class="form-control item-quantity" placeholder="Qty" min="1">
                             <input type="text" class="form-control item-name" placeholder="Item Name">
-                            <button type="button" class="btn btn-danger remove-item">-</button>
-                            <button type="button" class="btn btn-success add-item">+</button>
+                            <button type="button" class="btn btn-danger btn-sm remove-item">
+                                <i class="fas fa-minus"></i>
+                            </button>
+                            <button type="button" class="btn btn-success btn-sm add-item">
+                                <i class="fas fa-plus"></i>
+                            </button>
                         </div>
                     </div>
                 `;
-            
+
                 Swal.fire({
-                    title: 'Edit Campaign',
-                    width: 800,
+                    title: '<i class="fas fa-edit text-primary"></i> Edit Campaign',
+                    width: '900px',
+                    customClass: {
+                        popup: 'swal2-campaign-modal'
+                    },
                     html: `
-                        <div class="container">
-                            <div class="row mb-3">
-                                <div class="col">
-                                    <input 
-                                        id="campaignName" 
-                                        type="text" 
-                                        class="form-control" 
-                                        placeholder="Campaign Name"
-                                        required
-                                        autocomplete="off"
-                                        value="${campaign.name}"
-                                    >
-                                </div>
+                        <div class="campaign-modal-container">
+                            <!-- Tab Navigation -->
+                            <div class="nav nav-tabs campaign-tabs" role="tablist">
+                                <button class="nav-link active" data-tab="basic" type="button">
+                                    <i class="fas fa-info-circle"></i> Basic Info
+                                </button>
+                                <button class="nav-link" data-tab="requirements" type="button">
+                                    <i class="fas fa-list-check"></i> Requirements
+                                </button>
+                                <button class="nav-link" data-tab="rewards" type="button">
+                                    <i class="fas fa-gift"></i> Rewards
+                                </button>
                             </div>
-                            <div class="row mb-3">
-                                <div class="col">
-                                    <input 
-                                        id="brandName" 
-                                        type="text" 
-                                        class="form-control" 
-                                        placeholder="Brand Name"
-                                        required
-                                        autocomplete="off"
-                                        value="${campaign.brandName}"
-                                    >
-                                </div>
-                                <div class="col">
-                                    <input 
-                                        id="storeName" 
-                                        type="text" 
-                                        class="form-control" 
-                                        placeholder="Store Name (optional)"
-                                        autocomplete="off"
-                                        value="${campaign.storeName || ''}"
-                                    >
-                                </div>
-                            </div>
-                            <div class="row mb-3">
-                                <div class="col">
-                                    <input id="minPurchase" class="form-control" type="number" placeholder="Minimum Purchase Amount" value="${campaign.minPurchaseAmount || 0}">
-                                </div>
-                                <div class="col">
-                                    <select id="campaignStatus" class="form-control">
-                                        <option value="active" ${campaign.status === 'active' ? 'selected' : ''}>Active</option>
-                                        <option value="inactive" ${campaign.status === 'inactive' ? 'selected' : ''}>Inactive</option>
-                                        <option value="draft" ${campaign.status === 'draft' ? 'selected' : ''}>Draft</option>
-                                    </select>
-                                </div>
-                            </div>
-                            <div class="row mb-3">
-                                <div class="col">
-                                    <input id="startDate" class="form-control" type="date" value="${campaign.startDate || ''}">
-                                </div>
-                                <div class="col">
-                                    <input id="endDate" class="form-control" type="date" value="${campaign.endDate || ''}">
-                                </div>
-                            </div>
-                            <div class="row mb-3">
-                                <div class="col">
-                                    <h6>Required Items</h6>
-                                    <div id="requiredItems">
-                                        ${campaign.requiredItems && campaign.requiredItems.length ? 
-                                            campaign.requiredItems.map(item => `
-                                                <div class="required-item-row mb-2">
-                                                    <div class="input-group">
-                                                        <input type="number" class="form-control item-quantity" placeholder="Qty" min="1" value="${item.quantity}">
-                                                        <input type="text" class="form-control item-name" placeholder="Item Name" value="${item.itemName}">
-                                                        <button type="button" class="btn btn-danger remove-item">-</button>
-                                                        <button type="button" class="btn btn-success add-item">+</button>
-                                                    </div>
-                                                </div>
-                                            `).join('') 
-                                            : itemRowTemplate
-                                        }
-                                    </div>
-                                </div>
-                            </div>
-                            <div class="row">
-                                <div class="col">
-                                    <h6>Active Days</h6>
-                                    <div id="activeDays" class="weekday-selector-grid">
-                                        ${this.daysOfWeek.map(day => `
-                                            <div class="weekday-item">
-                                                <input 
-                                                    type="checkbox" 
-                                                    class="form-check-input day-checkbox" 
-                                                    id="day${day.value}" 
-                                                    value="${day.value}"
-                                                    ${campaign.activeDays && campaign.activeDays.includes(day.value) ? 'checked' : ''}
-                                                >
-                                                <label 
-                                                    class="form-check-label" 
-                                                    for="day${day.value}"
-                                                >
-                                                    ${day.label}
+
+                            <!-- Tab Content -->
+                            <div class="tab-content campaign-tab-content">
+                                <!-- Basic Information Tab -->
+                                <div class="tab-pane fade show active" id="basic-tab">
+                                    <div class="row g-3">
+                                        <div class="col-12">
+                                            <div class="form-floating">
+                                                <input type="text" class="form-control" id="editCampaignName" 
+                                                       placeholder="Campaign Name" value="${campaign.name}">
+                                                <label for="editCampaignName">
+                                                    <i class="fas fa-bullhorn"></i> Campaign Name *
+                                                </label>
+                                                <div class="invalid-feedback"></div>
+                                            </div>
+                                        </div>
+                                        
+                                        <div class="col-md-6">
+                                            <div class="form-floating">
+                                                <input type="text" class="form-control" id="editBrandName" 
+                                                       placeholder="Brand Name" value="${campaign.brandName}">
+                                                <label for="editBrandName">
+                                                    <i class="fas fa-building"></i> Brand Name *
+                                                </label>
+                                                <div class="invalid-feedback"></div>
+                                            </div>
+                                        </div>
+                                        
+                                        <div class="col-md-6">
+                                            <div class="form-floating">
+                                                <input type="text" class="form-control" id="editStoreName" 
+                                                       placeholder="Store Name" value="${campaign.storeName || ''}">
+                                                <label for="editStoreName">
+                                                    <i class="fas fa-store"></i> Store Name (Optional)
                                                 </label>
                                             </div>
-                                        `).join('')}
+                                        </div>
+                                        
+                                        <div class="col-md-4">
+                                            <div class="form-floating">
+                                                <input type="number" class="form-control" id="editMinPurchase" 
+                                                       placeholder="0" min="0" step="0.01" value="${campaign.minPurchaseAmount || 0}">
+                                                <label for="editMinPurchase">
+                                                    <i class="fas fa-dollar-sign"></i> Minimum Purchase (R)
+                                                </label>
+                                            </div>
+                                        </div>
+                                        
+                                        <div class="col-md-4">
+                                            <div class="form-floating">
+                                                <select class="form-select" id="editCampaignStatus">
+                                                    <option value="active" ${campaign.status === 'active' ? 'selected' : ''}>Active</option>
+                                                    <option value="inactive" ${campaign.status === 'inactive' ? 'selected' : ''}>Inactive</option>
+                                                    <option value="draft" ${campaign.status === 'draft' ? 'selected' : ''}>Draft</option>
+                                                </select>
+                                                <label for="editCampaignStatus">
+                                                    <i class="fas fa-toggle-on"></i> Status
+                                                </label>
+                                            </div>
+                                        </div>
+                                        
+                                        <div class="col-md-4">
+                                            <div class="form-floating">
+                                                <input type="date" class="form-control" id="editStartDate" 
+                                                       value="${campaign.startDate || ''}">
+                                                <label for="editStartDate">
+                                                    <i class="fas fa-calendar-alt"></i> Start Date *
+                                                </label>
+                                                <div class="invalid-feedback"></div>
+                                            </div>
+                                        </div>
+                                        
+                                        <div class="col-md-6">
+                                            <div class="form-floating">
+                                                <input type="date" class="form-control" id="editEndDate" 
+                                                       value="${campaign.endDate || ''}">
+                                                <label for="editEndDate">
+                                                    <i class="fas fa-calendar-alt"></i> End Date *
+                                                </label>
+                                                <div class="invalid-feedback"></div>
+                                            </div>
+                                        </div>
+                                        
+                                        <div class="col-md-6">
+                                            <div class="form-text">
+                                                <i class="fas fa-info-circle text-primary"></i>
+                                                Campaign will be active between these dates
+                                            </div>
+                                        </div>
                                     </div>
                                 </div>
-                            </div>
-                            <div class="row">
-                                <div class="col">
-                                    <h6>Reward Types</h6>
-                                    <div id="rewardTypesSection">
-                                        ${this.availableRewardTypes.map(type => `
-                                            <div class="reward-type-item mb-3">
-                                                <div class="form-check">
-                                                    <input type="checkbox" 
-                                                        class="form-check-input" 
-                                                        id="reward-type-${type.id}" 
-                                                        value="${type.id}"
-                                                        ${campaign.rewardTypes && campaign.rewardTypes.some(r => r.typeId === type.id) ? 'checked' : ''}>
-                                                    <label class="form-check-label" 
-                                                        for="reward-type-${type.id}">
-                                                        ${type.name}
-                                                    </label>
+
+                                <!-- Requirements Tab -->
+                                <div class="tab-pane fade" id="requirements-tab">
+                                    <div class="row g-4">
+                                        <!-- Required Items Section -->
+                                        <div class="col-12">
+                                            <div class="card border-0 shadow-sm">
+                                                <div class="card-header bg-light">
+                                                    <h6 class="mb-0">
+                                                        <i class="fas fa-shopping-cart text-primary"></i> 
+                                                        Required Items
+                                                    </h6>
+                                                    <small class="text-muted">Specify items that must be purchased</small>
                                                 </div>
-                                                <div class="reward-criteria mt-2" style="display:${campaign.rewardTypes && campaign.rewardTypes.some(r => r.typeId === type.id) ? 'block' : 'none'}">
-                                                    <input type="text" 
-                                                        class="form-control" 
-                                                        id="criteria-${type.id}" 
-                                                        placeholder="Enter criteria for ${type.name}"
-                                                        value="${(campaign.rewardTypes && campaign.rewardTypes.find(r => r.typeId === type.id)?.criteria) || ''}">
+                                                <div class="card-body">
+                                                    <div id="requiredItems">
+                                                        ${campaign.requiredItems && campaign.requiredItems.length ? 
+                                                            campaign.requiredItems.map(item => `
+                                                                <div class="required-item-row mb-2">
+                                                                    <div class="input-group">
+                                                                        <input type="number" class="form-control item-quantity" 
+                                                                               placeholder="Qty" min="1" value="${item.quantity}">
+                                                                        <input type="text" class="form-control item-name" 
+                                                                               placeholder="Item Name" value="${item.itemName}">
+                                                                        <button type="button" class="btn btn-danger btn-sm remove-item">
+                                                                            <i class="fas fa-minus"></i>
+                                                                        </button>
+                                                                        <button type="button" class="btn btn-success btn-sm add-item">
+                                                                            <i class="fas fa-plus"></i>
+                                                                        </button>
+                                                                    </div>
+                                                                </div>
+                                                            `).join('') 
+                                                            : itemRowTemplate
+                                                        }
+                                                    </div>
                                                 </div>
                                             </div>
-                                        `).join('')}
+                                        </div>
+                                        
+                                        <!-- Active Days Section -->
+                                        <div class="col-12">
+                                            <div class="card border-0 shadow-sm">
+                                                <div class="card-header bg-light">
+                                                    <h6 class="mb-0">
+                                                        <i class="fas fa-calendar-week text-primary"></i> 
+                                                        Active Days
+                                                    </h6>
+                                                    <small class="text-muted">Select days when campaign is active</small>
+                                                </div>
+                                                <div class="card-body">
+                                                    <div id="activeDays" class="row g-2">
+                                                        ${this.daysOfWeek.map(day => `
+                                                            <div class="col-md-3">
+                                                                <div class="form-check form-check-card">
+                                                                    <input type="checkbox" class="form-check-input day-checkbox" 
+                                                                           id="day${day.value}" value="${day.value}"
+                                                                           ${campaign.activeDays && campaign.activeDays.includes(day.value) ? 'checked' : ''}>
+                                                                    <label class="form-check-label fw-semibold" for="day${day.value}">
+                                                                        ${day.label}
+                                                                    </label>
+                                                                </div>
+                                                            </div>
+                                                        `).join('')}
+                                                    </div>
+                                                    <small class="form-text text-muted">Select which days the campaign is active</small>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <!-- Rewards Tab -->
+                                <div class="tab-pane fade" id="rewards-tab">
+                                    <div class="row g-4">
+                                        <div class="col-12">
+                                            <div class="d-flex justify-content-between align-items-center mb-3">
+                                                <h6 class="mb-0">
+                                                    <i class="fas fa-gift text-primary"></i> 
+                                                    Reward Types
+                                                </h6>
+                                                <button type="button" class="btn btn-outline-primary btn-sm" id="addNewRewardType">
+                                                    <i class="fas fa-plus"></i> New Reward Type
+                                                </button>
+                                            </div>
+                                            
+                                            <div id="rewardTypesSection" class="reward-types-grid">
+                                                ${this.availableRewardTypes.map(type => {
+                                                    const isSelected = campaign.rewardTypes && campaign.rewardTypes.some(r => r.typeId === type.id);
+                                                    const existingReward = campaign.rewardTypes ? campaign.rewardTypes.find(r => r.typeId === type.id) : null;
+                                                    return `
+                                                        <div class="reward-type-card ${isSelected ? 'selected' : ''}">
+                                                            <div class="card-header">
+                                                                <div class="form-check">
+                                                                    <input type="checkbox" class="form-check-input reward-type-checkbox" 
+                                                                           id="reward-type-${type.id}" value="${type.id}"
+                                                                           ${isSelected ? 'checked' : ''}>
+                                                                    <label class="form-check-label" for="reward-type-${type.id}">
+                                                                        <strong>${type.name}</strong>
+                                                                    </label>
+                                                                </div>
+                                                                <div class="reward-type-info">
+                                                                    <small class="text-muted">${type.category}</small>
+                                                                    <div class="reward-value">${type.value}</div>
+                                                                </div>
+                                                            </div>
+                                                            <div class="card-body reward-criteria" style="display: ${isSelected ? 'block' : 'none'}">
+                                                                <div class="row g-2">
+                                                                    <div class="col-md-6">
+                                                                        <div class="form-floating">
+                                                                            <input type="number" class="form-control reward-min-purchase" 
+                                                                                   placeholder="0" min="0" step="0.01"
+                                                                                   value="${existingReward ? existingReward.criteria.minPurchaseAmount : 0}">
+                                                                            <label>Min Purchase (R)</label>
+                                                                        </div>
+                                                                    </div>
+                                                                    <div class="col-md-6">
+                                                                        <div class="form-floating">
+                                                                            <input type="number" class="form-control reward-max-count" 
+                                                                                   placeholder="1" min="1"
+                                                                                   value="${existingReward ? existingReward.criteria.maxRewards : 1}">
+                                                                            <label>Max Rewards</label>
+                                                                        </div>
+                                                                    </div>
+                                                                </div>
+                                                                <div class="mt-2">
+                                                                    <small class="text-muted">
+                                                                        <i class="fas fa-info-circle"></i>
+                                                                        ${type.description || 'Configure reward criteria'}
+                                                                    </small>
+                                                                </div>
+                                                            </div>
+                                                        </div>
+                                                    `;
+                                                }).join('')}
+                                            </div>
+                                            
+                                            ${this.availableRewardTypes.length === 0 ? `
+                                                <div class="text-center py-4">
+                                                    <i class="fas fa-gift fa-3x text-muted mb-3"></i>
+                                                    <h6 class="text-muted">No reward types available</h6>
+                                                    <p class="text-muted">Create your first reward type to get started</p>
+                                                    <button type="button" class="btn btn-primary" id="createFirstRewardType">
+                                                        <i class="fas fa-plus"></i> Create Reward Type
+                                                    </button>
+                                                </div>
+                                            ` : ''}
+                                        </div>
                                     </div>
                                 </div>
                             </div>
                         </div>
                     `,
                     didOpen: () => {
-                        // Add event listener for adding new item rows
-                        document.querySelectorAll('.add-item').forEach(button => {
-                            button.addEventListener('click', () => {
-                                const container = document.getElementById('requiredItems');
-                                container.insertAdjacentHTML('beforeend', itemRowTemplate);
-                            });
-                        });
-
-                        // Add event listener for removing item rows
-                        document.querySelectorAll('.remove-item').forEach(button => {
-                            button.addEventListener('click', (e) => {
-                                const rows = document.querySelectorAll('.required-item-row');
-                                if (rows.length > 1) {
-                                    e.target.closest('.required-item-row').remove();
-                                }
-                            });
-                        });
-
-                        // Set up event handlers for reward type checkboxes
-                        const modal = Swal.getHtmlContainer();
-                        const rewardTypeCheckboxes = modal.querySelectorAll('.reward-type-item input[type="checkbox"]');
-                        rewardTypeCheckboxes.forEach(checkbox => {
-                            checkbox.addEventListener('change', (e) => {
-                                const typeId = e.target.value;
-                                const criteriaDiv = modal.querySelector(`#criteria-${typeId}`).parentElement;
-                                criteriaDiv.style.display = e.target.checked ? 'block' : 'none';
-                            });
-                        });
-
-                        // Add reward type checkbox handlers
-                        document.querySelectorAll('#rewardTypesSection input[type="checkbox"]').forEach(checkbox => {
-                            checkbox.addEventListener('change', (e) => {
-                                const typeId = e.target.value;
-                                const criteriaDiv = e.target.closest('.reward-type-item').querySelector('.reward-criteria');
-                                criteriaDiv.style.display = e.target.checked ? 'block' : 'none';
+                        // Tab Navigation
+                        document.querySelectorAll('.campaign-tabs .nav-link').forEach(tab => {
+                            tab.addEventListener('click', (e) => {
+                                // Get the tab button element (in case user clicked on an icon inside)
+                                const tabButton = e.target.closest('.nav-link');
+                                const targetTab = tabButton ? tabButton.getAttribute('data-tab') : null;
                                 
-                                if (e.target.checked) {
-                                    // Add reward type
-                                    const minPurchaseInput = criteriaDiv.querySelector('.reward-min-purchase');
-                                    const maxRewardsInput = criteriaDiv.querySelector('.reward-max-rewards');
-                                    selectedRewardTypes.push({
-                                        typeId,
-                                        criteria: {
-                                            minPurchaseAmount: parseFloat(minPurchaseInput.value) || 0,
-                                            maxRewards: parseInt(maxRewardsInput.value) || 0
-                                        }
-                                    });
-                                } else {
-                                    // Remove reward type
-                                    selectedRewardTypes = selectedRewardTypes.filter(r => r.typeId !== typeId);
+                                // Only proceed if we have a valid targetTab
+                                if (!targetTab) {
+                                    console.warn('No targetTab found for clicked element');
+                                    return;
                                 }
+                                
+                                // Update active tab
+                                document.querySelectorAll('.campaign-tabs .nav-link').forEach(t => t.classList.remove('active'));
+                                document.querySelectorAll('.tab-pane').forEach(t => {
+                                    t.classList.remove('show', 'active');
+                                });
+                                
+                                tabButton.classList.add('active');
+                                const targetTabElement = document.getElementById(`${targetTab}-tab`);
+                                if (targetTabElement) {
+                                    targetTabElement.classList.add('show', 'active');
+                                } else {
+                                    console.error(`Tab element with ID '${targetTab}-tab' not found`);
+                                }
+                                
+                                currentTab = targetTab;
                             });
-                            
-                            // Add change handlers for criteria inputs
-                            const criteriaDiv = checkbox.closest('.reward-type-item').querySelector('.reward-criteria');
-                            const minPurchaseInput = criteriaDiv.querySelector('.reward-min-purchase');
-                            const maxRewardsInput = criteriaDiv.querySelector('.reward-max-rewards');
-                            
-                            [minPurchaseInput, maxRewardsInput].forEach(input => {
-                                input.addEventListener('change', (e) => {
-                                    const typeId = e.target.dataset.typeId;
-                                    const rewardType = selectedRewardTypes.find(r => r.typeId === typeId);
-                                    if (rewardType) {
-                                        if (e.target.classList.contains('reward-min-purchase')) {
-                                            rewardType.criteria.minPurchaseAmount = parseFloat(e.target.value) || 0;
-                                        } else {
-                                            rewardType.criteria.maxRewards = parseInt(e.target.value) || 0;
-                                        }
+                        });
+
+                        // Real-time validation
+                        const validationFields = ['editCampaignName', 'editBrandName', 'editStartDate', 'editEndDate'];
+                        validationFields.forEach(fieldId => {
+                            const field = document.getElementById(fieldId);
+                            if (field) {
+                                field.addEventListener('input', () => this.clearEditFieldError(fieldId));
+                                field.addEventListener('blur', () => this.validateEditField(fieldId));
+                            }
+                        });
+
+                        // Required items management
+                        const setupItemRowEvents = (container) => {
+                            container.querySelectorAll('.add-item').forEach(button => {
+                                button.addEventListener('click', (e) => {
+                                    e.preventDefault();
+                                    const itemsContainer = document.getElementById('requiredItems');
+                                    const newRow = document.createElement('div');
+                                    newRow.innerHTML = itemRowTemplate;
+                                    itemsContainer.appendChild(newRow.firstElementChild);
+                                    setupItemRowEvents(itemsContainer);
+                                });
+                            });
+
+                            container.querySelectorAll('.remove-item').forEach(button => {
+                                button.addEventListener('click', (e) => {
+                                    e.preventDefault();
+                                    const rows = document.querySelectorAll('.required-item-row');
+                                    if (rows.length > 1) {
+                                        e.target.closest('.required-item-row').remove();
                                     }
                                 });
+                            });
+                        };
+
+                        setupItemRowEvents(document.getElementById('requiredItems'));
+
+                        // Reward type management
+                        document.querySelectorAll('.reward-type-checkbox').forEach(checkbox => {
+                            checkbox.addEventListener('change', (e) => {
+                                const card = e.target.closest('.reward-type-card');
+                                const criteriaDiv = card ? card.querySelector('.reward-criteria') : null;
+                                const typeId = e.target.value;
+                                
+                                if (!card) {
+                                    console.warn('Could not find reward type card for checkbox');
+                                    return;
+                                }
+                                
+                                if (e.target.checked) {
+                                    card.classList.add('selected');
+                                    if (criteriaDiv) {
+                                        criteriaDiv.style.display = 'block';
+                                    }
+                                } else {
+                                    card.classList.remove('selected');
+                                    if (criteriaDiv) {
+                                        criteriaDiv.style.display = 'none';
+                                    }
+                                }
+                            });
+                        });
+
+                        // Quick reward type creation
+                        const addRewardButtons = document.querySelectorAll('#addNewRewardType, #createFirstRewardType');
+                        addRewardButtons.forEach(button => {
+                            button.addEventListener('click', () => {
+                                this.showRewardTypeManagementModal();
                             });
                         });
                     },
                     showCancelButton: true,
-                    confirmButtonText: 'Update',
+                    confirmButtonText: '<i class="fas fa-save"></i> Update Campaign',
+                    cancelButtonText: '<i class="fas fa-times"></i> Cancel',
+                    showLoaderOnConfirm: true,
                     preConfirm: () => {
-                        const modal = Swal.getHtmlContainer();
-                        
-                        const campaignNameInput = modal.querySelector('#campaignName');
-                        const brandNameInput = modal.querySelector('#brandName');
-                        const storeNameInput = modal.querySelector('#storeName');
-                        const minPurchaseInput = modal.querySelector('#minPurchase');
-                        const startDateInput = modal.querySelector('#startDate');
-                        const endDateInput = modal.querySelector('#endDate');
-                        
-                        // Trim values
-                        const campaignName = campaignNameInput?.value?.trim();
-                        const brandName = brandNameInput?.value?.trim();
-                        const storeName = storeNameInput?.value?.trim();
-                        const minPurchaseAmount = parseFloat(minPurchaseInput?.value) || 0;
-                        const startDate = startDateInput?.value?.trim();
-                        const endDate = endDateInput?.value?.trim();
-                        
-                        console.log('Form Values:', {
-                            campaignName,
-                            brandName,
-                            storeName,
-                            minPurchaseAmount,
-                            startDate,
-                            endDate
-                        });
-                        
-                        const requiredItems = this.getRequiredItemsFromForm();
-                        const activeDays = this.getActiveDaysFromForm();
-                        
-                        let validationErrors = [];
-                        if (!campaignName) {
-                            console.log('Campaign name validation failed:', {
-                                campaignName,
-                                isEmpty: !campaignName,
-                                inputExists: !!campaignNameInput
-                            });
-                            validationErrors.push('Campaign name is required');
-                        }
-                        if (!brandName) validationErrors.push('Brand name is required');
-                        
-                        if (validationErrors.length > 0) {
-                            console.log('Validation errors:', validationErrors);
-                            Swal.showValidationMessage(validationErrors.join('\n'));
-                            return false;
-                        }
-
-                        // Get form values with proper trimming and type conversion
-                        const formData = {
-                            name: campaignName,
-                            brandName,
-                            storeName,
-                            minPurchaseAmount,
-                            startDate,
-                            endDate,
-                            requiredItems,
-                            activeDays,
-                            rewardTypes: selectedRewardTypes,
-                            status: document.getElementById('campaignStatus').value
-                        };
-
-                        console.log('Form Data:', formData);
-
-                        // Additional validation for dates
-                        if (!formData.startDate || !formData.endDate) {
-                            Swal.showValidationMessage('Start and end dates are required');
-                            return false;
-                        }
-
-                        return formData;
+                        return this.validateAndCollectCampaignData();
                     }
                 }).then(async (result) => {
                     if (result.isConfirmed) {
@@ -826,10 +1526,21 @@ export function initializeCampaignManagement() {
                                 updatedAt: Date.now()
                             });
                             await this.loadCampaigns();
-                            Swal.fire('Updated!', 'Campaign has been updated successfully.', 'success');
+                            
+                            Swal.fire({
+                                icon: 'success',
+                                title: 'Campaign Updated!',
+                                text: 'Your campaign has been updated successfully.',
+                                timer: 2000,
+                                showConfirmButton: false
+                            });
                         } catch (error) {
                             console.error('Error updating campaign:', error);
-                            Swal.fire('Error', 'Failed to update campaign', 'error');
+                            Swal.fire({
+                                icon: 'error',
+                                title: 'Update Failed',
+                                text: 'Failed to update campaign. Please try again.'
+                            });
                         }
                     }
                 });
@@ -859,113 +1570,28 @@ export function initializeCampaignManagement() {
         mounted() {
             this.loadCampaigns();
             this.loadRewardTypes();
-        },
-        template: `
-            <div class="campaign-management">
-                <div class="header d-flex justify-content-between align-items-center mb-4">
-                    <h2>Campaign Management</h2>
-                    <div class="controls d-flex gap-2">
-                        <input 
-                            type="text" 
-                            class="form-control" 
-                            v-model="filters.brandName" 
-                            placeholder="Search campaigns...">
-                        <select 
-                            class="form-select" 
-                            v-model="filters.status">
-                            <option value="">All Status</option>
-                            <option value="active">Active</option>
-                            <option value="inactive">Inactive</option>
-                            <option value="draft">Draft</option>
-                        </select>
-                        <button 
-                            class="btn btn-primary"
-                            @click="showAddCampaignModal">
-                            <i class="fas fa-plus"></i> New Campaign
-                        </button>
-                    </div>
-                </div>
-
-                <!-- Loading State -->
-                <div v-if="loading" class="text-center py-4">
-                    <div class="spinner-border text-primary"></div>
-                    <p class="mt-2">Loading campaigns...</p>
-                </div>
-
-                <!-- Error State -->
-                <div v-else-if="error" class="alert alert-danger">
-                    {{ error }}
-                </div>
-
-                <!-- Campaign List -->
-                <div v-else class="campaign-list">
-                    <div v-if="filteredCampaigns.length === 0" class="alert alert-info">
-                        No campaigns found. Click "New Campaign" to create one.
-                    </div>
-                    <div v-else class="row">
-                        <div v-for="campaign in filteredCampaigns" 
-                             :key="campaign.id"
-                             class="col-md-6 col-lg-4 mb-4">
-                            <div class="card h-100">
-                                <div class="card-header d-flex justify-content-between align-items-center">
-                                    <h5 class="mb-0">{{ campaign.name }}</h5>
-                                    <span :class="getStatusBadgeClass(campaign.status)">
-                                        {{ campaign.status }}
-                                    </span>
-                                </div>
-                                <div class="card-body">
-                                    <p><strong>Brand:</strong> {{ campaign.brandName }}</p>
-                                    <p><strong>Store:</strong> {{ campaign.storeName || 'All Stores' }}</p>
-                                    <p><strong>Duration:</strong> {{ formatDate(campaign.startDate) }} - {{ formatDate(campaign.endDate) }}</p>
-                                    <p v-if="campaign.minPurchaseAmount">
-                                        <strong>Min. Purchase:</strong> R{{ campaign.minPurchaseAmount }}
-                                    </p>
-                                    <div v-if="campaign.requiredItems && campaign.requiredItems.length">
-                                        <strong>Required Items:</strong>
-                                        <ul class="list-unstyled">
-                                            <li v-for="item in campaign.requiredItems" :key="item.itemName">
-                                                {{ item.quantity }}x {{ item.itemName }}
-                                            </li>
-                                        </ul>
-                                    </div>
-                                    <div v-if="campaign.activeDays && campaign.activeDays.length">
-                                        <strong>Active Days:</strong>
-                                        <p class="mb-0">{{ formatActiveDays(campaign.activeDays) }}</p>
-                                    </div>
-                                </div>
-                                <div class="card-footer">
-                                    <div class="btn-group btn-group-sm">
-                                        <button class="btn btn-info" @click="viewCampaign(campaign)">
-                                            <i class="fas fa-eye"></i>
-                                        </button>
-                                        <button class="btn btn-warning" @click="editCampaign(campaign)">
-                                            <i class="fas fa-edit"></i>
-                                        </button>
-                                        <button class="btn btn-danger" @click="deleteCampaign(campaign)">
-                                            <i class="fas fa-trash"></i>
-                                        </button>
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-            </div>
-        `
+        }
     });
 
     // Mount the app
-    campaignManagement.app.mount('#campaign-management-app');
-    console.log('Campaign management initialized');
-
-    return campaignManagement.app;
+    try {
+        campaignManagement.app.mount(container);
+        console.log('Campaign management initialized successfully');
+        return campaignManagement.app;
+    } catch (error) {
+        console.error('Error mounting campaign management app:', error);
+        return null;
+    }
 }
 
-// Add cleanup function
 export function cleanupCampaignManagement() {
     if (campaignManagement.app) {
-        console.log('Cleaning up campaign management');
-        campaignManagement.app.unmount();
+        console.log('Cleaning up campaign management app...');
+        try {
+            campaignManagement.app.unmount();
+        } catch (error) {
+            console.warn('Error unmounting campaign management app:', error);
+        }
         campaignManagement.app = null;
     }
 }

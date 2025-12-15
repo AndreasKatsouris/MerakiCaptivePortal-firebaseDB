@@ -1,4 +1,4 @@
-import { auth, rtdb, ref, get } from '../config/firebase-config.js';
+import { auth, rtdb, ref, get, set, update, remove } from '../config/firebase-config.js';
 import { AdminClaims } from '../auth/admin-claims.js';
 
 export class AdminUserManagement {
@@ -198,11 +198,12 @@ export class AdminUserManagement {
             }
         }
     }
+
     /**
-     * Set admin privileges for a user
+     * Set admin privileges for a user - FIXED VERSION
      * @param {string} uid - The user ID to grant admin privileges to
      * @param {boolean} isAdmin - Whether to grant or revoke admin privileges
-     * @returns {Promise<Object>} Response from the server
+     * @returns {Promise<Object>} Response from the operation
      */
     static async setUserAdminStatus(uid, isAdmin = true) {
         try {
@@ -217,27 +218,101 @@ export class AdminUserManagement {
                 throw new Error('Current user does not have admin privileges');
             }
 
-            const idToken = await currentUser.getIdToken();
-            const response = await fetch('/setAdminClaim', {
-                method: 'POST',
-                headers: {
-                    'Authorization': `Bearer ${idToken}`,
-                    'Content-Type': 'application/json'
-                },
-                body: JSON.stringify({
-                    uid,
-                    isAdmin
-                })
-            });
+            console.log(`🔧 [AdminUserManagement] ${isAdmin ? 'Granting' : 'Removing'} admin privileges for user: ${uid}`);
 
-            if (!response.ok) {
-                const errorData = await response.json();
-                throw new Error(errorData.error || 'Failed to set admin status');
+            // FIXED: Get existing user data to preserve all fields
+            const userRef = ref(rtdb, `users/${uid}`);
+            const userSnapshot = await get(userRef);
+            const existingUserData = userSnapshot.val();
+
+            if (!existingUserData) {
+                // User doesn't exist, create minimal user record
+                console.log(`📝 [AdminUserManagement] Creating new user record for: ${uid}`);
+                
+                // SAFETY CHECK: Double-check if user exists with minimal delay
+                await new Promise(resolve => setTimeout(resolve, 100));
+                const doubleCheckSnapshot = await get(userRef);
+                if (doubleCheckSnapshot.exists()) {
+                    console.log(`⚠️ [AdminUserManagement] User ${uid} created during operation, switching to update mode`);
+                    // User was created during our operation, preserve existing data
+                    const existingData = doubleCheckSnapshot.val();
+                    const userUpdates = {
+                        ...existingData,
+                        role: isAdmin ? 'admin' : 'user',
+                        isAdmin: isAdmin,
+                        updatedAt: Date.now(),
+                        updatedBy: currentUser.uid
+                    };
+                    await update(userRef, userUpdates);
+                } else {
+                    // Safe to create new user
+                    const newUserData = {
+                        uid: uid,
+                        role: isAdmin ? 'admin' : 'user',
+                        isAdmin: isAdmin,
+                        createdAt: Date.now(),
+                        updatedAt: Date.now(),
+                        updatedBy: currentUser.uid
+                    };
+                    await set(userRef, newUserData);
+                }
+            } else {
+                // FIXED: User exists, preserve ALL existing data including phone numbers
+                console.log(`📝 [AdminUserManagement] Updating existing user record for: ${uid}`);
+                
+                // SAFETY CHECK: Log if phoneNumber exists to monitor preservation
+                if (existingUserData.phoneNumber) {
+                    console.log(`✅ [AdminUserManagement] Preserving phoneNumber for user ${uid}:`, existingUserData.phoneNumber);
+                }
+
+                // Start with ALL existing user data
+                const userUpdates = {
+                    ...existingUserData,
+                    // Only update admin-related fields
+                    role: isAdmin ? 'admin' : 'user',
+                    isAdmin: isAdmin,
+                    updatedAt: Date.now(),
+                    updatedBy: currentUser.uid
+                };
+
+                // VALIDATION: Verify critical fields are preserved
+                const criticalFields = ['phoneNumber', 'phone', 'businessPhone', 'email', 'displayName', 'uid'];
+                criticalFields.forEach(field => {
+                    if (existingUserData[field] && !userUpdates[field]) {
+                        console.warn(`⚠️ [AdminUserManagement] Critical field '${field}' missing from update for user ${uid}`);
+                        userUpdates[field] = existingUserData[field];
+                    }
+                });
+
+                console.log(`📝 [AdminUserManagement] Updating user ${uid} with preserved fields:`, {
+                    preservedFields: Object.keys(existingUserData),
+                    updatedFields: ['role', 'isAdmin', 'updatedAt', 'updatedBy'],
+                    hasPhoneNumber: !!(userUpdates.phoneNumber || userUpdates.phone || userUpdates.businessPhone)
+                });
+
+                await update(userRef, userUpdates);
             }
 
-            return await response.json();
+            // Update admin-claims collection
+            const adminClaimsRef = ref(rtdb, `admin-claims/${uid}`);
+            if (isAdmin) {
+                console.log(`📝 [AdminUserManagement] Adding user to admin-claims: ${uid}`);
+                await set(adminClaimsRef, true);
+            } else {
+                console.log(`📝 [AdminUserManagement] Removing user from admin-claims: ${uid}`);
+                await remove(adminClaimsRef);
+            }
+
+            console.log(`✅ [AdminUserManagement] Successfully ${isAdmin ? 'granted' : 'removed'} admin privileges for user: ${uid}`);
+
+            return {
+                success: true,
+                message: `Successfully ${isAdmin ? 'granted' : 'removed'} admin privileges for user ${uid}`,
+                uid: uid,
+                isAdmin: isAdmin
+            };
         } catch (error) {
-            console.error('Error setting admin status:', error);
+            console.error('❌ [AdminUserManagement] Error setting admin status:', error);
             throw error;
         }
     }
@@ -300,7 +375,7 @@ export class AdminUserManagement {
     /**
      * Remove admin privileges from a user
      * @param {string} uid - The user ID to remove admin privileges from
-     * @returns {Promise<Object>} Response from the server
+     * @returns {Promise<Object>} Response from the operation
      */
     static async removeAdminPrivileges(uid) {
         return this.setUserAdminStatus(uid, false);

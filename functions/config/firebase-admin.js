@@ -20,13 +20,29 @@ const storage = admin.storage();
 const bucket = storage.bucket();
 
 // Database functions
-const ref = (path) => {
-    if (path === undefined || path === null) {
+const ref = (database, path) => {
+    // Handle both Firebase v9 modular syntax and legacy syntax
+    let actualPath;
+    let actualDatabase;
+    
+    if (typeof database === 'string') {
+        // Legacy syntax: ref(path)
+        actualPath = database;
+        actualDatabase = rtdb;
+    } else if (database && typeof path === 'string') {
+        // Firebase v9 modular syntax: ref(rtdb, path)
+        actualDatabase = database;
+        actualPath = path;
+    } else {
+        throw new Error('Invalid arguments: expected ref(path) or ref(database, path)');
+    }
+    
+    if (actualPath === undefined || actualPath === null) {
         throw new Error('Path cannot be null or undefined');
     }
 
     // Convert to string and clean
-    const pathString = String(path).trim();
+    const pathString = String(actualPath).trim();
     if (!pathString) {
         throw new Error('Path cannot be empty');
     }
@@ -45,20 +61,37 @@ const ref = (path) => {
     const finalPath = validSegments.join('/');
     
     console.log('Database path:', finalPath);
-    return rtdb.ref(finalPath);
+    
+    return actualDatabase.ref(finalPath);
 };
 
 const get = async (ref) => await ref.once('value');
 const set = async (ref, data) => await ref.set(data);
 const update = async (ref, data) => await ref.update(data);
 
-const push = (path) => {
-    if (path === undefined || path === null) {
+const push = (database, path) => {
+    // Handle both Firebase v9 modular syntax and legacy syntax
+    let actualPath;
+    let actualDatabase;
+    
+    if (typeof database === 'string') {
+        // Legacy syntax: push(path)
+        actualPath = database;
+        actualDatabase = rtdb;
+    } else if (database && typeof path === 'string') {
+        // Firebase v9 modular syntax: push(rtdb, path)
+        actualDatabase = database;
+        actualPath = path;
+    } else {
+        throw new Error('Invalid arguments: expected push(path) or push(database, path)');
+    }
+    
+    if (actualPath === undefined || actualPath === null) {
         throw new Error('Path cannot be null or undefined');
     }
 
     // Convert to string and clean
-    const pathString = String(path).trim();
+    const pathString = String(actualPath).trim();
     if (!pathString) {
         throw new Error('Path cannot be empty');
     }
@@ -77,10 +110,13 @@ const push = (path) => {
     const finalPath = validSegments.join('/');
     
     console.log('Push path:', finalPath);
-    return rtdb.ref(finalPath).push();
+    return actualDatabase.ref(finalPath).push();
 };
 
 const remove = async (ref) => await ref.remove();
+
+// Timestamp functions
+const serverTimestamp = () => admin.database.ServerValue.TIMESTAMP;
 
 // Storage functions
 const uploadFile = async (path, file) => {
@@ -107,6 +143,7 @@ module.exports = {
     update,
     push,
     remove,
+    serverTimestamp,
     // Storage operations
     uploadFile
 };

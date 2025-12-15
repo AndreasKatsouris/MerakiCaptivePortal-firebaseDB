@@ -4,5 +4,17 @@ service firebase.storage {
     match /logos/{logoName} {
       allow read, write: if request.auth != null; // Allow read/write for authenticated users
     }
+
+    // Receipt template examples - Admin only write
+    match /receipt-templates/{templateFile} {
+      allow read: if request.auth != null; // All authenticated users can read
+      allow write: if request.auth != null && request.auth.token.admin == true; // Only admins can write
+    }
+
+    // Processed receipts from WhatsApp/Twilio (created by receiptProcessor.js)
+    match /receipts/{receiptFile} {
+      allow read: if request.auth != null; // All authenticated users can read
+      allow write: if true; // Allow functions to write (no auth context)
+    }
   }
 }

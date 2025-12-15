@@ -11,11 +11,30 @@ function registerServiceWorker() {
         .then(registration => {
           console.log('ServiceWorker registration successful with scope: ', registration.scope);
           
+          // IMMEDIATE UPDATE: Force service worker update to clear cached auth.js
+          console.log('🔄 [ServiceWorker] Forcing immediate update to clear auth.js cache...');
+          registration.update().then(() => {
+            console.log('✅ [ServiceWorker] Update completed - stale cache should be cleared');
+          });
+          
           // Check for updates periodically
           setInterval(() => {
             registration.update();
             console.log('ServiceWorker update check initiated');
           }, 60 * 60 * 1000); // Check every hour
+          
+          // HANDLE SERVICE WORKER UPDATES: When new SW is available, activate it immediately
+          registration.addEventListener('updatefound', () => {
+            console.log('🔄 [ServiceWorker] New service worker version found, installing...');
+            const newWorker = registration.installing;
+            newWorker.addEventListener('statechange', () => {
+              if (newWorker.state === 'installed' && navigator.serviceWorker.controller) {
+                console.log('✅ [ServiceWorker] New version installed, will activate on next page load');
+                // Optionally show user notification about update
+                console.log('💡 [ServiceWorker] Refresh page to get latest auth fixes');
+              }
+            });
+          });
         })
         .catch(error => {
           console.error('ServiceWorker registration failed: ', error);
@@ -24,7 +43,8 @@ function registerServiceWorker() {
     
     // Listen for controller change events
     navigator.serviceWorker.addEventListener('controllerchange', () => {
-      console.log('ServiceWorker controller has changed, reloading page for fresh content');
+      console.log('🔄 [ServiceWorker] Controller changed - new service worker active');
+      console.log('✅ [ServiceWorker] Auth.js cache should now be cleared');
       // Optional: reload the page to ensure fresh content
       // window.location.reload();
     });

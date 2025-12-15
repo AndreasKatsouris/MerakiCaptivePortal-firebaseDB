@@ -7,24 +7,43 @@
 import { 
     ensureFirebaseInitialized, 
     getRef, 
-    rtdb, 
+    getRtdb, 
     ref, 
     get, 
     set, 
     update, 
-    remove 
+    remove,
+    getAuth 
 } from './firebase-helpers.js';
 import { generateTimestampKey } from './utilities.js';
+
+// Initialize Firebase on module load
+ensureFirebaseInitialized();
 
 /**
  * Save stock data to Firebase Realtime Database
  * @param {Object} data - Stock data to save
  * @returns {Promise} - Promise resolving with the save result
  */
-export async function saveStockDataToDatabase(data) {
+export async function saveStockData(data) {
     // Verify Firebase is initialized
     if (!ensureFirebaseInitialized()) {
         throw new Error('Firebase is not initialized');
+    }
+    
+    // Get current Firebase instances
+    const rtdb = getRtdb();
+    const auth = getAuth();
+    
+    // Check if user is authenticated
+    const user = auth.currentUser;
+    if (!user) {
+        throw new Error('User must be authenticated to save stock data');
+    }
+    
+    // Validate that selectedLocationId is provided
+    if (!data.selectedLocationId) {
+        throw new Error('Location must be selected to save stock data');
     }
     
     // Ensure data is valid
@@ -32,24 +51,20 @@ export async function saveStockDataToDatabase(data) {
         throw new Error('Invalid stock data provided');
     }
     
-    // Function is aliased as saveStockUsage in the component
-    return await saveStockUsage(data);
-}
-
-/**
- * Save stock usage data to Firebase
- * This is the main function used by the refactored-app-component
- * @param {Object} data - Stock data to save
- * @returns {Promise} - Promise resolving with the save result
- */
-export async function saveStockUsage(data) {
-    
     try {
         // Generate a unique timestamp-based key for this entry
         const timestamp = generateTimestampKey();
         
-        // Create a reference to the stockUsage/{timestamp} path
-        const stockUsageRef = ref(rtdb, `stockUsage/${timestamp}`);
+        // Log what we're about to save for debugging
+        console.log('[StockData] Attempting to save with:', {
+            userId: user.uid,
+            selectedLocationId: data.selectedLocationId,
+            timestamp: Date.now(),
+            path: `locations/${data.selectedLocationId}/stockUsage/${timestamp}`
+        });
+        
+        // Create a reference to the location-specific stockUsage path
+        const stockUsageRef = ref(rtdb, `locations/${data.selectedLocationId}/stockUsage/${timestamp}`);
         
         // Check if an entry with this exact data already exists to prevent duplicates
         const checkDuplicate = await checkForExistingData(data);
@@ -59,29 +74,24 @@ export async function saveStockUsage(data) {
         
         // Calculate actual period days from opening to closing date if available
         let periodDays = data.stockPeriodDays || 0;
-        
-        // If we have both opening and closing dates, calculate the actual period
         if (data.openingDate && data.closingDate) {
             const openingDate = new Date(data.openingDate);
             const closingDate = new Date(data.closingDate);
+            const diffTime = Math.abs(closingDate - openingDate);
+            periodDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24)) || 1;
             
-            // Ensure dates are valid
-            if (!isNaN(openingDate) && !isNaN(closingDate)) {
-                // Calculate the difference in days
-                const diffTime = Math.abs(closingDate - openingDate);
-                const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
-                
-                // Use calculated period days (DONT add 1 because we include both start and end dates)
-                periodDays = diffDays;
+            if (periodDays !== data.stockPeriodDays) {
                 console.log(`[StockData] Calculated period days from date range: ${periodDays} days`);
             }
         }
         
         // Set data to Firebase
         await set(stockUsageRef, {
+            userId: user.uid, // Add user ID for access control
             timestamp: Date.now(),
             formattedTimestamp: new Date().toLocaleString(),
-            storeName: data.storeName || 'Default Store',
+            selectedLocationId: data.selectedLocationId, // Location ID is required
+            storeName: data.storeName || 'Default Store', // Keep for backward compatibility
             openingDate: data.openingDate || '',
             closingDate: data.closingDate || '',
             daysToNextDelivery: data.daysToNextDelivery || 0,
@@ -91,6 +101,7 @@ export async function saveStockUsage(data) {
             // Create a storeContext object that matches what the historical service expects
             storeContext: {
                 name: data.storeName || 'Default Store',
+                locationId: data.selectedLocationId, // Add location ID for cross-reference
                 periodDays: periodDays,
                 openingDate: data.openingDate || '',
                 closingDate: data.closingDate || ''
@@ -120,14 +131,37 @@ export async function saveStockUsage(data) {
 }
 
 /**
+ * Save stock usage data to Firebase
+ * This is the main function used by the refactored-app-component
+ * @param {Object} data - Stock data to save
+ * @returns {Promise} - Promise resolving with the save result
+ */
+export async function saveStockUsage(data) {
+    return await saveStockData(data);
+}
+
+/**
+ * Alias for saveStockData for backward compatibility
+ * @param {Object} data - Stock data to save
+ * @returns {Promise} - Promise resolving with the save result
+ */
+export async function saveStockDataToDatabase(data) {
+    return await saveStockData(data);
+}
+
+/**
  * Check for existing data in the database to prevent duplicates
  * @param {Object} data - Data to check
  * @returns {Promise<Object>} - Promise resolving with check result
  */
 export async function checkForExistingData(data) {
     try {
-        // Get all stockUsage entries
-        const stockUsageRef = ref(rtdb, 'stockUsage');
+        // Get current Firebase instances
+        const rtdb = getRtdb();
+        const auth = getAuth();
+        
+        // Get stockUsage entries for the specific location
+        const stockUsageRef = ref(rtdb, `locations/${data.selectedLocationId}/stockUsage`);
         const snapshot = await get(stockUsageRef);
         
         if (!snapshot.exists()) {
@@ -138,9 +172,8 @@ export async function checkForExistingData(data) {
         
         // Check each entry for a potential match
         for (const [timestamp, entryData] of Object.entries(stockUsageData)) {
-            // Check if this is the same store and date range
-            if (entryData.storeName === data.storeName &&
-                entryData.openingDate === data.openingDate &&
+            // Since we're already in location-specific path, just check date range and items
+            if (entryData.openingDate === data.openingDate &&
                 entryData.closingDate === data.closingDate &&
                 entryData.totalItems === data.stockItems.length) {
                 
@@ -184,50 +217,95 @@ export async function checkForExistingData(data) {
 }
 
 /**
- * Load historical stock data from the database
- * @returns {Promise<Array>} - Promise resolving with historical data entries
+ * Load historical stock data from Firebase
+ * Filters data to only show records for locations the user has access to
+ * @returns {Promise<Array>} - Promise resolving with historical data array
  */
 export async function loadHistoricalData() {
-    // Verify Firebase is initialized
-    if (!ensureFirebaseInitialized()) {
+    // Get current Firebase instances
+    const rtdb = getRtdb();
+    const auth = getAuth();
+    
+    if (!rtdb) {
         throw new Error('Firebase is not initialized');
     }
     
+    // Check if user is authenticated
+    const user = auth.currentUser;
+    if (!user) {
+        throw new Error('User must be authenticated to load stock data');
+    }
+    
     try {
-        // Get all stockUsage entries
-        const stockUsageRef = ref(rtdb, 'stockUsage');
-        const snapshot = await get(stockUsageRef);
+        // First, get user's accessible locations
+        const userLocationsRef = ref(rtdb, `userLocations/${user.uid}`);
+        const userLocationsSnapshot = await get(userLocationsRef);
         
-        if (!snapshot.exists()) {
-            return [];
+        // Create a set of accessible location IDs
+        const accessibleLocationIds = new Set();
+        if (userLocationsSnapshot.exists()) {
+            Object.keys(userLocationsSnapshot.val()).forEach(locationId => {
+                accessibleLocationIds.add(locationId);
+            });
         }
         
-        const stockUsageData = snapshot.val();
+        // Check if user is admin
+        const adminRef = ref(rtdb, `admins/${user.uid}`);
+        const adminSnapshot = await get(adminRef);
+        const isAdmin = adminSnapshot.exists();
         
-        // Convert to array and add the key to each entry
-        const historicalEntries = Object.entries(stockUsageData).map(([key, data]) => ({
-            key,
-            timestamp: data.formattedTimestamp || new Date(data.timestamp).toLocaleString(),
-            storeName: data.storeName || 'Unknown Store',
-            openingDate: data.openingDate || '',
-            closingDate: data.closingDate || '',
-            totalItems: data.totalItems || (data.stockItems ? data.stockItems.length : 0),
-            stockItems: data.stockItems, // Include actual stockItems array for accurate count
-            totalCostOfUsage: data.totalCostOfUsage || 0,
-            costPercentage: data.costPercentage || 0
-        }));
+        // Collect all stock data from accessible locations
+        const allHistoricalEntries = [];
+        
+        // If admin, get all locations
+        if (isAdmin) {
+            const locationsRef = ref(rtdb, 'locations');
+            const locationsSnapshot = await get(locationsRef);
+            if (locationsSnapshot.exists()) {
+                const allLocationIds = Object.keys(locationsSnapshot.val());
+                allLocationIds.forEach(id => accessibleLocationIds.add(id));
+            }
+        }
+        
+        // Load stock data from each accessible location
+        for (const locationId of accessibleLocationIds) {
+            const locationStockRef = ref(rtdb, `locations/${locationId}/stockUsage`);
+            const locationSnapshot = await get(locationStockRef);
+            
+            if (locationSnapshot.exists()) {
+                const locationData = locationSnapshot.val();
+                Object.entries(locationData).forEach(([key, data]) => {
+                    allHistoricalEntries.push({
+                        key,
+                        locationId,
+                        timestamp: data.formattedTimestamp || new Date(data.timestamp).toLocaleString(),
+                        storeName: data.storeName || 'Unknown Store',
+                        selectedLocationId: locationId,
+                        openingDate: data.openingDate || '',
+                        closingDate: data.closingDate || '',
+                        totalItems: data.totalItems || (data.stockItems ? data.stockItems.length : 0),
+                        stockItems: data.stockItems,
+                        totalCostOfUsage: data.totalCostOfUsage || 0,
+                        salesAmount: data.salesAmount || 0,
+                        costPercentage: data.costPercentage || 0,
+                        totalOpeningValue: data.totalOpeningValue || 0,
+                        totalClosingValue: data.totalClosingValue || 0,
+                        stockPeriodDays: data.stockPeriodDays || 0,
+                        _rawTimestamp: data.timestamp
+                    });
+                });
+            }
+        }
         
         // Sort by timestamp (most recent first)
-        historicalEntries.sort((a, b) => {
-            // If using numeric timestamps
-            if (stockUsageData[a.key].timestamp && stockUsageData[b.key].timestamp) {
-                return stockUsageData[b.key].timestamp - stockUsageData[a.key].timestamp;
+        allHistoricalEntries.sort((a, b) => {
+            if (a._rawTimestamp && b._rawTimestamp) {
+                return b._rawTimestamp - a._rawTimestamp;
             }
-            // Fallback to string comparison of keys (assuming timestamp-based keys)
             return b.key.localeCompare(a.key);
         });
         
-        return historicalEntries;
+        return allHistoricalEntries;
     } catch (error) {
         console.error('Error loading historical data:', error);
         throw error;
@@ -244,6 +322,10 @@ export async function loadSpecificHistoricalData(key) {
     if (!ensureFirebaseInitialized()) {
         throw new Error('Firebase is not initialized');
     }
+    
+    // Get current Firebase instances
+    const rtdb = getRtdb();
+    const auth = getAuth();
     
     if (!key) {
         throw new Error('No key provided for loading historical data');
@@ -276,12 +358,16 @@ export async function loadHistoricalRecord(recordId) {
 
 /**
  * Delete a specific historical data entry
- * @param {string} key - The unique key of the historical data entry to delete
+ * @param {string} key - The key of the historical data entry to delete
+ * @param {string} locationId - The location ID where the record is stored
  * @returns {Promise<Object>} - Promise resolving when the data is deleted
  */
-export async function deleteHistoricalData(key) {
-    // Verify Firebase is initialized
-    if (!ensureFirebaseInitialized()) {
+export async function deleteHistoricalData(key, locationId) {
+    // Get current Firebase instances
+    const rtdb = getRtdb();
+    const auth = getAuth();
+    
+    if (!rtdb) {
         throw new Error('Firebase is not initialized');
     }
     
@@ -289,9 +375,51 @@ export async function deleteHistoricalData(key) {
         throw new Error('No key provided for deleting historical data');
     }
     
+    if (!locationId) {
+        throw new Error('No location ID provided for deleting historical data');
+    }
+    
+    // Check if user is authenticated
+    const user = auth.currentUser;
+    if (!user) {
+        throw new Error('User must be authenticated to delete stock data');
+    }
+    
     try {
-        // Get a reference to the specific stockUsage entry
-        const stockUsageRef = ref(rtdb, `stockUsage/${key}`);
+        // Get the record to check permissions before deleting
+        const stockUsageRef = ref(rtdb, `locations/${locationId}/stockUsage/${key}`);
+        const snapshot = await get(stockUsageRef);
+        
+        if (!snapshot.exists()) {
+            throw new Error(`Record with key ${key} does not exist`);
+        }
+        
+        //const existingData = snapshot.val();
+        
+        // Check if user has permission to delete this record
+        // Admin can delete any record
+        // Non-admin users can only delete records for their locations
+        const adminRef = ref(rtdb, `admins/${user.uid}`);
+        const adminSnapshot = await get(adminRef);
+        const isAdmin = adminSnapshot.exists();
+
+        if (!isAdmin) {
+            // Get user's accessible locations
+            const userLocationsRef = ref(rtdb, `userLocations/${user.uid}`);
+            const userLocationsSnapshot = await get(userLocationsRef);
+            
+            const accessibleLocationIds = new Set();
+            if (userLocationsSnapshot.exists()) {
+                Object.keys(userLocationsSnapshot.val()).forEach(id => {
+                    accessibleLocationIds.add(id);
+                });
+            }
+            
+            // Check if user has access to this location
+            if (!accessibleLocationIds.has(locationId)) {
+                throw new Error('You do not have permission to delete stock records for this location');
+            }
+        }
         
         // Remove the entry
         await remove(stockUsageRef);
@@ -314,12 +442,17 @@ export async function deleteHistoricalRecord(recordId) {
 
 /**
  * Get historical usage data for an item
+ * Filters data to only show records for locations the user has access to
  * @param {string} itemCode - The item code to get history for
+ * @param {string} locationId - Optional location ID to filter by specific location
  * @returns {Promise<Array>} - Promise resolving with the historical usage data
  */
-export async function getItemHistoricalData(itemCode) {
-    // Verify Firebase is initialized
-    if (!ensureFirebaseInitialized()) {
+export async function getItemHistoricalData(itemCode, locationId = null) {
+    // Get current Firebase instances
+    const rtdb = getRtdb();
+    const auth = getAuth();
+    
+    if (!rtdb) {
         throw new Error('Firebase is not initialized');
     }
     
@@ -327,7 +460,25 @@ export async function getItemHistoricalData(itemCode) {
         throw new Error('No item code provided for historical data');
     }
     
+    // Check if user is authenticated
+    const user = auth.currentUser;
+    if (!user) {
+        throw new Error('User must be authenticated to load historical data');
+    }
+    
     try {
+        // First, get user's accessible locations
+        const userLocationsRef = ref(rtdb, `userLocations/${user.uid}`);
+        const userLocationsSnapshot = await get(userLocationsRef);
+        
+        // Create a set of accessible location IDs
+        const accessibleLocationIds = new Set();
+        if (userLocationsSnapshot.exists()) {
+            Object.keys(userLocationsSnapshot.val()).forEach(locId => {
+                accessibleLocationIds.add(locId);
+            });
+        }
+        
         // Get all stockUsage entries
         const stockUsageRef = ref(rtdb, 'stockUsage');
         const snapshot = await get(stockUsageRef);
@@ -341,7 +492,17 @@ export async function getItemHistoricalData(itemCode) {
         
         // Search through all entries and find matching items
         for (const [key, data] of Object.entries(stockUsageData)) {
-            if (data.stockItems && Array.isArray(data.stockItems)) {
+            // Check if user has access to this data
+            const hasAccess = user.customClaims?.admin === true ||
+                            data.userId === user.uid ||
+                            (data.selectedLocationId && accessibleLocationIds.has(data.selectedLocationId));
+            
+            // If locationId is specified, only include data for that location
+            if (locationId && data.selectedLocationId !== locationId) {
+                continue;
+            }
+            
+            if (hasAccess && data.stockItems && Array.isArray(data.stockItems)) {
                 // Find the matching item
                 const matchingItem = data.stockItems.find(item => item.itemCode === itemCode);
                 
@@ -351,6 +512,7 @@ export async function getItemHistoricalData(itemCode) {
                         timestamp: data.timestamp,
                         formattedTimestamp: data.formattedTimestamp || new Date(data.timestamp).toLocaleString(),
                         storeName: data.storeName || 'Unknown Store',
+                        selectedLocationId: data.selectedLocationId || null,
                         openingDate: data.openingDate || '',
                         closingDate: data.closingDate || '',
                         stockPeriodDays: data.stockPeriodDays || 1,
@@ -394,6 +556,10 @@ export async function getStockStatistics() {
     if (!ensureFirebaseInitialized()) {
         throw new Error('Firebase is not initialized');
     }
+    
+    // Get current Firebase instances
+    const rtdb = getRtdb();
+    const auth = getAuth();
     
     try {
         // Get all historical data
@@ -442,6 +608,10 @@ export async function getRecentStoreContext() {
         throw new Error('Firebase is not initialized');
     }
     
+    // Get current Firebase instances
+    const rtdb = getRtdb();
+    const auth = getAuth();
+    
     try {
         // Get the most recent record
         const records = await loadHistoricalData();
@@ -473,11 +643,15 @@ export async function getRecentStoreContext() {
  * @param {string} recordId - The ID of the record to update
  * @param {Object} data - The updated stock data
  * @param {Object} userData - Information about the user making the edit
+ * @param {string} locationId - The location ID where the record is stored
  * @returns {Promise<Object>} - Promise resolving with the update result
  */
-export async function updateStockUsage(recordId, data, userData) {
-    // Verify Firebase is initialized
-    if (!ensureFirebaseInitialized()) {
+export async function updateStockUsage(recordId, data, userData, locationId) {
+    // Get current Firebase instances
+    const rtdb = getRtdb();
+    const auth = getAuth();
+    
+    if (!rtdb) {
         throw new Error('Firebase is not initialized');
     }
     
@@ -485,9 +659,19 @@ export async function updateStockUsage(recordId, data, userData) {
         throw new Error('No record ID provided for update');
     }
     
+    if (!locationId) {
+        throw new Error('No location ID provided for update');
+    }
+    
     // Ensure data is valid
     if (!data || !data.stockItems || !Array.isArray(data.stockItems)) {
         throw new Error('Invalid stock data provided for update');
+    }
+    
+    // Check if user is authenticated
+    const user = auth.currentUser;
+    if (!user) {
+        throw new Error('User must be authenticated to update stock data');
     }
     
     // Ensure user data is provided
@@ -496,8 +680,8 @@ export async function updateStockUsage(recordId, data, userData) {
     }
     
     try {
-        // Get the existing record to check if it exists and to create edit history
-        const stockUsageRef = ref(rtdb, `stockUsage/${recordId}`);
+        // Get the existing record to check if it exists and check permissions
+        const stockUsageRef = ref(rtdb, `locations/${locationId}/stockUsage/${recordId}`);
         const snapshot = await get(stockUsageRef);
         
         if (!snapshot.exists()) {
@@ -505,6 +689,31 @@ export async function updateStockUsage(recordId, data, userData) {
         }
         
         const existingData = snapshot.val();
+        
+        // Check if user has permission to update this record
+        // Admin can update any record
+        // Non-admin users can only update records for their locations
+        const adminRef = ref(rtdb, `admins/${user.uid}`);
+        const adminSnapshot = await get(adminRef);
+        const isAdmin = adminSnapshot.exists();
+        
+        if (!isAdmin) {
+            // Get user's accessible locations
+            const userLocationsRef = ref(rtdb, `userLocations/${user.uid}`);
+            const userLocationsSnapshot = await get(userLocationsRef);
+            
+            const accessibleLocationIds = new Set();
+            if (userLocationsSnapshot.exists()) {
+                Object.keys(userLocationsSnapshot.val()).forEach(id => {
+                    accessibleLocationIds.add(id);
+                });
+            }
+            
+            // Check if user has access to this location
+            if (!accessibleLocationIds.has(locationId)) {
+                throw new Error('You do not have permission to update stock records for this location');
+            }
+        }
         
         // Calculate actual period days from opening to closing date if available
         let periodDays = data.stockPeriodDays || 0;
@@ -520,7 +729,7 @@ export async function updateStockUsage(recordId, data, userData) {
                 const diffTime = Math.abs(closingDate - openingDate);
                 const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
                 
-                // Use calculated period days (add 1 because we include both start and end dates)
+                // Use calculated period days
                 periodDays = diffDays;
                 console.log(`[StockData] Calculated period days from date range: ${periodDays} days`);
             }

@@ -14,6 +14,17 @@ export const featureAccessControl = {
   cache: new Map(),
   cacheTimestamps: new Map(),
   CACHE_DURATION: 5 * 60 * 1000, // 5 minutes
+  
+  // Session-level caches for performance optimization
+  adminStatusCache: null,
+  subscriptionCache: null,
+  tierDataCache: null,
+  sessionCacheTimestamp: null,
+  SESSION_CACHE_DURATION: 30 * 60 * 1000, // 30 minutes
+  
+  // Request deduplication for admin verification and subscription data
+  adminVerificationPromise: null,
+  subscriptionFetchPromise: null,
 
   /**
    * Clear the cache
@@ -21,6 +32,141 @@ export const featureAccessControl = {
   clearCache() {
     this.cache.clear();
     this.cacheTimestamps.clear();
+  },
+
+  /**
+   * Clear session-level caches
+   */
+  clearSessionCache() {
+    this.adminStatusCache = null;
+    this.subscriptionCache = null;
+    this.tierDataCache = null;
+    this.sessionCacheTimestamp = null;
+    this.adminVerificationPromise = null;
+    this.subscriptionFetchPromise = null;
+    console.log('[FeatureAccess] Session cache cleared');
+  },
+
+  /**
+   * Check if session cache is valid
+   */
+  isSessionCacheValid() {
+    if (!this.sessionCacheTimestamp) return false;
+    return (Date.now() - this.sessionCacheTimestamp) < this.SESSION_CACHE_DURATION;
+  },
+
+  /**
+   * Perform admin verification (deduplicated)
+   */
+  async performAdminVerification(userId) {
+    try {
+      console.log('[FeatureAccess] Importing AdminClaims module...');
+      const { AdminClaims } = await import(`../../../auth/admin-claims.js?v=${Date.now()}`);
+      console.log('[FeatureAccess] Verifying admin status...');
+      const isAdmin = await AdminClaims.verifyAdminStatus(auth.currentUser);
+      console.log('[FeatureAccess] Admin verification result:', isAdmin);
+      
+      // Cache the admin status for session
+      this.adminStatusCache = {
+        userId: userId,
+        isAdmin: isAdmin
+      };
+      if (!this.sessionCacheTimestamp) {
+        this.sessionCacheTimestamp = Date.now();
+      }
+      console.log('[FeatureAccess] Admin status cached for session');
+      
+      return isAdmin;
+    } catch (error) {
+      console.error('[FeatureAccess] Admin verification failed:', error);
+      throw error;
+    }
+  },
+
+  /**
+   * Perform subscription data fetch (deduplicated)
+   */
+  async performSubscriptionFetch(userId, cacheKey) {
+    try {
+      // Get user subscription directly from Firebase for non-admin users
+      console.log('[FeatureAccess] Fetching subscription from database...');
+      const subscriptionSnapshot = await get(ref(rtdb, `subscriptions/${userId}`));
+      const subscription = subscriptionSnapshot.val();
+      console.log('[FeatureAccess] Raw subscription data:', subscription);
+      
+      if (!subscription) {
+        console.log('[FeatureAccess] No subscription found for user');
+        return null;
+      }
+      
+      // Get tier details - use tierId field which is the database standard
+      // For old subscriptions created before tier system, check metadata.initialTier
+      const tierId = subscription.tierId
+                  || subscription.tier
+                  || subscription.metadata?.initialTier  // Check old subscription format
+                  || 'free'; // Final fallback
+      console.log('[FeatureAccess] Resolved tier ID:', tierId, '(from:',
+                  subscription.tierId ? 'tierId' :
+                  subscription.tier ? 'tier' :
+                  subscription.metadata?.initialTier ? 'metadata.initialTier' :
+                  'default)', ')');
+      
+      if (!tierId) {
+        console.warn('[FeatureAccess] Subscription has no tier ID');
+        return null;
+      }
+      
+      // PERFORMANCE OPTIMIZATION: Check tier data cache
+      let tier;
+      if (this.tierDataCache && this.tierDataCache.tierId === tierId && this.isSessionCacheValid()) {
+        console.log('[FeatureAccess] Using cached tier data for:', tierId);
+        tier = this.tierDataCache.data;
+      } else {
+        console.log('[FeatureAccess] Fetching tier details...');
+        const tierSnapshot = await get(ref(rtdb, `subscriptionTiers/${tierId}`));
+        tier = tierSnapshot.val();
+        console.log('[FeatureAccess] Tier data:', tier);
+        
+        // Cache tier data for session
+        this.tierDataCache = {
+          tierId: tierId,
+          data: tier
+        };
+        console.log('[FeatureAccess] Tier data cached for session');
+      }
+      
+      if (!tier) {
+        console.warn(`[FeatureAccess] Tier not found: ${tierId}`);
+        return null;
+      }
+      
+      const result = {
+        ...subscription,
+        tierId: tierId,
+        tier: tier
+      };
+      
+      console.log('[FeatureAccess] Final subscription result:', result);
+      
+      // Cache the result in both regular cache and session cache
+      this.cache.set(cacheKey, result);
+      this.cacheTimestamps.set(cacheKey, Date.now());
+      
+      // Session-level cache for performance
+      this.subscriptionCache = {
+        userId: userId,
+        data: result
+      };
+      if (!this.sessionCacheTimestamp) {
+        this.sessionCacheTimestamp = Date.now();
+      }
+      console.log('[FeatureAccess] Subscription data cached for session');
+      
+      return result;
+    } catch (error) {
+      console.error('[FeatureAccess] Subscription fetch failed:', error);
+      throw error;
+    }
   },
 
   /**
@@ -37,25 +183,41 @@ export const featureAccessControl = {
     const cacheKey = `subscription_${userId}`;
     console.log('[FeatureAccess] Getting subscription for user:', userId);
     
-    // Clear any existing cache for this user to ensure fresh data
-    this.cache.delete(cacheKey);
-    this.cacheTimestamps.delete(cacheKey);
-    console.log('[FeatureAccess] Cleared existing cache for fresh admin check');
+    // Don't return cached subscription data early - we need to check admin status first for consistency
     
-    // CRITICAL FIX: Consolidate admin verification into single try-catch block
+    // PERFORMANCE OPTIMIZATION: Use cached admin status if available
     let isAdmin = false;
     let adminVerificationFailed = false;
     
-    try {
-      console.log('[FeatureAccess] Importing AdminClaims module...');
-      const { AdminClaims } = await import(`../../../auth/admin-claims.js?v=${Date.now()}`);
-      console.log('[FeatureAccess] Verifying admin status...');
-      isAdmin = await AdminClaims.verifyAdminStatus(auth.currentUser);
-      console.log('[FeatureAccess] Admin verification result:', isAdmin);
-    } catch (error) {
-      console.error('[FeatureAccess] CRITICAL: Admin verification failed:', error);
-      adminVerificationFailed = true;
-      // Do not proceed with regular flow if admin verification failed - try fallback
+    if (this.isSessionCacheValid() && this.adminStatusCache && this.adminStatusCache.userId === userId) {
+      console.log('[FeatureAccess] Using cached admin status');
+      isAdmin = this.adminStatusCache.isAdmin;
+    } else {
+      // Request deduplication: if admin verification is already in progress, wait for it
+      if (this.adminVerificationPromise) {
+        console.log('[FeatureAccess] Admin verification in progress, waiting...');
+        try {
+          isAdmin = await this.adminVerificationPromise;
+          console.log('[FeatureAccess] Using admin verification result from parallel request');
+        } catch (error) {
+          console.error('[FeatureAccess] Parallel admin verification failed:', error);
+          adminVerificationFailed = true;
+        }
+      } else {
+        console.log('[FeatureAccess] Starting fresh admin verification');
+        // Start admin verification and cache the promise for other parallel requests
+        this.adminVerificationPromise = this.performAdminVerification(userId);
+        try {
+          isAdmin = await this.adminVerificationPromise;
+          console.log('[FeatureAccess] Fresh admin verification completed');
+        } catch (error) {
+          console.error('[FeatureAccess] CRITICAL: Admin verification failed:', error);
+          adminVerificationFailed = true;
+        } finally {
+          // Clear the promise so future requests can start fresh verification if needed
+          this.adminVerificationPromise = null;
+        }
+      }
     }
     
     // If admin verification failed, try fallback admin detection
@@ -177,49 +339,39 @@ export const featureAccessControl = {
         return adminSubscription;
       }
       
-      // Get user subscription directly from Firebase for non-admin users
-      console.log('[FeatureAccess] Fetching subscription from database...');
-      const subscriptionSnapshot = await get(ref(rtdb, `subscriptions/${userId}`));
-      const subscription = subscriptionSnapshot.val();
-      console.log('[FeatureAccess] Raw subscription data:', subscription);
-      
-      if (!subscription) {
-        console.log('[FeatureAccess] No subscription found for user');
-        return null;
+      // PERFORMANCE OPTIMIZATION: Check session cache for non-admin users
+      if (this.isSessionCacheValid() && this.subscriptionCache && this.subscriptionCache.userId === userId) {
+        console.log('[FeatureAccess] Returning cached subscription: ', this.subscriptionCache.data);
+        return this.subscriptionCache.data;
       }
       
-      // Get tier details
-      const tierId = subscription.tier || 'free'; // Standardized on tier field
-      console.log('[FeatureAccess] Resolved tier ID:', tierId);
-      
-      if (!tierId) {
-        console.warn('[FeatureAccess] Subscription has no tier ID');
-        return null;
+      // Request deduplication: if subscription fetching is already in progress, wait for it
+      if (this.subscriptionFetchPromise) {
+        console.log('[FeatureAccess] Subscription fetch in progress, waiting...');
+        try {
+          const result = await this.subscriptionFetchPromise;
+          console.log('[FeatureAccess] Using subscription result from parallel request');
+          return result;
+        } catch (error) {
+          console.error('[FeatureAccess] Parallel subscription fetch failed:', error);
+          return null;
+        }
+      } else {
+        console.log('[FeatureAccess] Starting fresh subscription fetch');
+        // Start subscription fetch and cache the promise for other parallel requests
+        this.subscriptionFetchPromise = this.performSubscriptionFetch(userId, cacheKey);
+        try {
+          const result = await this.subscriptionFetchPromise;
+          console.log('[FeatureAccess] Fresh subscription fetch completed');
+          return result;
+        } catch (error) {
+          console.error('[FeatureAccess] Subscription fetch failed:', error);
+          return null;
+        } finally {
+          // Clear the promise so future requests can start fresh fetch if needed
+          this.subscriptionFetchPromise = null;
+        }
       }
-      
-      console.log('[FeatureAccess] Fetching tier details...');
-      const tierSnapshot = await get(ref(rtdb, `subscriptionTiers/${tierId}`));
-      const tier = tierSnapshot.val();
-      console.log('[FeatureAccess] Tier data:', tier);
-      
-      if (!tier) {
-        console.warn(`[FeatureAccess] Tier not found: ${tierId}`);
-        return null;
-      }
-      
-      const result = {
-        ...subscription,
-        tierId: tierId,
-        tier: tier
-      };
-      
-      console.log('[FeatureAccess] Final subscription result:', result);
-      
-      // Cache the result
-      this.cache.set(cacheKey, result);
-      this.cacheTimestamps.set(cacheKey, Date.now());
-      
-      return result;
     } catch (error) {
       console.error('[FeatureAccess] Error getting user subscription:', error);
       return null;

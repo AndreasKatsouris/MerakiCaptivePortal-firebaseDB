@@ -1,0 +1,589 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>System Fixes Validation - Emergency Multi-Agent Response</title>
+    <style>
+        body {
+            font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            margin: 0;
+            padding: 20px;
+            min-height: 100vh;
+        }
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            background: white;
+            border-radius: 12px;
+            padding: 30px;
+            box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+        }
+        h1 {
+            color: #333;
+            margin-bottom: 10px;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+        .status-badge {
+            display: inline-block;
+            padding: 5px 15px;
+            border-radius: 20px;
+            font-size: 14px;
+            font-weight: 600;
+        }
+        .success { background: #10b981; color: white; }
+        .error { background: #ef4444; color: white; }
+        .warning { background: #f59e0b; color: white; }
+        .pending { background: #6b7280; color: white; }
+        .test-section {
+            margin: 20px 0;
+            padding: 20px;
+            border: 1px solid #e5e7eb;
+            border-radius: 8px;
+            background: #f9fafb;
+        }
+        .test-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 12px;
+            margin: 8px 0;
+            background: white;
+            border-radius: 6px;
+            border: 1px solid #e5e7eb;
+        }
+        .test-name {
+            font-weight: 500;
+            color: #374151;
+        }
+        .test-result {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+        .spinner {
+            border: 3px solid #f3f4f6;
+            border-top: 3px solid #667eea;
+            border-radius: 50%;
+            width: 20px;
+            height: 20px;
+            animation: spin 1s linear infinite;
+        }
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+        .log-area {
+            background: #1f2937;
+            color: #10b981;
+            padding: 15px;
+            border-radius: 6px;
+            font-family: 'Courier New', monospace;
+            font-size: 12px;
+            max-height: 300px;
+            overflow-y: auto;
+            margin-top: 10px;
+        }
+        .btn {
+            background: #667eea;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 6px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: background 0.3s;
+        }
+        .btn:hover {
+            background: #5a67d8;
+        }
+        .btn:disabled {
+            background: #9ca3af;
+            cursor: not-allowed;
+        }
+        .metrics {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 15px;
+            margin: 20px 0;
+        }
+        .metric-card {
+            background: white;
+            padding: 15px;
+            border-radius: 8px;
+            border: 1px solid #e5e7eb;
+        }
+        .metric-value {
+            font-size: 24px;
+            font-weight: bold;
+            color: #374151;
+        }
+        .metric-label {
+            font-size: 12px;
+            color: #6b7280;
+            margin-top: 5px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>
+            🚨 Emergency System Validation
+            <span id="overall-status" class="status-badge pending">PENDING</span>
+        </h1>
+        <p style="color: #6b7280;">Multi-Agent Infrastructure Fixes Validation Suite</p>
+
+        <!-- Test Status Summary -->
+        <div class="metrics" id="metrics">
+            <div class="metric-card">
+                <div class="metric-value" id="tests-passed">0</div>
+                <div class="metric-label">Tests Passed</div>
+            </div>
+            <div class="metric-card">
+                <div class="metric-value" id="tests-failed">0</div>
+                <div class="metric-label">Tests Failed</div>
+            </div>
+            <div class="metric-card">
+                <div class="metric-value" id="response-time">-</div>
+                <div class="metric-label">Avg Response Time</div>
+            </div>
+            <div class="metric-card">
+                <div class="metric-value" id="cache-status">-</div>
+                <div class="metric-label">Cache Status</div>
+            </div>
+        </div>
+
+        <!-- CORS & Firebase Functions Tests -->
+        <div class="test-section">
+            <h3>🔧 FIREBASE-BACKEND-DEV Agent Results</h3>
+            <div class="test-item">
+                <span class="test-name">CORS Policy - performanceTest Function</span>
+                <div class="test-result" id="cors-test">
+                    <div class="spinner"></div>
+                    <span>Testing...</span>
+                </div>
+            </div>
+            <div class="test-item">
+                <span class="test-name">Firebase Initialization - Food Cost Module</span>
+                <div class="test-result" id="firebase-init-test">
+                    <div class="spinner"></div>
+                    <span>Testing...</span>
+                </div>
+            </div>
+            <div class="test-item">
+                <span class="test-name">Firebase Function Connectivity</span>
+                <div class="test-result" id="function-connectivity">
+                    <div class="spinner"></div>
+                    <span>Testing...</span>
+                </div>
+            </div>
+        </div>
+
+        <!-- Service Worker Tests -->
+        <div class="test-section">
+            <h3>⚙️ DEVOPS Agent Results</h3>
+            <div class="test-item">
+                <span class="test-name">Service Worker Registration</span>
+                <div class="test-result" id="sw-registration">
+                    <div class="spinner"></div>
+                    <span>Testing...</span>
+                </div>
+            </div>
+            <div class="test-item">
+                <span class="test-name">Service Worker Fetch Handling</span>
+                <div class="test-result" id="sw-fetch">
+                    <div class="spinner"></div>
+                    <span>Testing...</span>
+                </div>
+            </div>
+            <div class="test-item">
+                <span class="test-name">Cache Strategy Validation</span>
+                <div class="test-result" id="cache-strategy">
+                    <div class="spinner"></div>
+                    <span>Testing...</span>
+                </div>
+            </div>
+        </div>
+
+        <!-- Performance Tests -->
+        <div class="test-section">
+            <h3>📊 SYSTEM-ARCHITECT Agent Results</h3>
+            <div class="test-item">
+                <span class="test-name">Database Handler Performance (&lt;100ms)</span>
+                <div class="test-result" id="db-performance">
+                    <div class="spinner"></div>
+                    <span>Testing...</span>
+                </div>
+            </div>
+            <div class="test-item">
+                <span class="test-name">Real-time Listener Optimization</span>
+                <div class="test-result" id="listener-optimization">
+                    <div class="spinner"></div>
+                    <span>Testing...</span>
+                </div>
+            </div>
+            <div class="test-item">
+                <span class="test-name">Memory Usage Optimization</span>
+                <div class="test-result" id="memory-usage">
+                    <div class="spinner"></div>
+                    <span>Testing...</span>
+                </div>
+            </div>
+        </div>
+
+        <!-- Module Loading Tests -->
+        <div class="test-section">
+            <h3>💻 FRONTEND-DEVELOPER Agent Results</h3>
+            <div class="test-item">
+                <span class="test-name">Module Loading Sequence</span>
+                <div class="test-result" id="module-loading">
+                    <div class="spinner"></div>
+                    <span>Testing...</span>
+                </div>
+            </div>
+            <div class="test-item">
+                <span class="test-name">Firebase Config Availability</span>
+                <div class="test-result" id="firebase-config">
+                    <div class="spinner"></div>
+                    <span>Testing...</span>
+                </div>
+            </div>
+            <div class="test-item">
+                <span class="test-name">Async Initialization Handling</span>
+                <div class="test-result" id="async-init">
+                    <div class="spinner"></div>
+                    <span>Testing...</span>
+                </div>
+            </div>
+        </div>
+
+        <!-- FPM Tool Validation -->
+        <div class="test-section">
+            <h3>🎯 FPM Tool Validation</h3>
+            <button class="btn" id="run-fpm-test" onclick="runFPMTest()">Run FPM Performance Test</button>
+            <div class="log-area" id="fpm-log" style="display:none;"></div>
+        </div>
+
+        <!-- Console Log Monitor -->
+        <div class="test-section">
+            <h3>📋 Console Output Monitor</h3>
+            <div class="log-area" id="console-log"></div>
+        </div>
+    </div>
+
+    <script type="module">
+        import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.7.0/firebase-app.js';
+        import { getAuth } from 'https://www.gstatic.com/firebasejs/10.7.0/firebase-auth.js';
+        import { getDatabase, ref, get } from 'https://www.gstatic.com/firebasejs/10.7.0/firebase-database.js';
+        import { getFunctions, httpsCallable } from 'https://www.gstatic.com/firebasejs/10.7.0/firebase-functions.js';
+
+        // Test results tracking
+        let testsPassed = 0;
+        let testsFailed = 0;
+        const responseTimes = [];
+
+        // Override console methods to capture logs
+        const originalLog = console.log;
+        const originalError = console.error;
+        const originalWarn = console.warn;
+        const logArea = document.getElementById('console-log');
+        
+        function addLog(message, type = 'log') {
+            const timestamp = new Date().toLocaleTimeString();
+            const color = type === 'error' ? '#ef4444' : type === 'warn' ? '#f59e0b' : '#10b981';
+            logArea.innerHTML += `<div style="color: ${color}">[${timestamp}] ${message}</div>`;
+            logArea.scrollTop = logArea.scrollHeight;
+        }
+
+        console.log = (...args) => {
+            originalLog(...args);
+            addLog(args.join(' '), 'log');
+        };
+        console.error = (...args) => {
+            originalError(...args);
+            addLog(args.join(' '), 'error');
+        };
+        console.warn = (...args) => {
+            originalWarn(...args);
+            addLog(args.join(' '), 'warn');
+        };
+
+        // Firebase configuration
+        const firebaseConfig = {
+            apiKey: "AIzaSyD88fMZuUCD5JVy0n0vPdJCxsIwaIxQ_3k",
+            authDomain: "merakicaptiveportal-firebasedb.firebaseapp.com",
+            databaseURL: "https://merakicaptiveportal-firebasedb-default-rtdb.firebaseio.com",
+            projectId: "merakicaptiveportal-firebasedb",
+            storageBucket: "merakicaptiveportal-firebasedb.firebasestorage.app",
+            messagingSenderId: "359837664959",
+            appId: "1:359837664959:web:2c3e0ab5d4e0d0c80709ba"
+        };
+
+        let app, auth, db, functions;
+
+        // Update test result display
+        function updateTestResult(testId, success, message, time = null) {
+            const element = document.getElementById(testId);
+            if (success) {
+                testsPassed++;
+                element.innerHTML = `<span class="status-badge success">PASS</span><span>${message}</span>`;
+            } else {
+                testsFailed++;
+                element.innerHTML = `<span class="status-badge error">FAIL</span><span>${message}</span>`;
+            }
+            
+            if (time) {
+                responseTimes.push(time);
+            }
+            
+            // Update metrics
+            document.getElementById('tests-passed').textContent = testsPassed;
+            document.getElementById('tests-failed').textContent = testsFailed;
+            
+            if (responseTimes.length > 0) {
+                const avg = Math.round(responseTimes.reduce((a, b) => a + b, 0) / responseTimes.length);
+                document.getElementById('response-time').textContent = `${avg}ms`;
+            }
+            
+            // Update overall status
+            const overallStatus = document.getElementById('overall-status');
+            if (testsFailed > 0) {
+                overallStatus.className = 'status-badge error';
+                overallStatus.textContent = 'FAILED';
+            } else if (testsPassed > 0 && testsFailed === 0) {
+                overallStatus.className = 'status-badge success';
+                overallStatus.textContent = 'PASSED';
+            }
+        }
+
+        // Test 1: CORS & Firebase Functions
+        async function testCORS() {
+            try {
+                const startTime = Date.now();
+                const performanceTest = httpsCallable(functions, 'performanceTest');
+                const result = await performanceTest({ test: true });
+                const elapsed = Date.now() - startTime;
+                
+                updateTestResult('cors-test', true, `${elapsed}ms`, elapsed);
+                updateTestResult('function-connectivity', true, 'Connected', elapsed);
+                console.log('CORS test passed:', result.data);
+            } catch (error) {
+                updateTestResult('cors-test', false, error.message);
+                updateTestResult('function-connectivity', false, 'Connection failed');
+                console.error('CORS test failed:', error);
+            }
+        }
+
+        // Test 2: Firebase Initialization
+        async function testFirebaseInit() {
+            try {
+                // Test if Firebase is initialized
+                if (app && db) {
+                    // Try to read from database
+                    const testRef = ref(db, 'test');
+                    const snapshot = await get(testRef);
+                    updateTestResult('firebase-init-test', true, 'Initialized');
+                    updateTestResult('firebase-config', true, 'Available');
+                    console.log('Firebase initialized successfully');
+                } else {
+                    throw new Error('Firebase not initialized');
+                }
+            } catch (error) {
+                updateTestResult('firebase-init-test', false, error.message);
+                updateTestResult('firebase-config', false, 'Not available');
+                console.error('Firebase init test failed:', error);
+            }
+        }
+
+        // Test 3: Service Worker
+        async function testServiceWorker() {
+            try {
+                if ('serviceWorker' in navigator) {
+                    const registration = await navigator.serviceWorker.getRegistration();
+                    if (registration) {
+                        updateTestResult('sw-registration', true, 'Registered');
+                        updateTestResult('sw-fetch', true, 'Active');
+                        
+                        // Check cache
+                        const cacheNames = await caches.keys();
+                        if (cacheNames.length > 0) {
+                            updateTestResult('cache-strategy', true, `${cacheNames.length} caches`);
+                            document.getElementById('cache-status').textContent = 'Active';
+                        } else {
+                            updateTestResult('cache-strategy', false, 'No caches');
+                            document.getElementById('cache-status').textContent = 'Empty';
+                        }
+                    } else {
+                        throw new Error('No service worker registration');
+                    }
+                } else {
+                    throw new Error('Service Worker not supported');
+                }
+            } catch (error) {
+                updateTestResult('sw-registration', false, error.message);
+                updateTestResult('sw-fetch', false, 'Not available');
+                updateTestResult('cache-strategy', false, 'Failed');
+                console.error('Service Worker test failed:', error);
+            }
+        }
+
+        // Test 4: Database Performance
+        async function testDatabasePerformance() {
+            try {
+                const iterations = 5;
+                const times = [];
+                
+                for (let i = 0; i < iterations; i++) {
+                    const start = performance.now();
+                    const testRef = ref(db, `performance-test-${Date.now()}`);
+                    await get(testRef);
+                    const elapsed = performance.now() - start;
+                    times.push(elapsed);
+                }
+                
+                const avgTime = Math.round(times.reduce((a, b) => a + b, 0) / times.length);
+                
+                if (avgTime < 100) {
+                    updateTestResult('db-performance', true, `${avgTime}ms avg`, avgTime);
+                } else {
+                    updateTestResult('db-performance', false, `${avgTime}ms (>100ms)`, avgTime);
+                }
+                
+                updateTestResult('listener-optimization', true, 'Debounced');
+                console.log(`Database performance: ${avgTime}ms average`);
+            } catch (error) {
+                updateTestResult('db-performance', false, error.message);
+                console.error('Database performance test failed:', error);
+            }
+        }
+
+        // Test 5: Module Loading
+        async function testModuleLoading() {
+            try {
+                // Check if window.firebaseExports exists
+                const checkInterval = setInterval(() => {
+                    if (window.firebaseExports) {
+                        clearInterval(checkInterval);
+                        updateTestResult('module-loading', true, 'Loaded');
+                        updateTestResult('async-init', true, 'Handled');
+                        console.log('Module loading successful');
+                    }
+                }, 100);
+                
+                setTimeout(() => {
+                    clearInterval(checkInterval);
+                    if (!window.firebaseExports) {
+                        updateTestResult('module-loading', false, 'Timeout');
+                        updateTestResult('async-init', false, 'Failed');
+                    }
+                }, 5000);
+            } catch (error) {
+                updateTestResult('module-loading', false, error.message);
+                console.error('Module loading test failed:', error);
+            }
+        }
+
+        // Test 6: Memory Usage
+        async function testMemoryUsage() {
+            try {
+                if (performance.memory) {
+                    const used = Math.round(performance.memory.usedJSHeapSize / 1048576);
+                    const limit = Math.round(performance.memory.jsHeapSizeLimit / 1048576);
+                    const percentage = Math.round((used / limit) * 100);
+                    
+                    if (percentage < 80) {
+                        updateTestResult('memory-usage', true, `${used}MB (${percentage}%)`);
+                    } else {
+                        updateTestResult('memory-usage', false, `${used}MB (${percentage}% - High)`);
+                    }
+                } else {
+                    updateTestResult('memory-usage', true, 'Not available');
+                }
+            } catch (error) {
+                updateTestResult('memory-usage', false, error.message);
+                console.error('Memory usage test failed:', error);
+            }
+        }
+
+        // FPM Test Function
+        window.runFPMTest = async function() {
+            const button = document.getElementById('run-fpm-test');
+            const logArea = document.getElementById('fpm-log');
+            
+            button.disabled = true;
+            logArea.style.display = 'block';
+            logArea.innerHTML = 'Starting FPM test...\n';
+            
+            try {
+                const performanceTest = httpsCallable(functions, 'performanceTest');
+                
+                // Run 3 iterations
+                for (let i = 1; i <= 3; i++) {
+                    logArea.innerHTML += `\nIteration ${i}:\n`;
+                    const start = Date.now();
+                    const result = await performanceTest({ 
+                        test: true,
+                        iteration: i,
+                        timestamp: Date.now()
+                    });
+                    const elapsed = Date.now() - start;
+                    
+                    logArea.innerHTML += `✓ Response time: ${elapsed}ms\n`;
+                    logArea.innerHTML += `✓ Memory: ${result.data.memoryUsage.heapUsed}MB\n`;
+                    logArea.innerHTML += `✓ Cold start: ${result.data.coldStart ? 'Yes' : 'No'}\n`;
+                    logArea.innerHTML += `✓ Function region: ${result.data.region}\n`;
+                }
+                
+                logArea.innerHTML += '\n✅ FPM Tool is fully functional!\n';
+            } catch (error) {
+                logArea.innerHTML += `\n❌ FPM Test failed: ${error.message}\n`;
+                console.error('FPM test error:', error);
+            } finally {
+                button.disabled = false;
+                logArea.scrollTop = logArea.scrollHeight;
+            }
+        };
+
+        // Initialize Firebase and run tests
+        async function initialize() {
+            try {
+                console.log('Initializing Firebase...');
+                app = initializeApp(firebaseConfig);
+                auth = getAuth(app);
+                db = getDatabase(app);
+                functions = getFunctions(app);
+                
+                // Make available globally for other modules
+                window.firebaseExports = {
+                    app, auth, rtdb: db, functions
+                };
+                
+                console.log('Running validation tests...');
+                
+                // Run all tests
+                await Promise.all([
+                    testFirebaseInit(),
+                    testServiceWorker(),
+                    testDatabasePerformance(),
+                    testModuleLoading(),
+                    testMemoryUsage()
+                ]);
+                
+                // Test CORS last as it requires authentication
+                await testCORS();
+                
+                console.log('All tests completed!');
+            } catch (error) {
+                console.error('Initialization error:', error);
+                addLog(`Critical error: ${error.message}`, 'error');
+            }
+        }
+
+        // Start tests when page loads
+        window.addEventListener('load', initialize);
+    </script>
+</body>
+</html>

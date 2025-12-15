@@ -3,7 +3,7 @@
  * Handles user registration for the Laki Sparks platform
  */
 
-import { auth, rtdb, ref, get, functions, httpsCallable } from './config/firebase-config.js';
+import { auth, rtdb, ref, get, set, push, functions, httpsCallable, onAuthStateChanged } from './config/firebase-config.js';
 import { createUserWithEmailAndPassword, updateProfile } from 'https://www.gstatic.com/firebasejs/10.12.5/firebase-auth.js';
 import { showToast } from './utils/toast.js';
 
@@ -192,19 +192,21 @@ class SignupManager {
 
         // Get form values
         const formData = {
-            businessName: document.getElementById('businessName').value.trim(),
-            businessAddress: document.getElementById('businessAddress').value.trim(),
-            businessPhone: document.getElementById('businessPhone').value.trim(),
-            businessType: document.getElementById('businessType').value,
             firstName: document.getElementById('firstName').value.trim(),
             lastName: document.getElementById('lastName').value.trim(),
             email: document.getElementById('email').value.trim(),
             password: document.getElementById('password').value,
-            confirmPassword: document.getElementById('confirmPassword').value
+            businessName: document.getElementById('businessName').value.trim(),
+            businessAddress: document.getElementById('businessAddress').value.trim(),
+            businessPhone: document.getElementById('businessPhone').value.trim(),
+            businessType: document.getElementById('businessType').value,
+            isFranchise: document.getElementById('isFranchise').checked,
+            franchiseName: document.getElementById('franchiseName')?.value.trim() || '',
+            brandName: document.getElementById('brandName')?.value.trim() || ''
         };
 
         // Validate passwords match
-        if (formData.password !== formData.confirmPassword) {
+        if (formData.password !== document.getElementById('confirmPassword').value) {
             showToast('Passwords do not match', 'error');
             return;
         }
@@ -227,29 +229,171 @@ class SignupManager {
         submitBtnSpinner.style.display = 'inline-block';
 
         try {
-            // Create user account
-            const userCredential = await createUserWithEmailAndPassword(auth, formData.email, formData.password);
-            const user = userCredential.user;
-
-            // Update user profile
-            await updateProfile(user, {
-                displayName: `${formData.firstName} ${formData.lastName}`
-            });
-
-            // Use the registerUser Cloud Function to create user data in the database
-            const registerUserFunction = httpsCallable(functions, 'registerUser');
-            
-            // Call the Cloud Function with user data
-            await registerUserFunction({
-                firstName: formData.firstName,
-                lastName: formData.lastName,
-                businessName: formData.businessName,
-                businessAddress: formData.businessAddress,
-                businessPhone: formData.businessPhone,
-                businessType: formData.businessType,
-                selectedTier: this.selectedTier,
-                tierData: this.tiers[this.selectedTier] || {}
-            });
+            try {
+                // Create user account
+                const userCredential = await createUserWithEmailAndPassword(auth, formData.email, formData.password);
+                const user = userCredential.user;
+                
+                // Update user profile
+                await updateProfile(user, {
+                    displayName: `${formData.firstName} ${formData.lastName}`
+                });
+                
+                // Force refresh the ID token to ensure it includes all necessary claims
+                const idToken = await user.getIdToken(true);
+                
+                // Wait for auth state to be fully established
+                // This is critical for the cloud function to receive the auth context
+                await new Promise((resolve) => {
+                    const unsubscribe = onAuthStateChanged(auth, (currentUser) => {
+                        if (currentUser && currentUser.uid === user.uid) {
+                            unsubscribe();
+                            resolve();
+                        }
+                    });
+                });
+                
+                // Get the functions instance and ensure we have the latest auth token
+                const freshUser = auth.currentUser;
+                if (!freshUser) {
+                    throw new Error('User authentication failed - please try again');
+                }
+                
+                // Get a fresh token right before the function call
+                await freshUser.getIdToken(true);
+                
+                // Try the registerUser Cloud Function first
+                let registrationSuccessful = false;
+                try {
+                    const registerUserFunction = httpsCallable(functions, 'registerUser');
+                    
+                    // Call the Cloud Function with user data
+                    const result = await registerUserFunction({
+                        firstName: formData.firstName,
+                        lastName: formData.lastName,
+                        businessName: formData.businessName,
+                        businessAddress: formData.businessAddress,
+                        businessPhone: formData.businessPhone,
+                        businessType: formData.businessType,
+                        isFranchise: formData.isFranchise,
+                        franchiseName: formData.franchiseName,
+                        brandName: formData.brandName,
+                        selectedTier: this.selectedTier,
+                        tierData: this.tiers[this.selectedTier] || {}
+                    });
+                    
+                    if (result.data && result.data.success) {
+                        registrationSuccessful = true;
+                    }
+                } catch (functionError) {
+                    console.warn('[Signup] Cloud function failed:', functionError);
+                    // Continue with fallback approach
+                }
+                
+                // If cloud function failed, use direct database write as fallback
+                if (!registrationSuccessful) {
+                    console.log('[Signup] Using fallback database write');
+                    
+                    // Create user data
+                    const userData = {
+                        uid: freshUser.uid,
+                        email: freshUser.email,
+                        firstName: formData.firstName,
+                        lastName: formData.lastName,
+                        displayName: `${formData.firstName} ${formData.lastName}`,
+                        businessInfo: {
+                            name: formData.businessName,
+                            address: formData.businessAddress,
+                            phone: formData.businessPhone,
+                            type: formData.businessType
+                        },
+                        isFranchise: formData.isFranchise,
+                        franchiseName: formData.franchiseName,
+                        brandName: formData.brandName,
+                        createdAt: Date.now(),
+                        updatedAt: Date.now(),
+                        status: 'active',
+                        role: 'user'
+                    };
+                    
+                    // Create subscription data
+                    const subscriptionData = {
+                        userId: freshUser.uid,
+                        tier: this.selectedTier,
+                        status: 'trial',
+                        startDate: Date.now(),
+                        trialEndDate: Date.now() + (14 * 24 * 60 * 60 * 1000), // 14-day trial
+                        features: (this.tiers[this.selectedTier] || {}).features || {},
+                        limits: (this.tiers[this.selectedTier] || {}).limits || {},
+                        metadata: {
+                            signupSource: 'web',
+                            initialTier: this.selectedTier
+                        }
+                    };
+                    
+                    // Create location data
+                    const locationData = {
+                        name: formData.businessName,
+                        address: formData.businessAddress,
+                        phone: formData.businessPhone,
+                        type: formData.businessType,
+                        ownerId: freshUser.uid,
+                        isFranchise: formData.isFranchise,
+                        franchiseName: formData.franchiseName,
+                        brandName: formData.brandName || formData.businessName,
+                        createdAt: Date.now(),
+                        status: 'active'
+                    };
+                    
+                    // Save all data to database with overwrite protection
+                    const userRef = ref(rtdb, `users/${freshUser.uid}`);
+                    const subscriptionRef = ref(rtdb, `subscriptions/${freshUser.uid}`);
+                    
+                    // Double-check if user exists (race condition protection)
+                    const existingUserSnapshot = await get(userRef);
+                    if (existingUserSnapshot.exists()) {
+                        console.log(`⚠️ [Signup] User ${freshUser.uid} already exists, merging data instead of overwriting`);
+                        const existingUserData = existingUserSnapshot.val();
+                        
+                        // Preserve existing data, especially phone numbers
+                        const mergedUserData = {
+                            ...existingUserData,
+                            ...userData,
+                            // Explicitly preserve phone numbers if they exist
+                            phoneNumber: existingUserData.phoneNumber || userData.phoneNumber,
+                            phone: existingUserData.phone || userData.phone,
+                            businessPhone: existingUserData.businessPhone || userData.businessPhone,
+                            updatedAt: Date.now()
+                        };
+                        
+                        await update(userRef, mergedUserData);
+                    } else {
+                        await set(userRef, userData);
+                    }
+                    
+                    // Check subscription as well
+                    const existingSubscriptionSnapshot = await get(subscriptionRef);
+                    if (existingSubscriptionSnapshot.exists()) {
+                        console.log(`⚠️ [Signup] Subscription ${freshUser.uid} already exists, merging data`);
+                        const existingSubscriptionData = existingSubscriptionSnapshot.val();
+                        const mergedSubscriptionData = {
+                            ...existingSubscriptionData,
+                            ...subscriptionData,
+                            updatedAt: Date.now()
+                        };
+                        await update(subscriptionRef, mergedSubscriptionData);
+                    } else {
+                        await set(subscriptionRef, subscriptionData);
+                    }
+                    
+                    // Create location and link to user
+                    const newLocationRef = push(ref(rtdb, 'locations'));
+                    await set(newLocationRef, locationData);
+                    await set(ref(rtdb, `userLocations/${freshUser.uid}/${newLocationRef.key}`), true);
+                }
+            } catch (userCreationError) {
+                throw userCreationError;
+            }
 
             showToast('Account created successfully! Redirecting to dashboard...', 'success');
 

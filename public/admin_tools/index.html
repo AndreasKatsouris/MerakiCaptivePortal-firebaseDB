@@ -1,0 +1,962 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Admin Tools - Meraki Captive Portal</title>
+    
+    <!-- Bootstrap CSS -->
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <!-- Font Awesome -->
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    
+    <style>
+        /* Initially hide the page content until admin verification is complete */
+        body {
+            visibility: hidden;
+        }
+        
+        body.admin-verified {
+            visibility: visible;
+        }
+        
+        .tool-card {
+            transition: transform 0.2s, box-shadow 0.2s;
+            height: 100%;
+        }
+        
+        .tool-card:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 8px 25px rgba(0,0,0,0.15);
+        }
+        
+        .category-header {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 1rem;
+            border-radius: 0.5rem;
+            margin-bottom: 1.5rem;
+        }
+        
+        .tool-badge {
+            font-size: 0.75rem;
+            padding: 0.25rem 0.5rem;
+        }
+        
+        .back-button {
+            position: fixed;
+            top: 20px;
+            left: 20px;
+            z-index: 1000;
+        }
+        
+        .search-box {
+            position: sticky;
+            top: 20px;
+            z-index: 100;
+            background: white;
+            padding: 1rem;
+            border-radius: 0.5rem;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+            margin-bottom: 2rem;
+        }
+        
+        .admin-status {
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            z-index: 1000;
+            background: rgba(255, 255, 255, 0.95);
+            padding: 0.5rem 1rem;
+            border-radius: 0.25rem;
+            border: 1px solid #ddd;
+            font-size: 0.875rem;
+        }
+        
+        .loading-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(255, 255, 255, 0.95);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            z-index: 9999;
+            visibility: visible;
+        }
+        
+        .loading-overlay.hidden {
+            display: none;
+        }
+    </style>
+</head>
+<body class="bg-light">
+    <!-- Loading Overlay -->
+    <div id="loadingOverlay" class="loading-overlay">
+        <div class="text-center">
+            <div class="spinner-border text-primary mb-3" role="status">
+                <span class="visually-hidden">Loading...</span>
+            </div>
+            <h5>Verifying Admin Access...</h5>
+            <p class="text-muted">Please wait while we authenticate your credentials</p>
+        </div>
+    </div>
+
+    <!-- Admin Status Badge -->
+    <div id="adminStatus" class="admin-status">
+        <i class="fas fa-shield-alt text-success me-1"></i>
+        <span id="adminStatusText">Admin Verified</span>
+    </div>
+
+    <!-- Back Button -->
+    <a href="../admin-dashboard.html" class="btn btn-secondary back-button">
+        <i class="fas fa-arrow-left me-2"></i>Back to Dashboard
+    </a>
+    
+    <div class="container py-5">
+        <div class="text-center mb-5">
+            <h1 class="display-4 mb-3">
+                <i class="fas fa-tools me-3"></i>Admin Tools & Utilities
+            </h1>
+            <p class="lead">Comprehensive collection of testing, debugging, and administration tools</p>
+            <div class="alert alert-info" role="alert">
+                <i class="fas fa-info-circle me-2"></i>
+                <strong>Admin Access Required:</strong> These tools are restricted to verified administrators only.
+            </div>
+        </div>
+        
+        <!-- Search Box -->
+        <div class="search-box">
+            <div class="input-group">
+                <span class="input-group-text">
+                    <i class="fas fa-search"></i>
+                </span>
+                <input type="text" class="form-control" id="searchInput" placeholder="Search tools by name or description...">
+                <button class="btn btn-outline-secondary" type="button" onclick="clearSearch()">
+                    <i class="fas fa-times"></i>
+                </button>
+            </div>
+        </div>
+        
+        <!-- Database & Migration Tools -->
+        <div class="category-section" data-category="database">
+            <div class="category-header">
+                <h2 class="mb-0">
+                    <i class="fas fa-database me-3"></i>Database & Migration Tools
+                </h2>
+                <p class="mb-0 mt-2">Tools for database management, migration, and data integrity</p>
+            </div>
+            
+            <div class="row">
+                <div class="col-md-6 col-lg-4 mb-4">
+                    <div class="card tool-card">
+                        <div class="card-body">
+                            <h5 class="card-title">
+                                <i class="fas fa-exchange-alt text-primary me-2"></i>Database Structure Migration
+                                <span class="badge bg-danger tool-badge">Critical</span>
+                            </h5>
+                            <p class="card-text">Migrate from nested location structure to normalized database structure for better performance and scalability.</p>
+                            <a href="database-structure-migration.html" class="btn btn-danger btn-sm">
+                                <i class="fas fa-database me-1"></i>Open Migration Tool
+                            </a>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="col-md-6 col-lg-4 mb-4">
+                    <div class="card tool-card">
+                        <div class="card-body">
+                            <h5 class="card-title">
+                                <i class="fas fa-wrench text-warning me-2"></i>Data Integrity Repair Tool
+                                <span class="badge bg-warning tool-badge">Pre-Migration</span>
+                            </h5>
+                            <p class="card-text">Fix data validation issues before migration. Repairs missing selectedLocationId, storeName, and other integrity problems.</p>
+                            <a href="repair-data-integrity.html" class="btn btn-warning btn-sm">
+                                <i class="fas fa-wrench me-1"></i>Open Repair Tool
+                            </a>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="col-md-6 col-lg-4 mb-4">
+                    <div class="card tool-card">
+                        <div class="card-body">
+                            <h5 class="card-title">
+                                <i class="fas fa-file-invoice text-warning me-2"></i>Purchase Order Fix Test
+                                <span class="badge bg-warning tool-badge">Bug Fix</span>
+                            </h5>
+                            <p class="card-text">Tests the fix for Purchase Order location name issues in the food cost module.</p>
+                            <a href="test-purchase-order-fix.html" class="btn btn-primary btn-sm">
+                                <i class="fas fa-external-link-alt me-1"></i>Open Tool
+                            </a>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="col-md-6 col-lg-4 mb-4">
+                    <div class="card tool-card">
+                        <div class="card-body">
+                            <h5 class="card-title">
+                                <i class="fas fa-warehouse text-info me-2"></i>Stock Data Migration
+                                <span class="badge bg-info tool-badge">Data Tool</span>
+                            </h5>
+                            <p class="card-text">Allocate and migrate stock data to specific locations with validation and integrity checks.</p>
+                            <a href="allocate-stock-to-locations.html" class="btn btn-primary btn-sm">
+                                <i class="fas fa-external-link-alt me-1"></i>Open Tool
+                            </a>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="col-md-6 col-lg-4 mb-4">
+                    <div class="card tool-card">
+                        <div class="card-body">
+                            <h5 class="card-title">
+                                <i class="fas fa-check-double text-success me-2"></i>Advanced Purchase Orders Test
+                                <span class="badge bg-success tool-badge">Post-Migration</span>
+                            </h5>
+                            <p class="card-text">Comprehensive testing of Advanced Purchase Order functionality after database migration to verify everything works correctly.</p>
+                            <a href="test-advanced-purchase-orders.html" class="btn btn-success btn-sm">
+                                <i class="fas fa-check-double me-1"></i>Test Purchase Orders
+                            </a>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="col-md-6 col-lg-4 mb-4">
+                    <div class="card tool-card">
+                        <div class="card-body">
+                            <h5 class="card-title">
+                                <i class="fas fa-search-plus text-primary me-2"></i>Purchase Order Workflow Diagnostic
+                                <span class="badge bg-primary tool-badge">Debugging</span>
+                            </h5>
+                            <p class="card-text">Step-by-step diagnostic tool to identify location matching issues in Purchase Order workflow. Traces data flow and identifies mismatches.</p>
+                            <a href="purchase-order-workflow-diagnostic.html" class="btn btn-primary btn-sm">
+                                <i class="fas fa-diagnoses me-1"></i>Start Diagnostic
+                            </a>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="col-md-6 col-lg-4 mb-4">
+                    <div class="card tool-card">
+                        <div class="card-body">
+                            <h5 class="card-title">
+                                <i class="fas fa-bolt text-warning me-2"></i>Quick Location Diagnostic
+                                <span class="badge bg-warning tool-badge">Quick Test</span>
+                            </h5>
+                            <p class="card-text">Fast diagnostic specifically for Ocean Basket Brits location matching issue. Tests all data sources and matching strategies.</p>
+                            <a href="quick-location-diagnostic.html" class="btn btn-warning btn-sm">
+                                <i class="fas fa-zap me-1"></i>Quick Test
+                            </a>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="col-md-6 col-lg-4 mb-4">
+                    <div class="card tool-card">
+                        <div class="card-body">
+                            <h5 class="card-title">
+                                <i class="fas fa-rocket text-success me-2"></i>Enhanced Purchase Order Test
+                                <span class="badge bg-success tool-badge">Final Test</span>
+                            </h5>
+                            <p class="card-text">End-to-end test of the enhanced Advanced Purchase Order functionality. Simulates the exact workflow with Ocean Basket Brits data.</p>
+                            <a href="test-enhanced-purchase-order.html" class="btn btn-success btn-sm">
+                                <i class="fas fa-rocket me-1"></i>Test Enhanced PO
+                            </a>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Testing & Debugging Tools -->
+        <div class="category-section" data-category="testing">
+            <div class="category-header">
+                <h2 class="mb-0">
+                    <i class="fas fa-bug me-3"></i>Testing & Debugging Tools
+                </h2>
+                <p class="mb-0 mt-2">Tools for testing system functionality and debugging issues</p>
+            </div>
+            
+            <div class="row">
+                <div class="col-md-6 col-lg-4 mb-4">
+                    <div class="card tool-card">
+                        <div class="card-body">
+                            <h5 class="card-title">
+                                <i class="fas fa-table text-primary me-2"></i>Food Cost Tables Test
+                                <span class="badge bg-warning tool-badge">UI Test</span>
+                            </h5>
+                            <p class="card-text">Tests table header visibility and styling in the Food Cost module. Ensures proper contrast and readability.</p>
+                            <a href="test-food-cost-tables.html" class="btn btn-primary btn-sm">
+                                <i class="fas fa-external-link-alt me-1"></i>Open Tool
+                            </a>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="col-md-6 col-lg-4 mb-4">
+                    <div class="card tool-card">
+                        <div class="card-body">
+                            <h5 class="card-title">
+                                <i class="fas fa-eye text-info me-2"></i>Table Visibility Test
+                                <span class="badge bg-info tool-badge">CSS Test</span>
+                            </h5>
+                            <p class="card-text">Tests table visibility and styling issues across different components and modal overlays.</p>
+                            <a href="test-table-visibility.html" class="btn btn-primary btn-sm">
+                                <i class="fas fa-external-link-alt me-1"></i>Open Tool
+                            </a>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="col-md-6 col-lg-4 mb-4">
+                    <div class="card tool-card">
+                        <div class="card-body">
+                            <h5 class="card-title">
+                                <i class="fas fa-chart-line text-success me-2"></i>Analytics Tests
+                                <span class="badge bg-success tool-badge">Analytics</span>
+                            </h5>
+                            <p class="card-text">Multiple analytics testing pages for admin, sales data, and simple analytics verification.</p>
+                            <div class="btn-group-vertical w-100">
+                                <a href="test-analytics-admin.html" class="btn btn-outline-primary btn-sm">Admin Analytics</a>
+                                <a href="test-analytics-with-sales.html" class="btn btn-outline-primary btn-sm">Sales Analytics</a>
+                                <a href="test-analytics-simple.html" class="btn btn-outline-primary btn-sm">Simple Analytics</a>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="col-md-6 col-lg-4 mb-4">
+                    <div class="card tool-card">
+                        <div class="card-body">
+                            <h5 class="card-title">
+                                <i class="fas fa-utensils text-warning me-2"></i>Food Cost Analytics Test
+                                <span class="badge bg-warning tool-badge">Food Cost</span>
+                            </h5>
+                            <p class="card-text">Comprehensive testing of food cost analytics dashboard with charts and KPIs.</p>
+                            <a href="test-food-cost-analytics.html" class="btn btn-primary btn-sm">
+                                <i class="fas fa-external-link-alt me-1"></i>Open Tool
+                            </a>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="col-md-6 col-lg-4 mb-4">
+                    <div class="card tool-card">
+                        <div class="card-body">
+                            <h5 class="card-title">
+                                <i class="fas fa-layer-group text-purple me-2"></i>Tier Management Test
+                                <span class="badge bg-secondary tool-badge">Access Control</span>
+                            </h5>
+                            <p class="card-text">Tests the enhanced user subscription manager and tier management functionality.</p>
+                            <a href="test-tier-management.html" class="btn btn-primary btn-sm">
+                                <i class="fas fa-external-link-alt me-1"></i>Open Tool
+                            </a>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="col-md-6 col-lg-4 mb-4">
+                    <div class="card tool-card">
+                        <div class="card-body">
+                            <h5 class="card-title">
+                                <i class="fas fa-shield-alt text-danger me-2"></i>Firebase & Auth Tests
+                                <span class="badge bg-danger tool-badge">Security</span>
+                            </h5>
+                            <p class="card-text">Test Firebase paths, rules, authentication status, and location data.</p>
+                            <div class="btn-group-vertical w-100">
+                                <a href="test-firebase-paths.html" class="btn btn-outline-primary btn-sm">Firebase Paths</a>
+                                <a href="test-firebase-rules.html" class="btn btn-outline-primary btn-sm">Firebase Rules</a>
+                                <a href="test-auth-status.html" class="btn btn-outline-primary btn-sm">Auth Status</a>
+                                <a href="test-locations.html" class="btn btn-outline-primary btn-sm">Locations Test</a>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="col-md-6 col-lg-4 mb-4">
+                    <div class="card tool-card">
+                        <div class="card-body">
+                            <h5 class="card-title">
+                                <i class="fas fa-user-shield text-primary me-2"></i>Tier Access Tests
+                                <span class="badge bg-primary tool-badge">Subscription</span>
+                            </h5>
+                            <p class="card-text">Test tier-based access control and subscription page functionality.</p>
+                            <div class="btn-group-vertical w-100">
+                                <a href="test-tier-access.html" class="btn btn-outline-primary btn-sm">Tier Access v1</a>
+                                <a href="test-tier-access-v2.html" class="btn btn-outline-primary btn-sm">Tier Access v2</a>
+                                <a href="test-subscription-page.html" class="btn btn-outline-primary btn-sm">Subscription Page</a>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="col-md-6 col-lg-4 mb-4">
+                    <div class="card tool-card">
+                        <div class="card-body">
+                            <h5 class="card-title">
+                                <i class="fas fa-hamburger text-success me-2"></i>Food Cost Test
+                                <span class="badge bg-success tool-badge">Food Cost</span>
+                            </h5>
+                            <p class="card-text">Basic food cost functionality test page for core features validation.</p>
+                            <a href="food-cost-test.html" class="btn btn-primary btn-sm">
+                                <i class="fas fa-external-link-alt me-1"></i>Open Tool
+                            </a>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Data Checking & Verification Tools -->
+        <div class="category-section" data-category="verification">
+            <div class="category-header">
+                <h2 class="mb-0">
+                    <i class="fas fa-search me-3"></i>Data Checking & Verification Tools
+                </h2>
+                <p class="mb-0 mt-2">Tools for verifying data integrity and system status</p>
+            </div>
+            
+            <div class="row">
+                <div class="col-md-6 col-lg-4 mb-4">
+                    <div class="card tool-card">
+                        <div class="card-body">
+                            <h5 class="card-title">
+                                <i class="fas fa-database text-info me-2"></i>Stock Data Checker
+                                <span class="badge bg-info tool-badge">Data Verification</span>
+                            </h5>
+                            <p class="card-text">Checks stock usage data integrity across locations and database paths.</p>
+                            <a href="check-stock-data.html" class="btn btn-primary btn-sm">
+                                <i class="fas fa-external-link-alt me-1"></i>Open Tool
+                            </a>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="col-md-6 col-lg-4 mb-4">
+                    <div class="card tool-card">
+                        <div class="card-body">
+                            <h5 class="card-title">
+                                <i class="fas fa-check-circle text-success me-2"></i>Analytics Verifier
+                                <span class="badge bg-success tool-badge">Analytics</span>
+                            </h5>
+                            <p class="card-text">Quick verification of food cost analytics features and fixes status.</p>
+                            <a href="verify-analytics.html" class="btn btn-primary btn-sm">
+                                <i class="fas fa-external-link-alt me-1"></i>Open Tool
+                            </a>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="col-md-6 col-lg-4 mb-4">
+                    <div class="card tool-card">
+                        <div class="card-body">
+                            <h5 class="card-title">
+                                <i class="fas fa-layer-group text-purple me-2"></i>Tier Features Checker
+                                <span class="badge bg-secondary tool-badge">Features</span>
+                            </h5>
+                            <p class="card-text">Checks what features are enabled for each subscription tier.</p>
+                            <a href="check-tier-features.html" class="btn btn-primary btn-sm">
+                                <i class="fas fa-external-link-alt me-1"></i>Open Tool
+                            </a>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="col-md-6 col-lg-4 mb-4">
+                    <div class="card tool-card">
+                        <div class="card-body">
+                            <h5 class="card-title">
+                                <i class="fas fa-user-check text-warning me-2"></i>User Auth Checker
+                                <span class="badge bg-warning tool-badge">Authentication</span>
+                            </h5>
+                            <p class="card-text">Verifies user authentication status and permissions.</p>
+                            <a href="check-user-auth.html" class="btn btn-primary btn-sm">
+                                <i class="fas fa-external-link-alt me-1"></i>Open Tool
+                            </a>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="col-md-6 col-lg-4 mb-4">
+                    <div class="card tool-card">
+                        <div class="card-body">
+                            <h5 class="card-title">
+                                <i class="fas fa-broom text-danger me-2"></i>Cleanup Orphaned Rewards
+                                <span class="badge bg-danger tool-badge">Data Cleanup</span>
+                            </h5>
+                            <p class="card-text">Scans for and removes orphaned reward references that cause WhatsApp bot errors. Fixes invalid reward structure issues.</p>
+                            <a href="cleanup-orphaned-rewards.html" class="btn btn-danger btn-sm">
+                                <i class="fas fa-broom me-1"></i>Cleanup Tool
+                            </a>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="col-md-6 col-lg-4 mb-4">
+                    <div class="card tool-card">
+                        <div class="card-body">
+                            <h5 class="card-title">
+                                <i class="fas fa-calendar-alt text-info me-2"></i>Booking Management
+                                <span class="badge bg-info tool-badge">Bookings</span>
+                            </h5>
+                            <p class="card-text">Manage restaurant bookings and reservations. View, create, and update booking status. Send notifications to guests.</p>
+                            <a href="./booking-management.html" target="_blank" class="btn btn-info btn-sm">
+                                <i class="fas fa-utensils me-1"></i>Manage Bookings
+                            </a>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="col-md-6 col-lg-4 mb-4" data-category="verification">
+                    <div class="card tool-card">
+                        <div class="card-body">
+                            <h5 class="card-title">
+                                <i class="fas fa-sync-alt text-warning me-2"></i>Fix Guest Name Consistency
+                                <span class="badge bg-warning tool-badge">Data Consistency</span>
+                            </h5>
+                            <p class="card-text">Detects and fixes guest name inconsistencies across related records (rewards, receipts). Ensures data integrity when guest names are corrected.</p>
+                            <a href="fix-guest-name-consistency.html" class="btn btn-warning btn-sm">
+                                <i class="fas fa-sync-alt me-1"></i>Consistency Tool
+                            </a>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Data Generation & Management Tools -->
+        <div class="category-section" data-category="generation">
+            <div class="category-header">
+                <h2 class="mb-0">
+                    <i class="fas fa-cogs me-3"></i>Data Generation & Management Tools
+                </h2>
+                <p class="mb-0 mt-2">Tools for generating test data and managing system configurations</p>
+            </div>
+            
+            <div class="row">
+                <div class="col-md-6 col-lg-4 mb-4">
+                    <div class="card tool-card">
+                        <div class="card-body">
+                            <h5 class="card-title">
+                                <i class="fas fa-database text-primary me-2"></i>Test Stock Data Generator
+                                <span class="badge bg-primary tool-badge">Data Generator</span>
+                            </h5>
+                            <p class="card-text">Generates realistic stock usage data for testing food cost analytics dashboard.</p>
+                            <a href="generate-test-stock-data.html" class="btn btn-primary btn-sm">
+                                <i class="fas fa-external-link-alt me-1"></i>Open Tool
+                            </a>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="col-md-6 col-lg-4 mb-4">
+                    <div class="card tool-card">
+                        <div class="card-body">
+                            <h5 class="card-title">
+                                <i class="fas fa-exchange-alt text-success me-2"></i>Stock Allocation Tool
+                                <span class="badge bg-success tool-badge">Migration</span>
+                            </h5>
+                            <p class="card-text">Migrates orphaned stock data to proper location structures in the database.</p>
+                            <a href="allocate-stock-to-locations.html" class="btn btn-primary btn-sm">
+                                <i class="fas fa-external-link-alt me-1"></i>Open Tool
+                            </a>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="col-md-6 col-lg-4 mb-4">
+                    <div class="card tool-card">
+                        <div class="card-body">
+                            <h5 class="card-title">
+                                <i class="fas fa-calculator text-warning me-2"></i>Ocean Basket ROI Calculator
+                                <span class="badge bg-warning tool-badge">Business Tool</span>
+                            </h5>
+                            <p class="card-text">Comprehensive ROI calculator for Ocean Basket July campaign analysis.</p>
+                            <a href="ocean_basket_roi_calculator.html" class="btn btn-primary btn-sm">
+                                <i class="fas fa-external-link-alt me-1"></i>Open Tool
+                            </a>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="col-md-6 col-lg-4 mb-4">
+                    <div class="card tool-card">
+                        <div class="card-body">
+                            <h5 class="card-title">
+                                <i class="fas fa-chart-line text-info me-2"></i>Cost Driver Analysis
+                                <span class="badge bg-info tool-badge">Analytics</span>
+                            </h5>
+                            <p class="card-text">Analyzes and visualizes cost drivers in the business operations.</p>
+                            <a href="../js/modules/food-cost/cost-driver.html" class="btn btn-primary btn-sm">
+                                <i class="fas fa-external-link-alt me-1"></i>Open Tool
+                            </a>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="col-md-6 col-lg-4 mb-4">
+                    <div class="card tool-card">
+                        <div class="card-body">
+                            <h5 class="card-title">
+                                <i class="fas fa-chart-pie text-success me-2"></i>GP Analysis Dashboard
+                                <span class="badge bg-success tool-badge">MVP</span>
+                            </h5>
+                            <p class="card-text">Gross Profit analysis by category for Ocean Basket The Grove. Lean Startup MVP to test profitability optimization hypothesis.</p>
+                            <a href="gp_analysis_dashboard.html" class="btn btn-primary btn-sm">
+                                <i class="fas fa-external-link-alt me-1"></i>Open Tool
+                            </a>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="col-md-6 col-lg-4 mb-4">
+                    <div class="card tool-card">
+                        <div class="card-body">
+                            <h5 class="card-title">
+                                <i class="fab fa-whatsapp text-success me-2"></i>WhatsApp Management
+                                <span class="badge bg-success tool-badge">Multi-Location</span>
+                            </h5>
+                            <p class="card-text">Comprehensive WhatsApp multi-location management interface. Configure numbers, assign to locations, and monitor analytics.</p>
+                            <a href="whatsapp-management.html" class="btn btn-primary btn-sm">
+                                <i class="fas fa-external-link-alt me-1"></i>Open Tool
+                            </a>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="col-md-6 col-lg-4 mb-4">
+                    <div class="card tool-card">
+                        <div class="card-body">
+                            <h5 class="card-title">
+                                <i class="fas fa-tachometer-alt text-primary me-2"></i>Firebase Performance Monitor (FPM)
+                                <span class="badge bg-primary tool-badge">System Performance</span>
+                            </h5>
+                            <p class="card-text">Real-time Firebase performance monitoring with optimization recommendations. Monitor database queries, function performance, and system health.</p>
+                            <a href="firebase-performance-monitor.html" class="btn btn-primary btn-sm">
+                                <i class="fas fa-chart-line me-1"></i>Open FPM
+                            </a>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <!-- System Utilities & Fixes -->
+        <div class="category-section" data-category="utilities">
+            <div class="category-header">
+                <h2 class="mb-0">
+                    <i class="fas fa-wrench me-3"></i>System Utilities & Fixes
+                </h2>
+                <p class="mb-0 mt-2">Administrative utilities for system maintenance and fixes</p>
+            </div>
+            
+            <div class="row">
+                <div class="col-md-6 col-lg-4 mb-4">
+                    <div class="card tool-card">
+                        <div class="card-body">
+                            <h5 class="card-title">
+                                <i class="fas fa-user-cog text-danger me-2"></i>User Roles Fix
+                                <span class="badge bg-danger tool-badge">Admin Fix</span>
+                            </h5>
+                            <p class="card-text">Scans and fixes user role assignments, ensuring proper admin/user role allocation.</p>
+                            <a href="fix-user-roles.html" class="btn btn-primary btn-sm">
+                                <i class="fas fa-external-link-alt me-1"></i>Open Tool
+                            </a>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="col-md-6 col-lg-4 mb-4">
+                    <div class="card tool-card">
+                        <div class="card-body">
+                            <h5 class="card-title">
+                                <i class="fas fa-user-plus text-success me-2"></i>Admin Setup
+                                <span class="badge bg-success tool-badge">Setup</span>
+                            </h5>
+                            <p class="card-text">Initial admin account setup and configuration tool.</p>
+                            <div class="btn-group-vertical w-100">
+                                <a href="setup-admin.html" class="btn btn-outline-primary btn-sm">Setup Admin (Original)</a>
+                                <a href="admin-setup.html" class="btn btn-outline-primary btn-sm">Admin Setup (Alternative)</a>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="col-md-6 col-lg-4 mb-4">
+                    <div class="card tool-card">
+                        <div class="card-body">
+                            <h5 class="card-title">
+                                <i class="fas fa-tools text-warning me-2"></i>Temporary Setup
+                                <span class="badge bg-warning tool-badge">Temp Tool</span>
+                            </h5>
+                            <p class="card-text">Temporary setup utility for development and testing purposes.</p>
+                            <a href="temp-setup.html" class="btn btn-primary btn-sm">
+                                <i class="fas fa-external-link-alt me-1"></i>Open Tool
+                            </a>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Quick Links -->
+        <div class="text-center mt-5">
+            <div class="card">
+                <div class="card-body">
+                    <h4 class="card-title">
+                        <i class="fas fa-link me-2"></i>Quick Links
+                    </h4>
+                    <div class="btn-group flex-wrap" role="group">
+                        <a href="../admin-dashboard.html" class="btn btn-outline-primary">
+                            <i class="fas fa-tachometer-alt me-1"></i>Admin Dashboard
+                        </a>
+                        <a href="../user-dashboard.html" class="btn btn-outline-info">
+                            <i class="fas fa-user me-1"></i>User Dashboard
+                        </a>
+                        <a href="../analytics.html" class="btn btn-outline-success">
+                            <i class="fas fa-chart-bar me-1"></i>Analytics
+                        </a>
+                        <a href="../food-cost-analytics.html" class="btn btn-outline-warning">
+                            <i class="fas fa-utensils me-1"></i>Food Cost Analytics
+                        </a>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Bootstrap JS -->
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    
+    <script type="module">
+        // Import Firebase and authentication modules
+        import { auth, onAuthStateChanged } from '../js/config/firebase-config.js';
+        import { AdminClaims } from '../js/auth/admin-claims.js';
+        import { authManager } from '../js/auth/auth.js';
+
+        // Global variables
+        let currentUser = null;
+        let isAdminVerified = false;
+        const loadingOverlay = document.getElementById('loadingOverlay');
+        const adminStatus = document.getElementById('adminStatus');
+        const adminStatusText = document.getElementById('adminStatusText');
+
+        /**
+         * Initialize admin authentication and verification
+         */
+        async function initializeAdminAuth() {
+            console.log('[AdminTools] Starting admin authentication initialization...');
+            
+            try {
+                // Initialize auth manager
+                const user = await authManager.initialize();
+                
+                if (!user) {
+                    console.log('[AdminTools] No user found, redirecting to admin login');
+                    redirectToLogin('No authenticated user found');
+                    return;
+                }
+
+                currentUser = user;
+                console.log('[AdminTools] User found:', user.email);
+
+                // Force token refresh to get latest claims
+                await user.getIdToken(true);
+                console.log('[AdminTools] Token refreshed, verifying admin status...');
+                
+                // Verify admin access using AdminClaims
+                const hasAdminAccess = await AdminClaims.verifyAdminStatus(user);
+                
+                if (!hasAdminAccess) {
+                    console.warn('[AdminTools] User does not have admin privileges');
+                    redirectToLogin('Admin privileges required');
+                    return;
+                }
+
+                console.log('[AdminTools] Admin verification successful');
+                isAdminVerified = true;
+                
+                // Update UI to show admin verification
+                updateAdminStatus(user.email, true);
+                
+                // Show the page content
+                document.body.classList.add('admin-verified');
+                loadingOverlay.classList.add('hidden');
+                
+                // Initialize page functionality
+                initializePageFeatures();
+                
+            } catch (error) {
+                console.error('[AdminTools] Authentication error:', error);
+                redirectToLogin('Authentication failed: ' + error.message);
+            }
+        }
+
+        /**
+         * Set up auth state listener for ongoing session management
+         */
+        function setupAuthStateListener() {
+            onAuthStateChanged(auth, async (user) => {
+                if (!user && isAdminVerified) {
+                    console.log('[AdminTools] User signed out, redirecting to login');
+                    redirectToLogin('Session expired');
+                    return;
+                }
+                
+                // If user changes and we haven't verified yet, restart verification
+                if (user && !isAdminVerified && user.uid !== currentUser?.uid) {
+                    console.log('[AdminTools] New user detected, re-verifying admin status');
+                    await initializeAdminAuth();
+                }
+            });
+        }
+
+        /**
+         * Update admin status display
+         */
+        function updateAdminStatus(email, isAdmin) {
+            if (isAdmin) {
+                adminStatus.className = 'admin-status';
+                adminStatus.innerHTML = `
+                    <i class="fas fa-shield-alt text-success me-1"></i>
+                    <span>Admin: ${email}</span>
+                `;
+            } else {
+                adminStatus.className = 'admin-status';
+                adminStatus.innerHTML = `
+                    <i class="fas fa-exclamation-triangle text-warning me-1"></i>
+                    <span>Verifying...</span>
+                `;
+            }
+        }
+
+        /**
+         * Redirect to admin login with error message
+         */
+        function redirectToLogin(reason) {
+            console.log('[AdminTools] Redirecting to login:', reason);
+            
+            // Update loading overlay to show redirect message
+            loadingOverlay.innerHTML = `
+                <div class="text-center">
+                    <div class="spinner-border text-danger mb-3" role="status">
+                        <span class="visually-hidden">Redirecting...</span>
+                    </div>
+                    <h5 class="text-danger">Access Denied</h5>
+                    <p class="text-muted">${reason}</p>
+                    <p>Redirecting to admin login...</p>
+                </div>
+            `;
+            
+            // Redirect after short delay
+            setTimeout(() => {
+                window.location.href = '../admin-login.html';
+            }, 2000);
+        }
+
+        /**
+         * Initialize page features after admin verification
+         */
+        function initializePageFeatures() {
+            console.log('[AdminTools] Initializing page features...');
+            
+            // Initialize search functionality
+            initializeSearch();
+            
+            // Add click tracking for analytics
+            initializeAnalytics();
+            
+            console.log('[AdminTools] Page features initialized successfully');
+        }
+
+        /**
+         * Initialize search functionality
+         */
+        function initializeSearch() {
+            const searchInput = document.getElementById('searchInput');
+            if (!searchInput) return;
+            
+            searchInput.addEventListener('input', function(e) {
+                const searchTerm = e.target.value.toLowerCase();
+                const toolCards = document.querySelectorAll('.tool-card');
+                const categories = document.querySelectorAll('.category-section');
+                
+                toolCards.forEach(card => {
+                    const title = card.querySelector('.card-title').textContent.toLowerCase();
+                    const description = card.querySelector('.card-text').textContent.toLowerCase();
+                    const isVisible = title.includes(searchTerm) || description.includes(searchTerm);
+                    
+                    card.closest('.col-md-6, .col-lg-4').style.display = isVisible ? 'block' : 'none';
+                });
+                
+                // Hide categories with no visible tools
+                categories.forEach(category => {
+                    const hasVisibleTools = Array.from(category.querySelectorAll('.col-md-6, .col-lg-4')).some(col => col.style.display !== 'none');
+                    category.style.display = hasVisibleTools ? 'block' : 'none';
+                });
+            });
+        }
+
+        /**
+         * Initialize analytics tracking
+         */
+        function initializeAnalytics() {
+            document.querySelectorAll('.tool-card a').forEach(link => {
+                link.addEventListener('click', function() {
+                    console.log('[AdminTools] Tool accessed:', this.href);
+                    // Add any additional analytics tracking here
+                });
+            });
+        }
+
+        /**
+         * Clear search functionality (global function)
+         */
+        window.clearSearch = function() {
+            const searchInput = document.getElementById('searchInput');
+            if (searchInput) {
+                searchInput.value = '';
+            }
+            
+            document.querySelectorAll('.tool-card').forEach(card => {
+                card.closest('.col-md-6, .col-lg-4').style.display = 'block';
+            });
+            document.querySelectorAll('.category-section').forEach(category => {
+                category.style.display = 'block';
+            });
+        };
+
+        // Initialize authentication on page load
+        document.addEventListener('DOMContentLoaded', () => {
+            console.log('[AdminTools] DOM loaded, starting initialization...');
+            setupAuthStateListener();
+            initializeAdminAuth();
+        });
+
+        // Handle page visibility changes to maintain security
+        document.addEventListener('visibilitychange', () => {
+            if (document.visibilityState === 'visible' && isAdminVerified) {
+                // Reverify admin status when page becomes visible again
+                console.log('[AdminTools] Page visible again, reverifying admin status...');
+                if (currentUser) {
+                    AdminClaims.verifyAdminStatus(currentUser)
+                        .then(hasAccess => {
+                            if (!hasAccess) {
+                                console.warn('[AdminTools] Admin verification failed on visibility change');
+                                redirectToLogin('Admin privileges no longer valid');
+                            }
+                        })
+                        .catch(error => {
+                            console.error('[AdminTools] Verification error on visibility change:', error);
+                        });
+                }
+            }
+        });
+        
+    </script>
+</body>
+</html>

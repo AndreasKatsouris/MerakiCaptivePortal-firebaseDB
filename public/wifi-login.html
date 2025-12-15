@@ -1,0 +1,158 @@
+﻿<!DOCTYPE html>
+<html lang='en'>
+<head>
+    <meta charset='UTF-8'>
+    <meta name='viewport' content='width=device-width, initial-scale=1'>
+    <meta name='description' content='Guest WiFi login powered by Sparks Hospitality'>
+    <title>Guest WiFi - Sparks Hospitality</title>
+    <meta name='theme-color' content='#FF6B6B'>
+    <link rel='manifest' href='manifest.json'>
+    <link rel='preconnect' href='https://fonts.googleapis.com'>
+    <link rel='preconnect' href='https://fonts.gstatic.com' crossorigin>
+    <link href='https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap' rel='stylesheet'>
+    <link rel='stylesheet' href='css/bootstrap.min.css'>
+    <link rel='stylesheet' href='css/all.min.css'>
+    <link rel='stylesheet' href='css/style.css'>
+    <link rel='stylesheet' href='css/intlTelInput.css'>
+    <style>
+      .iti { width: 100%; display: block; }
+      :root {
+        --primary-color: #FF6B6B;
+        --secondary-color: #4ECDC4;
+        --primary-gradient: linear-gradient(135deg, #FF6B6B 0%, #4ECDC4 100%);
+      }
+      body { font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; }
+      .welcome-title { color: #2D3436; font-weight: 700; }
+      .btn-primary { background: var(--primary-gradient); border: none; transition: all 0.3s ease; }
+      .btn-primary:hover { transform: translateY(-2px); box-shadow: 0 5px 15px rgba(0, 0, 0, 0.2); }
+      .form-control:focus { border-color: var(--primary-color); box-shadow: 0 0 0 0.2rem rgba(255, 107, 107, 0.25); }
+      .wifi-instructions .card { border: 1px solid rgba(255, 107, 107, 0.2); }
+      .wifi-instructions .card-title { color: var(--primary-color); }
+      .powered-by { text-align: center; margin-top: 2rem; color: #636E72; font-size: 0.875rem; }
+      .powered-by a { color: var(--primary-color); text-decoration: none; font-weight: 600; }
+      .powered-by a:hover { text-decoration: underline; }
+    </style>
+</head>
+<body>
+    <div class='container'>
+        <div class='row justify-content-center'>
+            <div class='col-md-8 col-lg-6'>
+                <div class='text-center mt-4 mb-3'>
+                    <img id='logo' src='img/platfrm_logo.png' alt='Restaurant Logo' class='img-fluid mb-2' style='max-width: 200px;'>
+                    <!-- <h1 class='welcome-title'>Welcome to Our Guest WiFi</h1> -->
+                </div>
+                <div class='wifi-instructions mb-4'>
+                    <div class='card'>
+                        <div class='card-body'>
+                            <h5 class='card-title'><i class='fas fa-wifi me-2'></i>Guest WiFi Access</h5>
+                            <p class='card-text'>Please sign in with your details below to enjoy complimentary WiFi during your visit.</p>
+                        </div>
+                    </div>
+                </div>
+                <div class='login-container'>
+                    <form id='loginForm' class='needs-validation' novalidate>
+                        <div class='form-group mb-3'>
+                            <label for='username' class='form-label'>Full Name</label>
+                            <div class='input-group'>
+                                <span class='input-group-text'><i class='fas fa-user'></i></span>
+                                <input type='text' class='form-control' id='username' placeholder='Enter your full name' required autocomplete='name'/>
+                            </div>
+                            <div class='invalid-feedback' id='nameValidationMessage'></div>
+                        </div>
+                        <div class='form-group mb-3'>
+                            <label for='email' class='form-label'>Email Address</label>
+                            <div class='input-group'>
+                                <span class='input-group-text'><i class='fas fa-envelope'></i></span>
+                                <input type='email' class='form-control' id='email' placeholder='Enter your email' required autocomplete='email'/>
+                            </div>
+                            <div class='invalid-feedback' id='emailValidationMessage'></div>
+                        </div>
+                        <div class='form-group mb-3'>
+                            <label for='phone' class='form-label'>Phone Number</label>
+                            <input id='phone' type='tel' class='form-control' placeholder='Enter your phone number' required autocomplete='tel'>
+                            <div class='invalid-feedback' id='phoneValidationMessage'></div>
+                        </div>
+                        <div class='form-group mb-3'>
+                            <label for='table' class='form-label'>Table Number</label>
+                            <div class='input-group'>
+                                <span class='input-group-text'><i class='fas fa-utensils'></i></span>
+                                <input type='text' class='form-control' id='table' placeholder='Enter your table number' autocomplete='off'/>
+                            </div>
+                            <div class='invalid-feedback' id='tableValidationMessage'></div>
+                        </div>
+                        <div class='form-group mb-4'>
+                            <div class='form-check'>
+                                <input type='checkbox' class='form-check-input' id='terms' required>
+                                <label class='form-check-label' for='terms'>
+                                    I agree to the <a href='#' data-bs-toggle='modal' data-bs-target='#termsModal'>terms and conditions</a>
+                                </label>
+                                <div class='invalid-feedback' id='termsValidationMessage'></div>
+                            </div>
+                        </div>
+                        <div class='d-grid'>
+                            <button type='submit' class='btn btn-primary btn-lg login-button'>
+                                <i class='fas fa-wifi me-2'></i>Connect to WiFi
+                            </button>
+                        </div>
+                    </form>
+                </div>
+                <div id='error-container' class='alert alert-danger mt-3' style='display: none;'></div>
+                <div class='powered-by'>
+                    <img src='img/platfrm_logo.png' alt='Sparks Hospitality' style='height: 24px; width: auto; vertical-align: middle; margin-right: 8px;'>
+                    Powered by <a href='/' target='_blank'>Sparks Hospitality</a>
+                </div>
+                <div class='text-center mt-3 mb-5'>
+                    <a href='admin-login.html' class='btn btn-sm btn-outline-secondary'>
+                        <i class='fas fa-cog me-1'></i>Admin Login
+                    </a>
+                </div>
+            </div>
+        </div>
+    </div>
+    <footer class='text-center py-3 mt-3'>
+        <div class='container'>
+            <small class='text-muted'>Sparks Hospitality WiFi Portal v2.0</small>
+        </div>
+    </footer>
+    <script type='module'>
+        import { rtdb, ref, get, set } from './js/config/firebase-config.js';
+        document.addEventListener('DOMContentLoaded', function () {
+            get(ref(rtdb, 'customization/'))
+                .then(function(snapshot) {
+                    const settings = snapshot.val();
+                    if (settings) {
+                        document.body.style.backgroundColor = settings.bgColor || '#ffffff';
+                        document.body.style.fontFamily = settings.font || 'Inter, sans-serif';
+                        document.body.style.fontSize = settings.fontSize ? settings.fontSize + 'px' : '16px';
+                        if (settings.logoURL) {
+                            document.getElementById('logo').src = settings.logoURL;
+                        }
+                        if (settings.bgImageUrl) {
+                            document.body.style.backgroundImage = 'url(' + settings.bgImageUrl + ')';
+                            document.body.style.backgroundSize = 'cover';
+                            document.body.style.backgroundPosition = 'center';
+                            document.body.style.backgroundRepeat = 'no-repeat';
+                        }
+                    }
+                })
+                .catch(function(error) {
+                    console.error('Error fetching customization settings:', error);
+                });
+        });
+    </script>
+    <script>
+        function generateSessionID() {
+            return 'session-' + Math.random().toString(36).substr(2, 9);
+        }
+        let sessionID = localStorage.getItem('sessionID');
+        if (!sessionID) {
+            sessionID = generateSessionID();
+            localStorage.setItem('sessionID', sessionID);
+        }
+    </script>
+    <script src='js/bootstrap.bundle.min.js'></script>
+    <script src='js/intlTelInput.min.js'></script>
+    <script type='module' src='js/merakiFirebase.js'></script>
+    <script src='js/service-worker-registration.js'></script>
+</body>
+</html>

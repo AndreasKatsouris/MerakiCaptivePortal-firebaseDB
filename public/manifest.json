@@ -1,11 +1,11 @@
 {
-  "name": "Ocean Basket Guest WiFi",
-  "short_name": "OB WiFi",
-  "description": "Guest WiFi login for Ocean Basket restaurants",
+  "name": "Sparks Hospitality",
+  "short_name": "Sparks",
+  "description": "Transform your restaurant operations with intelligent management tools",
   "start_url": "/index.html",
   "display": "standalone",
   "background_color": "#ffffff",
-  "theme_color": "#0074D9",
+  "theme_color": "#FF6B6B",
   "icons": [
     {
       "src": "img/icons/icon-72x72.png",

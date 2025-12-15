@@ -1,0 +1,151 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Analytics Dashboard - Meraki Captive Portal</title>
+    
+    <!-- Bootstrap CSS -->
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <!-- Font Awesome -->
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <!-- Chart.js -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <!-- Lodash -->
+    <script src="https://cdn.jsdelivr.net/npm/lodash@4.17.21/lodash.min.js"></script>
+    <!-- Vue.js -->
+    <script src="https://unpkg.com/vue@3/dist/vue.global.prod.js"></script>
+    <!-- SweetAlert2 -->
+    <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+    
+    <style>
+        body {
+            background-color: #f8f9fa;
+        }
+        .dashboard-header {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 2rem 0;
+            margin-bottom: 2rem;
+        }
+        .back-link {
+            color: white;
+            text-decoration: none;
+            display: inline-flex;
+            align-items: center;
+            gap: 0.5rem;
+            margin-bottom: 1rem;
+        }
+        .back-link:hover {
+            color: #f0f0f0;
+        }
+        .locked-overlay {
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(0, 0, 0, 0.8);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            color: white;
+            z-index: 10;
+        }
+    </style>
+</head>
+<body>
+    <div class="dashboard-header">
+        <div class="container">
+            <a href="/user-dashboard.html" class="back-link">
+                <i class="fas fa-arrow-left"></i> Back to Dashboard
+            </a>
+            <h1>Analytics Dashboard</h1>
+            <p>View insights and trends from your business data</p>
+        </div>
+    </div>
+    
+    <div class="container">
+        <div id="app">
+            <!-- Feature access check -->
+            <div v-if="!hasAccess" class="position-relative">
+                <div class="locked-overlay">
+                    <i class="fas fa-lock fa-3x mb-3"></i>
+                    <h3>Analytics Locked</h3>
+                    <p>Upgrade your subscription to access analytics</p>
+                    <button @click="showUpgradePrompt" class="btn btn-primary">
+                        Upgrade Now
+                    </button>
+                </div>
+                <div style="filter: blur(5px); opacity: 0.5;">
+                    <div class="row">
+                        <div class="col-md-3">
+                            <div class="card mb-4">
+                                <div class="card-body text-center">
+                                    <h3>0</h3>
+                                    <p>Total Guests</p>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Analytics content when user has access -->
+            <div v-else>
+                <component :is="analyticsComponent"></component>
+            </div>
+        </div>
+    </div>
+    
+    <script type="module">
+        import { auth, rtdb, ref, get, onAuthStateChanged } from './js/config/firebase-config.js';
+        import { featureAccessControl } from './js/modules/access-control/services/feature-access-control.js';
+        
+        // Import the analytics module
+        import analyticsModule from './js/modules/analytics/index.js';
+        
+        const { createApp } = Vue;
+        
+        const app = createApp({
+            data() {
+                return {
+                    hasAccess: false,
+                    loading: true,
+                    analyticsComponent: null
+                };
+            },
+            async mounted() {
+                // Check authentication
+                onAuthStateChanged(auth, async (user) => {
+                    if (!user) {
+                        window.location.href = '/user-login.html?message=unauthorized';
+                        return;
+                    }
+                    
+                    // Check feature access
+                    this.hasAccess = await featureAccessControl.checkFeatureAccess('analyticsBasic');
+                    
+                    if (this.hasAccess) {
+                        // Register the analytics component
+                        this.analyticsComponent = analyticsModule;
+                    }
+                    
+                    this.loading = false;
+                });
+            },
+            methods: {
+                showUpgradePrompt() {
+                    featureAccessControl.showUpgradePrompt('analyticsBasic');
+                }
+            }
+        });
+        
+        // Register the analytics module as a component
+        app.component('analytics-module', analyticsModule);
+        
+        app.mount('#app');
+    </script>
+</body>
+</html>

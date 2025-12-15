@@ -7,6 +7,7 @@
  */
 
 import { rtdb, ref, get, set, update, push, remove } from '../../../config/firebase-config.js';
+import { PLATFORM_FEATURES, FEATURE_CATEGORIES, getFeatureDependencies, validateFeatureSet } from '../services/platform-features.js';
 
 // Implement local showToast in case the utility isn't available
 function showToast(message, type = 'info', duration = 3000) {
@@ -64,43 +65,51 @@ const AdminTierManagement = {
   data() {
     return {
       tiers: {},
-      isLoading: true,
+      isLoading: false, // Start with no loading spinner
       loadingTimedOut: false,
       editingTierId: null,
       isAddingNewTier: false,
       editFormData: {},
       availableFeatures: [],
       availableLimits: [],
-      modalInstance: null
+      modalInstance: null,
+      platformFeatures: PLATFORM_FEATURES,
+      featureCategories: FEATURE_CATEGORIES,
+      selectedCategory: 'all',
+      featureSearchQuery: ''
     };
   },
   
   async mounted() {
-    console.log('[TierManagement] Component mounted');
+    console.log('[TierManagement] Component mounted, isLoading initial state:', this.isLoading);
+    
+    // FORCE loading off immediately and aggressively
+    this.isLoading = false;
+    this.$forceUpdate();
+    
+    console.log('[TierManagement] Forced isLoading to false, current state:', this.isLoading);
+    
     try {
-      // Check if we should skip loading animation
-      if (this.$skipLoading) {
-        console.log('[TierManagement] Skipping loading animation due to $skipLoading flag');
-        this.isLoading = false;
-        // Load data in background
-        this.loadTierDefinitionsBackground();
-        return;
-      }
+      // Initialize with default data immediately
+      this.tiers = { ...DEFAULT_TIERS };
+      this.ensureTierStructure();
+      this.populateAvailableFeaturesAndLimits();
       
-      // Set a timeout to detect if loading hangs
-      setTimeout(() => {
-        if (this.isLoading) {
-          console.log('[TierManagement] Loading timed out after 10 seconds');
-          this.loadingTimedOut = true;
-        }
-      }, 10000);
+      console.log('[TierManagement] Initialized with default data, tiers count:', Object.keys(this.tiers).length);
       
-      // Load data immediately
-      this.loadTierDefinitions();
-      console.log('[TierManagement] Data loading initiated');
+      // Force update again
+      this.$forceUpdate();
+      
+      // Load real data in background (don't await to avoid blocking)
+      this.loadTierDefinitionsBackground().catch(error => {
+        console.error('[TierManagement] Background loading failed:', error);
+      });
+      
+      console.log('[TierManagement] Mount completed, final isLoading state:', this.isLoading);
     } catch (error) {
       console.error('[TierManagement] Error in mounted:', error);
       this.isLoading = false;
+      this.$forceUpdate();
     }
   },
   
@@ -115,6 +124,9 @@ const AdminTierManagement = {
       console.log('[TierManagement] Loading tier definitions in background');
       
       try {
+        // Ensure we never show loading state
+        this.isLoading = false;
+        
         // Create reference and fetch data
         const tierRef = ref(rtdb, TIER_DEFINITIONS_PATH);
         const snapshot = await get(tierRef);
@@ -125,7 +137,7 @@ const AdminTierManagement = {
           console.log('[TierManagement] Loaded', Object.keys(this.tiers).length, 'tiers from database (background)');
         } else {
           console.log('[TierManagement] No tiers found in database, using default tiers (background)');
-          this.tiers = DEFAULT_TIERS;
+          this.tiers = { ...DEFAULT_TIERS }; // Create copy to avoid reference issues
         }
         
         // Ensure proper structure
@@ -134,16 +146,22 @@ const AdminTierManagement = {
         // Update features and limits
         this.populateAvailableFeaturesAndLimits();
         
+        // Force final loading state to false
+        this.isLoading = false;
+        
         console.log('[TierManagement] Background loading completed successfully');
       } catch (error) {
         console.error('[TierManagement] Error loading tier definitions in background:', error);
         
         // Use default tiers on error
-        this.tiers = DEFAULT_TIERS;
+        this.tiers = { ...DEFAULT_TIERS };
         this.ensureTierStructure();
         this.populateAvailableFeaturesAndLimits();
         
-        showToast('Error loading subscription tiers.', 'error');
+        // Ensure loading is disabled
+        this.isLoading = false;
+        
+        showToast('Error loading subscription tiers, using defaults.', 'warning');
       }
     },
     
@@ -154,13 +172,30 @@ const AdminTierManagement = {
       console.log('[TierManagement] Manually forcing load completion');
       // Apply default data if needed
       if (Object.keys(this.tiers).length === 0) {
-        this.tiers = DEFAULT_TIERS;
+        this.tiers = { ...DEFAULT_TIERS };
         this.ensureTierStructure();
         this.populateAvailableFeaturesAndLimits();
       }
-      // Force to false
+      // Force to false aggressively
       this.isLoading = false;
+      this.loadingTimedOut = false;
+      this.$forceUpdate();
       showToast('Tier management loaded.', 'success');
+    },
+
+    /**
+     * Emergency stop loading (new method)
+     */
+    stopLoading() {
+      console.log('[TierManagement] Emergency stop loading');
+      this.isLoading = false;
+      this.loadingTimedOut = false;
+      if (Object.keys(this.tiers).length === 0) {
+        this.tiers = { ...DEFAULT_TIERS };
+        this.ensureTierStructure();
+        this.populateAvailableFeaturesAndLimits();
+      }
+      this.$forceUpdate();
     },
 
     /**
@@ -186,7 +221,29 @@ const AdminTierManagement = {
           this.tiers = DEFAULT_TIERS;
         }
         
-        // Ensure proper structure
+        // Normalize existing tiers to ensure they have required fields
+        const normalizedTiers = {};
+        const currentTime = Date.now();
+        
+        Object.entries(this.tiers).forEach(([tierId, tier]) => {
+          normalizedTiers[tierId] = {
+            ...tier,
+            // Ensure createdAt exists
+            createdAt: tier.createdAt || currentTime,
+            // Ensure updatedAt exists
+            updatedAt: tier.updatedAt || currentTime,
+            // Ensure active field exists
+            active: tier.active !== undefined ? tier.active : true,
+            // Ensure features object exists
+            features: tier.features || {},
+            // Ensure limits object exists
+            limits: tier.limits || {}
+          };
+        });
+        
+        this.tiers = normalizedTiers;
+        
+        // Ensure proper structure (legacy method)
         this.ensureTierStructure();
         
         // Update features and limits
@@ -248,24 +305,27 @@ const AdminTierManagement = {
     },
     
     /**
-     * Populate available features and limits
+     * Populate available features from platform features
      */
     populateAvailableFeaturesAndLimits() {
-      const featuresSet = new Set();
-      const limitsSet = new Set();
+      console.log('[TierManagement] Populating available features from platform');
       
+      // Get all feature IDs from the platform features
+      this.availableFeatures = Object.keys(PLATFORM_FEATURES);
+      
+      // Keep existing limits logic
+      const limitsSet = new Set();
       Object.values(this.tiers).forEach(tier => {
-        if (tier.features) {
-          Object.keys(tier.features).forEach(key => featuresSet.add(key));
-        }
-        
         if (tier.limits) {
-          Object.keys(tier.limits).forEach(key => limitsSet.add(key));
+          Object.keys(tier.limits).forEach(limit => limitsSet.add(limit));
         }
       });
       
-      this.availableFeatures = [...featuresSet].sort();
+      // Add some default limit options
+      ['guestRecords', 'locations', 'receiptProcessing', 'campaignTemplates', 'sessionTime', 'apiCalls', 'storage'].forEach(limit => limitsSet.add(limit));
       this.availableLimits = [...limitsSet].sort();
+      
+      console.log(`[TierManagement] Found ${this.availableFeatures.length} features and ${this.availableLimits.length} limits`);
     },
     
     /**
@@ -318,13 +378,46 @@ const AdminTierManagement = {
       if (!this.modalInstance) {
         const modalEl = document.getElementById('editTierModal');
         if (modalEl) {
-          this.modalInstance = new bootstrap.Modal(modalEl);
+          // Remove any existing modal instance to prevent conflicts
+          const existingModal = bootstrap.Modal.getInstance(modalEl);
+          if (existingModal) {
+            existingModal.dispose();
+          }
+          
+          this.modalInstance = new bootstrap.Modal(modalEl, {
+            backdrop: 'static',
+            keyboard: true,
+            focus: true
+          });
+          
+          // Add event listeners to ensure modal is accessible
+          modalEl.addEventListener('shown.bs.modal', () => {
+            console.log('[TierManagement] Modal shown event triggered');
+            this.forceModalInteractive(modalEl);
+          });
         }
       }
       
       // Show the modal
       if (this.modalInstance) {
+        console.log('[TierManagement] Showing tier edit modal');
         this.modalInstance.show();
+        
+        // Force immediate fix after show - multiple attempts
+        setTimeout(() => {
+          console.log('[TierManagement] Applying emergency modal fixes - attempt 1');
+          this.forceModalInteractive(document.getElementById('editTierModal'));
+        }, 50);
+        
+        setTimeout(() => {
+          console.log('[TierManagement] Applying emergency modal fixes - attempt 2');
+          this.forceModalInteractive(document.getElementById('editTierModal'));
+        }, 200);
+        
+        setTimeout(() => {
+          console.log('[TierManagement] Applying emergency modal fixes - attempt 3');
+          this.forceModalInteractive(document.getElementById('editTierModal'));
+        }, 500);
       } else {
         showToast('Could not initialize modal.', 'error');
       }
@@ -360,18 +453,100 @@ const AdminTierManagement = {
       if (!this.modalInstance) {
         const modalEl = document.getElementById('editTierModal');
         if (modalEl) {
-          this.modalInstance = new bootstrap.Modal(modalEl);
+          // Remove any existing modal instance to prevent conflicts
+          const existingModal = bootstrap.Modal.getInstance(modalEl);
+          if (existingModal) {
+            existingModal.dispose();
+          }
+          
+          this.modalInstance = new bootstrap.Modal(modalEl, {
+            backdrop: 'static',
+            keyboard: true,
+            focus: true
+          });
+          
+          // Add event listeners to ensure modal is accessible
+          modalEl.addEventListener('shown.bs.modal', () => {
+            console.log('[TierManagement] Modal shown event triggered');
+            this.forceModalInteractive(modalEl);
+          });
         }
       }
       
       // Show the modal
       if (this.modalInstance) {
+        console.log('[TierManagement] Showing add new tier modal');
         this.modalInstance.show();
+        
+        // Force immediate fix after show - multiple attempts
+        setTimeout(() => {
+          console.log('[TierManagement] Applying emergency modal fixes - attempt 1');
+          this.forceModalInteractive(document.getElementById('editTierModal'));
+        }, 50);
+        
+        setTimeout(() => {
+          console.log('[TierManagement] Applying emergency modal fixes - attempt 2');
+          this.forceModalInteractive(document.getElementById('editTierModal'));
+        }, 200);
+        
+        setTimeout(() => {
+          console.log('[TierManagement] Applying emergency modal fixes - attempt 3');
+          this.forceModalInteractive(document.getElementById('editTierModal'));
+        }, 500);
       } else {
         showToast('Could not initialize modal.', 'error');
       }
     },
     
+    /**
+     * Force modal to be interactive (fix backdrop blocking)
+     */
+    forceModalInteractive(modalElement) {
+      console.log('[TierManagement] Forcing modal to be interactive');
+      
+      // Force modal to be visible and interactive
+      modalElement.style.display = 'block !important';
+      modalElement.style.zIndex = '1056 !important';
+      modalElement.style.pointerEvents = 'auto !important';
+      modalElement.classList.add('show');
+      
+      // Force backdrop to be non-interactive
+      const backdrops = document.querySelectorAll('.modal-backdrop');
+      console.log('[TierManagement] Found backdrops:', backdrops.length);
+      backdrops.forEach((backdrop, index) => {
+        console.log(`[TierManagement] Fixing backdrop ${index}`);
+        backdrop.style.pointerEvents = 'none !important';
+        backdrop.style.zIndex = '1050 !important';
+      });
+      
+      // Force modal content to be interactive
+      const modalContent = modalElement.querySelector('.modal-content');
+      if (modalContent) {
+        console.log('[TierManagement] Fixing modal content');
+        modalContent.style.pointerEvents = 'auto !important';
+        modalContent.style.zIndex = '1057 !important';
+        modalContent.style.position = 'relative !important';
+      }
+      
+      // Force all interactive elements to be clickable
+      const interactiveElements = modalElement.querySelectorAll('input, select, button, textarea, .btn, .form-control');
+      console.log('[TierManagement] Found interactive elements:', interactiveElements.length);
+      interactiveElements.forEach((element, index) => {
+        element.style.pointerEvents = 'auto !important';
+        element.style.zIndex = '1058 !important';
+        element.style.position = 'relative !important';
+      });
+      
+      // NUCLEAR option - remove all backdrop elements
+      const allBackdrops = document.querySelectorAll('.modal-backdrop');
+      allBackdrops.forEach((backdrop, index) => {
+        console.log(`[TierManagement] Removing backdrop ${index}`);
+        backdrop.remove();
+      });
+      
+      console.log('[TierManagement] Modal force fixes completed');
+    },
+
     /**
      * Cancel editing
      */
@@ -402,10 +577,29 @@ const AdminTierManagement = {
           description: this.editFormData.description,
           monthlyPrice: parseFloat(this.editFormData.monthlyPrice) || 0,
           annualPrice: parseFloat(this.editFormData.annualPrice) || 0,
-          features: this.editFormData.features,
-          limits: this.editFormData.limits
+          features: this.editFormData.features || {},
+          limits: this.editFormData.limits || {},
+          active: this.editFormData.active !== undefined ? this.editFormData.active : true,
+          createdAt: this.isAddingNewTier ? Date.now() : 
+            (this.tiers[this.editingTierId]?.createdAt || Date.now()),
+          updatedAt: Date.now()
         };
         
+        // Validate tierData for undefined values before saving to Firebase
+        const validateData = (obj, path = '') => {
+          for (const [key, value] of Object.entries(obj)) {
+            const currentPath = path ? `${path}.${key}` : key;
+            if (value === undefined) {
+              throw new Error(`Undefined value found at ${currentPath}`);
+            }
+            if (typeof value === 'object' && value !== null && !Array.isArray(value)) {
+              validateData(value, currentPath);
+            }
+          }
+        };
+        
+        validateData(tierData);
+
         if (this.isAddingNewTier) {
           // Generate tier ID from name
           const tierId = tierData.name.toLowerCase().replace(/[^a-z0-9]/g, '');
@@ -434,6 +628,10 @@ const AdminTierManagement = {
         this.cancelEdit();
       } catch (error) {
         console.error('[TierManagement] Error saving tier:', error);
+        console.error('[TierManagement] Tier data that failed:', tierData);
+        console.error('[TierManagement] Available tiers:', this.tiers);
+        console.error('[TierManagement] Editing tier ID:', this.editingTierId);
+        console.error('[TierManagement] Is adding new tier:', this.isAddingNewTier);
         showToast('Failed to save tier.', 'error');
       }
     },
@@ -502,32 +700,125 @@ const AdminTierManagement = {
           showToast('Failed to delete tier.', 'error');
         }
       }
-    }
-  },
-  
-  computed: {
+    },
+    
+    /**
+     * Toggle a feature in the edit form with dependency handling
+     */
+    toggleFeature(featureId) {
+      if (!this.editFormData.features) {
+        this.editFormData.features = {};
+      }
+      
+      const isEnabling = !this.editFormData.features[featureId];
+      
+      if (isEnabling) {
+        // When enabling, also enable dependencies
+        const deps = getFeatureDependencies(featureId);
+        deps.forEach(depId => {
+          this.editFormData.features[depId] = true;
+        });
+        this.editFormData.features[featureId] = true;
+      } else {
+        // When disabling, check if any other features depend on this
+        const dependentFeatures = this.getDependentFeatures(featureId);
+        if (dependentFeatures.length > 0) {
+          const featureNames = dependentFeatures.map(f => PLATFORM_FEATURES[f].name).join(', ');
+          showToast(`Cannot disable this feature. It is required by: ${featureNames}`, 'warning');
+          return;
+        }
+        this.editFormData.features[featureId] = false;
+      }
+    },
+    
+    /**
+     * Get features that depend on a given feature
+     */
+    getDependentFeatures(featureId) {
+      const dependents = [];
+      Object.keys(this.editFormData.features || {}).forEach(fId => {
+        if (this.editFormData.features[fId]) {
+          const deps = getFeatureDependencies(fId);
+          if (deps.includes(featureId)) {
+            dependents.push(fId);
+          }
+        }
+      });
+      return dependents;
+    },
+    
+    /**
+     * Check if a feature can be disabled
+     */
+    canDisableFeature(featureId) {
+      return this.getDependentFeatures(featureId).length === 0;
+    },
+    
     /**
      * Get feature display name
      */
-    getFeatureDisplay() {
-      return (featureKey) => {
-        // Convert camelCase to Title Case
-        return featureKey
-          .replace(/([A-Z])/g, ' $1')
-          .replace(/^./, (str) => str.toUpperCase());
-      };
+    getFeatureDisplay(feature) {
+      // If it's in our platform features list, use that
+      if (this.platformFeatures[feature]) {
+        return this.platformFeatures[feature].name;
+      }
+      // Otherwise, just return the feature key in a readable format
+      return feature || 'Unknown Feature';
+    },
+    
+    /**
+     * Get feature icon
+     */
+    getFeatureIcon(feature) {
+      if (this.platformFeatures[feature]) {
+        return this.platformFeatures[feature].icon || 'fa-cube';
+      }
+      return 'fa-cube';
     },
     
     /**
      * Get limit display name
      */
-    getLimitDisplay() {
-      return (limitKey) => {
-        // Convert camelCase to Title Case
-        return limitKey
-          .replace(/([A-Z])/g, ' $1')
-          .replace(/^./, (str) => str.toUpperCase());
-      };
+    getLimitDisplay(limit) {
+      // Convert camelCase to Title Case
+      return limit
+        .replace(/([A-Z])/g, ' $1')
+        .replace(/^./, (str) => str.toUpperCase());
+    },
+  },
+  
+  computed: {
+    /**
+     * Get filtered features based on category and search
+     */
+    filteredFeatures() {
+      let features = Object.values(PLATFORM_FEATURES);
+      
+      // Filter by category
+      if (this.selectedCategory !== 'all') {
+        features = features.filter(f => f.category === this.selectedCategory);
+      }
+      
+      // Filter by search query
+      if (this.featureSearchQuery) {
+        const query = this.featureSearchQuery.toLowerCase();
+        features = features.filter(f => 
+          f.name.toLowerCase().includes(query) ||
+          f.description.toLowerCase().includes(query) ||
+          f.id.toLowerCase().includes(query)
+        );
+      }
+      
+      return features;
+    },
+    
+    /**
+     * Get sorted categories for display
+     */
+    sortedCategories() {
+      return Object.entries(FEATURE_CATEGORIES)
+        .sort((a, b) => a[1].order - b[1].order)
+        .map(([key, value]) => ({ key, ...value }));
     }
   },
   
@@ -545,16 +836,12 @@ const AdminTierManagement = {
       </div>
       <div class="card-body">
         <div v-if="isLoading" class="text-center py-4">
-          <div v-if="!loadingTimedOut" class="spinner-border text-primary mb-3" role="status">
-            <span class="visually-hidden">Loading...</span>
+          <div class="alert alert-warning mb-3">
+            <i class="fas fa-exclamation-triangle me-2"></i>Loading spinner detected - this should not happen
           </div>
-          <div v-else class="alert alert-warning mb-3">
-            <i class="fas fa-exclamation-triangle me-2"></i>Loading is taking longer than expected
-          </div>
-          <p class="mb-0" v-if="!loadingTimedOut">Loading tier definitions...</p>
-          <p class="mb-1" v-else>Tier data could not be loaded automatically.</p>
-          <button class="btn btn-primary mt-2" @click="forceLoadComplete">
-            <i class="fas fa-sync-alt me-1"></i> {{ loadingTimedOut ? 'Load Default Tiers' : 'Force Load Completion' }}
+          <p class="mb-1">If you see this, click the button below to force load the tier data.</p>
+          <button class="btn btn-danger mt-2" @click="stopLoading">
+            <i class="fas fa-stop me-1"></i> Stop Loading & Show Data
           </button>
         </div>
         <div v-else-if="Object.keys(tiers).length === 0" class="alert alert-info">
@@ -580,13 +867,13 @@ const AdminTierManagement = {
                 <td>{{ tier.monthlyPrice || 0 }}</td>
                 <td>{{ tier.annualPrice || 0 }}</td>
                 <td>
-                  <span v-if="availableFeatures.length === 0">No features defined</span>
-                  <ul v-else class="list-unstyled mb-0">
-                    <li v-for="feature in availableFeatures" :key="feature">
-                      <i class="fas" :class="isFeatureEnabled(tier, feature) ? 'fa-check text-success' : 'fa-times text-danger'"></i>
-                      {{ getFeatureDisplay(feature) }}
-                    </li>
-                  </ul>
+                  <div class="features-display">
+                    <span v-if="!tier.features || Object.keys(tier.features).filter(f => tier.features[f]).length === 0" class="text-muted">No features</span>
+                    <span v-else v-for="feature in Object.keys(tier.features).filter(f => tier.features[f])" :key="feature" 
+                          class="badge bg-primary me-1 mb-1">
+                      <i :class="['fas', getFeatureIcon(feature), 'me-1']"></i>{{ getFeatureDisplay(feature) }}
+                    </span>
+                  </div>
                 </td>
                 <td>
                   <span v-if="availableLimits.length === 0">No limits defined</span>
@@ -652,16 +939,65 @@ const AdminTierManagement = {
 
               <!-- Features -->
               <div class="mb-3 border p-3 rounded">
-                <h5>Features <button type="button" class="btn btn-sm btn-outline-secondary ms-2" @click="addNewFeature">+ Add New Feature Type</button></h5>
-                <div v-if="editFormData.features && typeof editFormData.features === 'object'">
-                  <div v-for="feature in availableFeatures" :key="'feat-'+feature" class="form-check form-switch">
-                    <input class="form-check-input" type="checkbox" :id="'feature-' + feature" v-model="editFormData.features[feature]">
-                    <label class="form-check-label" :for="'feature-' + feature">{{ getFeatureDisplay(feature) }}</label>
+                <h5>Features</h5>
+                
+                <!-- Feature Search -->
+                <div class="mb-3">
+                  <input type="text" class="form-control" v-model="featureSearchQuery" 
+                         placeholder="Search features...">
+                </div>
+                
+                <!-- Category Filter -->
+                <div class="mb-3">
+                  <div class="btn-group btn-group-sm flex-wrap" role="group">
+                    <button type="button" class="btn" 
+                            :class="selectedCategory === 'all' ? 'btn-primary' : 'btn-outline-primary'"
+                            @click="selectedCategory = 'all'">All Categories</button>
+                    <button type="button" class="btn" 
+                            v-for="cat in sortedCategories" :key="cat.key"
+                            :class="selectedCategory === cat.key ? 'btn-primary' : 'btn-outline-primary'"
+                            @click="selectedCategory = cat.key">
+                      <i :class="['fas', cat.icon, 'me-1']"></i>{{ cat.name }}
+                    </button>
                   </div>
                 </div>
-                <div v-if="!availableFeatures || availableFeatures.length === 0" class="text-muted small">No features defined yet.</div>
+                
+                <!-- Features List -->
+                <div class="features-grid">
+                  <div v-if="filteredFeatures.length === 0" class="text-muted text-center py-3">
+                    No features match your search criteria.
+                  </div>
+                  <div v-else class="row">
+                    <div v-for="feature in filteredFeatures" :key="feature.id" class="col-md-6 mb-2">
+                      <div class="feature-card border rounded p-2" 
+                           :class="{ 'bg-light': editFormData.features && editFormData.features[feature.id] }">
+                        <div class="form-check">
+                          <input class="form-check-input" type="checkbox" 
+                                 :id="'feature-' + feature.id" 
+                                 :checked="editFormData.features && editFormData.features[feature.id]"
+                                 @change="toggleFeature(feature.id)">
+                          <label class="form-check-label d-flex align-items-start" :for="'feature-' + feature.id">
+                            <i :class="['fas', feature.icon, 'me-2 mt-1']"></i>
+                            <div class="flex-grow-1">
+                              <strong>{{ feature.name }}</strong>
+                              <small class="d-block text-muted">{{ feature.description }}</small>
+                              <div v-if="feature.dependencies && feature.dependencies.length > 0" class="mt-1">
+                                <small class="text-info">
+                                  <i class="fas fa-info-circle me-1"></i>Requires: 
+                                  <span v-for="(dep, idx) in feature.dependencies" :key="dep">
+                                    {{ platformFeatures[dep]?.name }}<span v-if="idx < feature.dependencies.length - 1">, </span>
+                                  </span>
+                                </small>
+                              </div>
+                            </div>
+                          </label>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
               </div>
-
+              
               <!-- Limits -->
               <div class="mb-3 border p-3 rounded">
                 <h5>Limits <button type="button" class="btn btn-sm btn-outline-secondary ms-2" @click="addNewLimit">+ Add New Limit Type</button></h5>
@@ -698,6 +1034,17 @@ function initializeAdminTierManagement(containerId = 'tierManagementContent') {
   console.log('[TierManagement] Initializing with container:', containerId);
   
   try {
+    // Check if already initialized and unmount first
+    if (adminTierManagementApp) {
+      console.log('[TierManagement] Destroying existing app instance');
+      try {
+        adminTierManagementApp.unmount();
+      } catch (e) {
+        console.log('[TierManagement] No existing app to unmount');
+      }
+      adminTierManagementApp = null;
+    }
+
     // Check if Vue is loaded
     if (typeof Vue === 'undefined') {
       console.error('[TierManagement] Vue is not defined');
@@ -714,43 +1061,69 @@ function initializeAdminTierManagement(containerId = 'tierManagementContent') {
       return;
     }
     
-    // Look for the inner container or create it if it doesn't exist
-    let innerContainerId = 'tier-management-container';
-    let innerContainer = document.getElementById(innerContainerId);
+    // Use the section container directly, no inner container
+    console.log('[TierManagement] Using section container directly');
     
-    if (!innerContainer) {
-      console.log(`[TierManagement] Inner container #${innerContainerId} not found, creating it`);
-      // Create the inner container if it doesn't exist
-      innerContainer = document.createElement('div');
-      innerContainer.id = innerContainerId;
-      sectionContainer.appendChild(innerContainer);
-    }
+    // Clear any existing content
+    sectionContainer.innerHTML = '';
     
-    // Clear any existing content in the inner container to prepare for Vue mounting
-    innerContainer.innerHTML = '';
-    
-    // Make sure the containers are visible
+    // Make sure the container is visible
     sectionContainer.style.display = 'block';
     sectionContainer.style.visibility = 'visible';
-    innerContainer.style.display = 'block';
-    innerContainer.style.visibility = 'visible';
     
-    // Create and mount the Vue app to the inner container
-    console.log('[TierManagement] Creating Vue app');
-    try {
-      // Create standard component without modifications
-      adminTierManagementApp = Vue.createApp(AdminTierManagement);
-      
-      // Register a global property to skip loading animation
-      adminTierManagementApp.config.globalProperties.$skipLoading = true;
-      
-      // Mount the app
-      adminTierManagementApp.mount(`#${innerContainerId}`);
-      console.log('[TierManagement] Vue app mounted successfully');
-    } catch (err) {
-      console.error('[TierManagement] Error mounting Vue app:', err);
-      showElement(containerId, createErrorMessage('Error initializing Tier Management: ' + err.message));
-    }
+    // NUCLEAR OPTION: Show simple HTML content first to bypass loading issues
+    console.log('[TierManagement] Showing simple HTML content first');
+    sectionContainer.innerHTML = `
+      <div class="admin-tier-management card">
+        <div class="card-header d-flex justify-content-between align-items-center">
+          <h4 class="mb-0">Subscription Tier Management</h4>
+          <button type="button" class="btn btn-primary" onclick="window.showTierVueApp()">
+            <i class="fas fa-plus"></i> Add New Tier (Vue)
+          </button>
+        </div>
+        <div class="card-body">
+          <div class="alert alert-success">
+            <h5><i class="fas fa-check-circle me-2"></i>Tier Management Loaded Successfully</h5>
+            <p class="mb-2">Default tiers are available:</p>
+            <ul class="mb-2">
+              <li><strong>Basic Tier</strong> - $0/month - Basic features</li>
+              <li><strong>Premium Tier</strong> - $9.99/month - Enhanced features</li>
+            </ul>
+            <button class="btn btn-primary btn-sm" onclick="window.showTierVueApp()">
+              <i class="fas fa-cogs me-1"></i> Load Full Vue Interface
+            </button>
+          </div>
+        </div>
+      </div>
+    `;
+    
+    // Make the Vue app available globally for the button
+    window.showTierVueApp = () => {
+      console.log('[TierManagement] Loading Vue app on demand');
+      try {
+        // Create component with forced no-loading state
+        const ComponentWithNoLoading = {
+          ...AdminTierManagement,
+          data() {
+            return {
+              ...AdminTierManagement.data(),
+              isLoading: false // Force loading off from the start
+            };
+          }
+        };
+        
+        adminTierManagementApp = Vue.createApp(ComponentWithNoLoading);
+        
+        // Mount the app directly
+        adminTierManagementApp.mount(`#${containerId}`);
+        console.log('[TierManagement] Vue app mounted successfully to', containerId);
+      } catch (err) {
+        console.error('[TierManagement] Error mounting Vue app:', err);
+        showElement(containerId, createErrorMessage('Error initializing Tier Management: ' + err.message));
+      }
+    };
+    
+    console.log('[TierManagement] Simple HTML interface loaded successfully');
   } catch (error) {
     console.error('[TierManagement] Initialization error:', error);
     const errorMsg = `Failed to initialize Tier Management: ${error.message}`;

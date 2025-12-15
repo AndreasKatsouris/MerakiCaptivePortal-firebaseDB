@@ -1,0 +1,345 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Firebase Performance Monitor (FPM) - Admin Tools</title>
+    
+    <!-- Bootstrap CSS -->
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <!-- Font Awesome -->
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <!-- Chart.js -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    
+    <style>
+        body {
+            background-color: #f8f9fa;
+            visibility: hidden;
+        }
+        
+        body.admin-verified {
+            visibility: visible;
+        }
+        
+        .performance-card {
+            transition: all 0.3s ease;
+            border-left: 4px solid #007bff;
+        }
+        
+        .performance-card:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 15px rgba(0,0,0,0.1);
+        }
+        
+        .metric-card {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border-radius: 12px;
+        }
+        
+        .status-good {
+            color: #28a745;
+        }
+        
+        .status-warning {
+            color: #ffc107;
+        }
+        
+        .status-critical {
+            color: #dc3545;
+        }
+        
+        .performance-chart {
+            height: 300px;
+            width: 100%;
+        }
+        
+        .loading-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(255, 255, 255, 0.95);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            z-index: 9999;
+        }
+        
+        .loading-overlay.hidden {
+            display: none;
+        }
+        
+        .back-button {
+            position: fixed;
+            top: 20px;
+            left: 20px;
+            z-index: 1000;
+        }
+        
+        .admin-status {
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            z-index: 1000;
+            background: rgba(255, 255, 255, 0.95);
+            padding: 0.5rem 1rem;
+            border-radius: 0.25rem;
+            border: 1px solid #ddd;
+            font-size: 0.875rem;
+        }
+        
+        .recommendation-badge {
+            font-size: 0.75rem;
+            padding: 0.25rem 0.5rem;
+            margin-left: 0.5rem;
+        }
+        
+        .performance-gauge {
+            width: 100px;
+            height: 100px;
+            margin: 0 auto;
+        }
+    </style>
+</head>
+<body>
+    <!-- Loading Overlay -->
+    <div id="loadingOverlay" class="loading-overlay">
+        <div class="text-center">
+            <div class="spinner-border text-primary mb-3" role="status">
+                <span class="visually-hidden">Loading...</span>
+            </div>
+            <h5>Initializing Firebase Performance Monitor</h5>
+            <p class="text-muted">Collecting system metrics and performance data...</p>
+        </div>
+    </div>
+
+    <!-- Admin Status Badge -->
+    <div id="adminStatus" class="admin-status">
+        <i class="fas fa-shield-alt text-success me-1"></i>
+        <span id="adminStatusText">Admin Verified</span>
+    </div>
+
+    <!-- Back Button -->
+    <a href="index.html" class="btn btn-secondary back-button">
+        <i class="fas fa-arrow-left me-2"></i>Back to Admin Tools
+    </a>
+    
+    <div class="container-fluid py-5">
+        <div class="text-center mb-5">
+            <h1 class="display-5 mb-3">
+                <i class="fas fa-tachometer-alt me-3 text-primary"></i>Firebase Performance Monitor
+            </h1>
+            <p class="lead">Real-time system performance monitoring and optimization recommendations</p>
+        </div>
+
+        <!-- Performance Overview Cards -->
+        <div class="row mb-4">
+            <div class="col-md-3 mb-3">
+                <div class="card metric-card">
+                    <div class="card-body text-center">
+                        <i class="fas fa-server fa-3x mb-3"></i>
+                        <h5 class="card-title">System Health</h5>
+                        <h2 id="systemHealthScore">--</h2>
+                        <span id="systemHealthStatus" class="badge bg-light text-dark">Loading...</span>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-3 mb-3">
+                <div class="card metric-card">
+                    <div class="card-body text-center">
+                        <i class="fas fa-database fa-3x mb-3"></i>
+                        <h5 class="card-title">Database Performance</h5>
+                        <h2 id="dbPerformanceScore">--</h2>
+                        <span id="dbPerformanceStatus" class="badge bg-light text-dark">Loading...</span>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-3 mb-3">
+                <div class="card metric-card">
+                    <div class="card-body text-center">
+                        <i class="fas fa-bolt fa-3x mb-3"></i>
+                        <h5 class="card-title">Function Performance</h5>
+                        <h2 id="functionPerformanceScore">--</h2>
+                        <span id="functionPerformanceStatus" class="badge bg-light text-dark">Loading...</span>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-3 mb-3">
+                <div class="card metric-card">
+                    <div class="card-body text-center">
+                        <i class="fas fa-globe fa-3x mb-3"></i>
+                        <h5 class="card-title">Frontend Performance</h5>
+                        <h2 id="frontendPerformanceScore">--</h2>
+                        <span id="frontendPerformanceStatus" class="badge bg-light text-dark">Loading...</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Real-time Performance Charts -->
+        <div class="row mb-4">
+            <div class="col-lg-6 mb-4">
+                <div class="card performance-card">
+                    <div class="card-header">
+                        <h5 class="mb-0">
+                            <i class="fas fa-chart-line me-2"></i>Firebase Functions Response Time
+                        </h5>
+                    </div>
+                    <div class="card-body">
+                        <canvas id="functionsChart" class="performance-chart"></canvas>
+                    </div>
+                </div>
+            </div>
+            <div class="col-lg-6 mb-4">
+                <div class="card performance-card">
+                    <div class="card-header">
+                        <h5 class="mb-0">
+                            <i class="fas fa-database me-2"></i>Database Query Performance
+                        </h5>
+                    </div>
+                    <div class="card-body">
+                        <canvas id="databaseChart" class="performance-chart"></canvas>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Detailed Metrics -->
+        <div class="row">
+            <div class="col-lg-8">
+                <!-- Firebase Functions Performance -->
+                <div class="card performance-card mb-4">
+                    <div class="card-header">
+                        <h5 class="mb-0">
+                            <i class="fas fa-functions me-2"></i>Firebase Functions Performance
+                        </h5>
+                    </div>
+                    <div class="card-body">
+                        <div id="functionsMetrics">
+                            <div class="text-center">
+                                <div class="spinner-border text-primary" role="status">
+                                    <span class="visually-hidden">Loading functions data...</span>
+                                </div>
+                                <p class="mt-2">Analyzing Firebase Functions performance...</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Database Performance -->
+                <div class="card performance-card mb-4">
+                    <div class="card-header">
+                        <h5 class="mb-0">
+                            <i class="fas fa-database me-2"></i>Database Performance Metrics
+                        </h5>
+                    </div>
+                    <div class="card-body">
+                        <div id="databaseMetrics">
+                            <div class="text-center">
+                                <div class="spinner-border text-primary" role="status">
+                                    <span class="visually-hidden">Loading database metrics...</span>
+                                </div>
+                                <p class="mt-2">Analyzing database performance...</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Frontend Performance -->
+                <div class="card performance-card mb-4">
+                    <div class="card-header">
+                        <h5 class="mb-0">
+                            <i class="fas fa-globe me-2"></i>Frontend Performance Analysis
+                        </h5>
+                    </div>
+                    <div class="card-body">
+                        <div id="frontendMetrics">
+                            <div class="text-center">
+                                <div class="spinner-border text-primary" role="status">
+                                    <span class="visually-hidden">Loading frontend metrics...</span>
+                                </div>
+                                <p class="mt-2">Analyzing frontend performance...</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Recommendations Panel -->
+            <div class="col-lg-4">
+                <div class="card performance-card">
+                    <div class="card-header">
+                        <h5 class="mb-0">
+                            <i class="fas fa-lightbulb me-2"></i>Performance Recommendations
+                        </h5>
+                    </div>
+                    <div class="card-body">
+                        <div id="recommendationsPanel">
+                            <div class="text-center">
+                                <div class="spinner-border text-warning" role="status">
+                                    <span class="visually-hidden">Generating recommendations...</span>
+                                </div>
+                                <p class="mt-2">Analyzing system and generating recommendations...</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Quick Actions -->
+                <div class="card performance-card mt-4">
+                    <div class="card-header">
+                        <h5 class="mb-0">
+                            <i class="fas fa-tools me-2"></i>Quick Actions
+                        </h5>
+                    </div>
+                    <div class="card-body">
+                        <div class="d-grid gap-2">
+                            <button class="btn btn-primary" id="refreshMetrics">
+                                <i class="fas fa-sync me-2"></i>Refresh All Metrics
+                            </button>
+                            <button class="btn btn-warning" id="exportReport">
+                                <i class="fas fa-download me-2"></i>Export Performance Report
+                            </button>
+                            <button class="btn btn-info" id="runOptimization">
+                                <i class="fas fa-magic me-2"></i>Run Auto-Optimization
+                            </button>
+                            <button class="btn btn-success" id="scheduleMonitoring">
+                                <i class="fas fa-clock me-2"></i>Schedule Monitoring
+                            </button>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Alert Panel -->
+                <div class="card performance-card mt-4">
+                    <div class="card-header">
+                        <h5 class="mb-0">
+                            <i class="fas fa-exclamation-triangle me-2"></i>Performance Alerts
+                        </h5>
+                    </div>
+                    <div class="card-body">
+                        <div id="alertsPanel">
+                            <p class="text-muted text-center">No alerts at this time</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Bootstrap JS -->
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    
+    <!-- Firebase SDK -->
+    <script src="https://www.gstatic.com/firebasejs/10.12.5/firebase-app.js" type="module"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.12.5/firebase-auth.js" type="module"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.12.5/firebase-database.js" type="module"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.12.5/firebase-functions.js" type="module"></script>
+    
+    <!-- Load Firebase Performance Monitor Module -->
+    <script type="module" src="../js/modules/firebase-performance-monitor.js?v=1.0.0"></script>
+</body>
+</html>

@@ -6,6 +6,7 @@
 
 import { generatePurchaseOrder, exportPurchaseOrderToCSV } from '../../order-calculator.js';
 import { generateAdvancedPurchaseOrder, exportAdvancedPurchaseOrderToCSV } from '../../order-calculator-advanced.js';
+import { generateCalculusPurchaseOrder, exportCalculusPurchaseOrderToCSV } from '../../order-calculator-calculus.js';
 
 /**
  * Purchase Order Modal Component
@@ -28,6 +29,10 @@ export const PurchaseOrderModal = {
         storeName: {
             type: String,
             default: 'default'
+        },
+        selectedLocationId: {
+            type: String,
+            default: null
         },
         daysToNextDelivery: {
             type: Number,
@@ -74,11 +79,25 @@ export const PurchaseOrderModal = {
             // Additional parameters
             coveringDays: 2, // Previously leadTimeDays
             
-            // Advanced ordering options
-            useAdvancedCalculation: false,
-            lookbackDays: 14,
+            // Calculation type selection
+            calculationType: 'basic', // 'basic', 'advanced', or 'calculus'
+            lookbackDays: 30, // Extended to capture more seasonal patterns
+            lookbackOptions: [
+                { value: 14, label: '2 weeks' },
+                { value: 21, label: '3 weeks' },
+                { value: 30, label: '1 month (recommended)' },
+                { value: 45, label: '6 weeks' },
+                { value: 60, label: '2 months' }
+            ],
             volatilityMultiplier: 1.0,
-            isAdvancedGenerating: false
+            isAdvancedGenerating: false,
+            
+            // Calculus-specific parameters
+            orderingCost: 50,
+            holdingCostRate: 0.2,
+            serviceLevel: 0.95,
+            leadTimeStdDev: 1,
+            enableMultiItemOptimization: false
         };
     },
     
@@ -111,30 +130,12 @@ export const PurchaseOrderModal = {
             this.regeneratePurchaseOrder();
         },
         
-        useAdvancedCalculation() {
-            // When advanced calculation is toggled, properly get store name first
-            if (this.useAdvancedCalculation && this.stockData && this.stockData.length > 0) {
-                // Try to extract store name directly from stock data
-                const firstRecord = this.stockData[0];
-                if (firstRecord.storeName) {
-                    console.log(`[PO Modal] Found store name in stock data: ${firstRecord.storeName}`);
-                    // Store the name in localStorage so it persists
-                    localStorage.setItem('lastStoreName', firstRecord.storeName);
-                } else if (firstRecord.storeContext && firstRecord.storeContext.name) {
-                    console.log(`[PO Modal] Found store name in storeContext: ${firstRecord.storeContext.name}`);
-                    localStorage.setItem('lastStoreName', firstRecord.storeContext.name);
-                } else if (firstRecord.metadata && firstRecord.metadata.storeName) {
-                    console.log(`[PO Modal] Found store name in metadata: ${firstRecord.metadata.storeName}`);
-                    localStorage.setItem('lastStoreName', firstRecord.metadata.storeName);
-                }
-            }
-            
-            // Then regenerate the purchase order
+        calculationType() {
             this.regeneratePurchaseOrder();
         },
         
         lookbackDays() {
-            if (this.useAdvancedCalculation) {
+            if (this.calculationType === 'advanced') {
                 this.regeneratePurchaseOrder();
             }
         }
@@ -153,6 +154,13 @@ export const PurchaseOrderModal = {
             this.isLoading = true;
             
             try {
+                // Clear historical data cache to ensure fresh data is fetched
+                // This is important when the data location paths have been updated
+                if (window.HistoricalUsageService && typeof window.HistoricalUsageService.clearCache === 'function') {
+                    window.HistoricalUsageService.clearCache();
+                    console.log('[PO Modal] Historical usage cache cleared for fresh data fetch');
+                }
+                
                 // Create parameters for order calculation using local values
                 const orderParams = {
                     daysToNextDelivery: this.localDaysToNextDelivery,
@@ -161,8 +169,68 @@ export const PurchaseOrderModal = {
                     criticalItemBuffer: this.localCriticalItemBuffer
                 };
                 
-                // Add advanced parameters if using advanced calculation
-                if (this.useAdvancedCalculation) {
+                // Get store identifier for advanced/calculus calculations
+                // ENHANCED: Try multiple identifiers for better matching after migration
+                let storeIdentifier = this.selectedLocationId || this.storeName;
+                let alternateIdentifiers = [];
+                
+                // Build list of alternate identifiers to try if primary fails
+                if (this.selectedLocationId && this.storeName) {
+                    // We have both location ID and name - try both
+                    alternateIdentifiers.push(this.storeName);
+                } else if (this.selectedLocationId) {
+                    // Only have location ID - could try to resolve name if needed
+                    alternateIdentifiers.push(this.selectedLocationId);
+                } else if (this.storeName) {
+                    // Only have store name - no alternates available
+                    alternateIdentifiers.push(this.storeName);
+                }
+                
+                // Add calculation-specific parameters
+                if (this.calculationType === 'advanced' || this.calculationType === 'calculus') {
+                    // If no location ID is provided in props, try to get store name from localStorage
+                    if (!this.selectedLocationId && this.storeName === 'default' && localStorage.getItem('lastStoreName')) {
+                        storeIdentifier = localStorage.getItem('lastStoreName');
+                        console.log(`[PO Modal] Using store name from localStorage: ${storeIdentifier}`);
+                    }
+                    
+                    // Store this identifier for future use
+                    if (storeIdentifier !== 'default' && storeIdentifier !== null) {
+                        localStorage.setItem('lastStoreName', storeIdentifier);
+                    }
+                    
+                    console.log(`[PO Modal] Using store/location context: ${storeIdentifier} for ${this.calculationType} order generation`);
+                    console.log(`[PO Modal] Alternate identifiers available: ${alternateIdentifiers.join(', ')}`);
+                }
+                
+                // Handle different calculation types
+                if (this.calculationType === 'calculus') {
+                    // Add calculus-specific parameters
+                    Object.assign(orderParams, {
+                        orderingCost: this.orderingCost,
+                        holdingCostRate: this.holdingCostRate,
+                        serviceLevel: this.serviceLevel,
+                        leadTimeStdDev: this.leadTimeStdDev,
+                        enableMultiItemOptimization: this.enableMultiItemOptimization,
+                        lookbackDays: this.lookbackDays // Also use lookback for historical data
+                    });
+                    
+                    this.isAdvancedGenerating = true;
+                    this.orderStatus = {
+                        type: 'info',
+                        message: 'Generating calculus-optimized purchase order...'
+                    };
+                    
+                    // Generate calculus-optimized purchase order
+                    this.purchaseOrderItems = await generateCalculusPurchaseOrder(
+                        this.stockData,
+                        storeIdentifier,
+                        this.localSelectedSupplier,
+                        orderParams
+                    );
+                    
+                    this.isAdvancedGenerating = false;
+                } else if (this.calculationType === 'advanced') {
                     Object.assign(orderParams, {
                         lookbackDays: this.lookbackDays,
                         volatilityMultiplier: this.volatilityMultiplier
@@ -174,27 +242,10 @@ export const PurchaseOrderModal = {
                         message: 'Generating advanced purchase order using historical data...'
                     };
                     
-                    // Use the storeName directly from props
-                    // This value is passed from the parent component and should be the most accurate
-                    let storeName = this.storeName;
-                    
-                    // If no store name is provided in props, try to get it from localStorage
-                    if (storeName === 'default' && localStorage.getItem('lastStoreName')) {
-                        storeName = localStorage.getItem('lastStoreName');
-                        console.log(`[PO Modal] Using store name from localStorage: ${storeName}`);
-                    }
-                    
-                    // Store this store name for future use
-                    if (storeName !== 'default') {
-                        localStorage.setItem('lastStoreName', storeName);
-                    }
-                    
-                    console.log(`Using store context: ${storeName} for advanced order generation`);
-                    
                     // Generate advanced purchase order with historical data
                     this.purchaseOrderItems = await generateAdvancedPurchaseOrder(
                         this.stockData,
-                        storeName,
+                        storeIdentifier,
                         this.localSelectedSupplier,
                         orderParams
                     );
@@ -213,13 +264,13 @@ export const PurchaseOrderModal = {
                 this.updatePurchaseOrderTotals();
                 this.updateSupplierSummary();
                 
-                console.log(`Purchase order regenerated with ${this.purchaseOrderItems.length} items using ${this.useAdvancedCalculation ? 'advanced' : 'basic'} calculation`);
+                console.log(`Purchase order regenerated with ${this.purchaseOrderItems.length} items using ${this.calculationType} calculation`);
                 
                 // Show confirmation if successful
                 if (this.purchaseOrderItems.length > 0) {
                     this.orderStatus = {
                         type: 'success',
-                        message: `${this.useAdvancedCalculation ? 'Advanced' : 'Basic'} purchase order generated with ${this.purchaseOrderItems.length} items`
+                        message: `${this.calculationType.charAt(0).toUpperCase() + this.calculationType.slice(1)} purchase order generated with ${this.purchaseOrderItems.length} items`
                     };
                 } else {
                     this.orderStatus = {
@@ -231,11 +282,11 @@ export const PurchaseOrderModal = {
                 console.error('Error generating purchase order:', error);
                 this.orderStatus = {
                     type: 'error',
-                    message: `Error generating ${this.useAdvancedCalculation ? 'advanced' : 'basic'} purchase order. Please check console for details.`
+                    message: `Error generating ${this.calculationType} purchase order. Please check console for details.`
                 };
                 
                 // If advanced calculation failed, offer to try basic calculation
-                if (this.useAdvancedCalculation) {
+                if (this.calculationType !== 'basic') {
                     this.orderStatus.message += ' Consider using Basic calculation method instead.';
                 }
             } finally {
@@ -362,15 +413,23 @@ export const PurchaseOrderModal = {
                     : this.localSelectedSupplier.toLowerCase().replace(/\s+/g, '-');
                 
                 // Add calculation type to filename
-                const calcType = this.useAdvancedCalculation ? 'advanced' : 'basic';
+                const calcType = this.calculationType;
                 
                 // Create filename
                 const filename = `purchase_order_${calcType}_${supplierStr}_${timestamp}.csv`;
                 
                 // Generate CSV content based on calculation type
-                const csvContent = this.useAdvancedCalculation
-                    ? exportAdvancedPurchaseOrderToCSV(this.purchaseOrderItems)
-                    : exportPurchaseOrderToCSV(this.purchaseOrderItems);
+                let csvContent;
+                switch (this.calculationType) {
+                    case 'calculus':
+                        csvContent = exportCalculusPurchaseOrderToCSV(this.purchaseOrderItems);
+                        break;
+                    case 'advanced':
+                        csvContent = exportAdvancedPurchaseOrderToCSV(this.purchaseOrderItems);
+                        break;
+                    default:
+                        csvContent = exportPurchaseOrderToCSV(this.purchaseOrderItems);
+                }
                 
                 // Create download link
                 const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
@@ -390,7 +449,7 @@ export const PurchaseOrderModal = {
                 
                 this.orderStatus = {
                     type: 'success',
-                    message: `${this.useAdvancedCalculation ? 'Advanced' : 'Basic'} purchase order exported to ${filename}`
+                    message: `${this.calculationType.charAt(0).toUpperCase() + this.calculationType.slice(1)} purchase order exported to ${filename}`
                 };
                 
             } catch (error) {
@@ -528,7 +587,30 @@ export const PurchaseOrderModal = {
             };
             
             // Will trigger regeneration through watch property
-        },
+        }
+    },
+    
+    mounted() {
+        // Initialize Bootstrap tooltips
+        if (window.$ && window.$.fn.tooltip) {
+            window.$('[data-toggle="tooltip"]').tooltip();
+        }
+    },
+    
+    updated() {
+        // Re-initialize tooltips after component updates
+        this.$nextTick(() => {
+            if (window.$ && window.$.fn.tooltip) {
+                window.$('[data-toggle="tooltip"]').tooltip();
+            }
+        });
+    },
+    
+    beforeDestroy() {
+        // Clean up tooltips
+        if (window.$ && window.$.fn.tooltip) {
+            window.$('[data-toggle="tooltip"]').tooltip('dispose');
+        }
     },
     
     template: `
@@ -539,7 +621,8 @@ export const PurchaseOrderModal = {
                     <div class="modal-header bg-primary text-white">
                         <h5 class="modal-title d-flex align-items-center">
                             <i class="fas fa-file-invoice mr-2"></i> Generate Purchase Order
-                            <span v-if="useAdvancedCalculation" class="badge bg-info text-white ml-2">Advanced</span>
+                            <span v-if="calculationType === 'advanced'" class="badge bg-info text-white ml-2">Advanced</span>
+                            <span v-else-if="calculationType === 'calculus'" class="badge bg-success text-white ml-2">Calculus-Optimized</span>
                         </h5>
                         <button type="button" class="btn-close btn-close-white" @click="closeModal">
                             <span aria-hidden="true">&times;</span>
@@ -627,31 +710,126 @@ export const PurchaseOrderModal = {
                                             </select>
                                         </div>
                                         
-                                        <!-- Advanced Calculation Toggle -->
+                                        <!-- Calculation Type Toggle -->
                                         <div class="form-group mb-4">
                                             <div class="d-flex justify-content-between align-items-center mb-2">
                                                 <label class="mb-0"><i class="fas fa-chart-line mr-2"></i> Calculation Method:</label>
-                                                <span class="badge" :class="useAdvancedCalculation ? 'bg-info text-white' : 'bg-secondary text-white'">{{ useAdvancedCalculation ? 'Advanced' : 'Basic' }}</span>
+                                                <span class="badge" :class="{
+                                                    'bg-secondary text-white': calculationType === 'basic',
+                                                    'bg-info text-white': calculationType === 'advanced',
+                                                    'bg-success text-white': calculationType === 'calculus'
+                                                }">
+                                                    {{ calculationType === 'basic' ? 'Basic' : calculationType === 'advanced' ? 'Advanced' : 'Calculus-Optimized' }}
+                                                </span>
                                             </div>
-                                            <div class="form-check form-switch">
-                                                <input class="form-check-input" type="checkbox" id="useAdvancedCalculation" v-model="useAdvancedCalculation">
-                                                <label class="form-check-label" for="useAdvancedCalculation">
-                                                    Use Historical Data Analysis
+                                            <div class="btn-group btn-group-toggle w-100" data-toggle="buttons">
+                                                <label class="btn btn-outline-secondary" :class="{ active: calculationType === 'basic' }">
+                                                    <input type="radio" v-model="calculationType" value="basic" autocomplete="off"> 
+                                                    Basic
+                                                    <i class="fas fa-info-circle ml-1" 
+                                                       data-toggle="tooltip" 
+                                                       data-placement="top" 
+                                                       :title="'Simple calculation based on current usage rate and days to cover. Best for stable, predictable items.'"></i>
+                                                </label>
+                                                <label class="btn btn-outline-info" :class="{ active: calculationType === 'advanced' }">
+                                                    <input type="radio" v-model="calculationType" value="advanced" autocomplete="off"> 
+                                                    Advanced
+                                                    <i class="fas fa-info-circle ml-1" 
+                                                       data-toggle="tooltip" 
+                                                       data-placement="top" 
+                                                       :title="'Uses historical data to detect trends and adjust for volatility. Accounts for seasonal variations and usage patterns.'"></i>
+                                                </label>
+                                                <label class="btn btn-outline-success" :class="{ active: calculationType === 'calculus' }">
+                                                    <input type="radio" v-model="calculationType" value="calculus" autocomplete="off"> 
+                                                    Calculus
+                                                    <i class="fas fa-info-circle ml-1" 
+                                                       data-toggle="tooltip" 
+                                                       data-placement="top" 
+                                                       :title="'Uses mathematical optimization to minimize total costs. Calculates the Economic Order Quantity (EOQ) and dynamic safety stock based on demand derivatives.'"></i>
                                                 </label>
                                             </div>
-                                            <small class="text-muted d-block mt-1" v-if="useAdvancedCalculation">
+                                            <small class="text-muted d-block mt-1" v-if="calculationType === 'advanced'">
                                                 <i class="fas fa-info-circle mr-1"></i> Uses historical usage patterns to calculate more accurate order quantities.
+                                            </small>
+                                            <small class="text-muted d-block mt-1" v-if="calculationType === 'calculus'">
+                                                <i class="fas fa-info-circle mr-1"></i> Uses calculus optimization with EOQ, demand derivatives, and dynamic safety stock.
                                             </small>
                                         </div>
                                         
                                         <!-- Advanced Parameters (only shown when advanced calculation is enabled) -->
-                                        <div class="form-group mb-4" v-if="useAdvancedCalculation">
+                                        <div class="form-group mb-4" v-if="calculationType === 'advanced'">
                                             <label for="lookbackDays" class="mb-2">Historical Look-back Period (days):</label>
                                             <select class="form-control form-control-sm" v-model="lookbackDays" id="lookbackDays">
                                                 <option value="7">7 days</option>
                                                 <option value="14">14 days</option>
                                                 <option value="30">30 days</option>
                                             </select>
+                                        </div>
+                                        
+                                        <!-- Calculus Parameters -->
+                                        <div v-if="calculationType === 'calculus'">
+                                            <div class="form-group mb-3">
+                                                <label for="lookbackDaysCalculus" class="mb-2">
+                                                    Historical Period:
+                                                    <i class="fas fa-question-circle text-info ml-1" 
+                                                       data-toggle="tooltip" 
+                                                       data-placement="right" 
+                                                       :title="'Number of days of historical data to analyze for demand patterns and trends. More days = more accurate trend detection.'"></i>
+                                                </label>
+                                                <select class="form-control form-control-sm" v-model="lookbackDays" id="lookbackDaysCalculus">
+                                                    <option value="7">7 days</option>
+                                                    <option value="14">14 days</option>
+                                                    <option value="30">30 days</option>
+                                                </select>
+                                            </div>
+                                            <div class="form-group mb-3">
+                                                <label for="serviceLevel" class="mb-2">
+                                                    Service Level:
+                                                    <i class="fas fa-question-circle text-info ml-1" 
+                                                       data-toggle="tooltip" 
+                                                       data-placement="right" 
+                                                       :title="'Probability of not running out of stock. 95% means you accept a 5% chance of stockout. Higher = more safety stock.'"></i>
+                                                </label>
+                                                <select class="form-control form-control-sm" v-model="serviceLevel" id="serviceLevel">
+                                                    <option value="0.90">90%</option>
+                                                    <option value="0.95">95%</option>
+                                                    <option value="0.98">98%</option>
+                                                    <option value="0.99">99%</option>
+                                                </select>
+                                            </div>
+                                            <div class="form-group mb-3">
+                                                <label for="orderingCost" class="mb-2">
+                                                    Cost per Order:
+                                                    <i class="fas fa-question-circle text-info ml-1" 
+                                                       data-toggle="tooltip" 
+                                                       data-placement="right" 
+                                                       :title="'Fixed cost incurred each time you place an order (delivery fees, processing, etc.). Higher cost = larger, less frequent orders.'"></i>
+                                                </label>
+                                                <input type="number" class="form-control form-control-sm" 
+                                                       v-model.number="orderingCost" 
+                                                       id="orderingCost" 
+                                                       min="0" 
+                                                       step="10"
+                                                       placeholder="50">
+                                            </div>
+                                            <div class="form-group mb-3">
+                                                <label for="holdingCostRate" class="mb-2">
+                                                    Holding Cost Rate:
+                                                    <i class="fas fa-question-circle text-info ml-1" 
+                                                       data-toggle="tooltip" 
+                                                       data-placement="right" 
+                                                       :title="'Annual cost of holding inventory as % of item value (storage, refrigeration, spoilage, capital). 0.20 = 20% per year.'"></i>
+                                                </label>
+                                                <input type="number" 
+                                                       class="form-control form-control-sm" 
+                                                       v-model.number="holdingCostRate" 
+                                                       id="holdingCostRate" 
+                                                       min="0" 
+                                                       max="1" 
+                                                       step="0.05"
+                                                       placeholder="0.20">
+                                                <small class="text-muted">Annual % of item value</small>
+                                            </div>
                                         </div>
                                     </div>
                                     <div class="col-md-3 col-sm-6 mb-3">
@@ -745,12 +923,18 @@ export const PurchaseOrderModal = {
                                         </thead>
                                         <tbody>
                                             <template v-for="item in purchaseOrderItems">
-                                                <tr :key="item.itemCode" :class="{'table-warning': item.isCritical}">
+                                                <tr :key="item.itemCode" :class="{'table-warning': item.isCritical, 'table-danger': item.stockStatus && item.stockStatus.isStockout}">
                                                     <td>{{ item.itemCode }}</td>
                                                     <td>
                                                         {{ item.description }}
                                                         <span v-if="item.isCritical" class="badge bg-warning text-dark ml-1" title="Critical Item">
                                                             <i class="fas fa-exclamation-triangle"></i>
+                                                        </span>
+                                                        <span v-if="item.stockStatus && item.stockStatus.isStockout" class="badge bg-danger text-white ml-1" title="Out of Stock!">
+                                                            <i class="fas fa-times-circle"></i> STOCKOUT
+                                                        </span>
+                                                        <span v-else-if="item.stockStatus && item.stockStatus.isNearStockout" class="badge bg-warning text-dark ml-1" title="Low Stock!">
+                                                            <i class="fas fa-exclamation-circle"></i> LOW
                                                         </span>
                                                     </td>
                                                     <td>
@@ -788,7 +972,7 @@ export const PurchaseOrderModal = {
                                                                 <h6 class="border-bottom pb-2">Calculation Details</h6>
                                                                 
                                                                 <!-- Advanced calculation insights -->
-                                                                <div v-if="useAdvancedCalculation && item.historicalInsights" class="alert alert-info mb-3 py-2 px-3">
+                                                                <div v-if="calculationType === 'advanced' && item.historicalInsights" class="alert alert-info mb-3 py-2 px-3">
                                                                     <h6 class="mb-2 font-weight-bold"><i class="fas fa-chart-line mr-2"></i> Historical Insights</h6>
                                                                     
                                                                     <!-- Basic statistics -->
@@ -837,7 +1021,7 @@ export const PurchaseOrderModal = {
                                                                             </tr>
                                                                             <tr class="bg-light font-weight-bold">
                                                                                 <td class="text-muted">Final Usage Rate</td>
-                                                                                <td class="text-right">{{ item.usagePerDay.toFixed(2) }} per day</td>
+                                                                                <td class="text-right">{{ item.historicalInsights.adjustments && item.historicalInsights.adjustments.finalUsage ? item.historicalInsights.adjustments.finalUsage.toFixed(2) : item.usagePerDay.toFixed(2) }} per day</td>
                                                                             </tr>
                                                                         </table>
                                                                     </div>
@@ -897,21 +1081,186 @@ export const PurchaseOrderModal = {
                                                                     </div>
                                                                 </div>
                                                                 
+                                                                <!-- Calculus calculation insights -->
+                                                                <div v-if="calculationType === 'calculus' && item.calculusInsights" class="alert alert-success mb-3 py-2 px-3">
+                                                                    <h6 class="mb-2 font-weight-bold">
+                                                                        <i class="fas fa-calculator mr-2"></i> Calculus Optimization
+                                                                        <i class="fas fa-question-circle text-info ml-2 small" 
+                                                                           data-toggle="tooltip" 
+                                                                           data-placement="right" 
+                                                                           :title="'Mathematical optimization using derivatives to minimize total inventory costs while maintaining service levels.'"></i>
+                                                                    </h6>
+                                                                    
+                                                                    <!-- Demand Analysis -->
+                                                                    <div class="row mb-2">
+                                                                        <div class="col-md-6">
+                                                                            <small class="d-block mb-1">
+                                                                                <span class="text-muted">Demand Trend:</span> 
+                                                                                <strong :class="{
+                                                                                    'text-danger': item.calculusInsights.trendDirection === 'decreasing',
+                                                                                    'text-success': item.calculusInsights.trendDirection === 'increasing',
+                                                                                    'text-warning': item.calculusInsights.trendDirection === 'accelerating' || item.calculusInsights.trendDirection === 'decelerating'
+                                                                                }">
+                                                                                    {{ item.calculusInsights.trendDirection.charAt(0).toUpperCase() + item.calculusInsights.trendDirection.slice(1) }}
+                                                                                </strong>
+                                                                                <i class="fas fa-question-circle text-muted ml-1" 
+                                                                                   data-toggle="tooltip" 
+                                                                                   :title="'Direction of demand change: Increasing/Decreasing = steady change, Accelerating/Decelerating = rate of change is changing'"></i>
+                                                                            </small>
+                                                                            <small class="d-block mb-1">
+                                                                                <span class="text-muted">Confidence:</span> 
+                                                                                <strong>{{ (item.calculusInsights.confidenceLevel * 100).toFixed(0) }}%</strong>
+                                                                                <i class="fas fa-question-circle text-muted ml-1" 
+                                                                                   data-toggle="tooltip" 
+                                                                                   :title="'Statistical confidence in the trend analysis. Higher % = more reliable prediction.'"></i>
+                                                                            </small>
+                                                                        </div>
+                                                                        <div class="col-md-6">
+                                                                            <small class="d-block mb-1">
+                                                                                <span class="text-muted">Demand Velocity:</span> 
+                                                                                <strong>{{ item.calculusInsights && item.calculusInsights.demandVelocity !== undefined ? item.calculusInsights.demandVelocity.toFixed(3) : '0.000' }}</strong> units/day²
+                                                                                <i class="fas fa-question-circle text-muted ml-1" 
+                                                                                   data-toggle="tooltip" 
+                                                                                   :title="'First derivative - rate of change in demand. Positive = increasing demand, Negative = decreasing demand.'"></i>
+                                                                            </small>
+                                                                            <small class="d-block mb-1">
+                                                                                <span class="text-muted">Acceleration:</span> 
+                                                                                <strong>{{ item.calculusInsights && item.calculusInsights.demandAcceleration !== undefined ? item.calculusInsights.demandAcceleration.toFixed(3) : '0.000' }}</strong> units/day³
+                                                                                <i class="fas fa-question-circle text-muted ml-1" 
+                                                                                   data-toggle="tooltip" 
+                                                                                   :title="'Second derivative - how fast the rate of change is changing. Shows if demand changes are speeding up or slowing down.'"></i>
+                                                                            </small>
+                                                                        </div>
+                                                                    </div>
+                                                                    
+                                                                    <!-- EOQ Optimization -->
+                                                                    <div class="border-top pt-2 mt-2">
+                                                                        <h6 class="small font-weight-bold">
+                                                                            Economic Order Quantity (EOQ)
+                                                                            <i class="fas fa-question-circle text-info ml-1" 
+                                                                               data-toggle="tooltip" 
+                                                                               :title="'EOQ formula finds the optimal order size that minimizes total costs (ordering costs + holding costs)'"></i>
+                                                                        </h6>
+                                                                        <div class="row">
+                                                                            <div class="col-md-6">
+                                                                                <table class="table table-sm table-bordered mb-0 small">
+                                                                                    <tr>
+                                                                                        <td class="text-muted" width="60%">
+                                                                                            Optimal EOQ
+                                                                                            <i class="fas fa-question-circle text-muted ml-1" 
+                                                                                               data-toggle="tooltip" 
+                                                                                               :title="'√(2 × Annual Demand × Order Cost ÷ Holding Cost). The mathematically optimal quantity to order each time.'"></i>
+                                                                                        </td>
+                                                                                        <td class="text-right"><strong>{{ item.calculationDetails && item.calculationDetails.eoq ? item.calculationDetails.eoq : 'N/A' }}</strong> units</td>
+                                                                                    </tr>
+                                                                                    <tr>
+                                                                                        <td class="text-muted">
+                                                                                            Safety Stock
+                                                                                            <i class="fas fa-question-circle text-muted ml-1" 
+                                                                                               data-toggle="tooltip" 
+                                                                                               :title="'Extra stock to protect against demand variability and supply delays. Calculated based on service level and demand variation.'"></i>
+                                                                                        </td>
+                                                                                        <td class="text-right">{{ item.calculationDetails && item.calculationDetails.safetyStock ? item.calculationDetails.safetyStock : 'N/A' }} units</td>
+                                                                                    </tr>
+                                                                                    <tr>
+                                                                                        <td class="text-muted">
+                                                                                            Reorder Point
+                                                                                            <i class="fas fa-question-circle text-muted ml-1" 
+                                                                                               data-toggle="tooltip" 
+                                                                                               :title="'Stock level that triggers a new order. = (Lead Time × Daily Usage) + Safety Stock'"></i>
+                                                                                        </td>
+                                                                                        <td class="text-right">{{ item.calculationDetails && item.calculationDetails.reorderPoint ? item.calculationDetails.reorderPoint : 'N/A' }} units</td>
+                                                                                    </tr>
+                                                                                </table>
+                                                                            </div>
+                                                                            <div class="col-md-6">
+                                                                                <table class="table table-sm table-bordered mb-0 small">
+                                                                                    <tr>
+                                                                                        <td class="text-muted" width="60%">
+                                                                                            Order Cycle
+                                                                                            <i class="fas fa-question-circle text-muted ml-1" 
+                                                                                               data-toggle="tooltip" 
+                                                                                               :title="'Days between orders when using EOQ. = EOQ ÷ Daily Usage'"></i>
+                                                                                        </td>
+                                                                                        <td class="text-right">{{ item.calculusInsights && item.calculusInsights.optimalOrderCycle ? item.calculusInsights.optimalOrderCycle.toFixed(1) : 'N/A' }} days</td>
+                                                                                    </tr>
+                                                                                    <tr>
+                                                                                        <td class="text-muted">
+                                                                                            Annual Orders
+                                                                                            <i class="fas fa-question-circle text-muted ml-1" 
+                                                                                               data-toggle="tooltip" 
+                                                                                               :title="'Number of times you should order per year using EOQ'"></i>
+                                                                                        </td>
+                                                                                        <td class="text-right">{{ item.calculusInsights && item.calculusInsights.optimalOrderCycle ? (365 / item.calculusInsights.optimalOrderCycle).toFixed(1) : 'N/A' }}</td>
+                                                                                    </tr>
+                                                                                </table>
+                                                                            </div>
+                                                                        </div>
+                                                                    </div>
+                                                                    
+                                                                    <!-- Cost Analysis -->
+                                                                    <div class="border-top pt-2 mt-2">
+                                                                        <h6 class="small font-weight-bold">
+                                                                            Annual Cost Analysis
+                                                                            <i class="fas fa-question-circle text-info ml-1" 
+                                                                               data-toggle="tooltip" 
+                                                                               :title="'Projected annual costs using the EOQ model vs. current ordering patterns'"></i>
+                                                                        </h6>
+                                                                        <table class="table table-sm table-bordered mb-0 small">
+                                                                            <tr>
+                                                                                <td class="text-muted" width="60%">
+                                                                                    Ordering Cost/Year
+                                                                                    <i class="fas fa-question-circle text-muted ml-1" 
+                                                                                       data-toggle="tooltip" 
+                                                                                       :title="'Total cost of placing orders annually = (Number of Orders × Cost per Order)'"></i>
+                                                                                </td>
+                                                                                <td class="text-right">{{ item.calculusInsights && item.calculusInsights.annualOrderingCost ? item.calculusInsights.annualOrderingCost.toFixed(2) : '0.00' }}</td>
+                                                                            </tr>
+                                                                            <tr>
+                                                                                <td class="text-muted">
+                                                                                    Holding Cost/Year
+                                                                                    <i class="fas fa-question-circle text-muted ml-1" 
+                                                                                       data-toggle="tooltip" 
+                                                                                       :title="'Cost of storing average inventory = (Average Inventory × Item Value × Holding Cost Rate)'"></i>
+                                                                                </td>
+                                                                                <td class="text-right">{{ item.calculusInsights && item.calculusInsights.annualHoldingCost ? item.calculusInsights.annualHoldingCost.toFixed(2) : '0.00' }}</td>
+                                                                            </tr>
+                                                                            <tr class="bg-light font-weight-bold">
+                                                                                <td class="text-muted">
+                                                                                    Total Inventory Cost/Year
+                                                                                    <i class="fas fa-question-circle text-muted ml-1" 
+                                                                                       data-toggle="tooltip" 
+                                                                                       :title="'Sum of ordering and holding costs. EOQ minimizes this total.'"></i>
+                                                                                </td>
+                                                                                <td class="text-right">{{ item.calculusInsights && item.calculusInsights.totalAnnualCost ? item.calculusInsights.totalAnnualCost.toFixed(2) : '0.00' }}</td>
+                                                                            </tr>
+                                                                        </table>
+                                                                    </div>
+                                                                    
+                                                                    <!-- Discount Information -->
+                                                                    <div v-if="item.appliedDiscount && item.appliedDiscount > 0" class="border-top pt-2 mt-2">
+                                                                        <small class="text-success">
+                                                                            <i class="fas fa-tag mr-1"></i>
+                                                                            Volume discount applied: {{ (item.appliedDiscount * 100).toFixed(0) }}%
+                                                                        </small>
+                                                                    </div>
+                                                                </div>
+                                                                
                                                                 <dl class="row mb-0">
                                                                     <dt class="col-sm-6">Days to Next Delivery:</dt>
-                                                                    <dd class="col-sm-6">{{ daysToNextDelivery }} days</dd>
+                                                                    <dd class="col-sm-6">{{ localDaysToNextDelivery }} days</dd>
                                                                     
                                                                     <dt class="col-sm-6">Covering Days:</dt>
                                                                     <dd class="col-sm-6">{{ coveringDays }} days</dd>
                                                                     
                                                                     <dt class="col-sm-6">Forecast Period:</dt>
-                                                                    <dd class="col-sm-6">{{ daysToNextDelivery + coveringDays }} days</dd>
+                                                                    <dd class="col-sm-6">{{ localDaysToNextDelivery + coveringDays }} days</dd>
                                                                     
                                                                     <dt class="col-sm-6">Usage Rate:</dt>
                                                                     <dd class="col-sm-6">{{ item.usagePerDay ? item.usagePerDay.toFixed(2) : '0.00' }} units/day</dd>
                                                                     
                                                                     <dt class="col-sm-6">Safety Stock:</dt>
-                                                                    <dd class="col-sm-6">{{ safetyStockPercentage }}%</dd>
+                                                                    <dd class="col-sm-6">{{ localSafetyStockPercentage }}%</dd>
                                                                     
                                                                     <dt class="col-sm-6">Critical Status:</dt>
                                                                     <dd class="col-sm-6">{{ item.isCritical ? 'Yes' : 'No' }}</dd>

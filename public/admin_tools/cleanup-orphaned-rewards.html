@@ -1,0 +1,342 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Cleanup Orphaned Rewards - Admin Tool</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" rel="stylesheet">
+    <style>
+        .log-container {
+            background-color: #f8f9fa;
+            border: 1px solid #dee2e6;
+            border-radius: 0.25rem;
+            padding: 1rem;
+            font-family: monospace;
+            font-size: 0.875rem;
+            white-space: pre-wrap;
+            max-height: 400px;
+            overflow-y: auto;
+        }
+        .stats-card {
+            border-left: 4px solid #007bff;
+        }
+        .warning-card {
+            border-left: 4px solid #ffc107;
+        }
+        .danger-card {
+            border-left: 4px solid #dc3545;
+        }
+        .success-card {
+            border-left: 4px solid #28a745;
+        }
+    </style>
+</head>
+<body>
+    <div class="container mt-4">
+        <div class="row">
+            <div class="col-12">
+                <div class="d-flex justify-content-between align-items-center mb-4">
+                    <h1>Cleanup Orphaned Rewards</h1>
+                    <a href="index.html" class="btn btn-secondary">← Back to Admin Tools</a>
+                </div>
+                
+                <div class="alert alert-warning" role="alert">
+                    <strong>Warning:</strong> This tool will scan for and remove orphaned reward references. 
+                    These are entries in the guest-rewards index that point to non-existent or invalid rewards.
+                    This operation is safe and will only remove broken references.
+                </div>
+                
+                <div id="authWarning" class="alert alert-info" role="alert" style="display: none;">
+                    <strong>Authentication Required:</strong> Please log in to the main platform first at 
+                    <a href="../admin-login.html" target="_blank">Admin Login</a> or 
+                    <a href="../user-login.html" target="_blank">User Login</a>, then refresh this page.
+                </div>
+
+                <!-- Status Cards -->
+                <div class="row mb-4">
+                    <div class="col-md-3">
+                        <div class="card stats-card">
+                            <div class="card-body">
+                                <h5 class="card-title">Total Guests</h5>
+                                <p class="card-text" id="totalGuests">-</p>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-md-3">
+                        <div class="card warning-card">
+                            <div class="card-body">
+                                <h5 class="card-title">Orphaned References</h5>
+                                <p class="card-text" id="orphanedCount">-</p>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-md-3">
+                        <div class="card success-card">
+                            <div class="card-body">
+                                <h5 class="card-title">Valid Rewards</h5>
+                                <p class="card-text" id="validRewards">-</p>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-md-3">
+                        <div class="card danger-card">
+                            <div class="card-body">
+                                <h5 class="card-title">Cleaned Up</h5>
+                                <p class="card-text" id="cleanedUp">0</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Control Panel -->
+                <div class="card mb-4">
+                    <div class="card-header">
+                        <h5 class="mb-0">Control Panel</h5>
+                    </div>
+                    <div class="card-body">
+                        <div class="row">
+                            <div class="col-md-6">
+                                <button id="scanBtn" class="btn btn-primary me-2">
+                                    <span class="spinner-border spinner-border-sm d-none" role="status"></span>
+                                    Scan for Orphaned References
+                                </button>
+                                <button id="cleanupBtn" class="btn btn-warning me-2" disabled>
+                                    <span class="spinner-border spinner-border-sm d-none" role="status"></span>
+                                    Cleanup Found Issues
+                                </button>
+                                <button id="clearLogBtn" class="btn btn-secondary">Clear Log</button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Log Display -->
+                <div class="card">
+                    <div class="card-header">
+                        <h5 class="mb-0">Operation Log</h5>
+                    </div>
+                    <div class="card-body">
+                        <div id="logContainer" class="log-container">
+                            Ready to scan for orphaned reward references...
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/js/bootstrap.bundle.min.js"></script>
+    <script type="module">
+        import { auth, onAuthStateChanged, rtdb, ref, get, update } from '../js/config/firebase-config.js';
+
+        let foundIssues = [];
+        let isAuthenticated = false;
+
+        // DOM elements
+        const scanBtn = document.getElementById('scanBtn');
+        const cleanupBtn = document.getElementById('cleanupBtn');
+        const clearLogBtn = document.getElementById('clearLogBtn');
+        const logContainer = document.getElementById('logContainer');
+        const totalGuestsEl = document.getElementById('totalGuests');
+        const orphanedCountEl = document.getElementById('orphanedCount');
+        const validRewardsEl = document.getElementById('validRewards');
+        const cleanedUpEl = document.getElementById('cleanedUp');
+
+        // Utility functions
+        function log(message, type = 'info') {
+            const timestamp = new Date().toLocaleTimeString();
+            const logLine = `[${timestamp}] ${message}\n`;
+            logContainer.textContent += logLine;
+            logContainer.scrollTop = logContainer.scrollHeight;
+            
+            console.log(message);
+        }
+
+        function updateStats(stats) {
+            totalGuestsEl.textContent = stats.totalGuests || '-';
+            orphanedCountEl.textContent = stats.orphanedCount || '-';
+            validRewardsEl.textContent = stats.validRewards || '-';
+            cleanedUpEl.textContent = stats.cleanedUp || '0';
+        }
+
+        function setLoading(button, isLoading) {
+            const spinner = button.querySelector('.spinner-border');
+            if (isLoading) {
+                button.disabled = true;
+                spinner.classList.remove('d-none');
+            } else {
+                button.disabled = false;
+                spinner.classList.add('d-none');
+            }
+        }
+
+        // Authentication check
+        onAuthStateChanged(auth, (user) => {
+            const authWarning = document.getElementById('authWarning');
+            if (user) {
+                isAuthenticated = true;
+                authWarning.style.display = 'none';
+                log('✅ Authenticated successfully');
+            } else {
+                isAuthenticated = false;
+                authWarning.style.display = 'block';
+                log('❌ Not authenticated. Please log in to the main platform first.');
+            }
+        });
+
+        // Scan for orphaned references
+        async function scanForOrphanedReferences() {
+            if (!isAuthenticated) {
+                alert('Please log in to the main platform first, then refresh this page.');
+                return;
+            }
+
+            setLoading(scanBtn, true);
+            log('🔍 Starting scan for orphaned reward references...');
+            
+            try {
+                foundIssues = [];
+                let totalGuests = 0;
+                let totalOrphaned = 0;
+                let totalValid = 0;
+
+                // Get all guest-rewards data
+                const guestRewardsSnapshot = await get(ref(rtdb, 'guest-rewards'));
+                const guestRewardsData = guestRewardsSnapshot.val() || {};
+                
+                totalGuests = Object.keys(guestRewardsData).length;
+                log(`📊 Found ${totalGuests} guests with reward references`);
+
+                // Check each guest's rewards
+                for (const [phoneNumber, rewards] of Object.entries(guestRewardsData)) {
+                    if (!rewards || typeof rewards !== 'object') continue;
+                    
+                    const rewardIds = Object.keys(rewards);
+                    log(`👤 Checking ${rewardIds.length} rewards for ${phoneNumber}`);
+                    
+                    for (const rewardId of rewardIds) {
+                        try {
+                            // Check if the actual reward exists
+                            const rewardSnapshot = await get(ref(rtdb, `rewards/${rewardId}`));
+                            const rewardData = rewardSnapshot.val();
+                            
+                            if (!rewardData) {
+                                // Orphaned reference - reward doesn't exist
+                                foundIssues.push({
+                                    phoneNumber,
+                                    rewardId,
+                                    issue: 'missing_reward',
+                                    description: 'Reward reference exists but actual reward is missing'
+                                });
+                                totalOrphaned++;
+                                log(`❌ Found orphaned reference: ${phoneNumber} -> ${rewardId} (missing reward)`);
+                            } else if (!rewardData.status || !rewardData.expiresAt || !rewardData.metadata) {
+                                // Invalid reward structure
+                                foundIssues.push({
+                                    phoneNumber,
+                                    rewardId,
+                                    issue: 'invalid_structure',
+                                    description: 'Reward exists but has invalid structure'
+                                });
+                                totalOrphaned++;
+                                log(`❌ Found invalid reward structure: ${phoneNumber} -> ${rewardId}`);
+                            } else {
+                                totalValid++;
+                            }
+                        } catch (error) {
+                            log(`⚠️ Error checking reward ${rewardId}: ${error.message}`);
+                        }
+                    }
+                }
+
+                updateStats({
+                    totalGuests,
+                    orphanedCount: totalOrphaned,
+                    validRewards: totalValid
+                });
+
+                if (foundIssues.length === 0) {
+                    log('✅ No orphaned references found! Database is clean.');
+                    cleanupBtn.disabled = true;
+                } else {
+                    log(`⚠️ Found ${foundIssues.length} orphaned references that need cleanup.`);
+                    cleanupBtn.disabled = false;
+                }
+
+            } catch (error) {
+                log(`❌ Error during scan: ${error.message}`);
+                console.error('Scan error:', error);
+            } finally {
+                setLoading(scanBtn, false);
+            }
+        }
+
+        // Cleanup orphaned references
+        async function cleanupOrphanedReferences() {
+            if (!isAuthenticated) {
+                alert('Please log in to the main platform first, then refresh this page.');
+                return;
+            }
+
+            if (foundIssues.length === 0) {
+                alert('No issues found to cleanup. Run a scan first.');
+                return;
+            }
+
+            if (!confirm(`Are you sure you want to cleanup ${foundIssues.length} orphaned references? This action cannot be undone.`)) {
+                return;
+            }
+
+            setLoading(cleanupBtn, true);
+            log('🧹 Starting cleanup of orphaned references...');
+
+            try {
+                const updates = {};
+                
+                // Prepare batch updates to remove orphaned references
+                foundIssues.forEach(issue => {
+                    updates[`guest-rewards/${issue.phoneNumber}/${issue.rewardId}`] = null;
+                });
+
+                // Execute batch update
+                await update(ref(rtdb), updates);
+                
+                const cleanedCount = foundIssues.length;
+                log(`✅ Successfully cleaned up ${cleanedCount} orphaned references`);
+                
+                // Update stats
+                updateStats({
+                    totalGuests: parseInt(totalGuestsEl.textContent),
+                    orphanedCount: 0,
+                    validRewards: parseInt(validRewardsEl.textContent),
+                    cleanedUp: cleanedCount
+                });
+
+                // Reset found issues
+                foundIssues = [];
+                cleanupBtn.disabled = true;
+
+                log('🎉 Cleanup completed successfully!');
+
+            } catch (error) {
+                log(`❌ Error during cleanup: ${error.message}`);
+                console.error('Cleanup error:', error);
+            } finally {
+                setLoading(cleanupBtn, false);
+            }
+        }
+
+        // Event listeners
+        scanBtn.addEventListener('click', scanForOrphanedReferences);
+        cleanupBtn.addEventListener('click', cleanupOrphanedReferences);
+        clearLogBtn.addEventListener('click', () => {
+            logContainer.textContent = 'Log cleared...\n';
+        });
+
+        // Initial load
+        log('🚀 Orphaned Rewards Cleanup Tool initialized');
+        log('ℹ️ Waiting for authentication...');
+        log('ℹ️ If not authenticated, please log in to the main platform first');
+    </script>
+</body>
+</html> 

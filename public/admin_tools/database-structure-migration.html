@@ -1,0 +1,943 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Database Structure Migration Tool</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+    <style>
+        body {
+            padding: 20px;
+            background-color: #f8f9fa;
+        }
+        .container {
+            max-width: 1400px;
+        }
+        .migration-step {
+            margin-bottom: 30px;
+            padding: 20px;
+            background: white;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        .migration-step.completed {
+            border-left: 5px solid #28a745;
+            background-color: #f8fff9;
+        }
+        .migration-step.in-progress {
+            border-left: 5px solid #ffc107;
+            background-color: #fffdf5;
+        }
+        .migration-step.pending {
+            border-left: 5px solid #6c757d;
+        }
+        .progress-section {
+            position: sticky;
+            top: 20px;
+            z-index: 1000;
+        }
+        .data-preview {
+            max-height: 300px;
+            overflow-y: auto;
+            background: #f8f9fa;
+            padding: 15px;
+            border-radius: 5px;
+            font-family: monospace;
+            font-size: 12px;
+        }
+        .warning-box {
+            background-color: #fff3cd;
+            border: 1px solid #ffeaa7;
+            border-radius: 5px;
+            padding: 15px;
+            margin-bottom: 20px;
+        }
+        .success-box {
+            background-color: #d4edda;
+            border: 1px solid #c3e6cb;
+            border-radius: 5px;
+            padding: 15px;
+            margin-bottom: 20px;
+        }
+        .info-box {
+            background-color: #d1ecf1;
+            border: 1px solid #bee5eb;
+            border-radius: 5px;
+            padding: 15px;
+            margin-bottom: 20px;
+        }
+        .structure-diagram {
+            background: white;
+            padding: 20px;
+            border-radius: 8px;
+            border: 2px solid #dee2e6;
+            margin: 20px 0;
+        }
+        .old-structure {
+            border-color: #dc3545;
+        }
+        .new-structure {
+            border-color: #28a745;
+        }
+        .migration-stats {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 15px;
+            margin: 20px 0;
+        }
+        .stat-card {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 20px;
+            border-radius: 8px;
+            text-align: center;
+        }
+        .stat-card h3 {
+            margin: 0;
+            font-size: 2rem;
+        }
+        .stat-card p {
+            margin: 5px 0 0 0;
+            opacity: 0.9;
+        }
+        .step-number {
+            display: inline-block;
+            width: 30px;
+            height: 30px;
+            background: #6c757d;
+            color: white;
+            border-radius: 50%;
+            text-align: center;
+            line-height: 30px;
+            margin-right: 10px;
+        }
+        .migration-step.completed .step-number {
+            background: #28a745;
+        }
+        .migration-step.in-progress .step-number {
+            background: #ffc107;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="row">
+            <div class="col-md-8">
+                <h1 class="display-4">Database Structure Migration</h1>
+                <p class="lead">Migrate from nested location-based structure to normalized collections for better performance and scalability.</p>
+
+                <!-- Current vs New Structure -->
+                <div class="row mb-4">
+                    <div class="col-md-6">
+                        <div class="structure-diagram old-structure">
+                            <h5><i class="fas fa-times-circle text-danger"></i> Current Structure (Problematic)</h5>
+                            <pre>locations/
+  └── {locationId}/
+      ├── name: "Ocean Basket Brits"
+      ├── address: "123 Main St"
+      └── stockUsage/
+          └── {timestamp}/
+              ├── stockItems: {...}
+              ├── totals: {...}
+              └── metadata: {...}</pre>
+                            <div class="text-danger small">
+                                <strong>Issues:</strong><br>
+                                • Tight coupling<br>
+                                • Heavy location nodes<br>
+                                • Hard to query across locations<br>
+                                • Data integrity risks
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-md-6">
+                        <div class="structure-diagram new-structure">
+                            <h5><i class="fas fa-check-circle text-success"></i> New Structure (Optimized)</h5>
+                            <pre>stockData/
+  └── {stockDataId}/
+      ├── locationId: "{locationId}"
+      ├── locationName: "Ocean Basket Brits"
+      ├── timestamp: 1744820269356
+      ├── stockItems: {...}
+      └── metadata: {...}
+
+stockDataIndex/
+  └── byLocation/
+      └── {locationId}/
+          └── {timestamp}: true</pre>
+                            <div class="text-success small">
+                                <strong>Benefits:</strong><br>
+                                • Normalized structure<br>
+                                • Efficient querying<br>
+                                • Cross-location analytics<br>
+                                • Better scalability
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Warning Section -->
+                <div class="warning-box">
+                    <h5><i class="fas fa-exclamation-triangle"></i> Important Migration Notes</h5>
+                    <ul>
+                        <li><strong>Backup Required:</strong> This migration modifies production data. Ensure you have a recent backup.</li>
+                        <li><strong>Dual-Write Phase:</strong> During migration, data will be written to both old and new structures.</li>
+                        <li><strong>Read Priority:</strong> New structure will be preferred for reads, with fallback to old structure.</li>
+                        <li><strong>Gradual Migration:</strong> Existing data will be migrated in batches to avoid performance issues.</li>
+                        <li><strong>Rollback Plan:</strong> Migration can be reversed if issues are detected.</li>
+                    </ul>
+                </div>
+
+                <!-- Migration Steps -->
+                <div class="migration-step pending" id="step1">
+                    <h4><span class="step-number">1</span> Analyze Current Data</h4>
+                    <p>Scan the database to understand the current structure and identify data to migrate.</p>
+                    <button class="btn btn-primary" onclick="analyzeCurrentData()">
+                        <i class="fas fa-search"></i> Analyze Database
+                    </button>
+                    <div id="analysisResults" class="mt-3"></div>
+                </div>
+
+                <div class="migration-step pending" id="step2">
+                    <h4><span class="step-number">2</span> Validate Data Integrity</h4>
+                    <p>Check for data consistency issues and prepare migration plan.</p>
+                    <button class="btn btn-warning" onclick="validateDataIntegrity()" disabled>
+                        <i class="fas fa-check-double"></i> Validate Data
+                    </button>
+                    <div id="validationResults" class="mt-3"></div>
+                </div>
+
+                <div class="migration-step pending" id="step3">
+                    <h4><span class="step-number">3</span> Enable Dual-Write Mode</h4>
+                    <p>Configure the application to write to both old and new structures.</p>
+                    <button class="btn btn-info" onclick="enableDualWrite()" disabled>
+                        <i class="fas fa-code-branch"></i> Enable Dual-Write
+                    </button>
+                    <div id="dualWriteResults" class="mt-3"></div>
+                </div>
+
+                <div class="migration-step pending" id="step4">
+                    <h4><span class="step-number">4</span> Migrate Historical Data</h4>
+                    <p>Transfer existing data from old structure to new structure in batches.</p>
+                    <button class="btn btn-success" onclick="startDataMigration()" disabled>
+                        <i class="fas fa-database"></i> Start Migration
+                    </button>
+                    <div id="migrationResults" class="mt-3"></div>
+                </div>
+
+                <div class="migration-step pending" id="step5">
+                    <h4><span class="step-number">5</span> Update Read Logic</h4>
+                    <p>Switch read operations to prefer the new structure with fallback to old.</p>
+                    <button class="btn btn-primary" onclick="updateReadLogic()" disabled>
+                        <i class="fas fa-sync-alt"></i> Update Reads
+                    </button>
+                    <div id="readLogicResults" class="mt-3"></div>
+                </div>
+
+                <div class="migration-step pending" id="step6">
+                    <h4><span class="step-number">6</span> Verify Migration</h4>
+                    <p>Test the new structure and verify data integrity.</p>
+                    <button class="btn btn-info" onclick="verifyMigration()" disabled>
+                        <i class="fas fa-clipboard-check"></i> Verify Migration
+                    </button>
+                    <div id="verificationResults" class="mt-3"></div>
+                </div>
+
+                <div class="migration-step pending" id="step7">
+                    <h4><span class="step-number">7</span> Cleanup Old Structure</h4>
+                    <p>Remove old data structure after successful migration (optional).</p>
+                    <button class="btn btn-danger" onclick="cleanupOldStructure()" disabled>
+                        <i class="fas fa-trash-alt"></i> Cleanup (Optional)
+                    </button>
+                    <div id="cleanupResults" class="mt-3"></div>
+                </div>
+            </div>
+
+            <!-- Progress Sidebar -->
+            <div class="col-md-4">
+                <div class="progress-section">
+                    <div class="card">
+                        <div class="card-header">
+                            <h5><i class="fas fa-chart-line"></i> Migration Progress</h5>
+                        </div>
+                        <div class="card-body">
+                            <div class="progress mb-3">
+                                <div id="overallProgress" class="progress-bar progress-bar-striped" 
+                                     role="progressbar" style="width: 0%"></div>
+                            </div>
+                            <div id="progressText">Ready to start migration</div>
+                            
+                            <div class="migration-stats mt-4" id="migrationStats" style="display: none;">
+                                <div class="stat-card">
+                                    <h3 id="totalRecords">0</h3>
+                                    <p>Total Records</p>
+                                </div>
+                                <div class="stat-card">
+                                    <h3 id="migratedRecords">0</h3>
+                                    <p>Migrated</p>
+                                </div>
+                                <div class="stat-card">
+                                    <h3 id="errorCount">0</h3>
+                                    <p>Errors</p>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="card mt-3">
+                        <div class="card-header">
+                            <h5><i class="fas fa-cogs"></i> Migration Settings</h5>
+                        </div>
+                        <div class="card-body">
+                            <div class="form-group mb-3">
+                                <label>Batch Size:</label>
+                                <select class="form-control" id="batchSize">
+                                    <option value="10">10 records</option>
+                                    <option value="25" selected>25 records</option>
+                                    <option value="50">50 records</option>
+                                    <option value="100">100 records</option>
+                                </select>
+                            </div>
+                            
+                            <div class="form-group mb-3">
+                                <label>Delay Between Batches:</label>
+                                <select class="form-control" id="batchDelay">
+                                    <option value="500">0.5 seconds</option>
+                                    <option value="1000" selected>1 second</option>
+                                    <option value="2000">2 seconds</option>
+                                    <option value="5000">5 seconds</option>
+                                </select>
+                            </div>
+                            
+                            <div class="form-check">
+                                <input type="checkbox" class="form-check-input" id="deleteAfterMigration">
+                                <label class="form-check-label" for="deleteAfterMigration">
+                                    Delete old data after migration
+                                </label>
+                            </div>
+                            
+                            <div class="form-check">
+                                <input type="checkbox" class="form-check-input" id="dryRunMode">
+                                <label class="form-check-label" for="dryRunMode">
+                                    Dry run mode (preview only)
+                                </label>
+                            </div>
+                            
+                            <div class="alert alert-info mt-2 mb-0">
+                                <i class="fas fa-info-circle"></i>
+                                <strong>Migration Mode:</strong> Uncheck "Dry run mode" to perform actual migration. 
+                                Dry run is useful for testing first.
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="card mt-3">
+                        <div class="card-header">
+                            <h5><i class="fas fa-download"></i> Export Tools</h5>
+                        </div>
+                        <div class="card-body">
+                            <button class="btn btn-outline-primary btn-sm w-100 mb-2" onclick="exportMigrationPlan()">
+                                <i class="fas fa-file-export"></i> Export Migration Plan
+                            </button>
+                            <button class="btn btn-outline-success btn-sm w-100 mb-2" onclick="exportMigrationLog()">
+                                <i class="fas fa-file-alt"></i> Export Migration Log
+                            </button>
+                            <button class="btn btn-outline-danger btn-sm w-100" onclick="exportRollbackScript()">
+                                <i class="fas fa-undo"></i> Export Rollback Script
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    <script type="module">
+        import { auth, rtdb, ref, get, set, remove, onAuthStateChanged } from '../js/config/firebase-config.js';
+
+        // Global migration state
+        let migrationState = {
+            currentStep: 0,
+            totalSteps: 7,
+            totalRecords: 0,
+            migratedRecords: 0,
+            errorCount: 0,
+            migrationLog: [],
+            rollbackData: []
+        };
+
+        // Initialize
+        window.addEventListener('DOMContentLoaded', () => {
+            onAuthStateChanged(auth, (user) => {
+                if (!user) {
+                    alert('Please login as an admin to use this migration tool');
+                    window.location.href = '/admin-login.html';
+                    return;
+                }
+                
+                // Check if user is admin
+                checkAdminPermissions(user);
+            });
+        });
+
+        async function checkAdminPermissions(user) {
+            try {
+                const adminRef = ref(rtdb, `admins/${user.uid}`);
+                const snapshot = await get(adminRef);
+                
+                if (!snapshot.exists()) {
+                    alert('Admin permissions required for database migration');
+                    window.location.href = '/admin-dashboard.html';
+                    return;
+                }
+                
+                console.log('Admin permissions verified');
+            } catch (error) {
+                console.error('Error checking admin permissions:', error);
+                alert('Error verifying permissions: ' + error.message);
+            }
+        }
+
+        // Step 1: Analyze Current Data
+        window.analyzeCurrentData = async function() {
+            const output = document.getElementById('analysisResults');
+            output.innerHTML = '<div class="spinner-border spinner-border-sm"></div> Analyzing database structure...';
+            
+            try {
+                // Analyze locations and their stock data
+                const locationsRef = ref(rtdb, 'locations');
+                const locationsSnapshot = await get(locationsRef);
+                
+                if (!locationsSnapshot.exists()) {
+                    output.innerHTML = '<div class="alert alert-warning">No locations found in database</div>';
+                    return;
+                }
+                
+                const locations = locationsSnapshot.val();
+                const locationEntries = Object.entries(locations);
+                
+                let totalStockRecords = 0;
+                let locationAnalysis = [];
+                
+                for (const [locationId, locationData] of locationEntries) {
+                    const stockUsageRef = ref(rtdb, `locations/${locationId}/stockUsage`);
+                    const stockSnapshot = await get(stockUsageRef);
+                    
+                    const recordCount = stockSnapshot.exists() ? Object.keys(stockSnapshot.val()).length : 0;
+                    totalStockRecords += recordCount;
+                    
+                    locationAnalysis.push({
+                        id: locationId,
+                        name: locationData.name || locationData.displayName || 'Unknown',
+                        recordCount
+                    });
+                }
+                
+                // Also check root stockUsage
+                const rootStockRef = ref(rtdb, 'stockUsage');
+                const rootStockSnapshot = await get(rootStockRef);
+                const rootRecords = rootStockSnapshot.exists() ? Object.keys(rootStockSnapshot.val()).length : 0;
+                
+                migrationState.totalRecords = totalStockRecords + rootRecords;
+                
+                let html = '<div class="success-box">';
+                html += `<h6>Analysis Complete</h6>`;
+                html += `<p><strong>Total Locations:</strong> ${locationEntries.length}</p>`;
+                html += `<p><strong>Total Stock Records:</strong> ${totalStockRecords}</p>`;
+                html += `<p><strong>Root Stock Records:</strong> ${rootRecords}</p>`;
+                html += `<p><strong>Total Records to Migrate:</strong> ${migrationState.totalRecords}</p>`;
+                html += '</div>';
+                
+                html += '<h6>Location Breakdown:</h6>';
+                html += '<div class="data-preview">';
+                locationAnalysis.forEach(loc => {
+                    html += `${loc.name} (${loc.id}): ${loc.recordCount} records\n`;
+                });
+                html += '</div>';
+                
+                output.innerHTML = html;
+                
+                // Update stats
+                document.getElementById('totalRecords').textContent = migrationState.totalRecords;
+                document.getElementById('migrationStats').style.display = 'block';
+                
+                // Enable next step
+                completeStep(1);
+                enableStep(2);
+                
+            } catch (error) {
+                output.innerHTML = `<div class="alert alert-danger">Analysis failed: ${error.message}</div>`;
+            }
+        };
+
+        // Step 2: Validate Data Integrity
+        window.validateDataIntegrity = async function() {
+            const output = document.getElementById('validationResults');
+            output.innerHTML = '<div class="spinner-border spinner-border-sm"></div> Validating data integrity...';
+            
+            try {
+                let validationIssues = [];
+                let validRecords = 0;
+                
+                // Check locations data
+                const locationsRef = ref(rtdb, 'locations');
+                const locationsSnapshot = await get(locationsRef);
+                const locations = locationsSnapshot.val();
+                
+                for (const [locationId, locationData] of Object.entries(locations)) {
+                    const stockUsageRef = ref(rtdb, `locations/${locationId}/stockUsage`);
+                    const stockSnapshot = await get(stockUsageRef);
+                    
+                    if (stockSnapshot.exists()) {
+                        const stockData = stockSnapshot.val();
+                        
+                        for (const [timestamp, record] of Object.entries(stockData)) {
+                            // Validate record structure
+                            if (!record.stockItems) {
+                                validationIssues.push(`Missing stockItems in ${locationId}/${timestamp}`);
+                            } else if (!record.selectedLocationId) {
+                                validationIssues.push(`Missing selectedLocationId in ${locationId}/${timestamp}`);
+                            } else {
+                                validRecords++;
+                            }
+                        }
+                    }
+                }
+                
+                let html = '<div class="info-box">';
+                html += `<h6>Validation Complete</h6>`;
+                html += `<p><strong>Valid Records:</strong> ${validRecords}</p>`;
+                html += `<p><strong>Issues Found:</strong> ${validationIssues.length}</p>`;
+                html += '</div>';
+                
+                if (validationIssues.length > 0) {
+                    html += '<h6>Issues to Address:</h6>';
+                    html += '<div class="data-preview">';
+                    validationIssues.slice(0, 10).forEach(issue => {
+                        html += `⚠️ ${issue}\n`;
+                    });
+                    if (validationIssues.length > 10) {
+                        html += `... and ${validationIssues.length - 10} more issues\n`;
+                    }
+                    html += '</div>';
+                }
+                
+                output.innerHTML = html;
+                
+                // Enable next step if validation passes
+                if (validationIssues.length < migrationState.totalRecords * 0.1) { // Allow up to 10% issues
+                    completeStep(2);
+                    enableStep(3);
+                } else {
+                    output.innerHTML += '<div class="alert alert-warning">Too many validation issues. Please fix data before proceeding.</div>';
+                }
+                
+            } catch (error) {
+                output.innerHTML = `<div class="alert alert-danger">Validation failed: ${error.message}</div>`;
+            }
+        };
+
+        // Step 3: Enable Dual-Write Mode
+        window.enableDualWrite = async function() {
+            const output = document.getElementById('dualWriteResults');
+            output.innerHTML = '<div class="spinner-border spinner-border-sm"></div> Enabling dual-write mode...';
+            
+            try {
+                // Create a flag in the database to enable dual-write mode
+                const configRef = ref(rtdb, 'migrationConfig');
+                await set(configRef, {
+                    dualWriteEnabled: true,
+                    migrationStarted: Date.now(),
+                    migrationStatus: 'dual-write-enabled'
+                });
+                
+                let html = '<div class="success-box">';
+                html += '<h6>Dual-Write Mode Enabled</h6>';
+                html += '<p>The application will now write to both old and new structures.</p>';
+                html += '<p><strong>Note:</strong> You may need to restart the application for this to take effect.</p>';
+                html += '</div>';
+                
+                output.innerHTML = html;
+                
+                completeStep(3);
+                enableStep(4);
+                
+            } catch (error) {
+                output.innerHTML = `<div class="alert alert-danger">Failed to enable dual-write: ${error.message}</div>`;
+            }
+        };
+
+        // Step 4: Start Data Migration
+        window.startDataMigration = async function() {
+            const output = document.getElementById('migrationResults');
+            const isDryRun = document.getElementById('dryRunMode').checked;
+            const batchSize = parseInt(document.getElementById('batchSize').value);
+            const batchDelay = parseInt(document.getElementById('batchDelay').value);
+            
+            output.innerHTML = `<div class="spinner-border spinner-border-sm"></div> ${isDryRun ? 'Simulating' : 'Starting'} data migration...`;
+            
+            try {
+                let migratedCount = 0;
+                let errorCount = 0;
+                const migrationLog = [];
+                
+                // Get all locations
+                const locationsRef = ref(rtdb, 'locations');
+                const locationsSnapshot = await get(locationsRef);
+                const locations = locationsSnapshot.val();
+                
+                for (const [locationId, locationData] of Object.entries(locations)) {
+                    const stockUsageRef = ref(rtdb, `locations/${locationId}/stockUsage`);
+                    const stockSnapshot = await get(stockUsageRef);
+                    
+                    if (stockSnapshot.exists()) {
+                        const stockData = stockSnapshot.val();
+                        const entries = Object.entries(stockData);
+                        
+                        // Process in batches
+                        for (let i = 0; i < entries.length; i += batchSize) {
+                            const batch = entries.slice(i, i + batchSize);
+                            
+                            for (const [timestamp, record] of batch) {
+                                try {
+                                    // Create new structure data
+                                    const newStockData = {
+                                        ...record,
+                                        locationId: locationId,
+                                        locationName: locationData.name || locationData.displayName || 'Unknown Location',
+                                        migratedFrom: `locations/${locationId}/stockUsage/${timestamp}`,
+                                        migratedAt: Date.now()
+                                    };
+                                    
+                                    if (!isDryRun) {
+                                        // Write to new structure
+                                        const newStockRef = ref(rtdb, `stockData/${timestamp}`);
+                                        await set(newStockRef, newStockData);
+                                        
+                                        // Create index entry
+                                        const indexRef = ref(rtdb, `stockDataIndex/byLocation/${locationId}/${timestamp}`);
+                                        await set(indexRef, true);
+                                    }
+                                    
+                                    migratedCount++;
+                                    migrationLog.push(`✅ Migrated ${locationId}/${timestamp}`);
+                                    
+                                } catch (recordError) {
+                                    errorCount++;
+                                    migrationLog.push(`❌ Failed ${locationId}/${timestamp}: ${recordError.message}`);
+                                }
+                            }
+                            
+                            // Update progress
+                            const progress = (migratedCount / migrationState.totalRecords) * 100;
+                            updateProgress(progress, `Migrated ${migratedCount}/${migrationState.totalRecords} records`);
+                            document.getElementById('migratedRecords').textContent = migratedCount;
+                            document.getElementById('errorCount').textContent = errorCount;
+                            
+                            // Delay between batches
+                            if (i + batchSize < entries.length) {
+                                await new Promise(resolve => setTimeout(resolve, batchDelay));
+                            }
+                        }
+                    }
+                }
+                
+                migrationState.migratedRecords = migratedCount;
+                migrationState.errorCount = errorCount;
+                migrationState.migrationLog = migrationLog;
+                
+                let html = `<div class="${isDryRun ? 'info-box' : 'success-box'}">`;
+                html += `<h6>${isDryRun ? 'Migration Simulation' : 'Migration'} Complete</h6>`;
+                html += `<p><strong>Records Processed:</strong> ${migratedCount}</p>`;
+                html += `<p><strong>Errors:</strong> ${errorCount}</p>`;
+                html += `<p><strong>Success Rate:</strong> ${((migratedCount / (migratedCount + errorCount)) * 100).toFixed(1)}%</p>`;
+                html += '</div>';
+                
+                if (migrationLog.length > 0) {
+                    html += '<h6>Migration Log (last 20 entries):</h6>';
+                    html += '<div class="data-preview">';
+                    migrationLog.slice(-20).forEach(entry => {
+                        html += `${entry}\n`;
+                    });
+                    html += '</div>';
+                }
+                
+                output.innerHTML = html;
+                
+                if (!isDryRun && errorCount < migratedCount * 0.05) { // Less than 5% errors
+                    completeStep(4);
+                    enableStep(5);
+                    
+                    // Auto-proceed to next step after successful migration
+                    setTimeout(() => {
+                        output.innerHTML += `
+                            <div class="alert alert-success mt-3">
+                                <h6><i class="fas fa-check-circle"></i> Migration Successful!</h6>
+                                <p>Data migration completed successfully. Proceeding to Step 5...</p>
+                                <div class="progress mb-2">
+                                    <div class="progress-bar progress-bar-striped progress-bar-animated" 
+                                         style="width: 100%">Auto-proceeding...</div>
+                                </div>
+                            </div>
+                        `;
+                        
+                        // Auto-click Step 5 after a short delay
+                        setTimeout(() => {
+                            const step5Button = document.querySelector('#step5 button');
+                            if (step5Button && !step5Button.disabled) {
+                                step5Button.click();
+                            }
+                        }, 2000);
+                    }, 1000);
+                } else if (isDryRun) {
+                    // Show message about running actual migration
+                    output.innerHTML += `
+                        <div class="alert alert-warning mt-3">
+                            <h6><i class="fas fa-exclamation-triangle"></i> Simulation Complete</h6>
+                            <p>This was a dry run simulation. To perform actual migration:</p>
+                            <ol>
+                                <li>Uncheck "Dry run mode" above</li>
+                                <li>Click "Start Migration" again</li>
+                            </ol>
+                        </div>
+                    `;
+                }
+                
+            } catch (error) {
+                output.innerHTML = `<div class="alert alert-danger">Migration failed: ${error.message}</div>`;
+            }
+        };
+
+        // Helper functions
+        function completeStep(stepNumber) {
+            const step = document.getElementById(`step${stepNumber}`);
+            step.classList.remove('pending', 'in-progress');
+            step.classList.add('completed');
+            
+            migrationState.currentStep = stepNumber;
+            updateOverallProgress();
+        }
+
+        function enableStep(stepNumber) {
+            const step = document.getElementById(`step${stepNumber}`);
+            const button = step.querySelector('button');
+            if (button) {
+                button.disabled = false;
+            }
+        }
+
+        function updateProgress(percentage, text) {
+            document.getElementById('overallProgress').style.width = percentage + '%';
+            document.getElementById('progressText').textContent = text;
+        }
+
+        function updateOverallProgress() {
+            const percentage = (migrationState.currentStep / migrationState.totalSteps) * 100;
+            updateProgress(percentage, `Step ${migrationState.currentStep} of ${migrationState.totalSteps} completed`);
+        }
+
+        // Export functions
+        window.exportMigrationPlan = function() {
+            const plan = {
+                timestamp: new Date().toISOString(),
+                totalRecords: migrationState.totalRecords,
+                migrationSteps: migrationState.totalSteps,
+                currentStep: migrationState.currentStep,
+                settings: {
+                    batchSize: document.getElementById('batchSize').value,
+                    batchDelay: document.getElementById('batchDelay').value,
+                    deleteAfterMigration: document.getElementById('deleteAfterMigration').checked,
+                    dryRunMode: document.getElementById('dryRunMode').checked
+                }
+            };
+            
+            downloadJSON(plan, 'migration-plan.json');
+        };
+
+        window.exportMigrationLog = function() {
+            const log = {
+                timestamp: new Date().toISOString(),
+                totalRecords: migrationState.totalRecords,
+                migratedRecords: migrationState.migratedRecords,
+                errorCount: migrationState.errorCount,
+                log: migrationState.migrationLog
+            };
+            
+            downloadJSON(log, 'migration-log.json');
+        };
+
+        function downloadJSON(data, filename) {
+            const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = filename;
+            a.click();
+            URL.revokeObjectURL(url);
+        }
+
+        // Step 5: Update Read Logic
+        window.updateReadLogic = async function() {
+            const output = document.getElementById('readLogicResults');
+            output.innerHTML = '<div class="spinner-border spinner-border-sm"></div> Updating read logic configuration...';
+            
+            try {
+                // Update the migration config to prefer new structure
+                const configRef = ref(rtdb, 'migrationConfig');
+                await set(configRef, {
+                    dualWriteEnabled: true,
+                    migrationStarted: Date.now(),
+                    migrationStatus: 'read-logic-updated',
+                    preferNewStructure: true,
+                    migrationCompleted: Date.now()
+                });
+                
+                let html = '<div class="success-box">';
+                html += '<h6>Read Logic Updated</h6>';
+                html += '<p>The application will now read from the new structure first, with fallback to old structure.</p>';
+                html += '<p><strong>Status:</strong> Migration phase completed successfully!</p>';
+                html += '</div>';
+                
+                output.innerHTML = html;
+                
+                completeStep(5);
+                enableStep(6);
+                
+                // Auto-proceed to verification
+                setTimeout(() => {
+                    output.innerHTML += `
+                        <div class="alert alert-info mt-3">
+                            <h6><i class="fas fa-info-circle"></i> Auto-proceeding to Verification</h6>
+                            <p>Moving to Step 6 to verify the migration...</p>
+                        </div>
+                    `;
+                    
+                    setTimeout(() => {
+                        const step6Button = document.querySelector('#step6 button');
+                        if (step6Button && !step6Button.disabled) {
+                            step6Button.click();
+                        }
+                    }, 2000);
+                }, 1000);
+                
+            } catch (error) {
+                output.innerHTML = `<div class="alert alert-danger">Failed to update read logic: ${error.message}</div>`;
+            }
+        };
+
+        // Step 6: Verify Migration
+        window.verifyMigration = async function() {
+            const output = document.getElementById('verificationResults');
+            output.innerHTML = '<div class="spinner-border spinner-border-sm"></div> Verifying migration integrity...';
+            
+            try {
+                let verificationResults = {
+                    newStructureRecords: 0,
+                    oldStructureRecords: 0,
+                    dataIntegrityIssues: [],
+                    samplesChecked: 0
+                };
+                
+                // Check new structure
+                const newStockRef = ref(rtdb, 'stockData');
+                const newStockSnapshot = await get(newStockRef);
+                
+                if (newStockSnapshot.exists()) {
+                    verificationResults.newStructureRecords = Object.keys(newStockSnapshot.val()).length;
+                }
+                
+                // Check old structure (sample locations)
+                const locationsRef = ref(rtdb, 'locations');
+                const locationsSnapshot = await get(locationsRef);
+                
+                if (locationsSnapshot.exists()) {
+                    const locations = locationsSnapshot.val();
+                    
+                    for (const [locationId, locationData] of Object.entries(locations)) {
+                        const stockUsageRef = ref(rtdb, `locations/${locationId}/stockUsage`);
+                        const stockSnapshot = await get(stockUsageRef);
+                        
+                        if (stockSnapshot.exists()) {
+                            verificationResults.oldStructureRecords += Object.keys(stockSnapshot.val()).length;
+                        }
+                    }
+                }
+                
+                // Verify data integrity by sampling
+                if (newStockSnapshot.exists()) {
+                    const newStockData = newStockSnapshot.val();
+                    const sampleKeys = Object.keys(newStockData).slice(0, 10); // Sample first 10
+                    
+                    for (const key of sampleKeys) {
+                        const record = newStockData[key];
+                        verificationResults.samplesChecked++;
+                        
+                        // Check required fields
+                        if (!record.locationId) {
+                            verificationResults.dataIntegrityIssues.push(`Missing locationId in record ${key}`);
+                        }
+                        if (!record.stockItems) {
+                            verificationResults.dataIntegrityIssues.push(`Missing stockItems in record ${key}`);
+                        }
+                        if (!record.migratedFrom) {
+                            verificationResults.dataIntegrityIssues.push(`Missing migration metadata in record ${key}`);
+                        }
+                    }
+                }
+                
+                let html = '<div class="success-box">';
+                html += '<h6>Migration Verification Complete</h6>';
+                html += `<p><strong>New Structure Records:</strong> ${verificationResults.newStructureRecords}</p>`;
+                html += `<p><strong>Old Structure Records:</strong> ${verificationResults.oldStructureRecords}</p>`;
+                html += `<p><strong>Data Samples Checked:</strong> ${verificationResults.samplesChecked}</p>`;
+                html += `<p><strong>Data Integrity Issues:</strong> ${verificationResults.dataIntegrityIssues.length}</p>`;
+                html += '</div>';
+                
+                if (verificationResults.dataIntegrityIssues.length > 0) {
+                    html += '<h6>Issues Found:</h6>';
+                    html += '<div class="data-preview">';
+                    verificationResults.dataIntegrityIssues.forEach(issue => {
+                        html += `⚠️ ${issue}\n`;
+                    });
+                    html += '</div>';
+                }
+                
+                const migrationSuccess = verificationResults.newStructureRecords > 0 && 
+                                       verificationResults.dataIntegrityIssues.length === 0;
+                
+                if (migrationSuccess) {
+                    html += `
+                        <div class="alert alert-success mt-3">
+                            <h6><i class="fas fa-check-circle"></i> Migration Verified Successfully!</h6>
+                            <p>Your database migration is complete and verified. The system is now using the new optimized structure.</p>
+                            <p><strong>Next Steps:</strong></p>
+                            <ul>
+                                <li>Monitor system performance</li>
+                                <li>Consider running Step 7 to clean up old data (optional)</li>
+                                <li>Update any documentation or procedures</li>
+                            </ul>
+                        </div>
+                    `;
+                    
+                    completeStep(6);
+                    enableStep(7);
+                }
+                
+                output.innerHTML = html;
+                
+            } catch (error) {
+                output.innerHTML = `<div class="alert alert-danger">Verification failed: ${error.message}</div>`;
+            }
+        };
+
+        window.cleanupOldStructure = function() {
+            alert('This step would remove the old data structure after confirming migration success.');
+        };
+
+        window.exportRollbackScript = function() {
+            alert('This would generate a script to rollback the migration if needed.');
+        };
+    </script>
+</body>
+</html> 

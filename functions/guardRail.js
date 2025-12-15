@@ -18,8 +18,8 @@ const {
 async function getActiveCampaigns() {
     try {
         console.log('Fetching active campaigns from database');
-        const campaignsRef = ref(rtdb, 'campaigns');
-        console.log('Database path:', campaignsRef.toString());
+            const campaignsRef = ref(rtdb, 'campaigns');
+    console.log('Database path:', 'campaigns');
         const snapshot = await get(campaignsRef);
         
         const campaigns = snapshot.val();
@@ -364,44 +364,28 @@ function validateBasicCriteria(receiptData, campaign) {
 
 /**
  * Validates campaign date and time criteria
- * @param {Object} receiptData - Receipt data containing date
+ * @param {Object} receiptData - Receipt data containing date (in ISO format YYYY-MM-DD)
  * @param {Object} campaign - Campaign with start/end dates
  * @returns {boolean} True if receipt date is within campaign period
  */
 function validateDateTimeCriteria(receiptData, campaign) {
     try {
-        const [part1, part2, year] = receiptData.date.split('/').map(Number);
         const campaignStart = new Date(campaign.startDate);
         const campaignEnd = new Date(campaign.endDate);
-        const currentMonth = new Date().getMonth() + 1; // 1-based month
+        
+        // Receipt date is already in ISO format (YYYY-MM-DD) from receiptProcessor
+        const receiptDate = new Date(receiptData.date);
 
         console.log('Campaign date validation:', {
             receiptDate: receiptData.date,
+            receiptDateParsed: receiptDate,
             campaignStart,
-            campaignEnd,
-            currentMonth
+            campaignEnd
         });
 
-        // Check if parts could be valid months (1-12)
-        const couldBeMonth = part1 >= 1 && part1 <= 12;
-        const part2CouldBeMonth = part2 >= 1 && part2 <= 12;
-
-        // Create receipt date based on current month interpretation
-        let receiptDate;
-        if (currentMonth === part1 && couldBeMonth) {
-            // Interpret as MM/DD/YYYY
-            receiptDate = new Date(year, part1 - 1, part2);
-            console.log('Interpreting as MM/DD/YYYY:', receiptDate);
-        } else if (currentMonth === part2 && part2CouldBeMonth) {
-            // Interpret as DD/MM/YYYY
-            receiptDate = new Date(year, part2 - 1, part1);
-            console.log('Interpreting as DD/MM/YYYY:', receiptDate);
-        } else {
-            console.log('Could not determine date format:', {
-                interpretedAsMMDD: { month: part1, day: part2 },
-                interpretedAsDDMM: { month: part2, day: part1 },
-                currentMonth
-            });
+        // Validate that the date was parsed correctly
+        if (isNaN(receiptDate.getTime())) {
+            console.error('Invalid receipt date format:', receiptData.date);
             return false;
         }
 
@@ -412,7 +396,10 @@ function validateDateTimeCriteria(receiptData, campaign) {
             receiptDate,
             campaignStart,
             campaignEnd,
-            isWithinPeriod
+            isWithinPeriod,
+            receiptTime: receiptDate.getTime(),
+            startTime: campaignStart.getTime(),
+            endTime: campaignEnd.getTime()
         });
 
         return isWithinPeriod;
@@ -571,6 +558,28 @@ async function validateMinimumPurchase(criteria, receiptData) {
 }
 
 /**
+ * Normalize phone number format by removing + prefix and whatsapp: prefix
+ * @param {string} phoneNumber - Phone number to normalize  
+ * @returns {string} Normalized phone number without + prefix
+ */
+function normalizePhoneNumber(phoneNumber) {
+    if (!phoneNumber) return '';
+    // Only remove WhatsApp prefix, preserve + for international numbers
+    let cleaned = phoneNumber.replace(/^whatsapp:/, '').trim();
+    
+    // Ensure + prefix for international numbers (South African numbers)
+    if (/^27\d{9}$/.test(cleaned)) {
+        // If it's a 27xxxxxxxxx number without +, add it
+        cleaned = '+' + cleaned;
+    } else if (!cleaned.startsWith('+') && /^\d+$/.test(cleaned)) {
+        // If it's all digits without +, assume it's South African
+        cleaned = '+27' + cleaned.replace(/^0+/, ''); // Remove leading zeros
+    }
+    
+    return cleaned;
+}
+
+/**
  * Validates the maximum rewards limit for a user
  * @async
  * @function validateMaximumRewards
@@ -603,15 +612,19 @@ async function validateMaximumRewards(criteria, receiptData, rewardType) {
                 return false;
             }
 
+            // Normalize phone number for consistent database lookups
+            const normalizedPhone = normalizePhoneNumber(receiptData.guestPhoneNumber);
+
             const currentCount = await getUserRewardTypeCount(
-                receiptData.guestPhoneNumber, 
+                normalizedPhone, 
                 rewardType.typeId
             );
 
             console.log('Checking max rewards limit:', {
                 currentCount,
                 maxAllowed: criteria.maxRewards,
-                guestPhone: receiptData.guestPhoneNumber
+                guestPhone: normalizedPhone,
+                originalPhone: receiptData.guestPhoneNumber
             });
             
             if (currentCount >= criteria.maxRewards) {
@@ -630,7 +643,7 @@ async function validateMaximumRewards(criteria, receiptData, rewardType) {
   * Gets the count of specific reward type for a user
  * @async
  * @function getUserRewardTypeCount
- * @param {string} phoneNumber - User's phone number
+ * @param {string} phoneNumber - User's phone number (normalized without + prefix)
  * @param {string} rewardTypeId - ID of the reward type to count
  * @returns {Promise<number>} Count of rewards for the specified type
  * @throws {Error} If database operation fails
@@ -642,10 +655,19 @@ async function getUserRewardTypeCount(phoneNumber, rewardTypeId) {
         
         const rewards = snapshot.val() || {};
         
-        return Object.values(rewards).filter(reward => 
+        const count = Object.values(rewards).filter(reward => 
             reward.guestPhone === phoneNumber && 
             reward.typeId === rewardTypeId
         ).length;
+        
+        console.log('User reward type count result:', {
+            phoneNumber,
+            rewardTypeId,
+            count,
+            totalRewards: Object.keys(rewards).length
+        });
+        
+        return count;
     } catch (error) {
         console.error('Error getting user reward count:', error);
         throw new Error('Failed to get user reward count');

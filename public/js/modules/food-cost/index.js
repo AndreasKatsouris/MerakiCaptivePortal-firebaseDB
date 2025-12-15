@@ -4,21 +4,24 @@
  */
 
 // Version tracker for code updates
-const MODULE_VERSION = '2.1.4-2025-05-15';
+const MODULE_VERSION = '2.1.5-2025-06-06';
 
 // Import the Vue component
-import { FoodCostApp } from './refactored-app-component.js';
+import { FoodCostApp } from './refactored-app-component.js?v=2.1.5-20250606';
 
 // Basic firebase helpers - these should load first
 import { 
     ensureFirebaseInitialized
-} from './firebase-helpers.js';
+} from './firebase-helpers.js?v=2.1.5-20250606';
 
 // Core services - avoid circular dependencies
-import * as DatabaseOperations from './database-operations.js';
-import * as DataService from './services/data-service.js';
-import * as DataProcessor from './data-processor.js';
-import * as OrderCalculator from './order-calculator.js';
+import * as DatabaseOperations from './database-operations.js?v=2.1.5-20250606';
+import * as DataService from './services/data-service.js?v=2.1.5-20250606';
+import * as DataProcessor from './data-processor.js?v=2.1.5-20250606';
+import * as OrderCalculator from './order-calculator.js?v=2.1.5-20250606';
+
+// Import Analytics Dashboard
+import { FoodCostAnalyticsDashboard, initializeFoodCostAnalytics } from './analytics-dashboard.js?v=2.1.5-20250606';
 
 // Track the current app instance
 let currentFoodCostApp = null;
@@ -111,6 +114,8 @@ window.FoodCost.initializeFoodCostModule = initializeFoodCostModule;
 window.FoodCost.checkFoodCostModuleVersion = checkFoodCostModuleVersion;
 window.FoodCost.OrderCalculator = OrderCalculator; // Expose OrderCalculator directly for calculation details
 window.FoodCost.calculateCriticalityScore = OrderCalculator.calculateCriticalityScore; // Expose criticality calculation
+window.FoodCost.AnalyticsDashboard = FoodCostAnalyticsDashboard; // Expose Analytics Dashboard
+window.FoodCost.initializeFoodCostAnalytics = initializeFoodCostAnalytics; // Expose Analytics initialization
 
 // Export the public API
 export {
@@ -118,5 +123,7 @@ export {
     DataService,
     DataProcessor,
     OrderCalculator,
+    FoodCostAnalyticsDashboard,
+    initializeFoodCostAnalytics,
     MODULE_VERSION
 };

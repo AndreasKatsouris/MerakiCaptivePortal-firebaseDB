@@ -8,6 +8,84 @@ import { generatePurchaseOrder, calculateOrderDetails, calculateCriticalityScore
 import HistoricalUsageService from './services/historical-usage-service.js';
 
 /**
+ * Calculate time-weighted historical average giving more weight to recent data
+ * @param {Array} historicalRecords - Array of historical usage records
+ * @param {number} decayRate - Rate of exponential decay (default: 0.1)
+ * @returns {number} - Time-weighted average usage
+ */
+function calculateTimeWeightedAverage(historicalRecords, decayRate = 0.1) {
+    if (!historicalRecords || historicalRecords.length === 0) return 0;
+    
+    // Sort by date, newest first
+    const sortedRecords = [...historicalRecords].sort((a, b) => {
+        const dateA = new Date(a.date || a.timestamp);
+        const dateB = new Date(b.date || b.timestamp);
+        return dateB - dateA;
+    });
+    
+    let weightedSum = 0;
+    let totalWeight = 0;
+    
+    sortedRecords.forEach((record, index) => {
+        const usageValue = parseFloat(record.usagePerDay) || 0;
+        if (usageValue > 0) { // Only include valid usage data
+            const weight = Math.exp(-index * decayRate);
+            weightedSum += usageValue * weight;
+            totalWeight += weight;
+        }
+    });
+    
+    return totalWeight > 0 ? weightedSum / totalWeight : 0;
+}
+
+/**
+ * Calculate confidence scores for historical data quality
+ * @param {Object} historicalSummary - Historical usage summary
+ * @param {number} currentUsage - Current usage per day
+ * @returns {Object} - Confidence scores and recommended weights
+ */
+function calculateHistoricalConfidence(historicalSummary, currentUsage) {
+    const dataPoints = historicalSummary.dataPoints || 0;
+    const volatility = historicalSummary.volatility || 0;
+    const stdDev = historicalSummary.stdDevUsage || 0;
+    
+    // Data quantity confidence (0-1)
+    const dataQuantityConfidence = Math.min(dataPoints / 30, 1); // 30 days for full confidence
+    
+    // Data stability confidence (0-1) - lower volatility = higher confidence
+    const avgUsage = historicalSummary.avgDailyUsage || 1;
+    const coefficientOfVariation = avgUsage > 0 ? stdDev / avgUsage : 1;
+    const stabilityConfidence = Math.max(0, 1 - Math.min(coefficientOfVariation, 1));
+    
+    // Trend consistency confidence (0-1)
+    const trendStrength = historicalSummary.trend?.strength || 0;
+    const trendConfidence = Math.abs(trendStrength) > 0.1 ? 0.8 : 0.6; // Higher if clear trend
+    
+    // Current vs historical deviation confidence
+    const currentVsHistoricalRatio = currentUsage > 0 && avgUsage > 0 ? 
+        Math.min(currentUsage / avgUsage, avgUsage / currentUsage) : 0.5;
+    const deviationConfidence = Math.max(0, currentVsHistoricalRatio);
+    
+    // Overall confidence (weighted average)
+    const overallConfidence = (
+        dataQuantityConfidence * 0.4 +
+        stabilityConfidence * 0.3 +
+        trendConfidence * 0.2 +
+        deviationConfidence * 0.1
+    );
+    
+    return {
+        overall: overallConfidence,
+        dataQuantity: dataQuantityConfidence,
+        stability: stabilityConfidence,
+        trend: trendConfidence,
+        deviation: deviationConfidence,
+        recommendedHistoricalWeight: 0.3 + (0.5 * overallConfidence), // 30-80% range
+        recommendedCurrentWeight: 0.7 - (0.5 * overallConfidence)     // 70-20% range
+    };
+}
+
+/**
  * Enhanced order details calculation that incorporates historical data
  * @param {Object} item - Stock item data
  * @param {Object} historicalSummary - Historical usage summary for this item
@@ -45,14 +123,63 @@ export function calculateAdvancedOrderDetails(item, historicalSummary = null, pa
     
     // ENHANCEMENT 1: Replace current usage with historical average if available
     // But blend with current usage to be responsive to recent changes
-    // Adjusted to give more weight to current usage for stability
-    const currentUsageWeight = 0.7; // 70% weight to current, 30% to historical
-    const historicalUsageWeight = 1 - currentUsageWeight;
+    // IMPROVED: Dynamic weighting based on historical data quality
     
-    console.log(`[AdvancedOrderCalc] Blending weights: Current ${currentUsageWeight * 100}%, Historical ${historicalUsageWeight * 100}%`);
+    // Calculate usage weights based on confidence scores
+    let currentUsageWeight, historicalUsageWeight;
+    
+    // Only use confidence-based weighting if we have sufficient data
+    if (historicalSummary.dataPoints >= 5) {
+        const confidence = calculateHistoricalConfidence(historicalSummary, parseFloat(enhancedItem.usagePerDay) || 0);
+        
+        currentUsageWeight = confidence.recommendedCurrentWeight;
+        historicalUsageWeight = confidence.recommendedHistoricalWeight;
+        
+        console.log(`[AdvancedOrderCalc] Confidence-based weighting: Overall confidence=${(confidence.overall * 100).toFixed(1)}%, Historical weight=${(historicalUsageWeight * 100).toFixed(1)}%`);
+        console.log(`[AdvancedOrderCalc] Confidence breakdown: Data=${(confidence.dataQuantity * 100).toFixed(0)}%, Stability=${(confidence.stability * 100).toFixed(0)}%, Trend=${(confidence.trend * 100).toFixed(0)}%, Deviation=${(confidence.deviation * 100).toFixed(0)}%`);
+        
+        // Store confidence details for UI display
+        enhancedItem.usageCalculation = {
+            confidence: {
+                overall: confidence.overall,
+                breakdown: {
+                    dataQuantity: confidence.dataQuantity,
+                    stability: confidence.stability,
+                    trend: confidence.trend,
+                    deviation: confidence.deviation
+                }
+            }
+        };
+    } else {
+        // Fall back to simple weighting for insufficient data
+        const minDataPoints = 7;
+        const optimalDataPoints = 21;
+        
+        const dataConfidenceFactor = Math.min(
+            Math.max(historicalSummary.dataPoints - minDataPoints, 0) / (optimalDataPoints - minDataPoints),
+            1
+        );
+        
+        const baseCurrentWeight = 0.5;
+        const baseHistoricalWeight = 0.5;
+        const maxAdjustment = 0.2;
+        
+        currentUsageWeight = baseCurrentWeight - (maxAdjustment * dataConfidenceFactor);
+        historicalUsageWeight = baseHistoricalWeight + (maxAdjustment * dataConfidenceFactor);
+        
+        console.log(`[AdvancedOrderCalc] Simple data quality weighting: ${historicalSummary.dataPoints} points → Current: ${(currentUsageWeight * 100).toFixed(1)}%, Historical: ${(historicalUsageWeight * 100).toFixed(1)}%`);
+    }
     
     const currentUsagePerDay = parseFloat(enhancedItem.usagePerDay) || 0;
-    const historicalAvgUsage = parseFloat(historicalSummary.avgDailyUsage) || 0;
+    
+    // Use time-weighted historical average instead of simple average
+    const simpleHistoricalAvg = parseFloat(historicalSummary.avgDailyUsage) || 0;
+    const timeWeightedAvg = calculateTimeWeightedAverage(historicalSummary.raw || []);
+    
+    // Use time-weighted if we have raw data, otherwise fall back to simple average
+    const historicalAvgUsage = timeWeightedAvg > 0 ? timeWeightedAvg : simpleHistoricalAvg;
+    
+    console.log(`[AdvancedOrderCalc] Historical averages: Simple=${simpleHistoricalAvg.toFixed(2)}, Time-weighted=${timeWeightedAvg.toFixed(2)}, Using=${historicalAvgUsage.toFixed(2)}`);
     
     // Weighted blend of current and historical usage
     let blendedUsage = (currentUsagePerDay * currentUsageWeight) + 
@@ -74,7 +201,9 @@ export function calculateAdvancedOrderDetails(item, historicalSummary = null, pa
         weights: {
             current: currentUsageWeight,
             historical: historicalUsageWeight
-        }
+        },
+        // Add confidence data if it was calculated
+        ...(enhancedItem.usageCalculation?.confidence && { confidence: enhancedItem.usageCalculation.confidence })
     };
     
     // ENHANCEMENT 2: Apply day-of-week adjustment if available
@@ -134,6 +263,35 @@ export function calculateAdvancedOrderDetails(item, historicalSummary = null, pa
         
         // Detailed logging
         console.log(`[AdvancedOrderCalc] Trend adjustment (${historicalSummary.trend.direction}): ${preAdjustmentUsage.toFixed(2)} → ${enhancedItem.usagePerDay.toFixed(2)} (${(adjustmentFactor * 100).toFixed(1)}% ${historicalSummary.trend.direction === 'increasing' ? 'increase' : 'decrease'})`);
+    }
+    
+    // Store the final calculated usage for the UI
+    enhancedItem.usageCalculation.finalUsage = enhancedItem.usagePerDay;
+    
+    // ENHANCEMENT 3.5: Check for critical stockout situation
+    const currentStock = parseFloat(enhancedItem.closingQty) || 0;
+    const isStockout = currentStock <= 0;
+    const isNearStockout = currentStock < (enhancedItem.usagePerDay * 2); // Less than 2 days of stock
+    
+    if (isStockout || isNearStockout) {
+        console.warn(`[AdvancedOrderCalc] CRITICAL: Item ${enhancedItem.itemCode} is ${isStockout ? 'OUT OF STOCK' : 'NEAR STOCKOUT'} (${currentStock.toFixed(2)} units)`);
+        
+        // Increase covering days for stockout situations
+        if (isStockout) {
+            // For complete stockout, order for more days
+            const originalCoveringDays = context.coveringDays;
+            context.coveringDays = Math.max(context.coveringDays * 2, 7); // At least 7 days or double normal
+            console.log(`[AdvancedOrderCalc] Increasing covering days from ${originalCoveringDays} to ${context.coveringDays} due to stockout`);
+            
+            // Also increase safety stock for stockout items
+            const originalSafetyStock = context.safetyStockPercentage;
+            context.safetyStockPercentage = Math.max(context.safetyStockPercentage * 1.5, 30); // At least 30% or 1.5x normal
+            console.log(`[AdvancedOrderCalc] Increasing safety stock from ${originalSafetyStock}% to ${context.safetyStockPercentage}% due to stockout`);
+        }
+        
+        // Mark this as a stockout situation for reporting
+        enhancedItem.isStockout = isStockout;
+        enhancedItem.isNearStockout = isNearStockout;
     }
     
     // Now call the standard calculation with our enhanced item data
@@ -222,10 +380,17 @@ export function calculateAdvancedOrderDetails(item, historicalSummary = null, pa
                     // Include the usage calculation data for UI breakdown
                     currentUsage: enhancedItem.usageCalculation.currentUsage,
                     blendedUsage: enhancedItem.usageCalculation.blendedUsage,
+                    finalUsage: enhancedItem.usageCalculation.finalUsage || enhancedItem.usagePerDay,
                     volatilityAdjustment,
                     trendAdjustment: enhancedItem.usageCalculation.trendAdjustment || 0,
                     seasonalAdjustment: context.useDayOfWeekPatterns
                 }
+            },
+            // Add stockout status
+            stockStatus: {
+                isStockout: enhancedItem.isStockout || false,
+                isNearStockout: enhancedItem.isNearStockout || false,
+                currentStock: parseFloat(enhancedItem.closingQty) || 0
             }
         };
     } else {
@@ -240,10 +405,17 @@ export function calculateAdvancedOrderDetails(item, historicalSummary = null, pa
                 dataPoints: historicalSummary.dataPoints,
                 adjustments: {
                     blendedUsage: enhancedItem.usagePerDay,
+                    finalUsage: enhancedItem.usagePerDay,
                     volatilityAdjustment: 0,
                     trendAdjustment: historicalSummary.trend.direction !== 'stable',
                     seasonalAdjustment: context.useDayOfWeekPatterns
                 }
+            },
+            // Add stockout status
+            stockStatus: {
+                isStockout: enhancedItem.isStockout || false,
+                isNearStockout: enhancedItem.isNearStockout || false,
+                currentStock: parseFloat(enhancedItem.closingQty) || 0
             }
         };
     }
@@ -252,14 +424,14 @@ export function calculateAdvancedOrderDetails(item, historicalSummary = null, pa
 /**
  * Generate an advanced purchase order using historical usage data
  * @param {Array} stockData - The stock data array
- * @param {String} storeName - Store name to get historical data for
+ * @param {String} storeIdentifier - Store name or location ID to get historical data for
  * @param {String} supplierFilter - Optional supplier to filter by
  * @param {Object} params - Additional parameters for order calculation
  * @returns {Promise<Array>} - Purchase order items with historical insights
  */
-export async function generateAdvancedPurchaseOrder(stockData, storeName, supplierFilter = 'All Suppliers', params = {}) {
+export async function generateAdvancedPurchaseOrder(stockData, storeIdentifier, supplierFilter = 'All Suppliers', params = {}) {
     console.log('%c [Advanced PO Generator] Generating purchase order with historical data', 'color: #0066cc; font-weight: bold;');
-    console.log(`[Advanced PO Generator] Store: ${storeName}, Supplier: ${supplierFilter}`);
+    console.log(`[Advanced PO Generator] Store/Location: ${storeIdentifier}, Supplier: ${supplierFilter}`);
     
     // Validate input data
     if (!stockData || !Array.isArray(stockData) || stockData.length === 0) {
@@ -267,18 +439,18 @@ export async function generateAdvancedPurchaseOrder(stockData, storeName, suppli
         return [];
     }
     
-    if (!storeName) {
-        console.warn('[Advanced PO Generator] No store name provided, falling back to basic calculation');
+    if (!storeIdentifier) {
+        console.warn('[Advanced PO Generator] No store identifier provided, falling back to basic calculation');
         return generatePurchaseOrder(stockData, supplierFilter, params);
     }
     
     // Enhanced parameters with defaults for advanced features
     const advancedParams = {
-        lookbackDays: 14, // Default to 2 weeks of history
+        lookbackDays: 365, // Increased to capture all historical data including future-dated test data
         volatilityMultiplier: 1.0, // How much to adjust for historical volatility
         trendFactor: 0.5, // How much to consider trend direction
         useDayOfWeekPatterns: true, // Whether to use day-of-week seasonality
-        minimumHistoryRequired: 3, // Minimum data points needed for advanced calculation (lowered from 5)
+        minimumHistoryRequired: 2, // Reduced to allow advanced calculations with fewer data points
         ...params
     };
     
@@ -286,13 +458,24 @@ export async function generateAdvancedPurchaseOrder(stockData, storeName, suppli
         console.log('[Advanced PO Generator] Fetching historical data...');
         
         // Step 1: Generate historical summaries for all stock items
+        console.log(`[Advanced PO Generator] Calling HistoricalUsageService.generateHistoricalSummaries with store identifier: "${storeIdentifier}"`);
+        console.log(`[Advanced PO Generator] Looking for historical data for ${stockData.length} stock items with ${advancedParams.lookbackDays} days lookback`);
+        
         const historicalSummaries = await HistoricalUsageService.generateHistoricalSummaries(
-            storeName, 
+            storeIdentifier, 
             stockData, 
             { lookbackDays: advancedParams.lookbackDays }
         );
         
-        console.log(`[Advanced PO Generator] Retrieved historical data for ${Object.keys(historicalSummaries).length} items`);
+        console.log(`[Advanced PO Generator] Retrieved historical data for ${Object.keys(historicalSummaries).length} items out of ${stockData.length} requested`);
+        
+        // Log detailed breakdown of which items have historical data
+        if (Object.keys(historicalSummaries).length > 0) {
+            console.log(`[Advanced PO Generator] Items with historical data:`, Object.keys(historicalSummaries).slice(0, 10).join(', ') + (Object.keys(historicalSummaries).length > 10 ? '...' : ''));
+        } else {
+            console.warn(`[Advanced PO Generator] ⚠️  NO HISTORICAL DATA FOUND for store identifier: "${storeIdentifier}"`);
+            console.log(`[Advanced PO Generator] This may indicate a location matching issue. Check if data exists under a different identifier.`);
+        }
         
         // Step 2: Generate basic purchase order but with item-by-item advanced calculations
         // This is a modified version of the generatePurchaseOrder function
@@ -380,7 +563,9 @@ export async function generateAdvancedPurchaseOrder(stockData, storeName, suppli
                 needsReordering: orderDetails.orderResults.needsReordering,
                 // Add historical insights if available
                 historicalInsights: orderDetails.historicalInsights || null,
-                calculationType: orderDetails.historicalInsights ? 'advanced' : 'basic'
+                calculationType: orderDetails.historicalInsights ? 'advanced' : 'basic',
+                // Add stock status if available
+                stockStatus: orderDetails.stockStatus || null
             };
         }).filter(item => item !== null);
         
@@ -457,6 +642,7 @@ export function exportAdvancedPurchaseOrderToCSV(purchaseOrderItems) {
         'Description',
         'Supplier',
         'Category',
+        'Stock Status',
         'Current Stock',
         'Current Usage/Day',
         'Historical Avg Usage/Day',
@@ -480,12 +666,23 @@ export function exportAdvancedPurchaseOrderToCSV(purchaseOrderItems) {
         const trend = item.historicalInsights ? 
                     item.historicalInsights.trendDirection : 'N/A';
         
+        // Determine stock status
+        let stockStatus = 'OK';
+        if (item.stockStatus) {
+            if (item.stockStatus.isStockout) {
+                stockStatus = 'STOCKOUT';
+            } else if (item.stockStatus.isNearStockout) {
+                stockStatus = 'LOW STOCK';
+            }
+        }
+        
         // Format CSV row
         return [
             escapeCsvValue(item.itemCode || ''),
             escapeCsvValue(item.description || ''),
             escapeCsvValue(item.supplierName || ''),
             escapeCsvValue(item.category || ''),
+            escapeCsvValue(stockStatus),
             formatValue(item.closingQty || 0),
             formatValue(item.usagePerDay || 0),
             historicalAvgUsage,

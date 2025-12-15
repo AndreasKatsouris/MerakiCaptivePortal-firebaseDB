@@ -7,7 +7,7 @@
  */
 
 import { rtdb, ref, get, set, update, push, serverTimestamp } from '../../../config/firebase-config.js';
-import { authManager } from '../../../auth/auth.js';
+import { authManager } from '../../../auth/auth.js?v=20250131-fix';
 import AccessControl from './access-control-service.js';
 
 // Subscription tiers with metadata
@@ -17,18 +17,22 @@ const SUBSCRIPTION_TIERS = {
     description: 'Basic features for small operations',
     monthlyPrice: 0,
     annualPrice: 0,
+    isVisible: true, // Always visible
     features: {
       // Basic features included in free tier
       analyticsBasic: true,
       wifiBasic: true,
       guestManagementBasic: true,
-      receiptProcessingManual: true
+      receiptProcessingManual: true,
+      bookingManagement: true // Enable for testing
     },
     limits: {
       guestRecords: 500,
       locations: 1,
       receiptProcessing: 50,
-      campaignTemplates: 2
+      campaignTemplates: 2,
+      bookingEntries: 50,
+      bookingHistoryDays: 30
     }
   },
   starter: {
@@ -36,6 +40,7 @@ const SUBSCRIPTION_TIERS = {
     description: 'Essential features for growing businesses',
     monthlyPrice: 49.99,
     annualPrice: 499.99, // 2 months free
+    isVisible: true, // Public tier
     features: {
       // All free features plus these
       campaignsBasic: true,
@@ -55,6 +60,7 @@ const SUBSCRIPTION_TIERS = {
     description: 'Advanced features for established businesses',
     monthlyPrice: 99.99,
     annualPrice: 999.99, // 2 months free
+    isVisible: true, // Public tier
     features: {
       // All starter features plus these
       analyticsExport: true,
@@ -64,7 +70,10 @@ const SUBSCRIPTION_TIERS = {
       rewardsAdvanced: true,
       receiptProcessingAutomated: true,
       whatsappAdvanced: true,
-      foodCostBasic: true
+      foodCostBasic: true,
+      bookingManagement: true,
+      bookingAdvanced: true,
+      bookingAnalytics: true
     },
     limits: {
       guestRecords: 10000,
@@ -78,6 +87,7 @@ const SUBSCRIPTION_TIERS = {
     description: 'Complete solution for larger operations',
     monthlyPrice: 199.99,
     annualPrice: 1999.99, // 2 months free
+    isVisible: false, // Hidden tier - contact sales only
     features: {
       // All professional features plus these
       campaignsCustom: true,
@@ -99,6 +109,20 @@ const SUBSCRIPTION_TIERS = {
  */
 export function getSubscriptionTiers() {
   return { ...SUBSCRIPTION_TIERS };
+}
+
+/**
+ * Get only visible subscription tiers for public display
+ * @returns {Object} Visible subscription tier definitions
+ */
+export function getVisibleSubscriptionTiers() {
+  const visibleTiers = {};
+  Object.entries(SUBSCRIPTION_TIERS).forEach(([id, tier]) => {
+    if (tier.isVisible !== false) {
+      visibleTiers[id] = { ...tier };
+    }
+  });
+  return visibleTiers;
 }
 
 /**
@@ -139,7 +163,7 @@ export async function createSubscription(tierId, billingCycle = 'monthly', payme
     : now + (30 * 24 * 60 * 60 * 1000);
   
   const subscriptionData = {
-    tier: tierId,
+    tierId: tierId,
     startDate: now,
     renewalDate,
     billingCycle,
@@ -149,7 +173,7 @@ export async function createSubscription(tierId, billingCycle = 'monthly', payme
     history: {
       [now]: {
         action: 'created',
-        tier: tierId,
+        tierId: tierId,
         timestamp: now
       }
     },
@@ -212,13 +236,13 @@ export async function updateSubscription(tierId, billingCycle = null) {
     
     const now = Date.now();
     const updates = {
-      tier: tierId,
+      tierId: tierId,
       features: { ...SUBSCRIPTION_TIERS[tierId].features },
       limits: { ...SUBSCRIPTION_TIERS[tierId].limits },
       [`history/${now}`]: {
         action: 'updated',
-        previousTier: currentSubscription.tier,
-        tier: tierId,
+        previousTier: currentSubscription.tierId,
+        tierId: tierId,
         timestamp: now
       }
     };
@@ -281,7 +305,7 @@ export async function cancelSubscription(reason = '') {
       cancellationDate: now,
       [`history/${now}`]: {
         action: 'canceled',
-        previousTier: currentSubscription.tier,
+        previousTier: currentSubscription.tierId,
         reason,
         timestamp: now
       }
@@ -357,7 +381,7 @@ export async function startFreeTrial(tierId, trialDays = 14) {
     const snapshot = await get(ref(rtdb, `subscriptions/${user.uid}`));
     const currentSubscription = snapshot.val();
     
-    if (currentSubscription && currentSubscription.tier !== 'free') {
+    if (currentSubscription && currentSubscription.tierId !== 'free') {
       throw new Error('User already has an active subscription');
     }
     
@@ -365,7 +389,7 @@ export async function startFreeTrial(tierId, trialDays = 14) {
     const trialEndDate = now + (trialDays * 24 * 60 * 60 * 1000);
     
     const subscriptionData = {
-      tier: tierId,
+      tierId: tierId,
       startDate: now,
       renewalDate: trialEndDate,
       isTrial: true,
@@ -376,7 +400,7 @@ export async function startFreeTrial(tierId, trialDays = 14) {
       history: {
         [now]: {
           action: 'trial_started',
-          tier: tierId,
+          tierId: tierId,
           trialDays,
           timestamp: now
         }
@@ -429,13 +453,13 @@ export async function getTrialStatus() {
     
     return {
       isInTrial: true,
-      tier: subscription.tier,
+      tierId: subscription.tierId,
       daysLeft,
       endDate: subscription.trialEndDate
     };
   } catch (error) {
     console.error('Failed to get trial status:', error);
-    
+
     return {
       isInTrial: false,
       error: error.message
@@ -443,16 +467,194 @@ export async function getTrialStatus() {
   }
 }
 
+/**
+ * Get locations associated with the current user's subscription
+ * @returns {Promise<Array>} Array of location IDs
+ */
+export async function getSubscriptionLocations() {
+  const user = authManager.getCurrentUser();
+
+  if (!user) {
+    throw new Error('User must be authenticated');
+  }
+
+  try {
+    const snapshot = await get(ref(rtdb, `subscriptions/${user.uid}/locationIds`));
+    return snapshot.val() || [];
+  } catch (error) {
+    console.error('Failed to get subscription locations:', error);
+    return [];
+  }
+}
+
+/**
+ * Add a location to the current user's subscription
+ * @param {string} locationId The location ID to add
+ * @returns {Promise<Object>} Result of the operation
+ */
+export async function addLocationToSubscription(locationId) {
+  const user = authManager.getCurrentUser();
+
+  if (!user) {
+    throw new Error('User must be authenticated');
+  }
+
+  try {
+    // Get current subscription
+    const snapshot = await get(ref(rtdb, `subscriptions/${user.uid}`));
+    const subscription = snapshot.val();
+
+    if (!subscription) {
+      throw new Error('No subscription found');
+    }
+
+    // Check location limit
+    const currentLocations = subscription.locationIds || [];
+    const maxLocations = subscription.limits?.locations || subscription.limits?.maxLocations || 1;
+
+    if (currentLocations.includes(locationId)) {
+      return { success: true, message: 'Location already assigned' };
+    }
+
+    if (maxLocations !== Infinity && currentLocations.length >= maxLocations) {
+      throw new Error(`Location limit reached. Your tier allows ${maxLocations} location(s).`);
+    }
+
+    // Add location
+    const newLocations = [...currentLocations, locationId];
+    await update(ref(rtdb, `subscriptions/${user.uid}`), { locationIds: newLocations });
+
+    // Also add to userLocations
+    await set(ref(rtdb, `userLocations/${user.uid}/${locationId}`), {
+      role: 'owner',
+      addedAt: Date.now(),
+      addedBy: user.uid
+    });
+
+    // Reset cache
+    AccessControl.resetCache();
+
+    return { success: true, locationIds: newLocations };
+  } catch (error) {
+    console.error('Failed to add location:', error);
+    return { success: false, error: error.message };
+  }
+}
+
+/**
+ * Remove a location from the current user's subscription
+ * @param {string} locationId The location ID to remove
+ * @returns {Promise<Object>} Result of the operation
+ */
+export async function removeLocationFromSubscription(locationId) {
+  const user = authManager.getCurrentUser();
+
+  if (!user) {
+    throw new Error('User must be authenticated');
+  }
+
+  try {
+    const snapshot = await get(ref(rtdb, `subscriptions/${user.uid}/locationIds`));
+    const currentLocations = snapshot.val() || [];
+
+    const newLocations = currentLocations.filter(id => id !== locationId);
+    await update(ref(rtdb, `subscriptions/${user.uid}`), { locationIds: newLocations });
+
+    // Reset cache
+    AccessControl.resetCache();
+
+    return { success: true, locationIds: newLocations };
+  } catch (error) {
+    console.error('Failed to remove location:', error);
+    return { success: false, error: error.message };
+  }
+}
+
+/**
+ * Check if a location is within the user's subscription
+ * @param {string} locationId The location to check
+ * @returns {Promise<boolean>} Whether the location is accessible
+ */
+export async function hasLocationAccess(locationId) {
+  const user = authManager.getCurrentUser();
+
+  if (!user) return false;
+
+  try {
+    const snapshot = await get(ref(rtdb, `subscriptions/${user.uid}`));
+    const subscription = snapshot.val();
+
+    if (!subscription) return false;
+
+    const locationIds = subscription.locationIds || [];
+    const maxLocations = subscription.limits?.locations || subscription.limits?.maxLocations || 1;
+
+    // Enterprise/unlimited tiers have access to all locations
+    if (maxLocations === Infinity || maxLocations > 100) {
+      return true;
+    }
+
+    return locationIds.includes(locationId);
+  } catch (error) {
+    console.error('Failed to check location access:', error);
+    return false;
+  }
+}
+
+/**
+ * Get remaining location slots for the subscription
+ * @returns {Promise<Object>} Object with used, max, and remaining counts
+ */
+export async function getLocationQuota() {
+  const user = authManager.getCurrentUser();
+
+  if (!user) {
+    throw new Error('User must be authenticated');
+  }
+
+  try {
+    const snapshot = await get(ref(rtdb, `subscriptions/${user.uid}`));
+    const subscription = snapshot.val();
+
+    if (!subscription) {
+      return { used: 0, max: 1, remaining: 1, unlimited: false };
+    }
+
+    const locationIds = subscription.locationIds || [];
+    const maxLocations = subscription.limits?.locations || subscription.limits?.maxLocations || 1;
+    const isUnlimited = maxLocations === Infinity || maxLocations > 100;
+
+    return {
+      used: locationIds.length,
+      max: isUnlimited ? 'unlimited' : maxLocations,
+      remaining: isUnlimited ? 'unlimited' : Math.max(0, maxLocations - locationIds.length),
+      unlimited: isUnlimited
+    };
+  } catch (error) {
+    console.error('Failed to get location quota:', error);
+    return { used: 0, max: 1, remaining: 1, unlimited: false, error: error.message };
+  }
+}
+
 // Create the main service object to expose
 const SubscriptionService = {
   getSubscriptionTiers,
+  getVisibleSubscriptionTiers,
   getTierDetails,
   createSubscription,
   updateSubscription,
   cancelSubscription,
   getSubscriptionHistory,
   startFreeTrial,
-  getTrialStatus
+  getTrialStatus,
+  // Location management
+  getSubscriptionLocations,
+  addLocationToSubscription,
+  removeLocationFromSubscription,
+  hasLocationAccess,
+  getLocationQuota
 };
 
+// Export both as default and named export for compatibility
 export default SubscriptionService;
+export const subscriptionService = SubscriptionService;

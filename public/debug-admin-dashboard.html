@@ -1,0 +1,198 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Admin Dashboard Debug Tool</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+</head>
+<body>
+    <div class="container mt-4">
+        <h1>Admin Dashboard Debug Tool</h1>
+        <div class="row mt-4">
+            <div class="col-md-6">
+                <div class="card">
+                    <div class="card-header">
+                        <h5>Quick Tests</h5>
+                    </div>
+                    <div class="card-body">
+                        <button onclick="testBasicAccess()" class="btn btn-primary btn-block mb-2">Test Basic Access</button>
+                        <button onclick="testRewardTypes()" class="btn btn-warning btn-block mb-2">Test Reward Types</button>
+                        <button onclick="copyDebugCode()" class="btn btn-success btn-block">Copy Debug Code</button>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-6">
+                <div class="card">
+                    <div class="card-header">
+                        <h5>Results</h5>
+                    </div>
+                    <div class="card-body">
+                        <div id="results" style="height: 300px; overflow-y: auto; background: #f8f9fa; padding: 10px;">
+                            <p>Click a test button to see results here...</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        function log(message, type = 'info') {
+            const results = document.getElementById('results');
+            const timestamp = new Date().toLocaleTimeString();
+            const color = type === 'error' ? 'text-danger' : type === 'success' ? 'text-success' : 'text-info';
+            results.innerHTML += `<div class="${color}"><strong>${timestamp}</strong> ${message}</div>`;
+            results.scrollTop = results.scrollHeight;
+        }
+
+        async function testBasicAccess() {
+            log('Testing basic file access...');
+            
+            const files = [
+                'admin-dashboard.html',
+                'js/admin-dashboard.js',
+                'js/reward-types.js',
+                'js/config/firebase-config.js'
+            ];
+            
+            for (const file of files) {
+                try {
+                    const response = await fetch(file);
+                    if (response.ok) {
+                        log(`✅ ${file} - OK`, 'success');
+                    } else {
+                        log(`❌ ${file} - ${response.status}`, 'error');
+                    }
+                } catch (error) {
+                    log(`❌ ${file} - ${error.message}`, 'error');
+                }
+            }
+        }
+
+        async function testRewardTypes() {
+            log('Testing reward types module...');
+            
+            try {
+                const response = await fetch('js/reward-types.js');
+                if (response.ok) {
+                    const content = await response.text();
+                    
+                    if (content.includes('initializeRewardTypes')) {
+                        log('✅ initializeRewardTypes function found', 'success');
+                    } else {
+                        log('❌ initializeRewardTypes function not found', 'error');
+                    }
+                    
+                    if (content.includes('Vue.createApp')) {
+                        log('✅ Vue.createApp usage found', 'success');
+                    } else {
+                        log('❌ Vue.createApp usage not found', 'error');
+                    }
+                } else {
+                    log('❌ Cannot access reward-types.js', 'error');
+                }
+            } catch (error) {
+                log(`❌ Error: ${error.message}`, 'error');
+            }
+        }
+
+        function copyDebugCode() {
+            const debugCode = `
+// ADMIN DASHBOARD DEBUG CODE - Run this in the admin dashboard console
+console.clear();
+console.log('🔬 ADMIN DASHBOARD DEBUG STARTING...');
+
+// Test 1: Check if sections exist
+console.log('\\n1. DOM ELEMENTS:');
+const rewardTypesContent = document.getElementById('rewardTypesContent');
+const adminToolsContent = document.getElementById('adminToolsContent');
+const rewardTypesApp = document.getElementById('reward-types-app');
+
+console.log('rewardTypesContent:', rewardTypesContent);
+console.log('adminToolsContent:', adminToolsContent);
+console.log('reward-types-app:', rewardTypesApp);
+
+// Test 2: Check visibility
+console.log('\\n2. VISIBILITY CHECK:');
+if (rewardTypesContent) {
+    const styles = window.getComputedStyle(rewardTypesContent);
+    console.log('Reward Types Content Styles:');
+    console.log('- display:', styles.display);
+    console.log('- visibility:', styles.visibility);
+    console.log('- opacity:', styles.opacity);
+    console.log('- classList:', Array.from(rewardTypesContent.classList));
+    console.log('- parent:', rewardTypesContent.parentElement?.id);
+}
+
+// Test 3: Check debug functions
+console.log('\\n3. DEBUG FUNCTIONS:');
+console.log('window.debugModule:', typeof window.debugModule);
+console.log('window.debug:', typeof window.debug);
+console.log('window.adminDashboard:', typeof window.adminDashboard);
+
+// Test 4: Check Vue
+console.log('\\n4. VUE.JS:');
+console.log('Vue:', typeof Vue);
+console.log('Vue.createApp:', typeof Vue?.createApp);
+
+// Test 5: Try to show reward types section
+console.log('\\n5. TRYING TO SHOW REWARD TYPES:');
+if (window.adminDashboard && window.adminDashboard.showSection) {
+    console.log('Calling showSection...');
+    window.adminDashboard.showSection('rewardTypesContent');
+    console.log('✅ showSection called');
+} else {
+    console.log('❌ showSection not available');
+}
+
+// Test 6: Force visibility
+console.log('\\n6. FORCE VISIBILITY:');
+if (rewardTypesContent) {
+    rewardTypesContent.classList.remove('d-none');
+    rewardTypesContent.style.display = 'block !important';
+    rewardTypesContent.style.visibility = 'visible !important';
+    rewardTypesContent.style.opacity = '1 !important';
+    console.log('✅ Force visibility applied');
+    
+    // Check if it's visible now
+    const newStyles = window.getComputedStyle(rewardTypesContent);
+    console.log('After force visibility:');
+    console.log('- display:', newStyles.display);
+    console.log('- visibility:', newStyles.visibility);
+    console.log('- opacity:', newStyles.opacity);
+}
+
+// Test 7: Check if Vue app is mounted
+console.log('\\n7. VUE APP CHECK:');
+if (rewardTypesApp) {
+    console.log('reward-types-app innerHTML length:', rewardTypesApp.innerHTML.length);
+    console.log('reward-types-app first 100 chars:', rewardTypesApp.innerHTML.substring(0, 100));
+    console.log('Has Vue data attributes:', rewardTypesApp.hasAttribute('data-v-app'));
+}
+
+// Test 8: Manual initialization
+console.log('\\n8. MANUAL INITIALIZATION:');
+if (typeof window.initializeRewardTypes === 'function') {
+    console.log('Calling initializeRewardTypes...');
+    window.initializeRewardTypes();
+    console.log('✅ initializeRewardTypes called');
+} else {
+    console.log('❌ initializeRewardTypes not available');
+}
+
+console.log('\\n🔬 DEBUG COMPLETE!');
+console.log('If reward types is still not visible, check the Network tab for failed requests.');
+            `;
+            
+            navigator.clipboard.writeText(debugCode).then(() => {
+                log('✅ Debug code copied to clipboard!', 'success');
+                log('📋 Now: 1) Open admin dashboard, 2) Open console (F12), 3) Paste and run', 'info');
+            }).catch(() => {
+                log('❌ Failed to copy to clipboard', 'error');
+                console.log('DEBUG CODE:', debugCode);
+            });
+        }
+    </script>
+</body>
+</html> 

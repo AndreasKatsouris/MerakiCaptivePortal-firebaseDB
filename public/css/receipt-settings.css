@@ -1,0 +1,121 @@
+/* Receipt Settings Styles */
+
+.template-card {
+    transition: all 0.3s ease;
+    border-left: 4px solid transparent;
+}
+
+.template-card.status-active {
+    border-left-color: #28a745;
+}
+
+.template-card.status-testing {
+    border-left-color: #ffc107;
+}
+
+.template-card.status-deprecated {
+    border-left-color: #dc3545;
+    opacity: 0.6;
+}
+
+.template-card:hover {
+    box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+    transform: translateY(-2px);
+}
+
+.priority-badge {
+    font-size: 0.9em;
+    padding: 0.25rem 0.5rem;
+}
+
+.priority-high {
+    background-color: #dc3545;
+}
+
+.priority-medium {
+    background-color: #ffc107;
+}
+
+.priority-low {
+    background-color: #28a745;
+}
+
+.stats-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+    gap: 1rem;
+    margin-top: 1rem;
+}
+
+.stat-item {
+    background: #f8f9fa;
+    padding: 1rem;
+    border-radius: 0.5rem;
+    text-align: center;
+}
+
+.stat-value {
+    font-size: 1.5rem;
+    font-weight: bold;
+    color: #2c3e50;
+}
+
+.stat-label {
+    font-size: 0.85rem;
+    color: #6c757d;
+    margin-top: 0.25rem;
+}
+
+.filter-section {
+    background: white;
+    padding: 1.5rem;
+    border-radius: 0.5rem;
+    margin-bottom: 1.5rem;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+}
+
+.empty-state {
+    text-align: center;
+    padding: 3rem;
+    background: white;
+    border-radius: 0.5rem;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+}
+
+.empty-state i {
+    font-size: 4rem;
+    color: #dee2e6;
+    margin-bottom: 1rem;
+}
+
+.loading-spinner {
+    text-align: center;
+    padding: 3rem;
+}
+
+.pattern-preview {
+    background: #f8f9fa;
+    padding: 0.5rem;
+    border-radius: 0.25rem;
+    font-family: monospace;
+    font-size: 0.85rem;
+    margin-top: 0.5rem;
+    max-height: 100px;
+    overflow-y: auto;
+}
+
+.performance-chart-container {
+    height: 300px;
+    margin-top: 1rem;
+}
+
+.template-actions {
+    display: flex;
+    gap: 0.5rem;
+    margin-top: 1rem;
+}
+
+.modal-body-scroll {
+    max-height: 70vh;
+    overflow-y: auto;
+}

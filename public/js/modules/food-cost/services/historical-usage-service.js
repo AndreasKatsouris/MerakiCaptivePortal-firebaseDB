@@ -4,7 +4,8 @@
  * Version: 2.0.0-alpha-2025-04-24
  */
 
-import { rtdb, ref, get, query, orderByChild, startAt, endAt } from '../../../config/firebase-config.js';
+import { getRtdb, getAuth, ref, get } from '../firebase-helpers.js?v=2.1.5-20250606';
+import { query, orderByChild, startAt, endAt } from '../../../config/firebase-config.js';
 
 /**
  * Service for retrieving and analyzing historical stock usage data
@@ -24,137 +25,269 @@ const HistoricalUsageService = {
     
     /**
      * Retrieve historical stock usage data for a specific store and date range
-     * @param {string} storeName - The store to retrieve data for
+     * @param {string} storeIdentifier - The store name or location ID to retrieve data for
      * @param {Object} dateRange - Date range to query { startDate, endDate }
      * @param {number} lookbackDays - Alternative to dateRange, days to look back from today
      * @returns {Promise<Array>} - Array of historical stock records
      */
-    async getHistoricalData(storeName, dateRange = null, lookbackDays = 14) {
-        console.log(`[HistoricalUsage] Retrieving data for store: ${storeName}`);
+    async getHistoricalData(storeIdentifier, { dateRange = null, lookbackDays = 30 } = {}) {
+        // Check if user is authenticated
+        const user = getAuth().currentUser;
+        if (!user) {
+            throw new Error('User must be authenticated to access historical data');
+        }
         
-        // Determine date range
-        const range = this._normalizeDateRange(dateRange, lookbackDays);
-        console.log(`[HistoricalUsage] Date range: ${range.startDate.toISOString()} to ${range.endDate.toISOString()}`);
-        
-        // Create cache key
-        const cacheKey = `${storeName}_${range.startDate.toISOString()}_${range.endDate.toISOString()}`;
+        // Calculate date range
+        const range = dateRange || this._calculateDateRange(lookbackDays);
         
         // Check cache first
-        const cachedData = this._checkCache(cacheKey);
+        const cacheKey = `${storeIdentifier}_${range.startDate.getTime()}_${range.endDate.getTime()}`;
+        const cachedData = this._getFromCache(cacheKey);
+        
         if (cachedData) {
-            console.log(`[HistoricalUsage] Using cached data for ${storeName}`);
+            console.log('[HistoricalUsage] Returning cached data');
             return cachedData;
         }
         
         try {
-            // Convert dates to timestamps for Firebase query
+            // Get timestamps for query
             const startTimestamp = range.startDate.getTime();
             const endTimestamp = range.endDate.getTime();
+            
+            // First, get user's accessible locations
+            const userLocationsRef = ref(getRtdb(), `userLocations/${user.uid}`);
+            const userLocationsSnapshot = await get(userLocationsRef);
+            
+            const accessibleLocationIds = new Set();
+            if (userLocationsSnapshot.exists()) {
+                Object.keys(userLocationsSnapshot.val()).forEach(locationId => {
+                    accessibleLocationIds.add(locationId);
+                });
+            }
+            
+            // Check if user is admin
+            const adminRef = ref(getRtdb(), `admins/${user.uid}`);
+            const adminSnapshot = await get(adminRef);
+            const isAdmin = adminSnapshot.exists();
+            
+            // If admin, get all locations
+            if (isAdmin) {
+                const locationsRef = ref(getRtdb(), 'locations');
+                const locationsSnapshot = await get(locationsRef);
+                if (locationsSnapshot.exists()) {
+                    const allLocationIds = Object.keys(locationsSnapshot.val());
+                    allLocationIds.forEach(id => accessibleLocationIds.add(id));
+                }
+            }
             
             // Query database for records within date range and matching store
             let stockRecords = [];
             
-            // Try a different approach that doesn't require indexing
-            // Get all stock usage records and filter in memory
+            // If storeIdentifier looks like a location ID (starts with '-'), 
+            // check that specific location
+            if (storeIdentifier.startsWith('-')) {
+                console.log(`[HistoricalUsage] Looking for data in location: ${storeIdentifier}`);
+                
+                // Check if user has access to this location
+                if (accessibleLocationIds.has(storeIdentifier) || isAdmin) {
+                    const locationStockRef = ref(getRtdb(), `locations/${storeIdentifier}/stockUsage`);
+                    const locationSnapshot = await get(locationStockRef);
+                    
+                    if (locationSnapshot.exists()) {
+                        const locationData = locationSnapshot.val();
+                        
+                        // Filter by date range
+                        stockRecords = Object.entries(locationData)
+                            .map(([key, record]) => ({
+                                id: key,
+                                ...record
+                            }))
+                            .filter(record => {
+                                const recordDate = record.timestamp || record.recordDate || 0;
+                                return recordDate >= startTimestamp && recordDate <= endTimestamp;
+                            });
+                        
+                        console.log(`[HistoricalUsage] Found ${stockRecords.length} records in location ${storeIdentifier}`);
+                    }
+                }
+            } else {
+                // If it's a store name, check all accessible locations
+                console.log(`[HistoricalUsage] Looking for data with store name: ${storeIdentifier}`);
+                
+                for (const locationId of accessibleLocationIds) {
+                    const locationStockRef = ref(getRtdb(), `locations/${locationId}/stockUsage`);
+                    const locationSnapshot = await get(locationStockRef);
+                    
+                    if (locationSnapshot.exists()) {
+                        const locationData = locationSnapshot.val();
+                        
+                        // Filter by store name and date range
+                        const locationRecords = Object.entries(locationData)
+                            .map(([key, record]) => ({
+                                id: key,
+                                ...record
+                            }))
+                                                    .filter(record => {
+                            // Check store name match - be more flexible with matching
+                            const recordStore = record.storeName || 
+                                              (record.storeContext && record.storeContext.name) ||
+                                              (record.metadata && record.metadata.storeName);
+                            
+                            // Try multiple matching strategies:
+                            // 1. Exact match
+                            // 2. Case-insensitive match
+                            // 3. Partial match (for cases where one has "Ocean Basket Brits" and other has "Brits")
+                            const storeMatch = recordStore === storeIdentifier ||
+                                             (recordStore && storeIdentifier && 
+                                              recordStore.toLowerCase() === storeIdentifier.toLowerCase()) ||
+                                             (recordStore && storeIdentifier && 
+                                              (recordStore.includes(storeIdentifier) || storeIdentifier.includes(recordStore)));
+                            
+                            // Check date range match
+                            const recordDate = record.timestamp || record.recordDate || 0;
+                            const dateMatch = recordDate >= startTimestamp && recordDate <= endTimestamp;
+                            
+                            return storeMatch && dateMatch;
+                        });
+                        
+                        stockRecords.push(...locationRecords);
+                    }
+                }
+            }
+            
+            // Also check the root stockUsage path for backward compatibility
             try {
-                console.log(`[HistoricalUsage] Retrieving all stock usage records for filtering`); 
-                const allRecordsQuery = query(ref(rtdb, 'stockUsage'));
-                const snapshot = await get(allRecordsQuery);
-                const allData = snapshot.val() || {};
+                console.log(`[HistoricalUsage] Checking root stockUsage path for backward compatibility`); 
+                const rootStockRef = ref(getRtdb(), 'stockUsage');
+                const rootSnapshot = await get(rootStockRef);
                 
-                console.log(`[HistoricalUsage] Retrieved ${Object.keys(allData).length} records, filtering for ${storeName}`);
-                
-                // Filter in memory by store name and date range
-                stockRecords = Object.entries(allData)
-                    .map(([key, record]) => ({
-                        id: key,
-                        ...record
-                    }))
-                    .filter(record => {
-                        // Check store name match
-                        const recordStore = record.storeName || 
-                                          (record.storeContext && record.storeContext.name) ||
-                                          (record.metadata && record.metadata.storeName);
-                                          
-                        const storeMatch = recordStore === storeName;
-                        
-                        // Check date range match
-                        const recordDate = record.timestamp || record.recordDate || 0;
-                        const dateMatch = recordDate >= startTimestamp && recordDate <= endTimestamp;
-                        
-                        return storeMatch && dateMatch;
-                    });
-            } catch (indexError) {
-                console.warn(`[HistoricalUsage] Error retrieving all records: ${indexError.message}`);
-                
-                // If the above approach fails, try a fallback method
-                // This is less efficient but should work in most cases
-                console.log(`[HistoricalUsage] Trying fallback approach with date-based queries`);
-                
-                // Try querying by date range instead, since timestamp is more likely to be indexed
-                try {
-                    const dateQuery = query(
-                        ref(rtdb, 'stockUsage'),
-                        orderByChild('timestamp'),
-                        startAt(startTimestamp),
-                        endAt(endTimestamp)
-                    );
+                if (rootSnapshot.exists()) {
+                    const rootData = rootSnapshot.val() || {};
+                    console.log(`[HistoricalUsage] Found ${Object.keys(rootData).length} records in root path`);
                     
-                    const dateSnapshot = await get(dateQuery);
-                    const dateFilteredData = dateSnapshot.val() || {};
-                    
-                    // Then filter by store name in memory
-                    stockRecords = Object.entries(dateFilteredData)
+                    // Filter root data
+                    const rootRecords = Object.entries(rootData)
                         .map(([key, record]) => ({
                             id: key,
                             ...record
                         }))
                         .filter(record => {
+                            // Check permissions first
+                            const hasAccess = isAdmin ||
+                                            record.userId === user.uid ||
+                                            (record.selectedLocationId && accessibleLocationIds.has(record.selectedLocationId));
+                            
+                            if (!hasAccess) {
+                                return false;
+                            }
+                            
+                            // Check store name or location ID match - be more flexible
                             const recordStore = record.storeName || 
                                               (record.storeContext && record.storeContext.name) ||
                                               (record.metadata && record.metadata.storeName);
-                                              
-                            return recordStore === storeName;
+                            
+                            const recordLocationId = record.selectedLocationId || 
+                                                   (record.storeContext && record.storeContext.locationId) ||
+                                                   (record.metadata && record.metadata.locationId);
+                            
+                            // Try multiple matching strategies for better compatibility
+                            const storeMatch = recordStore === storeIdentifier || 
+                                             recordLocationId === storeIdentifier ||
+                                             (recordStore && storeIdentifier && 
+                                              recordStore.toLowerCase() === storeIdentifier.toLowerCase()) ||
+                                             (recordStore && storeIdentifier && 
+                                              (recordStore.includes(storeIdentifier) || storeIdentifier.includes(recordStore)));
+                            
+                            // Check date range match
+                            const recordDate = record.timestamp || record.recordDate || 0;
+                            const dateMatch = recordDate >= startTimestamp && recordDate <= endTimestamp;
+                            
+                            return storeMatch && dateMatch;
                         });
-                } catch (dateError) {
-                    console.warn(`[HistoricalUsage] Date-based query failed: ${dateError.message}`);
-                    throw new Error(`Unable to retrieve historical data: ${dateError.message}. Please add indexing for 'storeName' and 'timestamp' in Firebase rules.`);
-                }
-            }
-            
-            // If no store-specific data found, fall back to checking all records
-            // (handles older data format without storeName field)
-            if (stockRecords.length === 0) {
-                console.log(`[HistoricalUsage] No store-specific data found, checking all records`);
-                
-                // Query by date range
-                const dateQuery = query(
-                    ref(rtdb, 'stockUsage'),
-                    orderByChild('timestamp'),
-                    startAt(startTimestamp),
-                    endAt(endTimestamp)
-                );
-                
-                const dateSnapshot = await get(dateQuery);
-                const allData = dateSnapshot.val() || {};
-                
-                // Filter by store name within metadata or context
-                stockRecords = Object.entries(allData)
-                    .map(([key, record]) => ({
-                        id: key,
-                        ...record
-                    }))
-                    .filter(record => {
-                        // Check various potential locations for store information
-                        const recordStore = record.storeName || 
-                                          (record.storeContext && record.storeContext.name) ||
-                                          (record.metadata && record.metadata.storeName);
-                                          
-                        return recordStore === storeName;
+                    
+                    // Add any root records not already in our results
+                    const existingIds = new Set(stockRecords.map(r => r.id));
+                    rootRecords.forEach(record => {
+                        if (!existingIds.has(record.id)) {
+                            stockRecords.push(record);
+                        }
                     });
+                }
+            } catch (rootError) {
+                console.warn(`[HistoricalUsage] Error checking root stockUsage path: ${rootError.message}`);
             }
             
-            console.log(`[HistoricalUsage] Found ${stockRecords.length} historical records for ${storeName}`);
+            // ENHANCEMENT: Also check the new normalized stockData structure
+            try {
+                console.log(`[HistoricalUsage] Checking new normalized stockData structure`);
+                const stockDataRef = ref(getRtdb(), 'stockData');
+                const stockDataSnapshot = await get(stockDataRef);
+                
+                if (stockDataSnapshot.exists()) {
+                    const stockDataRecords = stockDataSnapshot.val() || {};
+                    console.log(`[HistoricalUsage] Found ${Object.keys(stockDataRecords).length} records in stockData`);
+                    
+                    // Filter stockData records
+                    const normalizedRecords = Object.entries(stockDataRecords)
+                        .map(([key, record]) => ({
+                            id: key,
+                            ...record
+                        }))
+                        .filter(record => {
+                            // Check permissions first
+                            const hasAccess = isAdmin ||
+                                            record.userId === user.uid ||
+                                            (record.locationId && accessibleLocationIds.has(record.locationId)) ||
+                                            (record.selectedLocationId && accessibleLocationIds.has(record.selectedLocationId));
+                            
+                            if (!hasAccess) {
+                                return false;
+                            }
+                            
+                            // Check location/store match with enhanced matching
+                            const recordStore = record.storeName || record.locationName || 
+                                              (record.storeContext && record.storeContext.name) ||
+                                              (record.metadata && record.metadata.storeName);
+                            
+                            const recordLocationId = record.locationId || record.selectedLocationId || 
+                                                   (record.storeContext && record.storeContext.locationId) ||
+                                                   (record.metadata && record.metadata.locationId);
+                            
+                            // Enhanced matching strategies for post-migration data
+                            const storeMatch = recordStore === storeIdentifier || 
+                                             recordLocationId === storeIdentifier ||
+                                             (recordStore && storeIdentifier && 
+                                              recordStore.toLowerCase() === storeIdentifier.toLowerCase()) ||
+                                             (recordStore && storeIdentifier && 
+                                              (recordStore.includes(storeIdentifier) || storeIdentifier.includes(recordStore))) ||
+                                             // Additional matching for location ID to name resolution
+                                             (storeIdentifier.startsWith('-') && recordLocationId === storeIdentifier) ||
+                                             (!storeIdentifier.startsWith('-') && recordStore && 
+                                              (recordStore.toLowerCase().includes(storeIdentifier.toLowerCase()) || 
+                                               storeIdentifier.toLowerCase().includes(recordStore.toLowerCase())));
+                            
+                            // Check date range match
+                            const recordDate = record.timestamp || record.recordDate || 0;
+                            const dateMatch = recordDate >= startTimestamp && recordDate <= endTimestamp;
+                            
+                            return storeMatch && dateMatch;
+                        });
+                    
+                    // Add any normalized records not already in our results
+                    const existingIds = new Set(stockRecords.map(r => r.id));
+                    normalizedRecords.forEach(record => {
+                        if (!existingIds.has(record.id)) {
+                            stockRecords.push(record);
+                        }
+                    });
+                    
+                    console.log(`[HistoricalUsage] Added ${normalizedRecords.length} records from normalized stockData structure`);
+                }
+            } catch (stockDataError) {
+                console.warn(`[HistoricalUsage] Error checking normalized stockData structure: ${stockDataError.message}`);
+            }
+            
+            console.log(`[HistoricalUsage] Found ${stockRecords.length} total historical records for ${storeIdentifier}`);
             
             // Cache the results
             this._updateCache(cacheKey, stockRecords);
@@ -196,9 +329,33 @@ const HistoricalUsageService = {
                       ? record.stockItems.find(i => i.itemCode === itemCode) // Array format
                       : null;
                 
+                // Debug logging for first few items
+                if (itemData.length < 2 && item) {
+                    console.log(`[HistoricalUsage] Found item ${itemCode} in record:`, {
+                        usage: item.usage,
+                        costOfUsage: item.costOfUsage,
+                        openingQty: item.openingQty,
+                        closingQty: item.closingQty,
+                        purchases: item.purchases
+                    });
+                }
+                
                 if (item) {
                     // Extract usage value, period days and date
-                    const usage = parseFloat(item.usage || 0);
+                    // ENHANCEMENT: Calculate usage from stock quantities if not directly available
+                    let usage = parseFloat(item.usage || 0);
+                    
+                    // If usage is not directly available, calculate it from stock quantities
+                    if (!usage && (item.openingQty !== undefined || item.openingStockValue !== undefined)) {
+                        const openingQty = parseFloat(item.openingQty || item.openingStockValue || 0);
+                        const purchaseQty = parseFloat(item.purchaseQty || item.purchases || 0);
+                        const closingQty = parseFloat(item.closingQty || item.closingStockValue || 0);
+                        
+                        // Usage = Opening + Purchases - Closing
+                        usage = openingQty + purchaseQty - closingQty;
+                        
+                        console.log(`[HistoricalUsage] Calculated usage for ${itemCode}: ${openingQty} + ${purchaseQty} - ${closingQty} = ${usage}`);
+                    }
                     
                     // Calculate period days from multiple possible sources
                     let periodDays;
@@ -298,27 +455,97 @@ const HistoricalUsageService = {
     
     /**
      * Generate comprehensive historical summaries for a list of items
-     * @param {string} storeName - Store to analyze
+     * @param {string} storeIdentifier - Store name or location ID to analyze
      * @param {Array} items - Current stock items array 
      * @param {Object} options - Options for analysis
      * @returns {Promise<Object>} - Map of itemCode to historical summary
      */
-    async generateHistoricalSummaries(storeName, items, options = {}) {
+    async generateHistoricalSummaries(storeIdentifier, items, options = {}) {
         if (!items || !Array.isArray(items) || items.length === 0) {
             console.warn('[HistoricalUsage] No items provided for historical summary generation');
             return {};
         }
         
-        const lookbackDays = options.lookbackDays || 14;
+        const lookbackDays = options.lookbackDays || 365; // Default to 365 days to capture all historical data
         const dateRange = options.dateRange || null;
         
         console.log(`[HistoricalUsage] Generating historical summaries for ${items.length} items`);
         
-        // Get historical data for the specified store
-        const historicalRecords = await this.getHistoricalData(storeName, dateRange, lookbackDays);
+        // ENHANCEMENT: Try multiple identifiers and merge results for maximum data coverage
+        let allHistoricalRecords = [];
+        const searchStrategies = [];
         
-        if (historicalRecords.length === 0) {
-            console.warn(`[HistoricalUsage] No historical records found for ${storeName}`);
+        // Build search strategies based on the store identifier
+        if (storeIdentifier.startsWith('-')) {
+            // If it's a location ID, also try to get the location name
+            searchStrategies.push({
+                identifier: storeIdentifier,
+                type: 'Location ID'
+            });
+            
+            // Try to resolve location name from the ID
+            try {
+                const { ref, get, getRtdb } = await import('../../config/firebase-config.js');
+                
+                const locationRef = ref(getRtdb(), `locations/${storeIdentifier}`);
+                const locationSnapshot = await get(locationRef);
+                
+                if (locationSnapshot.exists()) {
+                    const locationData = locationSnapshot.val();
+                    if (locationData.name) {
+                        searchStrategies.push({
+                            identifier: locationData.name,
+                            type: 'Location Name'
+                        });
+                    }
+                    if (locationData.displayName && locationData.displayName !== locationData.name) {
+                        searchStrategies.push({
+                            identifier: locationData.displayName,
+                            type: 'Display Name'
+                        });
+                    }
+                }
+            } catch (locationError) {
+                console.warn(`[HistoricalUsage] Could not resolve location name for ${storeIdentifier}:`, locationError.message);
+            }
+        } else {
+            // If it's a name, use it directly
+            searchStrategies.push({
+                identifier: storeIdentifier,
+                type: 'Store Name'
+            });
+        }
+        
+        console.log(`[HistoricalUsage] Using ${searchStrategies.length} search strategies:`, searchStrategies.map(s => `${s.type}: "${s.identifier}"`).join(', '));
+        
+        // Execute all search strategies and merge results
+        const recordsById = new Map(); // Use Map to avoid duplicates
+        
+        for (const strategy of searchStrategies) {
+            try {
+                console.log(`[HistoricalUsage] Searching with ${strategy.type}: "${strategy.identifier}"`);
+                const records = await this.getHistoricalData(strategy.identifier, { dateRange, lookbackDays });
+                
+                console.log(`[HistoricalUsage] Found ${records.length} records with ${strategy.type}`);
+                
+                // Add records to the map, avoiding duplicates by ID
+                records.forEach(record => {
+                    if (record.id && !recordsById.has(record.id)) {
+                        recordsById.set(record.id, record);
+                    }
+                });
+            } catch (searchError) {
+                console.warn(`[HistoricalUsage] Search failed for ${strategy.type} "${strategy.identifier}":`, searchError.message);
+            }
+        }
+        
+        // Convert map back to array
+        allHistoricalRecords = Array.from(recordsById.values());
+        
+        console.log(`[HistoricalUsage] Combined total: ${allHistoricalRecords.length} unique historical records`);
+        
+        if (allHistoricalRecords.length === 0) {
+            console.warn(`[HistoricalUsage] No historical records found for any search strategy`);
             return {};
         }
         
@@ -330,7 +557,7 @@ const HistoricalUsageService = {
             if (!itemCode) continue;
             
             // Calculate statistics for this item
-            const stats = this.calculateItemStatistics(historicalRecords, itemCode);
+            const stats = this.calculateItemStatistics(allHistoricalRecords, itemCode);
             
             // Only include items with valid data
             if (stats.dataPoints > 0) {
@@ -338,7 +565,7 @@ const HistoricalUsageService = {
             }
         }
         
-        console.log(`[HistoricalUsage] Generated summaries for ${Object.keys(summaries).length} items`);
+        console.log(`[HistoricalUsage] Generated summaries for ${Object.keys(summaries).length} items from ${allHistoricalRecords.length} total records`);
         return summaries;
     },
     
@@ -374,7 +601,7 @@ const HistoricalUsageService = {
      * @returns {Array|null} - Cached data or null if not found/expired
      * @private
      */
-    _checkCache(key) {
+    _getFromCache(key) {
         const cached = this._cache[key];
         
         if (!cached) return null;
@@ -403,24 +630,15 @@ const HistoricalUsageService = {
     },
     
     /**
-     * Normalize date range from different input formats
-     * @param {Object} dateRange - Date range object { startDate, endDate }
+     * Calculate date range from different input formats
      * @param {number} lookbackDays - Days to look back from today
      * @returns {Object} - Normalized date range
      * @private
      */
-    _normalizeDateRange(dateRange, lookbackDays) {
+    _calculateDateRange(lookbackDays) {
         const endDate = new Date();
         
-        // If date range is provided, use that
-        if (dateRange && dateRange.startDate && dateRange.endDate) {
-            return {
-                startDate: new Date(dateRange.startDate),
-                endDate: new Date(dateRange.endDate)
-            };
-        }
-        
-        // Otherwise calculate based on lookback days
+        // Calculate based on lookback days
         const startDate = new Date();
         startDate.setDate(startDate.getDate() - lookbackDays);
         
@@ -557,5 +775,10 @@ const HistoricalUsageService = {
         };
     }
 };
+
+// Expose to window for global access
+if (typeof window !== 'undefined') {
+    window.HistoricalUsageService = HistoricalUsageService;
+}
 
 export default HistoricalUsageService;

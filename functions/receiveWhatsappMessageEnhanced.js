@@ -75,6 +75,112 @@ function normalizePhoneNumber(phoneNumber) {
 }
 
 /**
+ * Normalize date format for consistent comparison
+ * @param {string} dateString - Date string in various formats
+ * @returns {string} Normalized date in YYYY-MM-DD format
+ */
+function normalizeDate(dateString) {
+    if (!dateString) return '';
+    
+    try {
+        // Handle DD/MM/YYYY format (e.g., "17/07/2025")
+        if (/^\d{1,2}\/\d{1,2}\/\d{4}$/.test(dateString)) {
+            const [day, month, year] = dateString.split('/');
+            return `${year}-${month.padStart(2, '0')}-${day.padStart(2, '0')}`;
+        }
+        
+        // Handle YYYY-MM-DD format (already normalized)
+        if (/^\d{4}-\d{1,2}-\d{1,2}$/.test(dateString)) {
+            const [year, month, day] = dateString.split('-');
+            return `${year}-${month.padStart(2, '0')}-${day.padStart(2, '0')}`;
+        }
+        
+        // Handle other formats by attempting to parse
+        const parsed = new Date(dateString);
+        if (!isNaN(parsed.getTime())) {
+            return parsed.toISOString().split('T')[0];
+        }
+        
+        console.warn(`⚠️ Unrecognized date format: ${dateString}`);
+        return dateString; // Return as-is if can't normalize
+    } catch (error) {
+        console.error('Error normalizing date:', error);
+        return dateString;
+    }
+}
+
+/**
+ * Log suspicious activity for admin review
+ * @param {Object} activityData - Suspicious activity data
+ */
+async function logSuspiciousActivity(activityData) {
+    try {
+        const suspiciousRef = ref(rtdb, 'suspicious-activity');
+        const newActivityRef = push(suspiciousRef);
+        await set(newActivityRef, {
+            ...activityData,
+            id: newActivityRef.key,
+            status: 'pending_review',
+            reviewed: false
+        });
+        console.log('🚨 Suspicious activity logged:', newActivityRef.key);
+    } catch (error) {
+        console.error('❌ Error logging suspicious activity:', error);
+    }
+}
+
+/**
+ * Check if input looks like a command rather than a name
+ * @param {string} text - Input text
+ * @returns {boolean} Whether text appears to be a command
+ */
+function isCommand(text) {
+    if (!text) return false;
+    
+    const trimmed = text.trim().toLowerCase();
+    
+    // Single word commands
+    const commands = [
+        'help', 'hi', 'hello', 'hey', 'start', 'menu', 'info',
+        'points', 'rewards', 'balance', 'history', 'profile',
+        'consent', 'privacy', 'yes', 'no', 'ok', 'okay'
+    ];
+    
+    // Check for exact command matches
+    if (commands.includes(trimmed)) return true;
+    
+    // Check for command patterns
+    if (trimmed.startsWith('use reward')) return true;
+    if (trimmed.includes('check') && trimmed.includes('points')) return true;
+    if (trimmed.includes('view') && trimmed.includes('rewards')) return true;
+    
+    // Check for test patterns (like "TEST 1435")
+    if (trimmed.match(/^test\s+\d+$/)) return true;
+    
+    // Check if it's all caps single word (likely a command)
+    if (trimmed.match(/^[A-Z]+$/) && trimmed.length <= 10) return true;
+    
+    return false;
+}
+
+/**
+ * Check if input looks like a valid name
+ * @param {string} text - Input text
+ * @returns {boolean} Whether text appears to be a name
+ */
+function isValidName(text) {
+    if (!text) return false;
+    
+    const trimmed = text.trim();
+    
+    // Basic name validation
+    return trimmed.length >= 2 && 
+           trimmed.length <= 50 && 
+           /^[a-zA-Z\s]+$/.test(trimmed) && 
+           !isCommand(text);
+}
+
+/**
  * Determine location context from receiving WhatsApp number
  * @param {string} toNumber - WhatsApp number that received the message
  * @returns {Promise<Object|null>} Location context or null if not found
@@ -233,6 +339,7 @@ async function getOrCreateGuestWithLocation(phoneNumber, locationId) {
         // Create new guest with location context
         const newGuestData = {
             phoneNumber: phoneNumber,
+            name: null, // Explicitly set to null to trigger name collection
             currentLocationId: locationId || null,
             createdAt: admin.database.ServerValue.TIMESTAMP,
             lastLocationUpdate: admin.database.ServerValue.TIMESTAMP,
@@ -255,6 +362,260 @@ async function getOrCreateGuestWithLocation(phoneNumber, locationId) {
 }
 
 /**
+ * Check receipt data for quality issues
+ * @param {Object} receiptData - Receipt data to validate
+ * @returns {Array} Array of issues found
+ */
+function checkReceiptDataIssues(receiptData) {
+    const issues = [];
+
+    if (!receiptData.brandName || receiptData.brandName === 'Unknown Brand') {
+        issues.push("• The brand/restaurant name isn't clearly visible");
+    }
+    if (!receiptData.storeName || receiptData.storeName === 'Unknown Location') {
+        issues.push("• The store location isn't visible");
+    }
+    if (!receiptData.date) {
+        issues.push("• The receipt date isn't visible");
+    }
+    if (!receiptData.time) {
+        issues.push("• The receipt time isn't visible");
+    }
+    if (!receiptData.totalAmount || receiptData.totalAmount === 0) {
+        issues.push("• The total amount isn't clear");
+    }
+    if (!receiptData.items || receiptData.items.length === 0) {
+        issues.push("• The list of purchased items isn't readable");
+    }
+    if (!receiptData.invoiceNumber) {
+        issues.push("• The receipt/invoice number isn't visible");
+    }
+
+    return issues;
+}
+
+/**
+ * Construct error message based on error type and location context
+ * @param {Error} error - Error object
+ * @param {Object} locationContext - Location context
+ * @returns {string} Formatted error message
+ */
+function constructErrorMessage(error, locationContext) {
+    const locationName = locationContext?.mapping?.locationName || 'the restaurant';
+    
+    // Network or system errors
+    if (error.code === 'ECONNREFUSED' || error.code === 'ETIMEDOUT') {
+        return `🤖 Oops! I'm having trouble connecting to my servers right now. Please give me a few minutes and try sending your receipt to ${locationName} again! 🔄`;
+    }
+
+    // Receipt processing errors
+    if (error.message.includes('OCR') || error.message.includes('image')) {
+        return `🤖 I'm having trouble reading your receipt from ${locationName} clearly. Let me help you get a better photo:\n\n` +
+               `📸 Photo tips:\n` +
+               `• Use good lighting with no glare\n` +
+               `• Keep the receipt flat and not folded\n` +
+               `• Include the entire receipt in the photo\n` +
+               `• Make sure all text is clearly visible\n\n` +
+               `Try again - I'm here to help you earn rewards at ${locationName}! 🎯`;
+    }
+
+    // Campaign validation errors
+    if (error.message.includes('campaign') || error.message.includes('reward')) {
+        return `🤖 I encountered a technical issue while checking your receipt from ${locationName}. Please try again, and if this keeps happening, let our support team know! 🛠️`;
+    }
+
+    // Default error message
+    return `🤖 Something unexpected happened while processing your receipt from ${locationName}. Please try again in a moment! 🔄`;
+}
+
+/**
+ * Construct detailed failure message based on validation results
+ * @param {string} guestName - Guest's name
+ * @param {Object} matchResult - Campaign matching result
+ * @param {Object} receiptData - Processed receipt data
+ * @param {Object} locationContext - Location context
+ * @returns {string} Formatted failure message
+ */
+function constructFailureMessage(guestName, matchResult, receiptData, locationContext) {
+    const locationName = locationContext?.mapping?.locationName || 'the restaurant';
+    
+    // Handle case where no campaigns are active
+    if (matchResult.error === 'No active campaigns found') {
+        return `🤖 Hi ${guestName}! I checked but there are no active campaigns running at ${locationName} right now. Don't worry - new campaigns start regularly, so please try again soon! 🎯`;
+    }
+
+    // Handle case where brand has no active campaigns
+    if (matchResult.error === `No active campaigns found for ${receiptData.brandName}`) {
+        return `🤖 Hi ${guestName}! I can see this is from ${receiptData.brandName}, but they don't have any active campaigns at the moment. Check out our other participating brands or try again later! 🏪`;
+    }
+
+    let message = `🤖 Hi ${guestName}! I've analyzed your receipt from ${locationName} but couldn't validate it for rewards this time.`;
+    const issues = [];
+
+    // Check receipt data quality issues
+    const dataIssues = checkReceiptDataIssues(receiptData);
+    if (dataIssues.length > 0) {
+        issues.push('\n📸 Receipt clarity issues:', ...dataIssues);
+    }
+
+    // Add resolution steps
+    let resolutionSteps = [];
+    if (dataIssues.length > 0) {
+        resolutionSteps.push(
+            '\n💡 To help me read your receipt better:',
+            '• Take the photo in good lighting',
+            '• Make sure the receipt is flat and not folded',
+            '• Include the entire receipt in the photo',
+            '• Ensure all text is clearly visible'
+        );
+    }
+
+    // Construct final message
+    if (issues.length > 0) {
+        message += '\n' + issues.join('\n');
+    }
+    if (resolutionSteps.length > 0) {
+        message += '\n' + resolutionSteps.join('\n');
+    }
+
+    message += `\n\n🎉 Keep trying - I'm here to help you earn rewards at ${locationName}!`;
+
+    return message;
+}
+
+/**
+ * Check if receipt has already been processed to prevent duplicates
+ * @param {object} receiptData - Receipt data
+ * @param {string} phoneNumber - Guest's phone number
+ * @returns {Promise<boolean>} True if duplicate found
+ */
+async function checkDuplicateReceipt(receiptData, phoneNumber) {
+    try {
+        if (!receiptData.invoiceNumber) {
+            console.log('No invoice number found, cannot check for duplicates');
+            return false;
+        }
+        
+        const normalizedPhone = normalizePhoneNumber(phoneNumber);
+        
+        // Check existing receipts for this phone number and invoice
+        const receiptsRef = ref(rtdb, 'receipts');
+        console.log('Checking receipts collection for duplicates...');
+        const snapshot = await get(receiptsRef);
+        const allReceipts = snapshot.val() || {};
+        
+        console.log('Checking for duplicates among receipts:', Object.keys(allReceipts).length);
+        
+        // Enhanced duplicate detection: invoice + date + brand + store (regardless of phone)
+        const duplicate = Object.entries(allReceipts).find(([firebaseId, receipt]) => {
+            // Core duplicate criteria (phone-agnostic)
+            const invoiceMatch = receipt.invoiceNumber === receiptData.invoiceNumber;
+            
+            const storedDateNormalized = normalizeDate(receipt.date);
+            const currentDateNormalized = normalizeDate(receiptData.date);
+            const dateMatch = storedDateNormalized === currentDateNormalized;
+            
+            // Brand and store matching for higher accuracy
+            const brandMatch = receipt.brandName && receiptData.brandName && 
+                              receipt.brandName.toLowerCase().trim() === receiptData.brandName.toLowerCase().trim();
+            const storeMatch = receipt.storeName && receiptData.storeName && 
+                              receipt.storeName.toLowerCase().trim() === receiptData.storeName.toLowerCase().trim();
+            
+            // Primary duplicate: All 4 criteria match
+            const exactDuplicate = invoiceMatch && dateMatch && brandMatch && storeMatch;
+            
+            // Phone comparison for suspicious activity detection
+            const storedPhoneNormalized = normalizePhoneNumber(receipt.guestPhoneNumber);
+            const samePhone = storedPhoneNormalized === normalizedPhone;
+            
+            const matches = exactDuplicate;
+            
+            // Enhanced debugging for each comparison
+            console.log(`🔍 Duplicate check for receipt ${firebaseId}:`, {
+                storedPhone: receipt.guestPhoneNumber,
+                storedPhoneNormalized: storedPhoneNormalized,
+                currentPhone: normalizedPhone,
+                samePhone: samePhone,
+                storedInvoice: receipt.invoiceNumber,
+                currentInvoice: receiptData.invoiceNumber,
+                invoiceMatch: invoiceMatch,
+                storedDate: receipt.date,
+                storedDateNormalized: storedDateNormalized,
+                currentDate: receiptData.date,
+                currentDateNormalized: currentDateNormalized,
+                dateMatch: dateMatch,
+                storedBrand: receipt.brandName,
+                currentBrand: receiptData.brandName,
+                brandMatch: brandMatch,
+                storedStore: receipt.storeName,
+                currentStore: receiptData.storeName,
+                storeMatch: storeMatch,
+                exactDuplicate: exactDuplicate,
+                overallMatch: matches
+            });
+            
+            // Flag suspicious activity (same receipt, different phone)
+            if (exactDuplicate && !samePhone) {
+                console.warn(`🚨 SUSPICIOUS ACTIVITY: Same receipt from different phone numbers`, {
+                    originalPhone: receipt.guestPhoneNumber,
+                    newPhone: normalizedPhone,
+                    invoiceNumber: receiptData.invoiceNumber,
+                    date: receiptData.date,
+                    brand: receiptData.brandName,
+                    store: receiptData.storeName,
+                    firebaseId: firebaseId
+                });
+                
+                // Log to suspicious activity collection for admin review
+                logSuspiciousActivity({
+                    type: 'duplicate_receipt_different_phone',
+                    originalReceiptId: firebaseId,
+                    originalPhone: receipt.guestPhoneNumber,
+                    attemptedPhone: normalizedPhone,
+                    receiptData: {
+                        invoiceNumber: receiptData.invoiceNumber,
+                        date: receiptData.date,
+                        brandName: receiptData.brandName,
+                        storeName: receiptData.storeName
+                    },
+                    timestamp: new Date().toISOString()
+                });
+            }
+            
+            if (matches) {
+                console.log('✅ DUPLICATE CONFIRMED:', {
+                    firebaseId: firebaseId,
+                    receiptId: receipt.id || receipt.receiptId,
+                    invoiceNumber: receipt.invoiceNumber,
+                    guestPhone: receipt.guestPhoneNumber,
+                    date: receipt.date
+                });
+            }
+            
+            return matches;
+        });
+        
+        if (duplicate) {
+            const [firebaseId, duplicateReceipt] = duplicate;
+            console.log('Duplicate receipt confirmed:', {
+                firebaseId: firebaseId,
+                receiptId: duplicateReceipt.id || duplicateReceipt.receiptId,
+                invoiceNumber: receiptData.invoiceNumber,
+                guestPhone: normalizedPhone
+            });
+            return true;
+        }
+        
+        console.log('No duplicate found, processing can continue');
+        return false;
+    } catch (error) {
+        console.error('Error checking for duplicate receipt:', error);
+        // If we can't check, allow processing to continue
+        return false;
+    }
+}
+
+/**
  * Process receipt with location context
  * @param {string} imageUrl - Receipt image URL
  * @param {string} phoneNumber - Guest phone number
@@ -266,14 +627,50 @@ async function processReceiptWithLocationContext(imageUrl, phoneNumber, location
     try {
         console.log(`📸 Processing receipt with location context: ${locationContext.mapping.locationName}`);
         
-        // Use the existing receipt processor to extract data
-        const extractedData = await processReceipt(imageUrl, phoneNumber);
+        // Step 1: Extract receipt data without saving yet
+        console.log('Step 1: Starting receipt OCR and data extraction...');
+        const { processReceiptWithoutSaving } = require('./receiptProcessor');
+        const extractedData = await processReceiptWithoutSaving(imageUrl, phoneNumber);
+        console.log('Step 1 completed: Receipt data extracted', {
+            brandName: extractedData.brandName,
+            totalAmount: extractedData.totalAmount,
+            itemCount: extractedData.items?.length || 0,
+            invoiceNumber: extractedData.invoiceNumber,
+            date: extractedData.date,
+            locationContext: locationContext.mapping.locationName
+        });
+        
+        // Step 2: Check for duplicate receipt BEFORE saving
+        console.log('Step 2: Checking for duplicate receipt...');
+        const isDuplicate = await checkDuplicateReceipt(extractedData, phoneNumber);
+        if (isDuplicate) {
+            console.log('Duplicate receipt detected, skipping processing');
+            const duplicateMessage = `🤖 I've already processed this receipt for you at ${locationContext.mapping.locationName}! Check "view rewards" to see your existing rewards. 😊`;
+            
+            const { sendWhatsAppMessage } = require('./utils/whatsappClient');
+            await sendWhatsAppMessage(phoneNumber, duplicateMessage);
+            
+            return {
+                success: false,
+                message: duplicateMessage,
+                reason: 'duplicate_receipt',
+                data: extractedData
+            };
+        }
+        
+        // Step 3: Save receipt only after duplicate check passes
+        console.log('Step 3: No duplicate found, saving receipt...');
+        const { saveReceiptData } = require('./receiptProcessor');
+        // Include guest name in extracted data so it's always saved
+        extractedData.guestName = guestData.name;
+        const receiptData = await saveReceiptData(extractedData, phoneNumber);
+        console.log('Step 3 completed: Receipt saved successfully with ID:', receiptData.id);
         
         // Enhance the extracted data with location context
-        if (extractedData && extractedData.id && extractedData.totalAmount) {
+        if (receiptData && receiptData.id && receiptData.totalAmount) {
             // Add location information to the receipt data
             const locationEnhancedData = {
-                ...extractedData,
+                ...receiptData,
                 locationId: locationContext.locationId,
                 locationName: locationContext.mapping.locationName,
                 receivingWhatsAppNumber: locationContext.mapping.phoneNumber,
@@ -336,15 +733,18 @@ async function processReceiptWithLocationContext(imageUrl, phoneNumber, location
                     };
                 }
             } else {
-                // Handle campaign matching failure
+                // Handle campaign matching failure with detailed feedback
+                const guestName = guestData.name || 'Guest';
+                const failureMessage = constructFailureMessage(guestName, matchResult, locationEnhancedData, locationContext);
+                
                 const { sendWhatsAppMessage } = require('./utils/whatsappClient');
-                const noMatchMessage = `Thank you for your receipt! Unfortunately, this receipt doesn't match any of our current reward campaigns. Keep sending your receipts to earn rewards!`;
-                await sendWhatsAppMessage(phoneNumber, noMatchMessage);
+                await sendWhatsAppMessage(phoneNumber, failureMessage);
                 
                 return {
-                    success: true,
-                    message: noMatchMessage,
-                    data: locationEnhancedData
+                    success: false,
+                    message: failureMessage,
+                    data: locationEnhancedData,
+                    reason: 'campaign_no_match'
                 };
             }
         }
@@ -353,9 +753,23 @@ async function processReceiptWithLocationContext(imageUrl, phoneNumber, location
         
     } catch (error) {
         console.error('❌ Error processing receipt with location context:', error);
+        console.error('Error details:', {
+            message: error.message,
+            stack: error.stack,
+            phoneNumber: phoneNumber,
+            locationId: locationContext?.locationId,
+            locationName: locationContext?.mapping?.locationName
+        });
+        
+        // Send location-aware error message to user
+        const errorMessage = constructErrorMessage(error, locationContext);
+        const { sendWhatsAppMessage } = require('./utils/whatsappClient');
+        await sendWhatsAppMessage(phoneNumber, errorMessage);
+        
         return {
             success: false,
-            message: `Sorry, I couldn't process your receipt. ${error.message || 'Please try again with a clearer photo.'}`,
+            message: errorMessage,
+            reason: 'processing_error',
             error: error.message
         };
     }
@@ -463,6 +877,15 @@ async function handleNameCollectionInLocationContext(guestData, messageBody, med
     try {
         console.log(`👤 Handling name collection in location: ${locationContext.mapping.locationName}`);
         
+        // If there's media, ask for name first
+        if (mediaUrl) {
+            await sendWhatsAppMessage(
+                guestData.phoneNumber,
+                `🤖 Hi there! I'd love to help you with your receipt at ${locationContext.mapping.locationName}, but I'll need to know your full name first. Could you please share your name with me? 😊`
+            );
+            return res.status(200).send('Name required before receipt processing.');
+        }
+        
         if (!messageBody || messageBody.trim().length === 0) {
             const promptMessage = `👋 Welcome to ${locationContext.mapping.locationName}!\n\n` +
                 `To get started, please tell me your name.`;
@@ -471,54 +894,97 @@ async function handleNameCollectionInLocationContext(guestData, messageBody, med
             return res.status(200).send('Name prompt sent');
         }
         
-        // Extract name from message
-        const extractedName = messageBody.trim().split(/\s+/).slice(0, 2).join(' '); // First two words
+        const trimmedInput = messageBody.trim();
         
-        if (extractedName.length < 2) {
-            const retryMessage = `Please provide your full name so I can assist you better at ${locationContext.mapping.locationName}.`;
-            await sendWhatsAppMessage(guestData.phoneNumber, retryMessage);
-            return res.status(200).send('Name retry requested');
+        // Check if input is a command instead of a name
+        if (isCommand(trimmedInput)) {
+            console.log(`Command detected during name collection: ${trimmedInput}`);
+            
+            // Handle help command specifically
+            if (trimmedInput.toLowerCase() === 'help') {
+                await sendWhatsAppMessage(
+                    guestData.phoneNumber,
+                    `🤖 Hi! Welcome to ${locationContext.mapping.locationName}. To get started, I'll need to know your full name first.\n\nOnce registered, you'll be able to:\n• Send receipt photos to earn rewards\n• Check your points balance\n• View available rewards\n\nCould you please share your full name with me? (e.g., "John Smith") 😊`
+                );
+                return res.status(200).send('Help provided during name collection.');
+            }
+            
+            // For other commands, redirect to name collection
+            await sendWhatsAppMessage(
+                guestData.phoneNumber,
+                `🤖 Hi! I'd love to help you with that at ${locationContext.mapping.locationName}, but I'll need to know your full name first. Could you please share your name with me? (e.g., "John Smith") 😊`
+            );
+            return res.status(200).send('Name required for command.');
         }
         
-        // Update guest with name and location context
-        const guestRef = ref(rtdb, `guests/${guestData.phoneNumber}`);
-        await update(guestRef, {
-            name: extractedName,
-            currentLocationId: locationContext.locationId,
-            lastLocationUpdate: admin.database.ServerValue.TIMESTAMP,
-            lastInteraction: admin.database.ServerValue.TIMESTAMP
-        });
+        // Check if input looks like a valid name
+        if (isValidName(trimmedInput)) {
+            // Clean and format the name properly
+            const cleanedName = trimmedInput.toLowerCase()
+                .split(' ')
+                .map(word => word.charAt(0).toUpperCase() + word.slice(1))
+                .join(' ');
+            
+            console.log(`Setting name for ${guestData.phoneNumber}: "${cleanedName}" in location ${locationContext.mapping.locationName}`);
+            
+            // Update guest with name and location context
+            const guestRef = ref(rtdb, `guests/${guestData.phoneNumber}`);
+            await update(guestRef, {
+                name: cleanedName,
+                nameCollectedAt: admin.database.ServerValue.TIMESTAMP,
+                currentLocationId: locationContext.locationId,
+                lastLocationUpdate: admin.database.ServerValue.TIMESTAMP,
+                lastInteraction: admin.database.ServerValue.TIMESTAMP,
+                consentPending: true,
+                lastConsentPrompt: Date.now()
+            });
         
-        // Send welcome message with location context
-        const welcomeMessage = `🎉 Welcome ${extractedName}!\n\n` +
-            `You're now connected to ${locationContext.mapping.locationName}.\n\n` +
-            `You can:\n` +
-            `📸 Send receipt photos to earn rewards\n` +
-            `🎫 Check queue status\n` +
-            `📅 Make bookings\n` +
-            `❓ Ask questions\n\n` +
-            `How can I help you today?`;
-        
-        await sendWhatsAppMessage(guestData.phoneNumber, welcomeMessage);
-        
-        // Track welcome message
-        await trackWhatsAppMessage(
-            locationContext.locationId,
-            MESSAGE_TYPES.WELCOME_MESSAGE,
-            'outbound',
-            {
+            // Automatically start consent flow after name collection with location context
+            const guestDataWithName = {
+                ...guestData,
+                name: cleanedName,
                 phoneNumber: guestData.phoneNumber,
-                content: welcomeMessage,
-                metadata: {
-                    guestName: extractedName,
-                    locationName: locationContext.mapping.locationName,
-                    isNewUser: true
-                }
+                consentPending: true,
+                currentLocationId: locationContext.locationId
+            };
+
+            console.log(`Starting consent flow for ${cleanedName} at ${locationContext.mapping.locationName}`);
+            const consentResult = await handleConsentFlow(guestDataWithName, 'consent');
+
+            if (consentResult.shouldMessage) {
+                // Send location-aware consent message
+                const locationConsentMessage = consentResult.message + 
+                    `\n\n📍 This consent applies to your interaction with ${locationContext.mapping.locationName}.`;
+                await sendWhatsAppMessage(guestData.phoneNumber, locationConsentMessage);
             }
-        );
         
-        console.log(`✅ Name collection completed for ${extractedName} at ${locationContext.mapping.locationName}`);
-        return res.status(200).send('Name collection completed');
+            // Track consent prompt instead of welcome message
+            await trackWhatsAppMessage(
+                locationContext.locationId,
+                MESSAGE_TYPES.CONSENT_PROMPT,
+                'outbound',
+                {
+                    phoneNumber: guestData.phoneNumber,
+                    content: consentResult.message,
+                    metadata: {
+                        guestName: cleanedName,
+                        locationName: locationContext.mapping.locationName,
+                        isNewUser: true,
+                        consentFlowStarted: true
+                    }
+                }
+            );
+        
+            console.log(`✅ Name collection completed for ${cleanedName} at ${locationContext.mapping.locationName}, consent flow started`);
+            return res.status(200).send('Name collection completed, consent flow started');
+        } else {
+            // Input doesn't look like a valid name
+            await sendWhatsAppMessage(
+                guestData.phoneNumber,
+                `🤖 I need a valid name with just letters and spaces (e.g., "John Smith"). Could you try again without numbers or special characters? 😊`
+            );
+            return res.status(200).send('Invalid name format.');
+        }
         
     } catch (error) {
         console.error('❌ Error handling name collection in location context:', error);
@@ -643,22 +1109,32 @@ async function receiveWhatsAppMessageEnhanced(req, res) {
         const consentStatus = await checkConsent(guestData);
         console.log('📋 Consent status:', { hasConsent: consentStatus.hasConsent, requiresConsent: consentStatus.requiresConsent });
         
-        // Handle consent flow if needed
-        if (isConsentMessage(Body)) {
-            console.log('✅ Processing consent message');
+        // Handle consent flow if needed - check for both consent commands AND if user is in consent flow
+        if (isConsentMessage(Body) || (guestData.consentPending && Body && ['yes', 'no', 'y', 'n', 'agree', 'accept', 'decline', 'reject'].includes(Body.toLowerCase().trim()))) {
+            console.log('✅ Processing consent message or response');
             const consentResult = await handleConsentFlow(guestData, Body);
             
-            if (consentResult.requiresResponse) {
+            // Send acknowledgment message if consent handler provides one
+            if (consentResult.shouldMessage && consentResult.message) {
                 await sendWhatsAppMessage(guestData.phoneNumber, consentResult.message);
+                console.log('✅ Consent acknowledgment sent:', consentResult.message);
+            }
+            
+            if (consentResult.requiresResponse) {
                 return res.status(200).send('Consent flow handled');
             }
             
-            if (!consentResult.hasConsent) {
+            if (!consentResult.hasConsent && !consentResult.consentGranted) {
                 return res.status(200).send('Consent not granted');
             }
             
-            // If consent was granted and no response needed, continue to process original command
-            console.log('✅ Consent granted, continuing with message processing');
+            // If consent was granted, continue to process original command or show success
+            if (consentResult.consentGranted) {
+                console.log('✅ Consent granted, user can now use full features');
+                return res.status(200).send('Consent granted successfully');
+            }
+            
+            console.log('✅ Consent processing completed, continuing with message processing');
         } else if (requiresConsent(Body) && !consentStatus.hasConsent) {
             console.log('📋 Command requires consent but user has not consented');
             const consentMessage = `📋 Privacy Notice\n\n` +
@@ -671,9 +1147,53 @@ async function receiveWhatsAppMessageEnhanced(req, res) {
         }
 
         // Handle different message types based on guest state
-        if (!guestData.name) {
+        // Check if guest needs name collection (handle missing, null, or invalid names)
+        if (!guestData.name || guestData.name === 'N/A' || guestData.name === '') {
             console.log('👤 Guest has no name, handling name collection in location context');
             return await handleNameCollectionInLocationContext(guestData, Body, MediaUrl0, locationContext, res);
+        }
+        
+        // Check if existing user requires consent before processing any messages
+        if (!consentStatus.hasConsent && guestData.name) {
+            console.log('📋 Existing user requires consent - triggering consent flow');
+            
+            // Set consent pending flag for existing user
+            const guestRef = ref(rtdb, `guests/${guestData.phoneNumber}`);
+            await update(guestRef, {
+                consentPending: true,
+                lastConsentPrompt: Date.now(),
+                lastInteraction: admin.database.ServerValue.TIMESTAMP
+            });
+
+            // Trigger consent flow for existing user
+            const consentResult = await handleConsentFlow(guestData, 'consent');
+            
+            if (consentResult.shouldMessage) {
+                // Send location-aware consent message for existing user
+                const locationConsentMessage = consentResult.message + 
+                    `\n\n📍 This consent applies to your continued interaction with ${locationContext.mapping.locationName}.`;
+                await sendWhatsAppMessage(guestData.phoneNumber, locationConsentMessage);
+                
+                // Track consent prompt for existing user
+                await trackWhatsAppMessage(
+                    locationContext.locationId,
+                    MESSAGE_TYPES.CONSENT_PROMPT,
+                    'outbound',
+                    {
+                        phoneNumber: guestData.phoneNumber,
+                        content: consentResult.message,
+                        metadata: {
+                            guestName: guestData.name,
+                            locationName: locationContext.mapping.locationName,
+                            isExistingUser: true,
+                            consentFlowTriggered: true
+                        }
+                    }
+                );
+                
+                console.log(`✅ Consent flow triggered for existing user ${guestData.name} at ${locationContext.mapping.locationName}`);
+                return res.status(200).send('Consent prompt sent to existing user');
+            }
         }
         
         console.log(`✅ Processing message from ${guestData.name} at ${locationContext.mapping.locationName}`);

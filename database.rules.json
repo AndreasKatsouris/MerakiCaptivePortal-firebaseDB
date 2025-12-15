@@ -2,10 +2,14 @@
   "rules": {
     ".read": "auth != null",
     ".write": "auth != null && auth.token.admin === true",
+    "subscriptionTiers": {
+      ".read": true,
+      ".write": "auth != null && auth.token.admin === true"
+    },
     "guests": {
       ".read": "auth != null",
       ".write": "auth != null && auth.token.admin === true",
-      ".indexOn": ["phoneNumber", "createdAt"],
+      ".indexOn": ["phoneNumber", "locationId", "createdAt", "email", "nameCollectedAt"],
       "$phoneNumber": {
         ".read": "auth != null && (auth.token.phone_number === $phoneNumber || auth.token.admin === true)",
         ".write": "auth != null && (auth.token.phone_number === $phoneNumber || auth.token.admin === true)"
@@ -14,7 +18,29 @@
     "users": {
       "$uid": {
         ".read": "auth != null",
-        ".write": "auth != null && auth.uid === $uid && auth.token.admin === true"
+        ".write": "auth != null && (auth.uid === $uid || auth.token.admin === true)"
+      }
+    },
+    "subscriptions": {
+      ".indexOn": ["userId", "tier", "status", "expirationDate"],
+      "$uid": {
+        ".read": "auth != null && (auth.uid === $uid || auth.token.admin === true)",
+        ".write": "auth != null && (auth.uid === $uid || auth.token.admin === true)"
+      }
+    },
+    "locations": {
+      ".read": "auth != null",
+      ".write": "auth != null",
+      ".indexOn": ["userId", "ownerId", "isActive", "createdAt", "name"],
+      "$locationId": {
+        ".read": "auth != null",
+        ".write": "auth != null && (auth.uid === data.child('ownerId').val() || auth.token.admin === true || !data.exists())"
+      }
+    },
+    "userLocations": {
+      "$uid": {
+        ".read": "auth != null && (auth.uid === $uid || auth.token.admin === true)",
+        ".write": "auth != null && (auth.uid === $uid || auth.token.admin === true)"
       }
     },
     "admin-claims": {
@@ -35,6 +61,15 @@
         ".indexOn": ["typeId"],
         ".read": "auth != null && (auth.token.phone_number === $phoneNumber || auth.token.admin === true)",
         ".write": "auth != null && (auth.token.admin === true || auth.token.phone_number === $phoneNumber)"
+      }
+    },
+    "campaign-rewards": {
+      ".read": "auth != null",
+      ".write": "auth != null && auth.token.admin === true",
+      "$campaignId": {
+        "$rewardId": {
+          ".write": "auth != null && auth.token.admin === true"
+        }
       }
     },
     "guest-receipts": {
@@ -69,7 +104,7 @@
       ".write": "auth != null && auth.token.admin === true"
     },
     "receipts": {
-      ".indexOn": ["phoneNumber", "guestPhoneNumber", "status", "processedAt"],
+      ".indexOn": ["phoneNumber", "guestPhoneNumber", "locationId", "status", "processedAt", "createdAt"],
       ".read": "auth != null",
       ".write": "auth != null",
       "$receiptId": {
@@ -111,6 +146,130 @@
     "userPreferences": {
       ".read": "auth != null",
       ".write": true
+    },
+    "stockUsage": {
+      ".read": "auth != null",
+      ".indexOn": ["storeName", "timestamp"],
+      "$recordId": {
+        ".write": "auth != null && (auth.token.admin === true || (newData.child('userId').val() === auth.uid && newData.child('selectedLocationId').exists() && root.child('userLocations').child(auth.uid).child(newData.child('selectedLocationId').val()).exists()))",
+        ".read": "auth != null && (auth.token.admin === true || (data.child('userId').val() === auth.uid))",
+        ".validate": "newData.hasChildren(['timestamp', 'userId', 'selectedLocationId'])"
+      }
+    },
+    "bookings": {
+      ".read": "auth != null && (auth.token.admin === true || root.child('admin-claims').child(auth.uid).exists())",
+      ".write": "auth != null && (auth.token.admin === true || root.child('admin-claims').child(auth.uid).exists())",
+      ".indexOn": ["status", "date", "location", "createdAt"],
+      "$bookingId": {
+        ".read": "auth != null && (
+          auth.token.admin === true || 
+          root.child('admin-claims').child(auth.uid).exists() ||
+          (data.child('location').exists() && (
+            root.child('locations').child(data.child('location').val()).child('ownerId').val() === auth.uid ||
+            root.child('userLocations').child(auth.uid).child(data.child('location').val()).exists()
+          ))
+        )",
+        ".write": "auth != null && (
+          auth.token.admin === true || 
+          root.child('admin-claims').child(auth.uid).exists() ||
+          (newData.child('location').exists() && (
+            root.child('locations').child(newData.child('location').val()).child('ownerId').val() === auth.uid ||
+            root.child('userLocations').child(auth.uid).child(newData.child('location').val()).exists()
+          )) ||
+          (data.child('location').exists() && (
+            root.child('locations').child(data.child('location').val()).child('ownerId').val() === auth.uid ||
+            root.child('userLocations').child(auth.uid).child(data.child('location').val()).exists()
+          ))
+        )",
+        ".validate": "newData.hasChildren(['guestName', 'phoneNumber', 'date', 'time', 'location', 'numberOfGuests', 'status', 'createdAt'])"
+      }
+    },
+    "whatsapp-numbers": {
+      ".read": "auth != null",
+      ".write": "auth != null",
+      ".indexOn": ["userId", "status", "createdAt"],
+      "$whatsappNumberId": {
+        ".read": "auth != null && (auth.token.admin === true || data.child('userId').val() === auth.uid)",
+        ".write": "auth != null && (auth.token.admin === true || data.child('userId').val() === auth.uid || !data.exists())",
+        ".validate": "newData.hasChildren(['phoneNumber', 'displayName', 'userId', 'status', 'createdAt'])"
+      }
+    },
+    "location-whatsapp-mapping": {
+      ".read": "auth != null",
+      ".write": "auth != null",
+      ".indexOn": ["userId", "whatsappNumberId", "assignedAt"],
+      "$locationId": {
+        ".read": "auth != null && (auth.token.admin === true || data.child('userId').val() === auth.uid)",
+        ".write": "auth != null && (auth.token.admin === true || data.child('userId').val() === auth.uid || !data.exists())",
+        ".validate": "newData.hasChildren(['locationId', 'whatsappNumberId', 'phoneNumber', 'userId', 'assignedAt'])"
+      }
+    },
+    "whatsapp-tier-limits": {
+      ".read": "auth != null",
+      ".write": "auth != null && auth.token.admin === true"
+    },
+    "whatsapp-message-history": {
+      ".read": "auth != null",
+      ".write": "auth != null",
+      ".indexOn": ["locationId", "messageType", "timestamp", "phoneNumber"],
+      "$messageId": {
+        ".read": "auth != null && (auth.token.admin === true || auth.token.phone_number === data.child('phoneNumber').val())",
+        ".write": "auth != null",
+        ".validate": "newData.hasChildren(['locationId', 'messageType', 'direction', 'timestamp', 'phoneNumber'])"
+      }
+    },
+    "queue": {
+      ".read": "auth != null",
+      ".write": "auth != null",
+      ".indexOn": ["locationId", "status", "createdAt"],
+      "$locationId": {
+        ".read": "auth != null",
+        ".write": "auth != null",
+        ".indexOn": ["status", "createdAt"],
+        "entries": {
+          ".indexOn": ["status", "createdAt", "phoneNumber", "estimatedWaitTime"],
+          "$entryId": {
+            ".read": "auth != null",
+            ".write": "auth != null",
+            ".validate": "newData.hasChildren(['phoneNumber', 'status', 'createdAt'])"
+          }
+        },
+        "metadata": {
+          ".read": "auth != null",
+          ".write": "auth != null"
+        }
+      }
+    },
+    "receiptTemplates": {
+      ".read": "auth != null",
+      ".write": "auth != null && auth.token.admin === true",
+      ".indexOn": ["brandName", "status", "priority", "createdAt"],
+      "$templateId": {
+        ".read": "auth != null",
+        ".write": "auth != null && auth.token.admin === true",
+        ".validate": "newData.hasChildren(['templateName', 'brandName', 'patterns', 'status', 'priority', 'createdAt', 'createdBy'])"
+      }
+    },
+    "receiptPatternLogs": {
+      ".read": "auth != null && auth.token.admin === true",
+      ".write": true,
+      ".indexOn": ["templateId", "success", "timestamp", "brandName"],
+      "$logId": {
+        ".read": "auth != null && auth.token.admin === true",
+        ".write": true,
+        ".validate": "newData.hasChildren(['receiptId', 'success', 'timestamp'])"
+      }
+    },
+    "debug": {
+      ".read": "auth != null && auth.token.admin === true",
+      ".write": true,
+      "ocr-logs": {
+        ".indexOn": ["timestamp", "phoneNumber"],
+        "$logId": {
+          ".read": "auth != null && auth.token.admin === true",
+          ".write": true
+        }
+      }
     }
   }
 }

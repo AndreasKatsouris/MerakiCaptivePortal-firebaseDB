@@ -61,6 +61,14 @@ const DataSummary = {
         editable: {
             type: Boolean,
             default: true
+        },
+        
+        /**
+         * Whether to show charts (can be controlled by parent)
+         */
+        showCharts: {
+            type: Boolean,
+            default: true
         }
     },
     
@@ -102,6 +110,29 @@ const DataSummary = {
         if (!this.chartsInitialized && this.stockData.length > 0) {
             this.initializeCharts();
         }
+    },
+    
+    beforeDestroy() {
+        // Clean up charts when component is destroyed
+        if (this.categoryChart) {
+            try {
+                this.categoryChart.destroy();
+                this.categoryChart = null;
+            } catch (error) {
+                console.warn('Error destroying category chart on unmount:', error);
+            }
+        }
+        
+        if (this.topItemsChart) {
+            try {
+                this.topItemsChart.destroy();
+                this.topItemsChart = null;
+            } catch (error) {
+                console.warn('Error destroying top items chart on unmount:', error);
+            }
+        }
+        
+        this.chartsInitialized = false;
     },
     
     methods: {
@@ -168,6 +199,16 @@ const DataSummary = {
             const categoryCtx = document.getElementById('categoryChart');
             if (!categoryCtx) return;
             
+            // Destroy existing chart if it exists
+            if (this.categoryChart) {
+                try {
+                    this.categoryChart.destroy();
+                    this.categoryChart = null;
+                } catch (error) {
+                    console.warn('Error destroying category chart:', error);
+                }
+            }
+            
             // Get categories and aggregate usage by category
             const categoryData = {};
             this.stockData.forEach(item => {
@@ -191,36 +232,44 @@ const DataSummary = {
             // Generate random colors for categories
             const backgroundColors = labels.map(() => this.getRandomColor());
             
-            this.categoryChart = new Chart(categoryCtx, {
-                type: 'pie',
-                data: {
-                    labels: labels,
-                    datasets: [{
-                        data: data,
-                        backgroundColor: backgroundColors,
-                        borderWidth: 1
-                    }]
-                },
-                options: {
-                    responsive: true,
-                    maintainAspectRatio: false,
-                    legend: {
-                        position: 'right'
+            try {
+                this.categoryChart = new Chart(categoryCtx, {
+                    type: 'pie',
+                    data: {
+                        labels: labels,
+                        datasets: [{
+                            data: data,
+                            backgroundColor: backgroundColors,
+                            borderWidth: 1
+                        }]
                     },
-                    title: {
-                        display: true,
-                        text: 'Usage Cost by Category'
-                    },
-                    tooltips: {
-                        callbacks: {
-                            label: (tooltipItem, data) => {
-                                const value = data.datasets[0].data[tooltipItem.index];
-                                return `${data.labels[tooltipItem.index]}: ${this.formatCurrency(value)}`;
+                    options: {
+                        responsive: true,
+                        maintainAspectRatio: false,
+                        plugins: {
+                            legend: {
+                                position: 'right'
+                            },
+                            title: {
+                                display: true,
+                                text: 'Usage Cost by Category'
+                            },
+                            tooltip: {
+                                callbacks: {
+                                    label: (context) => {
+                                        const value = context.parsed;
+                                        const label = context.label || '';
+                                        return `${label}: ${this.formatCurrency(value)}`;
+                                    }
+                                }
                             }
                         }
                     }
-                }
-            });
+                });
+            } catch (error) {
+                console.error('Error creating category chart:', error);
+                this.categoryChart = null;
+            }
         },
         
         /**
@@ -229,6 +278,16 @@ const DataSummary = {
         initializeTopItemsChart() {
             const topItemsCtx = document.getElementById('topItemsChart');
             if (!topItemsCtx) return;
+            
+            // Destroy existing chart if it exists
+            if (this.topItemsChart) {
+                try {
+                    this.topItemsChart.destroy();
+                    this.topItemsChart = null;
+                } catch (error) {
+                    console.warn('Error destroying top items chart:', error);
+                }
+            }
             
             // Sort items by usage cost (usage * unitCost)
             const sortedItems = [...this.stockData]
@@ -246,87 +305,132 @@ const DataSummary = {
             const labels = sortedItems.map(item => item.itemCode);
             const data = sortedItems.map(item => item.cost);
             
-            this.topItemsChart = new Chart(topItemsCtx, {
-                type: 'bar',
-                data: {
-                    labels: labels,
-                    datasets: [{
-                        label: 'Usage Cost',
-                        data: data,
-                        backgroundColor: '#4e73df',
-                        borderWidth: 1
-                    }]
-                },
-                options: {
-                    responsive: true,
-                    maintainAspectRatio: false,
-                    scales: {
-                        yAxes: [{
-                            ticks: {
-                                beginAtZero: true,
-                                callback: value => this.formatCurrency(value)
-                            }
+            try {
+                this.topItemsChart = new Chart(topItemsCtx, {
+                    type: 'bar',
+                    data: {
+                        labels: labels,
+                        datasets: [{
+                            label: 'Usage Cost',
+                            data: data,
+                            backgroundColor: '#4e73df',
+                            borderWidth: 1
                         }]
                     },
-                    tooltips: {
-                        callbacks: {
-                            label: (tooltipItem, data) => {
-                                const value = data.datasets[0].data[tooltipItem.index];
-                                return `${tooltipItem.xLabel}: ${this.formatCurrency(value)}`;
+                    options: {
+                        responsive: true,
+                        maintainAspectRatio: false,
+                        plugins: {
+                            title: {
+                                display: true,
+                                text: 'Top Items by Usage'
+                            },
+                            tooltip: {
+                                callbacks: {
+                                    label: (context) => {
+                                        const value = context.parsed;
+                                        const label = context.label || '';
+                                        return `${label}: ${this.formatCurrency(value)}`;
+                                    }
+                                }
+                            }
+                        },
+                        scales: {
+                            y: {
+                                ticks: {
+                                    beginAtZero: true,
+                                    callback: value => this.formatCurrency(value)
+                                }
                             }
                         }
                     }
-                }
-            });
+                });
+            } catch (error) {
+                console.error('Error creating top items chart:', error);
+                this.topItemsChart = null;
+            }
         },
         
         /**
          * Update charts with current data
          */
         updateCharts() {
-            if (!this.chartsInitialized) {
+            if (!this.stockData || this.stockData.length === 0) return;
+            
+            // Check if component is still mounted
+            if (!this.$el || !this.$el.isConnected) {
+                console.warn('Component is not mounted, skipping chart update');
+                return;
+            }
+            
+            // Ensure charts are initialized before updating
+            if (!this.chartsInitialized || !window.Chart) {
+                console.warn('Charts not initialized yet, attempting initialization...');
                 this.initializeCharts();
                 return;
             }
             
-            if (this.categoryChart) {
-                // Update category chart data
-                const categoryData = {};
-                this.stockData.forEach(item => {
-                    if (!item.category) return;
-                    
-                    const category = item.category.trim();
-                    const usage = parseFloat(item.usage) || 0;
-                    const cost = usage * (parseFloat(item.unitCost) || 0);
-                    
-                    if (!categoryData[category]) {
-                        categoryData[category] = 0;
-                    }
-                    
-                    categoryData[category] += cost;
-                });
-                
-                this.categoryChart.data.labels = Object.keys(categoryData);
-                this.categoryChart.data.datasets[0].data = Object.values(categoryData);
-                this.categoryChart.update();
+            // Check if canvas elements still exist
+            const categoryCanvas = document.getElementById('categoryChart');
+            const topItemsCanvas = document.getElementById('topItemsChart');
+            
+            if (!categoryCanvas || !topItemsCanvas) {
+                console.warn('Chart canvas elements not found, reinitializing charts...');
+                this.chartsInitialized = false;
+                this.initializeCharts();
+                return;
             }
             
-            if (this.topItemsChart) {
-                // Update top items chart data
-                const sortedItems = [...this.stockData]
-                    .map(item => ({
-                        itemCode: item.itemCode,
-                        description: item.description,
-                        usage: parseFloat(item.usage) || 0,
-                        unitCost: parseFloat(item.unitCost) || 0,
-                        cost: (parseFloat(item.usage) || 0) * (parseFloat(item.unitCost) || 0)
-                    }))
-                    .sort((a, b) => b.cost - a.cost)
-                    .slice(0, 10);
-                
-                this.topItemsChart.data.labels = sortedItems.map(item => item.itemCode);
-                this.topItemsChart.data.datasets[0].data = sortedItems.map(item => item.cost);
-                this.topItemsChart.update();
+            if (this.categoryChart && this.categoryChart.data && this.categoryChart.config && categoryCanvas) {
+                try {
+                    // Update category chart data
+                    const categoryData = {};
+                    this.stockData.forEach(item => {
+                        if (!item.category) return;
+                        
+                        const category = item.category.trim();
+                        const usage = parseFloat(item.usage) || 0;
+                        const cost = usage * (parseFloat(item.unitCost) || 0);
+                        
+                        if (!categoryData[category]) {
+                            categoryData[category] = 0;
+                        }
+                        
+                        categoryData[category] += cost;
+                    });
+                    
+                    this.categoryChart.data.labels = Object.keys(categoryData);
+                    this.categoryChart.data.datasets[0].data = Object.values(categoryData);
+                    this.categoryChart.update('none'); // Use 'none' mode to prevent animation issues
+                } catch (error) {
+                    console.error('Error updating category chart:', error);
+                    // Try to reinitialize if update fails
+                    this.initializeCategoryChart();
+                }
+            }
+            
+            if (this.topItemsChart && this.topItemsChart.data && this.topItemsChart.config && topItemsCanvas) {
+                try {
+                    // Update top items chart data
+                    const sortedItems = [...this.stockData]
+                        .map(item => ({
+                            itemCode: item.itemCode,
+                            description: item.description,
+                            usage: parseFloat(item.usage) || 0,
+                            unitCost: parseFloat(item.unitCost) || 0,
+                            cost: (parseFloat(item.usage) || 0) * (parseFloat(item.unitCost) || 0)
+                        }))
+                        .sort((a, b) => b.cost - a.cost)
+                        .slice(0, 10);
+                    
+                    this.topItemsChart.data.labels = sortedItems.map(item => item.itemCode);
+                    this.topItemsChart.data.datasets[0].data = sortedItems.map(item => item.cost);
+                    this.topItemsChart.update('none'); // Use 'none' mode to prevent animation issues
+                } catch (error) {
+                    console.error('Error updating top items chart:', error);
+                    // Try to reinitialize if update fails
+                    this.initializeTopItemsChart();
+                }
             }
         },
         
@@ -396,7 +500,7 @@ const DataSummary = {
             </div>
             
             <!-- Charts Section -->
-            <div class="row" v-if="stockData.length > 0">
+            <div class="row" v-if="stockData.length > 0 && showCharts">
                 <div class="col-md-6">
                     <div class="card">
                         <div class="card-header bg-light">

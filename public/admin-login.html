@@ -23,6 +23,10 @@
             --box-shadow: 0 8px 24px rgba(0, 0, 0, 0.1);
         }
         
+        * {
+            box-sizing: border-box;
+        }
+        
         body {
             min-height: 100vh;
             display: flex;
@@ -33,12 +37,36 @@
                 radial-gradient(circle at 100% 0%, rgba(59, 113, 202, 0.08), transparent 400px),
                 linear-gradient(to bottom right, rgba(59, 113, 202, 0.04), transparent);
             font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            animation: backgroundShift 20s ease-in-out infinite;
+        }
+        
+        @keyframes backgroundShift {
+            0%, 100% { background-position: 0% 0%; }
+            50% { background-position: 100% 100%; }
+        }
+        
+        @keyframes fadeInUp {
+            from {
+                opacity: 0;
+                transform: translateY(20px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+        
+        @keyframes shake {
+            0%, 100% { transform: translateX(0); }
+            10%, 30%, 50%, 70%, 90% { transform: translateX(-5px); }
+            20%, 40%, 60%, 80% { transform: translateX(5px); }
         }
         
         .login-container {
             width: 100%;
             max-width: 420px;
             padding: 1.5rem;
+            animation: fadeInUp 0.6s ease-out;
         }
         
         .login-box {
@@ -48,6 +76,12 @@
             padding: 2.5rem;
             position: relative;
             overflow: hidden;
+            transition: transform 0.3s ease, box-shadow 0.3s ease;
+        }
+        
+        .login-box:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 12px 32px rgba(0, 0, 0, 0.15);
         }
         
         .logo-section {
@@ -58,6 +92,11 @@
         .logo-section img {
             height: 60px;
             margin-bottom: 1rem;
+            transition: transform 0.3s ease;
+        }
+        
+        .logo-section img:hover {
+            transform: scale(1.05);
         }
         
         .logo-section h2 {
@@ -77,18 +116,47 @@
             font-weight: 500;
             margin-bottom: 0.5rem;
             font-size: 0.9rem;
+            color: var(--text-color);
         }
         
         .form-control {
-            padding: 0.75rem 1rem;
+            padding: 0.75rem 2.5rem 0.75rem 1rem;
             border-radius: 8px;
             border: 1px solid #ddd;
             transition: all 0.25s ease;
+            background-color: #fafafa;
         }
         
         .form-control:focus {
             border-color: var(--primary-color);
             box-shadow: 0 0 0 4px rgba(59, 113, 202, 0.1);
+            background-color: #fff;
+        }
+        
+        .form-control:hover {
+            border-color: #bbb;
+        }
+        
+        .password-input-group {
+            position: relative;
+        }
+        
+        .password-toggle {
+            position: absolute;
+            right: 12px;
+            top: 50%;
+            transform: translateY(-50%);
+            background: none;
+            border: none;
+            color: #999;
+            cursor: pointer;
+            padding: 0.5rem;
+            transition: color 0.2s ease;
+            z-index: 10;
+        }
+        
+        .password-toggle:hover {
+            color: var(--primary-color);
         }
         
         .btn-primary {
@@ -98,12 +166,37 @@
             font-weight: 500;
             border-radius: 8px;
             transition: all 0.3s ease;
+            position: relative;
+            overflow: hidden;
+        }
+        
+        .btn-primary::before {
+            content: '';
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            width: 0;
+            height: 0;
+            border-radius: 50%;
+            background: rgba(255, 255, 255, 0.2);
+            transform: translate(-50%, -50%);
+            transition: width 0.6s, height 0.6s;
+        }
+        
+        .btn-primary:hover::before {
+            width: 300px;
+            height: 300px;
         }
         
         .btn-primary:hover, .btn-primary:focus {
             background-color: var(--primary-hover);
             border-color: var(--primary-hover);
             transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(59, 113, 202, 0.3);
+        }
+        
+        .btn-primary:active {
+            transform: translateY(0);
         }
         
         .form-group {
@@ -117,12 +210,48 @@
             right: 16px;
             transform: translateY(-50%);
             color: #999;
+            transition: color 0.2s ease;
+        }
+        
+        .form-control:focus ~ .input-icon {
+            color: var(--primary-color);
+        }
+        
+        .remember-me-group {
+            display: flex;
+            align-items: center;
+            margin-bottom: 1.5rem;
+        }
+        
+        .form-check-input {
+            cursor: pointer;
+            width: 18px;
+            height: 18px;
+            margin-right: 0.5rem;
+        }
+        
+        .form-check-label {
+            cursor: pointer;
+            font-size: 0.9rem;
+            color: var(--text-color);
+            user-select: none;
         }
         
         .alert {
             border-radius: 8px;
             font-size: 0.85rem;
             padding: 1rem;
+            animation: fadeInUp 0.3s ease;
+        }
+        
+        .alert-danger {
+            background-color: #fee;
+            border: 1px solid #fcc;
+            color: #c33;
+        }
+        
+        .alert.shake {
+            animation: shake 0.5s ease;
         }
         
         .decorated-line {
@@ -148,10 +277,115 @@
             margin-left: 1rem;
         }
         
+        .quick-links {
+            margin-top: 1.5rem;
+            padding-top: 1.5rem;
+            border-top: 1px solid #eee;
+            text-align: center;
+        }
+        
+        .quick-links-title {
+            font-size: 0.9rem;
+            color: var(--light-text);
+            margin-bottom: 0.75rem;
+            font-weight: 500;
+        }
+        
+        .quick-links-grid {
+            display: flex;
+            justify-content: center;
+            gap: 1rem;
+            flex-wrap: wrap;
+        }
+        
+        .quick-link {
+            display: inline-flex;
+            align-items: center;
+            gap: 0.5rem;
+            padding: 0.5rem 1rem;
+            background: #f8f9fa;
+            border-radius: 6px;
+            text-decoration: none;
+            color: var(--text-color);
+            font-size: 0.85rem;
+            transition: all 0.2s ease;
+            border: 1px solid #e9ecef;
+        }
+        
+        .quick-link:hover {
+            background: var(--primary-color);
+            color: white;
+            transform: translateY(-1px);
+            box-shadow: 0 2px 8px rgba(59, 113, 202, 0.2);
+            border-color: var(--primary-color);
+        }
+        
+        .quick-link i {
+            font-size: 0.9rem;
+        }
+        
+        .tooltip-icon {
+            display: inline-block;
+            margin-left: 0.25rem;
+            color: var(--light-text);
+            cursor: help;
+            font-size: 0.8rem;
+        }
+        
+        .loading-overlay {
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(255, 255, 255, 0.9);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            border-radius: var(--border-radius);
+            opacity: 0;
+            visibility: hidden;
+            transition: opacity 0.3s ease, visibility 0.3s ease;
+        }
+        
+        .loading-overlay.active {
+            opacity: 1;
+            visibility: visible;
+        }
+        
+        .loading-spinner {
+            width: 40px;
+            height: 40px;
+            border: 3px solid #f3f3f3;
+            border-top: 3px solid var(--primary-color);
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+        }
+        
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+        
         @media (max-width: 576px) {
             .login-box {
                 padding: 2rem 1.5rem;
             }
+            
+            .quick-links-grid {
+                flex-direction: column;
+                align-items: stretch;
+            }
+            
+            .quick-link {
+                justify-content: center;
+            }
+        }
+        
+        /* Focus visible for accessibility */
+        *:focus-visible {
+            outline: 2px solid var(--primary-color);
+            outline-offset: 2px;
         }
     </style>
 </head>
@@ -159,48 +393,94 @@
     <div class="container">
         <div class="login-container">
             <div class="login-box">
+                <div class="loading-overlay" id="loadingOverlay">
+                    <div class="loading-spinner"></div>
+                </div>
+                
                 <div class="logo-section">
                     <img src="img/laki-sparks-logo.png" alt="Laki Sparks" onerror="this.src='https://placehold.co/200x60?text=Laki+Sparks';this.onerror='';">
                     <h2>Admin Portal</h2>
                     <p>Enter your credentials to access dashboard</p>
                 </div>
                 
-                <form id="loginForm">
+                <form id="loginForm" novalidate>
                     <div class="form-group mb-3">
-                        <label for="email" class="form-label">Email Address</label>
+                        <label for="email" class="form-label">
+                            Email Address
+                            <i class="fas fa-info-circle tooltip-icon" title="Use your administrator email address"></i>
+                        </label>
                         <div class="position-relative">
                             <input type="email" 
                                 class="form-control" 
                                 id="email" 
                                 placeholder="admin@lakisparks.com"
                                 autocomplete="username"
+                                aria-label="Email address"
+                                aria-describedby="email-error"
                                 required>
                             <i class="fas fa-envelope input-icon"></i>
                         </div>
+                        <span id="email-error" class="text-danger small" style="display: none;"></span>
                     </div>
                     
-                    <div class="form-group mb-4">
-                        <label for="password" class="form-label">Password</label>
-                        <div class="position-relative">
+                    <div class="form-group mb-3">
+                        <label for="password" class="form-label">
+                            Password
+                            <i class="fas fa-info-circle tooltip-icon" title="Enter your secure password"></i>
+                        </label>
+                        <div class="password-input-group position-relative">
                             <input type="password" 
                                 class="form-control" 
                                 id="password" 
                                 placeholder="••••••••"
                                 autocomplete="current-password"
+                                aria-label="Password"
+                                aria-describedby="password-error"
                                 required>
-                            <i class="fas fa-lock input-icon"></i>
+                            <button type="button" 
+                                class="password-toggle" 
+                                id="passwordToggle"
+                                aria-label="Toggle password visibility"
+                                tabindex="-1">
+                                <i class="fas fa-eye" id="toggleIcon"></i>
+                            </button>
                         </div>
+                        <span id="password-error" class="text-danger small" style="display: none;"></span>
                     </div>
                     
-                    <div id="error-message" class="alert alert-danger mb-3" style="display: none;"></div>
+                    <div class="remember-me-group">
+                        <input type="checkbox" 
+                            class="form-check-input" 
+                            id="rememberMe"
+                            aria-label="Remember me">
+                        <label class="form-check-label" for="rememberMe">
+                            Remember me for 30 days
+                        </label>
+                    </div>
                     
-                    <button type="submit" class="btn btn-primary w-100 position-relative">
+                    <div id="error-message" class="alert alert-danger mb-3" role="alert" style="display: none;"></div>
+                    
+                    <button type="submit" class="btn btn-primary w-100 position-relative" id="submitBtn">
                         <span id="loading-indicator" class="spinner-border spinner-border-sm me-2" style="display: none;"></span>
-                        <span>Sign In</span>
+                        <span id="btnText">Sign In</span>
                     </button>
                 </form>
                 
                 <div class="decorated-line">Admin Access Only</div>
+                
+                <div class="quick-links">
+                    <div class="quick-links-title">Quick Tools</div>
+                    <div class="quick-links-grid">
+                        <a href="ocean_basket_roi_calculator.html" class="quick-link" target="_blank">
+                            <i class="fas fa-calculator"></i>
+                            <span>ROI Calculator</span>
+                        </a>
+                        <a href="#" class="quick-link" id="forgotPassword">
+                            <i class="fas fa-key"></i>
+                            <span>Forgot Password</span>
+                        </a>
+                    </div>
+                </div>
                 
                 <div class="text-center mt-3">
                     <small class="text-muted">Laki Sparks Restaurant Management Platform</small>
@@ -214,5 +494,79 @@
     <!-- Custom Scripts -->
     <script type="module" src="js/config/firebase-config.js"></script>
     <script type="module" src="js/admin/login.js"></script>
+    
+    <script>
+        // Password visibility toggle
+        const passwordToggle = document.getElementById('passwordToggle');
+        const passwordInput = document.getElementById('password');
+        const toggleIcon = document.getElementById('toggleIcon');
+        
+        passwordToggle.addEventListener('click', function() {
+            const type = passwordInput.getAttribute('type') === 'password' ? 'text' : 'password';
+            passwordInput.setAttribute('type', type);
+            
+            // Toggle icon
+            toggleIcon.classList.toggle('fa-eye');
+            toggleIcon.classList.toggle('fa-eye-slash');
+        });
+        
+        // Form validation feedback
+        const emailInput = document.getElementById('email');
+        const form = document.getElementById('loginForm');
+        
+        emailInput.addEventListener('blur', function() {
+            if (this.value && !this.validity.valid) {
+                document.getElementById('email-error').textContent = 'Please enter a valid email address';
+                document.getElementById('email-error').style.display = 'block';
+                this.classList.add('is-invalid');
+            } else {
+                document.getElementById('email-error').style.display = 'none';
+                this.classList.remove('is-invalid');
+            }
+        });
+        
+        // Forgot password handler
+        document.getElementById('forgotPassword').addEventListener('click', function(e) {
+            e.preventDefault();
+            const email = emailInput.value;
+            if (email) {
+                if (confirm(`Send password reset link to ${email}?`)) {
+                    // Handle password reset
+                    alert('Password reset link has been sent to your email.');
+                }
+            } else {
+                alert('Please enter your email address first.');
+                emailInput.focus();
+            }
+        });
+        
+        // Add loading state management
+        form.addEventListener('submit', function(e) {
+            const submitBtn = document.getElementById('submitBtn');
+            const loadingOverlay = document.getElementById('loadingOverlay');
+            
+            // Show loading state
+            submitBtn.disabled = true;
+            loadingOverlay.classList.add('active');
+            document.getElementById('loading-indicator').style.display = 'inline-block';
+            document.getElementById('btnText').textContent = 'Signing in...';
+        });
+        
+        // Error message animation
+        const errorMessage = document.getElementById('error-message');
+        const originalDisplay = errorMessage.style.display;
+        const observer = new MutationObserver(function(mutations) {
+            mutations.forEach(function(mutation) {
+                if (mutation.attributeName === 'style') {
+                    if (errorMessage.style.display !== 'none' && errorMessage.style.display !== originalDisplay) {
+                        errorMessage.classList.add('shake');
+                        setTimeout(() => errorMessage.classList.remove('shake'), 500);
+                    }
+                }
+            });
+        });
+        
+        observer.observe(errorMessage, { attributes: true });
+    </script>
 </body>
 </html>

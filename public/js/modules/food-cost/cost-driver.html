@@ -1,0 +1,144 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate" />
+    <meta http-equiv="Pragma" content="no-cache" />
+    <meta http-equiv="Expires" content="0" />
+    <title>Cost Driver Analysis - Meraki Captive Portal</title>
+    
+    <!-- Bootstrap CSS -->
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <!-- Font Awesome -->
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <!-- Custom CSS -->
+    <link href="../../../css/food-cost-dashboard.css" rel="stylesheet">
+    <link href="../../../css/table-fixes.css" rel="stylesheet">
+    
+    <!-- Vue.js - Use production version -->
+    <script src="https://unpkg.com/vue@3/dist/vue.global.prod.js"></script>
+    
+    <!-- SweetAlert2 -->
+    <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+    <!-- Lodash -->
+    <script src="https://cdn.jsdelivr.net/npm/lodash@4.17.21/lodash.min.js"></script>
+    <!-- Chart.js -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    
+    <style>
+        body {
+            background-color: #f8f9fa;
+        }
+        .dashboard-header {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 2rem 0;
+            margin-bottom: 2rem;
+        }
+        .back-link {
+            color: white;
+            text-decoration: none;
+            display: inline-flex;
+            align-items: center;
+            gap: 0.5rem;
+            margin-bottom: 1rem;
+        }
+        .back-link:hover {
+            color: #f0f0f0;
+        }
+        /* Vue.js related styles */
+        [v-cloak] {
+            display: none;
+        }
+        
+        .modal-overlay {
+            position: fixed;
+            z-index: 9999;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0, 0, 0, 0.5);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+        }
+        
+        .card {
+            margin-bottom: 1.5rem;
+        }
+    </style>
+</head>
+<body>
+    <div class="dashboard-header">
+        <div class="container">
+            <a href="../../../user-dashboard.html" class="back-link">
+                <i class="fas fa-arrow-left"></i> Back to Dashboard
+            </a>
+            <h1>Cost Driver Analysis</h1>
+            <p>Manage food costs, track inventory, and analyze profitability</p>
+        </div>
+    </div>
+    
+    <div class="container">
+        <div class="row">
+            <div class="col-md-12">
+                <div class="card shadow">
+                    <div class="card-body">
+                        <div id="food-cost-app"></div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script type="module">
+        import { initializeFoodCostModule } from './index.js?v=2.1.5-20250606';
+        import { auth, onAuthStateChanged } from '../../config/firebase-config.js';
+        import { featureAccessControl } from '../access-control/services/feature-access-control.js';
+        
+        document.addEventListener('DOMContentLoaded', async () => {
+            // Check authentication first
+            onAuthStateChanged(auth, async (user) => {
+                if (!user) {
+                    window.location.href = '../../../user-login.html?message=unauthorized';
+                    return;
+                }
+                
+                // Check feature access based on URL parameter
+                const urlParams = new URLSearchParams(window.location.search);
+                const view = urlParams.get('view');
+                const feature = view === 'advanced' ? 'foodCostAdvanced' : 'foodCostBasic';
+                
+                const hasAccess = await featureAccessControl.checkFeatureAccess(feature);
+                
+                if (!hasAccess) {
+                    // Show upgrade prompt
+                    await featureAccessControl.showUpgradePrompt(feature);
+                    // Redirect back to dashboard after showing prompt
+                    setTimeout(() => {
+                        window.location.href = '../../../user-dashboard.html';
+                    }, 2000);
+                    return;
+                }
+                
+                // User has access, initialize the module
+                try {
+                    console.log('Initializing Food Cost Module...');
+                    const moduleInstance = await initializeFoodCostModule('food-cost-app');
+                    console.log('Food Cost Module initialized:', moduleInstance);
+                } catch (error) {
+                    console.error('Error initializing Food Cost Module:', error);
+                    document.getElementById('food-cost-app').innerHTML = `
+                        <div class="alert alert-danger">
+                            <h4>Module Initialization Error</h4>
+                            <p>Failed to initialize the Food Cost Module: ${error.message}</p>
+                        </div>
+                    `;
+                }
+            });
+        });
+    </script>
+</body>
+</html>

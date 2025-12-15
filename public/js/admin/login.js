@@ -1,4 +1,4 @@
-import { authManager } from '../auth/auth.js';
+import { authManager } from '../auth/auth.js?v=20250131-fix';
 import { AdminClaims } from '../auth/admin-claims.js';
 
 /**

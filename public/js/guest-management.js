@@ -1,6 +1,215 @@
 // Import Firebase dependencies
 import { auth, rtdb, ref, get, push, set, update, remove } from './config/firebase-config.js';
 
+/**
+ * Normalize phone number format by removing + prefix and whatsapp: prefix
+ * @param {string} phoneNumber - Phone number to normalize  
+ * @returns {string} Normalized phone number without + prefix
+ */
+function normalizePhoneNumber(phoneNumber) {
+    if (!phoneNumber) return '';
+    // Only remove WhatsApp prefix, preserve + for international numbers
+    let cleaned = phoneNumber.replace(/^whatsapp:/, '').trim();
+    
+    // Ensure + prefix for international numbers (South African numbers)
+    if (/^27\d{9}$/.test(cleaned)) {
+        // If it's a 27xxxxxxxxx number without +, add it
+        cleaned = '+' + cleaned;
+    } else if (!cleaned.startsWith('+') && /^\d+$/.test(cleaned)) {
+        // If it's all digits without +, assume it's South African
+        cleaned = '+27' + cleaned.replace(/^0+/, ''); // Remove leading zeros
+    }
+    
+    return cleaned;
+}
+
+/**
+ * Format phone number for display (ensure + prefix for international numbers)
+ * @param {string} phoneNumber - Phone number to format
+ * @returns {string} Display-formatted phone number
+ */
+function formatPhoneNumberForDisplay(phoneNumber) {
+    if (!phoneNumber) return '';
+    const normalized = normalizePhoneNumber(phoneNumber);
+    // The new normalization already ensures + prefix, so just return it
+    return normalized;
+}
+
+/**
+ * Validate phone number format (accepts various formats)
+ * @param {string} phoneNumber - Phone number to validate
+ * @returns {Object} Validation result with isValid and normalized phone
+ */
+function validatePhoneNumber(phoneNumber) {
+    if (!phoneNumber) {
+        return { isValid: false, error: 'Phone number is required', normalized: '' };
+    }
+    
+    const normalized = normalizePhoneNumber(phoneNumber);
+    
+    // Check if it's a valid South African number (starts with 27)
+    if (!normalized.startsWith('27') || normalized.length < 11) {
+        return { 
+            isValid: false, 
+            error: 'Phone number must be a valid South African number (e.g., +27827001116 or 27827001116)', 
+            normalized: normalized 
+        };
+    }
+    
+    return { isValid: true, normalized: normalized };
+}
+
+// Add the cascading update function before the guestManagement object
+/**
+ * Cascading update function to sync guest name changes to related records
+ * This function addresses the denormalization issue where guestName is stored
+ * in multiple places (rewards, receipts, etc.) and needs to be updated when
+ * the guest's name is changed in the main guest record.
+ * 
+ * @param {string} phoneNumber - The normalized phone number (used as the key)
+ * @param {string} oldName - The old guest name (for logging/verification)
+ * @param {string} newName - The new guest name to propagate
+ * @returns {Promise<Object>} - Result object with success status and details
+ */
+async function cascadeGuestNameUpdate(phoneNumber, oldName, newName) {
+    console.log('🔄 Starting cascading guest name update:', {
+        phoneNumber,
+        oldName,
+        newName
+    });
+    
+    const results = {
+        success: false,
+        errors: [],
+        updatedRecords: {
+            rewards: 0,
+            receipts: 0,
+            other: 0
+        },
+        details: []
+    };
+    
+    try {
+        // Step 1: Update all rewards with this guest's phone number
+        console.log('1️⃣ Updating rewards...');
+        const rewardsSnapshot = await get(ref(rtdb, 'rewards'));
+        const rewardsData = rewardsSnapshot.val() || {};
+        
+        const rewardUpdates = {};
+        let rewardUpdateCount = 0;
+        
+        Object.entries(rewardsData).forEach(([rewardId, reward]) => {
+            if (reward.guestPhone === phoneNumber && reward.guestName !== newName) {
+                rewardUpdates[`rewards/${rewardId}/guestName`] = newName;
+                rewardUpdates[`rewards/${rewardId}/updatedAt`] = Date.now();
+                rewardUpdates[`rewards/${rewardId}/lastCascadeUpdate`] = Date.now();
+                rewardUpdateCount++;
+                console.log(`   - Reward ${rewardId}: "${reward.guestName}" -> "${newName}"`);
+            }
+        });
+        
+        if (rewardUpdateCount > 0) {
+            await update(ref(rtdb), rewardUpdates);
+            results.updatedRecords.rewards = rewardUpdateCount;
+            results.details.push(`Updated ${rewardUpdateCount} reward record(s)`);
+        }
+        
+        // Step 2: Check for any other places where guest name might be stored
+        // Look for any receipt fields that might have guest name (less common but possible)
+        console.log('2️⃣ Checking receipts for guest name fields...');
+        const receiptsSnapshot = await get(ref(rtdb, 'receipts'));
+        const receiptsData = receiptsSnapshot.val() || {};
+        
+        const receiptUpdates = {};
+        let receiptUpdateCount = 0;
+        
+        Object.entries(receiptsData).forEach(([receiptId, receipt]) => {
+            if (receipt.guestPhoneNumber === phoneNumber) {
+                // Check if receipt has a guestName field (some might, some might not)
+                if (receipt.guestName && receipt.guestName !== newName) {
+                    receiptUpdates[`receipts/${receiptId}/guestName`] = newName;
+                    receiptUpdates[`receipts/${receiptId}/updatedAt`] = Date.now();
+                    receiptUpdates[`receipts/${receiptId}/lastCascadeUpdate`] = Date.now();
+                    receiptUpdateCount++;
+                    console.log(`   - Receipt ${receiptId}: "${receipt.guestName}" -> "${newName}"`);
+                }
+            }
+        });
+        
+        if (receiptUpdateCount > 0) {
+            await update(ref(rtdb), receiptUpdates);
+            results.updatedRecords.receipts = receiptUpdateCount;
+            results.details.push(`Updated ${receiptUpdateCount} receipt record(s)`);
+        }
+        
+        // Step 3: Check for any other collections that might have guest name
+        // This is a safety check for any future extensions
+        console.log('3️⃣ Checking other potential collections...');
+        const otherCollections = ['vouchers', 'notifications', 'analytics-cache'];
+        
+        for (const collection of otherCollections) {
+            try {
+                const collectionSnapshot = await get(ref(rtdb, collection));
+                const collectionData = collectionSnapshot.val() || {};
+                
+                const collectionUpdates = {};
+                let collectionUpdateCount = 0;
+                
+                Object.entries(collectionData).forEach(([recordId, record]) => {
+                    if (record.guestPhone === phoneNumber || record.guestPhoneNumber === phoneNumber) {
+                        if (record.guestName && record.guestName !== newName) {
+                            collectionUpdates[`${collection}/${recordId}/guestName`] = newName;
+                            collectionUpdates[`${collection}/${recordId}/updatedAt`] = Date.now();
+                            collectionUpdates[`${collection}/${recordId}/lastCascadeUpdate`] = Date.now();
+                            collectionUpdateCount++;
+                            console.log(`   - ${collection} ${recordId}: "${record.guestName}" -> "${newName}"`);
+                        }
+                    }
+                });
+                
+                if (collectionUpdateCount > 0) {
+                    await update(ref(rtdb), collectionUpdates);
+                    results.updatedRecords.other += collectionUpdateCount;
+                    results.details.push(`Updated ${collectionUpdateCount} ${collection} record(s)`);
+                }
+            } catch (error) {
+                console.warn(`Warning: Could not process ${collection} collection:`, error);
+                // Don't fail the entire operation for missing collections
+            }
+        }
+        
+        // Step 4: Update the main guest record to mark that a cascade update occurred
+        console.log('4️⃣ Marking cascade update in guest record...');
+        const guestRef = ref(rtdb, `guests/${phoneNumber}`);
+        await update(guestRef, {
+            lastCascadeUpdate: Date.now(),
+            nameUpdateHistory: {
+                [Date.now()]: {
+                    oldName,
+                    newName,
+                    updatedRecords: results.updatedRecords
+                }
+            }
+        });
+        
+        results.success = true;
+        const totalUpdated = results.updatedRecords.rewards + results.updatedRecords.receipts + results.updatedRecords.other;
+        
+        console.log('✅ Cascade update completed successfully:', {
+            totalUpdated,
+            breakdown: results.updatedRecords
+        });
+        
+        return results;
+        
+    } catch (error) {
+        console.error('❌ Error in cascade update:', error);
+        results.errors.push(`Cascade update failed: ${error.message}`);
+        results.success = false;
+        return results;
+    }
+}
+
 // Guest Management State
 const guestManagement = {
     app: null,
@@ -15,13 +224,36 @@ const guestManagement = {
                             type="text" 
                             v-model="searchQuery" 
                             class="form-control" 
-                            placeholder="Search guests..."
+                            placeholder="Search guests (name or phone)..."
                         >
+                        <button 
+                            @click="refreshData" 
+                            class="btn btn-outline-primary"
+                            title="Refresh guest data"
+                            :disabled="loading"
+                        >
+                            <i class="fas" :class="loading ? 'fa-spinner fa-spin' : 'fa-sync-alt'"></i> 
+                            {{ loading ? 'Refreshing...' : 'Refresh' }}
+                        </button>
                         <button 
                             @click="showAddGuestModal" 
                             class="btn btn-primary"
                         >
                             <i class="fas fa-plus"></i> Add Guest
+                        </button>
+                        <button 
+                            @click="debugGuestData" 
+                            class="btn btn-outline-secondary"
+                            title="Debug guest data inconsistencies"
+                        >
+                            <i class="fas fa-bug"></i> Debug
+                        </button>
+                        <button 
+                            @click="fixDataConsistency" 
+                            class="btn btn-warning"
+                            title="Fix guest name inconsistencies in related records"
+                        >
+                            <i class="fas fa-sync-alt"></i> Fix Name Consistency
                         </button>
                     </div>
                 </div>
@@ -81,13 +313,13 @@ const guestManagement = {
                                             Visit Frequency 
                                             <i :class="getSortIcon('metrics.visitCount')"></i>
                                         </th>
+                                        <th @click="sort('metrics.totalSpent')">
+                                            Total Spent 
+                                            <i :class="getSortIcon('metrics.totalSpent')"></i>
+                                        </th>
                                         <th @click="sort('metrics.averageSpend')">
                                             Avg. Spend 
                                             <i :class="getSortIcon('metrics.averageSpend')"></i>
-                                        </th>
-                                        <th @click="sort('metrics.lifetimeValue')">
-                                            Lifetime Value 
-                                            <i :class="getSortIcon('metrics.lifetimeValue')"></i>
                                         </th>
                                         <th @click="sort('metrics.engagementScore')">
                                             Engagement 
@@ -100,11 +332,18 @@ const guestManagement = {
                                 </thead>
                                 <tbody>
                                     <tr v-for="guest in filteredGuests" :key="guest.phoneNumber">
-                                        <td>{{ guest.name || 'N/A' }}</td>
-                                        <td>{{ guest.phoneNumber || 'N/A' }}</td>
+                                        <td>
+                                            <span v-if="guest.name === '(Name Pending)'" class="text-muted fst-italic">
+                                                {{ guest.name }}
+                                            </span>
+                                            <span v-else>
+                                                {{ guest.name }}
+                                            </span>
+                                        </td>
+                                        <td>{{ formatPhoneForDisplay(guest.phoneNumber) }}</td>
                                         <td>{{ guest.metrics?.visitCount || 0 }} visits</td>
                                         <td>R{{ (guest.metrics?.totalSpent || 0).toFixed(2) }}</td>
-                                        <td>R{{ (guest.metrics?.lifetimeValue || 0).toFixed(2) }}</td>
+                                        <td>R{{ (guest.metrics?.averageSpend || 0).toFixed(2) }}</td>
                                         <td>
                                             <div class="d-flex align-items-center">
                                                 <div class="progress flex-grow-1" style="height: 8px;">
@@ -118,7 +357,7 @@ const guestManagement = {
                                             </div>
                                         </td>
                                         <td>{{ guest.metrics?.favoriteStore }}</td>
-                                        <td>{{ formatDate(guest.metrics?.lastVisitDate) }}</td>
+                                        <td>{{ formatDate(guest.metrics?.lastVisit) }}</td>
                                         <td>
                                             <div class="btn-group btn-group-sm">
                                                 <button 
@@ -201,7 +440,12 @@ const guestManagement = {
                     result = result.filter(guest => {
                         const name = guest?.name || '';
                         const phone = guest?.phoneNumber || '';
-                        return name.toLowerCase().includes(query) || phone.includes(query);
+                        const displayPhone = this.formatPhoneForDisplay(phone);
+                        
+                        // Search in name, normalized phone, and display phone
+                        return name.toLowerCase().includes(query) || 
+                               phone.includes(query) || 
+                               displayPhone.includes(query);
                     });
                 }
 
@@ -250,6 +494,28 @@ const guestManagement = {
         },
 
         methods: {
+            formatPhoneForDisplay(phoneNumber) {
+                return formatPhoneNumberForDisplay(phoneNumber);
+            },
+
+            async refreshData() {
+                console.log('Refreshing guest data...');
+                await this.loadGuests();
+                
+                // Show a success toast notification
+                if (typeof Swal !== 'undefined') {
+                    Swal.fire({
+                        toast: true,
+                        position: 'top-end',
+                        icon: 'success',
+                        title: 'Guest data refreshed successfully',
+                        showConfirmButton: false,
+                        timer: 2000,
+                        timerProgressBar: true
+                    });
+                }
+            },
+
             async loadGuests() {
                 this.loading = true;
                 this.error = null;
@@ -257,13 +523,17 @@ const guestManagement = {
                     const snapshot = await get(ref(rtdb, 'guests'));
                     const guestsData = snapshot.val() || {};
                     
-                    this.guests = Object.entries(guestsData).map(([phoneNumber, data]) => {
+                    // Map guests, phoneNumber keys should already be normalized in database
+                    const guestPromises = Object.entries(guestsData).map(async ([phoneNumber, data]) => {
+                        // Add phoneNumber to data for metrics calculation
+                        const guestDataWithPhone = { ...data, phoneNumber };
+                        
                         // Get guest receipts and calculate metrics
-                        const metrics = this.calculateGuestMetrics(data);
+                        const metrics = await this.calculateGuestMetrics(guestDataWithPhone);
                         
                         return {
-                            phoneNumber,
-                            name: data.name || 'N/A',
+                            phoneNumber, // This should already be normalized from database
+                            name: data.name && data.name !== 'N/A' ? data.name : '(Name Pending)',
                             createdAt: data.createdAt,
                             lastConsentPrompt: data.lastConsentPrompt,
                             consent: data.consent || false,
@@ -272,6 +542,9 @@ const guestManagement = {
                             metrics
                         };
                     });
+
+                    // Wait for all guest metrics to be calculated
+                    this.guests = await Promise.all(guestPromises);
                 } catch (error) {
                     console.error('Error loading guests:', error);
                     this.error = 'Failed to load guests. Please try again.';
@@ -281,25 +554,123 @@ const guestManagement = {
                 }
             },
 
-            calculateGuestMetrics(guestData) {
-                if (!guestData) return {
-                    visitCount: 0,
-                    totalSpent: 0,
-                    averageSpend: 0,
-                    lastVisit: null,
-                    engagementScore: this.calculateEngagementScore(guestData)
-                };
+            async calculateGuestMetrics(guestData) {
+                if (!guestData || !guestData.phoneNumber) {
+                    console.log('📊 No guest data or phone number for metrics calculation');
+                    return {
+                        visitCount: 0,
+                        totalSpent: 0,
+                        averageSpend: 0,
+                        lastVisit: null,
+                        favoriteStore: null,
+                        engagementScore: this.calculateEngagementScore(guestData)
+                    };
+                }
 
-                const now = new Date();
-                const lastActivity = guestData.lastConsentPrompt || guestData.createdAt;
-                
-                return {
-                    visitCount: 0, // Will implement when receipt tracking is added
-                    totalSpent: 0, // Will implement when receipt tracking is added
-                    averageSpend: 0, // Will implement when receipt tracking is added
-                    lastVisit: lastActivity,
-                    engagementScore: this.calculateEngagementScore(guestData)
-                };
+                try {
+                    // Normalize phone number for consistent lookup
+                    const normalizedPhone = normalizePhoneNumber(guestData.phoneNumber);
+                    console.log('📊 Calculating metrics for:', normalizedPhone);
+                    
+                    // Query receipts for this guest
+                    const receiptsSnapshot = await get(ref(rtdb, 'receipts'));
+                    const allReceipts = receiptsSnapshot.val() || {};
+                    console.log('📊 Total receipts in database:', Object.keys(allReceipts).length);
+                    
+                    // Debug: Log sample receipt structure (only once)
+                    if (!this.receiptStructureLogged) {
+                        const sampleReceipt = Object.values(allReceipts)[0];
+                        if (sampleReceipt) {
+                            console.log('📊 Sample receipt full structure:', JSON.stringify(sampleReceipt, null, 2));
+                            console.log('📊 Sample receipt keys:', Object.keys(sampleReceipt));
+                            this.receiptStructureLogged = true;
+                        }
+                    }
+                    
+                    // Filter receipts for this guest (only validated receipts)
+                    const guestReceipts = Object.values(allReceipts).filter(receipt => {
+                        // Normalize receipt phone numbers for comparison
+                        const receiptPhone = normalizePhoneNumber(receipt.guestPhoneNumber || receipt.phoneNumber || '');
+                        const phoneMatch = receiptPhone === normalizedPhone;
+                        const statusMatch = receipt.status === 'validated' || receipt.status === 'pending_validation' || !receipt.status; // Include receipts without status
+                        
+                        if (phoneMatch) {
+                            console.log('📊 Phone match found:', receiptPhone, '(original:', receipt.guestPhoneNumber, ') status:', receipt.status);
+                        }
+                        
+                        return phoneMatch && statusMatch;
+                    });
+                    
+                    console.log('📊 Found receipts for', normalizedPhone, ':', guestReceipts.length);
+
+                    if (guestReceipts.length === 0) {
+                        const lastActivity = guestData.lastConsentPrompt || guestData.createdAt;
+                        return {
+                            visitCount: 0,
+                            totalSpent: 0,
+                            averageSpend: 0,
+                            lastVisit: lastActivity,
+                            favoriteStore: null,
+                            engagementScore: this.calculateEngagementScore(guestData)
+                        };
+                    }
+
+                    // Calculate metrics from actual receipt data
+                    const totalSpent = guestReceipts.reduce((sum, receipt) => {
+                        const amount = receipt.totalAmount || 0;
+                        return sum + (typeof amount === 'number' ? amount : 0);
+                    }, 0);
+
+                    const visitCount = guestReceipts.length;
+                    const averageSpend = visitCount > 0 ? totalSpent / visitCount : 0;
+
+                    // Find most recent visit
+                    const receiptDates = guestReceipts
+                        .map(r => r.processedAt || r.createdAt)
+                        .filter(date => date)
+                        .sort((a, b) => b - a);
+                    
+                    const lastVisit = receiptDates.length > 0 ? 
+                        new Date(receiptDates[0]).toISOString() : 
+                        (guestData.lastConsentPrompt || guestData.createdAt);
+
+                    // Calculate favorite store
+                    const storeVisits = {};
+                    guestReceipts.forEach(receipt => {
+                        const storeName = receipt.fullStoreName || receipt.storeName || 'Unknown Store';
+                        storeVisits[storeName] = (storeVisits[storeName] || 0) + 1;
+                    });
+
+                    const favoriteStore = Object.keys(storeVisits).length > 0 ?
+                        Object.keys(storeVisits).reduce((a, b) => 
+                            storeVisits[a] > storeVisits[b] ? a : b
+                        ) : null;
+
+                    const result = {
+                        visitCount,
+                        totalSpent: Math.round(totalSpent * 100) / 100, // Round to 2 decimal places
+                        averageSpend: Math.round(averageSpend * 100) / 100,
+                        lastVisit,
+                        favoriteStore,
+                        engagementScore: this.calculateEngagementScore(guestData)
+                    };
+                    
+                    console.log('📊 Calculated metrics for', normalizedPhone, ':', result);
+                    return result;
+
+                } catch (error) {
+                    console.error('Error calculating guest metrics:', error);
+                    // Fall back to basic data if calculation fails
+                    const lastActivity = guestData.lastConsentPrompt || guestData.createdAt;
+                    return {
+                        visitCount: 0,
+                        totalSpent: 0,
+                        averageSpend: 0,
+                        lastVisit: lastActivity,
+                        favoriteStore: null,
+                        engagementScore: this.calculateEngagementScore(guestData)
+                    };
+                }
             },
 
             calculateEngagementScore(guestData) {
@@ -337,7 +708,8 @@ const guestManagement = {
                         </div>
                         <div class="form-group mb-3">
                             <label for="phoneNumber">Phone Number</label>
-                            <input id="phoneNumber" class="form-control" placeholder="+27 Phone Number">
+                            <input id="phoneNumber" class="form-control" placeholder="Phone number (e.g., +27827001116 or 27827001116)">
+                            <small class="form-text text-muted">Accepts formats: +27827001116, 27827001116, or whatsapp:+27827001116</small>
                         </div>
                     `,
                     focusConfirm: false,
@@ -354,28 +726,43 @@ const guestManagement = {
                         }
                         
                         // Validate phone number format
-                        if (!phoneNumber.startsWith('+27')) {
-                            Swal.showValidationMessage('Phone number must start with +27');
+                        const validation = validatePhoneNumber(phoneNumber);
+                        if (!validation.isValid) {
+                            Swal.showValidationMessage(validation.error);
                             return false;
                         }
                         
-                        return { name, phoneNumber };
+                        return { name, phoneNumber: validation.normalized };
                     }
                 });
 
                 if (formValues) {
                     try {
                         const now = new Date().toISOString();
+                        // Use normalized phone number as database key
                         const guestRef = ref(rtdb, `guests/${formValues.phoneNumber}`);
-                        await set(guestRef, {
+                        
+                        // SAFETY CHECK: Preserve existing guest data to prevent overwrites
+                        const existingGuestSnapshot = await get(guestRef);
+                        const existingGuestData = existingGuestSnapshot.exists() ? existingGuestSnapshot.val() : {};
+                        
+                        // Merge existing data with new data
+                        const guestData = {
+                            // Preserve existing data
+                            ...existingGuestData,
+                            // Update with new values
                             name: formValues.name,
-                            phoneNumber: formValues.phoneNumber,
-                            createdAt: now,
+                            phoneNumber: formValues.phoneNumber, // Store normalized format
                             updatedAt: now,
-                            consent: false,
-                            tier: 'Bronze',
+                            // Only set these if they don't exist
+                            createdAt: existingGuestData.createdAt || now,
+                            consent: existingGuestData.consent !== undefined ? existingGuestData.consent : false,
+                            tier: existingGuestData.tier || 'Bronze',
                             lastConsentPrompt: null
-                        });
+                        };
+                        
+                        // Use update() to preserve existing data instead of set()
+                        await update(guestRef, guestData);
                         
                         await this.loadGuests();
                         Swal.fire('Success', 'Guest added successfully', 'success');
@@ -388,7 +775,9 @@ const guestManagement = {
 
             async getGuestReceipts(phoneNumber) {
                 try {
-                    const receiptsRef = ref(rtdb, `receipts/${phoneNumber}`);
+                    // Use normalized phone number for database operations
+                    const normalizedPhone = normalizePhoneNumber(phoneNumber);
+                    const receiptsRef = ref(rtdb, `receipts/${normalizedPhone}`);
                     const snapshot = await get(receiptsRef);
                     return snapshot.val() || {};
                 } catch (error) {
@@ -434,7 +823,8 @@ const guestManagement = {
                             <div class="col-md-6">
                                 <h6 class="text-muted">Basic Information</h6>
                                 <p><strong>Name:</strong> ${guest.name || 'N/A'}</p>
-                                <p><strong>Phone:</strong> ${guest.phoneNumber}</p>
+                                <p><strong>Phone:</strong> ${this.formatPhoneForDisplay(guest.phoneNumber)}</p>
+                                <p><strong>Phone (DB Format):</strong> <code>${guest.phoneNumber}</code></p>
                                 <p><strong>Loyalty Tier:</strong> ${guest.tier}</p>
                                 <p><strong>Joined:</strong> ${this.formatDate(guest.createdAt)}</p>
                             </div>
@@ -470,7 +860,8 @@ const guestManagement = {
                         </div>
                         <div class="form-group mb-3">
                             <label for="editPhone">Phone Number</label>
-                            <input id="editPhone" class="form-control" value="${guest.phoneNumber}" readonly>
+                            <input id="editPhone" class="form-control" value="${this.formatPhoneForDisplay(guest.phoneNumber)}" readonly>
+                            <small class="form-text text-muted">Phone number cannot be changed after creation</small>
                         </div>
                         <div class="form-group mb-3">
                             <label for="editTier">Loyalty Tier</label>
@@ -509,7 +900,37 @@ const guestManagement = {
 
                 if (formValues) {
                     try {
-                        const guestRef = ref(rtdb, `guests/${guest.phoneNumber}`);
+                        // Use normalized phone number for database operations
+                        const normalizedPhone = normalizePhoneNumber(guest.phoneNumber);
+                        const guestRef = ref(rtdb, `guests/${normalizedPhone}`);
+                        
+                        // Check if name has changed to trigger cascade update
+                        const nameChanged = guest.name !== formValues.name;
+                        
+                        if (nameChanged) {
+                            // Show confirmation dialog about cascade update
+                            const confirmCascade = await Swal.fire({
+                                title: 'Name Change Detected',
+                                html: `
+                                    <p>You are changing the name from <strong>"${guest.name}"</strong> to <strong>"${formValues.name}"</strong>.</p>
+                                    <p>This will also update the name in all related records (rewards, receipts, etc.) to maintain consistency.</p>
+                                    <div class="alert alert-info mt-3">
+                                        <i class="fas fa-info-circle"></i> This ensures all your data remains consistent across the platform.
+                                    </div>
+                                `,
+                                icon: 'question',
+                                showCancelButton: true,
+                                confirmButtonText: 'Continue with Update',
+                                cancelButtonText: 'Cancel',
+                                confirmButtonColor: '#3085d6'
+                            });
+                            
+                            if (!confirmCascade.isConfirmed) {
+                                return; // User cancelled the operation
+                            }
+                        }
+                        
+                        // Update the main guest record
                         await update(guestRef, {
                             name: formValues.name,
                             tier: formValues.tier,
@@ -518,36 +939,179 @@ const guestManagement = {
                             lastConsentPrompt: formValues.consent !== guest.consent ? new Date().toISOString() : guest.lastConsentPrompt
                         });
                         
+                        // If name changed, perform cascade update
+                        if (nameChanged) {
+                            console.log('Name changed, performing cascade update...');
+                            const cascadeResult = await cascadeGuestNameUpdate(
+                                normalizedPhone,
+                                guest.name,
+                                formValues.name
+                            );
+                            
+                            if (cascadeResult.success) {
+                                const totalUpdated = cascadeResult.updatedRecords.rewards + 
+                                                  cascadeResult.updatedRecords.receipts + 
+                                                  cascadeResult.updatedRecords.other;
+                                
+                                if (totalUpdated > 0) {
+                                    await Swal.fire({
+                                        title: 'Update Complete',
+                                        html: `
+                                            <div class="text-start">
+                                                <p><strong>Guest information updated successfully!</strong></p>
+                                                <p>Related records updated:</p>
+                                                <ul>
+                                                    <li>Rewards: ${cascadeResult.updatedRecords.rewards}</li>
+                                                    <li>Receipts: ${cascadeResult.updatedRecords.receipts}</li>
+                                                    <li>Other: ${cascadeResult.updatedRecords.other}</li>
+                                                </ul>
+                                                <p class="text-muted">All data is now consistent across the platform.</p>
+                                            </div>
+                                        `,
+                                        icon: 'success',
+                                        confirmButtonText: 'Great!'
+                                    });
+                                } else {
+                                    await Swal.fire('Success', 'Guest updated successfully (no related records needed updating)', 'success');
+                                }
+                            } else {
+                                console.error('Cascade update failed:', cascadeResult.errors);
+                                await Swal.fire({
+                                    title: 'Partial Update',
+                                    html: `
+                                        <div class="text-start">
+                                            <p>Guest information was updated, but there were some issues updating related records:</p>
+                                            <ul>
+                                                ${cascadeResult.errors.map(error => `<li class="text-danger">${error}</li>`).join('')}
+                                            </ul>
+                                            <p class="text-muted">You may need to use the "Fix Name Consistency" tool to resolve any remaining issues.</p>
+                                        </div>
+                                    `,
+                                    icon: 'warning',
+                                    confirmButtonText: 'I Understand'
+                                });
+                            }
+                        } else {
+                            await Swal.fire('Success', 'Guest updated successfully', 'success');
+                        }
+                        
                         await this.loadGuests();
-                        Swal.fire('Success', 'Guest updated successfully', 'success');
+                        
                     } catch (error) {
                         console.error('Error updating guest:', error);
-                        Swal.fire('Error', 'Failed to update guest', 'error');
+                        Swal.fire('Error', `Failed to update guest: ${error.message}`, 'error');
                     }
                 }
             },
 
             async deleteGuest(guest) {
+                console.log('🗑️ Starting guest deletion process...');
+                console.log('Guest data:', {
+                    name: guest.name,
+                    phoneNumber: guest.phoneNumber,
+                    displayPhone: this.formatPhoneForDisplay(guest.phoneNumber)
+                });
+
                 const result = await Swal.fire({
                     title: 'Delete Guest',
-                    text: `Are you sure you want to delete ${guest.name || 'this guest'}?`,
+                    html: `
+                        <p>Are you sure you want to delete <strong>${guest.name || 'this guest'}</strong>?</p>
+                        <p><strong>Phone:</strong> ${this.formatPhoneForDisplay(guest.phoneNumber)}</p>
+                        <p><strong>DB Key:</strong> <code>${guest.phoneNumber}</code></p>
+                        <div class="alert alert-warning mt-3">
+                            <strong>Warning:</strong> This will only delete the guest record. 
+                            For complete data deletion including rewards and receipts, 
+                            use the data management tools.
+                        </div>
+                    `,
                     icon: 'warning',
                     showCancelButton: true,
-                    confirmButtonText: 'Delete',
+                    confirmButtonText: 'Delete Guest Record',
                     cancelButtonText: 'Cancel',
                     confirmButtonColor: '#dc3545'
                 });
 
                 if (result.isConfirmed) {
                     try {
-                        const guestRef = ref(rtdb, `guests/${guest.phoneNumber}`);
-                        await remove(guestRef);
+                        console.log('✅ User confirmed deletion, proceeding...');
                         
+                        // Use the guest's phoneNumber directly as it's the exact database key
+                        const originalPhone = guest.phoneNumber;
+                        const databaseKey = guest.phoneNumber; // Don't normalize - use exact database key
+                        
+                        console.log('📱 Phone number processing:', {
+                            original: originalPhone,
+                            databaseKey: databaseKey,
+                            areSame: originalPhone === databaseKey
+                        });
+
+                        const databasePath = `guests/${databaseKey}`;
+                        console.log('🎯 Database path for deletion:', databasePath);
+                        
+                        // Check if guest exists before deletion
+                        console.log('🔍 Pre-deletion verification...');
+                        const preCheckRef = ref(rtdb, databasePath);
+                        const preCheckSnapshot = await get(preCheckRef);
+                        const preCheckExists = preCheckSnapshot.exists();
+                        console.log('Pre-deletion check:', {
+                            exists: preCheckExists,
+                            data: preCheckSnapshot.val()
+                        });
+                        
+                        if (!preCheckExists) {
+                            console.error('❌ Guest not found in database at path:', databasePath);
+                            Swal.fire('Error', 'Guest not found in database. Please refresh and try again.', 'error');
+                            return;
+                        }
+                        
+                        // Perform the deletion
+                        console.log('🗑️ Executing deletion...');
+                        const guestRef = ref(rtdb, databasePath);
+                        await remove(guestRef);
+                        console.log('✅ Delete operation completed');
+                        
+                        // Verify deletion
+                        console.log('🔍 Post-deletion verification...');
+                        const postCheckSnapshot = await get(preCheckRef);
+                        const postCheckExists = postCheckSnapshot.exists();
+                        console.log('Post-deletion check:', {
+                            exists: postCheckExists,
+                            data: postCheckSnapshot.val()
+                        });
+                        
+                        if (postCheckExists) {
+                            console.error('❌ Guest still exists after deletion!');
+                            Swal.fire('Error', 'Failed to delete guest from database', 'error');
+                            return;
+                        }
+                        
+                        console.log('🔄 Refreshing guest list...');
                         await this.loadGuests();
-                        Swal.fire('Success', 'Guest deleted successfully', 'success');
+                        console.log('✅ Guest list refreshed');
+                        
+                        // Check if guest still exists in local state
+                        const stillInLocalState = this.guests.find(g => g.phoneNumber === originalPhone);
+                        console.log('Local state check:', {
+                            stillExists: !!stillInLocalState,
+                            totalGuests: this.guests.length
+                        });
+                        
+                        if (stillInLocalState) {
+                            console.error('❌ Guest still exists in local state after refresh!');
+                            Swal.fire('Warning', 'Guest may still appear due to caching. Please refresh the page.', 'warning');
+                        } else {
+                            console.log('✅ Guest successfully removed from local state');
+                            Swal.fire('Success', 'Guest deleted successfully', 'success');
+                        }
+                        
                     } catch (error) {
-                        console.error('Error deleting guest:', error);
-                        Swal.fire('Error', 'Failed to delete guest', 'error');
+                        console.error('❌ Error deleting guest:', error);
+                        console.error('Error details:', {
+                            message: error.message,
+                            stack: error.stack,
+                            code: error.code
+                        });
+                        Swal.fire('Error', `Failed to delete guest: ${error.message}`, 'error');
                     }
                 }
             },
@@ -560,8 +1124,10 @@ const guestManagement = {
                 // Initialize the analytics component using the global reference
                 const analyticsRoot = document.getElementById('guestAnalyticsRoot');
                 if (analyticsRoot && window.GuestAnalytics) {
+                    // Pass normalized phone number to analytics component
+                    const normalizedPhone = normalizePhoneNumber(guest.phoneNumber);
                     ReactDOM.render(
-                        React.createElement(window.GuestAnalytics, { phoneNumber: guest.phoneNumber }),
+                        React.createElement(window.GuestAnalytics, { phoneNumber: normalizedPhone }),
                         analyticsRoot
                     );
                 } else {
@@ -575,6 +1141,256 @@ const guestManagement = {
                 if (totalSpend > 5000 && visitCount > 10) return 'GOLD';
                 if (totalSpend > 2000 && visitCount > 5) return 'SILVER';
                 return 'BRONZE';
+            },
+
+            async debugGuestData() {
+                console.log('🐛 Starting guest data debug...');
+                
+                try {
+                    // Get raw database data
+                    const snapshot = await get(ref(rtdb, 'guests'));
+                    const rawDatabaseData = snapshot.val() || {};
+                    
+                    console.log('📊 Database vs UI comparison:');
+                    console.log('Raw database guests:', Object.keys(rawDatabaseData).length);
+                    console.log('UI guests:', this.guests.length);
+                    
+                    console.log('📋 Database phone numbers:');
+                    Object.keys(rawDatabaseData).forEach((phoneKey, index) => {
+                        const guestData = rawDatabaseData[phoneKey];
+                        console.log(`${index + 1}. Database key: "${phoneKey}" | Name: "${guestData.name}" | Phone field: "${guestData.phoneNumber}"`);
+                    });
+                    
+                    console.log('📋 UI phone numbers:');
+                    this.guests.forEach((guest, index) => {
+                        console.log(`${index + 1}. Phone: "${guest.phoneNumber}" | Name: "${guest.name}" | Display: "${this.formatPhoneForDisplay(guest.phoneNumber)}"`);
+                    });
+                    
+                    // Find mismatches
+                    const databaseKeys = Object.keys(rawDatabaseData);
+                    const uiPhones = this.guests.map(g => g.phoneNumber);
+                    
+                    const onlyInDatabase = databaseKeys.filter(dbKey => !uiPhones.includes(dbKey));
+                    const onlyInUI = uiPhones.filter(uiPhone => !databaseKeys.includes(uiPhone));
+                    
+                    console.log('🔍 Mismatches found:');
+                    console.log('Only in database:', onlyInDatabase);
+                    console.log('Only in UI:', onlyInUI);
+                    
+                    // Check for specific user
+                    const testUserPhone = '27827001116';
+                    const testUserInDb = rawDatabaseData[testUserPhone];
+                    const testUserInUI = this.guests.find(g => g.phoneNumber === testUserPhone);
+                    
+                    console.log('🧪 Test user check (27827001116):');
+                    console.log('In database:', !!testUserInDb, testUserInDb);
+                    console.log('In UI:', !!testUserInUI, testUserInUI);
+                    
+                    // Show summary in alert
+                    const summary = `
+                        <div class="text-start">
+                            <h6>Database vs UI Comparison:</h6>
+                            <p><strong>Database guests:</strong> ${Object.keys(rawDatabaseData).length}</p>
+                            <p><strong>UI guests:</strong> ${this.guests.length}</p>
+                            
+                            ${onlyInDatabase.length > 0 ? `
+                                <div class="alert alert-warning">
+                                    <strong>Only in Database:</strong><br>
+                                    ${onlyInDatabase.map(phone => `• ${phone} (${rawDatabaseData[phone]?.name})`).join('<br>')}
+                                </div>
+                            ` : ''}
+                            
+                            ${onlyInUI.length > 0 ? `
+                                <div class="alert alert-danger">
+                                    <strong>Only in UI:</strong><br>
+                                    ${onlyInUI.join('<br>')}
+                                </div>
+                            ` : ''}
+                            
+                            <div class="alert alert-info">
+                                <strong>Test User (27827001116):</strong><br>
+                                Database: ${testUserInDb ? '✅ Found' : '❌ Not found'}<br>
+                                UI: ${testUserInUI ? '✅ Found' : '❌ Not found'}
+                            </div>
+                        </div>
+                    `;
+                    
+                    await Swal.fire({
+                        title: 'Guest Data Debug Report',
+                        html: summary,
+                        width: '600px',
+                        confirmButtonText: 'Close'
+                    });
+                    
+                } catch (error) {
+                    console.error('❌ Debug error:', error);
+                    Swal.fire('Error', 'Failed to debug guest data', 'error');
+                }
+            },
+
+            async fixDataConsistency() {
+                console.log('🔧 Starting data consistency fix...');
+                
+                const result = await Swal.fire({
+                    title: 'Fix Name Consistency',
+                    html: `
+                        <div class="text-start">
+                            <p>This tool will scan all guests and ensure their names are consistent across all related records (rewards, receipts, etc.).</p>
+                            <div class="alert alert-info">
+                                <i class="fas fa-info-circle"></i> This process will:
+                                <ul>
+                                    <li>Check all guest records</li>
+                                    <li>Find related rewards and receipts</li>
+                                    <li>Update any inconsistent names</li>
+                                    <li>Provide a detailed report</li>
+                                </ul>
+                            </div>
+                            <div class="alert alert-warning">
+                                <i class="fas fa-exclamation-triangle"></i> <strong>Warning:</strong> This will update existing data. Make sure you have backups if needed.
+                            </div>
+                        </div>
+                    `,
+                    icon: 'question',
+                    showCancelButton: true,
+                    confirmButtonText: 'Start Consistency Fix',
+                    cancelButtonText: 'Cancel',
+                    confirmButtonColor: '#ffc107'
+                });
+
+                if (!result.isConfirmed) return;
+
+                try {
+                    // Show loading
+                    Swal.fire({
+                        title: 'Fixing Data Consistency...',
+                        html: 'Please wait while we check and fix any inconsistencies.',
+                        allowOutsideClick: false,
+                        showConfirmButton: false,
+                        didOpen: () => {
+                            Swal.showLoading();
+                        }
+                    });
+
+                    const allResults = {
+                        processed: 0,
+                        updated: 0,
+                        errors: 0,
+                        details: []
+                    };
+
+                    // Get all guests
+                    const guestsSnapshot = await get(ref(rtdb, 'guests'));
+                    const guestsData = guestsSnapshot.val() || {};
+                    const guestEntries = Object.entries(guestsData);
+
+                    console.log(`🔍 Processing ${guestEntries.length} guests...`);
+
+                    // Process each guest
+                    for (const [phoneNumber, guestData] of guestEntries) {
+                        try {
+                            allResults.processed++;
+                            
+                            // Skip if guest has no name
+                            if (!guestData.name || guestData.name.trim() === '') {
+                                console.log(`⏭️ Skipping guest ${phoneNumber} (no name)`);
+                                continue;
+                            }
+
+                            console.log(`🔍 Processing guest ${phoneNumber}: ${guestData.name}`);
+
+                            // Run cascade update (this will find and fix inconsistencies)
+                            const cascadeResult = await cascadeGuestNameUpdate(
+                                phoneNumber,
+                                guestData.name, // Use current name as both old and new
+                                guestData.name  // This will ensure consistency
+                            );
+
+                            if (cascadeResult.success) {
+                                const totalUpdated = cascadeResult.updatedRecords.rewards + 
+                                                  cascadeResult.updatedRecords.receipts + 
+                                                  cascadeResult.updatedRecords.other;
+
+                                if (totalUpdated > 0) {
+                                    allResults.updated++;
+                                    allResults.details.push({
+                                        phoneNumber,
+                                        name: guestData.name,
+                                        updatedRecords: cascadeResult.updatedRecords,
+                                        totalUpdated
+                                    });
+                                    console.log(`✅ Fixed ${totalUpdated} records for ${guestData.name}`);
+                                }
+                            } else {
+                                allResults.errors++;
+                                console.error(`❌ Failed to fix data for ${guestData.name}:`, cascadeResult.errors);
+                            }
+
+                            // Small delay to prevent overwhelming the database
+                            await new Promise(resolve => setTimeout(resolve, 100));
+
+                        } catch (error) {
+                            allResults.errors++;
+                            console.error(`❌ Error processing guest ${phoneNumber}:`, error);
+                        }
+                    }
+
+                    // Show results
+                    const totalFixed = allResults.details.reduce((sum, detail) => sum + detail.totalUpdated, 0);
+                    
+                    let resultsHtml = `
+                        <div class="text-start">
+                            <h6>Consistency Fix Results:</h6>
+                            <p><strong>Guests processed:</strong> ${allResults.processed}</p>
+                            <p><strong>Guests with fixes:</strong> ${allResults.updated}</p>
+                            <p><strong>Total records fixed:</strong> ${totalFixed}</p>
+                            <p><strong>Errors:</strong> ${allResults.errors}</p>
+                    `;
+
+                    if (allResults.details.length > 0) {
+                        resultsHtml += `
+                            <div class="mt-3">
+                                <h6>Details:</h6>
+                                <div style="max-height: 200px; overflow-y: auto;">
+                        `;
+
+                        allResults.details.forEach(detail => {
+                            resultsHtml += `
+                                <div class="alert alert-success p-2 mb-2">
+                                    <strong>${detail.name}</strong> (${detail.phoneNumber})<br>
+                                    <small>
+                                        Rewards: ${detail.updatedRecords.rewards}, 
+                                        Receipts: ${detail.updatedRecords.receipts}, 
+                                        Other: ${detail.updatedRecords.other}
+                                    </small>
+                                </div>
+                            `;
+                        });
+
+                        resultsHtml += `
+                                </div>
+                            </div>
+                        `;
+                    }
+
+                    resultsHtml += `</div>`;
+
+                    await Swal.fire({
+                        title: 'Consistency Fix Complete',
+                        html: resultsHtml,
+                        icon: totalFixed > 0 ? 'success' : 'info',
+                        confirmButtonText: 'Close',
+                        width: '600px'
+                    });
+
+                } catch (error) {
+                    console.error('❌ Error in consistency fix:', error);
+                    await Swal.fire({
+                        title: 'Error',
+                        text: `Failed to fix data consistency: ${error.message}`,
+                        icon: 'error',
+                        confirmButtonText: 'Close'
+                    });
+                }
             }
         },
 
@@ -592,42 +1408,50 @@ const guestManagement = {
 
 function cleanupGuestManagement() {
     if (guestManagement.app) {
-        guestManagement.app.unmount();
+        console.log('Cleaning up guest management app...');
+        try {
+            guestManagement.app.unmount();
+        } catch (error) {
+            console.warn('Error unmounting guest management app:', error);
+        }
         guestManagement.app = null;
     }
 }
 
 function initializeGuestManagement() {
-    // Guest menu click handler
-    const guestManagementMenu = document.getElementById('guestManagementMenu');
-    if (guestManagementMenu) {
-        guestManagementMenu.addEventListener('click', function(e) {
-            e.preventDefault();
-            showGuestManagement();
-        });
-    }
-}
-
-function showGuestManagement() {
-    // Hide other sections
-    document.querySelectorAll('.content-section').forEach(section => {
-        section.style.display = 'none';
-    });
-
-    // Show guest management section
-    const guestSection = document.getElementById('guestManagementContent');
-    if (guestSection) {
-        guestSection.style.display = 'block';
-    }
-
-    // Initialize Vue app if not already done
-    if (!guestManagement.app) {
-        const app = Vue.createApp(guestManagement.component);
-        const mountPoint = document.getElementById('guest-management-app');
-        if (mountPoint) {
-            guestManagement.app = app;
-            guestManagement.app.mount('#guest-management-app');
+    console.log('Initializing guest management...');
+    
+    // Clean up any existing instance
+    if (guestManagement.app) {
+        console.log('Cleaning up existing guest management app...');
+        try {
+            guestManagement.app.unmount();
+        } catch (error) {
+            console.warn('Error unmounting existing app:', error);
         }
+        guestManagement.app = null;
+    }
+    
+    // Ensure the mount point exists and is clean
+    const mountPoint = document.getElementById('guest-management-app');
+    if (!mountPoint) {
+        console.error('Guest management mount point not found');
+        return null;
+    }
+    
+    // Clear any existing content to prevent conflicts
+    mountPoint.innerHTML = '';
+    
+    // Create and mount the Vue app
+    try {
+        const app = Vue.createApp(guestManagement.component);
+        app.mount(mountPoint);
+        guestManagement.app = app;
+        console.log('Guest management initialized successfully');
+        return app;
+    } catch (error) {
+        console.error('Error mounting guest management app:', error);
+        return null;
     }
 }
 

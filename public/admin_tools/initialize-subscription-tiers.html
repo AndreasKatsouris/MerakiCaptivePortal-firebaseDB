@@ -1,0 +1,355 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Initialize Subscription Tiers - Admin Tool</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <style>
+        body { background-color: #f8f9fa; }
+        .container { max-width: 1200px; margin-top: 30px; }
+        .admin-header { background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; padding: 20px; border-radius: 10px; margin-bottom: 30px; }
+        .feature-badge { display: inline-block; padding: 2px 8px; margin: 2px; background: #e3f2fd; color: #1976d2; border-radius: 12px; font-size: 0.8em; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="admin-header">
+            <h1><i class="fas fa-database me-2"></i>Initialize Subscription Tiers</h1>
+            <p class="mb-0">Set up subscription tiers in the Firebase database</p>
+        </div>
+
+        <div class="row">
+            <div class="col-md-6">
+                <div class="card">
+                    <div class="card-header">
+                        <h5><i class="fas fa-cog me-2"></i>Database Initialization</h5>
+                    </div>
+                    <div class="card-body">
+                        <div id="status" class="alert alert-info">
+                            Ready to initialize subscription tiers in database
+                        </div>
+                        
+                        <div class="d-grid gap-2">
+                            <button id="checkTiersBtn" class="btn btn-outline-primary">
+                                <i class="fas fa-search me-2"></i>Check Current Tiers
+                            </button>
+                            <button id="initializeTiersBtn" class="btn btn-primary">
+                                <i class="fas fa-play me-2"></i>Initialize Tiers
+                            </button>
+                            <button id="resetTiersBtn" class="btn btn-warning">
+                                <i class="fas fa-refresh me-2"></i>Reset Tiers
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="col-md-6">
+                <div class="card">
+                    <div class="card-header">
+                        <h5><i class="fas fa-info-circle me-2"></i>Tier Preview</h5>
+                    </div>
+                    <div class="card-body">
+                        <div id="tierPreview">
+                            <p class="text-muted">Click "Check Current Tiers" to see what's in the database</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="card mt-4">
+            <div class="card-header">
+                <h5><i class="fas fa-layer-group me-2"></i>Tier Structure That Will Be Created</h5>
+            </div>
+            <div class="card-body">
+                <div class="row">
+                    <div class="col-md-3">
+                        <h6 class="text-primary">Free Plan</h6>
+                        <p class="small text-muted">$0/month</p>
+                        <div class="mb-2">
+                            <span class="badge bg-success"><i class="fas fa-eye me-1"></i>Visible</span>
+                        </div>
+                        <div class="feature-badges">
+                            <span class="feature-badge">WiFi Basic</span>
+                            <span class="feature-badge">Guest Management</span>
+                            <span class="feature-badge">Analytics Basic</span>
+                            <span class="feature-badge">Campaign Basic</span>
+                        </div>
+                    </div>
+                    <div class="col-md-3">
+                        <h6 class="text-success">Starter Plan</h6>
+                        <p class="small text-muted">$49.99/month</p>
+                        <div class="mb-2">
+                            <span class="badge bg-success"><i class="fas fa-eye me-1"></i>Visible</span>
+                        </div>
+                        <div class="feature-badges">
+                            <span class="feature-badge">WiFi Premium</span>
+                            <span class="feature-badge">Rewards Basic</span>
+                            <span class="feature-badge">WhatsApp Basic</span>
+                            <span class="feature-badge">Multi-Location</span>
+                        </div>
+                    </div>
+                    <div class="col-md-3">
+                        <h6 class="text-warning">Professional Plan</h6>
+                        <p class="small text-muted">$99.99/month</p>
+                        <div class="mb-2">
+                            <span class="badge bg-success"><i class="fas fa-eye me-1"></i>Visible</span>
+                        </div>
+                        <div class="feature-badges">
+                            <span class="feature-badge">Advanced Analytics</span>
+                            <span class="feature-badge">Food Cost Basic</span>
+                            <span class="feature-badge">WhatsApp Automation</span>
+                            <span class="feature-badge">Guest Insights</span>
+                        </div>
+                    </div>
+                    <div class="col-md-3">
+                        <h6 class="text-danger">Enterprise Plan</h6>
+                        <p class="small text-muted">$199.99/month</p>
+                        <div class="mb-2">
+                            <span class="badge bg-secondary"><i class="fas fa-eye-slash me-1"></i>Hidden</span>
+                        </div>
+                        <div class="feature-badges">
+                            <span class="feature-badge">Food Cost Analytics</span>
+                            <span class="feature-badge">API Access</span>
+                            <span class="feature-badge">Priority Support</span>
+                            <span class="feature-badge">Contact Sales</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+    <script type="module">
+        import { rtdb, ref, get, set, auth, onAuthStateChanged } from '../js/config/firebase-config.js';
+
+        // Check authentication
+        onAuthStateChanged(auth, (user) => {
+            if (!user) {
+                window.location.href = '../admin-login.html';
+            }
+        });
+
+        // Tier definitions
+        const TIER_DEFINITIONS = {
+            free: {
+                name: 'Free Plan',
+                description: 'Basic features to get started',
+                monthlyPrice: 0,
+                annualPrice: 0,
+                isVisible: true,
+                features: {
+                    wifiBasic: true,
+                    guestManagementBasic: true,
+                    analyticsBasic: true,
+                    campaignBasic: true
+                },
+                limits: {
+                    locations: 1,
+                    monthlyUsers: 100,
+                    campaignsPerMonth: 2
+                }
+            },
+            starter: {
+                name: 'Starter Plan',
+                description: 'Essential features for growing businesses',
+                monthlyPrice: 49.99,
+                annualPrice: 499.99,
+                isVisible: true,
+                features: {
+                    wifiBasic: true,
+                    wifiPremium: true,
+                    guestManagementBasic: true,
+                    analyticsBasic: true,
+                    campaignBasic: true,
+                    rewardsBasic: true,
+                    whatsappBasic: true,
+                    multiLocation: true
+                },
+                limits: {
+                    locations: 3,
+                    monthlyUsers: 1000,
+                    campaignsPerMonth: 10
+                }
+            },
+            professional: {
+                name: 'Professional Plan',
+                description: 'Advanced features for established businesses',
+                monthlyPrice: 99.99,
+                annualPrice: 999.99,
+                isVisible: true,
+                features: {
+                    wifiBasic: true,
+                    wifiPremium: true,
+                    wifiAnalytics: true,
+                    guestManagementBasic: true,
+                    guestManagementAdvanced: true,
+                    analyticsBasic: true,
+                    analyticsAdvanced: true,
+                    campaignBasic: true,
+                    campaignAdvanced: true,
+                    rewardsBasic: true,
+                    rewardsAdvanced: true,
+                    whatsappBasic: true,
+                    whatsappAutomation: true,
+                    receiptProcessingOCR: true,
+                    foodCostBasic: true,
+                    multiLocation: true,
+                    guestInsights: true
+                },
+                limits: {
+                    locations: 10,
+                    monthlyUsers: 5000,
+                    campaignsPerMonth: 50
+                }
+            },
+            enterprise: {
+                name: 'Enterprise Plan',
+                description: 'Complete solution for large operations',
+                monthlyPrice: 199.99,
+                annualPrice: 1999.99,
+                isVisible: false, // Hidden tier - contact sales only
+                features: {
+                    wifiBasic: true,
+                    wifiPremium: true,
+                    wifiAnalytics: true,
+                    guestManagementBasic: true,
+                    guestManagementAdvanced: true,
+                    analyticsBasic: true,
+                    analyticsAdvanced: true,
+                    analyticsPredictive: true,
+                    campaignBasic: true,
+                    campaignAdvanced: true,
+                    campaignAutomation: true,
+                    rewardsBasic: true,
+                    rewardsAdvanced: true,
+                    rewardsGamefication: true,
+                    whatsappBasic: true,
+                    whatsappAutomation: true,
+                    whatsappBroadcast: true,
+                    receiptProcessingOCR: true,
+                    receiptAnalytics: true,
+                    foodCostBasic: true,
+                    foodCostAdvanced: true,
+                    foodCostAnalytics: true,
+                    multiLocation: true,
+                    guestInsights: true,
+                    apiAccess: true,
+                    thirdPartyIntegrations: true,
+                    supportPriority: true
+                },
+                limits: {
+                    locations: -1, // unlimited
+                    monthlyUsers: -1, // unlimited
+                    campaignsPerMonth: -1 // unlimited
+                }
+            }
+        };
+
+        function updateStatus(message, type = 'info') {
+            const statusEl = document.getElementById('status');
+            statusEl.className = `alert alert-${type}`;
+            statusEl.innerHTML = `<i class="fas fa-${type === 'danger' ? 'exclamation-triangle' : type === 'success' ? 'check' : 'info-circle'} me-2"></i>${message}`;
+        }
+
+        async function checkCurrentTiers() {
+            try {
+                updateStatus('Checking current tiers in database...', 'info');
+                
+                const snapshot = await get(ref(rtdb, 'subscriptionTiers'));
+                const tiers = snapshot.val();
+                
+                const previewEl = document.getElementById('tierPreview');
+                
+                if (!tiers) {
+                    previewEl.innerHTML = '<p class="text-warning"><i class="fas fa-exclamation-triangle me-2"></i>No tiers found in database</p>';
+                    updateStatus('No subscription tiers found in database', 'warning');
+                } else {
+                    previewEl.innerHTML = `
+                        <p class="text-success"><i class="fas fa-check me-2"></i>Found ${Object.keys(tiers).length} tier(s)</p>
+                        <ul class="list-group list-group-flush">
+                            ${Object.entries(tiers).map(([id, tier]) => `
+                                <li class="list-group-item d-flex justify-content-between align-items-center">
+                                    <div>
+                                        <strong>${tier.name || id}</strong>
+                                        <small class="d-block text-muted">$${tier.monthlyPrice || 0}/mo</small>
+                                    </div>
+                                    <div>
+                                        <span class="badge ${tier.isVisible !== false ? 'bg-success' : 'bg-secondary'}">
+                                            ${tier.isVisible !== false ? 'Visible' : 'Hidden'}
+                                        </span>
+                                    </div>
+                                </li>
+                            `).join('')}
+                        </ul>
+                    `;
+                    updateStatus(`Found ${Object.keys(tiers).length} subscription tiers in database`, 'success');
+                }
+            } catch (error) {
+                console.error('Error checking tiers:', error);
+                updateStatus('Error checking tiers: ' + error.message, 'danger');
+            }
+        }
+
+        async function initializeTiers() {
+            try {
+                updateStatus('Initializing subscription tiers...', 'info');
+                
+                await set(ref(rtdb, 'subscriptionTiers'), TIER_DEFINITIONS);
+                
+                updateStatus('Successfully initialized subscription tiers in database!', 'success');
+                
+                Swal.fire({
+                    title: 'Success!',
+                    text: 'Subscription tiers have been initialized in the database.',
+                    icon: 'success',
+                    confirmButtonColor: '#667eea'
+                });
+                
+                // Auto-check tiers after initialization
+                setTimeout(checkCurrentTiers, 1000);
+                
+            } catch (error) {
+                console.error('Error initializing tiers:', error);
+                updateStatus('Error initializing tiers: ' + error.message, 'danger');
+                
+                Swal.fire({
+                    title: 'Error',
+                    text: 'Failed to initialize subscription tiers: ' + error.message,
+                    icon: 'error',
+                    confirmButtonColor: '#dc3545'
+                });
+            }
+        }
+
+        async function resetTiers() {
+            const result = await Swal.fire({
+                title: 'Reset Subscription Tiers?',
+                text: 'This will overwrite all existing tier data in the database. This action cannot be undone.',
+                icon: 'warning',
+                showCancelButton: true,
+                confirmButtonColor: '#dc3545',
+                cancelButtonColor: '#6c757d',
+                confirmButtonText: 'Yes, reset them!'
+            });
+
+            if (result.isConfirmed) {
+                await initializeTiers();
+            }
+        }
+
+        // Event listeners
+        document.getElementById('checkTiersBtn').addEventListener('click', checkCurrentTiers);
+        document.getElementById('initializeTiersBtn').addEventListener('click', initializeTiers);
+        document.getElementById('resetTiersBtn').addEventListener('click', resetTiers);
+
+        // Auto-check on page load
+        checkCurrentTiers();
+    </script>
+</body>
+</html> 

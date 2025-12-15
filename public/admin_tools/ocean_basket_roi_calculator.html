@@ -1,0 +1,1016 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Ocean Basket July Campaign ROI Calculator</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #1e3c72 0%, #2a5298 100%);
+            color: #333;
+            min-height: 100vh;
+            padding: 20px;
+        }
+        
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+            background: white;
+            border-radius: 20px;
+            box-shadow: 0 20px 40px rgba(0,0,0,0.1);
+            overflow: hidden;
+        }
+        
+        .header {
+            background: linear-gradient(135deg, #ff6b6b 0%, #ee5a24 100%);
+            color: white;
+            padding: 30px;
+            text-align: center;
+        }
+        
+        .header h1 {
+            font-size: 2.5rem;
+            margin-bottom: 10px;
+            font-weight: 700;
+        }
+        
+        .header p {
+            font-size: 1.1rem;
+            opacity: 0.9;
+        }
+        
+        .main-content {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 30px;
+            padding: 30px;
+        }
+        
+        .input-section, .results-section {
+            background: #f8f9fa;
+            border-radius: 15px;
+            padding: 25px;
+        }
+        
+        .section-title {
+            font-size: 1.5rem;
+            color: #2c3e50;
+            margin-bottom: 20px;
+            border-bottom: 3px solid #3498db;
+            padding-bottom: 10px;
+        }
+        
+        .input-group {
+            margin-bottom: 20px;
+        }
+        
+        .input-group label {
+            display: block;
+            margin-bottom: 5px;
+            font-weight: 600;
+            color: #2c3e50;
+        }
+        
+        .input-group input, .input-group select {
+            width: 100%;
+            padding: 12px;
+            border: 2px solid #e0e0e0;
+            border-radius: 8px;
+            font-size: 16px;
+            transition: border-color 0.3s;
+        }
+        
+        .input-group input:focus, .input-group select:focus {
+            outline: none;
+            border-color: #3498db;
+        }
+        
+        .input-group input:disabled {
+            background-color: #e9ecef;
+            cursor: not-allowed;
+            opacity: 0.7;
+        }
+        
+        .slider-container {
+            margin-bottom: 20px;
+        }
+        
+        .slider-container label {
+            display: block;
+            margin-bottom: 5px;
+            font-weight: 600;
+            color: #2c3e50;
+        }
+        
+        .slider {
+            width: 100%;
+            height: 8px;
+            border-radius: 5px;
+            background: #ddd;
+            outline: none;
+            -webkit-appearance: none;
+        }
+        
+        .slider::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            appearance: none;
+            width: 20px;
+            height: 20px;
+            border-radius: 50%;
+            background: #3498db;
+            cursor: pointer;
+        }
+        
+        .slider::-moz-range-thumb {
+            width: 20px;
+            height: 20px;
+            border-radius: 50%;
+            background: #3498db;
+            cursor: pointer;
+        }
+        
+        .slider:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+        
+        .slider:disabled::-webkit-slider-thumb {
+            cursor: not-allowed;
+        }
+        
+        .slider:disabled::-moz-range-thumb {
+            cursor: not-allowed;
+        }
+        
+        .slider-value {
+            font-weight: bold;
+            color: #3498db;
+        }
+        
+        .results-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 15px;
+            margin-bottom: 20px;
+        }
+        
+        .metric-card {
+            background: white;
+            padding: 20px;
+            border-radius: 10px;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+            text-align: center;
+        }
+        
+        .metric-value {
+            font-size: 1.8rem;
+            font-weight: bold;
+            margin-bottom: 5px;
+        }
+        
+        .metric-label {
+            font-size: 0.9rem;
+            color: #666;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+        
+        .positive { color: #27ae60; }
+        .negative { color: #e74c3c; }
+        .neutral { color: #f39c12; }
+        
+        .scenario-tabs {
+            display: flex;
+            margin-bottom: 20px;
+            background: #ecf0f1;
+            border-radius: 10px;
+            overflow: hidden;
+        }
+        
+        .scenario-tab {
+            flex: 1;
+            padding: 12px;
+            background: transparent;
+            border: none;
+            cursor: pointer;
+            font-weight: 600;
+            transition: background-color 0.3s;
+        }
+        
+        .scenario-tab.active {
+            background: #3498db;
+            color: white;
+        }
+        
+        .full-width {
+            grid-column: 1 / -1;
+        }
+        
+        .breakdown-table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 20px;
+            background: white;
+            border-radius: 10px;
+            overflow: hidden;
+        }
+        
+        .breakdown-table th,
+        .breakdown-table td {
+            padding: 12px;
+            text-align: left;
+            border-bottom: 1px solid #eee;
+        }
+        
+        .breakdown-table th {
+            background: #34495e;
+            color: white;
+            font-weight: 600;
+        }
+        
+        .warning {
+            background: #fff3cd;
+            border: 1px solid #ffeaa7;
+            color: #856404;
+            padding: 15px;
+            border-radius: 8px;
+            margin-bottom: 20px;
+        }
+        
+        .info-box {
+            background: #d1ecf1;
+            border: 1px solid #bee5eb;
+            color: #0c5460;
+            padding: 12px;
+            border-radius: 6px;
+            margin-bottom: 15px;
+            font-size: 0.9rem;
+        }
+        
+        .disabled-notice {
+            font-size: 0.85rem;
+            color: #6c757d;
+            font-style: italic;
+            margin-top: 5px;
+        }
+        
+        @media (max-width: 768px) {
+            .main-content {
+                grid-template-columns: 1fr;
+            }
+            
+            .results-grid {
+                grid-template-columns: 1fr;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>🍤 Ocean Basket July Campaign ROI Calculator</h1>
+            <p>Analyze profitability for July campaign and July 16th Birthday Special</p>
+        </div>
+        
+        <div class="main-content">
+            <div class="input-section">
+                <h2 class="section-title">📊 Campaign Parameters</h2>
+                
+                <div class="scenario-tabs">
+                    <button class="scenario-tab active" onclick="switchScenario('july')">July Campaign (Full Month)</button>
+                    <button class="scenario-tab" onclick="switchScenario('birthday')">July 16th Special (Single Day)</button>
+                </div>
+                
+                <div class="input-group">
+                    <label for="dailyRevenue">Current Daily Revenue (R, excl VAT)</label>
+                    <input type="number" id="dailyRevenue" value="30000" onchange="calculate()">
+                </div>
+                
+                <div class="input-group">
+                    <label for="avgTransaction">Average Transaction Value (R)</label>
+                    <input type="number" id="avgTransaction" value="450" onchange="calculate()">
+                </div>
+                
+                <h3 style="color: #2c3e50; margin: 25px 0 15px 0; border-bottom: 2px solid #3498db; padding-bottom: 5px;">Portfolio Mix (Must Total 100%)</h3>
+                
+                <div id="julyNotice" class="info-box" style="display: none;">
+                    ℹ️ <strong>R30 Fish & Chips is ONLY available on July 16th.</strong> The percentage shown reflects the weighted average for the full month, where R30 sales only occur on one day (July 16th) out of 30 days.
+                </div>
+                
+                <div class="slider-container">
+                    <label for="r30Mix">R30 Fish & Chips % of Volume: <span class="slider-value" id="r30MixValue">15%</span></label>
+                    <input type="range" id="r30Mix" class="slider" min="5" max="100" value="15" oninput="updateSlider('r30Mix', 'r30MixValue', '%'); calculate()">
+                    <div id="r30MixNotice" class="disabled-notice" style="display: none;">Controlled by July 16th Special settings</div>
+                </div>
+                
+                <div class="slider-container">
+                    <label for="seafoodBurgerMix">Seafood Burgers (R75, 46% GP): <span class="slider-value" id="seafoodBurgerMixValue">20%</span></label>
+                    <input type="range" id="seafoodBurgerMix" class="slider" min="0" max="40" value="20" oninput="updateSlider('seafoodBurgerMix', 'seafoodBurgerMixValue', '%'); calculate()">
+                </div>
+                
+                <div class="slider-container">
+                    <label for="hightideComboMix">Hightide Combo (R99, 48% GP): <span class="slider-value" id="hightideComboMixValue">25%</span></label>
+                    <input type="range" id="hightideComboMix" class="slider" min="0" max="40" value="25" oninput="updateSlider('hightideComboMix', 'hightideComboMixValue', '%'); calculate()">
+                </div>
+                
+                <div class="slider-container">
+                    <label for="platterMix">Platters (R145-R295, 51-58% GP): <span class="slider-value" id="platterMixValue">15%</span></label>
+                    <input type="range" id="platterMix" class="slider" min="0" max="30" value="15" oninput="updateSlider('platterMix', 'platterMixValue', '%'); calculate()">
+                </div>
+                
+                <div class="slider-container">
+                    <label for="regularMenuMix">Regular Menu (62.6% GP): <span class="slider-value" id="regularMenuMixValue">25%</span></label>
+                    <input type="range" id="regularMenuMix" class="slider" min="0" max="100" value="25" oninput="updateRegularMenuSlider(); calculate()">
+                    <small style="color: #666; font-style: italic;">Auto-adjusts other sliders proportionally</small>
+                </div>
+                
+                <div style="background: #e8f5e8; padding: 10px; border-radius: 5px; margin: 15px 0; font-size: 14px; text-align: center;">
+                    <strong>Portfolio Total: <span id="portfolioTotal">100%</span></strong>
+                </div>
+                
+                <div class="slider-container">
+                    <label for="volumeIncrease">Expected Volume Increase: <span class="slider-value" id="volumeIncreaseValue">30%</span></label>
+                    <input type="range" id="volumeIncrease" class="slider" min="10" max="400" value="30" oninput="updateSlider('volumeIncrease', 'volumeIncreaseValue', '%'); calculate()">
+                </div>
+                
+                <div class="slider-container">
+                    <label for="r30NewCustomerPercent">% of R30 Customers That Are New: <span class="slider-value" id="r30NewCustomerPercentValue">35%</span></label>
+                    <input type="range" id="r30NewCustomerPercent" class="slider" min="10" max="60" value="35" oninput="updateSlider('r30NewCustomerPercent', 'r30NewCustomerPercentValue', '%'); calculate()">
+                    <small style="color: #666; font-style: italic;">Industry avg: 30-40% new, 20-30% win-back, 30-50% existing</small>
+                </div>
+                
+                <div class="input-group">
+                    <label for="marketingSpend">Marketing Spend (R) <span id="marketingPeriod"></span></label>
+                    <input type="number" id="marketingSpend" value="2000" onchange="calculate()">
+                </div>
+                
+                <div class="input-group">
+                    <label for="additionalStaffing">Additional Staffing Costs (R) <span id="staffingPeriod"></span></label>
+                    <input type="number" id="additionalStaffing" value="15000" onchange="calculate()">
+                </div>
+                
+                <div class="slider-container">
+                    <label for="fixedCostPercent">Fixed Costs % of Sales: <span class="slider-value" id="fixedCostPercentValue">20%</span></label>
+                    <input type="range" id="fixedCostPercent" class="slider" min="15" max="50" value="20" oninput="updateSlider('fixedCostPercent', 'fixedCostPercentValue', '%'); calculate()">
+                </div>
+                
+                <div class="slider-container">
+                    <label for="returnCustomerRate">New Customer Return Rate (3 months): <span class="slider-value" id="returnCustomerRateValue">25%</span></label>
+                    <input type="range" id="returnCustomerRate" class="slider" min="10" max="60" value="25" oninput="updateSlider('returnCustomerRate', 'returnCustomerRateValue', '%'); calculate()">
+                </div>
+            </div>
+            
+            <div class="results-section">
+                <h2 class="section-title">💰 Financial Impact <span id="periodLabel"></span></h2>
+                
+                <div id="warningMessage" class="warning" style="display: none;"></div>
+                
+                <div class="results-grid">
+                    <div class="metric-card">
+                        <div class="metric-value positive" id="revenueIncrease">+R180k</div>
+                        <div class="metric-label">Revenue Increase</div>
+                    </div>
+                    
+                    <div class="metric-card">
+                        <div class="metric-value neutral" id="totalCosts">R165k</div>
+                        <div class="metric-label">Total Campaign Costs</div>
+                    </div>
+                    
+                    <div class="metric-card">
+                        <div class="metric-value positive" id="netProfit">+R15k</div>
+                        <div class="metric-label">Net Profit Impact</div>
+                    </div>
+                    
+                    <div class="metric-card">
+                        <div class="metric-value positive" id="roi">130%</div>
+                        <div class="metric-label">Campaign ROI</div>
+                    </div>
+                </div>
+                
+                <div class="full-width">
+                    <table class="breakdown-table">
+                        <thead>
+                            <tr>
+                                <th>Metric</th>
+                                <th>Current</th>
+                                <th>Campaign</th>
+                                <th>Change</th>
+                            </tr>
+                        </thead>
+                        <tbody id="breakdownTable">
+                        </tbody>
+                    </table>
+                </div>
+                
+                <div class="full-width">
+                    <h3 style="margin-top: 30px; margin-bottom: 15px; color: #2c3e50;">🎯 Key Insights</h3>
+                    <div id="insights" style="background: white; padding: 20px; border-radius: 10px; box-shadow: 0 4px 6px rgba(0,0,0,0.1);"></div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let currentScenario = 'july';
+        let july16thR30Mix = 70; // Store July 16th R30 mix value
+        
+        // Store values for each scenario to prevent resetting
+        const scenarioValues = {
+            common: {
+                dailyRevenue: 45000,
+                avgTransaction: 450
+            },
+            july: {
+                seafoodBurgerMix: 0,
+                hightideComboMix: 0,
+                platterMix: 51,
+                regularMenuMix: 34,
+                volumeIncrease: 214,
+                marketingSpend: 4000,
+                additionalStaffing: 15000,
+                fixedCostPercent: 40,
+                returnCustomerRate: 38,
+                r30NewCustomerPercent: 35
+            },
+            birthday: {
+                r30Mix: 70,
+                seafoodBurgerMix: 0,
+                hightideComboMix: 0,
+                platterMix: 15,
+                regularMenuMix: 15,
+                volumeIncrease: 150,
+                marketingSpend: 1000,
+                additionalStaffing: 3000,
+                fixedCostPercent: 40,
+                returnCustomerRate: 38,
+                r30NewCustomerPercent: 35
+            }
+        };
+        
+        function saveCurrentValues() {
+            // Save common values
+            scenarioValues.common.dailyRevenue = parseFloat(document.getElementById('dailyRevenue').value);
+            scenarioValues.common.avgTransaction = parseFloat(document.getElementById('avgTransaction').value);
+            
+            // Save current values to the appropriate scenario object
+            const values = scenarioValues[currentScenario];
+            
+            if (currentScenario === 'birthday') {
+                values.r30Mix = parseFloat(document.getElementById('r30Mix').value);
+                july16thR30Mix = values.r30Mix; // Update the global variable
+            }
+            
+            values.seafoodBurgerMix = parseFloat(document.getElementById('seafoodBurgerMix').value);
+            values.hightideComboMix = parseFloat(document.getElementById('hightideComboMix').value);
+            values.platterMix = parseFloat(document.getElementById('platterMix').value);
+            values.regularMenuMix = parseFloat(document.getElementById('regularMenuMix').value);
+            values.volumeIncrease = parseFloat(document.getElementById('volumeIncrease').value);
+            values.marketingSpend = parseFloat(document.getElementById('marketingSpend').value);
+            values.additionalStaffing = parseFloat(document.getElementById('additionalStaffing').value);
+            values.fixedCostPercent = parseFloat(document.getElementById('fixedCostPercent').value);
+            values.returnCustomerRate = parseFloat(document.getElementById('returnCustomerRate').value);
+            values.r30NewCustomerPercent = parseFloat(document.getElementById('r30NewCustomerPercent').value);
+        }
+        
+        function switchScenario(scenario) {
+            // Save current values before switching
+            saveCurrentValues();
+            
+            currentScenario = scenario;
+            
+            // Update tab appearance
+            document.querySelectorAll('.scenario-tab').forEach(tab => {
+                tab.classList.remove('active');
+            });
+            
+            // Find the clicked tab and make it active
+            const tabs = document.querySelectorAll('.scenario-tab');
+            tabs.forEach(tab => {
+                if ((scenario === 'july' && tab.textContent.includes('July Campaign')) ||
+                    (scenario === 'birthday' && tab.textContent.includes('July 16th'))) {
+                    tab.classList.add('active');
+                }
+            });
+            
+            // Update labels and UI elements based on scenario
+            const periodLabel = document.getElementById('periodLabel');
+            const marketingPeriod = document.getElementById('marketingPeriod');
+            const staffingPeriod = document.getElementById('staffingPeriod');
+            const julyNotice = document.getElementById('julyNotice');
+            const r30MixNotice = document.getElementById('r30MixNotice');
+            const r30Slider = document.getElementById('r30Mix');
+            
+            // Load saved values for the scenario
+            const values = scenarioValues[scenario];
+            
+            if (scenario === 'birthday') {
+                // July 16th Birthday Special - single day
+                periodLabel.textContent = '(Single Day)';
+                marketingPeriod.textContent = '(for July 16th)';
+                staffingPeriod.textContent = '(for July 16th)';
+                julyNotice.style.display = 'none';
+                r30MixNotice.style.display = 'none';
+                r30Slider.disabled = false;
+                
+                // Load July 16th values - ensure they sync with UI
+                document.getElementById('r30Mix').value = values.r30Mix;
+                document.getElementById('seafoodBurgerMix').value = values.seafoodBurgerMix;
+                document.getElementById('hightideComboMix').value = values.hightideComboMix;
+                document.getElementById('platterMix').value = values.platterMix;
+                document.getElementById('regularMenuMix').value = values.regularMenuMix;
+            } else {
+                // July Campaign - full month
+                periodLabel.textContent = '(Full Month)';
+                marketingPeriod.textContent = '(for full month)';
+                staffingPeriod.textContent = '(for full month)';
+                julyNotice.style.display = 'block';
+                r30MixNotice.style.display = 'block';
+                r30Slider.disabled = true;
+                
+                // For July campaign, use different mix values
+                // R30 gets calculated as weighted average, others use July campaign values
+                document.getElementById('r30Mix').value = 15; // Will be recalculated in calculate()
+                document.getElementById('seafoodBurgerMix').value = values.seafoodBurgerMix;
+                document.getElementById('hightideComboMix').value = values.hightideComboMix;
+                document.getElementById('platterMix').value = values.platterMix;
+                document.getElementById('regularMenuMix').value = values.regularMenuMix;
+            }
+            
+            // Load other common values
+            document.getElementById('volumeIncrease').value = values.volumeIncrease;
+            document.getElementById('marketingSpend').value = values.marketingSpend;
+            document.getElementById('additionalStaffing').value = values.additionalStaffing;
+            document.getElementById('fixedCostPercent').value = values.fixedCostPercent || 20;
+            document.getElementById('returnCustomerRate').value = values.returnCustomerRate || 25;
+            document.getElementById('r30NewCustomerPercent').value = values.r30NewCustomerPercent || 35;
+            
+            updateAllSliders();
+            calculate();
+        }
+        
+        function updateSlider(sliderId, valueId, suffix) {
+            const slider = document.getElementById(sliderId);
+            const valueElement = document.getElementById(valueId);
+            
+            if (slider && valueElement) {
+                const value = slider.value;
+                valueElement.textContent = value + suffix;
+                
+                // If updating R30 mix on July 16th, store the value
+                if (sliderId === 'r30Mix' && currentScenario === 'birthday') {
+                    july16thR30Mix = parseFloat(value);
+                    scenarioValues.birthday.r30Mix = parseFloat(value);
+                }
+                
+                // Update portfolio total if it's a portfolio slider
+                if (['r30Mix', 'seafoodBurgerMix', 'hightideComboMix', 'platterMix', 'regularMenuMix'].includes(sliderId)) {
+                    setTimeout(updatePortfolioTotal, 10);
+                }
+            }
+        }
+        
+        function updateAllSliders() {
+            try {
+                const sliderIds = ['r30Mix', 'seafoodBurgerMix', 'hightideComboMix', 'platterMix', 'regularMenuMix', 'volumeIncrease', 'fixedCostPercent', 'returnCustomerRate', 'r30NewCustomerPercent'];
+                const valueIds = ['r30MixValue', 'seafoodBurgerMixValue', 'hightideComboMixValue', 'platterMixValue', 'regularMenuMixValue', 'volumeIncreaseValue', 'fixedCostPercentValue', 'returnCustomerRateValue', 'r30NewCustomerPercentValue'];
+                
+                for (let i = 0; i < sliderIds.length; i++) {
+                    if (document.getElementById(sliderIds[i]) && document.getElementById(valueIds[i])) {
+                        updateSlider(sliderIds[i], valueIds[i], '%');
+                    }
+                }
+                
+                updatePortfolioTotal();
+            } catch (error) {
+                console.error('Error in updateAllSliders:', error);
+            }
+        }
+        
+        function updatePortfolioTotal() {
+            const elements = {
+                r30Mix: document.getElementById('r30Mix'),
+                seafoodBurgerMix: document.getElementById('seafoodBurgerMix'),
+                hightideComboMix: document.getElementById('hightideComboMix'),
+                platterMix: document.getElementById('platterMix'),
+                regularMenuMix: document.getElementById('regularMenuMix'),
+                portfolioTotal: document.getElementById('portfolioTotal')
+            };
+            
+            if (Object.values(elements).every(el => el !== null)) {
+                // Always use the actual slider values for portfolio total calculation
+                const r30Mix = parseFloat(elements.r30Mix.value) || 0;
+                const seafoodBurgerMix = parseFloat(elements.seafoodBurgerMix.value) || 0;
+                const hightideComboMix = parseFloat(elements.hightideComboMix.value) || 0;
+                const platterMix = parseFloat(elements.platterMix.value) || 0;
+                const regularMenuMix = parseFloat(elements.regularMenuMix.value) || 0;
+                
+                const total = r30Mix + seafoodBurgerMix + hightideComboMix + platterMix + regularMenuMix;
+                
+                elements.portfolioTotal.textContent = total.toFixed(0) + '%';
+                elements.portfolioTotal.style.color = (total >= 95 && total <= 105) ? '#27ae60' : '#e74c3c';
+            }
+        }
+        
+        function updateRegularMenuSlider() {
+            const regularMenuSlider = document.getElementById('regularMenuMix');
+            const regularMenuValue = parseFloat(regularMenuSlider.value);
+            
+            updateSlider('regularMenuMix', 'regularMenuMixValue', '%');
+            
+            const remainingPercentage = 100 - regularMenuValue;
+            
+            // Get current values
+            const r30Current = parseFloat(document.getElementById('r30Mix').value);
+            const seafoodBurgerCurrent = parseFloat(document.getElementById('seafoodBurgerMix').value);
+            const hightideComboCurrent = parseFloat(document.getElementById('hightideComboMix').value);
+            const platterCurrent = parseFloat(document.getElementById('platterMix').value);
+            
+            // For July campaign, R30 is fixed, so only adjust other sliders
+            let otherSlidersTotal;
+            if (currentScenario === 'july') {
+                otherSlidersTotal = seafoodBurgerCurrent + hightideComboCurrent + platterCurrent;
+                const availablePercentage = remainingPercentage - r30Current;
+                
+                if (otherSlidersTotal > 0 && availablePercentage >= 0) {
+                    const scalingFactor = availablePercentage / otherSlidersTotal;
+                    
+                    document.getElementById('seafoodBurgerMix').value = Math.round(seafoodBurgerCurrent * scalingFactor);
+                    document.getElementById('hightideComboMix').value = Math.round(hightideComboCurrent * scalingFactor);
+                    document.getElementById('platterMix').value = Math.round(platterCurrent * scalingFactor);
+                    
+                    updateSlider('seafoodBurgerMix', 'seafoodBurgerMixValue', '%');
+                    updateSlider('hightideComboMix', 'hightideComboMixValue', '%');
+                    updateSlider('platterMix', 'platterMixValue', '%');
+                }
+            } else {
+                // July 16th - adjust all sliders proportionally
+                otherSlidersTotal = r30Current + seafoodBurgerCurrent + hightideComboCurrent + platterCurrent;
+                
+                if (otherSlidersTotal > 0 && remainingPercentage >= 0) {
+                    const scalingFactor = remainingPercentage / otherSlidersTotal;
+                    
+                    const newR30 = Math.round(r30Current * scalingFactor);
+                    document.getElementById('r30Mix').value = newR30;
+                    july16thR30Mix = newR30; // Update stored value
+                    
+                    document.getElementById('seafoodBurgerMix').value = Math.round(seafoodBurgerCurrent * scalingFactor);
+                    document.getElementById('hightideComboMix').value = Math.round(hightideComboCurrent * scalingFactor);
+                    document.getElementById('platterMix').value = Math.round(platterCurrent * scalingFactor);
+                    
+                    updateSlider('r30Mix', 'r30MixValue', '%');
+                    updateSlider('seafoodBurgerMix', 'seafoodBurgerMixValue', '%');
+                    updateSlider('hightideComboMix', 'hightideComboMixValue', '%');
+                    updateSlider('platterMix', 'platterMixValue', '%');
+                }
+            }
+            
+            updatePortfolioTotal();
+        }
+        
+        function formatCurrency(amount) {
+            return 'R' + Math.round(amount).toLocaleString();
+        }
+        
+        function calculate() {
+            try {
+                // Input values with null checks
+                const dailyRevenueElement = document.getElementById('dailyRevenue');
+                if (!dailyRevenueElement) {
+                    console.error('Daily revenue element not found');
+                    return;
+                }
+                
+                const dailyRevenue = parseFloat(dailyRevenueElement.value) || 30000;
+                const avgTransaction = parseFloat(document.getElementById('avgTransaction').value) || 450;
+                
+                // Always use actual slider values for calculations
+                let r30MixPercent = parseFloat(document.getElementById('r30Mix').value) || 15;
+                let seafoodBurgerMixPercent = parseFloat(document.getElementById('seafoodBurgerMix').value) || 0;
+                let hightideComboMixPercent = parseFloat(document.getElementById('hightideComboMix').value) || 0;
+                let platterMixPercent = parseFloat(document.getElementById('platterMix').value) || 0;
+                let regularMenuMixPercent = parseFloat(document.getElementById('regularMenuMix').value) || 0;
+                const volumeIncreasePercent = parseFloat(document.getElementById('volumeIncrease').value) || 30;
+                const marketingSpend = parseFloat(document.getElementById('marketingSpend').value) || 2000;
+                const additionalStaffing = parseFloat(document.getElementById('additionalStaffing').value) || 15000;
+                const fixedCostPercent = parseFloat(document.getElementById('fixedCostPercent').value) || 20;
+                const returnCustomerRate = parseFloat(document.getElementById('returnCustomerRate').value) || 25;
+                const r30NewCustomerPercent = parseFloat(document.getElementById('r30NewCustomerPercent').value) || 35;
+                
+                // Calculate base revenue based on scenario
+                let baseRevenue, periodDays, periodLabel;
+                let effectiveR30MixPercent = r30MixPercent;
+                
+                if (currentScenario === 'birthday') {
+                    // July 16th - single day
+                    baseRevenue = dailyRevenue;
+                    periodDays = 1;
+                    periodLabel = 'Day';
+                } else {
+                    // July Campaign - full month (30 days)
+                    baseRevenue = dailyRevenue * 30;
+                    periodDays = 30;
+                    periodLabel = 'Month';
+                    
+                    // For July campaign, calculate weighted average R30 percentage
+                    // R30 is ONLY available on July 16th (0% on all other days)
+                    const regularDayR30Percent = 0; // R30 not available on regular days
+                    const regularDayVolumeIncrease = volumeIncreasePercent; // Use the slider value
+                    const july16thR30Percent = july16thR30Mix; // From stored July 16th value
+                    const july16thVolumeIncrease = 150; // Typical for birthday special
+                    
+                    // Calculate daily transactions
+                    const baseTransactionsPerDay = dailyRevenue / avgTransaction;
+                    
+                    // Regular days (29 days)
+                    const regularDayTransactions = baseTransactionsPerDay * (1 + regularDayVolumeIncrease / 100);
+                    const regularDaysR30Transactions = regularDayTransactions * (regularDayR30Percent / 100) * 29;
+                    const regularDaysTotalTransactions = regularDayTransactions * 29;
+                    
+                    // July 16th (1 day)
+                    const july16thTransactions = baseTransactionsPerDay * (1 + july16thVolumeIncrease / 100);
+                    const july16thR30Transactions = july16thTransactions * (july16thR30Percent / 100);
+                    const july16thTotalTransactions = july16thTransactions;
+                    
+                    // Total month
+                    const totalMonthR30Transactions = regularDaysR30Transactions + july16thR30Transactions;
+                    const totalMonthTransactions = regularDaysTotalTransactions + july16thTotalTransactions;
+                    
+                    // Weighted average R30 percentage for the month
+                    effectiveR30MixPercent = (totalMonthR30Transactions / totalMonthTransactions) * 100;
+                    
+                    // Update the displayed R30 mix value for July campaign and sync slider
+                    document.getElementById('r30MixValue').textContent = effectiveR30MixPercent.toFixed(1) + '%';
+                    document.getElementById('r30Mix').value = effectiveR30MixPercent.toFixed(1);
+                    
+                    // Update the effective mix percentages to use for calculations
+                    r30MixPercent = effectiveR30MixPercent;
+                }
+                
+                // Portfolio item definitions
+                const portfolioItems = {
+                    r30: { price: 30, gp: 0, netCost: 23.61 }, // Special calculation with rebate
+                    seafoodBurger: { price: 75, gp: 46 },
+                    hightideCombo: { price: 99, gp: 48 },
+                    platter: { price: 195, gp: 54.5 }, // Average of R145-R295 range
+                    regularMenu: { price: 450, gp: 62.6 } // Current baseline
+                };
+                
+                // Validate mix percentages using current slider values
+                const currentR30Mix = parseFloat(document.getElementById('r30Mix').value) || 0;
+                const currentSeafoodBurgerMix = parseFloat(document.getElementById('seafoodBurgerMix').value) || 0;
+                const currentHightideComboMix = parseFloat(document.getElementById('hightideComboMix').value) || 0;
+                const currentPlatterMix = parseFloat(document.getElementById('platterMix').value) || 0;
+                const currentRegularMenuMix = parseFloat(document.getElementById('regularMenuMix').value) || 0;
+                const totalMix = currentR30Mix + currentSeafoodBurgerMix + currentHightideComboMix + currentPlatterMix + currentRegularMenuMix;
+                
+                // Current state calculations
+                const currentTransactions = baseRevenue / avgTransaction;
+                const currentFixedCosts = baseRevenue * (fixedCostPercent / 100);
+                const currentVariableCosts = baseRevenue * (37.4 / 100); // 37.4% food cost
+                const currentGrossProfit = baseRevenue * (62.6 / 100);
+                const currentNetProfit = currentGrossProfit - currentFixedCosts;
+                
+                // Campaign calculations
+                const newTransactions = currentTransactions * (1 + volumeIncreasePercent / 100);
+                
+                // Calculate transactions by category using the mix percentages
+                const r30Transactions = newTransactions * (r30MixPercent / 100);
+                const seafoodBurgerTransactions = newTransactions * (seafoodBurgerMixPercent / 100);
+                const hightideComboTransactions = newTransactions * (hightideComboMixPercent / 100);
+                const platterTransactions = newTransactions * (platterMixPercent / 100);
+                const regularMenuTransactions = newTransactions * (regularMenuMixPercent / 100);
+                
+                // Revenue calculations
+                const r30Revenue = r30Transactions * portfolioItems.r30.price;
+                const seafoodBurgerRevenue = seafoodBurgerTransactions * portfolioItems.seafoodBurger.price;
+                const hightideComboRevenue = hightideComboTransactions * portfolioItems.hightideCombo.price;
+                const platterRevenue = platterTransactions * portfolioItems.platter.price;
+                const regularMenuRevenue = regularMenuTransactions * portfolioItems.regularMenu.price;
+                
+                const totalCampaignRevenue = r30Revenue + seafoodBurgerRevenue + hightideComboRevenue + platterRevenue + regularMenuRevenue;
+                
+                // Cost calculations
+                const r30FoodCost = r30Transactions * portfolioItems.r30.netCost;
+                const seafoodBurgerFoodCost = seafoodBurgerRevenue * ((100 - portfolioItems.seafoodBurger.gp) / 100);
+                const hightideComboCost = hightideComboRevenue * ((100 - portfolioItems.hightideCombo.gp) / 100);
+                const platterFoodCost = platterRevenue * ((100 - portfolioItems.platter.gp) / 100);
+                const regularMenuFoodCost = regularMenuRevenue * ((100 - portfolioItems.regularMenu.gp) / 100);
+                
+                const totalFoodCosts = r30FoodCost + seafoodBurgerFoodCost + hightideComboCost + platterFoodCost + regularMenuFoodCost;
+                
+                const totalFixedCosts = currentFixedCosts; // Fixed costs remain the same
+                const totalCampaignCosts = totalFoodCosts + totalFixedCosts + marketingSpend + additionalStaffing;
+                
+                // Profit calculations
+                const campaignGrossProfit = totalCampaignRevenue - totalFoodCosts;
+                const campaignNetProfit = campaignGrossProfit - totalFixedCosts - marketingSpend - additionalStaffing;
+                
+                // ROI calculations
+                const revenueIncrease = totalCampaignRevenue - baseRevenue;
+                const profitIncrease = campaignNetProfit - currentNetProfit;
+                const investmentCosts = marketingSpend + additionalStaffing;
+                const roi = investmentCosts > 0 ? (profitIncrease / investmentCosts) * 100 : 0;
+                
+                // Customer acquisition calculations (only R30 customers counted as new)
+                const newCustomersAcquired = r30Transactions * (r30NewCustomerPercent / 100);
+                const returningCustomers = newCustomersAcquired * (returnCustomerRate / 100);
+                const futureLTV = returningCustomers * avgTransaction * 3 * (62.6 / 100);
+                
+                // Update UI
+                document.getElementById('revenueIncrease').textContent = formatCurrency(revenueIncrease);
+                document.getElementById('totalCosts').textContent = formatCurrency(investmentCosts);
+                document.getElementById('netProfit').textContent = formatCurrency(profitIncrease);
+                document.getElementById('roi').textContent = roi.toFixed(0) + '%';
+                
+                // Color coding
+                document.getElementById('netProfit').className = 'metric-value ' + (profitIncrease > 0 ? 'positive' : 'negative');
+                document.getElementById('roi').className = 'metric-value ' + (roi > 0 ? 'positive' : 'negative');
+                
+                // Update breakdown table
+                const effectiveGPPercent = (campaignGrossProfit / totalCampaignRevenue) * 100;
+                const weightedAvgPrice = totalCampaignRevenue / newTransactions;
+                
+                const breakdownData = [
+                    [`${periodLabel}ly Transactions`, currentTransactions.toFixed(0), newTransactions.toFixed(0), '+' + (newTransactions - currentTransactions).toFixed(0)],
+                    ['Weighted Avg Price', formatCurrency(avgTransaction), formatCurrency(weightedAvgPrice), formatCurrency(weightedAvgPrice - avgTransaction)],
+                    ['Total Revenue', formatCurrency(baseRevenue), formatCurrency(totalCampaignRevenue), formatCurrency(revenueIncrease)],
+                    ['Food Costs', formatCurrency(currentVariableCosts), formatCurrency(totalFoodCosts), formatCurrency(totalFoodCosts - currentVariableCosts)],
+                    ['Gross Profit', formatCurrency(currentGrossProfit), formatCurrency(campaignGrossProfit), formatCurrency(campaignGrossProfit - currentGrossProfit)],
+                    ['Effective GP%', '62.6%', effectiveGPPercent.toFixed(1) + '%', (effectiveGPPercent - 62.6).toFixed(1) + '%'],
+                    ['Net Profit', formatCurrency(currentNetProfit), formatCurrency(campaignNetProfit), formatCurrency(profitIncrease)]
+                ];
+                
+                const tableBody = document.getElementById('breakdownTable');
+                tableBody.innerHTML = '';
+                breakdownData.forEach(row => {
+                    const tr = document.createElement('tr');
+                    row.forEach(cell => {
+                        const td = document.createElement('td');
+                        td.textContent = cell;
+                        tr.appendChild(td);
+                    });
+                    tableBody.appendChild(tr);
+                });
+                
+                // Generate insights
+                let insights = '';
+                
+                if (currentScenario === 'birthday') {
+                    insights += `📅 <strong>July 16th Birthday Special Analysis (Single Day)</strong><br><br>`;
+                } else {
+                    insights += `📅 <strong>July Campaign Analysis (Full Month)</strong><br><br>`;
+                    insights += `ℹ️ <strong>R30 Mix Calculation:</strong> The ${r30MixPercent.toFixed(1)}% shown is the weighted average for the full month, considering July 16th's ${july16thR30Mix}% R30 mix for one day and 0% R30 mix on regular days (R30 only available on July 16th).<br><br>`;
+                }
+                
+                if (totalMix < 95 || totalMix > 105) {
+                    insights += `⚠️ <strong>Portfolio mix totals ${totalMix.toFixed(0)}% - should equal 100%</strong><br><br>`;
+                }
+                
+                if (profitIncrease < 0) {
+                    insights += `⚠️ <strong>Campaign shows negative profit impact of ${formatCurrency(Math.abs(profitIncrease))}</strong><br><br>`;
+                    insights += `Consider increasing high-margin platter mix or reducing R30 volume.<br><br>`;
+                } else {
+                    insights += `✅ <strong>Campaign profitable with ${formatCurrency(profitIncrease)} additional profit</strong><br><br>`;
+                }
+                
+                // Portfolio performance insights
+                const highMarginPercent = platterMixPercent + regularMenuMixPercent;
+                const lowMarginPercent = r30MixPercent;
+                
+                if (highMarginPercent < 30) {
+                    insights += `⚠️ Only ${highMarginPercent.toFixed(0)}% high-margin items. Consider increasing platters/regular menu.<br><br>`;
+                }
+                
+                if (lowMarginPercent > 25 && currentScenario === 'july') {
+                    insights += `⚠️ R30 items represent ${lowMarginPercent.toFixed(0)}% of volume - monitor profitability closely.<br><br>`;
+                }
+                
+                insights += `📊 <strong>Portfolio Breakdown:</strong><br>`;
+                
+                // Only show items that have actual transactions
+                if (r30Transactions > 0) {
+                    insights += `R30 Fish & Chips: ${r30Transactions.toFixed(0)} transactions (${formatCurrency(r30Revenue)})<br>`;
+                }
+                if (seafoodBurgerTransactions > 0) {
+                    insights += `Seafood Burgers: ${seafoodBurgerTransactions.toFixed(0)} transactions (${formatCurrency(seafoodBurgerRevenue)})<br>`;
+                }
+                if (hightideComboTransactions > 0 || platterTransactions > 0) {
+                    const comboPlatterTransactions = hightideComboTransactions + platterTransactions;
+                    const comboPlatterRevenue = hightideComboRevenue + platterRevenue;
+                    if (comboPlatterTransactions > 0) {
+                        insights += `Combos & Platters: ${comboPlatterTransactions.toFixed(0)} transactions (${formatCurrency(comboPlatterRevenue)})<br>`;
+                    }
+                }
+                if (regularMenuTransactions > 0) {
+                    insights += `Regular Menu: ${regularMenuTransactions.toFixed(0)} transactions (${formatCurrency(regularMenuRevenue)})<br>`;
+                }
+                insights += `<br>`;
+                
+                // Customer acquisition breakdown
+                const existingR30Customers = r30Transactions * ((100 - r30NewCustomerPercent) / 100);
+                insights += `📈 <strong>R30 Customer Breakdown:</strong><br>`;
+                insights += `New customers: ${Math.round(newCustomersAcquired)} (${r30NewCustomerPercent}%)<br>`;
+                insights += `Existing/Win-back: ${Math.round(existingR30Customers)} (${(100 - r30NewCustomerPercent).toFixed(0)}%)<br>`;
+                insights += `Total R30 customers: ${Math.round(r30Transactions)}<br><br>`;
+                
+                insights += `🔄 Projected returning new customers (3 months): ${Math.round(returningCustomers)}<br>`;
+                insights += `💎 Future LTV from returning customers: ${formatCurrency(futureLTV)}<br><br>`;
+                
+                if (roi > 200) {
+                    insights += `🚀 Excellent ROI of ${roi.toFixed(0)}% - consider scaling this campaign!`;
+                } else if (roi > 100) {
+                    insights += `✅ Good ROI of ${roi.toFixed(0)}% - campaign is viable.`;
+                } else if (roi > 0) {
+                    insights += `⚠️ Low ROI of ${roi.toFixed(0)}% - optimization needed.`;
+                } else {
+                    insights += `❌ Negative ROI - campaign needs significant changes.`;
+                }
+                
+                document.getElementById('insights').innerHTML = insights;
+                
+                // Warning messages
+                const warningDiv = document.getElementById('warningMessage');
+                if (totalMix < 95 || totalMix > 105) {
+                    warningDiv.textContent = `Portfolio mix totals ${totalMix.toFixed(0)}% - adjust sliders to equal 100%!`;
+                    warningDiv.style.display = 'block';
+                } else if (effectiveGPPercent < 45) {
+                    warningDiv.textContent = 'Effective GP% drops below 45% - profitability at risk!';
+                    warningDiv.style.display = 'block';
+                } else {
+                    warningDiv.style.display = 'none';
+                }
+                
+            } catch (error) {
+                console.error('Error in calculate function:', error);
+                const warningDiv = document.getElementById('warningMessage');
+                if (warningDiv) {
+                    warningDiv.textContent = 'An error occurred while calculating. Please check your inputs.';
+                    warningDiv.style.display = 'block';
+                }
+            }
+        }
+        
+        // Initialize values from stored scenario
+        function initializeValues() {
+            const values = scenarioValues[currentScenario];
+            
+            // Set initial values
+            document.getElementById('dailyRevenue').value = scenarioValues.common.dailyRevenue;
+            document.getElementById('avgTransaction').value = scenarioValues.common.avgTransaction;
+            
+            if (currentScenario === 'birthday') {
+                document.getElementById('r30Mix').value = values.r30Mix;
+            } else {
+                document.getElementById('r30Mix').value = scenarioValues.birthday.r30Mix;
+            }
+            
+            document.getElementById('seafoodBurgerMix').value = values.seafoodBurgerMix;
+            document.getElementById('hightideComboMix').value = values.hightideComboMix;
+            document.getElementById('platterMix').value = values.platterMix;
+            document.getElementById('regularMenuMix').value = values.regularMenuMix;
+            document.getElementById('volumeIncrease').value = values.volumeIncrease;
+            document.getElementById('marketingSpend').value = values.marketingSpend;
+            document.getElementById('additionalStaffing').value = values.additionalStaffing;
+            document.getElementById('fixedCostPercent').value = values.fixedCostPercent;
+            document.getElementById('returnCustomerRate').value = values.returnCustomerRate;
+            document.getElementById('r30NewCustomerPercent').value = values.r30NewCustomerPercent;
+        }
+        
+        // Initialize with error handling
+        document.addEventListener('DOMContentLoaded', function() {
+            setTimeout(() => {
+                try {
+                    initializeValues();
+                    updateAllSliders();
+                    calculate();
+                } catch (error) {
+                    console.error('Error during initialization:', error);
+                }
+            }, 100);
+        });
+        
+        // Only run immediate initialization if DOM is already loaded
+        if (document.readyState === 'loading') {
+            // DOM not yet loaded, wait for DOMContentLoaded
+        } else {
+            // DOM already loaded, safe to initialize
+            setTimeout(() => {
+                try {
+                    initializeValues();
+                    updateAllSliders();
+                    calculate();
+                } catch (error) {
+                    console.error('Error during immediate initialization:', error);
+                }
+            }, 50);
+        }
+    </script>
+</body>
+</html>

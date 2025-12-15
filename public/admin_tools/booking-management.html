@@ -1,0 +1,1272 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Booking Management - Admin Tools</title>
+    
+    <!-- Bootstrap CSS -->
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <!-- Font Awesome -->
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <!-- Custom CSS -->
+    <link rel="stylesheet" href="../css/admin-style.css">
+    <link rel="stylesheet" href="../css/shadcn-inspired.css">
+    
+    <style>
+        /* Initially hide the page content until admin verification is complete */
+        body {
+            visibility: hidden;
+        }
+        
+        body.admin-verified {
+            visibility: visible;
+        }
+        
+        .booking-card {
+            background: white;
+            border-radius: 12px;
+            padding: 20px;
+            margin-bottom: 20px;
+            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+            border-left: 4px solid #3b82f6;
+            transition: all 0.3s ease;
+        }
+        
+        .booking-card:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.15);
+        }
+        
+        .booking-card.pending { border-left-color: #f59e0b; }
+        .booking-card.confirmed { border-left-color: #10b981; }
+        .booking-card.cancelled { border-left-color: #ef4444; }
+        
+        .booking-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 15px;
+        }
+        
+        .booking-id {
+            font-size: 18px;
+            font-weight: 600;
+            color: #1f2937;
+        }
+        
+        .booking-status {
+            padding: 6px 12px;
+            border-radius: 20px;
+            font-size: 12px;
+            font-weight: 500;
+            text-transform: uppercase;
+        }
+        
+        .status-pending { background: #fef3c7; color: #92400e; }
+        .status-confirmed { background: #d1fae5; color: #065f46; }
+        .status-cancelled { background: #fee2e2; color: #991b1b; }
+        
+        .booking-details {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: 15px;
+            margin-bottom: 15px;
+        }
+        
+        .booking-detail {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            padding: 8px 12px;
+            background: #f8f9fa;
+            border-radius: 8px;
+        }
+        
+        .booking-detail-icon {
+            font-size: 16px;
+            width: 20px;
+            color: #6b7280;
+        }
+        
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 20px;
+            margin-bottom: 30px;
+        }
+        
+        .stat-card {
+            background: white;
+            padding: 20px;
+            border-radius: 12px;
+            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+            text-align: center;
+        }
+        
+        .stat-number {
+            font-size: 32px;
+            font-weight: 700;
+            color: #1f2937;
+            margin-bottom: 5px;
+        }
+        
+        .stat-label {
+            font-size: 14px;
+            color: #6b7280;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+        }
+        
+        .filters-section {
+            background: white;
+            padding: 20px;
+            border-radius: 12px;
+            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+            margin-bottom: 30px;
+        }
+        
+        /* Loading spinner styles removed - no longer needed */
+        
+        .alert-custom {
+            border-radius: 8px;
+            border: none;
+            padding: 15px 20px;
+            margin-bottom: 20px;
+        }
+        
+        .alert-error {
+            background: #fee2e2;
+            color: #991b1b;
+        }
+        
+        .alert-success {
+            background: #d1fae5;
+            color: #065f46;
+        }
+        
+        .alert-info {
+            background: #dbeafe;
+            color: #1e40af;
+        }
+        
+        .form-modern {
+            background: white;
+            padding: 30px;
+            border-radius: 12px;
+            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+            margin-bottom: 30px;
+        }
+        
+        .form-modern .form-control {
+            border-radius: 8px;
+            border: 1px solid #d1d5db;
+            padding: 12px;
+            transition: border-color 0.3s ease;
+        }
+        
+        .form-modern .form-control:focus {
+            border-color: #3b82f6;
+            box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
+        }
+        
+        .btn-modern {
+            border-radius: 8px;
+            padding: 10px 20px;
+            font-weight: 500;
+            transition: all 0.3s ease;
+        }
+        
+        .btn-modern:hover {
+            transform: translateY(-1px);
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+        }
+        
+        .breadcrumb-custom {
+            background: white;
+            padding: 15px 20px;
+            border-radius: 8px;
+            margin-bottom: 20px;
+            box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+        }
+        
+        .page-header {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 30px;
+            border-radius: 12px;
+            margin-bottom: 30px;
+        }
+        
+        .page-header h1 {
+            margin: 0;
+            font-size: 2.5rem;
+            font-weight: 700;
+        }
+        
+        .page-header p {
+            margin: 10px 0 0 0;
+            opacity: 0.9;
+            font-size: 1.1rem;
+        }
+        
+        /* Modal fixes to ensure proper interaction */
+        .modal {
+            z-index: 1055;
+        }
+        
+        .modal-backdrop {
+            z-index: 1050;
+        }
+        
+        .modal-content {
+            position: relative;
+            z-index: 1056;
+            pointer-events: auto;
+        }
+        
+        .modal-dialog {
+            pointer-events: none;
+        }
+        
+        .modal-dialog .modal-content {
+            pointer-events: auto;
+        }
+    </style>
+</head>
+<body>
+    <!-- Navigation Breadcrumb -->
+    <nav class="breadcrumb-custom">
+        <ol class="breadcrumb mb-0">
+            <li class="breadcrumb-item">
+                <a href="../admin-dashboard.html" class="text-decoration-none">
+                    <i class="fas fa-home me-1"></i>Admin Dashboard
+                </a>
+            </li>
+            <li class="breadcrumb-item">
+                <a href="./index.html" class="text-decoration-none">
+                    <i class="fas fa-tools me-1"></i>Admin Tools
+                </a>
+            </li>
+            <li class="breadcrumb-item active">
+                <i class="fas fa-calendar-alt me-1"></i>Booking Management
+            </li>
+        </ol>
+    </nav>
+
+    <div class="container-fluid">
+        <!-- Page Header -->
+        <div class="page-header">
+            <div class="d-flex justify-content-between align-items-center">
+                <div>
+                    <h1><i class="fas fa-calendar-alt me-3"></i>Booking Management</h1>
+                    <p>Manage restaurant bookings and reservations</p>
+                </div>
+                <div>
+                    <button id="createBookingBtn" class="btn btn-light btn-modern">
+                        <i class="fas fa-plus me-2"></i>Create Booking
+                    </button>
+                    <button id="refreshBtn" class="btn btn-outline-light btn-modern ms-2">
+                        <i class="fas fa-sync-alt me-2"></i>Refresh
+                    </button>
+                    <button onclick="debugModal()" class="btn btn-outline-light btn-modern ms-2" title="Debug Modal Issues">
+                        <i class="fas fa-bug me-2"></i>Debug
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Authentication Check -->
+        <div id="authCheck" class="d-none">
+            <div class="text-center py-5">
+                <div class="spinner-border text-primary mb-3" role="status">
+                    <span class="visually-hidden">Loading...</span>
+                </div>
+                <h5>Checking authentication...</h5>
+                <p class="text-muted">Please wait while we verify your admin access.</p>
+            </div>
+        </div>
+
+        <!-- Main Content -->
+        <div id="mainContent" class="d-none">
+            <!-- Statistics Cards -->
+            <div class="stats-grid">
+                <div class="stat-card">
+                    <div class="stat-number" id="totalBookings">0</div>
+                    <div class="stat-label">Total Bookings</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-number" id="pendingBookings">0</div>
+                    <div class="stat-label">Pending</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-number" id="confirmedBookings">0</div>
+                    <div class="stat-label">Confirmed</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-number" id="todayBookings">0</div>
+                    <div class="stat-label">Today</div>
+                </div>
+            </div>
+
+            <!-- Filters -->
+            <div class="filters-section">
+                <div class="d-flex justify-content-between align-items-center mb-3">
+                    <h5 class="mb-0">
+                        <i class="fas fa-filter me-2"></i>Filters
+                    </h5>
+                    <button id="clearFiltersBtn" class="btn btn-outline-secondary btn-sm">
+                        <i class="fas fa-times me-1"></i>Clear Filters
+                    </button>
+                </div>
+                
+                <div class="row">
+                    <div class="col-md-3">
+                        <div class="form-group">
+                            <label for="filterStatus" class="form-label">Status</label>
+                            <select id="filterStatus" class="form-control">
+                                <option value="">All statuses</option>
+                                <option value="pending">Pending</option>
+                                <option value="confirmed">Confirmed</option>
+                                <option value="cancelled">Cancelled</option>
+                            </select>
+                        </div>
+                    </div>
+                    <div class="col-md-3">
+                        <div class="form-group">
+                            <label for="filterDate" class="form-label">Date</label>
+                            <input type="date" id="filterDate" class="form-control">
+                        </div>
+                    </div>
+                    <div class="col-md-3">
+                        <div class="form-group">
+                            <label for="filterLocation" class="form-label">Location</label>
+                            <select id="filterLocation" class="form-control">
+                                <option value="">All locations</option>
+                                <option value="Ocean Basket The Grove">Ocean Basket The Grove</option>
+                                <option value="Ocean Basket Sandton">Ocean Basket Sandton</option>
+                                <option value="Ocean Basket Waterfront">Ocean Basket Waterfront</option>
+                                <option value="Ocean Basket Menlyn">Ocean Basket Menlyn</option>
+                                <option value="Ocean Basket Rosebank">Ocean Basket Rosebank</option>
+                            </select>
+                        </div>
+                    </div>
+                    <div class="col-md-3">
+                        <div class="form-group">
+                            <label for="searchGuest" class="form-label">Search Guest</label>
+                            <input type="text" id="searchGuest" class="form-control" placeholder="Name or phone...">
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Bookings List -->
+            <div class="row">
+                <div class="col-12">
+                    <div class="d-flex justify-content-between align-items-center mb-3">
+                        <h5 class="mb-0">
+                            <i class="fas fa-list me-2"></i>Bookings
+                            <span id="bookingCount" class="badge bg-secondary ms-2">0</span>
+                        </h5>
+                        <div class="btn-group" role="group">
+                            <button id="viewGrid" class="btn btn-outline-secondary btn-sm active">
+                                <i class="fas fa-th"></i>
+                            </button>
+                            <button id="viewList" class="btn btn-outline-secondary btn-sm">
+                                <i class="fas fa-list"></i>
+                            </button>
+                        </div>
+                    </div>
+                    
+                    <div id="bookingsList">
+                        <!-- Bookings will be loaded here -->
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Create/Edit Booking Modal -->
+    <div class="modal fade" id="bookingModal" tabindex="-1">
+        <div class="modal-dialog modal-lg">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">
+                        <i class="fas fa-calendar-plus me-2"></i>
+                        <span id="modalTitle">Create New Booking</span>
+                    </h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <form id="bookingForm">
+                        <div class="row">
+                            <div class="col-md-6">
+                                <div class="form-group mb-3">
+                                    <label for="guestName" class="form-label">Guest Name *</label>
+                                    <input type="text" id="guestName" name="guestName" class="form-control" required>
+                                </div>
+                            </div>
+                            <div class="col-md-6">
+                                <div class="form-group mb-3">
+                                    <label for="guestPhone" class="form-label">Guest Phone *</label>
+                                    <input type="tel" id="guestPhone" name="guestPhone" class="form-control" required>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="row">
+                            <div class="col-md-6">
+                                <div class="form-group mb-3">
+                                    <label for="bookingDate" class="form-label">Date *</label>
+                                    <input type="date" id="bookingDate" name="bookingDate" class="form-control" required>
+                                </div>
+                            </div>
+                            <div class="col-md-6">
+                                <div class="form-group mb-3">
+                                    <label for="bookingTime" class="form-label">Time *</label>
+                                    <input type="time" id="bookingTime" name="bookingTime" class="form-control" required>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="row">
+                            <div class="col-md-6">
+                                <div class="form-group mb-3">
+                                    <label for="location" class="form-label">Location *</label>
+                                    <select id="location" name="location" class="form-control" required>
+                                        <option value="">Select location...</option>
+                                        <option value="Ocean Basket The Grove">Ocean Basket The Grove</option>
+                                        <option value="Ocean Basket Sandton">Ocean Basket Sandton</option>
+                                        <option value="Ocean Basket Waterfront">Ocean Basket Waterfront</option>
+                                        <option value="Ocean Basket Menlyn">Ocean Basket Menlyn</option>
+                                        <option value="Ocean Basket Rosebank">Ocean Basket Rosebank</option>
+                                    </select>
+                                </div>
+                            </div>
+                            <div class="col-md-6">
+                                <div class="form-group mb-3">
+                                    <label for="section" class="form-label">Section *</label>
+                                    <select id="section" name="section" class="form-control" required>
+                                        <option value="">Select section...</option>
+                                        <option value="Inside">Inside</option>
+                                        <option value="Outside/Patio">Outside/Patio</option>
+                                        <option value="Bar Area">Bar Area</option>
+                                        <option value="Private Dining">Private Dining</option>
+                                    </select>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="row">
+                            <div class="col-md-6">
+                                <div class="form-group mb-3">
+                                    <label for="numberOfGuests" class="form-label">Number of Guests *</label>
+                                    <input type="number" id="numberOfGuests" name="numberOfGuests" class="form-control" min="1" max="20" required>
+                                </div>
+                            </div>
+                            <div class="col-md-6">
+                                <div class="form-group mb-3">
+                                    <label for="status" class="form-label">Status</label>
+                                    <select id="status" name="status" class="form-control">
+                                        <option value="pending">Pending</option>
+                                        <option value="confirmed">Confirmed</option>
+                                    </select>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="form-group mb-3">
+                            <label for="specialRequests" class="form-label">Special Requests</label>
+                            <textarea id="specialRequests" name="specialRequests" class="form-control" rows="3" placeholder="Birthday celebration, anniversary, allergies, etc."></textarea>
+                        </div>
+                    </form>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                    <button type="submit" form="bookingForm" class="btn btn-primary">
+                        <i class="fas fa-save me-2"></i>Save Booking
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Bootstrap JS -->
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    
+    <!-- SweetAlert2 -->
+    <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+    
+    <script type="module">
+        // Import Firebase and authentication modules
+        import { auth, rtdb, ref, get, set, update, push, onAuthStateChanged } from '../js/config/firebase-config.js';
+        import { AdminClaims } from '../js/auth/admin-claims.js';
+
+        // Global variables
+        let currentUser = null;
+        let isAdminVerified = false;
+        let allBookings = [];
+        let filteredBookings = [];
+        let isEditing = false;
+        let editingBookingId = null;
+
+        // DOM elements
+        const elements = {
+            authCheck: document.getElementById('authCheck'),
+            mainContent: document.getElementById('mainContent'),
+            bookingsList: document.getElementById('bookingsList'),
+            bookingModal: document.getElementById('bookingModal'),
+            bookingForm: document.getElementById('bookingForm'),
+            // Stats
+            totalBookings: document.getElementById('totalBookings'),
+            pendingBookings: document.getElementById('pendingBookings'),
+            confirmedBookings: document.getElementById('confirmedBookings'),
+            todayBookings: document.getElementById('todayBookings'),
+            bookingCount: document.getElementById('bookingCount'),
+            // Filters
+            filterStatus: document.getElementById('filterStatus'),
+            filterDate: document.getElementById('filterDate'),
+            filterLocation: document.getElementById('filterLocation'),
+            searchGuest: document.getElementById('searchGuest'),
+            // Buttons
+            createBookingBtn: document.getElementById('createBookingBtn'),
+            refreshBtn: document.getElementById('refreshBtn'),
+            clearFiltersBtn: document.getElementById('clearFiltersBtn'),
+            viewGrid: document.getElementById('viewGrid'),
+            viewList: document.getElementById('viewList')
+        };
+
+        /**
+         * Initialize admin authentication and verification
+         */
+        async function initializeAdminAuth() {
+            console.log('🚀 Booking Management System Starting...');
+            console.log('📍 Current URL:', window.location.href);
+            console.log('🔍 Starting admin authentication initialization...');
+            
+            // Show authentication check
+            elements.authCheck.classList.remove('d-none');
+            elements.mainContent.classList.add('d-none');
+            
+            try {
+                // Wait for Firebase auth to be ready
+                await new Promise((resolve) => {
+                    const unsubscribe = onAuthStateChanged(auth, (user) => {
+                        console.log('🔄 Auth state ready, user:', user ? user.email : 'null');
+                        unsubscribe();
+                        resolve();
+                    });
+                });
+
+                // Get current user directly from Firebase auth
+                const user = auth.currentUser;
+                
+                if (!user) {
+                    console.log('❌ No user found, redirecting to admin login');
+                    showAuthError('No authenticated user found. Please log in to access booking management.', true);
+                    return;
+                }
+
+                currentUser = user;
+                console.log('👤 User found:', user.email);
+
+                // Force token refresh to get latest claims
+                await user.getIdToken(true);
+                console.log('🔄 Token refreshed, verifying admin status...');
+                
+                // Verify admin access using AdminClaims
+                const hasAdminAccess = await AdminClaims.verifyAdminStatus(user);
+                
+                if (!hasAdminAccess) {
+                    console.warn('❌ User does not have admin privileges');
+                    showAuthError('Admin privileges required for booking management. Please ensure you have admin access.');
+                    return;
+                }
+
+                console.log('✅ Admin verification successful');
+                isAdminVerified = true;
+                
+                // Show the page content
+                document.body.classList.add('admin-verified');
+                
+                // Hide authentication check and show main content
+                elements.authCheck.classList.add('d-none');
+                elements.mainContent.classList.remove('d-none');
+
+                // Initialize components
+                console.log('🔧 Initializing event listeners...');
+                try {
+                    initializeEventListeners();
+                    console.log('✅ Event listeners initialized successfully');
+                } catch (eventError) {
+                    console.error('⚠️ Event listener initialization failed:', eventError);
+                    // Continue anyway - don't let this block the main functionality
+                }
+                
+                console.log('📊 Loading bookings...');
+                await loadBookings();
+                
+                console.log('✅ Booking Management System Ready');
+                
+            } catch (error) {
+                console.error('❌ Authentication error:', error);
+                console.error('❌ Error stack:', error.stack);
+                showAuthError('Authentication failed: ' + error.message);
+            }
+        }
+
+        // Initialize application
+        document.addEventListener('DOMContentLoaded', async function() {
+            console.log('📱 DOM loaded, starting initialization...');
+            
+            // Set up simple auth state monitoring for sign-out detection
+            onAuthStateChanged(auth, (user) => {
+                // Only handle sign out events after verification is complete
+                if (!user && isAdminVerified) {
+                    console.log('🔄 User signed out, redirecting to login');
+                    showAuthError('Session expired. Please log in again.', true);
+                }
+            });
+            
+            await initializeAdminAuth();
+        });
+
+        /**
+         * Show authentication error with redirect option
+         */
+        function showAuthError(message, shouldRedirect = false) {
+            const currentUser = auth.currentUser;
+            const userInfo = currentUser ? `
+                <div class="alert alert-info mt-3">
+                    <h6>Current User Info:</h6>
+                    <p class="mb-1"><strong>Email:</strong> ${currentUser.email}</p>
+                    <p class="mb-0"><strong>UID:</strong> ${currentUser.uid}</p>
+                </div>
+            ` : '';
+            
+            // Show the auth check element and hide main content
+            elements.authCheck.classList.remove('d-none');
+            elements.mainContent.classList.add('d-none');
+            
+            elements.authCheck.innerHTML = `
+                <div class="container py-5">
+                    <div class="alert alert-custom alert-error">
+                        <div class="d-flex align-items-center">
+                            <i class="fas fa-exclamation-triangle me-3"></i>
+                            <div>
+                                <h5 class="mb-1">Authentication Required</h5>
+                                <p class="mb-0">${message}</p>
+                            </div>
+                        </div>
+                        ${userInfo}
+                        <hr>
+                        <div class="d-flex gap-2 flex-wrap">
+                            <a href="../admin-login.html" class="btn btn-primary btn-sm">
+                                <i class="fas fa-sign-in-alt me-1"></i>Admin Login
+                            </a>
+                            <a href="../admin-dashboard.html" class="btn btn-secondary btn-sm">
+                                <i class="fas fa-arrow-left me-1"></i>Back to Dashboard
+                            </a>
+                            <button onclick="location.reload()" class="btn btn-outline-secondary btn-sm">
+                                <i class="fas fa-refresh me-1"></i>Retry
+                            </button>
+                            ${currentUser ? `
+                                <a href="./setup-admin.html" class="btn btn-warning btn-sm">
+                                    <i class="fas fa-user-cog me-1"></i>Setup Admin Access
+                                </a>
+                            ` : ''}
+                        </div>
+                        <div class="mt-3">
+                            <small class="text-muted">
+                                <strong>Troubleshooting:</strong> If you should have admin access, try the "Setup Admin Access" button above, 
+                                or check the browser console (F12) for detailed error messages.
+                            </small>
+                        </div>
+                    </div>
+                </div>
+            `;
+            
+            // Auto-redirect if needed
+            if (shouldRedirect) {
+                console.log('🔄 Auto-redirecting to admin login in 3 seconds...');
+                setTimeout(() => {
+                    window.location.href = '../admin-login.html';
+                }, 3000);
+            }
+        }
+
+        // Initialize event listeners
+        function initializeEventListeners() {
+            // Buttons
+            elements.createBookingBtn.addEventListener('click', () => showBookingModal());
+            elements.refreshBtn.addEventListener('click', loadBookings);
+            elements.clearFiltersBtn.addEventListener('click', clearFilters);
+            
+            // View toggles
+            elements.viewGrid.addEventListener('click', () => toggleView('grid'));
+            elements.viewList.addEventListener('click', () => toggleView('list'));
+            
+            // Filters
+            elements.filterStatus.addEventListener('change', applyFilters);
+            elements.filterDate.addEventListener('change', applyFilters);
+            elements.filterLocation.addEventListener('change', applyFilters);
+            elements.searchGuest.addEventListener('input', debounce(applyFilters, 300));
+            
+            // Form
+            elements.bookingForm.addEventListener('submit', handleBookingSubmit);
+            
+            // Modal events
+            elements.bookingModal.addEventListener('hidden.bs.modal', resetBookingForm);
+            
+            // Set default date for booking form
+            const bookingDateField = document.getElementById('bookingDate');
+            if (bookingDateField) {
+                bookingDateField.valueAsDate = new Date();
+            }
+        }
+
+        // Load bookings
+        async function loadBookings() {
+            try {
+                console.log('📊 Starting to load bookings...');
+                // Removed loading spinner - loading directly
+                
+                const snapshot = await get(ref(rtdb, 'bookings'));
+                const bookingsData = snapshot.val() || {};
+                
+                console.log('📊 Raw bookings data:', bookingsData);
+                console.log('📊 Number of booking entries:', Object.keys(bookingsData).length);
+                
+                allBookings = Object.entries(bookingsData).map(([id, booking]) => {
+                    console.log('📊 Processing booking:', id, booking);
+                    return {
+                        id,
+                        ...booking
+                    };
+                }).sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0));
+                
+                console.log('📊 Processed bookings:', allBookings.length);
+                console.log('📊 First booking:', allBookings[0]);
+                
+                updateStatistics();
+                applyFilters(); // This will render the bookings directly
+                
+                console.log('✅ Bookings loading completed successfully');
+                
+            } catch (error) {
+                console.error('❌ Error loading bookings:', error);
+                console.error('❌ Error details:', error.message, error.stack);
+                showError('Failed to load bookings: ' + error.message);
+            }
+        }
+
+        // Update statistics
+        function updateStatistics() {
+            const total = allBookings.length;
+            const pending = allBookings.filter(b => b.status === 'pending').length;
+            const confirmed = allBookings.filter(b => b.status === 'confirmed').length;
+            
+            // Today's bookings
+            const today = new Date().toISOString().split('T')[0];
+            const todayCount = allBookings.filter(b => b.date === today).length;
+            
+            elements.totalBookings.textContent = total;
+            elements.pendingBookings.textContent = pending;
+            elements.confirmedBookings.textContent = confirmed;
+            elements.todayBookings.textContent = todayCount;
+        }
+
+        // Apply filters
+        function applyFilters() {
+            const statusFilter = elements.filterStatus.value;
+            const dateFilter = elements.filterDate.value;
+            const locationFilter = elements.filterLocation.value;
+            const guestFilter = elements.searchGuest.value.toLowerCase();
+            
+            filteredBookings = allBookings.filter(booking => {
+                if (statusFilter && booking.status !== statusFilter) return false;
+                if (dateFilter && booking.date !== dateFilter) return false;
+                if (locationFilter && booking.location !== locationFilter) return false;
+                if (guestFilter && !booking.guestName?.toLowerCase().includes(guestFilter) && 
+                    !booking.phoneNumber?.includes(guestFilter)) return false;
+                return true;
+            });
+            
+            elements.bookingCount.textContent = filteredBookings.length;
+            renderBookings();
+        }
+
+        // Clear filters
+        function clearFilters() {
+            elements.filterStatus.value = '';
+            elements.filterDate.value = '';
+            elements.filterLocation.value = '';
+            elements.searchGuest.value = '';
+            applyFilters();
+        }
+
+        // Toggle view
+        function toggleView(view) {
+            if (view === 'grid') {
+                elements.viewGrid.classList.add('active');
+                elements.viewList.classList.remove('active');
+            } else {
+                elements.viewList.classList.add('active');
+                elements.viewGrid.classList.remove('active');
+            }
+            renderBookings();
+        }
+
+        // Render bookings
+        function renderBookings() {
+            try {
+                console.log('🎨 Rendering bookings. Filtered count:', filteredBookings.length);
+                
+                if (filteredBookings.length === 0) {
+                    const emptyStateHTML = `
+                        <div class="text-center py-5">
+                            <i class="fas fa-calendar-times fa-3x text-muted mb-3"></i>
+                            <h5 class="text-muted">No bookings found</h5>
+                            <p class="text-muted">Try adjusting your filters or create a new booking</p>
+                            <button class="btn btn-primary btn-modern" onclick="showBookingModal()">
+                                <i class="fas fa-plus me-2"></i>Create First Booking
+                            </button>
+                        </div>
+                    `;
+                    elements.bookingsList.innerHTML = emptyStateHTML;
+                    console.log('✅ Rendered empty state');
+                    return;
+                }
+                
+                const isGridView = elements.viewGrid.classList.contains('active');
+                const html = filteredBookings.map(booking => {
+                    try {
+                        return createBookingCard(booking, isGridView);
+                    } catch (error) {
+                        console.error('❌ Error creating booking card:', error, booking);
+                        return `<div class="col-12"><div class="alert alert-warning">Error rendering booking: ${booking.id || 'Unknown'}</div></div>`;
+                    }
+                }).join('');
+                
+                const finalHTML = `<div class="row">${html}</div>`;
+                elements.bookingsList.innerHTML = finalHTML;
+                console.log('✅ Rendered bookings successfully');
+                console.log('✅ Final HTML length:', finalHTML.length);
+                
+            } catch (error) {
+                console.error('❌ Error in renderBookings:', error);
+                const errorHTML = `
+                    <div class="alert alert-danger">
+                        <h5>Error Rendering Bookings</h5>
+                        <p>There was an error displaying the bookings. Please try refreshing the page.</p>
+                        <button class="btn btn-primary" onclick="loadBookings()">
+                            <i class="fas fa-sync-alt me-1"></i>Refresh Bookings
+                        </button>
+                    </div>
+                `;
+                elements.bookingsList.innerHTML = errorHTML;
+                console.log('✅ Rendered error state');
+            }
+        }
+
+        // Create booking card HTML
+        function createBookingCard(booking, isGridView = true) {
+            // Ensure booking has required properties
+            if (!booking || !booking.id) {
+                console.error('Invalid booking data:', booking);
+                return `<div class="col-12"><div class="alert alert-warning">Invalid booking data</div></div>`;
+            }
+            
+            const statusClass = `status-${booking.status || 'unknown'}`;
+            const cardClass = booking.status || 'unknown';
+            
+            return `
+                <div class="${isGridView ? 'col-lg-6 col-xl-4' : 'col-12'} mb-4">
+                    <div class="booking-card ${cardClass}">
+                        <div class="booking-header">
+                            <div class="booking-id">Booking #${booking.id.toString().slice(-6)}</div>
+                            <div class="booking-status ${statusClass}">${booking.status || 'Unknown'}</div>
+                        </div>
+                        
+                        <div class="booking-details">
+                            <div class="booking-detail">
+                                <i class="fas fa-user booking-detail-icon"></i>
+                                <span><strong>${booking.guestName || 'No name'}</strong></span>
+                            </div>
+                            <div class="booking-detail">
+                                <i class="fas fa-phone booking-detail-icon"></i>
+                                <span>${booking.phoneNumber || 'No phone'}</span>
+                            </div>
+                            <div class="booking-detail">
+                                <i class="fas fa-calendar booking-detail-icon"></i>
+                                <span>${booking.date || 'No date'}</span>
+                            </div>
+                            <div class="booking-detail">
+                                <i class="fas fa-clock booking-detail-icon"></i>
+                                <span>${booking.time || 'No time'}</span>
+                            </div>
+                            <div class="booking-detail">
+                                <i class="fas fa-map-marker-alt booking-detail-icon"></i>
+                                <span>${booking.location || 'No location'}</span>
+                            </div>
+                            <div class="booking-detail">
+                                <i class="fas fa-users booking-detail-icon"></i>
+                                <span>${booking.numberOfGuests || 0} guests</span>
+                            </div>
+                        </div>
+                        
+                        ${booking.specialRequests ? `
+                            <div class="booking-detail mb-3">
+                                <i class="fas fa-star booking-detail-icon"></i>
+                                <span><strong>Special:</strong> ${booking.specialRequests}</span>
+                            </div>
+                        ` : ''}
+                        
+                        <div class="d-flex gap-2 flex-wrap">
+                            <button class="btn btn-sm btn-outline-primary" onclick="editBooking('${booking.id}')">
+                                <i class="fas fa-edit"></i> Edit
+                            </button>
+                            ${booking.status === 'pending' ? `
+                                <button class="btn btn-sm btn-success" onclick="updateBookingStatus('${booking.id}', 'confirmed')">
+                                    <i class="fas fa-check"></i> Confirm
+                                </button>
+                            ` : ''}
+                            ${booking.status !== 'cancelled' ? `
+                                <button class="btn btn-sm btn-danger" onclick="updateBookingStatus('${booking.id}', 'cancelled')">
+                                    <i class="fas fa-times"></i> Cancel
+                                </button>
+                            ` : ''}
+                            <button class="btn btn-sm btn-info" onclick="notifyGuest('${booking.id}')">
+                                <i class="fas fa-bell"></i> Notify
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            `;
+        }
+
+        // Show booking modal
+        function showBookingModal(bookingId = null) {
+            console.log('📝 Opening booking modal...', bookingId ? 'Edit mode' : 'Create mode');
+            
+            // Debug modal state
+            console.log('🔍 Modal debug info:', {
+                modalExists: !!elements.bookingModal,
+                modalId: elements.bookingModal?.id,
+                isEditing: !!bookingId,
+                adminVerified: isAdminVerified,
+                bodyClassList: document.body.classList.toString()
+            });
+            
+            isEditing = !!bookingId;
+            editingBookingId = bookingId;
+            
+            if (isEditing) {
+                const booking = allBookings.find(b => b.id === bookingId);
+                if (booking) {
+                    document.getElementById('modalTitle').textContent = 'Edit Booking';
+                    populateBookingForm(booking);
+                    console.log('✅ Booking form populated for editing');
+                } else {
+                    console.error('❌ Booking not found for editing:', bookingId);
+                    return;
+                }
+            } else {
+                document.getElementById('modalTitle').textContent = 'Create New Booking';
+                resetBookingForm();
+                console.log('✅ Booking form reset for creation');
+            }
+            
+            // Ensure no interfering elements
+            elements.authCheck.classList.add('d-none');
+            
+            try {
+                const modalInstance = new bootstrap.Modal(elements.bookingModal, {
+                    backdrop: 'static',
+                    keyboard: false
+                });
+                modalInstance.show();
+                console.log('✅ Modal shown successfully');
+            } catch (error) {
+                console.error('❌ Error showing modal:', error);
+            }
+        }
+
+        // Populate booking form
+        function populateBookingForm(booking) {
+            document.getElementById('guestName').value = booking.guestName || '';
+            document.getElementById('guestPhone').value = booking.phoneNumber || '';
+            document.getElementById('bookingDate').value = booking.date || '';
+            document.getElementById('bookingTime').value = booking.time || '';
+            document.getElementById('location').value = booking.location || '';
+            document.getElementById('section').value = booking.section || '';
+            document.getElementById('numberOfGuests').value = booking.numberOfGuests || '';
+            document.getElementById('status').value = booking.status || 'pending';
+            document.getElementById('specialRequests').value = booking.specialRequests || '';
+        }
+
+        // Reset booking form
+        function resetBookingForm() {
+            elements.bookingForm.reset();
+            document.getElementById('bookingDate').valueAsDate = new Date();
+            isEditing = false;
+            editingBookingId = null;
+        }
+
+        // Handle booking form submit
+        async function handleBookingSubmit(e) {
+            e.preventDefault();
+            
+            const formData = new FormData(elements.bookingForm);
+            const bookingData = {
+                guestName: formData.get('guestName'),
+                phoneNumber: normalizePhoneNumber(formData.get('guestPhone')),
+                date: formData.get('bookingDate'),
+                time: formData.get('bookingTime'),
+                location: formData.get('location'),
+                section: formData.get('section'),
+                numberOfGuests: parseInt(formData.get('numberOfGuests')),
+                specialRequests: formData.get('specialRequests') || '',
+                status: formData.get('status'),
+                updatedAt: Date.now(),
+                updatedBy: currentUser.uid
+            };
+            
+            try {
+                if (isEditing) {
+                    await update(ref(rtdb, `bookings/${editingBookingId}`), bookingData);
+                    showSuccessToast('Booking updated successfully');
+                } else {
+                    const newBookingRef = push(ref(rtdb, 'bookings'));
+                    bookingData.id = newBookingRef.key;
+                    bookingData.createdAt = Date.now();
+                    bookingData.createdBy = currentUser.uid;
+                    
+                    await set(newBookingRef, bookingData);
+                    showSuccessToast('Booking created successfully');
+                    
+                    // Send notification to guest
+                    await sendBookingNotification(bookingData);
+                }
+                
+                bootstrap.Modal.getInstance(elements.bookingModal).hide();
+                await loadBookings();
+                
+            } catch (error) {
+                console.error('❌ Error saving booking:', error);
+                showErrorToast('Failed to save booking: ' + error.message);
+            }
+        }
+
+        // Edit booking
+        function editBooking(bookingId) {
+            showBookingModal(bookingId);
+        }
+
+        // Update booking status
+        async function updateBookingStatus(bookingId, newStatus) {
+            try {
+                const result = await Swal.fire({
+                    title: 'Confirm Status Change',
+                    text: `Are you sure you want to ${newStatus} this booking?`,
+                    icon: 'question',
+                    showCancelButton: true,
+                    confirmButtonText: 'Yes, update it!',
+                    cancelButtonText: 'Cancel'
+                });
+                
+                if (result.isConfirmed) {
+                    await update(ref(rtdb, `bookings/${bookingId}`), {
+                        status: newStatus,
+                        updatedAt: Date.now(),
+                        updatedBy: currentUser.uid
+                    });
+                    
+                    showSuccessToast(`Booking ${newStatus} successfully`);
+                    await loadBookings();
+                    
+                    // Send notification to guest
+                    const booking = allBookings.find(b => b.id === bookingId);
+                    if (booking) {
+                        await sendStatusUpdateNotification({...booking, status: newStatus});
+                    }
+                }
+            } catch (error) {
+                console.error('❌ Error updating booking status:', error);
+                showErrorToast('Failed to update booking status');
+            }
+        }
+
+        // Notify guest
+        async function notifyGuest(bookingId) {
+            try {
+                const booking = allBookings.find(b => b.id === bookingId);
+                if (!booking) {
+                    showErrorToast('Booking not found');
+                    return;
+                }
+                
+                await sendBookingNotification(booking);
+                showSuccessToast('Guest notification sent successfully');
+                
+            } catch (error) {
+                console.error('❌ Error sending notification:', error);
+                showErrorToast('Failed to send notification');
+            }
+        }
+
+        // Send booking notification using template messaging
+        async function sendBookingNotification(booking) {
+            try {
+                const response = await fetch('https://us-central1-merakicaptiveportal-firebasedb.cloudfunctions.net/sendGuestBookingNotification', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(booking)
+                });
+                
+                if (!response.ok) {
+                    const errorData = await response.json();
+                    throw new Error(errorData.error || 'Failed to send notification');
+                }
+                
+                const result = await response.json();
+                console.log('✅ Booking notification sent successfully:', result);
+                
+            } catch (error) {
+                console.error('❌ Error sending booking notification:', error);
+                throw error; // Re-throw to handle in calling function
+            }
+        }
+
+        // Send status update notification using template messaging
+        async function sendStatusUpdateNotification(booking) {
+            try {
+                const response = await fetch('https://us-central1-merakicaptiveportal-firebasedb.cloudfunctions.net/sendGuestStatusNotification', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(booking)
+                });
+                
+                if (!response.ok) {
+                    const errorData = await response.json();
+                    throw new Error(errorData.error || 'Failed to send status update notification');
+                }
+                
+                const result = await response.json();
+                console.log('✅ Status notification sent successfully:', result);
+                
+            } catch (error) {
+                console.error('❌ Error sending status notification:', error);
+                throw error; // Re-throw to handle in calling function
+            }
+        }
+
+        // Normalize phone number
+        function normalizePhoneNumber(phoneNumber) {
+            if (!phoneNumber) return '';
+            // Only remove WhatsApp prefix, preserve + for international numbers
+            let cleaned = phoneNumber.replace(/^whatsapp:/, '').trim();
+            
+            // Ensure + prefix for international numbers (South African numbers)
+            if (/^27\d{9}$/.test(cleaned)) {
+                // If it's a 27xxxxxxxxx number without +, add it
+                cleaned = '+' + cleaned;
+            } else if (!cleaned.startsWith('+') && /^\d+$/.test(cleaned)) {
+                // If it's all digits without +, assume it's South African
+                cleaned = '+27' + cleaned.replace(/^0+/, ''); // Remove leading zeros
+            }
+            
+            return cleaned;
+        }
+
+        // Loading spinner functions removed - no longer needed
+
+        // Show error
+        function showError(message) {
+            elements.bookingsList.innerHTML = `
+                <div class="alert alert-custom alert-error">
+                    <i class="fas fa-exclamation-triangle me-2"></i>
+                    ${message}
+                </div>
+            `;
+        }
+
+        // Success toast
+        function showSuccessToast(message) {
+            Swal.fire({
+                toast: true,
+                position: 'top-end',
+                showConfirmButton: false,
+                timer: 3000,
+                timerProgressBar: true,
+                icon: 'success',
+                title: message
+            });
+        }
+
+        // Error toast
+        function showErrorToast(message) {
+            Swal.fire({
+                toast: true,
+                position: 'top-end',
+                showConfirmButton: false,
+                timer: 5000,
+                timerProgressBar: true,
+                icon: 'error',
+                title: message
+            });
+        }
+
+        // Debounce function
+        function debounce(func, wait) {
+            let timeout;
+            return function executedFunction(...args) {
+                const later = () => {
+                    clearTimeout(timeout);
+                    func(...args);
+                };
+                clearTimeout(timeout);
+                timeout = setTimeout(later, wait);
+            };
+        }
+
+        // Debug function to help identify modal issues
+        function debugModal() {
+            console.log('🔍 Modal Debug Information:');
+            console.log('Modal element:', elements.bookingModal);
+            console.log('Modal display:', window.getComputedStyle(elements.bookingModal).display);
+            console.log('Modal z-index:', window.getComputedStyle(elements.bookingModal).zIndex);
+            console.log('Body classes:', document.body.classList.toString());
+            console.log('Auth check display:', window.getComputedStyle(elements.authCheck).display);
+            console.log('Main content display:', window.getComputedStyle(elements.mainContent).display);
+            console.log('Admin verified:', isAdminVerified);
+            
+            // Check for any overlapping elements
+            const modalRect = elements.bookingModal.getBoundingClientRect();
+            console.log('Modal position:', modalRect);
+            
+            // Check for modal backdrop
+            const backdrop = document.querySelector('.modal-backdrop');
+            console.log('Modal backdrop present:', !!backdrop);
+            
+            // Force show modal for testing
+            try {
+                elements.bookingModal.style.display = 'block';
+                elements.bookingModal.style.zIndex = '9999';
+                elements.bookingModal.classList.add('show');
+                console.log('✅ Modal force-shown for testing');
+            } catch (error) {
+                console.error('❌ Error force-showing modal:', error);
+            }
+        }
+
+        // Make functions available globally for HTML onclick handlers
+        window.editBooking = editBooking;
+        window.updateBookingStatus = updateBookingStatus;
+        window.notifyGuest = notifyGuest;
+        window.showBookingModal = showBookingModal;
+        window.debugModal = debugModal;
+
+        // Auto-refresh bookings every 30 seconds
+        setInterval(loadBookings, 30000);
+        
+        console.log('🎉 Booking Management System Loaded');
+    </script>
+</body>
+</html> 

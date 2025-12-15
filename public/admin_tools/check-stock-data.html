@@ -1,0 +1,114 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Check Stock Data - Debug</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+</head>
+<body>
+    <div class="container mt-5">
+        <h1>Stock Usage Data Check</h1>
+        <div id="loading" class="text-center py-5">
+            <div class="spinner-border" role="status">
+                <span class="visually-hidden">Loading...</span>
+            </div>
+        </div>
+        <div id="results" style="display: none;">
+            <div id="locations-section" class="mb-4"></div>
+            <div id="stock-data-section" class="mb-4"></div>
+            <div id="location-stock-section" class="mb-4"></div>
+        </div>
+    </div>
+
+    <script type="module">
+        import { auth, onAuthStateChanged, rtdb, ref, get } from '../js/config/firebase-config.js';
+        
+        onAuthStateChanged(auth, async (user) => {
+            const loading = document.getElementById('loading');
+            const results = document.getElementById('results');
+            
+            if (!user) {
+                loading.innerHTML = '<div class="alert alert-warning">Not authenticated. Please log in first.</div>';
+                return;
+            }
+            
+            try {
+                // 1. Check locations
+                const locationsRef = ref(rtdb, 'locations');
+                const locSnapshot = await get(locationsRef);
+                let locationsHTML = '<h3>Locations Found:</h3>';
+                
+                if (locSnapshot.exists()) {
+                    const locations = locSnapshot.val();
+                    locationsHTML += '<ul>';
+                    for (const [id, loc] of Object.entries(locations)) {
+                        locationsHTML += `<li><strong>${id}</strong>: ${loc.name || 'No name'}</li>`;
+                    }
+                    locationsHTML += '</ul>';
+                } else {
+                    locationsHTML += '<p class="text-warning">No locations found!</p>';
+                }
+                document.getElementById('locations-section').innerHTML = locationsHTML;
+                
+                // 2. Check root stockUsage
+                const stockRef = ref(rtdb, 'stockUsage');
+                const stockSnapshot = await get(stockRef);
+                let stockHTML = '<h3>Stock Usage Data (Root Path):</h3>';
+                
+                if (stockSnapshot.exists()) {
+                    const data = stockSnapshot.val();
+                    const entries = Object.entries(data);
+                    stockHTML += `<p>Found ${entries.length} records</p>`;
+                    
+                    // Show first few records
+                    stockHTML += '<div class="card"><div class="card-body"><pre>';
+                    entries.slice(0, 3).forEach(([key, record]) => {
+                        const date = new Date(record.timestamp || parseInt(key));
+                        stockHTML += `\nRecord Key: ${key}\n`;
+                        stockHTML += `Date: ${date.toLocaleString()}\n`;
+                        stockHTML += `Location ID: ${record.selectedLocationId || 'Not set'}\n`;
+                        stockHTML += `Store Name: ${record.storeName || 'Not set'}\n`;
+                        stockHTML += `Has stockItems: ${record.stockItems ? 'Yes' : 'No'}\n`;
+                        stockHTML += `Total Cost: ${record.totals?.totalCostOfUsage || record.totalCostOfUsage || 'Not found'}\n`;
+                        stockHTML += `Sales Total: ${record.salesData?.total || record.salesAmount || 'Not found'}\n`;
+                        stockHTML += '---\n';
+                    });
+                    stockHTML += '</pre></div></div>';
+                } else {
+                    stockHTML += '<p class="text-warning">No data at root stockUsage path!</p>';
+                }
+                document.getElementById('stock-data-section').innerHTML = stockHTML;
+                
+                // 3. Check location-specific paths
+                let locationStockHTML = '<h3>Location-Specific Stock Data:</h3>';
+                if (locSnapshot.exists()) {
+                    const locations = locSnapshot.val();
+                    for (const [locId, loc] of Object.entries(locations)) {
+                        const locStockRef = ref(rtdb, `locations/${locId}/stockUsage`);
+                        const locStockSnapshot = await get(locStockRef);
+                        
+                        locationStockHTML += `<h4>Location: ${loc.name} (${locId})</h4>`;
+                        if (locStockSnapshot.exists()) {
+                            const data = locStockSnapshot.val();
+                            const count = Object.keys(data).length;
+                            locationStockHTML += `<p class="text-success">Found ${count} records at locations/${locId}/stockUsage</p>`;
+                        } else {
+                            locationStockHTML += `<p class="text-muted">No data at locations/${locId}/stockUsage</p>`;
+                        }
+                    }
+                } else {
+                    locationStockHTML += '<p>No locations to check</p>';
+                }
+                document.getElementById('location-stock-section').innerHTML = locationStockHTML;
+                
+            } catch (error) {
+                loading.innerHTML = `<div class="alert alert-danger">Error: ${error.message}</div>`;
+            } finally {
+                loading.style.display = 'none';
+                results.style.display = 'block';
+            }
+        });
+    </script>
+</body>
+</html> 

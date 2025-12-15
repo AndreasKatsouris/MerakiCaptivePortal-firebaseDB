@@ -1,0 +1,124 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Firebase Rules Test</title>
+    <script type="module">
+        import { auth, rtdb, ref, get, set, remove } from '../js/config/firebase-config.js';
+        
+        async function testFirebaseRules() {
+            const output = document.getElementById('output');
+            
+            try {
+                // Wait for auth
+                await new Promise((resolve) => {
+                    auth.onAuthStateChanged((user) => {
+                        if (user) resolve(user);
+                    });
+                });
+                
+                const user = auth.currentUser;
+                if (!user) {
+                    output.innerHTML = '<p style="color: red;">No user authenticated</p>';
+                    return;
+                }
+                
+                output.innerHTML += `<h2>User Info</h2>`;
+                output.innerHTML += `<p>Email: ${user.email}<br>UID: ${user.uid}</p>`;
+                
+                // Check if user is admin
+                const adminRef = ref(rtdb, `admins/${user.uid}`);
+                const adminSnapshot = await get(adminRef);
+                const isAdmin = adminSnapshot.exists();
+                output.innerHTML += `<p>Admin Status: ${isAdmin ? 'YES' : 'NO'}</p>`;
+                
+                // Get user's locations
+                const userLocationsRef = ref(rtdb, `userLocations/${user.uid}`);
+                const userLocSnapshot = await get(userLocationsRef);
+                const locationIds = userLocSnapshot.exists() ? Object.keys(userLocSnapshot.val()) : [];
+                const validLocationId = locationIds.find(id => id === '-OS-LnAWQUNA_zeR-UJG') || locationIds[0];
+                
+                output.innerHTML += `<h2>Location Access</h2>`;
+                output.innerHTML += `<p>Locations: ${locationIds.join(', ')}</p>`;
+                
+                if (validLocationId) {
+                    // Test different data structures
+                    output.innerHTML += `<h2>Testing Different Save Formats</h2>`;
+                    const timestamp = new Date().toISOString().replace(/[-:T.]/g, '').slice(0, 14);
+                    
+                    // Test 1: Minimal required fields
+                    output.innerHTML += `<h3>Test 1: Minimal Required Fields</h3>`;
+                    try {
+                        const test1Ref = ref(rtdb, `stockUsage/TEST1_${timestamp}`);
+                        await set(test1Ref, {
+                            userId: user.uid,
+                            selectedLocationId: validLocationId,
+                            timestamp: Date.now()
+                        });
+                        output.innerHTML += '<p style="color: green;">✓ Success with minimal fields</p>';
+                        await remove(test1Ref);
+                    } catch (error) {
+                        output.innerHTML += `<p style="color: red;">✗ Failed: ${error.message}</p>`;
+                    }
+                    
+                    // Test 2: With additional fields
+                    output.innerHTML += `<h3>Test 2: With Additional Fields</h3>`;
+                    try {
+                        const test2Ref = ref(rtdb, `stockUsage/TEST2_${timestamp}`);
+                        await set(test2Ref, {
+                            userId: user.uid,
+                            selectedLocationId: validLocationId,
+                            timestamp: Date.now(),
+                            formattedTimestamp: new Date().toLocaleString(),
+                            storeName: 'Test Store',
+                            test: true
+                        });
+                        output.innerHTML += '<p style="color: green;">✓ Success with additional fields</p>';
+                        await remove(test2Ref);
+                    } catch (error) {
+                        output.innerHTML += `<p style="color: red;">✗ Failed: ${error.message}</p>`;
+                    }
+                    
+                    // Test 3: Check if we can read existing stockUsage data
+                    output.innerHTML += `<h3>Test 3: Reading stockUsage Data</h3>`;
+                    try {
+                        const stockUsageRef = ref(rtdb, 'stockUsage');
+                        const snapshot = await get(stockUsageRef);
+                        if (snapshot.exists()) {
+                            const data = snapshot.val();
+                            const keys = Object.keys(data);
+                            output.innerHTML += `<p style="color: green;">✓ Can read stockUsage (${keys.length} records found)</p>`;
+                            
+                            // Show first record structure
+                            if (keys.length > 0) {
+                                const firstKey = keys[0];
+                                const firstRecord = data[firstKey];
+                                output.innerHTML += `<p>Sample record structure:<br><pre>${JSON.stringify(firstRecord, null, 2).substring(0, 500)}...</pre></p>`;
+                            }
+                        } else {
+                            output.innerHTML += '<p style="color: orange;">No stockUsage data found</p>';
+                        }
+                    } catch (error) {
+                        output.innerHTML += `<p style="color: red;">✗ Cannot read stockUsage: ${error.message}</p>`;
+                    }
+                    
+                } else {
+                    output.innerHTML += '<p style="color: orange;">No valid location found</p>';
+                }
+                
+            } catch (error) {
+                output.innerHTML += `<p style="color: red;">Error: ${error.message}</p>`;
+                console.error('Test error:', error);
+            }
+        }
+        
+        // Run test on load
+        window.addEventListener('load', testFirebaseRules);
+    </script>
+</head>
+<body>
+    <h1>Firebase Rules Test</h1>
+    <div id="output">Loading...</div>
+</body>
+</html>

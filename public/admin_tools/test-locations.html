@@ -1,0 +1,105 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Test User Locations</title>
+    <script type="module">
+        import { auth, rtdb, ref, get, set, remove } from '../js/config/firebase-config.js';
+        
+        async function testUserLocations() {
+            const output = document.getElementById('output');
+            let locationIds = []; // Define at function scope
+            
+            try {
+                // Wait for auth
+                await new Promise((resolve) => {
+                    auth.onAuthStateChanged((user) => {
+                        if (user) resolve(user);
+                    });
+                });
+                
+                const user = auth.currentUser;
+                if (!user) {
+                    output.innerHTML = '<p style="color: red;">No user authenticated</p>';
+                    return;
+                }
+                
+                output.innerHTML += `<p>Authenticated as: ${user.email} (${user.uid})</p>`;
+                
+                // Check userLocations
+                const userLocationsRef = ref(rtdb, `userLocations/${user.uid}`);
+                const userLocSnapshot = await get(userLocationsRef);
+                
+                if (!userLocSnapshot.exists()) {
+                    output.innerHTML += '<p style="color: orange;">No locations found in userLocations/${user.uid}</p>';
+                } else {
+                    locationIds = Object.keys(userLocSnapshot.val());
+                    output.innerHTML += `<p>Found ${locationIds.length} location(s) in userLocations:</p>`;
+                    
+                    // Fetch each location details
+                    for (const locationId of locationIds) {
+                        const locationRef = ref(rtdb, `locations/${locationId}`);
+                        const locationSnapshot = await get(locationRef);
+                        
+                        if (locationSnapshot.exists()) {
+                            const locationData = locationSnapshot.val();
+                            output.innerHTML += `<div style="border: 1px solid #ccc; padding: 10px; margin: 5px;">
+                                <strong>Location ID:</strong> ${locationId}<br>
+                                <strong>Name:</strong> ${locationData.name || 'N/A'}<br>
+                                <strong>Address:</strong> ${locationData.address || 'N/A'}<br>
+                                <strong>Brand:</strong> ${locationData.brandName || 'N/A'}<br>
+                                <strong>Is Franchise:</strong> ${locationData.isFranchise ? 'Yes' : 'No'}
+                            </div>`;
+                        } else {
+                            output.innerHTML += `<p style="color: red;">Location ${locationId} not found in locations/ node</p>`;
+                        }
+                    }
+                }
+                
+                // Test saving to stockUsage - only use valid locations
+                const validLocationId = locationIds.find(id => id === '-OS-LnAWQUNA_zeR-UJG') || locationIds[0];
+                
+                if (validLocationId) {
+                    output.innerHTML += '<h3>Testing Save Permission</h3>';
+                    output.innerHTML += `<p>Using location ID: ${validLocationId}</p>`;
+                    
+                    const testTimestamp = new Date().toISOString().replace(/[-:T.]/g, '').slice(0, 14);
+                    const testRef = ref(rtdb, `stockUsage/TEST_${testTimestamp}`);
+                    
+                    try {
+                        // Try a minimal save
+                        await set(testRef, {
+                            userId: user.uid,
+                            selectedLocationId: validLocationId,
+                            timestamp: Date.now(),
+                            test: true
+                        });
+                        output.innerHTML += '<p style="color: green;">✓ Successfully saved test data to stockUsage</p>';
+                        
+                        // Clean up test data
+                        await remove(testRef);
+                        output.innerHTML += '<p style="color: green;">✓ Successfully removed test data</p>';
+                    } catch (error) {
+                        output.innerHTML += `<p style="color: red;">✗ Permission error: ${error.message}</p>`;
+                        output.innerHTML += `<p style="color: red;">Full error: <pre>${JSON.stringify(error, null, 2)}</pre></p>`;
+                    }
+                } else {
+                    output.innerHTML += '<p style="color: orange;">No valid location ID found to test permissions</p>';
+                }
+                
+            } catch (error) {
+                output.innerHTML += `<p style="color: red;">Error: ${error.message}</p>`;
+                console.error('Test error:', error);
+            }
+        }
+        
+        // Run test on load
+        window.addEventListener('load', testUserLocations);
+    </script>
+</head>
+<body>
+    <h1>User Locations Test</h1>
+    <div id="output">Loading...</div>
+</body>
+</html>

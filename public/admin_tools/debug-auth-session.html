@@ -1,0 +1,272 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Debug Auth Session - Admin Tools</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+</head>
+<body class="bg-light">
+    <div class="container py-4">
+        <div class="row justify-content-center">
+            <div class="col-lg-8">
+                <div class="card">
+                    <div class="card-header bg-primary text-white">
+                        <h4 class="mb-0">
+                            <i class="fas fa-bug me-2"></i>Authentication Session Debugger
+                        </h4>
+                        <small>Debug authentication issues for booking management tool</small>
+                    </div>
+                    <div class="card-body">
+                        <div id="loading" class="text-center py-4">
+                            <div class="spinner-border text-primary" role="status">
+                                <span class="visually-hidden">Loading...</span>
+                            </div>
+                            <p class="mt-2">Checking authentication state...</p>
+                        </div>
+                        
+                        <div id="results" class="d-none">
+                            <div class="row">
+                                <div class="col-md-6">
+                                    <div class="card mb-3">
+                                        <div class="card-header">
+                                            <h6 class="mb-0">Current User</h6>
+                                        </div>
+                                        <div class="card-body">
+                                            <div id="userInfo"></div>
+                                        </div>
+                                    </div>
+                                </div>
+                                <div class="col-md-6">
+                                    <div class="card mb-3">
+                                        <div class="card-header">
+                                            <h6 class="mb-0">Admin Status</h6>
+                                        </div>
+                                        <div class="card-body">
+                                            <div id="adminInfo"></div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                            
+                            <div class="card mb-3">
+                                <div class="card-header">
+                                    <h6 class="mb-0">Token Claims</h6>
+                                </div>
+                                <div class="card-body">
+                                    <div id="tokenInfo"></div>
+                                </div>
+                            </div>
+                            
+                            <div class="card mb-3">
+                                <div class="card-header">
+                                    <h6 class="mb-0">Database Profile</h6>
+                                </div>
+                                <div class="card-body">
+                                    <div id="databaseInfo"></div>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <div class="mt-4">
+                            <button id="refreshBtn" class="btn btn-primary me-2">
+                                <i class="fas fa-sync-alt me-1"></i>Refresh Check
+                            </button>
+                            <a href="./booking-management.html" class="btn btn-info me-2">
+                                <i class="fas fa-calendar-alt me-1"></i>Test Booking Tool
+                            </a>
+                            <a href="../admin-login.html" class="btn btn-secondary">
+                                <i class="fas fa-sign-in-alt me-1"></i>Admin Login
+                            </a>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script type="module">
+        import { auth, rtdb, ref, get, onAuthStateChanged } from '../js/config/firebase-config.js';
+        import { AdminClaims } from '../js/auth/admin-claims.js';
+        import { authManager } from '../js/auth/auth.js';
+
+        const loading = document.getElementById('loading');
+        const results = document.getElementById('results');
+        const userInfo = document.getElementById('userInfo');
+        const adminInfo = document.getElementById('adminInfo');
+        const tokenInfo = document.getElementById('tokenInfo');
+        const databaseInfo = document.getElementById('databaseInfo');
+        const refreshBtn = document.getElementById('refreshBtn');
+
+        async function debugAuthSession() {
+            try {
+                console.log('🔍 Starting authentication debug session...');
+                
+                // Initialize auth manager
+                const user = await authManager.initialize();
+                
+                if (!user) {
+                    showResults({
+                        userStatus: 'No user logged in',
+                        adminStatus: 'N/A - No user',
+                        tokenClaims: 'N/A - No user',
+                        databaseProfile: 'N/A - No user'
+                    });
+                    return;
+                }
+
+                console.log('👤 User found:', user.email);
+
+                // Get user info
+                const userStatus = {
+                    email: user.email,
+                    uid: user.uid,
+                    emailVerified: user.emailVerified,
+                    lastSignIn: user.metadata.lastSignInTime
+                };
+
+                // Get token claims
+                let tokenClaims = {};
+                try {
+                    const idTokenResult = await user.getIdTokenResult(true);
+                    tokenClaims = {
+                        admin: idTokenResult.claims.admin || false,
+                        customClaims: Object.keys(idTokenResult.claims).filter(key => 
+                            !['iss', 'aud', 'auth_time', 'user_id', 'sub', 'iat', 'exp', 'email', 'email_verified', 'firebase'].includes(key)
+                        )
+                    };
+                } catch (error) {
+                    tokenClaims = { error: error.message };
+                }
+
+                // Check admin status
+                let adminStatus = {};
+                try {
+                    const isAdmin = await AdminClaims.verifyAdminStatus(user);
+                    adminStatus = {
+                        hasAdminAccess: isAdmin,
+                        verificationMethod: 'AdminClaims.verifyAdminStatus'
+                    };
+                } catch (error) {
+                    adminStatus = { error: error.message };
+                }
+
+                // Get database profile
+                let databaseProfile = {};
+                try {
+                    const userSnapshot = await get(ref(rtdb, `users/${user.uid}`));
+                    const userData = userSnapshot.val();
+                    
+                    if (userData) {
+                        databaseProfile = {
+                            role: userData.role || 'undefined',
+                            isAdmin: userData.isAdmin || false,
+                            status: userData.status || 'undefined',
+                            createdAt: userData.createdAt ? new Date(userData.createdAt).toLocaleString() : 'N/A'
+                        };
+                    } else {
+                        databaseProfile = { status: 'No database profile found' };
+                    }
+
+                    // Check admin-claims collection
+                    const adminClaimsSnapshot = await get(ref(rtdb, `admin-claims/${user.uid}`));
+                    databaseProfile.adminClaim = adminClaimsSnapshot.val() || false;
+                } catch (error) {
+                    databaseProfile = { error: error.message };
+                }
+
+                showResults({
+                    userStatus,
+                    adminStatus,
+                    tokenClaims,
+                    databaseProfile
+                });
+
+            } catch (error) {
+                console.error('Debug error:', error);
+                showResults({
+                    error: error.message
+                });
+            }
+        }
+
+        function showResults(data) {
+            loading.classList.add('d-none');
+            results.classList.remove('d-none');
+
+            if (data.error) {
+                userInfo.innerHTML = `<div class="alert alert-danger">${data.error}</div>`;
+                return;
+            }
+
+            // User info
+            if (typeof data.userStatus === 'string') {
+                userInfo.innerHTML = `<div class="alert alert-warning">${data.userStatus}</div>`;
+            } else {
+                userInfo.innerHTML = `
+                    <p><strong>Email:</strong> ${data.userStatus.email}</p>
+                    <p><strong>UID:</strong> <small>${data.userStatus.uid}</small></p>
+                    <p><strong>Email Verified:</strong> ${data.userStatus.emailVerified ? '✅' : '❌'}</p>
+                    <p><strong>Last Sign In:</strong> ${data.userStatus.lastSignIn || 'N/A'}</p>
+                `;
+            }
+
+            // Admin info
+            if (typeof data.adminStatus === 'string') {
+                adminInfo.innerHTML = `<div class="alert alert-info">${data.adminStatus}</div>`;
+            } else if (data.adminStatus.error) {
+                adminInfo.innerHTML = `<div class="alert alert-danger">${data.adminStatus.error}</div>`;
+            } else {
+                const statusClass = data.adminStatus.hasAdminAccess ? 'success' : 'warning';
+                const statusIcon = data.adminStatus.hasAdminAccess ? '✅' : '❌';
+                adminInfo.innerHTML = `
+                    <div class="alert alert-${statusClass}">
+                        <strong>Admin Access:</strong> ${statusIcon} ${data.adminStatus.hasAdminAccess}
+                    </div>
+                    <p><strong>Method:</strong> ${data.adminStatus.verificationMethod}</p>
+                `;
+            }
+
+            // Token info
+            if (typeof data.tokenClaims === 'string') {
+                tokenInfo.innerHTML = `<div class="alert alert-info">${data.tokenClaims}</div>`;
+            } else if (data.tokenClaims.error) {
+                tokenInfo.innerHTML = `<div class="alert alert-danger">${data.tokenClaims.error}</div>`;
+            } else {
+                tokenInfo.innerHTML = `
+                    <p><strong>Admin Claim:</strong> ${data.tokenClaims.admin ? '✅' : '❌'}</p>
+                    <p><strong>Custom Claims:</strong> ${data.tokenClaims.customClaims.length > 0 ? data.tokenClaims.customClaims.join(', ') : 'None'}</p>
+                `;
+            }
+
+            // Database info
+            if (typeof data.databaseProfile === 'string') {
+                databaseInfo.innerHTML = `<div class="alert alert-info">${data.databaseProfile}</div>`;
+            } else if (data.databaseProfile.error) {
+                databaseInfo.innerHTML = `<div class="alert alert-danger">${data.databaseProfile.error}</div>`;
+            } else if (data.databaseProfile.status) {
+                databaseInfo.innerHTML = `<div class="alert alert-warning">${data.databaseProfile.status}</div>`;
+            } else {
+                databaseInfo.innerHTML = `
+                    <p><strong>Role:</strong> ${data.databaseProfile.role}</p>
+                    <p><strong>isAdmin:</strong> ${data.databaseProfile.isAdmin ? '✅' : '❌'}</p>
+                    <p><strong>Admin Claim:</strong> ${data.databaseProfile.adminClaim ? '✅' : '❌'}</p>
+                    <p><strong>Status:</strong> ${data.databaseProfile.status}</p>
+                    <p><strong>Created:</strong> ${data.databaseProfile.createdAt}</p>
+                `;
+            }
+        }
+
+        // Event listeners
+        refreshBtn.addEventListener('click', () => {
+            loading.classList.remove('d-none');
+            results.classList.add('d-none');
+            debugAuthSession();
+        });
+
+        // Initialize
+        document.addEventListener('DOMContentLoaded', debugAuthSession);
+    </script>
+</body>
+</html> 

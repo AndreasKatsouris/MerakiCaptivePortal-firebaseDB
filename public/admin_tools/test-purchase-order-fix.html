@@ -1,0 +1,194 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Test Purchase Order Location Fix</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <style>
+        body { padding: 20px; background-color: #f8f9fa; }
+        .test-section { margin-bottom: 30px; padding: 20px; background: white; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+        .success { color: #28a745; }
+        .error { color: #dc3545; }
+        .info { color: #17a2b8; }
+        pre { background: #f8f9fa; padding: 10px; border-radius: 4px; font-size: 12px; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Purchase Order Location Name Fix Test</h1>
+        <p class="lead">This tool tests if the location name issue in Purchase Order generation has been resolved.</p>
+        
+        <div class="test-section">
+            <h3>Test 1: Location Name Retrieval</h3>
+            <button class="btn btn-primary" onclick="testLocationNames()">Test Location Names</button>
+            <div id="locationTest" class="mt-3"></div>
+        </div>
+        
+        <div class="test-section">
+            <h3>Test 2: Historical Data Service</h3>
+            <button class="btn btn-primary" onclick="testHistoricalService()">Test Historical Data Matching</button>
+            <div id="historicalTest" class="mt-3"></div>
+        </div>
+        
+        <div class="test-section">
+            <h3>Test Results Summary</h3>
+            <div id="testSummary" class="alert alert-info">
+                Click the test buttons above to run diagnostics.
+            </div>
+        </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    <script type="module">
+        import { auth, rtdb, ref, get, onAuthStateChanged } from '../js/config/firebase-config.js';
+
+        let testResults = {
+            locationNames: false,
+            historicalService: false
+        };
+
+        // Initialize authentication
+        onAuthStateChanged(auth, (user) => {
+            if (!user) {
+                alert('Please login to use this test tool');
+                window.location.href = '/admin-login.html';
+            }
+        });
+
+        window.testLocationNames = async function() {
+            const output = document.getElementById('locationTest');
+            output.innerHTML = '<div class="spinner-border spinner-border-sm"></div> Testing location name retrieval...';
+            
+            try {
+                // Test locations data
+                const locationsRef = ref(rtdb, 'locations');
+                const snapshot = await get(locationsRef);
+                
+                if (!snapshot.exists()) {
+                    output.innerHTML = '<div class="error">❌ No locations found in database</div>';
+                    return;
+                }
+                
+                const locations = snapshot.val();
+                const locationEntries = Object.entries(locations);
+                
+                let html = '<div class="success">✅ Locations Found</div>';
+                html += `<p>Found ${locationEntries.length} locations:</p><ul>`;
+                
+                locationEntries.forEach(([id, loc]) => {
+                    const displayName = loc.displayName || loc.name || 'No name';
+                    html += `<li><strong>ID:</strong> ${id} | <strong>Name:</strong> ${displayName}</li>`;
+                });
+                
+                html += '</ul>';
+                
+                // Test if location names are proper
+                const hasProperNames = locationEntries.some(([id, loc]) => 
+                    (loc.displayName || loc.name) && 
+                    (loc.displayName || loc.name) !== 'Store'
+                );
+                
+                if (hasProperNames) {
+                    html += '<div class="success">✅ Locations have proper names (not hardcoded "Store")</div>';
+                    testResults.locationNames = true;
+                } else {
+                    html += '<div class="error">❌ All locations still show generic names</div>';
+                }
+                
+                output.innerHTML = html;
+                updateTestSummary();
+                
+            } catch (error) {
+                output.innerHTML = `<div class="error">❌ Error: ${error.message}</div>`;
+            }
+        };
+
+        window.testHistoricalService = async function() {
+            const output = document.getElementById('historicalTest');
+            output.innerHTML = '<div class="spinner-border spinner-border-sm"></div> Testing historical data service...';
+            
+            try {
+                // Check recent stock data entries
+                const stockUsageRef = ref(rtdb, 'stockUsage');
+                const snapshot = await get(stockUsageRef);
+                
+                if (!snapshot.exists()) {
+                    output.innerHTML = '<div class="info">ℹ️ No stock data in root path</div>';
+                    testResults.historicalService = true;
+                    updateTestSummary();
+                    return;
+                }
+                
+                const stockData = snapshot.val();
+                const entries = Object.entries(stockData);
+                
+                let html = `<div class="info">Found ${entries.length} stock data entries</div>`;
+                
+                // Check recent entries for proper location names
+                const recentEntries = entries
+                    .sort(([,a], [,b]) => (b.timestamp || 0) - (a.timestamp || 0))
+                    .slice(0, 5);
+                
+                html += '<p><strong>Recent 5 entries:</strong></p>';
+                
+                let hasProperNames = false;
+                recentEntries.forEach(([key, data]) => {
+                    const storeName = data.storeName || 'No name';
+                    const hasGoodName = storeName !== 'Store' && storeName !== 'Default Store';
+                    if (hasGoodName) hasProperNames = true;
+                    
+                    html += `<div class="${hasGoodName ? 'success' : 'error'}">
+                        ${hasGoodName ? '✅' : '❌'} ${new Date(data.timestamp).toLocaleDateString()}: ${storeName}
+                    </div>`;
+                });
+                
+                if (hasProperNames) {
+                    html += '<div class="success">✅ Recent entries have proper location names</div>';
+                    testResults.historicalService = true;
+                } else {
+                    html += '<div class="error">❌ Recent entries still use generic names</div>';
+                }
+                
+                output.innerHTML = html;
+                updateTestSummary();
+                
+            } catch (error) {
+                output.innerHTML = `<div class="error">❌ Error: ${error.message}</div>`;
+            }
+        };
+
+        function updateTestSummary() {
+            const summary = document.getElementById('testSummary');
+            const passedTests = Object.values(testResults).filter(Boolean).length;
+            const totalTests = Object.keys(testResults).length;
+            
+            if (passedTests === totalTests) {
+                summary.className = 'alert alert-success';
+                summary.innerHTML = `
+                    <h5>🎉 All Tests Passed! (${passedTests}/${totalTests})</h5>
+                    <p>The Purchase Order location name fix appears to be working correctly.</p>
+                    <p><strong>Next Steps:</strong></p>
+                    <ul>
+                        <li>Test the actual Purchase Order generation with advanced mode</li>
+                        <li>Verify historical data is being loaded correctly</li>
+                        <li>Plan the database structure migration</li>
+                    </ul>
+                `;
+            } else if (passedTests > 0) {
+                summary.className = 'alert alert-warning';
+                summary.innerHTML = `
+                    <h5>⚠️ Partial Success (${passedTests}/${totalTests})</h5>
+                    <p>Some fixes are working, but there may still be issues to resolve.</p>
+                `;
+            } else {
+                summary.className = 'alert alert-danger';
+                summary.innerHTML = `
+                    <h5>❌ Tests Failed (${passedTests}/${totalTests})</h5>
+                    <p>The fixes may not be working as expected. Check the individual test results above.</p>
+                `;
+            }
+        }
+    </script>
+</body>
+</html> 

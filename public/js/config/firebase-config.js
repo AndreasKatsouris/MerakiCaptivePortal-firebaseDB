@@ -1,9 +1,9 @@
 // Import Firebase modules
 import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.12.5/firebase-app.js';
-import { getAuth, signInWithEmailAndPassword, signOut } from 'https://www.gstatic.com/firebasejs/10.12.5/firebase-auth.js';
+import { getAuth, signInWithEmailAndPassword, signOut, onAuthStateChanged } from 'https://www.gstatic.com/firebasejs/10.12.5/firebase-auth.js';
 import { getFirestore } from 'https://www.gstatic.com/firebasejs/10.12.5/firebase-firestore.js';
 import { getFunctions, httpsCallable } from 'https://www.gstatic.com/firebasejs/10.12.5/firebase-functions.js';
-import { getDatabase, ref, push, set, get, update, remove, query, onValue, serverTimestamp, orderByChild, orderByKey, orderByValue, limitToFirst, limitToLast, startAt, endAt, equalTo } from 'https://www.gstatic.com/firebasejs/10.12.5/firebase-database.js';
+import { getDatabase, ref, push, set, get, update, remove, query, onValue, off, serverTimestamp, orderByChild, orderByKey, orderByValue, limitToFirst, limitToLast, startAt, endAt, equalTo } from 'https://www.gstatic.com/firebasejs/10.12.5/firebase-database.js';
 import { getStorage, ref as storageRef, uploadBytesResumable, getDownloadURL } from 'https://www.gstatic.com/firebasejs/10.12.5/firebase-storage.js';
 
 // Firebase configuration
@@ -22,8 +22,7 @@ const firebaseConfig = {
 const app = initializeApp(firebaseConfig);
 const auth = getAuth(app);
 const db = getFirestore(app);
-const functions = getFunctions(app);
-functions.region = 'us-central1'; // Set the region for Firebase Functions
+const functions = getFunctions(app, 'us-central1'); // Properly set the region during initialization
 const rtdb = getDatabase(app);
 
 // Export Firebase instances and auth methods
@@ -36,6 +35,7 @@ export {
     rtdb,
     signInWithEmailAndPassword,
     signOut,
+    onAuthStateChanged,
     ref,
     push,
     set,
@@ -44,6 +44,7 @@ export {
     remove,
     query,
     onValue,
+    off,
     orderByChild,
     orderByKey,
     orderByValue,
@@ -70,6 +71,8 @@ window.firebaseExports = {
     remove,
     query,
     onValue,
+    off,
+    onAuthStateChanged,
     orderByChild,
     orderByKey,
     orderByValue,

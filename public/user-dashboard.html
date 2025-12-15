@@ -6,6 +6,7 @@
     <title>User Dashboard - Laki Sparks</title>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link href="css/table-fixes.css" rel="stylesheet">
     <style>
         body {
             background-color: #f8f9fa;
@@ -136,11 +137,27 @@
             color: inherit;
         }
         .action-card:hover {
-            border-color: #667eea;
-            transform: translateY(-2px);
-            box-shadow: 0 5px 15px rgba(0,0,0,0.1);
-            text-decoration: none;
-            color: inherit;
+            transform: translateY(-5px);
+            box-shadow: 0 5px 15px rgba(102, 126, 234, 0.3);
+        }
+        .action-card.locked {
+            opacity: 0.6;
+            cursor: not-allowed;
+            position: relative;
+        }
+        .action-card.locked::after {
+            content: '\f023';
+            font-family: 'Font Awesome 6 Free';
+            font-weight: 900;
+            position: absolute;
+            top: 10px;
+            right: 10px;
+            color: #6c757d;
+            font-size: 1.2rem;
+        }
+        .action-card.locked:hover {
+            transform: none;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.1);
         }
         .action-card i {
             font-size: 2.5rem;
@@ -155,6 +172,22 @@
             font-size: 0.85rem;
             color: #666;
             margin-bottom: 0;
+        }
+        .feature-badges {
+            margin-top: 10px;
+        }
+        .feature-badge {
+            display: inline-block;
+            padding: 3px 8px;
+            margin: 2px;
+            border-radius: 12px;
+            font-size: 0.75rem;
+            background-color: #667eea;
+            color: white;
+        }
+        .feature-badge.locked {
+            background-color: #6c757d;
+            text-decoration: line-through;
         }
     </style>
 </head>
@@ -172,6 +205,9 @@
                 <ul class="navbar-nav ms-auto">
                     <li class="nav-item">
                         <a class="nav-link active" href="#dashboard">Dashboard</a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link" href="user-subscription.html">Subscription</a>
                     </li>
                     <li class="nav-item">
                         <a class="nav-link" href="#locations">Locations</a>
@@ -226,7 +262,10 @@
                         <span id="locationCount">0 / 0</span>
                     </div>
                     <div class="detail">
-                        <button class="upgrade-btn" id="upgradeBtn">Upgrade Plan</button>
+                        <a href="user-subscription.html" class="upgrade-btn" style="text-decoration: none;">Manage Subscription</a>
+                    </div>
+                    <div class="feature-badges" id="featureBadges">
+                        <!-- Feature badges will be inserted here dynamically -->
                     </div>
                 </div>
             </div>
@@ -237,6 +276,11 @@
                     <i class="fas fa-plus-circle"></i>
                     <h6>Add Location</h6>
                     <p>Set up a new business location</p>
+                </a>
+                <a href="user-subscription.html" class="action-card">
+                    <i class="fas fa-credit-card"></i>
+                    <h6>Manage Subscription</h6>
+                    <p>View plan & usage details</p>
                 </a>
                 <a href="#" class="action-card">
                     <i class="fas fa-chart-line"></i>
@@ -252,6 +296,26 @@
                     <i class="fas fa-users"></i>
                     <h6>Guest Insights</h6>
                     <p>View customer analytics</p>
+                </a>
+                <a href="#" class="action-card" id="foodCostBasicAction">
+                    <i class="fas fa-utensils"></i>
+                    <h6>Food Cost Management</h6>
+                    <p>Track food costs & inventory</p>
+                </a>
+                <a href="#" class="action-card" id="foodCostAdvancedAction">
+                    <i class="fas fa-chart-pie"></i>
+                    <h6>Advanced Food Analytics</h6>
+                    <p>Recipe costing & waste tracking</p>
+                </a>
+                <a href="#" class="action-card" id="foodCostAnalyticsAction">
+                    <i class="fas fa-chart-line"></i>
+                    <h6>Food Cost Analytics</h6>
+                    <p>Industry KPIs & insights</p>
+                </a>
+                <a href="#" class="action-card" id="qmsBasicAction">
+                    <i class="fas fa-clock"></i>
+                    <h6>Queue Management</h6>
+                    <p>Manage customer queues & wait times</p>
                 </a>
             </div>
 
@@ -361,6 +425,6 @@
     <!-- Scripts -->
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
-    <script type="module" src="/js/user-dashboard.js"></script>
+    <script type="module" src="/js/user-dashboard.js?v=2.1.4-20250605"></script>
 </body>
 </html>

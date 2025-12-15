@@ -6,8 +6,8 @@
  * Implements the core permission checking logic for the tiered access system
  */
 
-import { rtdb, ref, get, onValue } from '../../../config/firebase-config.js';
-import { authManager } from '../../../auth/auth.js';
+import { rtdb, ref, get, onValue, auth } from '../../../config/firebase-config.js';
+import { authManager } from '../../../auth/auth.js?v=20250131-fix';
 
 // Cache duration in milliseconds (5 minutes)
 const CACHE_TTL = 5 * 60 * 1000;
@@ -21,39 +21,51 @@ const FEATURE_TIERS = {
   'analyticsBasic': 'free',
   'analyticsExport': 'professional',
   'analyticsAdvanced': 'professional',
-  
+
   // WiFi features
   'wifiBasic': 'free',
   'wifiAdvancedCollection': 'starter',
-  
+
   // Guest management
   'guestManagementBasic': 'free',
   'guestManagementAdvanced': 'professional',
-  
+
   // Campaign features
   'campaignsBasic': 'starter',
   'campaignsAdvanced': 'professional',
   'campaignsCustom': 'enterprise',
-  
+
   // Rewards features
   'rewardsBasic': 'starter',
   'rewardsAdvanced': 'professional',
   'rewardsCustom': 'enterprise',
-  
+
   // Receipt processing
   'receiptProcessingManual': 'free',
   'receiptProcessingAutomated': 'professional',
-  
+
   // WhatsApp features
   'whatsappBasic': 'starter',
   'whatsappAdvanced': 'professional',
-  
+
   // Food cost management
   'foodCostBasic': 'professional',
   'advancedFoodCostCalculation': 'enterprise',
-  
+
   // Multi-location
-  'multiLocation': 'starter'
+  'multiLocation': 'starter',
+
+  // Queue Management System (QMS) features
+  'qmsBasic': 'free',
+  'qmsAdvanced': 'starter',
+  'qmsWhatsAppIntegration': 'starter',
+  'qmsAnalytics': 'professional',
+  'qmsAutomation': 'enterprise',
+
+  // Booking Management features
+  'bookingManagement': 'free', // Enable for free tier for testing
+  'bookingAdvanced': 'professional',
+  'bookingAnalytics': 'professional'
 };
 
 // Resource limits by tier
@@ -62,25 +74,45 @@ const TIER_LIMITS = {
     guestRecords: 500,
     locations: 1,
     receiptProcessing: 50,
-    campaignTemplates: 2
+    campaignTemplates: 2,
+    queueEntries: 25,
+    queueLocations: 1,
+    queueHistoryDays: 7,
+    bookingEntries: 50,
+    bookingHistoryDays: 30
   },
   'starter': {
     guestRecords: 2000,
     locations: 2,
     receiptProcessing: 200,
-    campaignTemplates: 5
+    campaignTemplates: 5,
+    queueEntries: 100,
+    queueLocations: 2,
+    queueHistoryDays: 30,
+    bookingEntries: 200,
+    bookingHistoryDays: 60
   },
   'professional': {
     guestRecords: 10000,
     locations: 5,
     receiptProcessing: 500,
-    campaignTemplates: 20
+    campaignTemplates: 20,
+    queueEntries: 500,
+    queueLocations: 5,
+    queueHistoryDays: 90,
+    bookingEntries: 1000,
+    bookingHistoryDays: 365
   },
   'enterprise': {
     guestRecords: Infinity,
     locations: Infinity,
     receiptProcessing: Infinity,
-    campaignTemplates: Infinity
+    campaignTemplates: Infinity,
+    queueEntries: Infinity,
+    queueLocations: Infinity,
+    queueHistoryDays: Infinity,
+    bookingEntries: Infinity,
+    bookingHistoryDays: Infinity
   }
 };
 
@@ -99,31 +131,32 @@ let currentSubscriptionListener = null;
  * @returns {Promise<Object|null>} The user's subscription data or null if not found
  */
 export async function getCurrentSubscription() {
-  const user = authManager.getCurrentUser();
-  
+  // Try Firebase Auth first, fallback to authManager
+  const user = auth.currentUser || authManager.getCurrentUser();
+
   if (!user) {
     console.warn('Access Control: No user authenticated');
     return null;
   }
-  
+
   // Use cached data if valid
   if (
-    subscriptionCache.data && 
+    subscriptionCache.data &&
     subscriptionCache.userId === user.uid &&
     Date.now() - subscriptionCache.timestamp < CACHE_TTL
   ) {
     return subscriptionCache.data;
   }
-  
+
   try {
     const snapshot = await get(ref(rtdb, `subscriptions/${user.uid}`));
     const subscription = snapshot.val();
-    
+
     // Update cache
     subscriptionCache.data = subscription || { tier: 'free' }; // Default to free tier
     subscriptionCache.timestamp = Date.now();
     subscriptionCache.userId = user.uid;
-    
+
     return subscriptionCache.data;
   } catch (error) {
     console.error('Access Control: Failed to get subscription', error);
@@ -137,35 +170,36 @@ export async function getCurrentSubscription() {
  * @returns {Promise<Function>} Unsubscribe function
  */
 export async function subscribeToSubscription(callback) {
-  const user = authManager.getCurrentUser();
-  
+  // Try Firebase Auth first, fallback to authManager
+  const user = auth.currentUser || authManager.getCurrentUser();
+
   if (!user) {
     console.warn('Access Control: No user authenticated');
-    return () => {};
+    return () => { };
   }
-  
+
   // Remove any existing listener by calling the unsubscribe function directly
   if (currentSubscriptionListener) {
     console.log('Detaching previous subscription listener.');
     currentSubscriptionListener(); // Call the function returned by onValue
     currentSubscriptionListener = null;
   }
-  
+
   const subscriptionRef = ref(rtdb, `subscriptions/${user.uid}`);
-  
+
   // Set up the new listener
   currentSubscriptionListener = onValue(subscriptionRef, (snapshot) => {
     const subscription = snapshot.val() || { tier: 'free' };
-    
+
     // Update cache
     subscriptionCache.data = subscription;
     subscriptionCache.timestamp = Date.now();
     subscriptionCache.userId = user.uid;
-    
+
     // Invoke callback
     callback(subscription);
   });
-  
+
   // Return unsubscribe function
   return () => currentSubscriptionListener();
 }
@@ -177,21 +211,23 @@ export async function subscribeToSubscription(callback) {
  */
 export async function canUseFeature(featureId) {
   const subscription = await getCurrentSubscription();
-  
+
   if (!subscription) {
     return false;
   }
-  
+
   // Check direct feature flag first (for overrides)
   if (subscription.features && subscription.features[featureId] !== undefined) {
     return subscription.features[featureId];
   }
-  
+
   // Check tier-based access
   const requiredTier = FEATURE_TIERS[featureId] || 'enterprise';
-  const userTierIndex = TIERS.indexOf(subscription.tier);
+  // Support both 'tier' and 'tierId' fields for backwards compatibility
+  const userTier = subscription.tierId || subscription.tier || 'free';
+  const userTierIndex = TIERS.indexOf(userTier);
   const requiredTierIndex = TIERS.indexOf(requiredTier);
-  
+
   // User can access the feature if their tier is equal to or higher than the required tier
   return userTierIndex >= requiredTierIndex;
 }
@@ -203,20 +239,20 @@ export async function canUseFeature(featureId) {
  */
 export async function getLimit(limitId) {
   const subscription = await getCurrentSubscription();
-  
+
   if (!subscription) {
     return TIER_LIMITS.free[limitId] || 0;
   }
-  
+
   // Check direct limit override first
   if (subscription.limits && subscription.limits[limitId] !== undefined) {
     return subscription.limits[limitId];
   }
-  
+
   // Return tier-based limit
-  return TIER_LIMITS[subscription.tier]?.[limitId] || 
-         TIER_LIMITS.free[limitId] || 
-         0;
+  return TIER_LIMITS[subscription.tier]?.[limitId] ||
+    TIER_LIMITS.free[limitId] ||
+    0;
 }
 
 /**
@@ -237,7 +273,7 @@ export async function isAtLimit(limitId, currentUsage) {
 export async function getAllFeatures() {
   const subscription = await getCurrentSubscription();
   const result = {};
-  
+
   // Process all defined features
   for (const featureId in FEATURE_TIERS) {
     // Check direct feature flag first (for overrides)
@@ -245,15 +281,17 @@ export async function getAllFeatures() {
       result[featureId] = subscription.features[featureId];
       continue;
     }
-    
+
     // Check tier-based access
     const requiredTier = FEATURE_TIERS[featureId];
-    const userTierIndex = TIERS.indexOf(subscription?.tier || 'free');
+    // Support both 'tier' and 'tierId' fields for backwards compatibility
+    const userTier = subscription?.tierId || subscription?.tier || 'free';
+    const userTierIndex = TIERS.indexOf(userTier);
     const requiredTierIndex = TIERS.indexOf(requiredTier);
-    
+
     result[featureId] = userTierIndex >= requiredTierIndex;
   }
-  
+
   return result;
 }
 
@@ -266,7 +304,7 @@ export async function getAllFeatures() {
 export function isTierAtLeast(tierA, tierB) {
   const tierAIndex = TIERS.indexOf(tierA);
   const tierBIndex = TIERS.indexOf(tierB);
-  
+
   return tierAIndex >= tierBIndex;
 }
 
@@ -288,12 +326,12 @@ const AccessControl = {
   getCurrentSubscription,
   getAllFeatures,
   resetCache,
-  
+
   // Additional utility methods
   getAvailableTiers: () => [...TIERS],
-  getFeatureDefinitions: () => ({...FEATURE_TIERS}),
-  getTierLimits: (tier) => ({...TIER_LIMITS[tier || 'free']}),
-  
+  getFeatureDefinitions: () => ({ ...FEATURE_TIERS }),
+  getTierLimits: (tier) => ({ ...TIER_LIMITS[tier || 'free'] }),
+
   /**
    * Render an upgrade prompt for a specific feature
    * @param {string} featureId The feature ID that requires upgrade
@@ -301,17 +339,17 @@ const AccessControl = {
    */
   async showUpgradePrompt(featureId, container) {
     if (!container) return;
-    
+
     const requiredTier = FEATURE_TIERS[featureId] || 'enterprise';
     const subscription = await getCurrentSubscription();
     const currentTier = subscription?.tier || 'free';
-    
+
     // Only show if user doesn't have access
     if (isTierAtLeast(currentTier, requiredTier)) {
       container.innerHTML = '';
       return;
     }
-    
+
     // Simple upgrade prompt
     container.innerHTML = `
       <div class="upgrade-prompt">
@@ -319,7 +357,7 @@ const AccessControl = {
         <button class="btn btn-primary upgrade-button">Upgrade Now</button>
       </div>
     `;
-    
+
     // Add event listener to upgrade button
     const upgradeButton = container.querySelector('.upgrade-button');
     if (upgradeButton) {
