@@ -1832,8 +1832,8 @@ class AdminDashboard {
 
         try {
             // Load the admin tools content dynamically
-            console.log('Fetching admin tools content from: admin_tools/index.html');
-            const response = await fetch('admin_tools/index.html');
+            console.log('Fetching admin tools content from: tools/admin/index.html');
+            const response = await fetch('tools/admin/index.html');
 
             if (!response.ok) {
                 throw new Error(`Failed to fetch admin tools: ${response.status} ${response.statusText}`);
@@ -1855,12 +1855,12 @@ class AdminDashboard {
                     backButton.remove();
                 }
 
-                // Update relative paths for admin_tools resources
+                // Update relative paths for tools/admin resources
                 const links = mainContent.querySelectorAll('a[href^="test-"], a[href^="check-"], a[href^="generate-"], a[href^="verify-"], a[href^="fix-"], a[href^="setup-"], a[href^="admin-"], a[href^="temp-"], a[href^="allocate-"], a[href^="ocean_"], a[href^="food-"]');
                 links.forEach(link => {
                     const currentHref = link.getAttribute('href');
                     if (!currentHref.startsWith('http') && !currentHref.startsWith('../')) {
-                        link.setAttribute('href', 'admin_tools/' + currentHref);
+                        link.setAttribute('href', 'tools/admin/' + currentHref);
                         // Make links open in new tab since they are individual tools
                         link.setAttribute('target', '_blank');
                     }
@@ -2009,7 +2009,7 @@ class AdminDashboard {
                         // Load the script dynamically
                         script = document.createElement('script');
                         script.type = 'module';
-                        script.src = '../admin_tools/whatsapp-management.js?v=1.0.0-20250707';
+                        script.src = '../tools/admin/whatsapp-management.js?v=1.0.0-20250707';
                         document.body.appendChild(script);
 
                         // Wait for script to load and initialize
