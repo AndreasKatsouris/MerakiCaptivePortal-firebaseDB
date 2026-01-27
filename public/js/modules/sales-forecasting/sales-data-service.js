@@ -1,0 +1,601 @@
+/**
+ * Sales Data Service
+ * 
+ * Handles CRUD operations for sales data, forecasts, and actuals
+ * in Firebase Realtime Database.
+ */
+
+import { rtdb, ref, get, set, push, update, remove, query, orderByChild, equalTo } from '../../config/firebase-config.js';
+
+export class SalesDataService {
+    /**
+     * Initialize the service
+     * @param {string} userId - Current user ID
+     */
+    constructor(userId) {
+        this.userId = userId;
+        console.log('[SalesDataService] Initialized for user:', userId);
+    }
+
+    // ==========================================
+    // Historical Sales Data Operations
+    // ==========================================
+
+    /**
+     * Save historical sales data for a location
+     * @param {string} locationId - Location ID
+     * @param {Array} dailyData - Array of daily sales records
+     * @param {Object} options - Additional options
+     * @returns {Promise<Object>} Save result with salesDataId
+     */
+    async saveHistoricalData(locationId, dailyData, options = {}) {
+        try {
+            const salesDataRef = push(ref(rtdb, 'salesData'));
+            const salesDataId = salesDataRef.key;
+
+            // Calculate summary statistics
+            const summary = this.calculateDataSummary(dailyData);
+
+            // Get date range
+            const dates = dailyData.map(d => d.date).sort();
+            const dateRange = {
+                startDate: dates[0],
+                endDate: dates[dates.length - 1]
+            };
+
+            // Get location name
+            const locationName = options.locationName || await this.getLocationName(locationId);
+
+            // Prepare the data record
+            const salesDataRecord = {
+                locationId,
+                locationName,
+                userId: this.userId,
+                uploadedAt: Date.now(),
+                dataSource: options.dataSource || 'csv_upload',
+                dateRange,
+                recordCount: dailyData.length,
+                summary,
+                dailyData: this.indexDailyData(dailyData)
+            };
+
+            // Save the data
+            await set(salesDataRef, salesDataRecord);
+
+            // Update index
+            await this.updateSalesDataIndex(salesDataId, locationId, this.userId);
+
+            console.log('[SalesDataService] Saved historical data:', salesDataId);
+
+            return {
+                salesDataId,
+                recordCount: dailyData.length,
+                dateRange
+            };
+        } catch (error) {
+            console.error('[SalesDataService] Error saving historical data:', error);
+            throw error;
+        }
+    }
+
+    /**
+     * Get list of saved historical data sets for a location
+     * @param {string} locationId - Location ID
+     * @returns {Promise<Array>} List of saved data sets
+     */
+    async getHistoricalDataList(locationId) {
+        try {
+            const indexRef = ref(rtdb, `salesDataIndex/byLocation/${locationId}`);
+            const snapshot = await get(indexRef);
+
+            if (!snapshot.exists()) {
+                return [];
+            }
+
+            const dataIds = Object.keys(snapshot.val());
+            const dataSets = [];
+
+            for (const id of dataIds) {
+                const dataRef = ref(rtdb, `salesData/${id}`);
+                const dataSnapshot = await get(dataRef);
+
+                if (dataSnapshot.exists()) {
+                    const data = dataSnapshot.val();
+                    dataSets.push({
+                        id,
+                        locationId: data.locationId,
+                        locationName: data.locationName,
+                        uploadedAt: data.uploadedAt,
+                        dateRange: data.dateRange,
+                        recordCount: data.recordCount,
+                        summary: data.summary
+                    });
+                }
+            }
+
+            // Sort by upload date descending
+            dataSets.sort((a, b) => b.uploadedAt - a.uploadedAt);
+
+            return dataSets;
+        } catch (error) {
+            console.error('[SalesDataService] Error getting historical data list:', error);
+            throw error;
+        }
+    }
+
+    /**
+     * Get full historical data set
+     * @param {string} salesDataId - Sales data ID
+     * @returns {Promise<Object>} Full data set including daily data
+     */
+    async getHistoricalData(salesDataId) {
+        try {
+            const dataRef = ref(rtdb, `salesData/${salesDataId}`);
+            const snapshot = await get(dataRef);
+
+            if (!snapshot.exists()) {
+                throw new Error('Sales data not found');
+            }
+
+            const data = snapshot.val();
+
+            // Convert indexed daily data back to array
+            data.dailyDataArray = this.dailyDataToArray(data.dailyData);
+
+            return data;
+        } catch (error) {
+            console.error('[SalesDataService] Error getting historical data:', error);
+            throw error;
+        }
+    }
+
+    /**
+     * Delete historical data set
+     * @param {string} salesDataId - Sales data ID
+     */
+    async deleteHistoricalData(salesDataId) {
+        try {
+            // Get the data first to get location info
+            const dataRef = ref(rtdb, `salesData/${salesDataId}`);
+            const snapshot = await get(dataRef);
+
+            if (snapshot.exists()) {
+                const data = snapshot.val();
+
+                // Remove from index
+                const indexRef = ref(rtdb, `salesDataIndex/byLocation/${data.locationId}/${salesDataId}`);
+                await remove(indexRef);
+
+                const userIndexRef = ref(rtdb, `salesDataIndex/byUser/${this.userId}/${salesDataId}`);
+                await remove(userIndexRef);
+            }
+
+            // Remove the data
+            await remove(dataRef);
+
+            console.log('[SalesDataService] Deleted historical data:', salesDataId);
+        } catch (error) {
+            console.error('[SalesDataService] Error deleting historical data:', error);
+            throw error;
+        }
+    }
+
+    // ==========================================
+    // Forecast Operations
+    // ==========================================
+
+    /**
+     * Save a forecast
+     * @param {string} locationId - Location ID
+     * @param {string} salesDataId - Source sales data ID
+     * @param {Object} forecast - Forecast data
+     * @returns {Promise<Object>} Save result with forecastId
+     */
+    async saveForecast(locationId, salesDataId, forecast) {
+        try {
+            const forecastRef = push(ref(rtdb, 'forecasts'));
+            const forecastId = forecastRef.key;
+
+            // Get location name
+            const locationName = await this.getLocationName(locationId);
+
+            // Prepare the forecast record
+            const forecastRecord = {
+                locationId,
+                locationName,
+                userId: this.userId,
+                createdAt: Date.now(),
+                updatedAt: Date.now(),
+                status: 'active',
+                salesDataId,
+                config: forecast.config,
+                predictions: this.formatPredictions(forecast.predictions),
+                metadata: {
+                    totalPredictedRevenue: this.calculateTotalPredictedRevenue(forecast.predictions),
+                    adjustmentCount: 0
+                }
+            };
+
+            // Save the forecast
+            await set(forecastRef, forecastRecord);
+
+            // Update index
+            await this.updateForecastIndex(forecastId, locationId);
+
+            console.log('[SalesDataService] Saved forecast:', forecastId);
+
+            return { forecastId };
+        } catch (error) {
+            console.error('[SalesDataService] Error saving forecast:', error);
+            throw error;
+        }
+    }
+
+    /**
+     * Get forecasts for a location
+     * @param {string} locationId - Location ID
+     * @param {string} status - Filter by status (optional)
+     * @returns {Promise<Array>} List of forecasts
+     */
+    async getForecasts(locationId, status = null) {
+        try {
+            const indexRef = ref(rtdb, `forecastIndex/byLocation/${locationId}`);
+            const snapshot = await get(indexRef);
+
+            if (!snapshot.exists()) {
+                return [];
+            }
+
+            const forecastIndex = snapshot.val();
+            const forecasts = [];
+
+            for (const [forecastId, indexData] of Object.entries(forecastIndex)) {
+                if (status && indexData.status !== status) {
+                    continue;
+                }
+
+                const dataRef = ref(rtdb, `forecasts/${forecastId}`);
+                const dataSnapshot = await get(dataRef);
+
+                if (dataSnapshot.exists()) {
+                    forecasts.push({
+                        id: forecastId,
+                        ...dataSnapshot.val()
+                    });
+                }
+            }
+
+            // Sort by creation date descending
+            forecasts.sort((a, b) => b.createdAt - a.createdAt);
+
+            return forecasts;
+        } catch (error) {
+            console.error('[SalesDataService] Error getting forecasts:', error);
+            throw error;
+        }
+    }
+
+    /**
+     * Get a single forecast
+     * @param {string} forecastId - Forecast ID
+     * @returns {Promise<Object>} Forecast data
+     */
+    async getForecast(forecastId) {
+        try {
+            const dataRef = ref(rtdb, `forecasts/${forecastId}`);
+            const snapshot = await get(dataRef);
+
+            if (!snapshot.exists()) {
+                throw new Error('Forecast not found');
+            }
+
+            return {
+                id: forecastId,
+                ...snapshot.val()
+            };
+        } catch (error) {
+            console.error('[SalesDataService] Error getting forecast:', error);
+            throw error;
+        }
+    }
+
+    /**
+     * Update forecast adjustments
+     * @param {string} forecastId - Forecast ID
+     * @param {Object} adjustments - Adjustments by date
+     */
+    async updateForecastAdjustments(forecastId, adjustments) {
+        try {
+            const updates = {};
+            let adjustmentCount = 0;
+
+            for (const [date, adjustment] of Object.entries(adjustments)) {
+                updates[`forecasts/${forecastId}/predictions/${date}/adjusted`] = adjustment;
+                if (adjustment.reason) {
+                    updates[`forecasts/${forecastId}/predictions/${date}/adjustmentReason`] = adjustment.reason;
+                }
+                adjustmentCount++;
+            }
+
+            updates[`forecasts/${forecastId}/updatedAt`] = Date.now();
+            updates[`forecasts/${forecastId}/metadata/adjustmentCount`] = adjustmentCount;
+
+            await update(ref(rtdb), updates);
+
+            console.log('[SalesDataService] Updated adjustments for forecast:', forecastId);
+        } catch (error) {
+            console.error('[SalesDataService] Error updating adjustments:', error);
+            throw error;
+        }
+    }
+
+    /**
+     * Archive a forecast
+     * @param {string} forecastId - Forecast ID
+     */
+    async archiveForecast(forecastId) {
+        try {
+            const updates = {
+                [`forecasts/${forecastId}/status`]: 'archived',
+                [`forecasts/${forecastId}/updatedAt`]: Date.now()
+            };
+
+            // Also update index
+            const forecast = await this.getForecast(forecastId);
+            updates[`forecastIndex/byLocation/${forecast.locationId}/${forecastId}/status`] = 'archived';
+
+            await update(ref(rtdb), updates);
+
+            console.log('[SalesDataService] Archived forecast:', forecastId);
+        } catch (error) {
+            console.error('[SalesDataService] Error archiving forecast:', error);
+            throw error;
+        }
+    }
+
+    // ==========================================
+    // Actuals Operations
+    // ==========================================
+
+    /**
+     * Save actual sales data for comparison
+     * @param {string} forecastId - Forecast to compare against
+     * @param {Array} dailyActuals - Actual sales data
+     * @returns {Promise<Object>} Save result with actualId
+     */
+    async saveActuals(forecastId, dailyActuals) {
+        try {
+            const actualRef = push(ref(rtdb, 'forecastActuals'));
+            const actualId = actualRef.key;
+
+            // Get the forecast to get location info
+            const forecast = await this.getForecast(forecastId);
+
+            // Get date range
+            const dates = dailyActuals.map(d => d.date).sort();
+            const dateRange = {
+                startDate: dates[0],
+                endDate: dates[dates.length - 1]
+            };
+
+            // Prepare the actuals record
+            const actualsRecord = {
+                forecastId,
+                locationId: forecast.locationId,
+                uploadedAt: Date.now(),
+                uploadedBy: this.userId,
+                dateRange,
+                dailyActuals: this.indexDailyData(dailyActuals),
+                comparison: null // Will be calculated by analytics
+            };
+
+            // Save the actuals
+            await set(actualRef, actualsRecord);
+
+            console.log('[SalesDataService] Saved actuals:', actualId);
+
+            return { actualId };
+        } catch (error) {
+            console.error('[SalesDataService] Error saving actuals:', error);
+            throw error;
+        }
+    }
+
+    /**
+     * Get actuals for a forecast
+     * @param {string} forecastId - Forecast ID
+     * @returns {Promise<Object|null>} Actuals data or null
+     */
+    async getActuals(forecastId) {
+        try {
+            // Query actuals by forecastId
+            const actualsRef = ref(rtdb, 'forecastActuals');
+            const snapshot = await get(actualsRef);
+
+            if (!snapshot.exists()) {
+                return null;
+            }
+
+            const allActuals = snapshot.val();
+            for (const [id, actuals] of Object.entries(allActuals)) {
+                if (actuals.forecastId === forecastId) {
+                    return {
+                        id,
+                        ...actuals,
+                        dailyActualsArray: this.dailyDataToArray(actuals.dailyActuals)
+                    };
+                }
+            }
+
+            return null;
+        } catch (error) {
+            console.error('[SalesDataService] Error getting actuals:', error);
+            throw error;
+        }
+    }
+
+    /**
+     * Update comparison results for actuals
+     * @param {string} actualId - Actuals ID
+     * @param {Object} comparison - Comparison results
+     */
+    async updateComparison(actualId, comparison) {
+        try {
+            const updates = {
+                [`forecastActuals/${actualId}/comparison`]: comparison
+            };
+
+            await update(ref(rtdb), updates);
+
+            console.log('[SalesDataService] Updated comparison for actuals:', actualId);
+        } catch (error) {
+            console.error('[SalesDataService] Error updating comparison:', error);
+            throw error;
+        }
+    }
+
+    // ==========================================
+    // Helper Methods
+    // ==========================================
+
+    /**
+     * Calculate summary statistics for daily data
+     */
+    calculateDataSummary(dailyData) {
+        const totalRevenue = dailyData.reduce((sum, d) => sum + (d.revenue || 0), 0);
+        const totalTransactions = dailyData.reduce((sum, d) => sum + (d.transactions || d.transaction_qty || 0), 0);
+
+        return {
+            totalRevenue,
+            avgDailyRevenue: dailyData.length > 0 ? totalRevenue / dailyData.length : 0,
+            totalTransactions,
+            avgTransactionValue: totalTransactions > 0 ? totalRevenue / totalTransactions : 0
+        };
+    }
+
+    /**
+     * Index daily data by date for efficient storage
+     * Aggregates duplicate dates by summing revenue and transactions
+     */
+    indexDailyData(dailyData) {
+        const indexed = {};
+
+        // Helper to format date without timezone issues
+        const formatDateKey = (date) => {
+            if (typeof date === 'string') return date.split('T')[0].replace(/\//g, '-');
+            const d = new Date(date);
+            const year = d.getFullYear();
+            const month = String(d.getMonth() + 1).padStart(2, '0');
+            const day = String(d.getDate()).padStart(2, '0');
+            return `${year}-${month}-${day}`;
+        };
+
+        for (const day of dailyData) {
+            const dateKey = formatDateKey(day.date);
+
+            // If date already exists, aggregate the values
+            if (indexed[dateKey]) {
+                indexed[dateKey].revenue += (day.revenue || 0);
+                indexed[dateKey].transactions += (day.transactions || day.transaction_qty || day.transactionQty || 0);
+                // Recalculate avgSpend
+                indexed[dateKey].avgSpend = indexed[dateKey].transactions > 0
+                    ? indexed[dateKey].revenue / indexed[dateKey].transactions
+                    : 0;
+            } else {
+                indexed[dateKey] = {
+                    revenue: day.revenue || 0,
+                    transactions: day.transactions || day.transaction_qty || day.transactionQty || 0,
+                    avgSpend: day.avgSpend || day.avg_spend || 0
+                };
+            }
+        }
+
+        return indexed;
+    }
+
+    /**
+     * Convert indexed daily data back to array
+     */
+    dailyDataToArray(indexedData) {
+        if (!indexedData) return [];
+
+        return Object.entries(indexedData).map(([date, data]) => ({
+            date,
+            ...data
+        })).sort((a, b) => new Date(a.date) - new Date(b.date));
+    }
+
+    /**
+     * Format predictions for storage
+     */
+    formatPredictions(predictions) {
+        const formatted = {};
+
+        for (const pred of predictions) {
+            const dateKey = typeof pred.date === 'string'
+                ? pred.date
+                : pred.date.toISOString().split('T')[0];
+
+            formatted[dateKey] = {
+                original: {
+                    revenue: pred.revenue,
+                    transactions: pred.transactionQty || pred.transactions,
+                    avgSpend: pred.avgSpend
+                },
+                confidenceLower: pred.confidenceLower,
+                confidenceUpper: pred.confidenceUpper
+            };
+        }
+
+        return formatted;
+    }
+
+    /**
+     * Calculate total predicted revenue
+     */
+    calculateTotalPredictedRevenue(predictions) {
+        return predictions.reduce((sum, p) => sum + (p.revenue || 0), 0);
+    }
+
+    /**
+     * Get location name from ID
+     */
+    async getLocationName(locationId) {
+        try {
+            const locationRef = ref(rtdb, `locations/${locationId}/name`);
+            const snapshot = await get(locationRef);
+            return snapshot.exists() ? snapshot.val() : 'Unknown Location';
+        } catch (error) {
+            console.warn('[SalesDataService] Could not get location name:', error);
+            return 'Unknown Location';
+        }
+    }
+
+    /**
+     * Update sales data index
+     */
+    async updateSalesDataIndex(salesDataId, locationId, userId) {
+        const updates = {
+            [`salesDataIndex/byLocation/${locationId}/${salesDataId}`]: true,
+            [`salesDataIndex/byUser/${userId}/${salesDataId}`]: true
+        };
+
+        await update(ref(rtdb), updates);
+    }
+
+    /**
+     * Update forecast index
+     */
+    async updateForecastIndex(forecastId, locationId) {
+        const updates = {
+            [`forecastIndex/byLocation/${locationId}/${forecastId}`]: {
+                createdAt: Date.now(),
+                status: 'active'
+            }
+        };
+
+        await update(ref(rtdb), updates);
+    }
+}
+
+export default SalesDataService;
