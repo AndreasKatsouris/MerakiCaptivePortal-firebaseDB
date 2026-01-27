@@ -5,7 +5,7 @@
  * in Firebase Realtime Database.
  */
 
-import { rtdb, ref, get, set, push, update, remove, query, orderByChild, equalTo } from '../../config/firebase-config.js';
+import { rtdb, ref, get, set, push, update, remove, query, orderByChild, equalTo, onValue } from '../../config/firebase-config.js';
 
 export class SalesDataService {
     /**
@@ -178,6 +178,59 @@ export class SalesDataService {
             console.error('[SalesDataService] Error deleting historical data:', error);
             throw error;
         }
+    }
+
+    /**
+     * Get list of forecasts for a location with real-time updates
+     * @param {string} locationId - Location ID
+     * @param {Function} callback - Callback function(forecasts)
+     * @returns {Function} Unsubscribe function
+     */
+    getForecastsList(locationId, callback) {
+        console.log('[SalesDataService] Attaching real-time listener for forecasts:', locationId);
+
+        const forecastsRef = ref(rtdb, `forecastIndex/byLocation/${locationId}`);
+
+        const unsubscribe = onValue(forecastsRef, async (snapshot) => {
+            const forecasts = [];
+
+            if (snapshot.exists()) {
+                const forecastIds = Object.keys(snapshot.val());
+
+                for (const forecastId of forecastIds) {
+                    try {
+                        const forecastRef = ref(rtdb, `forecasts/${forecastId}`);
+                        const forecastSnapshot = await get(forecastRef);
+
+                        if (forecastSnapshot.exists()) {
+                            const forecast = forecastSnapshot.val();
+
+                            forecasts.push({
+                                id: forecastId,
+                                name: forecast.metadata?.name || this.generateDefaultName(forecast),
+                                description: forecast.metadata?.description || '',
+                                savedAt: forecast.metadata?.savedAt || forecast.createdAt,
+                                method: forecast.config?.method || 'unknown',
+                                horizon: forecast.config?.horizon || 0,
+                                summary: forecast.summary || null,
+                                accuracy: forecast.accuracy || null,
+                                savedAgo: this.getTimeAgo(forecast.metadata?.savedAt || forecast.createdAt)
+                            });
+                        }
+                    } catch (error) {
+                        console.error('[SalesDataService] Error loading forecast:', forecastId, error);
+                    }
+                }
+
+                // Sort by most recent first
+                forecasts.sort((a, b) => b.savedAt - a.savedAt);
+            }
+
+            console.log('[SalesDataService] Forecasts updated:', forecasts.length);
+            callback(forecasts);
+        });
+
+        return unsubscribe;
     }
 
     // ==========================================
