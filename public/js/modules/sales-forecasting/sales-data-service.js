@@ -233,6 +233,34 @@ export class SalesDataService {
         return unsubscribe;
     }
 
+    /**
+     * Get complete saved forecast data
+     * @param {string} forecastId - Forecast ID
+     * @returns {Promise<Object>} Complete forecast object
+     */
+    async getSavedForecast(forecastId) {
+        try {
+            console.log('[SalesDataService] Loading saved forecast:', forecastId);
+
+            const forecastRef = ref(rtdb, `forecasts/${forecastId}`);
+            const snapshot = await get(forecastRef);
+
+            if (!snapshot.exists()) {
+                throw new Error('Forecast not found');
+            }
+
+            const forecast = snapshot.val();
+
+            return {
+                id: forecastId,
+                ...forecast
+            };
+        } catch (error) {
+            console.error('[SalesDataService] Error loading forecast:', error);
+            throw error;
+        }
+    }
+
     // ==========================================
     // Forecast Operations
     // ==========================================
