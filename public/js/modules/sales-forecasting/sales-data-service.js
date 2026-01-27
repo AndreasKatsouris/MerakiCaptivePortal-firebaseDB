@@ -261,6 +261,68 @@ export class SalesDataService {
         }
     }
 
+    /**
+     * Update forecast name and description
+     * @param {string} forecastId - Forecast ID
+     * @param {Object} updates - {name, description}
+     * @returns {Promise<void>}
+     */
+    async updateForecastMetadata(forecastId, updates) {
+        try {
+            console.log('[SalesDataService] Updating forecast metadata:', forecastId);
+
+            const metadataRef = ref(rtdb, `forecasts/${forecastId}/metadata`);
+
+            await update(metadataRef, {
+                name: updates.name,
+                description: updates.description || '',
+                updatedAt: Date.now()
+            });
+
+            console.log('[SalesDataService] Forecast metadata updated');
+        } catch (error) {
+            console.error('[SalesDataService] Error updating forecast metadata:', error);
+            throw error;
+        }
+    }
+
+    /**
+     * Delete a saved forecast
+     * @param {string} forecastId - Forecast ID
+     * @returns {Promise<void>}
+     */
+    async deleteForecast(forecastId) {
+        try {
+            console.log('[SalesDataService] Deleting forecast:', forecastId);
+
+            // Get forecast to find location
+            const forecastRef = ref(rtdb, `forecasts/${forecastId}`);
+            const snapshot = await get(forecastRef);
+
+            if (snapshot.exists()) {
+                const forecast = snapshot.val();
+
+                // Remove from location index
+                if (forecast.locationId) {
+                    const locationIndexRef = ref(rtdb, `forecastIndex/byLocation/${forecast.locationId}/${forecastId}`);
+                    await remove(locationIndexRef);
+                }
+
+                // Remove from user index
+                const userIndexRef = ref(rtdb, `forecastIndex/byUser/${this.userId}/${forecastId}`);
+                await remove(userIndexRef);
+            }
+
+            // Remove the forecast
+            await remove(forecastRef);
+
+            console.log('[SalesDataService] Forecast deleted');
+        } catch (error) {
+            console.error('[SalesDataService] Error deleting forecast:', error);
+            throw error;
+        }
+    }
+
     // ==========================================
     // Forecast Operations
     // ==========================================
