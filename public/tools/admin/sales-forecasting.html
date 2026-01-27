@@ -2916,13 +2916,13 @@
                     locationSelect.dispatchEvent(new Event('change'));
                 }
 
-                // Restore forecast data
-                forecastData = forecast.predictions.map(p => ({
-                    date: p.date,
+                // Restore forecast data (convert from object to array)
+                forecastData = Object.entries(forecast.predictions).map(([date, p]) => ({
+                    date: date,
                     predicted: p.predicted,
                     confidenceLower: p.confidenceLower,
                     confidenceUpper: p.confidenceUpper
-                }));
+                })).sort((a, b) => new Date(a.date) - new Date(b.date));
 
                 // Update metrics
                 const totalRevenue = forecastData.reduce((sum, d) => sum + d.predicted, 0);
