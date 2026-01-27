@@ -449,6 +449,40 @@
             </div>
         </div>
 
+        <!-- Load Saved Forecast Card -->
+        <div class="card" id="loadSavedForecastCard">
+            <h3><i class="fas fa-chart-line me-2"></i>Load Saved Forecast</h3>
+            <p class="text-muted mb-3">View and restore previously generated forecasts</p>
+
+            <div class="row">
+                <div class="col-md-4">
+                    <div class="control-item">
+                        <label for="savedForecastLocationSelect"><i class="fas fa-map-marker-alt me-1"></i>Location</label>
+                        <select id="savedForecastLocationSelect" class="form-select">
+                            <option value="">Select a location...</option>
+                        </select>
+                    </div>
+                </div>
+                <div class="col-md-8">
+                    <div id="savedForecastListContainer">
+                        <div id="savedForecastLoading" class="text-center text-muted py-4 hidden">
+                            <div class="spinner-border spinner-border-sm me-2" role="status"></div>
+                            Loading saved forecasts...
+                        </div>
+                        <div id="savedForecastEmpty" class="text-center text-muted py-4">
+                            <i class="fas fa-chart-line fa-2x mb-3 d-block"></i>
+                            Select a location to view saved forecasts
+                        </div>
+                        <div id="savedForecastResults" class="hidden">
+                            <div class="list-group" id="savedForecastListItems">
+                                <!-- Populated dynamically -->
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
         <!-- Load Saved Historical Data Card -->
         <div class="card" id="loadSavedDataCard">
             <h3><i class="fas fa-database me-2"></i>Load Saved Historical Data</h3>
