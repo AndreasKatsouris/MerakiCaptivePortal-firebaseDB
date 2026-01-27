@@ -1012,6 +1012,11 @@
         import { auth, rtdb, ref, set, get, push, update, onAuthStateChanged } from '../../js/config/firebase-config.js';
         import { AdminClaims } from '../../js/auth/admin-claims.js';
 
+        // Required Firebase Realtime Database Indexes:
+        // - forecastIndex/byLocation/{locationId} - For listing forecasts by location
+        // - forecastIndex/byUser/{userId} - For user-specific forecast queries
+        // Note: The updateForecastIndex() method in SalesDataService manages these indexes
+
         // Import new module services
         import { SalesDataService } from '../../js/modules/sales-forecasting/sales-data-service.js';
         import { ForecastEngine } from '../../js/modules/sales-forecasting/forecast-engine.js';
