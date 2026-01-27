@@ -696,12 +696,9 @@ export class SalesDataService {
                 ? pred.date
                 : pred.date.toISOString().split('T')[0];
 
+            // Support both forecast structure (predicted) and original structure (revenue)
             formatted[dateKey] = {
-                original: {
-                    revenue: pred.revenue,
-                    transactions: pred.transactionQty || pred.transactions,
-                    avgSpend: pred.avgSpend
-                },
+                predicted: pred.predicted || pred.revenue,
                 confidenceLower: pred.confidenceLower,
                 confidenceUpper: pred.confidenceUpper
             };
