@@ -1185,6 +1185,12 @@
             // NEW: View saved data button
             document.getElementById('viewSavedDataBtn').addEventListener('click', toggleSavedDataSection);
 
+            // Save forecast confirmation
+            document.getElementById('confirmSaveForecastBtn')?.addEventListener('click', confirmSaveForecast);
+
+            // Edit forecast name confirmation
+            document.getElementById('confirmEditForecastNameBtn')?.addEventListener('click', confirmEditForecastName);
+
             // NEW: Save adjustments button
             document.getElementById('saveAdjustmentsBtn')?.addEventListener('click', saveAdjustments);
 
@@ -2344,112 +2350,116 @@
         }
 
         // Save forecast to database
+        /**
+         * Show save forecast modal
+         */
         async function saveForecast() {
             console.log('[SalesForecasting] Save forecast clicked');
             const locationId = document.getElementById('locationSelect').value;
             const method = document.getElementById('forecastMethod').value;
-            const preset = document.getElementById('forecastPreset').value;
 
             if (!locationId) {
-                showStatus('error', 'Please select a location');
+                showStatus('error', 'Please select a location first');
                 return;
             }
 
-            if (forecastData.length === 0) {
-                showStatus('error', 'Please generate a forecast first');
+            if (!forecastData || forecastData.length === 0) {
+                showStatus('error', 'No forecast data to save. Generate a forecast first.');
                 return;
             }
+
+            // Populate modal metadata
+            const location = locations.find(l => l.id === locationId);
+            document.getElementById('modalLocationName').textContent = location?.name || locationId;
+
+            const methodNames = {
+                'movingAverage': 'Moving Average',
+                'exponential': 'Exponential',
+                'seasonalTrend': 'Seasonal Trend',
+                'ml': 'Machine Learning'
+            };
+            document.getElementById('modalMethod').textContent = methodNames[method] || method;
+            document.getElementById('modalPeriod').textContent = `${forecastData.length} days`;
+
+            const totalRevenue = forecastData.reduce((sum, d) => sum + d.predicted, 0);
+            document.getElementById('modalRevenue').textContent = `R ${Math.round(totalRevenue).toLocaleString()}`;
+
+            // Generate default name
+            const defaultName = `${methodNames[method]} - ${new Date().toLocaleDateString()}`;
+            document.getElementById('forecastNameInput').value = defaultName;
+            document.getElementById('forecastDescriptionInput').value = '';
+
+            // Show modal
+            const modal = new bootstrap.Modal(document.getElementById('saveForecastModal'));
+            modal.show();
+        }
+
+        /**
+         * Confirm save forecast from modal
+         */
+        async function confirmSaveForecast() {
+            const locationId = document.getElementById('locationSelect').value;
+            const method = document.getElementById('forecastMethod').value;
+            const name = document.getElementById('forecastNameInput').value.trim();
+            const description = document.getElementById('forecastDescriptionInput').value.trim();
+
+            if (name.length < 3) {
+                document.getElementById('forecastNameInput').classList.add('is-invalid');
+                return;
+            }
+
+            document.getElementById('forecastNameInput').classList.remove('is-invalid');
 
             try {
                 showStatus('info', 'Saving forecast...');
 
-                // Use dataService if available (new method)
                 if (dataService) {
                     const config = {
                         method: method,
-                        horizon: preset === 'custom' ? forecastData.length : parseInt(preset),
+                        horizon: forecastData.length,
                         confidenceLevel: parseInt(document.getElementById('confidenceLevel')?.value || '95'),
                         growthRate: parseFloat(document.getElementById('growthRateInput')?.value || '5')
                     };
 
                     const forecastPayload = {
-                        config: config,
+                        config,
                         predictions: forecastData.map(d => ({
-                            date: d.date.toISOString().split('T')[0],
-                            revenue: d.revenue,
-                            transactionQty: d.transactionQty,
-                            avgSpend: d.avgSpend,
+                            date: d.date,
+                            predicted: d.predicted,
                             confidenceLower: d.confidenceLower,
                             confidenceUpper: d.confidenceUpper
                         }))
                     };
 
-                    // saveForecast(locationId, salesDataId, forecast)
+                    const location = locations.find(l => l.id === locationId);
+                    const metadata = {
+                        name,
+                        description,
+                        locationName: location?.name || 'Unknown'
+                    };
+
                     const result = await dataService.saveForecast(
                         locationId,
                         currentSalesDataId || null,
-                        forecastPayload
+                        forecastPayload,
+                        metadata
                     );
 
-                    currentForecastId = result.forecastId;
+                    currentLoadedForecastId = result.forecastId;
 
-                    // Show adjustment and comparison sections
-                    document.getElementById('adjustmentSection')?.classList.remove('hidden');
-                    document.getElementById('actualsSection')?.classList.remove('hidden');
-                    document.getElementById('analyticsSection')?.classList.remove('hidden');
+                    // Close modal
+                    const modal = bootstrap.Modal.getInstance(document.getElementById('saveForecastModal'));
+                    modal.hide();
 
-                    // Populate adjustment table
-                    renderAdjustmentTable();
+                    showStatus('success', 'Forecast saved successfully!');
 
-                    showStatus('success', 'Forecast saved successfully! You can now make adjustments or upload actuals.');
                 } else {
-                    // Fallback to old method
-                    const userId = currentUser.uid;
-                    const timestamp = Date.now();
-                    const forecastRef = ref(rtdb, `forecasts/${userId}/${locationId}/${timestamp}`);
-
-                    const forecastRecord = {
-                        metadata: {
-                            locationId,
-                            locationName: locations.find(l => l.id === locationId)?.name || 'Unknown',
-                            createdAt: timestamp,
-                            forecastMethod: method,
-                            forecastHorizon: horizon
-                        },
-                        historicData: {
-                            startDate: historicData[0].date.toISOString(),
-                            endDate: historicData[historicData.length - 1].date.toISOString(),
-                            totalRecords: historicData.length
-                        },
-                        forecast: {
-                            predictions: forecastData.map(d => ({
-                                date: d.date.toISOString(),
-                                revenue: d.revenue,
-                                transactionQty: d.transactionQty,
-                                avgSpend: d.avgSpend,
-                                confidenceLower: d.confidenceLower,
-                                confidenceUpper: d.confidenceUpper
-                            }))
-                        }
-                    };
-
-                    await set(forecastRef, forecastRecord);
-
-                    // Set a pseudo forecastId for adjustment purposes
-                    currentForecastId = `${userId}/${locationId}/${timestamp}`;
-
-                    // Show adjustment section
-                    document.getElementById('adjustmentSection')?.classList.remove('hidden');
-                    document.getElementById('actualsSection')?.classList.remove('hidden');
-
-                    // Populate adjustment table
-                    renderAdjustmentTable();
-
-                    showStatus('success', 'Forecast saved! You can now make adjustments.');
+                    throw new Error('Data service not initialized');
                 }
+
             } catch (error) {
                 console.error('[SalesForecasting] Error saving forecast:', error);
-                showStatus('error', `Error saving forecast: ${error.message}`);
+                showStatus('error', `Failed to save: ${error.message}`);
             }
         }
 
@@ -2748,6 +2758,287 @@
                     Error loading saved data<br>
                     <small class="text-muted">${error.message}</small>
                 `;
+            }
+        }
+
+        /**
+         * Load saved forecasts for a location with real-time updates
+         */
+        async function loadSavedForecastsForLocation(locationId) {
+            console.log('[SalesForecasting] Loading saved forecasts for location:', locationId);
+
+            const loadingEl = document.getElementById('savedForecastLoading');
+            const emptyEl = document.getElementById('savedForecastEmpty');
+            const resultsEl = document.getElementById('savedForecastResults');
+            const listEl = document.getElementById('savedForecastListItems');
+
+            loadingEl?.classList.remove('hidden');
+            emptyEl?.classList.add('hidden');
+            resultsEl?.classList.add('hidden');
+
+            try {
+                if (!dataService) {
+                    throw new Error('Data service not initialized');
+                }
+
+                // Attach real-time listener
+                forecastListUnsubscribe = dataService.getForecastsList(locationId, (forecasts) => {
+                    loadingEl?.classList.add('hidden');
+
+                    if (!forecasts || forecasts.length === 0) {
+                        emptyEl.innerHTML = `
+                            <i class="fas fa-chart-line fa-2x mb-3 d-block"></i>
+                            <p class="mb-1">No saved forecasts yet for this location</p>
+                            <small class="text-muted">Generate a forecast and click "Save Forecast" to store it</small>
+                        `;
+                        emptyEl.classList.remove('hidden');
+                        resultsEl?.classList.add('hidden');
+                    } else {
+                        renderSavedForecastsList(forecasts);
+                        emptyEl?.classList.add('hidden');
+                        resultsEl?.classList.remove('hidden');
+                    }
+                });
+
+            } catch (error) {
+                console.error('[SalesForecasting] Error loading saved forecasts:', error);
+                loadingEl?.classList.add('hidden');
+                emptyEl.innerHTML = `
+                    <i class="fas fa-exclamation-triangle fa-2x mb-3 d-block text-danger"></i>
+                    <p>Error loading saved forecasts</p>
+                    <small>${error.message}</small>
+                `;
+                emptyEl.classList.remove('hidden');
+            }
+        }
+
+        /**
+         * Render list of saved forecasts
+         */
+        function renderSavedForecastsList(forecasts) {
+            const listEl = document.getElementById('savedForecastListItems');
+
+            if (!listEl) return;
+
+            listEl.innerHTML = '';
+
+            forecasts.forEach(forecast => {
+                const item = document.createElement('div');
+                item.className = 'forecast-list-item';
+
+                // Determine accuracy badge
+                let accuracyBadge = '<span class="forecast-accuracy-badge pending">Not verified</span>';
+                if (forecast.accuracy) {
+                    const status = forecast.accuracy.status || 'pending';
+                    const mape = forecast.accuracy.mape;
+                    accuracyBadge = `<span class="forecast-accuracy-badge ${status}">Accuracy: ${(100 - mape).toFixed(1)}%</span>`;
+                }
+
+                // Format method name
+                const methodNames = {
+                    'movingAverage': 'Moving Average',
+                    'exponential': 'Exponential',
+                    'seasonalTrend': 'Seasonal Trend',
+                    'ml': 'Machine Learning'
+                };
+                const methodDisplay = methodNames[forecast.method] || forecast.method;
+
+                // Format revenue
+                const revenue = forecast.summary?.totalPredictedRevenue || 0;
+                const revenueDisplay = `R ${revenue.toLocaleString()}`;
+
+                item.innerHTML = `
+                    <div class="forecast-list-item-header">
+                        <div class="forecast-list-item-title">${forecast.name}</div>
+                        <div>${accuracyBadge}</div>
+                    </div>
+                    ${forecast.description ? `<div class="text-muted mb-2" style="font-size: 0.9em;">${forecast.description}</div>` : ''}
+                    <div class="forecast-list-item-meta">
+                        <i class="fas fa-clock me-1"></i>${forecast.savedAgo}
+                    </div>
+                    <div class="forecast-list-item-summary">
+                        <div class="forecast-list-item-summary-item">
+                            <span class="forecast-list-item-summary-label">Method:</span>
+                            <span class="forecast-list-item-summary-value">${methodDisplay}</span>
+                        </div>
+                        <div class="forecast-list-item-summary-item">
+                            <span class="forecast-list-item-summary-label">Period:</span>
+                            <span class="forecast-list-item-summary-value">${forecast.horizon} days</span>
+                        </div>
+                        <div class="forecast-list-item-summary-item">
+                            <span class="forecast-list-item-summary-label">Revenue:</span>
+                            <span class="forecast-list-item-summary-value">${revenueDisplay}</span>
+                        </div>
+                    </div>
+                    <div class="forecast-list-item-actions">
+                        <button class="btn btn-sm btn-primary-custom" onclick="loadSavedForecast('${forecast.id}')">
+                            <i class="fas fa-folder-open me-1"></i>Load
+                        </button>
+                        <button class="btn btn-sm btn-outline-secondary" onclick="editForecastName('${forecast.id}', '${forecast.name.replace(/'/g, "\\'")}', '${(forecast.description || '').replace(/'/g, "\\'")}')">
+                            <i class="fas fa-edit me-1"></i>Edit
+                        </button>
+                        <button class="btn btn-sm btn-outline-danger" onclick="deleteSavedForecast('${forecast.id}')">
+                            <i class="fas fa-trash me-1"></i>Delete
+                        </button>
+                    </div>
+                `;
+
+                listEl.appendChild(item);
+            });
+        }
+
+        /**
+         * Load a saved forecast
+         */
+        async function loadSavedForecast(forecastId) {
+            try {
+                showStatus('info', 'Loading forecast...');
+                console.log('[SalesForecasting] Loading forecast:', forecastId);
+
+                const forecast = await dataService.getSavedForecast(forecastId);
+
+                if (!forecast || !forecast.predictions) {
+                    throw new Error('No forecast data found');
+                }
+
+                // Store current forecast ID
+                currentLoadedForecastId = forecastId;
+
+                // Set location
+                const locationSelect = document.getElementById('locationSelect');
+                if (locationSelect && forecast.locationId) {
+                    locationSelect.value = forecast.locationId;
+                    locationSelect.dispatchEvent(new Event('change'));
+                }
+
+                // Restore forecast data
+                forecastData = forecast.predictions.map(p => ({
+                    date: p.date,
+                    predicted: p.predicted,
+                    confidenceLower: p.confidenceLower,
+                    confidenceUpper: p.confidenceUpper
+                }));
+
+                // Update metrics
+                const totalRevenue = forecastData.reduce((sum, d) => sum + d.predicted, 0);
+                const avgDaily = totalRevenue / forecastData.length;
+
+                document.getElementById('totalRevenue').textContent = `R ${Math.round(totalRevenue).toLocaleString()}`;
+                document.getElementById('avgDailySales').textContent = `R ${Math.round(avgDaily).toLocaleString()}`;
+
+                if (forecast.config?.growthRate) {
+                    document.getElementById('growthRateDisplay').textContent = `${forecast.config.growthRate}%`;
+                }
+
+                // Show metrics section
+                document.getElementById('metricsSection').classList.remove('hidden');
+
+                // Render chart and table
+                renderForecastChart();
+                renderForecastTable();
+
+                // Enable adjustment and export buttons
+                document.getElementById('saveForecastBtn').disabled = false;
+                document.getElementById('exportCsvBtn').disabled = false;
+
+                // Show loaded indicator
+                showStatus('success', `Loaded forecast: ${forecast.metadata?.name || 'Unnamed Forecast'}`, 5000);
+
+                // If accuracy data exists, show comparison
+                if (forecast.accuracy) {
+                    document.getElementById('forecastAccuracy').textContent =
+                        `${(100 - forecast.accuracy.mape).toFixed(1)}%`;
+                }
+
+            } catch (error) {
+                console.error('[SalesForecasting] Error loading forecast:', error);
+                showStatus('error', `Failed to load forecast: ${error.message}`);
+            }
+        }
+
+        /**
+         * Edit forecast name and description
+         */
+        function editForecastName(forecastId, currentName, currentDescription) {
+            console.log('[SalesForecasting] Editing forecast name:', forecastId);
+
+            // Populate modal
+            document.getElementById('editForecastNameInput').value = currentName;
+            document.getElementById('editForecastDescriptionInput').value = currentDescription;
+
+            // Show modal
+            const modal = new bootstrap.Modal(document.getElementById('editForecastNameModal'));
+            modal.show();
+
+            // Store forecast ID for confirmation
+            window.currentEditingForecastId = forecastId;
+        }
+
+        /**
+         * Confirm forecast name edit
+         */
+        async function confirmEditForecastName() {
+            const forecastId = window.currentEditingForecastId;
+
+            if (!forecastId) {
+                return;
+            }
+
+            const name = document.getElementById('editForecastNameInput').value.trim();
+            const description = document.getElementById('editForecastDescriptionInput').value.trim();
+
+            if (name.length < 3) {
+                showStatus('error', 'Name must be at least 3 characters');
+                return;
+            }
+
+            try {
+                showStatus('info', 'Updating forecast...');
+
+                await dataService.updateForecastMetadata(forecastId, {
+                    name,
+                    description
+                });
+
+                // Close modal
+                const modal = bootstrap.Modal.getInstance(document.getElementById('editForecastNameModal'));
+                modal.hide();
+
+                showStatus('success', 'Forecast updated successfully');
+
+                // Clear editing state
+                delete window.currentEditingForecastId;
+
+            } catch (error) {
+                console.error('[SalesForecasting] Error updating forecast:', error);
+                showStatus('error', `Failed to update: ${error.message}`);
+            }
+        }
+
+        /**
+         * Delete a saved forecast
+         */
+        async function deleteSavedForecast(forecastId) {
+            if (!confirm('Are you sure you want to delete this forecast? This cannot be undone.')) {
+                return;
+            }
+
+            try {
+                showStatus('info', 'Deleting forecast...');
+                console.log('[SalesForecasting] Deleting forecast:', forecastId);
+
+                await dataService.deleteForecast(forecastId);
+
+                showStatus('success', 'Forecast deleted successfully');
+
+                // If this was the loaded forecast, clear it
+                if (currentLoadedForecastId === forecastId) {
+                    currentLoadedForecastId = null;
+                }
+
+            } catch (error) {
+                console.error('[SalesForecasting] Error deleting forecast:', error);
+                showStatus('error', `Failed to delete: ${error.message}`);
             }
         }
 
@@ -3165,6 +3456,9 @@
         // Expose functions to global scope for onclick handlers
         window.useSavedData = useSavedData;
         window.deleteSavedData = deleteSavedData;
+        window.loadSavedForecast = loadSavedForecast;
+        window.editForecastName = editForecastName;
+        window.deleteSavedForecast = deleteSavedForecast;
 
         // Initialize on page load
         document.addEventListener('DOMContentLoaded', initializeAdminAuth);
