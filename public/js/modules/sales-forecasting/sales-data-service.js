@@ -644,10 +644,65 @@ export class SalesDataService {
             [`forecastIndex/byLocation/${locationId}/${forecastId}`]: {
                 createdAt: Date.now(),
                 status: 'active'
-            }
+            },
+            [`forecastIndex/byUser/${this.userId}/${forecastId}`]: true
         };
 
         await update(ref(rtdb), updates);
+    }
+
+    /**
+     * Generate default forecast name from metadata
+     * @param {Object} forecast - Forecast object
+     * @returns {string} Generated name
+     */
+    generateDefaultName(forecast) {
+        const method = forecast.config?.method || 'Forecast';
+        const date = new Date(forecast.createdAt || Date.now()).toLocaleDateString();
+        return `${method} - ${date}`;
+    }
+
+    /**
+     * Get human-readable time ago string
+     * @param {number} timestamp - Unix timestamp
+     * @returns {string} Time ago string
+     */
+    getTimeAgo(timestamp) {
+        const seconds = Math.floor((Date.now() - timestamp) / 1000);
+
+        if (seconds < 60) return 'Just now';
+        if (seconds < 3600) return `${Math.floor(seconds / 60)} minutes ago`;
+        if (seconds < 86400) return `${Math.floor(seconds / 3600)} hours ago`;
+        if (seconds < 604800) return `${Math.floor(seconds / 86400)} days ago`;
+        return new Date(timestamp).toLocaleDateString();
+    }
+
+    /**
+     * Calculate summary metrics from forecast data
+     * @param {Array} forecastData - Array of forecast predictions
+     * @returns {Object} Summary metrics
+     */
+    calculateForecastSummary(forecastData) {
+        if (!forecastData || forecastData.length === 0) {
+            return null;
+        }
+
+        const totalRevenue = forecastData.reduce((sum, d) => sum + (d.predicted || 0), 0);
+        const avgDaily = totalRevenue / forecastData.length;
+
+        const growth = forecastData.length > 1
+            ? ((forecastData[forecastData.length - 1].predicted / forecastData[0].predicted - 1) * 100)
+            : 0;
+
+        return {
+            totalPredictedRevenue: Math.round(totalRevenue),
+            avgDailyRevenue: Math.round(avgDaily),
+            predictedGrowth: parseFloat(growth.toFixed(1)),
+            dateRange: {
+                start: forecastData[0]?.date,
+                end: forecastData[forecastData.length - 1]?.date
+            }
+        };
     }
 }
 
