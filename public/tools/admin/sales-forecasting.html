@@ -1120,6 +1120,12 @@
                             option2.textContent = data.name;
                             savedDataLocationSelect?.appendChild(option2);
 
+                            // Also add to saved forecast location selector
+                            const option3 = document.createElement('option');
+                            option3.value = id;
+                            option3.textContent = data.name;
+                            document.getElementById('savedForecastLocationSelect')?.appendChild(option3);
+
                             locations.push({ id, name: data.name });
                         }
                     });
