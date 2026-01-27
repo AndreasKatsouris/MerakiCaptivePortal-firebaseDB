@@ -1036,6 +1036,8 @@
         let currentForecastId = null;
         let savedDataSets = [];
         let adjustments = {};
+        let forecastListUnsubscribe = null;
+        let currentLoadedForecastId = null;
 
         // Initialize admin authentication
         async function initializeAdminAuth() {
@@ -1208,6 +1210,26 @@
             savedDataLocationSelect?.addEventListener('change', async (e) => {
                 if (e.target.value) {
                     await loadSavedDataForLocationCard(e.target.value);
+                }
+            });
+
+            // Saved Forecast location selector change
+            const savedForecastLocationSelect = document.getElementById('savedForecastLocationSelect');
+            savedForecastLocationSelect?.addEventListener('change', async (e) => {
+                const locationId = e.target.value;
+
+                // Clean up previous listener
+                if (forecastListUnsubscribe) {
+                    forecastListUnsubscribe();
+                    forecastListUnsubscribe = null;
+                }
+
+                if (locationId) {
+                    await loadSavedForecastsForLocation(locationId);
+                } else {
+                    // Clear the list
+                    document.getElementById('savedForecastEmpty').classList.remove('hidden');
+                    document.getElementById('savedForecastResults').classList.add('hidden');
                 }
             });
 
@@ -3146,6 +3168,13 @@
 
         // Initialize on page load
         document.addEventListener('DOMContentLoaded', initializeAdminAuth);
+
+        // Clean up listeners on page unload
+        window.addEventListener('beforeunload', () => {
+            if (forecastListUnsubscribe) {
+                forecastListUnsubscribe();
+            }
+        });
     </script>
 
     <!-- Save Forecast Modal -->
