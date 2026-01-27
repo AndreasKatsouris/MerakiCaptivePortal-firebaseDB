@@ -5,7 +5,7 @@
  * in Firebase Realtime Database.
  */
 
-import { rtdb, ref, get, set, push, update, remove, query, orderByChild, equalTo } from '../../config/firebase-config.js';
+import { rtdb, ref, get, set, push, update, remove, query, orderByChild, equalTo, onValue } from '../../config/firebase-config.js';
 
 export class SalesDataService {
     /**
@@ -180,6 +180,149 @@ export class SalesDataService {
         }
     }
 
+    /**
+     * Get list of forecasts for a location with real-time updates
+     * @param {string} locationId - Location ID
+     * @param {Function} callback - Callback function(forecasts)
+     * @returns {Function} Unsubscribe function
+     */
+    getForecastsList(locationId, callback) {
+        console.log('[SalesDataService] Attaching real-time listener for forecasts:', locationId);
+
+        const forecastsRef = ref(rtdb, `forecastIndex/byLocation/${locationId}`);
+
+        const unsubscribe = onValue(forecastsRef, async (snapshot) => {
+            const forecasts = [];
+
+            if (snapshot.exists()) {
+                const forecastIds = Object.keys(snapshot.val());
+
+                for (const forecastId of forecastIds) {
+                    try {
+                        const forecastRef = ref(rtdb, `forecasts/${forecastId}`);
+                        const forecastSnapshot = await get(forecastRef);
+
+                        if (forecastSnapshot.exists()) {
+                            const forecast = forecastSnapshot.val();
+
+                            forecasts.push({
+                                id: forecastId,
+                                name: forecast.metadata?.name || this.generateDefaultName(forecast),
+                                description: forecast.metadata?.description || '',
+                                savedAt: forecast.metadata?.savedAt || forecast.createdAt,
+                                method: forecast.config?.method || 'unknown',
+                                horizon: forecast.config?.horizon || 0,
+                                summary: forecast.summary || null,
+                                accuracy: forecast.accuracy || null,
+                                savedAgo: this.getTimeAgo(forecast.metadata?.savedAt || forecast.createdAt)
+                            });
+                        }
+                    } catch (error) {
+                        console.error('[SalesDataService] Error loading forecast:', forecastId, error);
+                    }
+                }
+
+                // Sort by most recent first
+                forecasts.sort((a, b) => b.savedAt - a.savedAt);
+            }
+
+            console.log('[SalesDataService] Forecasts updated:', forecasts.length);
+            callback(forecasts);
+        });
+
+        return unsubscribe;
+    }
+
+    /**
+     * Get complete saved forecast data
+     * @param {string} forecastId - Forecast ID
+     * @returns {Promise<Object>} Complete forecast object
+     */
+    async getSavedForecast(forecastId) {
+        try {
+            console.log('[SalesDataService] Loading saved forecast:', forecastId);
+
+            const forecastRef = ref(rtdb, `forecasts/${forecastId}`);
+            const snapshot = await get(forecastRef);
+
+            if (!snapshot.exists()) {
+                throw new Error('Forecast not found');
+            }
+
+            const forecast = snapshot.val();
+
+            return {
+                id: forecastId,
+                ...forecast
+            };
+        } catch (error) {
+            console.error('[SalesDataService] Error loading forecast:', error);
+            throw error;
+        }
+    }
+
+    /**
+     * Update forecast name and description
+     * @param {string} forecastId - Forecast ID
+     * @param {Object} updates - {name, description}
+     * @returns {Promise<void>}
+     */
+    async updateForecastMetadata(forecastId, updates) {
+        try {
+            console.log('[SalesDataService] Updating forecast metadata:', forecastId);
+
+            const metadataRef = ref(rtdb, `forecasts/${forecastId}/metadata`);
+
+            await update(metadataRef, {
+                name: updates.name,
+                description: updates.description || '',
+                updatedAt: Date.now()
+            });
+
+            console.log('[SalesDataService] Forecast metadata updated');
+        } catch (error) {
+            console.error('[SalesDataService] Error updating forecast metadata:', error);
+            throw error;
+        }
+    }
+
+    /**
+     * Delete a saved forecast
+     * @param {string} forecastId - Forecast ID
+     * @returns {Promise<void>}
+     */
+    async deleteForecast(forecastId) {
+        try {
+            console.log('[SalesDataService] Deleting forecast:', forecastId);
+
+            // Get forecast to find location
+            const forecastRef = ref(rtdb, `forecasts/${forecastId}`);
+            const snapshot = await get(forecastRef);
+
+            if (snapshot.exists()) {
+                const forecast = snapshot.val();
+
+                // Remove from location index
+                if (forecast.locationId) {
+                    const locationIndexRef = ref(rtdb, `forecastIndex/byLocation/${forecast.locationId}/${forecastId}`);
+                    await remove(locationIndexRef);
+                }
+
+                // Remove from user index
+                const userIndexRef = ref(rtdb, `forecastIndex/byUser/${this.userId}/${forecastId}`);
+                await remove(userIndexRef);
+            }
+
+            // Remove the forecast
+            await remove(forecastRef);
+
+            console.log('[SalesDataService] Forecast deleted');
+        } catch (error) {
+            console.error('[SalesDataService] Error deleting forecast:', error);
+            throw error;
+        }
+    }
+
     // ==========================================
     // Forecast Operations
     // ==========================================
@@ -189,31 +332,45 @@ export class SalesDataService {
      * @param {string} locationId - Location ID
      * @param {string} salesDataId - Source sales data ID
      * @param {Object} forecast - Forecast data
+     * @param {Object} metadata - {name, description, locationName}
      * @returns {Promise<Object>} Save result with forecastId
      */
-    async saveForecast(locationId, salesDataId, forecast) {
+    async saveForecast(locationId, salesDataId, forecast, metadata = {}) {
         try {
             const forecastRef = push(ref(rtdb, 'forecasts'));
             const forecastId = forecastRef.key;
+            const timestamp = Date.now();
 
             // Get location name
-            const locationName = await this.getLocationName(locationId);
+            const locationName = metadata.locationName || await this.getLocationName(locationId);
+
+            // Calculate summary
+            const summary = this.calculateForecastSummary(forecast.predictions);
 
             // Prepare the forecast record
             const forecastRecord = {
                 locationId,
                 locationName,
                 userId: this.userId,
-                createdAt: Date.now(),
-                updatedAt: Date.now(),
+                createdAt: timestamp,
+                updatedAt: timestamp,
                 status: 'active',
                 salesDataId,
+                historicalDataRef: salesDataId ? `salesData/${salesDataId}` : null,
                 config: forecast.config,
                 predictions: this.formatPredictions(forecast.predictions),
                 metadata: {
-                    totalPredictedRevenue: this.calculateTotalPredictedRevenue(forecast.predictions),
-                    adjustmentCount: 0
-                }
+                    name: metadata.name || this.generateDefaultName(forecast),
+                    description: metadata.description || '',
+                    savedAt: timestamp,
+                    savedBy: this.userId,
+                    method: forecast.config?.method,
+                    horizon: forecast.config?.horizon,
+                    confidenceLevel: forecast.config?.confidenceLevel,
+                    growthRate: forecast.config?.growthRate
+                },
+                summary,
+                accuracy: null // Populated later when actuals uploaded
             };
 
             // Save the forecast
@@ -224,7 +381,10 @@ export class SalesDataService {
 
             console.log('[SalesDataService] Saved forecast:', forecastId);
 
-            return { forecastId };
+            return {
+                forecastId,
+                success: true
+            };
         } catch (error) {
             console.error('[SalesDataService] Error saving forecast:', error);
             throw error;
@@ -591,10 +751,65 @@ export class SalesDataService {
             [`forecastIndex/byLocation/${locationId}/${forecastId}`]: {
                 createdAt: Date.now(),
                 status: 'active'
-            }
+            },
+            [`forecastIndex/byUser/${this.userId}/${forecastId}`]: true
         };
 
         await update(ref(rtdb), updates);
+    }
+
+    /**
+     * Generate default forecast name from metadata
+     * @param {Object} forecast - Forecast object
+     * @returns {string} Generated name
+     */
+    generateDefaultName(forecast) {
+        const method = forecast.config?.method || 'Forecast';
+        const date = new Date(forecast.createdAt || Date.now()).toLocaleDateString();
+        return `${method} - ${date}`;
+    }
+
+    /**
+     * Get human-readable time ago string
+     * @param {number} timestamp - Unix timestamp
+     * @returns {string} Time ago string
+     */
+    getTimeAgo(timestamp) {
+        const seconds = Math.floor((Date.now() - timestamp) / 1000);
+
+        if (seconds < 60) return 'Just now';
+        if (seconds < 3600) return `${Math.floor(seconds / 60)} minutes ago`;
+        if (seconds < 86400) return `${Math.floor(seconds / 3600)} hours ago`;
+        if (seconds < 604800) return `${Math.floor(seconds / 86400)} days ago`;
+        return new Date(timestamp).toLocaleDateString();
+    }
+
+    /**
+     * Calculate summary metrics from forecast data
+     * @param {Array} forecastData - Array of forecast predictions
+     * @returns {Object} Summary metrics
+     */
+    calculateForecastSummary(forecastData) {
+        if (!forecastData || forecastData.length === 0) {
+            return null;
+        }
+
+        const totalRevenue = forecastData.reduce((sum, d) => sum + (d.predicted || 0), 0);
+        const avgDaily = totalRevenue / forecastData.length;
+
+        const growth = forecastData.length > 1
+            ? ((forecastData[forecastData.length - 1].predicted / forecastData[0].predicted - 1) * 100)
+            : 0;
+
+        return {
+            totalPredictedRevenue: Math.round(totalRevenue),
+            avgDailyRevenue: Math.round(avgDaily),
+            predictedGrowth: parseFloat(growth.toFixed(1)),
+            dateRange: {
+                start: forecastData[0]?.date,
+                end: forecastData[forecastData.length - 1]?.date
+            }
+        };
     }
 }
 
