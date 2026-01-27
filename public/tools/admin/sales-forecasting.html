@@ -3141,6 +3141,98 @@
         // Initialize on page load
         document.addEventListener('DOMContentLoaded', initializeAdminAuth);
     </script>
+
+    <!-- Save Forecast Modal -->
+    <div class="modal fade" id="saveForecastModal" tabindex="-1" aria-labelledby="saveForecastModalLabel" aria-hidden="true">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title" id="saveForecastModalLabel">
+                        <i class="fas fa-save me-2"></i>Save Forecast
+                    </h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body">
+                    <p class="text-muted mb-3">Name your forecast for easy reference</p>
+
+                    <div class="mb-3">
+                        <label for="forecastNameInput" class="form-label">
+                            Forecast Name <span class="text-danger">*</span>
+                        </label>
+                        <input type="text" class="form-control" id="forecastNameInput"
+                               placeholder="e.g., Q1 2026 Conservative Estimate" required>
+                        <div class="invalid-feedback">
+                            Please provide a name (minimum 3 characters)
+                        </div>
+                    </div>
+
+                    <div class="mb-3">
+                        <label for="forecastDescriptionInput" class="form-label">
+                            Description <span class="text-muted">(optional)</span>
+                        </label>
+                        <textarea class="form-control" id="forecastDescriptionInput" rows="2"
+                                  placeholder="e.g., Based on holiday season data"></textarea>
+                    </div>
+
+                    <div class="alert alert-info mb-0">
+                        <div class="row">
+                            <div class="col-6">
+                                <strong>📍 Location:</strong> <span id="modalLocationName">-</span>
+                            </div>
+                            <div class="col-6">
+                                <strong>📊 Method:</strong> <span id="modalMethod">-</span>
+                            </div>
+                        </div>
+                        <div class="row mt-2">
+                            <div class="col-6">
+                                <strong>📅 Period:</strong> <span id="modalPeriod">-</span>
+                            </div>
+                            <div class="col-6">
+                                <strong>💰 Revenue:</strong> <span id="modalRevenue">-</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                    <button type="button" class="btn btn-primary-custom" id="confirmSaveForecastBtn">
+                        <i class="fas fa-save me-2"></i>Save Forecast
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Edit Forecast Name Modal -->
+    <div class="modal fade" id="editForecastNameModal" tabindex="-1" aria-labelledby="editForecastNameModalLabel" aria-hidden="true">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title" id="editForecastNameModalLabel">
+                        <i class="fas fa-edit me-2"></i>Edit Forecast Name
+                    </h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body">
+                    <div class="mb-3">
+                        <label for="editForecastNameInput" class="form-label">Forecast Name</label>
+                        <input type="text" class="form-control" id="editForecastNameInput" required>
+                    </div>
+
+                    <div class="mb-3">
+                        <label for="editForecastDescriptionInput" class="form-label">Description</label>
+                        <textarea class="form-control" id="editForecastDescriptionInput" rows="2"></textarea>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                    <button type="button" class="btn btn-primary-custom" id="confirmEditForecastNameBtn">
+                        <i class="fas fa-save me-2"></i>Save Changes
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
 </body>
 
 </html>
