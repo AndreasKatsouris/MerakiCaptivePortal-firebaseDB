@@ -332,31 +332,45 @@ export class SalesDataService {
      * @param {string} locationId - Location ID
      * @param {string} salesDataId - Source sales data ID
      * @param {Object} forecast - Forecast data
+     * @param {Object} metadata - {name, description, locationName}
      * @returns {Promise<Object>} Save result with forecastId
      */
-    async saveForecast(locationId, salesDataId, forecast) {
+    async saveForecast(locationId, salesDataId, forecast, metadata = {}) {
         try {
             const forecastRef = push(ref(rtdb, 'forecasts'));
             const forecastId = forecastRef.key;
+            const timestamp = Date.now();
 
             // Get location name
-            const locationName = await this.getLocationName(locationId);
+            const locationName = metadata.locationName || await this.getLocationName(locationId);
+
+            // Calculate summary
+            const summary = this.calculateForecastSummary(forecast.predictions);
 
             // Prepare the forecast record
             const forecastRecord = {
                 locationId,
                 locationName,
                 userId: this.userId,
-                createdAt: Date.now(),
-                updatedAt: Date.now(),
+                createdAt: timestamp,
+                updatedAt: timestamp,
                 status: 'active',
                 salesDataId,
+                historicalDataRef: salesDataId ? `salesData/${salesDataId}` : null,
                 config: forecast.config,
                 predictions: this.formatPredictions(forecast.predictions),
                 metadata: {
-                    totalPredictedRevenue: this.calculateTotalPredictedRevenue(forecast.predictions),
-                    adjustmentCount: 0
-                }
+                    name: metadata.name || this.generateDefaultName(forecast),
+                    description: metadata.description || '',
+                    savedAt: timestamp,
+                    savedBy: this.userId,
+                    method: forecast.config?.method,
+                    horizon: forecast.config?.horizon,
+                    confidenceLevel: forecast.config?.confidenceLevel,
+                    growthRate: forecast.config?.growthRate
+                },
+                summary,
+                accuracy: null // Populated later when actuals uploaded
             };
 
             // Save the forecast
@@ -367,7 +381,10 @@ export class SalesDataService {
 
             console.log('[SalesDataService] Saved forecast:', forecastId);
 
-            return { forecastId };
+            return {
+                forecastId,
+                success: true
+            };
         } catch (error) {
             console.error('[SalesDataService] Error saving forecast:', error);
             throw error;
