@@ -1,0 +1,445 @@
+/**
+ * Sales Forecasting Module - Styles
+ */
+
+/* Main container */
+.sales-forecasting-module {
+    padding: 0;
+}
+
+/* Header */
+.sf-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 1.5rem;
+    padding-bottom: 1rem;
+    border-bottom: 2px solid #e9ecef;
+}
+
+.sf-header h2 {
+    margin: 0;
+    color: #2c3e50;
+    font-weight: 600;
+}
+
+.sf-location-selector {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+}
+
+.sf-location-selector label {
+    font-weight: 500;
+    color: #6c757d;
+    white-space: nowrap;
+}
+
+.sf-location-selector .form-select {
+    min-width: 200px;
+}
+
+/* Tabs */
+.sf-tabs {
+    margin-bottom: 1.5rem;
+}
+
+.sf-tabs .nav-link {
+    color: #6c757d;
+    border: none;
+    border-bottom: 3px solid transparent;
+    border-radius: 0;
+    padding: 0.75rem 1.25rem;
+    font-weight: 500;
+    transition: all 0.2s ease;
+}
+
+.sf-tabs .nav-link:hover {
+    color: #667eea;
+    border-bottom-color: rgba(102, 126, 234, 0.3);
+}
+
+.sf-tabs .nav-link.active {
+    color: #667eea;
+    border-bottom-color: #667eea;
+    background: transparent;
+}
+
+/* Content area */
+.sf-content {
+    min-height: 400px;
+}
+
+/* Upload zone */
+.sf-upload-zone {
+    border: 3px dashed #dee2e6;
+    border-radius: 15px;
+    padding: 2.5rem;
+    text-align: center;
+    background: rgba(102, 126, 234, 0.02);
+    transition: all 0.3s ease;
+    cursor: pointer;
+}
+
+.sf-upload-zone:hover {
+    border-color: #667eea;
+    background: rgba(102, 126, 234, 0.05);
+}
+
+.sf-upload-zone.dragover {
+    border-color: #667eea;
+    background: rgba(102, 126, 234, 0.1);
+    transform: scale(1.01);
+}
+
+.sf-upload-zone i {
+    color: #667eea;
+}
+
+.sf-upload-zone h5 {
+    color: #2c3e50;
+    margin-bottom: 0.5rem;
+}
+
+/* Chart container */
+.sf-chart-container {
+    position: relative;
+    height: 350px;
+    width: 100%;
+}
+
+.sf-chart-container canvas {
+    max-height: 100%;
+}
+
+/* Cards enhancement */
+.sf-upload-view .card,
+.sf-forecast-view .card,
+.sf-compare-view .card,
+.sf-analytics-view .card {
+    border: none;
+    border-radius: 12px;
+    box-shadow: 0 2px 12px rgba(0, 0, 0, 0.08);
+    transition: box-shadow 0.2s ease;
+}
+
+.sf-upload-view .card:hover,
+.sf-forecast-view .card:hover,
+.sf-compare-view .card:hover,
+.sf-analytics-view .card:hover {
+    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.12);
+}
+
+.card-header {
+    background: linear-gradient(135deg, #f8f9fa 0%, #fff 100%);
+    border-bottom: 1px solid #e9ecef;
+    padding: 1rem 1.25rem;
+}
+
+.card-header h5 {
+    margin: 0;
+    font-weight: 600;
+    color: #2c3e50;
+}
+
+/* Adjust view table */
+.sf-adjust-view .table {
+    margin-bottom: 0;
+}
+
+.sf-adjust-view .table th {
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    color: white;
+    font-weight: 600;
+    border: none;
+    padding: 0.875rem;
+}
+
+.sf-adjust-view .table td {
+    vertical-align: middle;
+    border-color: #e9ecef;
+}
+
+.sf-adjust-view .form-control {
+    border-radius: 6px;
+}
+
+.sf-adjust-view .form-control:focus {
+    border-color: #667eea;
+    box-shadow: 0 0 0 0.2rem rgba(102, 126, 234, 0.25);
+}
+
+/* Analytics cards */
+.sf-analytics-view .card.bg-primary,
+.sf-analytics-view .card.bg-success,
+.sf-analytics-view .card.bg-info {
+    border: none;
+    border-radius: 12px;
+}
+
+.sf-analytics-view .card h2 {
+    font-size: 2.5rem;
+    font-weight: 700;
+    margin-bottom: 0.25rem;
+}
+
+/* Accuracy metrics */
+#sf-accuracy-metrics .metric-item {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 0.75rem 0;
+    border-bottom: 1px solid #e9ecef;
+}
+
+#sf-accuracy-metrics .metric-item:last-child {
+    border-bottom: none;
+}
+
+#sf-accuracy-metrics .metric-label {
+    color: #6c757d;
+    font-weight: 500;
+}
+
+#sf-accuracy-metrics .metric-value {
+    font-weight: 600;
+    color: #2c3e50;
+}
+
+#sf-accuracy-metrics .metric-value.positive {
+    color: #28a745;
+}
+
+#sf-accuracy-metrics .metric-value.negative {
+    color: #dc3545;
+}
+
+/* Buttons */
+.sf-forecast-view .btn-success,
+.sf-upload-view .btn-success {
+    background: linear-gradient(135deg, #00b894 0%, #00a085 100%);
+    border: none;
+    font-weight: 600;
+    padding: 0.75rem 1.5rem;
+    border-radius: 8px;
+    transition: all 0.2s ease;
+}
+
+.sf-forecast-view .btn-success:hover,
+.sf-upload-view .btn-success:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(0, 184, 148, 0.35);
+}
+
+.sf-forecast-view .btn-primary,
+.sf-upload-view .btn-primary {
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    border: none;
+    font-weight: 600;
+    border-radius: 8px;
+    transition: all 0.2s ease;
+}
+
+.sf-forecast-view .btn-primary:hover,
+.sf-upload-view .btn-primary:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(102, 126, 234, 0.35);
+}
+
+/* Recommendations */
+#sf-recommendations .alert {
+    border: none;
+    border-radius: 10px;
+    border-left: 4px solid;
+}
+
+#sf-recommendations .alert-success {
+    border-left-color: #28a745;
+    background: rgba(40, 167, 69, 0.1);
+}
+
+#sf-recommendations .alert-info {
+    border-left-color: #17a2b8;
+    background: rgba(23, 162, 184, 0.1);
+}
+
+#sf-recommendations .alert-warning {
+    border-left-color: #ffc107;
+    background: rgba(255, 193, 7, 0.1);
+}
+
+/* Saved data list */
+.sf-upload-view .list-group-item {
+    border: none;
+    border-radius: 8px !important;
+    margin-bottom: 0.5rem;
+    background: #f8f9fa;
+    transition: all 0.2s ease;
+}
+
+.sf-upload-view .list-group-item:hover {
+    background: #e9ecef;
+}
+
+.sf-upload-view .list-group-item h6 {
+    color: #2c3e50;
+    font-weight: 600;
+    margin-bottom: 0.25rem;
+}
+
+/* Loading states */
+.sf-loading {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    min-height: 200px;
+}
+
+.sf-loading .spinner-border {
+    width: 3rem;
+    height: 3rem;
+}
+
+/* Empty states */
+.sf-empty-state {
+    text-align: center;
+    padding: 3rem 1rem;
+    color: #6c757d;
+}
+
+.sf-empty-state i {
+    color: #dee2e6;
+    margin-bottom: 1rem;
+}
+
+/* Responsive adjustments */
+@media (max-width: 768px) {
+    .sf-header {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 1rem;
+    }
+    
+    .sf-location-selector {
+        width: 100%;
+    }
+    
+    .sf-location-selector .form-select {
+        flex: 1;
+    }
+    
+    .sf-tabs .nav-link {
+        padding: 0.5rem 0.75rem;
+        font-size: 0.9rem;
+    }
+    
+    .sf-chart-container {
+        height: 250px;
+    }
+    
+    .sf-analytics-view .card h2 {
+        font-size: 1.75rem;
+    }
+}
+
+/* Comparison chart legend */
+.sf-comparison-legend {
+    display: flex;
+    justify-content: center;
+    gap: 2rem;
+    margin-top: 1rem;
+}
+
+.sf-comparison-legend .legend-item {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+.sf-comparison-legend .legend-color {
+    width: 16px;
+    height: 16px;
+    border-radius: 4px;
+}
+
+.sf-comparison-legend .legend-color.forecast {
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+}
+
+.sf-comparison-legend .legend-color.actual {
+    background: linear-gradient(135deg, #00b894 0%, #00a085 100%);
+}
+
+/* Accuracy badge */
+.sf-accuracy-badge {
+    display: inline-flex;
+    align-items: center;
+    padding: 0.25rem 0.75rem;
+    border-radius: 20px;
+    font-size: 0.85rem;
+    font-weight: 600;
+}
+
+.sf-accuracy-badge.excellent {
+    background: rgba(40, 167, 69, 0.15);
+    color: #28a745;
+}
+
+.sf-accuracy-badge.good {
+    background: rgba(23, 162, 184, 0.15);
+    color: #17a2b8;
+}
+
+.sf-accuracy-badge.fair {
+    background: rgba(255, 193, 7, 0.15);
+    color: #d39e00;
+}
+
+.sf-accuracy-badge.poor {
+    background: rgba(220, 53, 69, 0.15);
+    color: #dc3545;
+}
+
+/* Star rating */
+.sf-star-rating {
+    display: inline-flex;
+    gap: 0.125rem;
+}
+
+.sf-star-rating .fa-star {
+    color: #ffc107;
+}
+
+.sf-star-rating .fa-star.empty {
+    color: #dee2e6;
+}
+
+/* Tooltip enhancements */
+.sf-tooltip {
+    position: relative;
+    cursor: help;
+}
+
+.sf-tooltip::after {
+    content: attr(data-tooltip);
+    position: absolute;
+    bottom: 100%;
+    left: 50%;
+    transform: translateX(-50%);
+    background: #2c3e50;
+    color: white;
+    padding: 0.5rem 0.75rem;
+    border-radius: 6px;
+    font-size: 0.8rem;
+    white-space: nowrap;
+    opacity: 0;
+    visibility: hidden;
+    transition: all 0.2s ease;
+    z-index: 1000;
+}
+
+.sf-tooltip:hover::after {
+    opacity: 1;
+    visibility: visible;
+    bottom: calc(100% + 0.5rem);
+}
