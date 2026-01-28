@@ -2430,7 +2430,7 @@
                         config,
                         predictions: forecastData.map(d => ({
                             date: d.date,
-                            predicted: d.predicted,
+                            predicted: d.revenue || d.predicted, // Support both revenue (generated) and predicted (loaded)
                             confidenceLower: d.confidenceLower,
                             confidenceUpper: d.confidenceUpper
                         }))
