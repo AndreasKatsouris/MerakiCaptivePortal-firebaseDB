@@ -2244,7 +2244,7 @@
             const allLabels = [...historicLabels, ...forecastLabels];
 
             const historicValues = historicData.map(d => d.revenue);
-            const forecastValues = new Array(historicData.length).fill(null).concat(forecastData.map(d => d.revenue));
+            const forecastValues = new Array(historicData.length).fill(null).concat(forecastData.map(d => d.predicted || d.revenue));
 
             const datasets = [
                 {
@@ -2341,10 +2341,10 @@
 
                 row.innerHTML = `
                     <td><strong>${dayOfWeek}</strong> ${dateStr}</td>
-                    <td>R ${item.revenue.toLocaleString('en-ZA', { maximumFractionDigits: 0 })}</td>
-                    <td>${item.transactionQty}</td>
-                    <td>R ${item.avgSpend.toLocaleString('en-ZA', { maximumFractionDigits: 2 })}</td>
-                    <td>${item.confidenceLower !== null ?
+                    <td>R ${(item.predicted || item.revenue).toLocaleString('en-ZA', { maximumFractionDigits: 0 })}</td>
+                    <td>${item.transactionQty || '-'}</td>
+                    <td>R ${(item.avgSpend || 0).toLocaleString('en-ZA', { maximumFractionDigits: 2 })}</td>
+                    <td>${item.confidenceLower !== null && item.confidenceLower !== undefined ?
                         `R ${item.confidenceLower.toLocaleString('en-ZA', { maximumFractionDigits: 0 })} - R ${item.confidenceUpper.toLocaleString('en-ZA', { maximumFractionDigits: 0 })}` :
                         'N/A'}</td>
                 `;
@@ -2478,11 +2478,11 @@
             const headers = ['Date', 'Predicted Revenue', 'Transaction Qty', 'Avg Spend', 'Confidence Lower', 'Confidence Upper'];
             const rows = forecastData.map(item => [
                 item.date.toISOString().split('T')[0],
-                item.revenue.toFixed(2),
-                item.transactionQty,
-                item.avgSpend.toFixed(2),
-                item.confidenceLower !== null ? item.confidenceLower.toFixed(2) : '',
-                item.confidenceUpper !== null ? item.confidenceUpper.toFixed(2) : ''
+                (item.predicted || item.revenue).toFixed(2),
+                item.transactionQty || '',
+                (item.avgSpend || 0).toFixed(2),
+                item.confidenceLower !== null && item.confidenceLower !== undefined ? item.confidenceLower.toFixed(2) : '',
+                item.confidenceUpper !== null && item.confidenceUpper !== undefined ? item.confidenceUpper.toFixed(2) : ''
             ]);
 
             const csv = [headers, ...rows].map(row => row.join(',')).join('\n');
