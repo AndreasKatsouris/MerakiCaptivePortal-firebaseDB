@@ -1,12 +1,11 @@
 import { defineConfig } from 'vite'
-import vue from '@vitejs/plugin-vue'
 import { resolve } from 'path'
 
 export default defineConfig({
-  plugins: [vue()],
-  
+  plugins: [],
+
   root: 'PUBLIC',
-  
+
   resolve: {
     alias: {
       '@': resolve(__dirname, 'PUBLIC'),
@@ -14,19 +13,14 @@ export default defineConfig({
       '@/js': resolve(__dirname, 'PUBLIC/js')
     }
   },
-  
-  css: {
-    postcss: {
-      config: './postcss-v2.config.js'
-    }
-  },
-  
+
+
+
   build: {
     outDir: '../dist',
     rollupOptions: {
       input: {
         campaigns: resolve(__dirname, 'PUBLIC/campaigns/campaigns.js'),
-        'user-dashboard-v2': resolve(__dirname, 'PUBLIC/js/user-dashboard-v2.js'),
       },
       output: {
         format: 'es',
@@ -39,14 +33,14 @@ export default defineConfig({
     minify: false,
     sourcemap: true
   },
-  
+
   server: {
     port: 3000,
-    open: '/user-dashboard-v2.html'
+    open: '/user-dashboard.html'
   },
-  
+
   // Enable development optimizations
   optimizeDeps: {
-    include: ['vue', '@vueuse/core', 'clsx', 'tailwind-merge']
+    include: []
   }
 })

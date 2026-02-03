@@ -1,5 +1,6 @@
 <!DOCTYPE html>
 <html lang="en">
+
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -10,9 +11,11 @@
         .card {
             box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
         }
+
         .admin-table {
             margin-top: 20px;
         }
+
         .status-badge {
             display: inline-block;
             padding: 4px 8px;
@@ -20,36 +23,44 @@
             font-size: 12px;
             font-weight: bold;
         }
+
         .status-admin {
             background-color: #d4edda;
             color: #155724;
         }
+
         .status-no-admin {
             background-color: #f8d7da;
             color: #721c24;
         }
+
         .form-section {
             margin-bottom: 30px;
         }
+
         .result-section {
             margin-top: 20px;
             padding: 15px;
             border-radius: 5px;
             display: none;
         }
+
         .result-success {
             background-color: #d4edda;
             color: #155724;
             border: 1px solid #c3e6cb;
         }
+
         .result-error {
             background-color: #f8d7da;
             color: #721c24;
             border: 1px solid #f5c6cb;
         }
+
         .phone-input {
             font-family: 'Courier New', monospace;
         }
+
         .user-info {
             background-color: #f8f9fa;
             padding: 10px;
@@ -58,6 +69,7 @@
         }
     </style>
 </head>
+
 <body>
     <div class="container mt-5">
         <div class="row justify-content-center">
@@ -68,7 +80,7 @@
                         <small>Add phone numbers to existing platform admin users for WhatsApp access</small>
                     </div>
                     <div class="card-body">
-                        
+
                         <!-- Add Phone Number to Admin Section -->
                         <div class="form-section">
                             <h4>Add Phone Number to Admin User</h4>
@@ -77,8 +89,8 @@
                                     <div class="col-md-6">
                                         <div class="form-group">
                                             <label for="adminEmail">Admin Email *</label>
-                                            <input type="email" class="form-control" id="adminEmail" 
-                                                   placeholder="admin@example.com" required>
+                                            <input type="email" class="form-control" id="adminEmail"
+                                                placeholder="admin@example.com" required>
                                             <small class="form-text text-muted">
                                                 Email of the existing admin user
                                             </small>
@@ -87,8 +99,8 @@
                                     <div class="col-md-6">
                                         <div class="form-group">
                                             <label for="phoneNumber">Phone Number *</label>
-                                            <input type="tel" class="form-control phone-input" id="phoneNumber" 
-                                                   placeholder="+27123456789" required>
+                                            <input type="tel" class="form-control phone-input" id="phoneNumber"
+                                                placeholder="+27123456789" required>
                                             <small class="form-text text-muted">
                                                 Enter with country code (e.g., +27123456789)
                                             </small>
@@ -106,7 +118,7 @@
                                     </div>
                                 </div>
                             </form>
-                            
+
                             <!-- Admin User Info Display -->
                             <div id="adminUserInfo" class="user-info" style="display: none;">
                                 <h6>Admin User Details:</h6>
@@ -123,7 +135,8 @@
                         <div class="form-section">
                             <h4>Current Admin Users</h4>
                             <button id="refreshAdmins" class="btn btn-secondary mb-3">
-                                <span id="refreshSpinner" class="spinner-border spinner-border-sm d-none" role="status"></span>
+                                <span id="refreshSpinner" class="spinner-border spinner-border-sm d-none"
+                                    role="status"></span>
                                 Refresh List
                             </button>
                             <div id="adminsList">
@@ -139,8 +152,8 @@
                                     <div class="col-md-8">
                                         <div class="form-group">
                                             <label for="testPhoneNumber">Phone Number</label>
-                                            <input type="tel" class="form-control phone-input" id="testPhoneNumber" 
-                                                   placeholder="+27123456789" required>
+                                            <input type="tel" class="form-control phone-input" id="testPhoneNumber"
+                                                placeholder="+27123456789" required>
                                         </div>
                                     </div>
                                     <div class="col-md-4">
@@ -162,55 +175,55 @@
 
     <!-- Load Bootstrap -->
     <script src="../js/bootstrap.bundle.min.js"></script>
-    
+
     <!-- Firebase Configuration and Main Script -->
     <script type="module">
         // Import Firebase functions from config
-        import { rtdb, ref, get, update } from '../js/config/firebase-config.js';
-        
+        import { rtdb, ref, get, update } from '../../js/config/firebase-config.js';
+
         let foundAdminUser = null;
-        
+
         // Utility function to normalize phone number
         function normalizePhoneNumber(phoneNumber) {
             if (!phoneNumber) return '';
             return phoneNumber.replace(/^(whatsapp:|\+)/, '').trim();
         }
-        
+
         // Show result message
         function showResult(message, isSuccess = true) {
             const resultSection = document.getElementById('resultSection');
             const resultMessage = document.getElementById('resultMessage');
-            
+
             resultSection.className = `result-section ${isSuccess ? 'result-success' : 'result-error'}`;
             resultMessage.innerHTML = message;
             resultSection.style.display = 'block';
-            
+
             // Auto-hide after 10 seconds
             setTimeout(() => {
                 resultSection.style.display = 'none';
             }, 10000);
         }
-        
+
         // Find admin user by email
         document.getElementById('findAdminBtn').addEventListener('click', async () => {
             const email = document.getElementById('adminEmail').value.trim();
             const adminUserInfo = document.getElementById('adminUserInfo');
             const adminDetails = document.getElementById('adminDetails');
             const addPhoneBtn = document.querySelector('#addPhoneForm button[type="submit"]');
-            
+
             if (!email) {
                 showResult('Please enter an admin email address.', false);
                 return;
             }
-            
+
             try {
                 // Search for user by email in the users collection
                 const usersSnapshot = await get(ref(rtdb, 'users'));
                 const allUsers = usersSnapshot.val() || {};
-                
+
                 let foundUser = null;
                 let foundUserId = null;
-                
+
                 for (const [userId, userData] of Object.entries(allUsers)) {
                     if (userData.email && userData.email.toLowerCase() === email.toLowerCase()) {
                         foundUser = userData;
@@ -218,30 +231,30 @@
                         break;
                     }
                 }
-                
+
                 if (!foundUser) {
                     showResult('❌ No user found with that email address.', false);
                     adminUserInfo.style.display = 'none';
                     addPhoneBtn.disabled = true;
                     return;
                 }
-                
+
                 // Check if user is admin
                 const adminClaimsSnapshot = await get(ref(rtdb, `admin-claims/${foundUserId}`));
                 const isInAdminClaims = adminClaimsSnapshot.exists() && adminClaimsSnapshot.val() === true;
                 const hasAdminRole = foundUser.role === 'admin' || foundUser.isAdmin === true;
                 const isAdmin = isInAdminClaims || hasAdminRole;
-                
+
                 if (!isAdmin) {
                     showResult('❌ User found but they are not an admin user.', false);
                     adminUserInfo.style.display = 'none';
                     addPhoneBtn.disabled = true;
                     return;
                 }
-                
+
                 // Display admin user info
                 foundAdminUser = { ...foundUser, userId: foundUserId };
-                
+
                 adminDetails.innerHTML = `
                     <p><strong>Name:</strong> ${foundUser.displayName || foundUser.firstName + ' ' + foundUser.lastName || 'Not provided'}</p>
                     <p><strong>Email:</strong> ${foundUser.email}</p>
@@ -250,12 +263,12 @@
                     <p><strong>Current Phone:</strong> ${foundUser.phoneNumber || foundUser.phone || foundUser.businessPhone || 'None'}</p>
                     <p><strong>Status:</strong> ${foundUser.status || 'active'}</p>
                 `;
-                
+
                 adminUserInfo.style.display = 'block';
                 addPhoneBtn.disabled = false;
-                
+
                 showResult(`✅ Admin user found: ${foundUser.email}`, true);
-                
+
             } catch (error) {
                 console.error('Error finding admin user:', error);
                 showResult(`❌ Error searching for user: ${error.message}`, false);
@@ -263,80 +276,80 @@
                 addPhoneBtn.disabled = true;
             }
         });
-        
+
         // Add phone number to admin user
         document.getElementById('addPhoneForm').addEventListener('submit', async (e) => {
             e.preventDefault();
-            
+
             const phoneNumber = document.getElementById('phoneNumber').value.trim();
-            
+
             if (!foundAdminUser) {
                 showResult('Please find an admin user first.', false);
                 return;
             }
-            
+
             if (!phoneNumber) {
                 showResult('Please enter a phone number.', false);
                 return;
             }
-            
+
             try {
                 const normalizedPhone = normalizePhoneNumber(phoneNumber);
-                
+
                 if (!normalizedPhone || !/^\d{10,}$/.test(normalizedPhone)) {
                     showResult('Invalid phone number format. Please use format: +27123456789', false);
                     return;
                 }
-                
+
                 // Update user with phone number
                 const updateData = {
                     phoneNumber: normalizedPhone,
                     updatedAt: Date.now(),
                     whatsappAccessEnabled: true
                 };
-                
+
                 await update(ref(rtdb, `users/${foundAdminUser.userId}`), updateData);
-                
+
                 showResult(`✅ Phone number added successfully!<br>
                            Admin: ${foundAdminUser.email}<br>
                            Phone: ${normalizedPhone}<br>
                            They can now use WhatsApp admin commands.`, true);
-                
+
                 // Clear form
                 document.getElementById('addPhoneForm').reset();
                 document.getElementById('adminUserInfo').style.display = 'none';
                 document.querySelector('#addPhoneForm button[type="submit"]').disabled = true;
                 foundAdminUser = null;
-                
+
                 // Refresh admin list
                 refreshAdminsList();
-                
+
             } catch (error) {
                 console.error('Error adding phone number:', error);
                 showResult(`❌ Error adding phone number: ${error.message}`, false);
             }
         });
-        
+
         // Refresh admin users list
         async function refreshAdminsList() {
             const refreshButton = document.getElementById('refreshAdmins');
             const spinner = document.getElementById('refreshSpinner');
             const adminsList = document.getElementById('adminsList');
-            
+
             refreshButton.disabled = true;
             spinner.classList.remove('d-none');
-            
+
             try {
                 // Get all admin claims
                 const adminClaimsSnapshot = await get(ref(rtdb, 'admin-claims'));
                 const adminClaims = adminClaimsSnapshot.val() || {};
-                
+
                 // Get all users
                 const usersSnapshot = await get(ref(rtdb, 'users'));
                 const allUsers = usersSnapshot.val() || {};
-                
+
                 const adminUsers = [];
-                
+
                 // Get admin users from admin claims
                 for (const userId of Object.keys(adminClaims)) {
                     const userData = allUsers[userId];
@@ -348,10 +361,10 @@
                         });
                     }
                 }
-                
+
                 // Also get users with admin role
                 for (const [userId, userData] of Object.entries(allUsers)) {
-                    if ((userData.role === 'admin' || userData.isAdmin === true) && 
+                    if ((userData.role === 'admin' || userData.isAdmin === true) &&
                         !adminUsers.find(admin => admin.userId === userId)) {
                         adminUsers.push({
                             userId,
@@ -360,22 +373,22 @@
                         });
                     }
                 }
-                
+
                 if (adminUsers.length === 0) {
                     adminsList.innerHTML = '<p class="text-muted">No admin users found.</p>';
                     return;
                 }
-                
+
                 let html = '<table class="table table-striped admin-table">';
                 html += '<thead><tr><th>Name</th><th>Email</th><th>Phone Number</th><th>Admin Source</th><th>WhatsApp Access</th></tr></thead>';
                 html += '<tbody>';
-                
+
                 adminUsers.forEach(admin => {
                     const phone = admin.phoneNumber || admin.phone || admin.businessPhone || '';
                     const hasPhone = phone && phone.length > 0;
                     const whatsappAccess = hasPhone ? 'status-admin' : 'status-no-admin';
                     const whatsappText = hasPhone ? '✅ Enabled' : '❌ No Phone';
-                    
+
                     html += `<tr>
                         <td>${admin.displayName || admin.firstName + ' ' + admin.lastName || 'Not provided'}</td>
                         <td>${admin.email}</td>
@@ -384,10 +397,10 @@
                         <td><span class="status-badge ${whatsappAccess}">${whatsappText}</span></td>
                     </tr>`;
                 });
-                
+
                 html += '</tbody></table>';
                 adminsList.innerHTML = html;
-                
+
             } catch (error) {
                 console.error('Error fetching admin users:', error);
                 adminsList.innerHTML = '<p class="text-danger">Error loading admin users.</p>';
@@ -396,34 +409,34 @@
                 spinner.classList.add('d-none');
             }
         }
-        
+
         // Test phone number access
         document.getElementById('testPhoneForm').addEventListener('submit', async (e) => {
             e.preventDefault();
-            
+
             const phoneNumber = document.getElementById('testPhoneNumber').value.trim();
             const testResult = document.getElementById('testResult');
-            
+
             if (!phoneNumber) {
                 testResult.innerHTML = '<div class="alert alert-warning">Please enter a phone number.</div>';
                 return;
             }
-            
+
             try {
                 const normalizedPhone = normalizePhoneNumber(phoneNumber);
-                
+
                 if (!normalizedPhone || !/^\d{10,}$/.test(normalizedPhone)) {
                     testResult.innerHTML = '<div class="alert alert-danger">Invalid phone number format.</div>';
                     return;
                 }
-                
+
                 // Get all users and check for phone number match
                 const usersSnapshot = await get(ref(rtdb, 'users'));
                 const allUsers = usersSnapshot.val() || {};
-                
+
                 let matchedUser = null;
                 let matchedUserId = null;
-                
+
                 for (const [userId, userData] of Object.entries(allUsers)) {
                     const userPhone = userData.phoneNumber || userData.phone || userData.businessPhone;
                     if (userPhone && normalizePhoneNumber(userPhone) === normalizedPhone) {
@@ -432,19 +445,19 @@
                         break;
                     }
                 }
-                
+
                 if (!matchedUser) {
                     testResult.innerHTML = '<div class="alert alert-info">❌ No user found with this phone number.</div>';
                     return;
                 }
-                
+
                 // Check admin status
                 const adminClaimsSnapshot = await get(ref(rtdb, `admin-claims/${matchedUserId}`));
                 const isInAdminClaims = adminClaimsSnapshot.exists() && adminClaimsSnapshot.val() === true;
                 const hasAdminRole = matchedUser.role === 'admin' || matchedUser.isAdmin === true;
                 const isActiveUser = matchedUser.status !== 'inactive' && matchedUser.status !== 'deleted';
                 const isAdmin = (isInAdminClaims || hasAdminRole) && isActiveUser;
-                
+
                 testResult.innerHTML = `
                     <div class="alert alert-${isAdmin ? 'success' : 'warning'}">
                         <h5>${isAdmin ? '✅ WhatsApp Admin Access: GRANTED' : '❌ WhatsApp Admin Access: DENIED'}</h5>
@@ -457,23 +470,24 @@
                         <p><strong>Final Result:</strong> ${isAdmin ? 'Can use admin commands' : 'Cannot use admin commands'}</p>
                     </div>
                 `;
-                
+
             } catch (error) {
                 console.error('Error testing phone number:', error);
                 testResult.innerHTML = '<div class="alert alert-danger">Error testing phone number access.</div>';
             }
         });
-        
+
         // Event listeners
         document.getElementById('refreshAdmins').addEventListener('click', refreshAdminsList);
-        
+
         // Auto-refresh admin list on page load
         document.addEventListener('DOMContentLoaded', () => {
             refreshAdminsList();
         });
-        
+
         // Make refreshAdminsList available globally for the onclick event
         window.refreshAdminsList = refreshAdminsList;
     </script>
 </body>
-</html> 
+
+</html>

@@ -264,6 +264,34 @@ export const PLATFORM_FEATURES = {
     dependencies: ['foodCostAdvanced']
   },
 
+  // Sales Forecasting Features
+  salesForecastingBasic: {
+    id: 'salesForecastingBasic',
+    name: 'Basic Sales Forecasting',
+    module: 'salesForecasting',
+    description: 'Upload historical sales data and generate revenue predictions',
+    category: 'analytics',
+    icon: 'fa-chart-line'
+  },
+  salesForecastingAdvanced: {
+    id: 'salesForecastingAdvanced',
+    name: 'Advanced Sales Forecasting',
+    module: 'salesForecasting',
+    description: 'ML-based forecasting with adjustments and actuals comparison',
+    category: 'analytics',
+    icon: 'fa-brain',
+    dependencies: ['salesForecastingBasic']
+  },
+  salesForecastingAnalytics: {
+    id: 'salesForecastingAnalytics',
+    name: 'Forecast Analytics & Learning',
+    module: 'salesForecasting',
+    description: 'Accuracy tracking, pattern learning, and performance insights',
+    category: 'analytics',
+    icon: 'fa-graduation-cap',
+    dependencies: ['salesForecastingAdvanced']
+  },
+
   // Project Management Features
   projectManagementBasic: {
     id: 'projectManagementBasic',
@@ -442,6 +470,7 @@ export const PLATFORM_MODULES = {
   analytics: 'Analytics Dashboard',
   projects: 'Project Management',
   foodCost: 'Food Cost Management',
+  salesForecasting: 'Sales Forecasting',
   bookings: 'Booking Management',
   qms: 'Queue Management System',
   integrations: 'Integrations',
@@ -462,10 +491,10 @@ export function getFeaturesByModule(module) {
 export function getFeatureDependencies(featureId) {
   const feature = PLATFORM_FEATURES[featureId];
   if (!feature || !feature.dependencies) return [];
-  
+
   const deps = [...feature.dependencies];
   const allDeps = [...deps];
-  
+
   // Recursively get all dependencies
   deps.forEach(depId => {
     const subDeps = getFeatureDependencies(depId);
@@ -475,14 +504,14 @@ export function getFeatureDependencies(featureId) {
       }
     });
   });
-  
+
   return allDeps;
 }
 
 export function validateFeatureSet(features) {
   const featureSet = new Set(features);
   const errors = [];
-  
+
   features.forEach(featureId => {
     const deps = getFeatureDependencies(featureId);
     deps.forEach(depId => {
@@ -495,7 +524,7 @@ export function validateFeatureSet(features) {
       }
     });
   });
-  
+
   return { valid: errors.length === 0, errors };
 }
 

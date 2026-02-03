@@ -45,7 +45,7 @@ document.addEventListener('DOMContentLoaded', function () {
 
         const expectedSections = [
             'dashboardContent', 'campaignsContent', 'guestManagementContent',
-            'queueManagementContent', 'voucherManagementContent', 'analyticsContent',
+            'queueManagementContent', 'voucherManagementContent',
             'adminUsersContent', 'adminActivityMonitorContent', 'projectManagementContent',
             'foodCostContent', 'receiptManagementContent', 'rewardManagementContent',
             'settingsContent', 'databaseManagementContent', 'tierManagementContent',
@@ -198,13 +198,11 @@ document.addEventListener('DOMContentLoaded', function () {
 });
 
 import { auth, functions, httpsCallable, rtdb, ref, remove } from './config/firebase-config.js';
-// Import the Analytics module directly with a named import to ensure it's loaded
-import { DataProcessor, DatabaseOperations, ChartManager, Utilities } from './modules/analytics/index.js';
 import { AdminClaims } from './auth/admin-claims.js';
 import { AdminUserManagement } from './admin/user-management.js';
 import { initializeUsersLocationsManagement } from './admin/users-locations-management.js';
 import { initializeDashboard } from './dashboard.js';
-import { initializeProjectManagement } from './project-management.js';
+import { initializeProjectManagement, cleanupProjectManagement } from './modules/project-management/index.js';
 import { initializeGuestManagement, cleanupGuestManagement } from './guest-management.js';
 import { initializeQueueManagement, cleanupQueueManagement } from './queue-management.js';
 import { initializeCampaignManagement, cleanupCampaignManagement } from './campaigns/campaigns.js';
@@ -241,8 +239,7 @@ class AdminDashboard {
         // Section initialization tracking
         this.sectionInitialized = {
             foodCostContent: false,
-            analyticsContent: false,
-            foodCostAnalyticsContent: false,
+
             tierManagementContent: false,
             userSubscriptionManagementContent: false,
             dashboardContent: false,
@@ -364,20 +361,7 @@ class AdminDashboard {
             parent: 'engageSubmenu'
         });
 
-        this.sections.set('analyticsContent', {
-            menuId: 'analyticsMenu',
-            contentId: 'analyticsContent',
-            parent: 'driversSubmenu',
-            init: () => this.initializeAnalyticsSection(),
-            hasSubmodules: true
-        });
 
-        this.sections.set('foodCostAnalyticsContent', {
-            menuId: 'foodCostAnalyticsTab',
-            contentId: 'foodCostAnalyticsContent',
-            parent: 'analyticsContent',
-            init: () => this.initializeFoodCostAnalyticsSection()
-        });
 
         this.sections.set('adminUsersContent', {
             menuId: 'adminUsersMenu',
@@ -409,6 +393,7 @@ class AdminDashboard {
             menuId: 'projectManagementMenu',
             contentId: 'projectManagementContent',
             init: initializeProjectManagement,
+            cleanup: cleanupProjectManagement,
             parent: 'driversSubmenu'
         });
 
@@ -643,44 +628,8 @@ class AdminDashboard {
             return;
         }
 
-        // Handle settings submenu
-        const settingsLink = document.querySelector('[href="#settingsSubmenu"]');
-        if (settingsLink) {
-            settingsLink.addEventListener('click', (e) => {
-                e.preventDefault();
-                const submenu = document.getElementById('settingsSubmenu');
-                if (submenu) {
-                    submenu.classList.toggle('show');
-                    settingsLink.querySelector('.fa-chevron-down')?.classList.toggle('rotate');
-                }
-            });
-        }
-
-        // Handle engage submenu
-        const engageLink = document.querySelector('[href="#engageSubmenu"]');
-        if (engageLink) {
-            engageLink.addEventListener('click', (e) => {
-                e.preventDefault();
-                const submenu = document.getElementById('engageSubmenu');
-                if (submenu) {
-                    submenu.classList.toggle('show');
-                    engageLink.querySelector('.fa-chevron-down')?.classList.toggle('rotate');
-                }
-            });
-        }
-
-        // Handle drivers submenu
-        const driversLink = document.querySelector('[href="#driversSubmenu"]');
-        if (driversLink) {
-            driversLink.addEventListener('click', (e) => {
-                e.preventDefault();
-                const submenu = document.getElementById('driversSubmenu');
-                if (submenu) {
-                    submenu.classList.toggle('show');
-                    driversLink.querySelector('.fa-chevron-down')?.classList.toggle('rotate');
-                }
-            });
-        }
+        // Note: Submenu toggling is handled by Bootstrap's collapse plugin via data-bs-toggle="collapse"
+        // No need for custom toggle logic - it was causing double-toggle conflicts
 
         // Handle submenu item clicks (but only if not already handled in setupEventListeners)
         this.sections.forEach((section, sectionId) => {
@@ -1407,14 +1356,6 @@ class AdminDashboard {
                         this.sectionInitialized.whatsappManagementContent = true;
                     }
                     break;
-                case 'analyticsContent': {
-                    if (!this.sectionInitialized.analyticsContent) {
-                        console.log('Initializing analytics section...');
-                        this.initializeAnalyticsSection();
-                        this.sectionInitialized.analyticsContent = true;
-                    }
-                    break;
-                }
                 case 'foodCostContent': {
                     if (!this.foodCostInitialized) {
                         console.log('Initializing food cost module...');
@@ -2075,189 +2016,6 @@ class AdminDashboard {
         }
     }
 
-    /**
-     * Initialize the Analytics section
-     */
-    initializeAnalyticsSection() {
-        console.log('Initializing Analytics section');
-
-        if (this.sectionInitialized.analyticsContent) {
-            console.log('Analytics section already initialized');
-            return;
-        }
-
-        try {
-            // Set up tab event listeners
-            const tabElements = document.querySelectorAll('#analyticsNavTabs button[data-bs-toggle="tab"]');
-
-            tabElements.forEach(tab => {
-                tab.addEventListener('shown.bs.tab', (event) => {
-                    // Get the activated tab content ID
-                    const targetId = event.target.dataset.bsTarget.substring(1); // Remove the #
-
-                    // Save active tab to localStorage
-                    localStorage.setItem('analyticsContent_activeTab', targetId);
-
-                    // Initialize the tab content if needed
-                    const section = Array.from(this.sections.entries())
-                        .find(([id, info]) => id === targetId);
-
-                    if (section && section[1].init && !this.sectionInitialized[targetId]) {
-                        section[1].init();
-                        this.sectionInitialized[targetId] = true;
-                    }
-                });
-            });
-
-            // Initialize the default tab (Overview)
-            const activeTabId = localStorage.getItem('analyticsContent_activeTab') || 'overviewContent';
-            const activeTab = document.querySelector(`button[data-bs-target="#${activeTabId}"]`);
-            if (activeTab) {
-                const tabInstance = new bootstrap.Tab(activeTab);
-                tabInstance.show();
-            }
-
-            this.sectionInitialized.analyticsContent = true;
-        } catch (error) {
-            console.error('Error initializing Analytics section:', error);
-        }
-    }
-    /**
-     * Initialize the Food Cost Analytics section
-     */
-    async initializeFoodCostAnalyticsSection() {
-        console.log('Initializing Food Cost Analytics section');
-
-        if (this.sectionInitialized.foodCostAnalyticsContent) {
-            console.log('Food Cost Analytics section already initialized');
-            return;
-        }
-
-        try {
-            const container = document.getElementById('foodCostAnalyticsContent');
-            if (!container) {
-                console.error('Food Cost Analytics container not found');
-                return;
-            }
-
-            // Show loading indicator
-            container.innerHTML = `
-                <div class="d-flex justify-content-center align-items-center" style="height: 200px;">
-                    <div class="spinner-border text-primary" role="status">
-                        <span class="visually-hidden">Loading...</span>
-                    </div>
-                    <p class="ms-3 mb-0">Initializing Food Cost Analytics...</p>
-                </div>
-            `;
-
-            console.log('Loading all required Food Cost Analytics components...');
-
-            // Pre-load all required components first to ensure everything is available
-            try {
-                // First load and initialize the main analytics module
-                await import('./modules/analytics/index.js');
-
-                // Now load all Food Cost Analytics components
-                await Promise.all([
-                    import('./modules/analytics/components/food-cost-analytics/dashboard-component.js'),
-                    import('./modules/analytics/components/food-cost-analytics/trends-component.js'),
-                    import('./modules/analytics/components/food-cost-analytics/insights-component.js'),
-                    import('./modules/analytics/components/food-cost-analytics/forecast-component.js')
-                ]);
-
-                console.log('All Food Cost Analytics components loaded successfully');
-            } catch (importError) {
-                console.error('Failed to import Food Cost Analytics components:', importError);
-                throw new Error(`Failed to load Food Cost Analytics components: ${importError.message}`);
-            }
-
-            // Ensure Analytics namespace is available
-            if (!window.Analytics) {
-                console.error('Analytics namespace not available after imports');
-                window.Analytics = {}; // Create it if it doesn't exist
-            }
-
-            // Make sure initializeAnalyticsModule is attached to both window and window.Analytics
-            if (typeof window.initializeAnalyticsModule === 'function') {
-                window.Analytics.initializeAnalyticsModule = window.initializeAnalyticsModule;
-            } else {
-                console.error('initializeAnalyticsModule function not found after imports');
-                throw new Error('Analytics module initialization function not available');
-            }
-
-            // Initialize main analytics if not already done
-            if (!window.Analytics._appInstance) {
-                console.log('Initializing main Analytics module...');
-                window.initializeAnalyticsModule('analyticsContent');
-            }
-
-            // Ensure FoodCostAnalytics namespace exists
-            if (!window.Analytics.FoodCostAnalytics) {
-                console.error('FoodCostAnalytics namespace not found after imports');
-                window.Analytics.FoodCostAnalytics = {};
-            }
-
-            // If initialize method doesn't exist, create one using the FoodCostAnalyticsDashboard component
-            if (!window.Analytics.FoodCostAnalytics.initialize) {
-                console.log('Creating FoodCostAnalytics.initialize method dynamically');
-
-                // Import dashboard component again to make sure it's available
-                const dashboardModule = await import('./modules/analytics/components/food-cost-analytics/dashboard-component.js');
-
-                // Create initialize method
-                window.Analytics.FoodCostAnalytics.initialize = async function (targetContainer) {
-                    console.log('Dynamic initialize method called for Food Cost Analytics');
-
-                    // Get the dashboard component
-                    const FoodCostAnalyticsDashboard = dashboardModule.FoodCostAnalyticsDashboard;
-
-                    // Ensure the container is completely empty before we begin
-                    // (the container should already be empty from the earlier clear,
-                    // but this ensures we don't have any stray elements)
-                    targetContainer.innerHTML = '';
-
-                    // Create container for Vue app
-                    const appContainer = document.createElement('div');
-                    appContainer.id = 'food-cost-analytics-app';
-                    targetContainer.appendChild(appContainer);
-
-                    // Create default date range for last 30 days
-                    const dateRange = {
-                        startDate: new Date(new Date().setDate(new Date().getDate() - 30)).toISOString().split('T')[0],
-                        endDate: new Date().toISOString().split('T')[0]
-                    };
-
-                    // Create and mount Vue app
-                    const app = Vue.createApp(FoodCostAnalyticsDashboard, { dateRange }).mount('#food-cost-analytics-app');
-                    window.Analytics.FoodCostAnalytics._appInstance = app;
-                    return app;
-                };
-            }
-
-            console.log('Calling FoodCostAnalytics.initialize...');
-
-            // First, make sure the container is empty by removing the loading indicator
-            // This is critical to avoid duplicate content
-            container.innerHTML = '';
-
-            // Now initialize the Food Cost Analytics component
-            await window.Analytics.FoodCostAnalytics.initialize(container);
-            this.sectionInitialized.foodCostAnalyticsContent = true;
-            console.log('Food Cost Analytics initialized successfully');
-        } catch (error) {
-            console.error('Error initializing Food Cost Analytics:', error);
-            const container = document.getElementById('foodCostAnalyticsContent');
-            if (container) {
-                container.innerHTML = `
-                    <div class="alert alert-danger">
-                        <h4><i class="fas fa-exclamation-triangle me-2"></i> Error</h4>
-                        <p>Failed to initialize Food Cost Analytics. Please try again.</p>
-                        <p class="text-muted small">Error details: ${error.message}</p>
-                    </div>
-                `;
-            }
-        }
-    }
 
     async handleClearScanningData() {
         console.log('handleClearScanningData method called');

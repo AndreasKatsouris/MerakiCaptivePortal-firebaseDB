@@ -1,0 +1,391 @@
+/**
+ * Project Management Module - Main Entry Point
+ * Initializes and manages the project management interface
+ */
+
+import { projectService } from './services/project-service.js';
+import { auth } from '../../config/firebase-config.js';
+
+// Module state
+const projectManagementState = {
+    app: null,
+    projects: [],
+    currentFilter: 'all',
+    unsubscribe: null
+};
+
+/**
+ * Get status badge class based on project status
+ */
+function getStatusBadgeClass(status) {
+    const classes = {
+        'planning': 'bg-info',
+        'in_progress': 'bg-primary',
+        'completed': 'bg-success',
+        'on_hold': 'bg-warning'
+    };
+    return classes[status] || 'bg-secondary';
+}
+
+/**
+ * Get priority badge class
+ */
+function getPriorityBadgeClass(priority) {
+    const classes = {
+        'low': 'bg-secondary',
+        'medium': 'bg-info',
+        'high': 'bg-warning',
+        'critical': 'bg-danger'
+    };
+    return classes[priority] || 'bg-secondary';
+}
+
+/**
+ * Format date for display
+ */
+function formatDate(timestamp) {
+    if (!timestamp) return 'N/A';
+    return new Date(timestamp).toLocaleDateString('en-US', {
+        year: 'numeric',
+        month: 'short',
+        day: 'numeric'
+    });
+}
+
+/**
+ * Calculate project progress based on completed tasks
+ */
+function calculateProgress(project) {
+    const tasks = Object.values(project.tasks || {});
+    if (tasks.length === 0) return 0;
+    const completed = tasks.filter(t => t.status === 'done').length;
+    return Math.round((completed / tasks.length) * 100);
+}
+
+/**
+ * Initialize the Project Management module
+ */
+export async function initializeProjectManagement() {
+    console.log('[ProjectManagement] Initializing...');
+
+    const container = document.getElementById('project-management-app');
+    if (!container) {
+        console.error('[ProjectManagement] Container not found');
+        return null;
+    }
+
+    // Clear any existing content
+    container.innerHTML = '';
+
+    // Verify Vue.js is available
+    if (typeof Vue === 'undefined') {
+        container.innerHTML = `
+            <div class="alert alert-danger m-4">
+                <h4><i class="fas fa-exclamation-triangle me-2"></i>Error</h4>
+                <p>Vue.js is required for Project Management. Please refresh the page.</p>
+            </div>
+        `;
+        return null;
+    }
+
+    // Create Vue app
+    projectManagementState.app = Vue.createApp({
+        template: `
+            <div class="project-management">
+                <!-- Header -->
+                <div class="section-header mb-4">
+                    <div class="d-flex justify-content-between align-items-center">
+                        <div>
+                            <h2><i class="fas fa-tasks me-2"></i>Project Management</h2>
+                            <p class="text-muted mb-0">Track development tasks and onboarding milestones</p>
+                        </div>
+                        <button class="btn btn-primary" @click="showCreateProjectModal">
+                            <i class="fas fa-plus me-2"></i>New Project
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Loading State -->
+                <div v-if="loading" class="text-center py-5">
+                    <div class="spinner-border text-primary" role="status">
+                        <span class="visually-hidden">Loading...</span>
+                    </div>
+                    <p class="mt-2 text-muted">Loading projects...</p>
+                </div>
+
+                <!-- Error State -->
+                <div v-else-if="error" class="alert alert-danger">
+                    <i class="fas fa-exclamation-circle me-2"></i>{{ error }}
+                </div>
+
+                <!-- Projects Grid -->
+                <div v-else>
+                    <!-- Filters -->
+                    <div class="card mb-4">
+                        <div class="card-body">
+                            <div class="row g-3 align-items-center">
+                                <div class="col-md-4">
+                                    <label class="form-label">Filter by Status</label>
+                                    <select v-model="filter" class="form-select">
+                                        <option value="all">All Projects</option>
+                                        <option value="planning">Planning</option>
+                                        <option value="in_progress">In Progress</option>
+                                        <option value="completed">Completed</option>
+                                        <option value="on_hold">On Hold</option>
+                                    </select>
+                                </div>
+                                <div class="col-md-4">
+                                    <label class="form-label">Search</label>
+                                    <input type="text" v-model="searchQuery" class="form-control" placeholder="Search projects...">
+                                </div>
+                                <div class="col-md-4 text-end">
+                                    <p class="mb-0 text-muted">{{ filteredProjects.length }} project(s)</p>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Empty State -->
+                    <div v-if="filteredProjects.length === 0" class="text-center py-5">
+                        <i class="fas fa-folder-open fa-3x text-muted mb-3"></i>
+                        <h5>No Projects Found</h5>
+                        <p class="text-muted">Create your first project to get started.</p>
+                    </div>
+
+                    <!-- Projects Grid -->
+                    <div v-else class="row g-4">
+                        <div v-for="project in filteredProjects" :key="project.projectId" class="col-md-6 col-lg-4">
+                            <div class="card h-100 project-card" @click="selectProject(project)">
+                                <div class="card-header d-flex justify-content-between align-items-center">
+                                    <span class="badge" :class="getStatusBadgeClass(project.status)">
+                                        {{ formatStatus(project.status) }}
+                                    </span>
+                                    <span class="badge" :class="getPriorityBadgeClass(project.priority)">
+                                        {{ project.priority }}
+                                    </span>
+                                </div>
+                                <div class="card-body">
+                                    <h5 class="card-title">{{ project.name }}</h5>
+                                    <p class="card-text text-muted small">{{ project.description || 'No description' }}</p>
+                                    
+                                    <!-- Progress Bar -->
+                                    <div class="progress mb-3" style="height: 8px;">
+                                        <div class="progress-bar" :style="{ width: getProgress(project) + '%' }"></div>
+                                    </div>
+                                    
+                                    <!-- Stats -->
+                                    <div class="d-flex justify-content-between small text-muted">
+                                        <span><i class="fas fa-tasks me-1"></i>{{ getTaskCount(project) }} tasks</span>
+                                        <span><i class="fas fa-flag me-1"></i>{{ getMilestoneCount(project) }} milestones</span>
+                                    </div>
+                                </div>
+                                <div class="card-footer text-muted small">
+                                    <i class="fas fa-calendar me-1"></i>Due: {{ formatDate(project.dueDate) }}
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Create Project Modal -->
+                <div v-if="showModal" class="modal fade show d-block" tabindex="-1" style="background: rgba(0,0,0,0.5);">
+                    <div class="modal-dialog modal-lg">
+                        <div class="modal-content">
+                            <div class="modal-header">
+                                <h5 class="modal-title">
+                                    <i class="fas fa-plus-circle me-2"></i>Create New Project
+                                </h5>
+                                <button type="button" class="btn-close" @click="closeModal"></button>
+                            </div>
+                            <div class="modal-body">
+                                <form @submit.prevent="createProject">
+                                    <div class="mb-3">
+                                        <label class="form-label">Project Name *</label>
+                                        <input type="text" v-model="newProject.name" class="form-control" required>
+                                    </div>
+                                    <div class="mb-3">
+                                        <label class="form-label">Description</label>
+                                        <textarea v-model="newProject.description" class="form-control" rows="3"></textarea>
+                                    </div>
+                                    <div class="row">
+                                        <div class="col-md-6 mb-3">
+                                            <label class="form-label">Priority</label>
+                                            <select v-model="newProject.priority" class="form-select">
+                                                <option value="low">Low</option>
+                                                <option value="medium">Medium</option>
+                                                <option value="high">High</option>
+                                                <option value="critical">Critical</option>
+                                            </select>
+                                        </div>
+                                        <div class="col-md-6 mb-3">
+                                            <label class="form-label">Due Date</label>
+                                            <input type="date" v-model="newProject.dueDateStr" class="form-control">
+                                        </div>
+                                    </div>
+                                </form>
+                            </div>
+                            <div class="modal-footer">
+                                <button type="button" class="btn btn-secondary" @click="closeModal">Cancel</button>
+                                <button type="button" class="btn btn-primary" @click="createProject" :disabled="creating">
+                                    <span v-if="creating" class="spinner-border spinner-border-sm me-2"></span>
+                                    Create Project
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        `,
+        data() {
+            return {
+                projects: [],
+                loading: true,
+                error: null,
+                filter: 'all',
+                searchQuery: '',
+                showModal: false,
+                creating: false,
+                newProject: {
+                    name: '',
+                    description: '',
+                    priority: 'medium',
+                    dueDateStr: ''
+                }
+            };
+        },
+        computed: {
+            filteredProjects() {
+                let filtered = this.projects;
+
+                // Status filter
+                if (this.filter !== 'all') {
+                    filtered = filtered.filter(p => p.status === this.filter);
+                }
+
+                // Search filter
+                if (this.searchQuery.trim()) {
+                    const query = this.searchQuery.toLowerCase();
+                    filtered = filtered.filter(p =>
+                        p.name.toLowerCase().includes(query) ||
+                        (p.description || '').toLowerCase().includes(query)
+                    );
+                }
+
+                return filtered;
+            }
+        },
+        methods: {
+            getStatusBadgeClass,
+            getPriorityBadgeClass,
+            formatDate,
+
+            formatStatus(status) {
+                return status.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase());
+            },
+
+            getProgress(project) {
+                return calculateProgress(project);
+            },
+
+            getTaskCount(project) {
+                return Object.keys(project.tasks || {}).length;
+            },
+
+            getMilestoneCount(project) {
+                return Object.keys(project.milestones || {}).length;
+            },
+
+            showCreateProjectModal() {
+                this.newProject = {
+                    name: '',
+                    description: '',
+                    priority: 'medium',
+                    dueDateStr: ''
+                };
+                this.showModal = true;
+            },
+
+            closeModal() {
+                this.showModal = false;
+            },
+
+            async createProject() {
+                if (!this.newProject.name.trim()) {
+                    return;
+                }
+
+                this.creating = true;
+                try {
+                    const projectData = {
+                        name: this.newProject.name.trim(),
+                        description: this.newProject.description.trim(),
+                        priority: this.newProject.priority,
+                        dueDate: this.newProject.dueDateStr ? new Date(this.newProject.dueDateStr).getTime() : null
+                    };
+
+                    await projectService.createProject(projectData);
+                    this.closeModal();
+                    await this.loadProjects();
+                } catch (error) {
+                    console.error('Error creating project:', error);
+                    this.error = 'Failed to create project: ' + error.message;
+                } finally {
+                    this.creating = false;
+                }
+            },
+
+            selectProject(project) {
+                console.log('Selected project:', project.projectId);
+                // TODO: Implement project detail view
+            },
+
+            async loadProjects() {
+                this.loading = true;
+                this.error = null;
+                try {
+                    this.projects = await projectService.getProjects();
+                } catch (error) {
+                    console.error('Error loading projects:', error);
+                    this.error = 'Failed to load projects: ' + error.message;
+                } finally {
+                    this.loading = false;
+                }
+            }
+        },
+        mounted() {
+            console.log('[ProjectManagement] Vue app mounted');
+            this.loadProjects();
+        }
+    });
+
+    projectManagementState.app.mount(container);
+    console.log('[ProjectManagement] Initialized successfully');
+    return projectManagementState.app;
+}
+
+/**
+ * Cleanup the Project Management module
+ */
+export function cleanupProjectManagement() {
+    console.log('[ProjectManagement] Cleaning up...');
+
+    if (projectManagementState.unsubscribe) {
+        projectManagementState.unsubscribe();
+        projectManagementState.unsubscribe = null;
+    }
+
+    if (projectManagementState.app) {
+        try {
+            projectManagementState.app.unmount();
+        } catch (error) {
+            console.warn('[ProjectManagement] Error unmounting app:', error);
+        }
+        projectManagementState.app = null;
+    }
+}
+
+// Make functions globally available
+window.initializeProjectManagement = initializeProjectManagement;
+window.cleanupProjectManagement = cleanupProjectManagement;
+
+export default { initializeProjectManagement, cleanupProjectManagement };

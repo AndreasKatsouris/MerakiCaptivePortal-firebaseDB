@@ -17,6 +17,7 @@
     <link href="css/food-cost-dashboard.css" rel="stylesheet">
     <link href="css/table-fixes.css" rel="stylesheet">
     <link href="css/receipt-settings.css" rel="stylesheet">
+    <link href="css/project-management.css" rel="stylesheet">
 
     <!-- Vue.js - Use production version -->
     <script src="https://unpkg.com/vue@3/dist/vue.global.prod.js"></script>
@@ -365,12 +366,6 @@
                     </a>
                     <div class="collapse" id="driversSubmenu">
                         <ul class="nav flex-column">
-                            <li class="nav-item">
-                                <a href="#" id="analyticsMenu" class="nav-link" data-section="analyticsContent">
-                                    <i class="fas fa-chart-bar"></i>
-                                    Analytics
-                                </a>
-                            </li>
                             <li class="nav-item">
                                 <a href="#" id="projectManagementMenu" class="nav-link"
                                     data-section="projectManagementContent">
@@ -1184,20 +1179,8 @@
 
             <!-- Project Management Section -->
             <div id="projectManagementContent" class="content-section dashboard-content d-none">
-                <div class="section-header">
-                    <h2>Project Management</h2>
-                    <button id="add-project-btn" class="btn btn-primary">
-                        <i class="fas fa-plus"></i> New Project
-                    </button>
-                </div>
-                <div class="row mt-4">
-                    <div class="col-12">
-                        <div class="card">
-                            <div class="card-body">
-                                <div id="projectsList"></div>
-                            </div>
-                        </div>
-                    </div>
+                <div id="project-management-app">
+                    <!-- Vue will mount here -->
                 </div>
             </div>
 

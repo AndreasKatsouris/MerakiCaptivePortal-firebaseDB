@@ -118,6 +118,52 @@
         ".validate": "newData.hasChildren(['reviewerName', 'rating', 'text', 'timestamp'])"
       }
     },
+    "admins": {
+      ".read": "auth != null && auth.token.admin === true",
+      ".write": "auth != null && auth.token.admin === true",
+      "$uid": {
+        ".read": "auth != null && (auth.uid === $uid || auth.token.admin === true)",
+        ".write": "auth != null && auth.token.admin === true",
+        ".validate": "newData.hasChildren(['superAdmin'])"
+      }
+    },
+    "admin": {
+      ".read": "auth != null && auth.token.admin === true",
+      ".write": false,
+      "projects": {
+        ".read": "auth != null && auth.token.admin === true",
+        ".write": "auth != null && auth.token.admin === true",
+        ".indexOn": ["status", "priority", "locationId", "createdAt"],
+        "$projectId": {
+          ".read": "auth != null && auth.token.admin === true",
+          ".write": "auth != null && auth.token.admin === true",
+          ".validate": "newData.hasChildren(['name', 'status', 'createdAt'])",
+          "status": {
+            ".validate": "newData.val().matches(/^(planning|in_progress|completed|on_hold)$/)"
+          },
+          "priority": {
+            ".validate": "newData.val().matches(/^(low|medium|high|critical)$/)"
+          },
+          "createdAt": {
+            ".validate": "newData.isNumber()"
+          },
+          "tasks": {
+            ".read": "auth != null && auth.token.admin === true",
+            ".write": "auth != null && auth.token.admin === true",
+            "$taskId": {
+              ".validate": "newData.hasChildren(['title', 'status', 'createdAt'])"
+            }
+          },
+          "milestones": {
+            ".read": "auth != null && auth.token.admin === true",
+            ".write": "auth != null && auth.token.admin === true",
+            "$milestoneId": {
+              ".validate": "newData.hasChildren(['name', 'status', 'createdAt'])"
+            }
+          }
+        }
+      }
+    },
     "projects": {
       ".read": "auth != null",
       ".write": "auth != null && auth.token.admin === true",

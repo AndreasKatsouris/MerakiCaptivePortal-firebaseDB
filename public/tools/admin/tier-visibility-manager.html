@@ -1,5 +1,6 @@
 <!DOCTYPE html>
 <html lang="en">
+
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -7,16 +8,46 @@
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <style>
-        body { background-color: #f8f9fa; }
-        .container { max-width: 1200px; margin-top: 30px; }
-        .admin-header { background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; padding: 20px; border-radius: 10px; margin-bottom: 30px; }
-        .tier-card { transition: transform 0.2s; }
-        .tier-card:hover { transform: translateY(-2px); }
-        .visibility-toggle { cursor: pointer; }
-        .hidden-tier { opacity: 0.6; }
-        .visibility-badge { cursor: pointer; font-size: 0.9rem; }
+        body {
+            background-color: #f8f9fa;
+        }
+
+        .container {
+            max-width: 1200px;
+            margin-top: 30px;
+        }
+
+        .admin-header {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 20px;
+            border-radius: 10px;
+            margin-bottom: 30px;
+        }
+
+        .tier-card {
+            transition: transform 0.2s;
+        }
+
+        .tier-card:hover {
+            transform: translateY(-2px);
+        }
+
+        .visibility-toggle {
+            cursor: pointer;
+        }
+
+        .hidden-tier {
+            opacity: 0.6;
+        }
+
+        .visibility-badge {
+            cursor: pointer;
+            font-size: 0.9rem;
+        }
     </style>
 </head>
+
 <body>
     <div class="container">
         <div class="admin-header">
@@ -48,10 +79,12 @@
                     </div>
                     <div class="card-body">
                         <div class="alert alert-info">
-                            <strong>Visible Tiers:</strong> Displayed on the subscription page and available for user selection.
+                            <strong>Visible Tiers:</strong> Displayed on the subscription page and available for user
+                            selection.
                         </div>
                         <div class="alert alert-warning">
-                            <strong>Hidden Tiers:</strong> Not shown to users but can still be assigned by admins. Useful for enterprise/custom plans.
+                            <strong>Hidden Tiers:</strong> Not shown to users but can still be assigned by admins.
+                            Useful for enterprise/custom plans.
                         </div>
                         <div class="alert alert-success">
                             <strong>Free Tier:</strong> Always visible - this cannot be hidden as it's the default tier.
@@ -95,7 +128,7 @@
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
     <script type="module">
-        import { rtdb, ref, get, update, auth, onAuthStateChanged } from '../js/config/firebase-config.js';
+        import { rtdb, ref, get, update, auth, onAuthStateChanged } from '../../js/config/firebase-config.js';
 
         // Check authentication
         onAuthStateChanged(auth, (user) => {
@@ -126,7 +159,7 @@
             Object.entries(tiers).forEach(([id, tier]) => {
                 const isVisible = tier.isVisible !== false;
                 const isFree = id === 'free';
-                
+
                 const tierCard = document.createElement('div');
                 tierCard.className = `card tier-card mb-3 ${!isVisible ? 'hidden-tier' : ''}`;
                 tierCard.innerHTML = `
@@ -197,17 +230,17 @@
                     <strong class="text-secondary">${hiddenCount}</strong>
                 </div>
                 <div class="progress" style="height: 20px;">
-                    <div class="progress-bar bg-success" style="width: ${(visibleCount/totalCount)*100}%">
+                    <div class="progress-bar bg-success" style="width: ${(visibleCount / totalCount) * 100}%">
                         ${visibleCount} Visible
                     </div>
-                    <div class="progress-bar bg-secondary" style="width: ${(hiddenCount/totalCount)*100}%">
+                    <div class="progress-bar bg-secondary" style="width: ${(hiddenCount / totalCount) * 100}%">
                         ${hiddenCount} Hidden
                     </div>
                 </div>
             `;
         }
 
-        window.toggleVisibility = function(tierId, newVisibility) {
+        window.toggleVisibility = function (tierId, newVisibility) {
             if (tierId === 'free') {
                 Swal.fire('Cannot Hide Free Tier', 'The free tier must always be visible as it\'s the default tier for new users.', 'warning');
                 return;
@@ -217,10 +250,10 @@
             if (!tier) return;
 
             pendingChange = { tierId, newVisibility };
-            
+
             const action = newVisibility ? 'show' : 'hide';
             const message = `Are you sure you want to ${action} the "${tier.name}" tier ${newVisibility ? 'to' : 'from'} the public subscription page?`;
-            
+
             document.getElementById('confirmMessage').textContent = message;
             new bootstrap.Modal(document.getElementById('confirmModal')).show();
         };
@@ -230,7 +263,7 @@
 
             try {
                 const { tierId, newVisibility } = pendingChange;
-                
+
                 // Update in database
                 await update(ref(rtdb, `subscriptionTiers/${tierId}`), {
                     isVisible: newVisibility
@@ -238,18 +271,18 @@
 
                 // Update local data
                 tiers[tierId].isVisible = newVisibility;
-                
+
                 // Refresh display
                 displayTiers();
                 updateSummary();
-                
+
                 // Close modal
                 bootstrap.Modal.getInstance(document.getElementById('confirmModal')).hide();
-                
+
                 // Show success message
                 const action = newVisibility ? 'shown' : 'hidden';
                 Swal.fire('Success', `Tier visibility updated! The ${tiers[tierId].name} tier is now ${action}.`, 'success');
-                
+
                 pendingChange = null;
             } catch (error) {
                 console.error('Error updating tier visibility:', error);
@@ -263,4 +296,5 @@
         loadTiers();
     </script>
 </body>
-</html> 
+
+</html>

@@ -2945,3 +2945,14 @@ exports.getTemplatePerformance = onRequest({ cors: true }, async (req, res) => {
         }
     });
 });
+
+// ============================================
+// PROJECT MANAGEMENT FUNCTIONS
+// ============================================
+const projectManagement = require('./projectManagement');
+exports.createProject = projectManagement.createProject;
+exports.updateProject = projectManagement.updateProject;
+exports.deleteProject = projectManagement.deleteProject;
+exports.getProjects = projectManagement.getProjects;
+exports.manageProjectTasks = projectManagement.manageProjectTasks;
+exports.manageProjectMilestones = projectManagement.manageProjectMilestones;
