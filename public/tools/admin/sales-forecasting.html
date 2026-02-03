@@ -3352,6 +3352,12 @@
 
                 await dataService.deleteForecast(forecastId);
 
+                // Refresh analytics after deletion
+                const locationId = document.getElementById('savedForecastLocationSelect')?.value;
+                if (locationId) {
+                    await refreshAnalytics(locationId);
+                }
+
                 showStatus('success', 'Forecast deleted successfully');
 
                 // If this was the loaded forecast, clear it
