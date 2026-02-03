@@ -46,6 +46,10 @@ export class ForecastAnalytics {
      */
     async calculateAccuracy(forecastId, actualId) {
         try {
+            console.log('[ForecastAnalytics] ===== CALCULATING ACCURACY =====');
+            console.log('[ForecastAnalytics] Forecast ID:', forecastId);
+            console.log('[ForecastAnalytics] Actual ID:', actualId);
+
             // Get forecast
             const forecastRef = ref(rtdb, `forecasts/${forecastId}`);
             const forecastSnapshot = await get(forecastRef);
@@ -55,6 +59,13 @@ export class ForecastAnalytics {
             }
 
             const forecast = forecastSnapshot.val();
+
+            console.log('[ForecastAnalytics] Forecast predictions count:', Object.keys(forecast.predictions || {}).length);
+            console.log('[ForecastAnalytics] Forecast predictions sample (first 2):');
+            const forecastKeys = Object.keys(forecast.predictions || {}).slice(0, 2);
+            forecastKeys.forEach(key => {
+                console.log(`  ${key}:`, forecast.predictions[key]);
+            });
 
             // Get actuals
             const actualRef = ref(rtdb, `forecastActuals/${actualId}`);
@@ -66,11 +77,25 @@ export class ForecastAnalytics {
 
             const actuals = actualSnapshot.val();
 
+            console.log('[ForecastAnalytics] Actuals dailyActuals count:', Object.keys(actuals.dailyActuals || {}).length);
+            console.log('[ForecastAnalytics] Actuals dailyActuals sample (first 2):');
+            const actualsKeys = Object.keys(actuals.dailyActuals || {}).slice(0, 2);
+            actualsKeys.forEach(key => {
+                console.log(`  ${key}:`, actuals.dailyActuals[key]);
+            });
+
             // Calculate metrics
             const comparison = this.compareForecstWithActuals(
                 forecast.predictions,
                 actuals.dailyActuals
             );
+
+            console.log('[ForecastAnalytics] Comparison complete:', {
+                daysCompared: comparison.daysCompared,
+                mape: comparison.mape,
+                mae: comparison.mae,
+                bias: comparison.bias
+            });
 
             // Update actuals with comparison
             await update(ref(rtdb, `forecastActuals/${actualId}`), {
@@ -98,6 +123,10 @@ export class ForecastAnalytics {
      * @returns {Object} Comparison metrics
      */
     compareForecstWithActuals(predictions, dailyActuals) {
+        console.log('[ForecastAnalytics] ===== COMPARING FORECAST WITH ACTUALS =====');
+        console.log('[ForecastAnalytics] Predictions keys count:', Object.keys(predictions || {}).length);
+        console.log('[ForecastAnalytics] Actuals keys count:', Object.keys(dailyActuals || {}).length);
+
         const comparison = {
             daysCompared: 0,
             dayResults: {},
@@ -119,19 +148,40 @@ export class ForecastAnalytics {
         let totalPredictedTransactions = 0;
         let totalActualTransactions = 0;
 
+        let matchCount = 0;
+        let mismatchCount = 0;
+
         for (const [date, actual] of Object.entries(dailyActuals)) {
             const prediction = predictions[date];
 
-            if (!prediction) continue;
+            if (!prediction) {
+                mismatchCount++;
+                if (mismatchCount <= 3) {
+                    console.log(`[ForecastAnalytics] No prediction found for date: ${date}`);
+                }
+                continue;
+            }
 
+            matchCount++;
             comparison.daysCompared++;
 
             // Get predicted value (use adjusted if available)
-            const predictedRevenue = prediction.adjusted?.revenue || prediction.original?.revenue || 0;
-            const predictedTransactions = prediction.adjusted?.transactions || prediction.original?.transactions || 0;
+            const predictedRevenue = prediction.adjusted?.revenue || prediction.original?.revenue || prediction.predicted || 0;
+            const predictedTransactions = prediction.adjusted?.transactions || prediction.original?.transactions || prediction.transactionQty || 0;
 
             const actualRevenue = actual.revenue || 0;
             const actualTransactions = actual.transactions || 0;
+
+            // Log first 3 matches to see the data structure
+            if (matchCount <= 3) {
+                console.log(`[ForecastAnalytics] Match ${matchCount} - Date: ${date}`);
+                console.log(`  Prediction structure:`, prediction);
+                console.log(`  Extracted predicted revenue: ${predictedRevenue}`);
+                console.log(`  Extracted predicted transactions: ${predictedTransactions}`);
+                console.log(`  Actual structure:`, actual);
+                console.log(`  Actual revenue: ${actualRevenue}`);
+                console.log(`  Actual transactions: ${actualTransactions}`);
+            }
 
             // Calculate errors
             const error = actualRevenue - predictedRevenue;
@@ -157,6 +207,12 @@ export class ForecastAnalytics {
             totalActualTransactions += actualTransactions;
         }
 
+        console.log('[ForecastAnalytics] Date matching summary:');
+        console.log(`  Matched dates: ${matchCount}`);
+        console.log(`  Unmatched dates: ${mismatchCount}`);
+        console.log(`  Total predicted revenue: ${totalPredicted}`);
+        console.log(`  Total actual revenue: ${totalActual}`);
+
         if (comparison.daysCompared > 0) {
             // Calculate aggregate metrics
             comparison.mape = absolutePercentErrors.reduce((a, b) => a + b, 0) / absolutePercentErrors.length;
@@ -178,6 +234,13 @@ export class ForecastAnalytics {
                     : 0
             };
         }
+
+        console.log('[ForecastAnalytics] Final comparison metrics:', {
+            daysCompared: comparison.daysCompared,
+            mape: comparison.mape,
+            mae: comparison.mae,
+            bias: comparison.bias
+        });
 
         return comparison;
     }

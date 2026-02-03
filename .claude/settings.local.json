@@ -5,7 +5,12 @@
       "Bash(git commit -m \"$\\(cat <<''EOF''\nfeat: add sales forecasting module services\n\nAdd modular service layer for sales forecasting tool:\n- SalesDataService: Historical data and forecast management\n- ForecastEngine: Forecasting algorithms and calculations\n- ForecastAnalytics: Analytics and accuracy metrics\n\nCo-Authored-By: Claude Sonnet 4.5 <noreply@anthropic.com>\nEOF\n\\)\")",
       "Bash(git merge:*)",
       "Bash(git commit:*)",
-      "Bash(git checkout:*)"
+      "Bash(git checkout:*)",
+      "Bash(git check-ignore:*)",
+      "Bash(git worktree:*)",
+      "Bash(test:*)",
+      "Bash(npm install)",
+      "Bash(git show:*)"
     ]
   },
   "enabledPlugins": {
