@@ -1276,6 +1276,9 @@
                 showSaveAsNewModal();
             });
 
+            // Confirm Save As New button
+            document.getElementById('confirmSaveAsNewBtn')?.addEventListener('click', confirmSaveAsNew);
+
             // NEW: Actuals file input
             const actualsInput = document.getElementById('actualsFileInput');
             actualsInput?.addEventListener('change', (e) => {
@@ -3979,6 +3982,98 @@
             // Show modal
             const modal = new bootstrap.Modal(document.getElementById('saveAsNewModal'));
             modal.show();
+        }
+
+        /**
+         * Confirm and save as new forecast
+         */
+        async function confirmSaveAsNew() {
+            const name = document.getElementById('saveAsNewNameInput').value.trim();
+            const description = document.getElementById('saveAsNewDescriptionInput').value.trim();
+
+            if (name.length < 3) {
+                showStatus('error', 'Name must be at least 3 characters');
+                return;
+            }
+
+            try {
+                showStatus('info', 'Saving new forecast...');
+
+                const locationId = document.getElementById('locationSelect')?.value;
+                if (!locationId) {
+                    throw new Error('No location selected');
+                }
+
+                // Prepare forecast data (reuse existing save logic structure)
+                const config = {
+                    growthRate: parseFloat(document.getElementById('growthRate')?.value || 0),
+                    method: document.getElementById('forecastMethod')?.value || 'linear',
+                    startDate: document.getElementById('forecastStartDate')?.value,
+                    endDate: document.getElementById('forecastEndDate')?.value,
+                    horizon: forecastData.length,
+                    confidenceLevel: parseInt(document.getElementById('confidenceLevel')?.value || '95')
+                };
+
+                const forecastPayload = {
+                    config,
+                    predictions: forecastData.map(row => ({
+                        date: row.date,
+                        predicted: row.predicted,
+                        confidenceLower: row.confidenceLower,
+                        confidenceUpper: row.confidenceUpper,
+                        transactionQty: row.transactionQty,
+                        avgSpend: row.avgSpend
+                    }))
+                };
+
+                const location = locations.find(l => l.id === locationId);
+                const metadata = {
+                    name: name,
+                    description: description,
+                    locationName: location?.name || 'Unknown'
+                };
+
+                // Save as new forecast
+                const result = await dataService.saveForecast(
+                    locationId,
+                    currentSalesDataId || null,
+                    forecastPayload,
+                    metadata
+                );
+
+                // Close modal
+                const modal = bootstrap.Modal.getInstance(document.getElementById('saveAsNewModal'));
+                modal.hide();
+
+                // Update UI to show this as the loaded forecast
+                currentLoadedForecastId = result.forecastId;
+                currentForecastId = result.forecastId;
+
+                // Save new state as original
+                originalForecastState = {
+                    forecastId: result.forecastId,
+                    forecastData: JSON.parse(JSON.stringify(forecastData)),
+                    config: { ...config },
+                    metadata: { ...metadata }
+                };
+
+                // Reset modification flags
+                configModified = false;
+                valuesModified = false;
+                adjustments = {};
+
+                // Update button label
+                document.getElementById('saveForecastBtn').innerHTML = '<i class="fas fa-save me-2"></i>Update Forecast';
+
+                showStatus('success', `New forecast "${name}" saved successfully`);
+
+                // Refresh analytics
+                await refreshAnalytics(locationId);
+
+            } catch (error) {
+                console.error('[SalesForecasting] Error saving new forecast:', error);
+                showStatus('error', `Failed to save forecast: ${error.message}`);
+            }
         }
 
         // Expose functions to global scope for onclick handlers
