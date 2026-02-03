@@ -3167,6 +3167,20 @@
                     actualsSection.classList.remove('hidden');
                 }
 
+                // Save pristine state for revert functionality
+                originalForecastState = {
+                    forecastId: forecastId,
+                    forecastData: JSON.parse(JSON.stringify(forecastData)), // Deep copy
+                    config: forecast.config ? { ...forecast.config } : {},
+                    metadata: forecast.metadata ? { ...forecast.metadata } : {}
+                };
+
+                // Reset modification flags
+                configModified = false;
+                valuesModified = false;
+
+                console.log('[SalesForecasting] Original state preserved for revert');
+
                 // Show loaded indicator
                 showStatus('success', `Loaded forecast: ${forecast.metadata?.name || 'Unnamed Forecast'}`, 5000);
 
