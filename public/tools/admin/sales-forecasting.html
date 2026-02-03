@@ -4186,6 +4186,25 @@
             }
         }
 
+        /**
+         * Refresh analytics for a location
+         * @param {string} locationId - Location ID to refresh analytics for
+         */
+        async function refreshAnalytics(locationId) {
+            if (!locationId) {
+                console.warn('[SalesForecasting] Cannot refresh analytics: no location ID');
+                return;
+            }
+
+            try {
+                console.log('[SalesForecasting] Refreshing analytics for location:', locationId);
+                await loadLocationAnalytics();
+            } catch (error) {
+                console.error('[SalesForecasting] Error refreshing analytics:', error);
+                // Don't show error to user - analytics refresh is non-critical
+            }
+        }
+
         // Expose functions to global scope for onclick handlers
         window.useSavedData = useSavedData;
         window.deleteSavedData = deleteSavedData;
