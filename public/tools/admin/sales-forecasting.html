@@ -1279,6 +1279,12 @@
             // Confirm Save As New button
             document.getElementById('confirmSaveAsNewBtn')?.addEventListener('click', confirmSaveAsNew);
 
+            // Revert Changes dropdown item
+            document.getElementById('revertChangesBtn')?.addEventListener('click', (e) => {
+                e.preventDefault();
+                showRevertConfirmation();
+            });
+
             // NEW: Actuals file input
             const actualsInput = document.getElementById('actualsFileInput');
             actualsInput?.addEventListener('change', (e) => {
@@ -4073,6 +4079,91 @@
             } catch (error) {
                 console.error('[SalesForecasting] Error saving new forecast:', error);
                 showStatus('error', `Failed to save forecast: ${error.message}`);
+            }
+        }
+
+        /**
+         * Show revert changes confirmation
+         */
+        function showRevertConfirmation() {
+            if (!originalForecastState) {
+                showStatus('error', 'No original state to revert to');
+                return;
+            }
+
+            if (!configModified && !valuesModified) {
+                showStatus('info', 'No changes to revert');
+                return;
+            }
+
+            const confirmed = confirm(
+                'Revert all changes?\n\n' +
+                'This will restore the original forecast data and discard:\n' +
+                (configModified ? '• Configuration changes\n' : '') +
+                (valuesModified ? '• Manual adjustments\n' : '')
+            );
+
+            if (confirmed) {
+                revertChanges();
+            }
+        }
+
+        /**
+         * Revert all changes to original loaded state
+         */
+        function revertChanges() {
+            try {
+                // Restore forecast data
+                forecastData = JSON.parse(JSON.stringify(originalForecastState.forecastData));
+
+                // Restore config values in form
+                if (originalForecastState.config) {
+                    const growthRateInput = document.getElementById('growthRate');
+                    if (growthRateInput && originalForecastState.config.growthRate !== undefined) {
+                        growthRateInput.value = originalForecastState.config.growthRate;
+                    }
+
+                    const methodSelect = document.getElementById('forecastMethod');
+                    if (methodSelect && originalForecastState.config.method) {
+                        methodSelect.value = originalForecastState.config.method;
+                    }
+                }
+
+                // Clear adjustments
+                adjustments = {};
+
+                // Reset modification flags
+                configModified = false;
+                valuesModified = false;
+
+                // Re-render everything
+                renderForecastChart();
+                renderForecastTable();
+                renderAdjustmentTable();
+
+                // Hide revert button
+                document.getElementById('revertChangesBtn').style.display = 'none';
+
+                showStatus('success', 'Changes reverted to original state');
+                console.log('[SalesForecasting] Reverted to original state');
+
+            } catch (error) {
+                console.error('[SalesForecasting] Error reverting changes:', error);
+                showStatus('error', 'Failed to revert changes');
+            }
+        }
+
+        /**
+         * Update revert button visibility based on modification state
+         */
+        function updateRevertButtonVisibility() {
+            const revertBtn = document.getElementById('revertChangesBtn');
+            if (revertBtn) {
+                if (configModified || valuesModified) {
+                    revertBtn.style.display = 'block';
+                } else {
+                    revertBtn.style.display = 'none';
+                }
             }
         }
 
