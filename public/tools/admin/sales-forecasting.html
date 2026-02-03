@@ -786,9 +786,27 @@
                     <button class="btn btn-success-custom btn-lg me-2" id="generateForecastBtn">
                         <i class="fas fa-chart-line me-2"></i>Generate Forecast
                     </button>
-                    <button class="btn btn-primary-custom me-2" id="saveForecastBtn" disabled>
-                        <i class="fas fa-save me-2"></i>Save Forecast
-                    </button>
+                    <div class="btn-group me-2" role="group">
+                        <button type="button" class="btn btn-primary-custom" id="saveForecastBtn" disabled>
+                            <i class="fas fa-save me-2"></i>Save Forecast
+                        </button>
+                        <button type="button" class="btn btn-primary-custom dropdown-toggle dropdown-toggle-split"
+                                id="saveForecastDropdown" data-bs-toggle="dropdown" aria-expanded="false" disabled>
+                            <span class="visually-hidden">Toggle Dropdown</span>
+                        </button>
+                        <ul class="dropdown-menu" aria-labelledby="saveForecastDropdown">
+                            <li><a class="dropdown-item" href="#" id="updateForecastBtn">
+                                <i class="fas fa-save me-2"></i>Update Forecast
+                            </a></li>
+                            <li><a class="dropdown-item" href="#" id="saveAsNewBtn">
+                                <i class="fas fa-copy me-2"></i>Save As New
+                            </a></li>
+                            <li><hr class="dropdown-divider"></li>
+                            <li><a class="dropdown-item" href="#" id="revertChangesBtn" style="display: none;">
+                                <i class="fas fa-undo me-2"></i>Revert Changes
+                            </a></li>
+                        </ul>
+                    </div>
                     <button class="btn btn-primary-custom me-2" id="exportCsvBtn" disabled>
                         <i class="fas fa-download me-2"></i>Export CSV
                     </button>
@@ -1743,6 +1761,7 @@
 
                 // Enable save/export buttons
                 document.getElementById('saveForecastBtn').disabled = false;
+                document.getElementById('saveForecastDropdown').disabled = false;
                 document.getElementById('exportCsvBtn').disabled = false;
 
                 const dateRangeText = preset === 'custom'
@@ -3153,6 +3172,7 @@
 
                 // Enable adjustment and export buttons
                 document.getElementById('saveForecastBtn').disabled = false;
+                document.getElementById('saveForecastDropdown').disabled = false;
                 document.getElementById('exportCsvBtn').disabled = false;
 
                 // Show adjustment section
