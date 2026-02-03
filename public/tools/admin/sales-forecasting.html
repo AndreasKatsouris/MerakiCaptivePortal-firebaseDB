@@ -1267,6 +1267,9 @@
                 showUpdateForecastModal();
             });
 
+            // Confirm Update Forecast button
+            document.getElementById('confirmUpdateForecastBtn')?.addEventListener('click', confirmUpdateForecast);
+
             // NEW: Actuals file input
             const actualsInput = document.getElementById('actualsFileInput');
             actualsInput?.addEventListener('change', (e) => {
@@ -3871,6 +3874,76 @@
             // Show modal
             const modal = new bootstrap.Modal(document.getElementById('updateForecastModal'));
             modal.show();
+        }
+
+        /**
+         * Confirm and execute forecast update
+         */
+        async function confirmUpdateForecast() {
+            const forecastId = currentLoadedForecastId;
+
+            if (!forecastId || !originalForecastState) {
+                showStatus('error', 'No forecast loaded to update');
+                return;
+            }
+
+            try {
+                showStatus('info', 'Updating forecast...');
+
+                // Prepare updated forecast data
+                const updatedForecast = {
+                    locationId: originalForecastState.metadata?.locationId,
+                    predictions: {},
+                    config: originalForecastState.config,
+                    metadata: {
+                        name: originalForecastState.metadata?.name,
+                        description: originalForecastState.metadata?.description
+                    }
+                };
+
+                // Convert forecastData array to predictions object
+                forecastData.forEach(row => {
+                    const dateStr = row.date.toISOString().split('T')[0];
+                    updatedForecast.predictions[dateStr] = {
+                        predicted: row.predicted,
+                        confidenceLower: row.confidenceLower,
+                        confidenceUpper: row.confidenceUpper,
+                        transactionQty: row.transactionQty,
+                        avgSpend: row.avgSpend
+                    };
+                });
+
+                // Update in Firebase
+                await dataService.updateForecast(forecastId, updatedForecast);
+
+                // Close modal
+                const modal = bootstrap.Modal.getInstance(document.getElementById('updateForecastModal'));
+                modal.hide();
+
+                // Reset modification flags
+                configModified = false;
+                valuesModified = false;
+                adjustments = {};
+
+                // Update original state to current state
+                originalForecastState.forecastData = JSON.parse(JSON.stringify(forecastData));
+                originalForecastState.config = { ...updatedForecast.config };
+
+                // Hide revert button
+                document.getElementById('revertChangesBtn').style.display = 'none';
+
+                showStatus('success', 'Forecast updated successfully');
+
+                // Refresh analytics
+                const locationId = updatedForecast.locationId;
+                if (locationId) {
+                    await refreshAnalytics(locationId);
+                }
+
+            } catch (error) {
+                console.error('[SalesForecasting] Error updating forecast:', error);
+                showStatus('error', `Failed to update forecast: ${error.message}`);
+            }
         }
 
         // Expose functions to global scope for onclick handlers
