@@ -528,8 +528,19 @@ export class SalesDataService {
             const actualRef = push(ref(rtdb, 'forecastActuals'));
             const actualId = actualRef.key;
 
+            console.log('[SalesDataService] ===== SAVING ACTUALS =====');
+            console.log('[SalesDataService] Forecast ID:', forecastId);
+            console.log('[SalesDataService] Daily actuals count:', dailyActuals.length);
+
             // Get the forecast to get location info
             const forecast = await this.getForecast(forecastId);
+
+            console.log('[SalesDataService] Forecast location:', forecast.locationId);
+            console.log('[SalesDataService] Forecast predictions sample (first 2 keys):');
+            const predKeys = Object.keys(forecast.predictions || {}).slice(0, 2);
+            predKeys.forEach(key => {
+                console.log(`  ${key}:`, forecast.predictions[key]);
+            });
 
             // Get date range
             const dates = dailyActuals.map(d => d.date).sort();
@@ -538,6 +549,15 @@ export class SalesDataService {
                 endDate: dates[dates.length - 1]
             };
 
+            // Index the daily actuals
+            const indexedActuals = this.indexDailyData(dailyActuals);
+
+            console.log('[SalesDataService] Indexed actuals sample (first 2 keys):');
+            const actualsKeys = Object.keys(indexedActuals).slice(0, 2);
+            actualsKeys.forEach(key => {
+                console.log(`  ${key}:`, indexedActuals[key]);
+            });
+
             // Prepare the actuals record
             const actualsRecord = {
                 forecastId,
@@ -545,7 +565,7 @@ export class SalesDataService {
                 uploadedAt: Date.now(),
                 uploadedBy: this.userId,
                 dateRange,
-                dailyActuals: this.indexDailyData(dailyActuals),
+                dailyActuals: indexedActuals,
                 comparison: null // Will be calculated by analytics
             };
 
@@ -610,6 +630,117 @@ export class SalesDataService {
             console.log('[SalesDataService] Updated comparison for actuals:', actualId);
         } catch (error) {
             console.error('[SalesDataService] Error updating comparison:', error);
+            throw error;
+        }
+    }
+
+    /**
+     * Get all actuals for a specific location
+     * @param {string} locationId - Location ID
+     * @returns {Promise<Array>} List of actuals for the location
+     */
+    async getActualsForLocation(locationId) {
+        try {
+            console.log('[SalesDataService] Getting actuals for location:', locationId);
+            const actualsRef = ref(rtdb, 'forecastActuals');
+            const snapshot = await get(actualsRef);
+
+            if (!snapshot.exists()) {
+                console.log('[SalesDataService] No actuals found in database');
+                return [];
+            }
+
+            const allActuals = snapshot.val();
+            console.log('[SalesDataService] Total actuals in database:', Object.keys(allActuals).length);
+
+            const locationActuals = [];
+
+            for (const [id, actuals] of Object.entries(allActuals)) {
+                console.log('[SalesDataService] Checking actual:', id, 'locationId:', actuals.locationId, 'vs', locationId);
+
+                if (actuals.locationId === locationId) {
+                    // Get the forecast name to display with actuals
+                    let forecastName = 'Unknown Forecast';
+                    try {
+                        const forecast = await this.getForecast(actuals.forecastId);
+                        forecastName = forecast?.metadata?.name || forecastName;
+                    } catch (err) {
+                        console.warn('[SalesDataService] Could not get forecast name for actuals:', id, err);
+                    }
+
+                    locationActuals.push({
+                        id,
+                        ...actuals,
+                        forecastName,
+                        recordCount: Object.keys(actuals.dailyActuals || {}).length
+                    });
+                }
+            }
+
+            console.log('[SalesDataService] Found', locationActuals.length, 'actuals for location:', locationId);
+
+            // Sort by uploadedAt descending
+            locationActuals.sort((a, b) => b.uploadedAt - a.uploadedAt);
+
+            return locationActuals;
+        } catch (error) {
+            console.error('[SalesDataService] Error getting actuals for location:', error);
+            throw error;
+        }
+    }
+
+    /**
+     * Delete actuals record
+     * @param {string} actualId - Actuals ID to delete
+     * @returns {Promise<void>}
+     */
+    async deleteActuals(actualId) {
+        try {
+            const actualRef = ref(rtdb, `forecastActuals/${actualId}`);
+            await remove(actualRef);
+            console.log('[SalesDataService] Deleted actuals:', actualId);
+        } catch (error) {
+            console.error('[SalesDataService] Error deleting actuals:', error);
+            throw error;
+        }
+    }
+
+    /**
+     * Update an existing forecast
+     * @param {string} forecastId - Forecast ID to update
+     * @param {Object} updatedData - Updated forecast data
+     * @returns {Promise<void>}
+     */
+    async updateForecast(forecastId, updatedData) {
+        try {
+            const forecastRef = ref(rtdb, `forecasts/${forecastId}`);
+
+            // Get existing forecast to preserve creation metadata
+            const snapshot = await get(forecastRef);
+            if (!snapshot.exists()) {
+                throw new Error('Forecast not found');
+            }
+
+            const existingForecast = snapshot.val();
+
+            // Prepare update with preserved creation data
+            const updatePayload = {
+                ...updatedData,
+                metadata: {
+                    ...existingForecast.metadata,
+                    ...updatedData.metadata,
+                    createdAt: existingForecast.metadata?.createdAt, // Preserve original
+                    createdBy: existingForecast.metadata?.createdBy, // Preserve original
+                    lastModified: Date.now(),
+                    modifiedBy: this.userId
+                }
+            };
+
+            await set(forecastRef, updatePayload);
+
+            console.log('[SalesDataService] Updated forecast:', forecastId);
+        } catch (error) {
+            console.error('[SalesDataService] Error updating forecast:', error);
             throw error;
         }
     }
@@ -689,6 +820,7 @@ export class SalesDataService {
      * Format predictions for storage
      */
     formatPredictions(predictions) {
+        console.log('[SalesDataService] formatPredictions: Formatting', predictions.length, 'predictions');
         const formatted = {};
 
         for (const pred of predictions) {
@@ -700,8 +832,19 @@ export class SalesDataService {
             formatted[dateKey] = {
                 predicted: pred.predicted || pred.revenue,
                 confidenceLower: pred.confidenceLower,
-                confidenceUpper: pred.confidenceUpper
+                confidenceUpper: pred.confidenceUpper,
+                transactionQty: pred.transactionQty || 0,
+                avgSpend: pred.avgSpend || 0
             };
+        }
+
+        // Log sample of formatted data
+        const sampleKey = Object.keys(formatted)[0];
+        if (sampleKey) {
+            console.log('[SalesDataService] formatPredictions: Sample formatted prediction:', {
+                date: sampleKey,
+                ...formatted[sampleKey]
+            });
         }
 
         return formatted;
