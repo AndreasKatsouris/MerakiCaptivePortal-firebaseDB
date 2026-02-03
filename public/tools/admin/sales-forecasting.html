@@ -3146,6 +3146,18 @@
          * Load a saved forecast
          */
         async function loadSavedForecast(forecastId) {
+            // Check if there are unsaved changes
+            if (currentLoadedForecastId && (configModified || valuesModified)) {
+                const confirmed = confirm(
+                    'You have unsaved changes to the current forecast.\n\n' +
+                    'Do you want to discard these changes and load a different forecast?'
+                );
+
+                if (!confirmed) {
+                    return; // Cancel loading
+                }
+            }
+
             try {
                 showStatus('info', 'Loading forecast...');
                 console.log('[SalesForecasting] Loading forecast:', forecastId);
@@ -3940,6 +3952,12 @@
             }
 
             try {
+                // Check if user owns the forecast
+                if (originalForecastState.metadata?.createdBy !== currentUser.uid) {
+                    showStatus('error', 'You do not have permission to update this forecast');
+                    return;
+                }
+
                 showStatus('info', 'Updating forecast...');
 
                 // Prepare updated forecast data
@@ -3994,7 +4012,10 @@
 
             } catch (error) {
                 console.error('[SalesForecasting] Error updating forecast:', error);
-                showStatus('error', `Failed to update forecast: ${error.message}`);
+                const retry = confirm(`Failed to update forecast: ${error.message}\n\nWould you like to retry?`);
+                if (retry) {
+                    confirmUpdateForecast(); // Retry
+                }
             }
         }
 
@@ -4115,7 +4136,10 @@
 
             } catch (error) {
                 console.error('[SalesForecasting] Error saving new forecast:', error);
-                showStatus('error', `Failed to save forecast: ${error.message}`);
+                const retry = confirm(`Failed to save forecast: ${error.message}\n\nWould you like to retry?`);
+                if (retry) {
+                    confirmSaveAsNew(); // Retry
+                }
             }
         }
 
