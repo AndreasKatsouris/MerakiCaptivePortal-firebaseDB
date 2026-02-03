@@ -1799,6 +1799,20 @@
                 document.getElementById('saveForecastDropdown').disabled = false;
                 document.getElementById('exportCsvBtn').disabled = false;
 
+                // If we're regenerating a loaded forecast, mark config as modified
+                if (currentLoadedForecastId && originalForecastState) {
+                    configModified = true;
+                    updateRevertButtonVisibility();
+                    console.log('[SalesForecasting] Config modified - regenerated with new settings');
+                }
+
+                // Clear manual adjustments when regenerating
+                if (configModified) {
+                    adjustments = {};
+                    valuesModified = false;
+                    console.log('[SalesForecasting] Manual adjustments cleared due to regeneration');
+                }
+
                 const dateRangeText = preset === 'custom'
                     ? `${startDate.toLocaleDateString()} to ${endDate.toLocaleDateString()}`
                     : `${horizon} days ahead`;
