@@ -1688,6 +1688,17 @@
 
         // Generate forecast
         async function generateForecast() {
+            // Reset button labels for new forecast mode
+            const saveForecastBtn = document.getElementById('saveForecastBtn');
+            if (saveForecastBtn) {
+                saveForecastBtn.innerHTML = '<i class="fas fa-save me-2"></i>Save Forecast';
+            }
+
+            const generateBtn = document.getElementById('generateForecastBtn');
+            if (generateBtn) {
+                generateBtn.innerHTML = '<i class="fas fa-chart-line me-2"></i>Generate Forecast';
+            }
+
             const method = document.getElementById('forecastMethod').value;
             const preset = document.getElementById('forecastPreset').value;
             const confidenceLevel = parseInt(document.getElementById('confidenceLevel').value);
@@ -3200,6 +3211,20 @@
                 valuesModified = false;
 
                 console.log('[SalesForecasting] Original state preserved for revert');
+
+                // Update button labels for edit mode
+                const saveForecastBtn = document.getElementById('saveForecastBtn');
+                if (saveForecastBtn) {
+                    saveForecastBtn.innerHTML = '<i class="fas fa-save me-2"></i>Update Forecast';
+                }
+
+                // Update generate button label
+                const generateBtn = document.getElementById('generateForecastBtn');
+                if (generateBtn) {
+                    generateBtn.innerHTML = '<i class="fas fa-chart-line me-2"></i>Regenerate with New Settings';
+                }
+
+                console.log('[SalesForecasting] Button labels updated for edit mode');
 
                 // Show loaded indicator
                 showStatus('success', `Loaded forecast: ${forecast.metadata?.name || 'Unnamed Forecast'}`, 5000);
