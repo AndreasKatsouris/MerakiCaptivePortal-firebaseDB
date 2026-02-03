@@ -3495,6 +3495,11 @@
                 await dataService.updateForecastAdjustments(currentForecastId, newAdjustments);
                 adjustments = newAdjustments;
 
+                // Mark values as modified
+                valuesModified = true;
+                updateRevertButtonVisibility();
+                console.log('[SalesForecasting] Values modified - manual adjustments applied');
+
                 showStatus('success', 'Adjustments saved successfully');
             } catch (error) {
                 console.error('[SalesForecasting] Error saving adjustments:', error);
