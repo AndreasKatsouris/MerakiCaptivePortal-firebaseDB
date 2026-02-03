@@ -1270,6 +1270,12 @@
             // Confirm Update Forecast button
             document.getElementById('confirmUpdateForecastBtn')?.addEventListener('click', confirmUpdateForecast);
 
+            // Save As New dropdown item
+            document.getElementById('saveAsNewBtn')?.addEventListener('click', (e) => {
+                e.preventDefault();
+                showSaveAsNewModal();
+            });
+
             // NEW: Actuals file input
             const actualsInput = document.getElementById('actualsFileInput');
             actualsInput?.addEventListener('change', (e) => {
@@ -3946,6 +3952,35 @@
             }
         }
 
+        /**
+         * Show save as new forecast modal
+         */
+        function showSaveAsNewModal() {
+            if (!forecastData || forecastData.length === 0) {
+                showStatus('error', 'No forecast data to save');
+                return;
+            }
+
+            // Pre-populate with copy of current name if editing
+            let suggestedName = '';
+            if (currentLoadedForecastId && originalForecastState) {
+                const originalName = originalForecastState.metadata?.name || 'Unnamed Forecast';
+                suggestedName = `${originalName} (Copy)`;
+            } else {
+                const location = locations.find(l => l.id === document.getElementById('locationSelect')?.value);
+                const locationName = location?.name || 'Unknown Location';
+                const dateStr = new Date().toLocaleDateString('en-US', { month: 'long', year: 'numeric' });
+                suggestedName = `${locationName} - ${dateStr} Forecast`;
+            }
+
+            document.getElementById('saveAsNewNameInput').value = suggestedName;
+            document.getElementById('saveAsNewDescriptionInput').value = '';
+
+            // Show modal
+            const modal = new bootstrap.Modal(document.getElementById('saveAsNewModal'));
+            modal.show();
+        }
+
         // Expose functions to global scope for onclick handlers
         window.useSavedData = useSavedData;
         window.deleteSavedData = deleteSavedData;
@@ -4079,6 +4114,34 @@
                 <div class="modal-footer">
                     <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
                     <button type="button" class="btn btn-primary" id="confirmUpdateForecastBtn">Update Forecast</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Save As New Forecast Modal -->
+    <div class="modal fade" id="saveAsNewModal" tabindex="-1">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">Save as New Forecast</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <div class="mb-3">
+                        <label for="saveAsNewNameInput" class="form-label">Forecast Name</label>
+                        <input type="text" class="form-control" id="saveAsNewNameInput"
+                               placeholder="Enter forecast name" required>
+                    </div>
+                    <div class="mb-3">
+                        <label for="saveAsNewDescriptionInput" class="form-label">Description (Optional)</label>
+                        <textarea class="form-control" id="saveAsNewDescriptionInput"
+                                  rows="3" placeholder="Enter description"></textarea>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                    <button type="button" class="btn btn-primary" id="confirmSaveAsNewBtn">Save New Forecast</button>
                 </div>
             </div>
         </div>
