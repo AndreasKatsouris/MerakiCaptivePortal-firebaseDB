@@ -3323,6 +3323,12 @@
                     description
                 });
 
+                // Refresh analytics after edit
+                const locationId = document.getElementById('savedForecastLocationSelect')?.value;
+                if (locationId) {
+                    await refreshAnalytics(locationId);
+                }
+
                 // Close modal
                 const modal = bootstrap.Modal.getInstance(document.getElementById('editForecastNameModal'));
                 modal.hide();
