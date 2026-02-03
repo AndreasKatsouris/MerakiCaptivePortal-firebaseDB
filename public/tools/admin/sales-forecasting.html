@@ -2616,6 +2616,12 @@
                     const modal = bootstrap.Modal.getInstance(document.getElementById('saveForecastModal'));
                     modal.hide();
 
+                    // Refresh analytics after saving new forecast
+                    const locationId = document.getElementById('locationSelect')?.value;
+                    if (locationId) {
+                        await refreshAnalytics(locationId);
+                    }
+
                     showStatus('success', 'Forecast saved successfully!');
 
                 } else {
