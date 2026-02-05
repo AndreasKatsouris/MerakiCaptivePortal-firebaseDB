@@ -10,7 +10,11 @@
       "Bash(git worktree:*)",
       "Bash(test:*)",
       "Bash(npm install)",
-      "Bash(git show:*)"
+      "Bash(git show:*)",
+      "Bash(node -c:*)",
+      "Bash(git push:*)",
+      "Bash(firebase projects:list:*)",
+      "Bash(git clone:*)"
     ]
   },
   "enabledPlugins": {
