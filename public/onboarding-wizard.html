@@ -1,0 +1,381 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Welcome to Sparks Hospitality</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <style>
+        body {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .wizard-container {
+            max-width: 700px;
+            width: 100%;
+            padding: 20px;
+        }
+
+        .wizard-card {
+            background: white;
+            border-radius: 20px;
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+            overflow: hidden;
+        }
+
+        .wizard-header {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 30px;
+            text-align: center;
+        }
+
+        .wizard-header h2 {
+            margin: 0 0 10px 0;
+            font-size: 1.8rem;
+            font-weight: 700;
+        }
+
+        .wizard-body {
+            padding: 40px;
+        }
+
+        .wizard-step {
+            display: none;
+        }
+
+        .wizard-step.active {
+            display: block;
+            animation: fadeIn 0.3s ease-in;
+        }
+
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(10px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        .progress-container {
+            margin-bottom: 30px;
+        }
+
+        .progress {
+            height: 8px;
+            border-radius: 10px;
+            background-color: #e9ecef;
+        }
+
+        .progress-bar {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            transition: width 0.3s ease;
+        }
+
+        .step-indicator {
+            display: flex;
+            justify-content: space-between;
+            margin-top: 15px;
+        }
+
+        .step-dot {
+            width: 40px;
+            height: 40px;
+            border-radius: 50%;
+            background: #e9ecef;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: 600;
+            color: #6c757d;
+            transition: all 0.3s ease;
+            position: relative;
+        }
+
+        .step-dot.active {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            transform: scale(1.1);
+        }
+
+        .step-dot.completed {
+            background: #28a745;
+            color: white;
+        }
+
+        .step-dot.completed::after {
+            content: '\f00c';
+            font-family: 'Font Awesome 6 Free';
+            font-weight: 900;
+        }
+
+        .step-label {
+            font-size: 0.75rem;
+            margin-top: 8px;
+            text-align: center;
+            color: #6c757d;
+        }
+
+        .form-label {
+            font-weight: 600;
+            color: #495057;
+            margin-bottom: 8px;
+        }
+
+        .form-control, .form-select {
+            border-radius: 8px;
+            border: 2px solid #e9ecef;
+            padding: 12px;
+        }
+
+        .form-control:focus, .form-select:focus {
+            border-color: #667eea;
+            box-shadow: 0 0 0 0.2rem rgba(102, 126, 234, 0.25);
+        }
+
+        .btn-wizard {
+            padding: 12px 30px;
+            border-radius: 8px;
+            font-weight: 600;
+            transition: all 0.3s ease;
+        }
+
+        .btn-wizard-primary {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border: none;
+        }
+
+        .btn-wizard-primary:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(102, 126, 234, 0.4);
+        }
+
+        .btn-wizard-secondary {
+            background: #f8f9fa;
+            color: #495057;
+            border: 2px solid #e9ecef;
+        }
+
+        .wizard-actions {
+            display: flex;
+            justify-content: space-between;
+            margin-top: 30px;
+        }
+
+        .success-animation {
+            text-align: center;
+            padding: 40px 0;
+        }
+
+        .success-animation i {
+            font-size: 80px;
+            color: #28a745;
+            animation: scaleIn 0.5s ease;
+        }
+
+        @keyframes scaleIn {
+            from { transform: scale(0); }
+            to { transform: scale(1); }
+        }
+
+        .feature-card {
+            background: #f8f9fa;
+            border-radius: 10px;
+            padding: 15px;
+            margin-bottom: 15px;
+            border: 2px solid transparent;
+            transition: all 0.3s ease;
+            cursor: pointer;
+        }
+
+        .feature-card:hover {
+            border-color: #667eea;
+            transform: translateY(-2px);
+        }
+
+        .feature-card.selected {
+            border-color: #667eea;
+            background: rgba(102, 126, 234, 0.1);
+        }
+    </style>
+</head>
+<body>
+    <div class="wizard-container">
+        <div class="wizard-card">
+            <div class="wizard-header">
+                <h2><i class="fas fa-rocket me-2"></i> Welcome to Sparks Hospitality!</h2>
+                <p class="mb-0">Let's get your restaurant set up in just a few steps</p>
+            </div>
+
+            <div class="wizard-body">
+                <!-- Progress Indicator -->
+                <div class="progress-container">
+                    <div class="progress">
+                        <div class="progress-bar" id="wizard-progress" role="progressbar" style="width: 0%"></div>
+                    </div>
+                    <div class="step-indicator">
+                        <div class="text-center">
+                            <div class="step-dot active" id="step-dot-1">1</div>
+                            <div class="step-label">Business Info</div>
+                        </div>
+                        <div class="text-center">
+                            <div class="step-dot" id="step-dot-2">2</div>
+                            <div class="step-label">Location</div>
+                        </div>
+                        <div class="text-center">
+                            <div class="step-dot" id="step-dot-3">3</div>
+                            <div class="step-label">Preferences</div>
+                        </div>
+                        <div class="text-center">
+                            <div class="step-dot" id="step-dot-4">4</div>
+                            <div class="step-label">Complete</div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Step 1: Business Information -->
+                <div class="wizard-step active" data-step="1">
+                    <h4 class="mb-4"><i class="fas fa-briefcase me-2"></i> Tell us about your business</h4>
+                    <form id="business-info-form">
+                        <div class="mb-3">
+                            <label for="business-name" class="form-label">Business Name *</label>
+                            <input type="text" class="form-control" id="business-name" required placeholder="e.g., Joe's Pizzeria">
+                        </div>
+                        <div class="mb-3">
+                            <label for="business-type" class="form-label">Business Type *</label>
+                            <select class="form-select" id="business-type" required>
+                                <option value="">Select type...</option>
+                                <option value="restaurant">Restaurant</option>
+                                <option value="cafe">Café</option>
+                                <option value="bar">Bar</option>
+                                <option value="fast-food">Fast Food</option>
+                                <option value="fine-dining">Fine Dining</option>
+                                <option value="other">Other</option>
+                            </select>
+                        </div>
+                        <div class="mb-3">
+                            <label for="contact-phone" class="form-label">Contact Phone *</label>
+                            <input type="tel" class="form-control" id="contact-phone" required placeholder="+27 82 123 4567">
+                        </div>
+                    </form>
+                </div>
+
+                <!-- Step 2: Location Setup -->
+                <div class="wizard-step" data-step="2">
+                    <h4 class="mb-4"><i class="fas fa-map-marker-alt me-2"></i> Add your first location</h4>
+                    <form id="location-setup-form">
+                        <div class="mb-3">
+                            <label for="location-name" class="form-label">Location Name *</label>
+                            <input type="text" class="form-control" id="location-name" required placeholder="e.g., Downtown Branch">
+                        </div>
+                        <div class="mb-3">
+                            <label for="location-address" class="form-label">Address *</label>
+                            <textarea class="form-control" id="location-address" rows="3" required placeholder="123 Main Street, City, Province"></textarea>
+                        </div>
+                        <div class="row">
+                            <div class="col-md-6 mb-3">
+                                <label for="location-city" class="form-label">City *</label>
+                                <input type="text" class="form-control" id="location-city" required placeholder="Cape Town">
+                            </div>
+                            <div class="col-md-6 mb-3">
+                                <label for="location-timezone" class="form-label">Timezone *</label>
+                                <select class="form-select" id="location-timezone" required>
+                                    <option value="Africa/Johannesburg" selected>Africa/Johannesburg (SAST)</option>
+                                    <option value="Africa/Cape_Town">Africa/Cape Town (SAST)</option>
+                                </select>
+                            </div>
+                        </div>
+                    </form>
+                </div>
+
+                <!-- Step 3: Preferences -->
+                <div class="wizard-step" data-step="3">
+                    <h4 class="mb-4"><i class="fas fa-cog me-2"></i> Customize your preferences</h4>
+                    <form id="preferences-form">
+                        <div class="mb-4">
+                            <label class="form-label">Which features are you most interested in?</label>
+                            <div class="feature-card" data-feature="queue">
+                                <div class="d-flex align-items-center">
+                                    <i class="fas fa-users fa-2x text-primary me-3"></i>
+                                    <div>
+                                        <h6 class="mb-0">Queue Management</h6>
+                                        <small class="text-muted">Manage wait times and seating</small>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="feature-card" data-feature="receipts">
+                                <div class="d-flex align-items-center">
+                                    <i class="fas fa-receipt fa-2x text-success me-3"></i>
+                                    <div>
+                                        <h6 class="mb-0">Receipt Processing & Rewards</h6>
+                                        <small class="text-muted">OCR processing and loyalty programs</small>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="feature-card" data-feature="food-cost">
+                                <div class="d-flex align-items-center">
+                                    <i class="fas fa-chart-line fa-2x text-warning me-3"></i>
+                                    <div>
+                                        <h6 class="mb-0">Food Cost Analytics</h6>
+                                        <small class="text-muted">Track inventory and costs</small>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="feature-card" data-feature="campaigns">
+                                <div class="d-flex align-items-center">
+                                    <i class="fas fa-bullhorn fa-2x text-danger me-3"></i>
+                                    <div>
+                                        <h6 class="mb-0">Marketing Campaigns</h6>
+                                        <small class="text-muted">WhatsApp marketing automation</small>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="mb-3">
+                            <label for="currency" class="form-label">Currency *</label>
+                            <select class="form-select" id="currency" required>
+                                <option value="ZAR" selected>ZAR - South African Rand (R)</option>
+                                <option value="USD">USD - US Dollar ($)</option>
+                                <option value="EUR">EUR - Euro (€)</option>
+                            </select>
+                        </div>
+                    </form>
+                </div>
+
+                <!-- Step 4: Complete -->
+                <div class="wizard-step" data-step="4">
+                    <div class="success-animation">
+                        <i class="fas fa-check-circle"></i>
+                        <h3 class="mt-4 mb-2">You're All Set!</h3>
+                        <p class="text-muted">Your account has been configured successfully.</p>
+                        <div class="mt-4">
+                            <button class="btn btn-wizard-primary btn-lg" id="go-to-dashboard">
+                                <i class="fas fa-arrow-right me-2"></i> Go to Dashboard
+                            </button>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Navigation Buttons -->
+                <div class="wizard-actions">
+                    <button type="button" class="btn btn-wizard-secondary" id="prev-btn" style="display: none;">
+                        <i class="fas fa-arrow-left me-2"></i> Previous
+                    </button>
+                    <button type="button" class="btn btn-wizard-primary" id="next-btn">
+                        Next <i class="fas fa-arrow-right ms-2"></i>
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Firebase -->
+    <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-auth-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-database-compat.js"></script>
+    <script type="module" src="js/onboarding-wizard.js"></script>
+</body>
+</html>
