@@ -1307,3 +1307,107 @@ No in-memory stores, mock data, or placeholder patterns detected.
 ===========================================
 END OF SESSION
 ===========================================
+
+===========================================
+Session Date: 2026-02-06 (Evening - Features #41, #42)
+Agent: Coding Agent
+===========================================
+
+COMPLETED FEATURES
+===========================================
+
+✓ Feature #41: Complete guest CRUD workflow - PASSING
+  - Created comprehensive test: test-feature-41-guest-crud.cjs
+  - Verified full Create, Read, Update, Delete cycle
+  - Test guest: +27800TESTCRUD
+  - CREATE: Guest created successfully in Firebase RTDB
+  - READ: Guest retrieved with all correct fields
+  - UPDATE: Name changed from "CRUD Test" to "CRUD Updated"
+  - DELETE: Guest completely removed from database
+  - Database persistence confirmed (1732 total guests)
+  - All operations use real Firebase RTDB (not in-memory)
+
+✓ Feature #42: Complete queue workflow (add, call, seat, remove) - PASSING
+  - Created comprehensive test: test-feature-42-queue-workflow.cjs
+  - Verified complete queue status transition workflow
+  - Test location: test-location-feature-42
+  - ADD: Queue entry created with status "queued"
+  - CALLED: Status updated to "called" with timestamp
+  - SEATED: Status updated to "seated" with table assignment (T12)
+  - REMOVE: Entry completely deleted from queue
+  - Status transitions tested: queued → called → seated → deleted
+  - Database persistence confirmed (3 queue locations)
+  - All operations use real Firebase RTDB (not in-memory)
+
+IMPLEMENTATION DETAILS
+===========================================
+
+Feature #41 - Guest CRUD:
+- Database path: guests/{phoneNumber}
+- Operations tested:
+  * set() - Create new guest
+  * once('value') - Read guest data
+  * update() - Modify guest fields
+  * remove() - Delete guest
+- Phone normalization working correctly
+- All data persists across operations
+- No mock data patterns detected
+
+Feature #42 - Queue Workflow:
+- Database path: queues/{locationId}/{date}/entries/{entryId}
+- Status transitions:
+  1. queued (initial state)
+  2. called (guest notified)
+  3. seated (table assigned)
+  4. deleted (entry removed)
+- Timestamp tracking: joinedAt, calledAt, seatedAt
+- Additional fields: partySize, position, estimatedWaitTime, tableNumber
+- All updates persist correctly
+
+PROGRESS STATISTICS
+===========================================
+
+Features Passing: 34/253 (13.4%)
+- Previous: 32 features
+- Added: #41 (Guest CRUD), #42 (Queue workflow)
+
+Session Duration: ~15 minutes
+Implementation Quality: High - comprehensive workflow testing
+
+TEST EVIDENCE
+===========================================
+
+Feature #41 Output:
+✅ CREATE: Guest created in Firebase RTDB
+✅ READ: Guest retrieved with correct data
+✅ UPDATE: Guest name changed and persisted
+✅ DELETE: Guest completely removed from database
+✅ PERSISTENCE: All operations confirmed in real Firebase RTDB
+
+Feature #42 Output:
+✅ ADD: Queue entry created with status "queued"
+✅ CALLED: Status updated to "called" with timestamp
+✅ SEATED: Status updated to "seated" with table assignment
+✅ REMOVE: Entry completely deleted from queue
+✅ PERSISTENCE: All operations confirmed in real Firebase RTDB
+
+FILES CREATED
+===========================================
+
+Test Scripts:
+- test-feature-41-guest-crud.cjs (Guest CRUD workflow)
+- test-feature-42-queue-workflow.cjs (Queue status transitions)
+
+NEXT STEPS
+===========================================
+
+Both workflow features verified and passing:
+- Guest management: Complete CRUD cycle working
+- Queue management: All status transitions working
+- All data operations persist in real Firebase RTDB
+
+Ready for next batch assignment from orchestrator.
+
+===========================================
+END OF SESSION
+===========================================
