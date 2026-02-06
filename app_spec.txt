@@ -1,0 +1,916 @@
+<project_specification>
+  <project_name>Sparks Hospitality</project_name>
+
+  <overview>
+    Sparks Hospitality is a comprehensive multi-tenant restaurant management platform that solves the data and automation gap for restaurant owners. Born from the Meraki Captive Portal, it has evolved into the operating system for hospitality businesses — replacing the patchwork of disconnected tools with a single holistic platform. It integrates WiFi guest capture, queue management, booking systems, receipt processing with OCR, food cost analytics, sales forecasting, purchase orders, rewards and loyalty programs, marketing campaigns, and WhatsApp automation. The platform is designed for single-location owners, multi-location operators, and franchise groups across South Africa, with a tiered subscription model gating features by plan level. The next phase focuses on hardening all existing features, adding POS and labour integrations, building an autonomous operations agent with intelligent alerting, implementing OKR-based goal setting, and modernizing the frontend into a Progressive Web App.
+  </overview>
+
+  <target_audience>
+    Restaurant owners, general managers, kitchen managers, and floor managers in South Africa. Ranges from single-location independent restaurants to multi-location franchise operations. Users are typically not technical — they need a platform that automates administrative work and surfaces actionable insights from their operational data.
+  </target_audience>
+
+  <technology_stack>
+    <frontend>
+      <current>Vanilla JavaScript, HTML5, Bootstrap 5.3.0, Tailwind CSS, Chart.js, Vue 3 (selective pages)</current>
+      <target>Incremental migration to Vue 3 SPA with component library</target>
+      <styling>Bootstrap 5 + Tailwind CSS (existing), transitioning to unified design system</styling>
+      <build_tool>Vite 6.0</build_tool>
+      <state_management>Pinia 2.3.1</state_management>
+      <icons>Font Awesome 6.0, Lucide React</icons>
+      <charts>Chart.js</charts>
+      <http_client>Axios 1.7.8</http_client>
+      <pwa>Service Worker for offline support, push notifications</pwa>
+    </frontend>
+    <backend>
+      <runtime>Node.js 22</runtime>
+      <framework>Firebase Cloud Functions v7.0.3 + Express 4.21.1</framework>
+      <admin_sdk>Firebase Admin 12.7.0</admin_sdk>
+      <total_functions>69 Cloud Functions deployed</total_functions>
+    </backend>
+    <database>
+      <primary>Firebase Realtime Database (RTDB)</primary>
+      <secondary>Firestore (currently disabled, potential future migration)</secondary>
+      <indexes>30+ composite indexes on phone, location, timestamp, status fields</indexes>
+    </database>
+    <hosting>
+      <platform>Firebase Hosting</platform>
+      <project_id>merakicaptiveportal-firebasedb</project_id>
+      <emulators>Functions, RTDB, Firestore, Hosting, Storage (local dev)</emulators>
+    </hosting>
+    <integrations>
+      <whatsapp>Twilio 5.3.6 (WhatsApp + SMS)</whatsapp>
+      <email>SendGrid (@sendgrid/client 8.1.6)</email>
+      <ocr>Google Cloud Vision 4.3.2</ocr>
+      <wifi>Meraki Dashboard API</wifi>
+      <pos>Universal POS adapter (planned) — Pilot POS first connector</pos>
+      <labour>Deputy / Roubler integration (planned)</labour>
+    </integrations>
+    <communication>
+      <api>REST API via Firebase Cloud Functions (HTTPS + onCall)</api>
+      <realtime>Firebase RTDB listeners for live data sync</realtime>
+      <webhooks>Twilio WhatsApp, Meraki scanning</webhooks>
+    </communication>
+  </technology_stack>
+
+  <prerequisites>
+    <environment_setup>
+      - Node.js 22+ installed
+      - Firebase CLI installed and authenticated
+      - Firebase project: merakicaptiveportal-firebasedb
+      - Twilio account with WhatsApp-enabled number
+      - SendGrid API key for email campaigns
+      - Google Cloud Vision API enabled
+      - Environment variables configured per .env.template
+      - Firebase emulators for local development
+    </environment_setup>
+  </prerequisites>
+
+  <feature_count>252</feature_count>
+
+  <security_and_access_control>
+    <user_roles>
+      <role name="restaurant_owner">
+        <description>Restaurant owner or operator — primary platform user</description>
+        <permissions>
+          - Full access to own locations and data
+          - Manage guests, queues, bookings, receipts
+          - View analytics and reports for own locations
+          - Manage campaigns and rewards for own locations
+          - Configure receipt templates
+          - Manage subscription and billing
+          - Set up integrations (WhatsApp, POS, labour)
+          - Set and track OKRs for own business
+        </permissions>
+        <protected_routes>
+          - /user-dashboard.html (authenticated)
+          - /queue-management.html (authenticated + tier check)
+          - /food-cost-analytics.html (authenticated + tier check)
+          - /campaigns.html (authenticated + tier check)
+          - /receipt-settings.html (authenticated + tier check)
+        </protected_routes>
+      </role>
+      <role name="general_manager">
+        <description>Location general manager — may manage one or more locations</description>
+        <permissions>
+          - Access assigned locations
+          - Manage daily operations (queue, bookings, guests)
+          - View operational analytics
+          - Receive operational alerts
+          - Track OKR progress
+          - Cannot modify subscription or billing
+        </permissions>
+      </role>
+      <role name="kitchen_manager">
+        <description>Kitchen manager — food cost and stock focused</description>
+        <permissions>
+          - Access food cost analytics
+          - Process receipts and purchase orders
+          - View stock usage and forecasts
+          - Receive food cost alerts
+          - Cannot access guest data or campaigns
+        </permissions>
+      </role>
+      <role name="floor_manager">
+        <description>Floor manager — service and guest focused</description>
+        <permissions>
+          - Manage queue and bookings
+          - View guest information during service
+          - Receive service alerts (queue, labour)
+          - Cannot access financial data
+        </permissions>
+      </role>
+      <role name="platform_admin">
+        <description>Sparks Hospitality super admin — platform-wide access</description>
+        <permissions>
+          - Full platform access
+          - Manage all users and locations
+          - Assign subscription tiers
+          - Manage admin claims
+          - Access all analytics and data
+          - Project management tools
+        </permissions>
+        <protected_routes>
+          - /admin-dashboard.html (admin claims required)
+          - /admin-login.html (admin authentication)
+        </protected_routes>
+      </role>
+    </user_roles>
+    <authentication>
+      <method>Email/password via Firebase Authentication</method>
+      <admin_verification>Dual-level: Firebase custom claims + RTDB admin-claims node</admin_verification>
+      <phone_identity>Phone number as secondary identifier for guest operations</phone_identity>
+      <session_timeout>Firebase Auth managed sessions</session_timeout>
+    </authentication>
+    <sensitive_operations>
+      - Admin claim assignment requires superadmin verification
+      - Subscription tier changes require admin authentication
+      - Data deletion (GDPR) requires authenticated user confirmation
+      - WhatsApp number management requires admin access
+    </sensitive_operations>
+    <data_isolation>
+      - Users can only access data for their own locations
+      - Guest data scoped by phone number ownership
+      - Cross-location data visible only to location owners
+      - Admin has platform-wide read access
+    </data_isolation>
+  </security_and_access_control>
+
+  <core_features>
+    <infrastructure>
+      - Database connection established (Firebase RTDB)
+      - Database schema and indexes applied correctly
+      - Data persists across function cold starts and restarts
+      - No mock data patterns in codebase
+      - Backend API queries real database
+    </infrastructure>
+
+    <authentication_and_access_control>
+      - Email/password user registration with tier selection
+      - User login with session persistence
+      - User logout with session cleanup
+      - Admin login with dual-level verification
+      - Admin claims management (grant/revoke)
+      - Subscription tier-based feature gating (45+ features)
+      - Role-based UI rendering
+      - Auth state listener with concurrency protection
+      - Phone number preservation during auth sync
+      - 14-day trial period on signup
+      - Protected route enforcement
+      - Session management with auth state tracking
+    </authentication_and_access_control>
+
+    <subscription_and_billing>
+      - Free tier (500 guests, 1 location, 50 receipts, 2 campaign templates)
+      - Starter tier ($49.99/mo — 2,000 guests, 2 locations)
+      - Professional tier ($99.99/mo — 10,000 guests, 5 locations)
+      - Enterprise tier ($199.99/mo — unlimited)
+      - Tier upgrade/downgrade management
+      - Feature limit enforcement per tier
+      - Subscription status tracking (active/trial/expired/cancelled)
+      - Admin tier assignment tools
+    </subscription_and_billing>
+
+    <wifi_captive_portal>
+      - Meraki ExCaP integration for guest WiFi
+      - Guest splash page with data capture
+      - WiFi session management and tracking
+      - Guest onboarding flow via WiFi
+      - Time-limited WiFi access control
+      - WiFi analytics (tier-gated)
+    </wifi_captive_portal>
+
+    <guest_management>
+      - Unified guest profiles across locations
+      - Guest data indexed by phone number
+      - Consent tracking (WhatsApp/SMS opt-in)
+      - Tier/loyalty status tracking (Bronze, Silver, Gold)
+      - Guest search and filtering
+      - Guest history and engagement tracking
+      - Multi-location guest deduplication
+      - Guest data export (GDPR compliance)
+      - Guest data deletion (GDPR compliance)
+      - Guest anonymization for inactive accounts
+    </guest_management>
+
+    <queue_management_system>
+      - Real-time digital queue with FIFO ordering
+      - Add guest to queue with party size and special requests
+      - Update queue entry status (queued/called/seated/removed)
+      - Guest queue position tracking
+      - WhatsApp notifications for queue status changes
+      - Multi-location queue support
+      - Queue analytics (busy hours, peak times, avg wait)
+      - Real-time queue metrics dashboard
+      - Tier-based capacity limits (25/100/500/unlimited)
+      - Queue caching for performance (LRU)
+      - Bulk queue operations
+      - Scheduled queue cleanup and archival
+      - Manual queue addition notifications
+      - Queue performance statistics
+    </queue_management_system>
+
+    <booking_system>
+      - Table reservation creation
+      - WhatsApp booking confirmations
+      - Booking status management
+      - Booking history and analytics
+      - Admin booking management interface
+      - Multi-location booking support
+      - 30-day retention (free tier)
+      - Booking reminder notifications
+    </booking_system>
+
+    <receipt_processing_and_ocr>
+      - Manual receipt entry (free tier)
+      - OCR text extraction via Google Cloud Vision (professional tier)
+      - Template-based receipt parsing with 70% confidence threshold
+      - Receipt template management and creation
+      - Multi-location receipt handling
+      - Automatic rewards calculation from receipts
+      - Receipt submission via WhatsApp photo
+      - Receipt validation and fraud detection (duplicate check)
+      - Receipt status tracking (pending/validated/processed)
+      - Receipt analytics
+      - Platform-wide duplicate receipt detection
+      - Automated receipt processing (enterprise tier)
+    </receipt_processing_and_ocr>
+
+    <rewards_and_loyalty>
+      - Multiple reward types (discounts, loyalty points, vouchers)
+      - Voucher pool management with stock tracking
+      - Voucher redemption with status tracking
+      - Campaign-linked automatic rewards
+      - Guest rewards balance tracking
+      - Reward expiry management
+      - Pool availability monitoring
+      - Automatic campaign pause when pool depleted
+      - WhatsApp reward notifications
+      - Rewards analytics
+    </rewards_and_loyalty>
+
+    <campaign_management>
+      - Email campaigns via SendGrid
+      - WhatsApp template-based campaigns
+      - Campaign creation with targeting
+      - Campaign performance analytics
+      - Campaign status management (active/paused/ended)
+      - Campaign templates (2 free, more on higher tiers)
+      - Brand name matching for receipts
+      - Date range validation for campaigns
+    </campaign_management>
+
+    <whatsapp_integration>
+      - Inbound WhatsApp message handling via Twilio webhook
+      - Multi-location WhatsApp number mapping
+      - Outbound booking confirmations and status updates
+      - Queue position notifications
+      - Receipt submission via photo message
+      - Customer service bot functionality
+      - WhatsApp schema initialization and management
+      - WhatsApp number CRUD operations
+      - WhatsApp-to-location assignment
+      - Template-based messaging with ContentSid
+      - Fallback to formatted text messages
+      - WhatsApp analytics
+    </whatsapp_integration>
+
+    <food_cost_analytics>
+      - Food cost tracking by location
+      - Order calculator with cost drivers
+      - Advanced order calculator
+      - Cost trend analysis with charts
+      - Database operations for food cost data
+      - Food cost dashboard with visualizations
+      - Cost analysis by menu section
+      - Inventory tracking
+      - Predictive ordering suggestions
+      - Food cost comparison across locations
+      - Category-level cost breakdowns
+      - Cost target setting and monitoring
+      - Historical cost data retention
+      - Food cost alerts (planned — operations agent)
+    </food_cost_analytics>
+
+    <sales_forecasting>
+      - Forecast engine with trend analysis algorithms
+      - Historical sales data service
+      - Multiple forecast management (create, save, edit, delete)
+      - Saved forecast persistence with location linking
+      - Manual value adjustments with tracking
+      - Configuration modification tracking
+      - Forecast analytics dashboard with auto-refresh
+      - PDF export capability
+      - Charts and table rendering
+      - Forecast editing with state tracking
+    </sales_forecasting>
+
+    <purchase_orders>
+      - Purchase order generation from stock usage data
+      - Supplier management
+      - Stock-based ordering recommendations
+      - PO history and tracking
+      - Multi-location PO support
+      - PO approval workflow
+      - Delivery schedule management
+      - PO analytics
+    </purchase_orders>
+
+    <admin_dashboard>
+      - Comprehensive admin interface (users, locations, tiers)
+      - User management CRUD operations
+      - Location management and assignment
+      - Project management with tasks and milestones
+      - Admin phone mapping tools
+      - Grant super admin capabilities
+      - Tier visibility management
+      - WhatsApp number administration
+      - GP analysis dashboard
+      - ROI calculator tools
+    </admin_dashboard>
+
+    <gdpr_and_data_privacy>
+      - Guest consent tracking (consented/declined/pending)
+      - Platform and version tracking for consent
+      - Complete guest data deletion
+      - Portable data export
+      - Auto-anonymize inactive users (1 year)
+    </gdpr_and_data_privacy>
+
+    <pos_integration_layer>
+      - Universal POS data adapter architecture
+      - Pilot POS API connector (first implementation)
+      - POS-agnostic data normalization layer
+      - Sales data sync (daily/hourly totals, item-level)
+      - Stock usage data sync for purchase orders
+      - Payment method breakdowns import
+      - Table turn time data import
+      - Voids/comps/discounts tracking
+      - POS connection status monitoring
+      - POS data mapping configuration UI
+      - Historical data import on first connection
+      - Real-time vs batch sync options
+      - POS disconnection alerts
+      - API key/credentials secure storage
+      - Multi-location POS configuration
+    </pos_integration_layer>
+
+    <labour_integration>
+      - Universal labour platform adapter
+      - Deputy connector (primary implementation)
+      - Roubler connector (migration support)
+      - Scheduled hours vs actual hours tracking
+      - Labour cost per shift / per day calculation
+      - Labour-to-revenue ratio tracking
+      - Overstaffing/understaffing detection and alerting
+      - Staff clock-in status (who is on shift now)
+      - Labour data normalization across platforms
+      - Multi-location labour overview
+      - Labour cost forecasting (integrated with sales forecast)
+      - Shift scheduling insights
+    </labour_integration>
+
+    <autonomous_operations_agent>
+      - Real-time data monitoring engine
+      - Alert rule configuration (thresholds, conditions)
+      - Multi-tier alert system:
+        - Real-time alerts (during service — critical operational flags)
+        - Daily summary reports (end-of-day operational digest)
+        - Weekly trend reports (performance trends, areas of concern)
+      - Role-based alert routing:
+        - Owner: strategic and financial alerts
+        - General Manager: daily operational flags
+        - Kitchen Manager: food cost and stock alerts
+        - Floor Manager: service, queue, and labour alerts
+      - WhatsApp alert delivery (primary channel)
+      - Email alert delivery (secondary channel)
+      - Alert acknowledgment and resolution tracking
+      - Alert history and audit trail
+      - Configurable alert thresholds per location
+      - Cross-data-source correlation (POS + labour + food cost)
+      - Anomaly detection (unusual patterns in sales, costs, stock)
+      - Proactive recommendations based on data trends
+      - Alert fatigue management (smart grouping, severity levels)
+      - Alert escalation rules (if not acknowledged, escalate)
+      - Multi-location alert aggregation for owners
+      - Custom alert rule builder
+      - Scheduled report generation and delivery
+    </autonomous_operations_agent>
+
+    <okr_goal_setting_engine>
+      - OKR creation (Objectives and Key Results)
+      - Department-level goals (kitchen, floor, overall)
+      - Goal progress tracking with automated measurement
+      - Integration with platform data sources:
+        - Food cost targets linked to food cost analytics
+        - Revenue targets linked to sales data/forecasts
+        - Guest satisfaction targets linked to reviews/queue times
+        - Labour efficiency targets linked to labour data
+      - Goal dashboard with progress visualization
+      - Goal review periods (weekly, monthly, quarterly)
+      - Manager-level goal assignment
+      - Goal achievement notifications
+      - Historical goal performance tracking
+      - Goal templates for common restaurant objectives
+    </okr_goal_setting_engine>
+
+    <cross_location_analytics>
+      - Location comparison dashboard
+      - Franchise benchmarking metrics
+      - Consolidated multi-location reporting
+      - Location ranking by key metrics
+      - Anomaly detection across locations
+      - Unified guest analytics across locations
+      - Consolidated financial overview
+      - Location-specific vs portfolio-wide views
+    </cross_location_analytics>
+
+    <frontend_modernization>
+      - Incremental Vue 3 SPA migration strategy
+      - Shared component library (buttons, forms, cards, modals, tables)
+      - Unified design system (colors, typography, spacing)
+      - Vue Router for SPA navigation
+      - Pinia stores for global state management
+      - API service layer abstraction
+      - Responsive layout framework
+      - Dark mode support
+      - Loading states and skeleton screens
+      - Error boundary components
+      - Form validation component library
+      - Data table component with sort/filter/paginate
+      - Chart wrapper components
+      - Notification/toast system
+      - Confirmation dialog system
+    </frontend_modernization>
+
+    <pwa_mobile_experience>
+      - Progressive Web App manifest and configuration
+      - Service worker for offline caching
+      - Push notification support
+      - Mobile-optimized navigation (bottom nav, hamburger menu)
+      - Touch-friendly interactions
+      - Install prompt for home screen
+      - Offline data queue (sync when reconnected)
+      - Mobile-first responsive layouts
+      - Reduced data mode for slow connections
+      - App-like transitions and animations
+    </pwa_mobile_experience>
+
+    <onboarding_and_walkthroughs>
+      - First-time setup wizard (business info, location, preferences)
+      - Feature tour for each major module
+      - Contextual help tooltips
+      - Role-based onboarding paths (owner vs manager)
+      - Progress indicator for setup completion
+      - Sample data option for exploration
+      - Getting started checklist
+      - In-app documentation links
+    </onboarding_and_walkthroughs>
+
+    <notification_hub>
+      - Unified notification center in-app
+      - WhatsApp notification delivery
+      - Email notification delivery
+      - Notification preferences per user/role
+      - Notification history and read status
+      - Push notification support (PWA)
+      - Notification grouping and smart batching
+      - Do-not-disturb scheduling
+    </notification_hub>
+
+    <reporting_and_export>
+      - Scheduled report generation (daily, weekly, monthly)
+      - PDF report export for all modules
+      - CSV data export for analytics
+      - Custom report builder (select metrics, date range, locations)
+      - Report delivery via email
+      - Report templates for common needs
+    </reporting_and_export>
+  </core_features>
+
+  <database_schema>
+    <tables>
+      <users>
+        - uid (primary key), email, firstName, lastName, displayName
+        - businessInfo: {name, address, phone, type}
+        - createdAt, updatedAt, status (active/inactive)
+        - role, assignedLocations
+      </users>
+      <subscriptions>
+        - userId (primary key), tierId (free/starter/professional/enterprise)
+        - status (active/trial/expired/cancelled)
+        - startDate, trialEndDate, expirationDate
+        - features: {feature flags per tier}
+        - limits: {queueEntries, locations, guests, receipts}
+      </subscriptions>
+      <locations>
+        - locationId (primary key), name, address, phone, type
+        - ownerId, createdAt, status (active/inactive)
+        - settings: {timezone, currency, language}
+        - posConfig, labourConfig
+      </locations>
+      <userLocations>
+        - userId to locationId mapping
+        - role per location
+      </userLocations>
+      <guests>
+        - phoneNumber (primary key), name, email, locationId
+        - createdAt, lastActivity, nameCollectedAt
+        - consent: {status, platform, version, timestamp}
+        - loyaltyTier (bronze/silver/gold/platinum)
+      </guests>
+      <queues>
+        - locationId/date/entries/guestPhone
+        - status (queued/called/seated/removed)
+        - addedAt, seatedAt, partySize, specialRequests
+        - metadata: {maxCapacity, peakTime, avgWaitTime}
+      </queues>
+      <receipts>
+        - receiptId (primary key), guestPhoneNumber, totalAmount, brandName
+        - items: [{name, price, category}]
+        - status (pending/validated/processed)
+        - processedAt, createdAt, extractionMethod
+        - campaignId, rewardIds, locationId
+      </receipts>
+      <rewards>
+        - rewardId (primary key), guestPhone, guestName, campaignId
+        - value, rewardType, status (pending/approved/redeemed)
+        - voucherCode, expiresAt, createdAt
+      </rewards>
+      <voucherPools>
+        - rewardTypeId/vouchers/code
+        - status (available/assigned/redeemed), expiryDate
+        - statistics: {total, available, expired, assigned, redeemed}
+      </voucherPools>
+      <campaigns>
+        - campaignId (primary key), name, brandName
+        - status (active/paused/ended)
+        - rewardTypes, dateRange, targeting
+      </campaigns>
+      <consent_history>
+        - phoneNumber, status, platform, version, timestamp
+      </consent_history>
+      <admin_claims>
+        - uid: true (admin flag)
+      </admin_claims>
+      <admin_projects>
+        - projectId, name, description, locationId
+        - priority, status, milestones, tasks
+        - createdAt, dueDate
+      </admin_projects>
+      <whatsapp_numbers>
+        - phoneNumber, locationId, userId
+        - status, createdAt
+      </whatsapp_numbers>
+      <scanning_data>
+        - Meraki WiFi scanning data records
+      </scanning_data>
+      <queue_states>
+        - phoneNumber, step, data, startedAt, updatedAt
+        - WhatsApp conversation flow state machine
+      </queue_states>
+      <alerts_config>
+        - alertId, locationId, ruleType, threshold, comparison
+        - recipientRoles, channels (whatsapp/email)
+        - isActive, createdBy, createdAt
+      </alerts_config>
+      <alerts_history>
+        - alertId, locationId, triggeredAt, severity
+        - message, acknowledged, acknowledgedBy, resolvedAt
+      </alerts_history>
+      <okrs>
+        - okrId, locationId, objective, keyResults[]
+        - period (weekly/monthly/quarterly)
+        - ownerId, department, status, progress
+        - createdAt, dueDate
+      </okrs>
+      <pos_connections>
+        - connectionId, locationId, posProvider (pilot/generic)
+        - credentials (encrypted), syncFrequency
+        - lastSync, status, mappingConfig
+      </pos_connections>
+      <labour_connections>
+        - connectionId, locationId, provider (deputy/roubler)
+        - credentials (encrypted), syncFrequency
+        - lastSync, status
+      </labour_connections>
+      <onboarding_progress>
+        - userId, completedSteps[], currentStep
+        - toursSeen[], createdAt
+      </onboarding_progress>
+      <notifications>
+        - notificationId, userId, type, title, message
+        - channel (in-app/whatsapp/email), read, createdAt
+        - relatedEntity, locationId
+      </notifications>
+      <saved_reports>
+        - reportId, userId, name, config
+        - schedule, lastGenerated, format
+      </saved_reports>
+    </tables>
+  </database_schema>
+
+  <api_endpoints_summary>
+    <authentication>
+      - POST registerUser (onCall) — User registration
+      - POST setAdminClaim (onRequest) — Admin claim management
+      - GET verifyAdminStatus (onRequest) — Admin verification
+      - POST createUserAccount (onRequest) — Admin user creation
+      - POST setupInitialAdmin (onRequest) — Initial admin setup
+    </authentication>
+    <whatsapp>
+      - POST receiveWhatsAppMessage — Twilio webhook
+      - POST receiveWhatsAppMessageEnhanced — Multi-location webhook
+      - POST sendGuestBookingNotification — Booking notifications
+      - POST sendGuestStatusNotification — Status updates
+      - POST initializeWhatsAppSchema — Schema setup
+      - POST createWhatsAppNumber — Number registration
+      - POST assignWhatsAppToLocation — Number-location linking
+      - GET getWhatsAppByLocation — Location lookup
+      - GET getLocationByWhatsApp — Reverse lookup
+      - GET getUserWhatsAppNumbers — User numbers list
+      - GET getWhatsAppAnalytics — Analytics data
+      - DELETE removeWhatsAppNumber — Number deactivation
+    </whatsapp>
+    <queue_management>
+      - POST addGuestToQueue — Add to queue
+      - POST removeGuestFromQueue — Remove from queue
+      - PUT updateQueueEntryStatus — Status update
+      - GET getQueueStatus — Current queue
+      - POST bulkQueueOperations — Batch operations
+      - GET getGuestQueuePosition — Position check
+      - GET getQueueAnalytics — Queue analytics
+      - GET getRealtimeQueueMetrics — Live metrics
+      - GET getQueuePerformanceStats — Historical stats
+      - POST cleanupOldQueues — Archive old data
+      - POST clearQueueCache — Cache management
+      - POST processQueueMessage — WhatsApp queue messages
+      - POST sendQueueNotification — Queue notifications
+      - POST sendManualQueueAdditionNotification — Manual add notifications
+      - CALL getQMSTierInfo — Tier information
+      - CALL getQMSUsageStats — Usage statistics
+      - CALL validateQMSFeatureAccess — Feature validation
+      - CALL validateQMSWhatsAppIntegration — WhatsApp access check
+    </queue_management>
+    <receipts_and_rewards>
+      - POST processReceipt — OCR and parsing
+      - POST markVoucherRedeemed — Voucher redemption
+      - GET getVoucherDetails — Voucher info
+      - GET getVoucherPoolAvailability — Pool stock
+      - PUT updateVoucherPoolStats — Pool statistics
+    </receipts_and_rewards>
+    <meraki>
+      - POST merakiWebhook — Scanning data webhook
+      - GET merakiWebhook — Validator response
+    </meraki>
+    <project_management>
+      - POST createProject — Create project
+      - PUT updateProject — Update project
+      - GET getProject — Fetch project
+      - DELETE deleteProject — Delete project
+      - POST addProjectTask — Add task
+      - GET getProjectTasks — List tasks
+    </project_management>
+    <migration>
+      - GET checkWhatsAppMigrationStatus — Migration status
+      - POST startWhatsAppMigration — Begin migration
+      - POST rollbackWhatsAppMigration — Rollback
+      - GET getWhatsAppMigrationStatistics — Stats
+    </migration>
+    <planned_pos_integration>
+      - POST /api/pos/connect — Connect POS system
+      - GET /api/pos/status — Connection status
+      - POST /api/pos/sync — Trigger manual sync
+      - GET /api/pos/sales — Fetch sales data
+      - GET /api/pos/stock — Fetch stock usage
+      - PUT /api/pos/mapping — Configure data mapping
+      - DELETE /api/pos/disconnect — Remove POS connection
+    </planned_pos_integration>
+    <planned_labour_integration>
+      - POST /api/labour/connect — Connect labour platform
+      - GET /api/labour/status — Connection status
+      - GET /api/labour/hours — Fetch hours data
+      - GET /api/labour/cost — Labour cost calculations
+      - GET /api/labour/ratio — Labour-to-revenue ratio
+      - GET /api/labour/alerts — Staffing alerts
+    </planned_labour_integration>
+    <planned_operations_agent>
+      - POST /api/alerts/rules — Create alert rule
+      - GET /api/alerts/rules — List alert rules
+      - PUT /api/alerts/rules/:id — Update alert rule
+      - DELETE /api/alerts/rules/:id — Delete alert rule
+      - GET /api/alerts/history — Alert history
+      - POST /api/alerts/acknowledge — Acknowledge alert
+      - GET /api/alerts/summary — Daily/weekly summary
+      - POST /api/reports/schedule — Schedule report
+      - GET /api/reports/generate — Generate on-demand report
+    </planned_operations_agent>
+    <planned_okr>
+      - POST /api/okrs — Create OKR
+      - GET /api/okrs — List OKRs by location/department
+      - PUT /api/okrs/:id — Update OKR progress
+      - DELETE /api/okrs/:id — Delete OKR
+      - GET /api/okrs/dashboard — OKR dashboard data
+    </planned_okr>
+  </api_endpoints_summary>
+
+  <ui_layout>
+    <main_structure>
+      Progressive Web App with responsive layout:
+      - Desktop: Sidebar navigation (collapsible) + main content area
+      - Tablet: Condensed sidebar + full content
+      - Mobile: Bottom navigation bar + hamburger menu for secondary nav
+      - Top bar: Location selector, notifications bell, user profile, search
+    </main_structure>
+    <key_pages>
+      - Landing page (marketing site for Sparks Hospitality)
+      - User login / signup with tier selection
+      - User dashboard (location overview, key metrics, quick actions)
+      - Queue management (real-time queue view, actions, analytics)
+      - Booking management (calendar view, reservations)
+      - Guest insights (guest profiles, analytics, engagement)
+      - Food cost analytics (cost tracking, trends, alerts)
+      - Sales forecasting (forecast engine, saved forecasts, analytics)
+      - Receipt management (upload, OCR, templates, history)
+      - Campaign management (create, track, analytics)
+      - Rewards management (types, pools, redemption tracking)
+      - Settings (business info, integrations, team, preferences)
+      - POS integration setup (connect, configure, sync status)
+      - Labour integration setup (connect, hours, cost tracking)
+      - Operations center (alerts dashboard, rules, history)
+      - OKR dashboard (goals, progress, department views)
+      - Reports (scheduled reports, custom report builder, exports)
+      - Onboarding wizard (first-time setup, feature tours)
+      - Admin dashboard (platform admin — users, locations, tiers)
+    </key_pages>
+  </ui_layout>
+
+  <design_system>
+    <color_palette>
+      - Primary: Sparks Hospitality brand colors (warm, hospitality-focused)
+      - Success: Green tones for positive metrics and confirmations
+      - Warning: Amber/orange for alerts and caution states
+      - Danger: Red for critical alerts and destructive actions
+      - Neutral: Grays for backgrounds, borders, secondary text
+      - Dark mode: Full dark palette variant
+    </color_palette>
+    <typography>
+      - Headings: Clean sans-serif (Inter or similar)
+      - Body: Readable sans-serif at 14-16px base
+      - Data/metrics: Monospace or tabular numerals for alignment
+      - Mobile: Slightly larger touch targets and text
+    </typography>
+    <components>
+      - Cards for data grouping
+      - Data tables with sort, filter, pagination
+      - Charts (line, bar, pie, area) for analytics
+      - Modals for confirmations and quick actions
+      - Toast notifications for feedback
+      - Skeleton loaders for loading states
+      - Empty states with helpful guidance
+      - Badge system for statuses and counts
+    </components>
+  </design_system>
+
+  <implementation_steps>
+    <step number="1">
+      <title>Phase 1 — Rock Solid Foundation (Months 1-3)</title>
+      <tasks>
+        - Audit and harden all 14 existing modules
+        - Fix any bugs, edge cases, or inconsistencies
+        - Complete sales forecasting integration to user features
+        - Add comprehensive error handling across all modules
+        - Implement input validation on all forms and API endpoints
+        - Build onboarding wizard and feature walkthroughs
+        - Add loading states and skeleton screens to all pages
+        - Improve empty states across the platform
+        - Security audit: review all database rules and auth flows
+        - Performance audit: optimize slow queries and large pages
+        - Set up proper testing framework (unit + integration)
+        - Document all existing API endpoints and data models
+      </tasks>
+    </step>
+    <step number="2">
+      <title>Phase 2 — The Data Engine (Months 3-6)</title>
+      <tasks>
+        - Design and build universal POS adapter architecture
+        - Implement Pilot POS API connector
+        - Build POS data mapping and configuration UI
+        - Implement sales data sync (real-time and batch)
+        - Implement stock usage data sync for purchase orders
+        - Design and build universal labour platform adapter
+        - Implement Deputy connector
+        - Build labour-to-revenue ratio tracking
+        - Implement overstaffing/understaffing detection
+        - Build cross-location analytics dashboard
+        - Implement location comparison features
+        - Connect POS sales data to existing sales forecasting
+        - Connect stock data to existing purchase order system
+      </tasks>
+    </step>
+    <step number="3">
+      <title>Phase 3 — The Intelligence Layer (Months 6-9)</title>
+      <tasks>
+        - Design autonomous operations agent architecture
+        - Build real-time data monitoring engine
+        - Implement alert rule configuration system
+        - Build multi-tier alert delivery (real-time, daily, weekly)
+        - Implement role-based alert routing
+        - Build WhatsApp alert delivery channel
+        - Build email alert delivery channel
+        - Implement notification hub (in-app center)
+        - Build OKR creation and management interface
+        - Implement automated OKR progress measurement
+        - Connect OKRs to platform data sources
+        - Build scheduled report generation and delivery
+        - Implement custom report builder
+        - Build alert acknowledgment and escalation system
+      </tasks>
+    </step>
+    <step number="4">
+      <title>Phase 4 — The Modern Experience (Months 9-12)</title>
+      <tasks>
+        - Design unified component library (Vue 3)
+        - Begin incremental migration of pages to Vue SPA
+        - Implement Vue Router for SPA navigation
+        - Build responsive layout framework (desktop, tablet, mobile)
+        - Implement PWA manifest and service worker
+        - Add push notification support
+        - Build mobile-optimized navigation
+        - Implement offline data queuing and sync
+        - Add dark mode support
+        - Implement app-like transitions and animations
+        - Polish onboarding experience
+        - Performance optimization pass (lazy loading, code splitting)
+        - User acceptance testing with pilot restaurants
+        - Prepare for first 5 paying subscribers launch
+      </tasks>
+    </step>
+  </implementation_steps>
+
+  <success_criteria>
+    <functionality>
+      - All 14 existing modules working reliably without bugs
+      - POS integration syncing sales and stock data automatically
+      - Labour integration tracking hours and cost ratios
+      - Operations agent delivering timely, actionable alerts
+      - OKR system measuring progress against real platform data
+      - Cross-location analytics providing franchise-level insights
+      - All CRUD operations working correctly across all modules
+      - Multi-location data isolation enforced properly
+    </functionality>
+    <user_experience>
+      - Onboarding wizard guides new users to productive use within 15 minutes
+      - Feature walkthroughs available for every major module
+      - Platform usable on mobile devices during restaurant service
+      - Alert notifications arrive within 1 minute of trigger condition
+      - Page load times under 3 seconds on standard connections
+      - Intuitive navigation requiring minimal training
+      - Empty states provide helpful guidance, not blank screens
+    </user_experience>
+    <technical_quality>
+      - 80%+ test coverage across unit and integration tests
+      - Zero critical security vulnerabilities
+      - All API endpoints properly authenticated and authorized
+      - Database rules enforcing data isolation
+      - No hardcoded secrets in codebase
+      - Proper error handling on all API calls
+      - Performance: pages load in under 3s, API responses under 500ms
+      - PWA passing Lighthouse audit with 90+ score
+    </technical_quality>
+    <business_goals>
+      - 5 paying subscribers within 12 months
+      - 5/5 positive reviews from subscribers
+      - Measurable reduction in admin time for restaurant owners
+      - Platform stable enough for production restaurant operations
+      - Subscription revenue covering basic infrastructure costs
+    </business_goals>
+    <design_polish>
+      - Consistent visual language across all modules
+      - Responsive design working on desktop, tablet, and mobile
+      - Dark mode available
+      - Professional branding (Sparks Hospitality identity)
+      - Smooth animations and transitions
+      - Accessible (WCAG AA compliance)
+    </design_polish>
+  </success_criteria>
+</project_specification>
