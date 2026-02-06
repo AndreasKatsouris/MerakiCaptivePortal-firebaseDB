@@ -20,6 +20,9 @@ class UserDashboard {
     }
 
     async init() {
+        // Show loading overlay initially
+        this.showLoadingOverlay();
+
         // Check authentication
         onAuthStateChanged(auth, async (user) => {
             if (user) {
@@ -49,6 +52,9 @@ class UserDashboard {
 
                 // Load dashboard after user data and feature access are ready
                 await this.loadDashboard();
+
+                // Hide loading overlay after everything is loaded
+                this.hideLoadingOverlay();
             } else {
                 // Redirect to login
                 window.location.href = '/user-login.html?message=unauthorized';
@@ -56,6 +62,24 @@ class UserDashboard {
         });
 
         this.setupEventListeners();
+    }
+
+    showLoadingOverlay() {
+        const overlay = document.getElementById('pageLoadingOverlay');
+        if (overlay) {
+            overlay.classList.remove('hidden');
+        }
+    }
+
+    hideLoadingOverlay() {
+        const overlay = document.getElementById('pageLoadingOverlay');
+        if (overlay) {
+            overlay.classList.add('hidden');
+            // Remove from DOM after transition completes
+            setTimeout(() => {
+                overlay.style.display = 'none';
+            }, 300);
+        }
     }
 
     async checkFeatureAccess() {
