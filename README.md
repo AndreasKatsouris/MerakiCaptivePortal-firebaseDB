@@ -31,13 +31,7 @@ git clone https://github.com/dexterlabora/MerakiCaptivePortal-firebaseDB.git
 cd MerakiCaptivePortal-firebaseDB
 ```
 
-2. **Install dependencies**
-```bash
-npm install
-cd functions && npm install
-```
-
-3. **Configure environment**
+2. **Configure environment**
 ```bash
 # Copy template and fill in your credentials
 cp .env.template .env
@@ -45,7 +39,32 @@ cp functions/.env.template functions/.env
 ```
 See [Environment Setup Guide](docs/deployment/environment-setup.md) for detailed configuration.
 
-4. **Deploy to Firebase**
+3. **Run the initialization script**
+
+The init script will:
+- Check Node.js version (requires v22+)
+- Install Firebase CLI if not present
+- Install all dependencies (root + functions)
+- Start Firebase emulators for local development
+
+**Windows:**
+```bash
+init.bat
+```
+
+**macOS/Linux:**
+```bash
+chmod +x init.sh
+./init.sh
+```
+
+4. **Access the application**
+- **Frontend**: http://localhost:5000
+- **Emulator UI**: http://localhost:4000
+- **Functions**: http://localhost:5001
+- **RTDB**: http://localhost:9000
+
+5. **Deploy to production** (when ready)
 ```bash
 firebase use --add  # Select your Firebase project
 firebase deploy
@@ -173,19 +192,40 @@ npm run test:e2e
 
 ## 📝 Development
 
+### Feature-Driven Development
+
+This project uses an **autonomous feature-driven development** approach:
+
+- **253 Features Defined**: All features stored in SQLite database (`features.db`)
+- **Parallel Execution**: Multiple AI coding agents work on independent features simultaneously
+- **Test-Driven**: Each feature has specific verification steps and requires 80%+ test coverage
+- **Immutable Patterns**: All code follows immutability principles (no mutation)
+- **Real Data Only**: Prohibition of mock data - all features must use real Firebase RTDB
+
+Features are categorized across 20+ mandatory categories including:
+- Infrastructure (database connectivity, persistence)
+- Security & Access Control
+- Navigation Integrity
+- Real Data Verification
+- Error Handling
+- UI-Backend Integration
+- And 14 more...
+
 ### Coding Standards
 Follow the [Coding Standards Guide](docs/development/coding-standards.md) for:
 - File naming conventions (kebab-case)
 - Code style (ESLint/Prettier)
 - Module organization
 - Git commit messages
+- Immutability patterns (CRITICAL)
 
 ### Contributing
 1. Create a feature branch
 2. Follow coding standards
-3. Write tests for new features
-4. Update documentation
-5. Submit pull request
+3. Write tests for new features (80%+ coverage required)
+4. Ensure no mock data patterns
+5. Update documentation
+6. Submit pull request
 
 ## 📈 Updates
 
