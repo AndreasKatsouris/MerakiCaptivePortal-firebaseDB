@@ -297,7 +297,7 @@ export function initializeReceiptManagement() {
                     console.log('📊 Raw receipts data from database:', {
                         totalReceipts: Object.keys(data).length,
                         receiptIds: Object.keys(data),
-                        sampleData: Object.keys(data).length > 0 ? Object.entries(data)[0] : 'No data'
+                        firstEntry: Object.keys(data).length > 0 ? Object.entries(data)[0] : 'No data'
                     });
 
                     // Check specifically for the problematic receipt

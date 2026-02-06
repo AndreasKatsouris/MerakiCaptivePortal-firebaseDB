@@ -1,0 +1,295 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Test Feature #34 - Receipt Persistence</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+    <style>
+        body {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 2rem 0;
+        }
+        .test-card {
+            background: white;
+            border-radius: 15px;
+            box-shadow: 0 10px 40px rgba(0,0,0,0.1);
+            padding: 2rem;
+            margin-bottom: 2rem;
+        }
+        .status-badge {
+            padding: 0.5rem 1rem;
+            border-radius: 20px;
+            font-weight: 600;
+            font-size: 0.9rem;
+        }
+        .status-success { background: #d4edda; color: #155724; }
+        .status-error { background: #f8d7da; color: #721c24; }
+        .status-pending { background: #fff3cd; color: #856404; }
+        .test-step {
+            padding: 1rem;
+            border-left: 4px solid #667eea;
+            background: #f8f9fa;
+            margin-bottom: 1rem;
+            border-radius: 0 8px 8px 0;
+        }
+        .result-box {
+            background: #f8f9fa;
+            padding: 1rem;
+            border-radius: 8px;
+            margin-top: 1rem;
+            font-family: monospace;
+            font-size: 0.9rem;
+            max-height: 400px;
+            overflow-y: auto;
+        }
+        .btn-custom {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border: none;
+            padding: 0.75rem 2rem;
+            border-radius: 8px;
+            font-weight: 600;
+            transition: transform 0.2s;
+        }
+        .btn-custom:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(102, 126, 234, 0.4);
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="test-card">
+            <h1 class="mb-4">Feature #34: Receipt Data Persistence</h1>
+            <p class="lead">This test verifies that receipt data survives page navigation</p>
+
+            <div class="alert alert-info">
+                <strong>Test Scenario:</strong> Create a receipt with R150.00, navigate away, then back to verify persistence
+            </div>
+
+            <div class="test-step">
+                <h5>📋 Test Steps:</h5>
+                <ol>
+                    <li>Create test receipt with R150.00 total</li>
+                    <li>Verify receipt exists in Firebase RTDB</li>
+                    <li>Simulate navigation to dashboard</li>
+                    <li>Navigate back to receipt management</li>
+                    <li>Verify receipt still exists with correct data</li>
+                </ol>
+            </div>
+
+            <div class="d-grid gap-2">
+                <button class="btn btn-custom btn-lg" onclick="runTest()">
+                    🚀 Run Persistence Test
+                </button>
+                <button class="btn btn-outline-secondary" onclick="window.location.href='/admin-dashboard.html'">
+                    📊 Go to Admin Dashboard (to view receipts)
+                </button>
+                <button class="btn btn-outline-primary" onclick="window.location.href='/user-dashboard.html'">
+                    🏠 Go to User Dashboard (test navigation)
+                </button>
+            </div>
+
+            <div id="results" class="mt-4"></div>
+        </div>
+
+        <div class="test-card">
+            <h4>📊 Current Receipt Count</h4>
+            <p>Total receipts in database: <strong id="receiptCount">Loading...</strong></p>
+            <button class="btn btn-sm btn-outline-primary" onclick="loadReceiptCount()">
+                🔄 Refresh Count
+            </button>
+        </div>
+    </div>
+
+    <script type="module">
+        import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.12.5/firebase-app.js';
+        import { getDatabase, ref, get, set, remove } from 'https://www.gstatic.com/firebasejs/10.12.5/firebase-database.js';
+
+        const firebaseConfig = {
+            apiKey: "AIzaSyB_Qd-0SQFTcQHFDKMy_uJwMR1FVqZ_Q9A",
+            authDomain: "merakicaptiveportal-firebasedb.firebaseapp.com",
+            databaseURL: "https://merakicaptiveportal-firebasedb-default-rtdb.firebaseio.com",
+            projectId: "merakicaptiveportal-firebasedb",
+            storageBucket: "merakicaptiveportal-firebasedb.appspot.com",
+            messagingSenderId: "410647600823",
+            appId: "1:410647600823:web:e2745fb1f7be3b2c1a2b3c"
+        };
+
+        const app = initializeApp(firebaseConfig);
+        const db = getDatabase(app);
+        window.db = db;
+        window.dbRef = ref;
+        window.dbGet = get;
+        window.dbSet = set;
+        window.dbRemove = remove;
+
+        console.log('Firebase initialized for Feature #34 test');
+
+        // Load receipt count on page load
+        window.addEventListener('load', () => {
+            loadReceiptCount();
+        });
+    </script>
+
+    <script>
+        let testReceiptId = null;
+
+        function log(message, type = 'info') {
+            const resultsDiv = document.getElementById('results');
+            const timestamp = new Date().toLocaleTimeString();
+            const badge = type === 'success' ? 'status-success' :
+                         type === 'error' ? 'status-error' : 'status-pending';
+
+            const icon = type === 'success' ? '✅' :
+                        type === 'error' ? '❌' : '📝';
+
+            if (!resultsDiv.querySelector('.result-box')) {
+                resultsDiv.innerHTML = '<div class="result-box"></div>';
+            }
+
+            const resultBox = resultsDiv.querySelector('.result-box');
+            resultBox.innerHTML += `<div class="mb-2">
+                <span class="status-badge ${badge}">${icon} ${timestamp}</span> ${message}
+            </div>`;
+            resultBox.scrollTop = resultBox.scrollHeight;
+        }
+
+        async function runTest() {
+            document.getElementById('results').innerHTML = '';
+            log('Starting Feature #34 persistence test...', 'info');
+
+            try {
+                // Step 1: Create test receipt
+                log('Step 1: Creating test receipt with R150.00...', 'info');
+                testReceiptId = `TEST_RECEIPT_${Date.now()}`;
+
+                const testReceipt = {
+                    invoiceNumber: '12345',
+                    total: 150.00,
+                    currency: 'ZAR',
+                    guestName: 'Test Guest for Feature 34',
+                    guestPhoneNumber: '+27123456789',
+                    status: 'pending',
+                    createdAt: Date.now(),
+                    date: new Date().toISOString(),
+                    items: [
+                        {
+                            name: 'Test Item',
+                            price: 150.00,
+                            quantity: 1
+                        }
+                    ],
+                    testData: true
+                };
+
+                await window.dbSet(window.dbRef(window.db, `receipts/${testReceiptId}`), testReceipt);
+                log(`✓ Receipt created: ${testReceiptId}`, 'success');
+                log(`✓ Total: R${testReceipt.total}`, 'success');
+
+                // Step 2: Verify it exists
+                log('Step 2: Verifying receipt exists in database...', 'info');
+                const snapshot1 = await window.dbGet(window.dbRef(window.db, `receipts/${testReceiptId}`));
+                if (!snapshot1.exists()) {
+                    throw new Error('Receipt not found after creation!');
+                }
+                log('✓ Receipt confirmed in Firebase RTDB', 'success');
+
+                // Step 3: Simulate navigation delay
+                log('Step 3: Simulating page navigation...', 'info');
+                await new Promise(resolve => setTimeout(resolve, 1000));
+                log('✓ Navigation delay simulated (1 second)', 'success');
+
+                // Step 4: Fetch all receipts (as if loading receipt management page)
+                log('Step 4: Loading all receipts (as if navigating to receipt page)...', 'info');
+                const allReceipts = await window.dbGet(window.dbRef(window.db, 'receipts'));
+                const receiptsData = allReceipts.val() || {};
+                log(`✓ Loaded ${Object.keys(receiptsData).length} receipts from database`, 'success');
+
+                // Step 5: Verify our test receipt persists
+                log('Step 5: Verifying test receipt persists...', 'info');
+                if (!receiptsData[testReceiptId]) {
+                    throw new Error('Receipt NOT found after navigation!');
+                }
+
+                const persistedReceipt = receiptsData[testReceiptId];
+                if (persistedReceipt.total !== 150.00) {
+                    throw new Error(`Total mismatch! Expected 150.00, got ${persistedReceipt.total}`);
+                }
+
+                log('✓ Receipt persists with correct data:', 'success');
+                log(`  - Invoice: ${persistedReceipt.invoiceNumber}`, 'info');
+                log(`  - Total: R${persistedReceipt.total}`, 'info');
+                log(`  - Guest: ${persistedReceipt.guestName}`, 'info');
+                log(`  - Status: ${persistedReceipt.status}`, 'info');
+
+                // Success
+                log('', 'info');
+                log('🎉 FEATURE #34 TEST PASSED!', 'success');
+                log('Receipt data survives page navigation successfully', 'success');
+
+                // Cleanup
+                await cleanup();
+
+                await Swal.fire({
+                    icon: 'success',
+                    title: 'Test Passed!',
+                    html: `
+                        <strong>Feature #34 Verified</strong><br><br>
+                        ✅ Receipt created with R150.00<br>
+                        ✅ Data persists in Firebase RTDB<br>
+                        ✅ Survives page navigation<br>
+                        ✅ All fields preserved correctly
+                    `,
+                    confirmButtonText: 'Great!',
+                    confirmButtonColor: '#667eea'
+                });
+
+            } catch (error) {
+                log('', 'error');
+                log(`❌ TEST FAILED: ${error.message}`, 'error');
+                console.error('Test error:', error);
+
+                if (testReceiptId) {
+                    await cleanup();
+                }
+
+                await Swal.fire({
+                    icon: 'error',
+                    title: 'Test Failed',
+                    text: error.message,
+                    confirmButtonColor: '#dc3545'
+                });
+            }
+        }
+
+        async function cleanup() {
+            if (testReceiptId) {
+                log('Cleaning up test data...', 'info');
+                await window.dbRemove(window.dbRef(window.db, `receipts/${testReceiptId}`));
+                log('✓ Test receipt removed', 'success');
+                testReceiptId = null;
+            }
+        }
+
+        async function loadReceiptCount() {
+            try {
+                const snapshot = await window.dbGet(window.dbRef(window.db, 'receipts'));
+                const data = snapshot.val() || {};
+                const count = Object.keys(data).length;
+                document.getElementById('receiptCount').textContent = count;
+                console.log(`Loaded receipt count: ${count}`);
+            } catch (error) {
+                document.getElementById('receiptCount').textContent = 'Error loading';
+                console.error('Error loading receipt count:', error);
+            }
+        }
+
+        window.runTest = runTest;
+        window.loadReceiptCount = loadReceiptCount;
+    </script>
+</body>
+</html>

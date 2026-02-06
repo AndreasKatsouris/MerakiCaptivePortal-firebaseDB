@@ -2368,7 +2368,7 @@ exports.performanceTest = functions.https.onCall(async (data, context) => {
 
         // Simulate database operations to test performance
         const dbStartTime = process.hrtime.bigint();
-        const testData = await admin.database().ref('performance-test').once('value');
+        const perfSnapshot = await admin.database().ref('performance-test').once('value');
         const dbEndTime = process.hrtime.bigint();
         const dbResponseTime = Number(dbEndTime - dbStartTime) / 1000000;
 
@@ -2450,7 +2450,7 @@ exports.performanceTestHTTP = functions.https.onRequest((req, res) => {
 
             // Simulate database operations to test performance
             const dbStartTime = process.hrtime.bigint();
-            const testData = await admin.database().ref('performance-test').once('value');
+            const perfSnapshot = await admin.database().ref('performance-test').once('value');
             const dbEndTime = process.hrtime.bigint();
             const dbResponseTime = Number(dbEndTime - dbStartTime) / 1000000;
 

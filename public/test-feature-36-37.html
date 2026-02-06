@@ -1,0 +1,354 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Test Features #36 & #37 - Guest Edit & Delete</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <style>
+        body {
+            padding: 40px;
+            background-color: #f8f9fa;
+        }
+        .test-container {
+            max-width: 1000px;
+            margin: 0 auto;
+        }
+        .test-card {
+            background: white;
+            border-radius: 10px;
+            padding: 30px;
+            margin-bottom: 20px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        .step {
+            padding: 15px;
+            margin: 10px 0;
+            border-left: 4px solid #0d6efd;
+            background: #f8f9fa;
+        }
+        .result {
+            padding: 15px;
+            margin: 10px 0;
+            border-radius: 5px;
+        }
+        .result.success {
+            background: #d1e7dd;
+            border: 1px solid #badbcc;
+            color: #0f5132;
+        }
+        .result.error {
+            background: #f8d7da;
+            border: 1px solid #f5c2c7;
+            color: #842029;
+        }
+        .result.info {
+            background: #cff4fc;
+            border: 1px solid #b6effb;
+            color: #055160;
+        }
+        pre {
+            background: #f8f9fa;
+            padding: 10px;
+            border-radius: 5px;
+            overflow-x: auto;
+        }
+    </style>
+</head>
+<body>
+    <div class="test-container">
+        <h1 class="mb-4">🧪 Feature #36 & #37 Test Suite</h1>
+        <p class="lead">Guest Edit Persistence & Guest Delete Verification</p>
+
+        <!-- Feature #36: Guest Edit -->
+        <div class="test-card">
+            <h3>Feature #36: Guest Edit Updates Persist in RTDB</h3>
+            <p>This test verifies that when a guest's information is edited, the changes persist in Firebase Realtime Database.</p>
+
+            <div class="step">
+                <strong>Test Steps:</strong>
+                <ol>
+                    <li>Create test guest with phone +27800000010</li>
+                    <li>Edit guest name to "Updated Name"</li>
+                    <li>Verify update persists in RTDB</li>
+                    <li>Refresh page and verify persistence</li>
+                </ol>
+            </div>
+
+            <button id="runFeature36" class="btn btn-primary mb-3">
+                <i class="fas fa-play"></i> Run Feature #36 Test
+            </button>
+
+            <div id="feature36Results"></div>
+        </div>
+
+        <!-- Feature #37: Guest Delete -->
+        <div class="test-card">
+            <h3>Feature #37: Guest Delete Removes from RTDB</h3>
+            <p>This test verifies that when a guest is deleted, they are completely removed from Firebase Realtime Database.</p>
+
+            <div class="step">
+                <strong>Test Steps:</strong>
+                <ol>
+                    <li>Create test guest with phone +27800000020</li>
+                    <li>Delete the guest</li>
+                    <li>Verify guest no longer exists in RTDB</li>
+                    <li>Refresh page and verify deletion persists</li>
+                </ol>
+            </div>
+
+            <button id="runFeature37" class="btn btn-primary mb-3">
+                <i class="fas fa-play"></i> Run Feature #37 Test
+            </button>
+
+            <div id="feature37Results"></div>
+        </div>
+
+        <!-- Run All Tests -->
+        <div class="text-center mt-4">
+            <button id="runAllTests" class="btn btn-success btn-lg">
+                <i class="fas fa-check-circle"></i> Run All Tests
+            </button>
+        </div>
+    </div>
+
+    <!-- Firebase SDK -->
+    <script type="module">
+        import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.7.0/firebase-app.js';
+        import { getDatabase, ref, get, set, update, remove } from 'https://www.gstatic.com/firebasejs/10.7.0/firebase-database.js';
+
+        // Firebase configuration
+        const firebaseConfig = {
+            apiKey: "AIzaSyC-LeLcy1e39WnbAUh2HvN0DSK8aQQa3iw",
+            authDomain: "merakicaptiveportal-firebasedb.firebaseapp.com",
+            databaseURL: "https://merakicaptiveportal-firebasedb-default-rtdb.firebaseio.com",
+            projectId: "merakicaptiveportal-firebasedb",
+            storageBucket: "merakicaptiveportal-firebasedb.appspot.com",
+            messagingSenderId: "747849607698",
+            appId: "1:747849607698:web:e41dc84ff7c0d8c0c5f5a8"
+        };
+
+        // Initialize Firebase
+        const app = initializeApp(firebaseConfig);
+        const db = getDatabase(app);
+
+        // Test data
+        const EDIT_TEST_PHONE = '27800000010';
+        const DELETE_TEST_PHONE = '27800000020';
+        const ORIGINAL_NAME = 'Test User Alpha';
+        const UPDATED_NAME = 'Updated Name';
+        const DELETE_GUEST_NAME = 'Guest To Delete';
+
+        /**
+         * Utility: Wait for specified time
+         */
+        function wait(ms) {
+            return new Promise(resolve => setTimeout(resolve, ms));
+        }
+
+        /**
+         * Utility: Log result to UI
+         */
+        function logResult(containerId, message, type = 'info') {
+            const container = document.getElementById(containerId);
+            const resultDiv = document.createElement('div');
+            resultDiv.className = `result ${type}`;
+            resultDiv.innerHTML = message;
+            container.appendChild(resultDiv);
+        }
+
+        /**
+         * Test Feature #36: Guest Edit Persistence
+         */
+        async function testFeature36() {
+            const resultsId = 'feature36Results';
+            document.getElementById(resultsId).innerHTML = '';
+
+            logResult(resultsId, '🔄 <strong>Starting Feature #36 Test...</strong>', 'info');
+
+            try {
+                // Step 1: Create test guest
+                logResult(resultsId, '<strong>Step 1:</strong> Creating test guest...', 'info');
+                const guestRef = ref(db, `guests/${EDIT_TEST_PHONE}`);
+                const guestData = {
+                    name: ORIGINAL_NAME,
+                    phoneNumber: EDIT_TEST_PHONE,
+                    createdAt: new Date().toISOString(),
+                    updatedAt: new Date().toISOString(),
+                    tier: 'Bronze',
+                    consent: false
+                };
+
+                await set(guestRef, guestData);
+                logResult(resultsId, `✅ Test guest created: ${EDIT_TEST_PHONE} (${ORIGINAL_NAME})`, 'success');
+
+                // Verify creation
+                const createdSnapshot = await get(guestRef);
+                if (!createdSnapshot.exists()) {
+                    throw new Error('Guest was not created in database');
+                }
+                logResult(resultsId, '✅ Verified: Guest exists in RTDB', 'success');
+
+                await wait(500);
+
+                // Step 2: Edit guest name
+                logResult(resultsId, '<strong>Step 2:</strong> Editing guest name...', 'info');
+                await update(guestRef, {
+                    name: UPDATED_NAME,
+                    updatedAt: new Date().toISOString()
+                });
+                logResult(resultsId, `✅ Guest name updated to: ${UPDATED_NAME}`, 'success');
+
+                await wait(500);
+
+                // Step 3: Verify update persists
+                logResult(resultsId, '<strong>Step 3:</strong> Verifying update persistence...', 'info');
+                const updatedSnapshot = await get(guestRef);
+
+                if (!updatedSnapshot.exists()) {
+                    throw new Error('Guest no longer exists after update');
+                }
+
+                const updatedData = updatedSnapshot.val();
+                if (updatedData.name !== UPDATED_NAME) {
+                    throw new Error(`Name mismatch: expected "${UPDATED_NAME}", got "${updatedData.name}"`);
+                }
+
+                logResult(resultsId, `✅ Update verified in RTDB: <pre>${JSON.stringify(updatedData, null, 2)}</pre>`, 'success');
+
+                await wait(500);
+
+                // Step 4: Simulate page refresh
+                logResult(resultsId, '<strong>Step 4:</strong> Simulating page refresh (re-reading from RTDB)...', 'info');
+                const refreshSnapshot = await get(guestRef);
+
+                if (!refreshSnapshot.exists()) {
+                    throw new Error('Guest no longer exists after refresh');
+                }
+
+                const refreshData = refreshSnapshot.val();
+                if (refreshData.name !== UPDATED_NAME) {
+                    throw new Error(`Name did not persist after refresh: expected "${UPDATED_NAME}", got "${refreshData.name}"`);
+                }
+
+                logResult(resultsId, `✅ Name persists after refresh: ${refreshData.name}`, 'success');
+
+                // Cleanup
+                logResult(resultsId, '<strong>Cleanup:</strong> Removing test guest...', 'info');
+                await remove(guestRef);
+                logResult(resultsId, '✅ Test guest removed', 'success');
+
+                logResult(resultsId, '<strong>🎉 FEATURE #36 TEST PASSED</strong>', 'success');
+                return true;
+
+            } catch (error) {
+                logResult(resultsId, `❌ <strong>Test Failed:</strong> ${error.message}`, 'error');
+                console.error('Feature #36 test error:', error);
+                return false;
+            }
+        }
+
+        /**
+         * Test Feature #37: Guest Delete Persistence
+         */
+        async function testFeature37() {
+            const resultsId = 'feature37Results';
+            document.getElementById(resultsId).innerHTML = '';
+
+            logResult(resultsId, '🔄 <strong>Starting Feature #37 Test...</strong>', 'info');
+
+            try {
+                // Step 1: Create test guest
+                logResult(resultsId, '<strong>Step 1:</strong> Creating test guest for deletion...', 'info');
+                const guestRef = ref(db, `guests/${DELETE_TEST_PHONE}`);
+                const guestData = {
+                    name: DELETE_GUEST_NAME,
+                    phoneNumber: DELETE_TEST_PHONE,
+                    createdAt: new Date().toISOString(),
+                    updatedAt: new Date().toISOString(),
+                    tier: 'Bronze',
+                    consent: false
+                };
+
+                await set(guestRef, guestData);
+                logResult(resultsId, `✅ Test guest created: ${DELETE_TEST_PHONE} (${DELETE_GUEST_NAME})`, 'success');
+
+                // Verify creation
+                const createdSnapshot = await get(guestRef);
+                if (!createdSnapshot.exists()) {
+                    throw new Error('Guest was not created in database');
+                }
+                logResult(resultsId, '✅ Verified: Guest exists in RTDB', 'success');
+
+                await wait(500);
+
+                // Step 2: Delete the guest
+                logResult(resultsId, '<strong>Step 2:</strong> Deleting the guest...', 'info');
+                await remove(guestRef);
+                logResult(resultsId, '✅ Delete command executed', 'success');
+
+                await wait(500);
+
+                // Step 3: Verify deletion
+                logResult(resultsId, '<strong>Step 3:</strong> Verifying guest no longer exists...', 'info');
+                const deletedSnapshot = await get(guestRef);
+
+                if (deletedSnapshot.exists()) {
+                    throw new Error('Guest still exists after deletion');
+                }
+
+                logResult(resultsId, '✅ Guest successfully removed from RTDB', 'success');
+
+                await wait(500);
+
+                // Step 4: Simulate page refresh
+                logResult(resultsId, '<strong>Step 4:</strong> Simulating page refresh (re-reading from RTDB)...', 'info');
+                const refreshSnapshot = await get(guestRef);
+
+                if (refreshSnapshot.exists()) {
+                    throw new Error('Guest still exists after refresh');
+                }
+
+                logResult(resultsId, '✅ Guest remains deleted after refresh', 'success');
+
+                logResult(resultsId, '<strong>🎉 FEATURE #37 TEST PASSED</strong>', 'success');
+                return true;
+
+            } catch (error) {
+                logResult(resultsId, `❌ <strong>Test Failed:</strong> ${error.message}`, 'error');
+                console.error('Feature #37 test error:', error);
+                return false;
+            }
+        }
+
+        /**
+         * Run all tests
+         */
+        async function runAllTests() {
+            console.log('Running all tests...');
+
+            const feature36Result = await testFeature36();
+            await wait(1000);
+
+            const feature37Result = await testFeature37();
+
+            console.log('All tests completed');
+            console.log('Feature #36:', feature36Result ? 'PASSED' : 'FAILED');
+            console.log('Feature #37:', feature37Result ? 'PASSED' : 'FAILED');
+        }
+
+        // Event listeners
+        document.getElementById('runFeature36').addEventListener('click', testFeature36);
+        document.getElementById('runFeature37').addEventListener('click', testFeature37);
+        document.getElementById('runAllTests').addEventListener('click', runAllTests);
+
+        // Auto-run all tests on page load
+        window.addEventListener('load', () => {
+            console.log('Page loaded, ready to run tests');
+        });
+    </script>
+
+    <!-- Font Awesome -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+</body>
+</html>

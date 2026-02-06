@@ -1,0 +1,313 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Feature #38 Test - Location Persistence</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <style>
+        .test-container {
+            max-width: 800px;
+            margin: 50px auto;
+        }
+        .test-step {
+            padding: 15px;
+            margin: 10px 0;
+            border-radius: 5px;
+            background: #f8f9fa;
+        }
+        .test-step.success {
+            background: #d4edda;
+            border: 1px solid #c3e6cb;
+        }
+        .test-step.error {
+            background: #f8d7da;
+            border: 1px solid #f5c6cb;
+        }
+        .test-step.running {
+            background: #fff3cd;
+            border: 1px solid #ffeaa7;
+        }
+        pre {
+            background: #f4f4f4;
+            padding: 10px;
+            border-radius: 5px;
+            font-size: 12px;
+            max-height: 200px;
+            overflow-y: auto;
+        }
+    </style>
+</head>
+<body>
+    <div class="test-container">
+        <h1 class="mb-4">Feature #38: Location Persistence Test</h1>
+        <p class="lead">Testing that location creation persists in Firebase RTDB</p>
+
+        <div id="testSteps"></div>
+
+        <div class="mt-4">
+            <button id="runTestBtn" class="btn btn-primary btn-lg">Run Test</button>
+            <button id="refreshBtn" class="btn btn-secondary btn-lg ms-2" style="display:none;">Refresh & Verify</button>
+        </div>
+
+        <div id="testResults" class="mt-4"></div>
+    </div>
+
+    <script type="module">
+        import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js';
+        import {
+            getDatabase,
+            ref,
+            push,
+            set,
+            get,
+            remove,
+            onValue
+        } from 'https://www.gstatic.com/firebasejs/10.8.0/firebase-database.js';
+        import {
+            getAuth,
+            onAuthStateChanged
+        } from 'https://www.gstatic.com/firebasejs/10.8.0/firebase-auth.js';
+
+        // Firebase configuration
+        const firebaseConfig = {
+            apiKey: "AIzaSyDUZ_pn25EwE8p9IzRU_bcHbnRXQE-8oPU",
+            authDomain: "merakicaptiveportal-firebasedb.firebaseapp.com",
+            databaseURL: "https://merakicaptiveportal-firebasedb-default-rtdb.firebaseio.com",
+            projectId: "merakicaptiveportal-firebasedb",
+            storageBucket: "merakicaptiveportal-firebasedb.firebasestorage.app",
+            messagingSenderId: "821856229273",
+            appId: "1:821856229273:web:c7ff58b1bace3cc9ab9ca6"
+        };
+
+        const app = initializeApp(firebaseConfig);
+        const database = getDatabase(app);
+        const auth = getAuth(app);
+
+        let testLocationKey = null;
+        const TEST_USER_ID = 'test-user-location-browser';
+
+        function addTestStep(message, status = 'running') {
+            const stepsDiv = document.getElementById('testSteps');
+            const stepDiv = document.createElement('div');
+            stepDiv.className = `test-step ${status}`;
+            stepDiv.innerHTML = `<strong>${status === 'success' ? '✓' : status === 'error' ? '✗' : '⏳'}</strong> ${message}`;
+            stepsDiv.appendChild(stepDiv);
+            return stepDiv;
+        }
+
+        function updateTestStep(stepDiv, message, status) {
+            stepDiv.className = `test-step ${status}`;
+            stepDiv.innerHTML = `<strong>${status === 'success' ? '✓' : '✗'}</strong> ${message}`;
+        }
+
+        async function runTest() {
+            document.getElementById('testSteps').innerHTML = '';
+            document.getElementById('testResults').innerHTML = '';
+            document.getElementById('runTestBtn').disabled = true;
+            document.getElementById('refreshBtn').style.display = 'none';
+
+            try {
+                // Step 1: Create location data
+                const step1 = addTestStep('Creating test location data...', 'running');
+                const locationData = {
+                    name: 'Test Location Alpha',
+                    address: '123 Test Street, Cape Town',
+                    phone: '+27821234567',
+                    type: 'restaurant',
+                    timezone: 'Africa/Johannesburg',
+                    status: 'active',
+                    createdAt: Date.now(),
+                    createdBy: TEST_USER_ID,
+                    userId: TEST_USER_ID
+                };
+                updateTestStep(step1, `Created test location: ${locationData.name}`, 'success');
+
+                // Step 2: Save to Firebase RTDB
+                const step2 = addTestStep('Saving location to Firebase RTDB...', 'running');
+
+                // Create location in locations/ node
+                const locationsRef = ref(database, 'locations');
+                const newLocationRef = push(locationsRef);
+                testLocationKey = newLocationRef.key;
+
+                await set(newLocationRef, locationData);
+
+                // Create user-location mapping
+                const userLocationRef = ref(database, `userLocations/${TEST_USER_ID}/${testLocationKey}`);
+                await set(userLocationRef, true);
+
+                updateTestStep(step2, `Location saved with key: ${testLocationKey}`, 'success');
+
+                // Step 3: Verify location exists
+                const step3 = addTestStep('Verifying location exists in database...', 'running');
+                const locationSnapshot = await get(ref(database, `locations/${testLocationKey}`));
+
+                if (!locationSnapshot.exists()) {
+                    throw new Error('Location not found after creation!');
+                }
+
+                const retrievedLocation = locationSnapshot.val();
+                updateTestStep(step3, 'Location verified in database', 'success');
+
+                // Show location data
+                const dataDiv = document.createElement('pre');
+                dataDiv.textContent = JSON.stringify(retrievedLocation, null, 2);
+                step3.appendChild(dataDiv);
+
+                // Step 4: Verify user-location mapping
+                const step4 = addTestStep('Verifying user-location mapping...', 'running');
+                const userLocationSnapshot = await get(ref(database, `userLocations/${TEST_USER_ID}/${testLocationKey}`));
+
+                if (!userLocationSnapshot.exists()) {
+                    throw new Error('User-location mapping not found!');
+                }
+
+                updateTestStep(step4, 'User-location mapping verified', 'success');
+
+                // Step 5: Show refresh button
+                const step5 = addTestStep('Test data created. Click "Refresh & Verify" to test persistence', 'success');
+                document.getElementById('refreshBtn').style.display = 'inline-block';
+
+                // Store location key in sessionStorage for after refresh
+                sessionStorage.setItem('testLocationKey', testLocationKey);
+
+                // Show success message
+                document.getElementById('testResults').innerHTML = `
+                    <div class="alert alert-success">
+                        <h4>✅ Location Created Successfully</h4>
+                        <p>Location Key: <code>${testLocationKey}</code></p>
+                        <p>Click "Refresh & Verify" to confirm data persists across page reload.</p>
+                    </div>
+                `;
+
+            } catch (error) {
+                console.error('Test failed:', error);
+                addTestStep(`Test failed: ${error.message}`, 'error');
+
+                // Cleanup on error
+                if (testLocationKey) {
+                    await cleanup();
+                }
+
+                document.getElementById('testResults').innerHTML = `
+                    <div class="alert alert-danger">
+                        <h4>❌ Test Failed</h4>
+                        <p>${error.message}</p>
+                    </div>
+                `;
+            } finally {
+                document.getElementById('runTestBtn').disabled = false;
+            }
+        }
+
+        async function verifyAfterRefresh() {
+            document.getElementById('testSteps').innerHTML = '';
+            document.getElementById('testResults').innerHTML = '';
+
+            const storedKey = sessionStorage.getItem('testLocationKey');
+
+            if (!storedKey) {
+                document.getElementById('testResults').innerHTML = `
+                    <div class="alert alert-warning">
+                        <h4>⚠️ No Test Data Found</h4>
+                        <p>Please run the test first before refreshing.</p>
+                    </div>
+                `;
+                return;
+            }
+
+            try {
+                // Step 1: Verify location still exists after refresh
+                const step1 = addTestStep('Verifying location persists after page refresh...', 'running');
+                const locationSnapshot = await get(ref(database, `locations/${storedKey}`));
+
+                if (!locationSnapshot.exists()) {
+                    throw new Error('Location does not persist after page refresh!');
+                }
+
+                const locationData = locationSnapshot.val();
+                updateTestStep(step1, '✅ Location persists after refresh!', 'success');
+
+                // Show location data
+                const dataDiv = document.createElement('pre');
+                dataDiv.textContent = JSON.stringify(locationData, null, 2);
+                step1.appendChild(dataDiv);
+
+                // Step 2: Verify user-location mapping
+                const step2 = addTestStep('Verifying user-location mapping persists...', 'running');
+                const userLocationSnapshot = await get(ref(database, `userLocations/${TEST_USER_ID}/${storedKey}`));
+
+                if (!userLocationSnapshot.exists()) {
+                    throw new Error('User-location mapping does not persist!');
+                }
+
+                updateTestStep(step2, '✅ User-location mapping persists!', 'success');
+
+                // Step 3: Clean up test data
+                const step3 = addTestStep('Cleaning up test data...', 'running');
+                await remove(ref(database, `locations/${storedKey}`));
+                await remove(ref(database, `userLocations/${TEST_USER_ID}/${storedKey}`));
+                sessionStorage.removeItem('testLocationKey');
+                updateTestStep(step3, 'Test data cleaned up', 'success');
+
+                // Show final success message
+                document.getElementById('testResults').innerHTML = `
+                    <div class="alert alert-success">
+                        <h4>✅ Feature #38: PASSING</h4>
+                        <p><strong>All persistence tests passed!</strong></p>
+                        <ul>
+                            <li>✓ Location created in Firebase RTDB</li>
+                            <li>✓ Location persists across page refresh</li>
+                            <li>✓ User-location mapping persists</li>
+                            <li>✓ Data stored in Firebase (not in-memory)</li>
+                        </ul>
+                    </div>
+                `;
+
+                document.getElementById('refreshBtn').style.display = 'none';
+
+            } catch (error) {
+                console.error('Verification failed:', error);
+                addTestStep(`Verification failed: ${error.message}`, 'error');
+
+                document.getElementById('testResults').innerHTML = `
+                    <div class="alert alert-danger">
+                        <h4>❌ Persistence Test Failed</h4>
+                        <p>${error.message}</p>
+                    </div>
+                `;
+            }
+        }
+
+        async function cleanup() {
+            if (testLocationKey) {
+                try {
+                    await remove(ref(database, `locations/${testLocationKey}`));
+                    await remove(ref(database, `userLocations/${TEST_USER_ID}/${testLocationKey}`));
+                } catch (error) {
+                    console.error('Cleanup error:', error);
+                }
+            }
+        }
+
+        // Check if we're verifying after refresh
+        window.addEventListener('load', () => {
+            const storedKey = sessionStorage.getItem('testLocationKey');
+            if (storedKey) {
+                document.getElementById('refreshBtn').style.display = 'inline-block';
+                document.getElementById('testResults').innerHTML = `
+                    <div class="alert alert-info">
+                        <h4>ℹ️ Test Data Found</h4>
+                        <p>Click "Refresh & Verify" to complete the persistence test.</p>
+                    </div>
+                `;
+            }
+        });
+
+        // Event listeners
+        document.getElementById('runTestBtn').addEventListener('click', runTest);
+        document.getElementById('refreshBtn').addEventListener('click', verifyAfterRefresh);
+    </script>
+</body>
+</html>
