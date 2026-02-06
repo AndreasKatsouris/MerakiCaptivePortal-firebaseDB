@@ -79,6 +79,38 @@ if (!admin.apps.length) {
     });
 }
 
+// Health check endpoint
+exports.health = onRequest(async (req, res) => {
+    try {
+        // Test database connection
+        const db = admin.database();
+        const healthRef = db.ref('.info/connected');
+        const snapshot = await healthRef.once('value');
+        const isConnected = snapshot.val() === true;
+
+        res.status(200).json({
+            status: 'ok',
+            timestamp: new Date().toISOString(),
+            database: {
+                status: isConnected ? 'connected' : 'disconnected',
+                url: admin.app().options.databaseURL
+            },
+            service: 'sparks-hospitality-functions'
+        });
+    } catch (error) {
+        console.error('Health check failed:', error);
+        res.status(503).json({
+            status: 'error',
+            timestamp: new Date().toISOString(),
+            database: {
+                status: 'error',
+                error: error.message
+            },
+            service: 'sparks-hospitality-functions'
+        });
+    }
+});
+
 // Create Express app for WhatsApp webhook with proper middleware
 const whatsappApp = express();
 whatsappApp.use(express.urlencoded({ extended: true })); // Parse form-encoded data
