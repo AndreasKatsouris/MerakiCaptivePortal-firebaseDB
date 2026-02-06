@@ -1,0 +1,159 @@
+- generic [active] [ref=e1]:
+  - navigation [ref=e2]:
+    - generic [ref=e3]:
+      - link "Sparks Hospitality Sparks Hospitality" [ref=e4] [cursor=pointer]:
+        - /url: "#"
+        - img "Sparks Hospitality" [ref=e5]
+        - generic [ref=e6]: Sparks Hospitality
+      - list [ref=e7]:
+        - listitem [ref=e8]:
+          - link "Platform" [ref=e9] [cursor=pointer]:
+            - /url: "#features"
+        - listitem [ref=e10]:
+          - link "Our Story" [ref=e11] [cursor=pointer]:
+            - /url: "#about"
+        - listitem [ref=e12]:
+          - link "Case Studies" [ref=e13] [cursor=pointer]:
+            - /url: "#testimonials"
+        - listitem [ref=e14]:
+          - link "Login" [ref=e15] [cursor=pointer]:
+            - /url: /user-login.html
+        - listitem [ref=e16]:
+          - link "Get Started" [ref=e17] [cursor=pointer]:
+            - /url: /signup.html
+  - generic [ref=e19]:
+    - generic [ref=e20]:
+      - heading "Restaurant management, infinite scale." [level=1] [ref=e21]
+      - paragraph [ref=e22]: Sparks Hospitality amplifies what your team can do by effortlessly scaling your restaurant operations. So you can focus on what matters most - creating exceptional guest experiences.
+      - generic [ref=e23]:
+        - link "Get Started " [ref=e24] [cursor=pointer]:
+          - /url: /signup.html
+          - text: Get Started
+          - generic [ref=e25]: 
+        - link "Watch Demo" [ref=e26] [cursor=pointer]:
+          - /url: "#demo"
+    - img "Restaurant Management Dashboard" [ref=e28]
+  - generic [ref=e30]:
+    - generic [ref=e31]:
+      - heading "Scaling your operations" [level=2] [ref=e32]
+      - paragraph [ref=e33]: Our platform provides you with extra capacity at superhuman scale, enabling your team to go further, faster.
+    - generic [ref=e34]:
+      - generic [ref=e35]:
+        - generic [ref=e36]: 10x
+        - generic [ref=e37]: Efficiency increase
+      - generic [ref=e38]:
+        - generic [ref=e39]: 83%
+        - generic [ref=e40]: Reduction in waste
+      - generic [ref=e41]:
+        - generic [ref=e42]: "4.8"
+        - generic [ref=e43]: Customer rating
+      - generic [ref=e44]:
+        - generic [ref=e45]: 52%
+        - generic [ref=e46]: Increase in revenue
+  - generic [ref=e48]:
+    - generic [ref=e49]:
+      - heading "The Sparks Hospitality stack" [level=2] [ref=e50]
+      - paragraph [ref=e51]: Our platform sits at the heart of your operations, providing unprecedented management power at unlimited scale.
+    - generic [ref=e52]:
+      - generic [ref=e53]:
+        - generic [ref=e55]: 
+        - heading "Smart Guest WiFi" [level=3] [ref=e56]
+        - paragraph [ref=e57]: Transform your WiFi into a powerful engagement tool. Capture guest data, build relationships, and drive repeat visits automatically.
+      - generic [ref=e58]:
+        - generic [ref=e60]: 
+        - heading "Real-Time Analytics" [level=3] [ref=e61]
+        - paragraph [ref=e62]: Make data-driven decisions with instant insights into guest behavior, peak hours, and revenue trends.
+      - generic [ref=e63]:
+        - generic [ref=e65]: 
+        - heading "Food Cost Control" [level=3] [ref=e66]
+        - paragraph [ref=e67]: Optimize inventory, reduce waste, and maximize profits with AI-powered cost management and predictive ordering.
+      - generic [ref=e68]:
+        - generic [ref=e70]: 
+        - heading "Marketing Automation" [level=3] [ref=e71]
+        - paragraph [ref=e72]: Engage guests with personalized campaigns, loyalty programs, and targeted offers based on their preferences.
+      - generic [ref=e73]:
+        - generic [ref=e75]: 
+        - heading "Team Management" [level=3] [ref=e76]
+        - paragraph [ref=e77]: Streamline scheduling, track performance, and empower your staff with the tools they need to excel.
+      - generic [ref=e78]:
+        - generic [ref=e80]: 
+        - heading "Mobile Dashboard" [level=3] [ref=e81]
+        - paragraph [ref=e82]: Monitor and manage your restaurant from anywhere with our intuitive mobile-first design.
+  - generic [ref=e84]:
+    - generic [ref=e85]:
+      - heading "Inspired by service" [level=2] [ref=e86]
+      - paragraph [ref=e87]: A legacy that continues to guide everything we do
+    - generic [ref=e88]:
+      - generic [ref=e89]:
+        - generic [ref=e90]: "\"My father, Lakis Katsouris, served people all his life from a young age. As an entrepreneur, he understood that hospitality is about creating moments that matter. Sparks Hospitality carries forward his belief that technology should amplify human connection, not replace it.\""
+        - generic [ref=e91]:
+          - generic [ref=e92]: LK
+          - generic [ref=e93]:
+            - heading "Founder's Story" [level=4] [ref=e94]
+            - paragraph [ref=e95]: The Katsouris Legacy
+      - generic [ref=e96]:
+        - generic [ref=e97]: "\"Sparks transformed how we operate. The WiFi engagement alone increased our repeat visits by 40%. It's like having a dedicated team working around the clock.\""
+        - generic [ref=e98]:
+          - generic [ref=e99]: MR
+          - generic [ref=e100]:
+            - heading "Maria Rodriguez" [level=4] [ref=e101]
+            - paragraph [ref=e102]: Owner, Bella Vista
+      - generic [ref=e103]:
+        - generic [ref=e104]: "\"The food cost system is a game-changer. We've reduced waste by 30% and our margins have never been better. The predictive ordering is incredibly accurate.\""
+        - generic [ref=e105]:
+          - generic [ref=e106]: JC
+          - generic [ref=e107]:
+            - heading "James Chen" [level=4] [ref=e108]
+            - paragraph [ref=e109]: Executive Chef
+  - generic [ref=e111]:
+    - generic [ref=e112]:
+      - heading "Success at scale" [level=2] [ref=e113]
+      - paragraph [ref=e114]: Real results from restaurants transforming their operations
+    - generic [ref=e115]:
+      - generic [ref=e116]:
+        - heading "Ocean Basket Group" [level=3] [ref=e118]
+        - paragraph [ref=e119]: 15 locations saw 25% increase in retention and 35% boost in campaign effectiveness within 3 months.
+      - generic [ref=e120]:
+        - generic [ref=e122]: 
+        - heading "The Garden Bistro" [level=3] [ref=e123]
+        - paragraph [ref=e124]: Menu optimization based on guest insights led to 28% revenue increase in just 90 days.
+      - generic [ref=e125]:
+        - generic [ref=e127]: 
+        - heading "Mama's Kitchen" [level=3] [ref=e128]
+        - paragraph [ref=e129]: Built a community of 5,000+ loyal guests with automated engagement and personalized rewards.
+  - generic [ref=e131]:
+    - heading "Give your team superhuman powers" [level=2] [ref=e132]
+    - paragraph [ref=e133]: Join the hospitality revolution with a 30-day free trial.
+    - link "Get Started Free " [ref=e134] [cursor=pointer]:
+      - /url: /signup.html
+      - text: Get Started Free
+      - generic [ref=e135]: 
+  - contentinfo [ref=e136]:
+    - generic [ref=e137]:
+      - generic [ref=e138]:
+        - link "Platform" [ref=e139] [cursor=pointer]:
+          - /url: "#features"
+        - link "Our Story" [ref=e140] [cursor=pointer]:
+          - /url: "#about"
+        - link "Case Studies" [ref=e141] [cursor=pointer]:
+          - /url: "#testimonials"
+        - link "Terms" [ref=e142] [cursor=pointer]:
+          - /url: /terms.html
+        - link "Privacy" [ref=e143] [cursor=pointer]:
+          - /url: /privacy
+        - link "Admin" [ref=e144] [cursor=pointer]:
+          - /url: /admin-login.html
+      - generic [ref=e145]:
+        - link "" [ref=e146] [cursor=pointer]:
+          - /url: "#"
+          - generic [ref=e147]: 
+        - link "" [ref=e148] [cursor=pointer]:
+          - /url: "#"
+          - generic [ref=e149]: 
+        - link "" [ref=e150] [cursor=pointer]:
+          - /url: "#"
+          - generic [ref=e151]: 
+        - link "" [ref=e152] [cursor=pointer]:
+          - /url: "#"
+          - generic [ref=e153]: 
+      - paragraph [ref=e154]: © 2024 Sparks Hospitality. Built with ❤️ in honor of Lakis Katsouris.
