@@ -24,18 +24,29 @@ class UserDashboard {
         onAuthStateChanged(auth, async (user) => {
             if (user) {
                 this.currentUser = user;
-                
+
+                // Check if user needs to complete onboarding
+                const onboardingRef = ref(rtdb, `onboarding-progress/${user.uid}`);
+                const onboardingSnapshot = await get(onboardingRef);
+
+                if (!onboardingSnapshot.exists() || !onboardingSnapshot.val().completed) {
+                    // Redirect to onboarding wizard
+                    console.log('[Dashboard] User has not completed onboarding, redirecting...');
+                    window.location.href = '/onboarding-wizard.html';
+                    return;
+                }
+
                 // Run database fix to ensure proper subscription data
                 console.log('[Dashboard] Running database fix to ensure proper subscription data...');
                 await runCompleteDatabaseFix();
-                
-                // PERFORMANCE OPTIMIZATION: Load user data and check feature access in parallel  
+
+                // PERFORMANCE OPTIMIZATION: Load user data and check feature access in parallel
                 console.log('[Dashboard] Loading user data and checking feature access in parallel...');
                 await Promise.all([
                     this.loadUserData(),
                     this.checkFeatureAccess()
                 ]);
-                
+
                 // Load dashboard after user data and feature access are ready
                 await this.loadDashboard();
             } else {

@@ -395,11 +395,11 @@ class SignupManager {
                 throw userCreationError;
             }
 
-            showToast('Account created successfully! Redirecting to dashboard...', 'success');
+            showToast('Account created successfully! Redirecting to setup wizard...', 'success');
 
-            // Redirect to user dashboard after 2 seconds
+            // Redirect to onboarding wizard after 2 seconds
             setTimeout(() => {
-                window.location.href = '/user-dashboard.html';
+                window.location.href = '/onboarding-wizard.html';
             }, 2000);
 
         } catch (error) {
