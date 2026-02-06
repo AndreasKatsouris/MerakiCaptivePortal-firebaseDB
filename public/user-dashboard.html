@@ -189,6 +189,107 @@
             background-color: #6c757d;
             text-decoration: line-through;
         }
+
+        /* Top navigation bar styles */
+        .navbar .navbar-nav {
+            align-items: center;
+            gap: 15px;
+        }
+
+        .location-selector {
+            position: relative;
+        }
+
+        .location-selector .dropdown-toggle {
+            background: #f8f9fa;
+            border: 1px solid #dee2e6;
+            border-radius: 6px;
+            padding: 8px 15px;
+            color: #333;
+            font-weight: 500;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .location-selector .dropdown-toggle:hover {
+            background: #e9ecef;
+            border-color: #adb5bd;
+        }
+
+        .location-selector .dropdown-menu {
+            min-width: 250px;
+        }
+
+        .notification-bell {
+            position: relative;
+            padding: 8px 12px;
+            color: #495057;
+            font-size: 1.2rem;
+            cursor: pointer;
+            border-radius: 6px;
+            transition: all 0.2s;
+        }
+
+        .notification-bell:hover {
+            background: #f8f9fa;
+            color: #667eea;
+        }
+
+        .notification-bell .badge {
+            position: absolute;
+            top: 2px;
+            right: 2px;
+            padding: 3px 6px;
+            font-size: 0.65rem;
+            background: #dc3545;
+            border-radius: 10px;
+        }
+
+        .search-box {
+            position: relative;
+            max-width: 300px;
+        }
+
+        .search-box input {
+            padding: 8px 35px 8px 15px;
+            border: 1px solid #dee2e6;
+            border-radius: 6px;
+            width: 100%;
+            transition: all 0.2s;
+        }
+
+        .search-box input:focus {
+            outline: none;
+            border-color: #667eea;
+            box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
+        }
+
+        .search-box i {
+            position: absolute;
+            right: 12px;
+            top: 50%;
+            transform: translateY(-50%);
+            color: #6c757d;
+        }
+
+        .user-profile-dropdown .dropdown-toggle {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            padding: 6px 12px;
+            border-radius: 6px;
+            color: #333;
+            font-weight: 500;
+        }
+
+        .user-profile-dropdown .dropdown-toggle:hover {
+            background: #f8f9fa;
+        }
+
+        .user-profile-dropdown .dropdown-toggle::after {
+            margin-left: 5px;
+        }
     </style>
 </head>
 <body>
@@ -196,37 +297,120 @@
     <nav class="navbar navbar-expand-lg navbar-light fixed-top">
         <div class="container-fluid">
             <a class="navbar-brand" href="#">
-                <i class="fas fa-bolt me-2"></i>Laki Sparks
+                <i class="fas fa-bolt me-2"></i>Sparks Hospitality
             </a>
             <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav">
                 <span class="navbar-toggler-icon"></span>
             </button>
             <div class="collapse navbar-collapse" id="navbarNav">
                 <ul class="navbar-nav ms-auto">
-                    <li class="nav-item">
-                        <a class="nav-link active" href="#dashboard">Dashboard</a>
-                    </li>
-                    <li class="nav-item">
-                        <a class="nav-link" href="user-subscription.html">Subscription</a>
-                    </li>
-                    <li class="nav-item">
-                        <a class="nav-link" href="#locations">Locations</a>
-                    </li>
-                    <li class="nav-item">
-                        <a class="nav-link" href="#analytics">Analytics</a>
-                    </li>
-                    <li class="nav-item">
-                        <a class="nav-link" href="#campaigns">Campaigns</a>
-                    </li>
-                    <li class="nav-item dropdown">
-                        <a class="nav-link dropdown-toggle" href="#" id="userDropdown" role="button" data-bs-toggle="dropdown">
-                            <i class="fas fa-user-circle me-1"></i> <span id="userDisplayName">User</span>
-                        </a>
-                        <ul class="dropdown-menu dropdown-menu-end">
-                            <li><a class="dropdown-item" href="#profile"><i class="fas fa-user me-2"></i>Profile</a></li>
-                            <li><a class="dropdown-item" href="#settings"><i class="fas fa-cog me-2"></i>Settings</a></li>
+                    <!-- Location Selector -->
+                    <li class="nav-item dropdown location-selector">
+                        <button class="btn dropdown-toggle" type="button" id="locationDropdown" data-bs-toggle="dropdown" aria-expanded="false">
+                            <i class="fas fa-map-marker-alt"></i>
+                            <span id="selectedLocationName">All Locations</span>
+                        </button>
+                        <ul class="dropdown-menu" aria-labelledby="locationDropdown">
+                            <li><a class="dropdown-item active" href="#" data-location="all">
+                                <i class="fas fa-globe me-2"></i>All Locations
+                            </a></li>
                             <li><hr class="dropdown-divider"></li>
-                            <li><a class="dropdown-item" href="#" id="logoutBtn"><i class="fas fa-sign-out-alt me-2"></i>Logout</a></li>
+                            <li><a class="dropdown-item" href="#" data-location="1">
+                                <i class="fas fa-store me-2"></i>Main Restaurant
+                            </a></li>
+                            <li><a class="dropdown-item" href="#" data-location="2">
+                                <i class="fas fa-store me-2"></i>Downtown Branch
+                            </a></li>
+                            <li><hr class="dropdown-divider"></li>
+                            <li><a class="dropdown-item text-primary" href="#locations">
+                                <i class="fas fa-plus-circle me-2"></i>Manage Locations
+                            </a></li>
+                        </ul>
+                    </li>
+
+                    <!-- Search -->
+                    <li class="nav-item search-box d-none d-lg-block">
+                        <input type="text" class="form-control" id="globalSearch" placeholder="Search...">
+                        <i class="fas fa-search"></i>
+                    </li>
+
+                    <!-- Notifications Bell -->
+                    <li class="nav-item dropdown">
+                        <a class="notification-bell" href="#" id="notificationDropdown" role="button" data-bs-toggle="dropdown" aria-expanded="false">
+                            <i class="fas fa-bell"></i>
+                            <span class="badge" id="notificationCount">3</span>
+                        </a>
+                        <ul class="dropdown-menu dropdown-menu-end" aria-labelledby="notificationDropdown" style="min-width: 300px;">
+                            <li class="dropdown-header d-flex justify-content-between align-items-center">
+                                <span>Notifications</span>
+                                <a href="#" class="text-primary" style="font-size: 0.85rem;">Mark all read</a>
+                            </li>
+                            <li><hr class="dropdown-divider"></li>
+                            <li>
+                                <a class="dropdown-item" href="#">
+                                    <div class="d-flex">
+                                        <i class="fas fa-users text-primary me-2" style="margin-top: 3px;"></i>
+                                        <div>
+                                            <strong>New guest added to queue</strong>
+                                            <p class="mb-0 text-muted" style="font-size: 0.85rem;">Party of 4 at Main Restaurant</p>
+                                            <small class="text-muted">5 minutes ago</small>
+                                        </div>
+                                    </div>
+                                </a>
+                            </li>
+                            <li><hr class="dropdown-divider"></li>
+                            <li>
+                                <a class="dropdown-item" href="#">
+                                    <div class="d-flex">
+                                        <i class="fas fa-receipt text-success me-2" style="margin-top: 3px;"></i>
+                                        <div>
+                                            <strong>Receipt processed</strong>
+                                            <p class="mb-0 text-muted" style="font-size: 0.85rem;">Reward issued to customer</p>
+                                            <small class="text-muted">1 hour ago</small>
+                                        </div>
+                                    </div>
+                                </a>
+                            </li>
+                            <li><hr class="dropdown-divider"></li>
+                            <li>
+                                <a class="dropdown-item" href="#">
+                                    <div class="d-flex">
+                                        <i class="fas fa-chart-line text-warning me-2" style="margin-top: 3px;"></i>
+                                        <div>
+                                            <strong>Food cost alert</strong>
+                                            <p class="mb-0 text-muted" style="font-size: 0.85rem;">Costs above target this week</p>
+                                            <small class="text-muted">3 hours ago</small>
+                                        </div>
+                                    </div>
+                                </a>
+                            </li>
+                            <li><hr class="dropdown-divider"></li>
+                            <li class="text-center">
+                                <a href="#notifications" class="dropdown-item text-primary">View all notifications</a>
+                            </li>
+                        </ul>
+                    </li>
+
+                    <!-- User Profile -->
+                    <li class="nav-item dropdown user-profile-dropdown">
+                        <a class="dropdown-toggle" href="#" id="userDropdown" role="button" data-bs-toggle="dropdown" aria-expanded="false">
+                            <i class="fas fa-user-circle me-1"></i>
+                            <span id="userDisplayName">User</span>
+                        </a>
+                        <ul class="dropdown-menu dropdown-menu-end" aria-labelledby="userDropdown">
+                            <li><a class="dropdown-item" href="#profile">
+                                <i class="fas fa-user me-2"></i>Profile
+                            </a></li>
+                            <li><a class="dropdown-item" href="user-subscription.html">
+                                <i class="fas fa-crown me-2"></i>Subscription
+                            </a></li>
+                            <li><a class="dropdown-item" href="#settings">
+                                <i class="fas fa-cog me-2"></i>Settings
+                            </a></li>
+                            <li><hr class="dropdown-divider"></li>
+                            <li><a class="dropdown-item" href="#" id="logoutBtn">
+                                <i class="fas fa-sign-out-alt me-2"></i>Logout
+                            </a></li>
                         </ul>
                     </li>
                 </ul>

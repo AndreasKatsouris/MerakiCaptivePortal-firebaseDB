@@ -122,6 +122,69 @@ class UserDashboard {
         document.getElementById('upgradeBtn')?.addEventListener('click', () => {
             this.showUpgradeOptions();
         });
+
+        // Location selector dropdown items
+        document.querySelectorAll('#locationDropdown + .dropdown-menu .dropdown-item[data-location]').forEach(item => {
+            item.addEventListener('click', (e) => {
+                e.preventDefault();
+                this.handleLocationChange(e.target.closest('[data-location]').dataset.location);
+            });
+        });
+
+        // Global search input
+        document.getElementById('globalSearch')?.addEventListener('input', (e) => {
+            this.handleGlobalSearch(e.target.value);
+        });
+
+        // Mark all notifications as read
+        document.querySelector('.dropdown-header a')?.addEventListener('click', (e) => {
+            e.preventDefault();
+            this.markAllNotificationsRead();
+        });
+    }
+
+    handleLocationChange(locationId) {
+        console.log('[Dashboard] Location changed to:', locationId);
+
+        // Update the selected location display
+        const selectedLocationName = document.getElementById('selectedLocationName');
+        const clickedItem = document.querySelector(`[data-location="${locationId}"]`);
+
+        if (selectedLocationName && clickedItem) {
+            selectedLocationName.textContent = clickedItem.textContent.trim();
+        }
+
+        // Remove active class from all location items
+        document.querySelectorAll('#locationDropdown + .dropdown-menu .dropdown-item[data-location]').forEach(item => {
+            item.classList.remove('active');
+        });
+
+        // Add active class to clicked item
+        if (clickedItem) {
+            clickedItem.classList.add('active');
+        }
+
+        // Here you would typically filter dashboard data by location
+        // For now, we'll just log it
+        showToast('info', 'Location Selected', `Viewing data for: ${clickedItem?.textContent.trim()}`);
+    }
+
+    handleGlobalSearch(searchTerm) {
+        console.log('[Dashboard] Global search:', searchTerm);
+        // Implement global search functionality here
+        // This would typically search across guests, campaigns, receipts, etc.
+    }
+
+    markAllNotificationsRead() {
+        console.log('[Dashboard] Marking all notifications as read');
+
+        // Hide the notification badge
+        const notificationCount = document.getElementById('notificationCount');
+        if (notificationCount) {
+            notificationCount.style.display = 'none';
+        }
+
+        showToast('success', 'Notifications', 'All notifications marked as read');
     }
 
     async loadUserData() {
