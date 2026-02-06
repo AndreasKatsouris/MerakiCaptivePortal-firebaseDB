@@ -201,7 +201,19 @@ export async function subscribeToSubscription(callback) {
 
   // Set up the new listener
   currentSubscriptionListener = onValue(subscriptionRef, (snapshot) => {
-    const subscription = snapshot.val() || { tier: 'free' };
+    let subscription = snapshot.val() || { tier: 'free' };
+
+    // Handle expired subscriptions - fall back to free tier
+    if (subscription && subscription.status === 'expired') {
+      console.warn('Access Control: Subscription expired, falling back to free tier');
+      subscription = {
+        ...subscription,
+        tierId: 'free',
+        tier: 'free',
+        features: TIER_LIMITS.free, // Use free tier limits
+        limits: TIER_LIMITS.free
+      };
+    }
 
     // Update cache
     subscriptionCache.data = subscription;

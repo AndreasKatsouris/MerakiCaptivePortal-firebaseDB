@@ -5,15 +5,16 @@
  */
 
 const admin = require('firebase-admin');
-const path = require('path');
 
-// Initialize Firebase Admin
-const serviceAccount = require('./serviceAccountKey.json');
+// Set project ID environment variable
+process.env.GOOGLE_CLOUD_PROJECT = 'merakicaptiveportal-firebasedb';
 
+// Initialize Firebase Admin SDK
 if (!admin.apps.length) {
   admin.initializeApp({
-    credential: admin.credential.cert(serviceAccount),
-    databaseURL: 'https://merakicaptiveportal-firebasedb-default-rtdb.firebaseio.com'
+    credential: admin.credential.applicationDefault(),
+    databaseURL: 'https://merakicaptiveportal-firebasedb-default-rtdb.firebaseio.com',
+    projectId: 'merakicaptiveportal-firebasedb'
   });
 }
 

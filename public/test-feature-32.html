@@ -1,0 +1,165 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Feature #32 Test - Guest Persistence</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <style>
+        body { padding: 20px; background-color: #f8f9fa; }
+        .test-card { margin-bottom: 20px; }
+        .result-box { padding: 15px; border-radius: 5px; margin: 10px 0; }
+        .success { background-color: #d4edda; border: 1px solid #c3e6cb; }
+        .error { background-color: #f8d7da; border: 1px solid #f5c6cb; }
+        .info { background-color: #d1ecf1; border: 1px solid #bee5eb; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Feature #32: Guest Creation Persists in Firebase RTDB</h1>
+        <p class="text-muted">Testing that guest data written to Firebase RTDB persists across page refreshes</p>
+
+        <div class="card test-card">
+            <div class="card-header">
+                <h5>Test Guest: +27800000001 (Test Guest Alpha)</h5>
+            </div>
+            <div class="card-body">
+                <div id="authStatus" class="result-box info">
+                    <strong>Auth Status:</strong> <span id="authText">Checking...</span>
+                </div>
+                <div id="guestStatus" class="result-box info">
+                    <strong>Guest Status:</strong> <span id="guestText">Checking...</span>
+                </div>
+                <div id="guestData" class="result-box info">
+                    <strong>Guest Data:</strong>
+                    <pre id="guestDataText">Loading...</pre>
+                </div>
+                <div id="verificationResult" class="result-box" style="display: none;">
+                    <strong>Verification:</strong> <span id="verificationText"></span>
+                </div>
+
+                <button onclick="refreshTest()" class="btn btn-primary mt-3">Refresh Test</button>
+            </div>
+        </div>
+
+        <div class="card">
+            <div class="card-header">
+                <h5>All Guests (Latest 10)</h5>
+            </div>
+            <div class="card-body">
+                <div id="allGuestsList" class="result-box info">
+                    <span id="allGuestsText">Loading...</span>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Firebase -->
+    <script type="module">
+        import { auth, rtdb, ref, get, onAuthStateChanged } from './js/config/firebase-config.js';
+
+        window.testGuest = null;
+
+        async function runTest() {
+            console.log('Running Feature #32 test...');
+
+            // Check auth status
+            onAuthStateChanged(auth, async (user) => {
+                if (user) {
+                    document.getElementById('authText').textContent = `Logged in as ${user.email}`;
+                    document.getElementById('authStatus').className = 'result-box success';
+
+                    // Now test guest retrieval
+                    await checkGuest();
+                    await listAllGuests();
+                } else {
+                    document.getElementById('authText').textContent = 'Not logged in';
+                    document.getElementById('authStatus').className = 'result-box error';
+                    document.getElementById('guestText').textContent = 'Cannot test - please log in';
+                    document.getElementById('guestStatus').className = 'result-box error';
+                }
+            });
+        }
+
+        async function checkGuest() {
+            const testPhone = '+27800000001';
+            try {
+                const guestRef = ref(rtdb, `guests/${testPhone}`);
+                const snapshot = await get(guestRef);
+
+                if (snapshot.exists()) {
+                    const guestData = snapshot.val();
+                    window.testGuest = guestData;
+
+                    document.getElementById('guestText').textContent = 'Guest found in database ✅';
+                    document.getElementById('guestStatus').className = 'result-box success';
+
+                    document.getElementById('guestDataText').textContent = JSON.stringify(guestData, null, 2);
+                    document.getElementById('guestData').className = 'result-box success';
+
+                    // Verification
+                    const isValid = guestData.name === 'Test Guest Alpha' && guestData.phoneNumber === testPhone;
+                    document.getElementById('verificationText').textContent = isValid
+                        ? '✅ Guest data is correct and persists in Firebase RTDB'
+                        : '❌ Guest data mismatch';
+                    document.getElementById('verificationResult').className = isValid ? 'result-box success' : 'result-box error';
+                    document.getElementById('verificationResult').style.display = 'block';
+                } else {
+                    document.getElementById('guestText').textContent = 'Guest NOT found in database ❌';
+                    document.getElementById('guestStatus').className = 'result-box error';
+                    document.getElementById('guestDataText').textContent = 'Guest does not exist';
+                    document.getElementById('guestData').className = 'result-box error';
+                }
+            } catch (error) {
+                console.error('Error checking guest:', error);
+                document.getElementById('guestText').textContent = `Error: ${error.message}`;
+                document.getElementById('guestStatus').className = 'result-box error';
+            }
+        }
+
+        async function listAllGuests() {
+            try {
+                const guestsRef = ref(rtdb, 'guests');
+                const snapshot = await get(guestsRef);
+
+                if (snapshot.exists()) {
+                    const allGuests = snapshot.val();
+                    const guestArray = Object.entries(allGuests).map(([phone, data]) => ({
+                        phone,
+                        ...data
+                    }));
+
+                    // Sort by createdAt (most recent first) and take last 10
+                    const recentGuests = guestArray
+                        .sort((a, b) => (b.createdAt || '').localeCompare(a.createdAt || ''))
+                        .slice(0, 10);
+
+                    let html = `<strong>Total Guests: ${guestArray.length}</strong><br><br>`;
+                    html += '<table class="table table-sm"><thead><tr><th>Name</th><th>Phone</th><th>Created</th></tr></thead><tbody>';
+                    recentGuests.forEach(guest => {
+                        const highlight = guest.phone === '+27800000001' ? 'style="background-color: #ffffcc;"' : '';
+                        html += `<tr ${highlight}><td>${guest.name}</td><td>${guest.phone}</td><td>${new Date(guest.createdAt).toLocaleString()}</td></tr>`;
+                    });
+                    html += '</tbody></table>';
+
+                    document.getElementById('allGuestsText').innerHTML = html;
+                    document.getElementById('allGuestsList').className = 'result-box success';
+                } else {
+                    document.getElementById('allGuestsText').textContent = 'No guests found';
+                }
+            } catch (error) {
+                console.error('Error listing guests:', error);
+                document.getElementById('allGuestsText').textContent = `Error: ${error.message}`;
+                document.getElementById('allGuestsList').className = 'result-box error';
+            }
+        }
+
+        window.refreshTest = function() {
+            location.reload();
+        };
+
+        // Auto-run test on page load
+        runTest();
+    </script>
+</body>
+</html>
