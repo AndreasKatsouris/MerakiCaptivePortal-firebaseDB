@@ -8,6 +8,8 @@
     "dev": "vite",
     "build": "vite build",
     "serve": "vite preview",
+    "emulators": "firebase emulators:start --import=./firebase-export --export-on-exit",
+    "emulators:export": "firebase emulators:export ./firebase-export",
     "build-css-v2": "tailwindcss -c tailwind-v2.config.js -i PUBLIC/css/dashboard-v2.css -o PUBLIC/css/dashboard-v2-compiled.css",
     "watch-css-v2": "tailwindcss -c tailwind-v2.config.js -i PUBLIC/css/dashboard-v2.css -o PUBLIC/css/dashboard-v2-compiled.css --watch",
     "dev-v2": "npm run build-css-v2 && vite dev",
