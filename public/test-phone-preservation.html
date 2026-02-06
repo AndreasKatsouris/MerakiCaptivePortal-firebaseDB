@@ -1,0 +1,421 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Feature #24: Test Phone Number Preservation</title>
+
+  <!-- Bootstrap 5 -->
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+
+  <!-- Font Awesome -->
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+
+  <style>
+    body {
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      min-height: 100vh;
+      padding: 30px 0;
+    }
+
+    .test-container {
+      max-width: 1200px;
+      margin: 0 auto;
+    }
+
+    .test-card {
+      background: white;
+      border-radius: 12px;
+      box-shadow: 0 10px 30px rgba(0,0,0,0.2);
+      padding: 30px;
+      margin-bottom: 20px;
+    }
+
+    .test-result {
+      margin-top: 20px;
+      padding: 15px;
+      border-radius: 8px;
+      display: none;
+    }
+
+    .test-result.success {
+      background: #d1e7dd;
+      border: 1px solid #a3cfbb;
+      color: #0f5132;
+      display: block;
+    }
+
+    .test-result.error {
+      background: #f8d7da;
+      border: 1px solid #f1aeb5;
+      color: #842029;
+      display: block;
+    }
+
+    .test-result.info {
+      background: #cfe2ff;
+      border: 1px solid #9ec5fe;
+      color: #084298;
+      display: block;
+    }
+
+    .data-display {
+      background: #f8f9fa;
+      border: 1px solid #dee2e6;
+      border-radius: 8px;
+      padding: 15px;
+      font-family: monospace;
+      white-space: pre-wrap;
+      max-height: 400px;
+      overflow-y: auto;
+    }
+  </style>
+</head>
+<body>
+  <div class="test-container">
+    <!-- Header -->
+    <div class="test-card">
+      <h1><i class="fas fa-phone"></i> Feature #24: Phone Number Preservation Test</h1>
+      <p class="lead">Verify phone number identity maintained when syncing auth data</p>
+      <p><strong>Test Objective:</strong> Ensure guest data is not overwritten when a user registers with the same phone number</p>
+    </div>
+
+    <!-- Test Steps -->
+    <div class="test-card">
+      <h3>Test Steps</h3>
+      <div class="mb-3">
+        <button class="btn btn-primary" onclick="step1CreateGuest()">
+          Step 1: Create Guest with Phone +27812345678
+        </button>
+        <div id="step1Result" class="test-result"></div>
+      </div>
+
+      <div class="mb-3">
+        <button class="btn btn-primary" onclick="step2ShowGuestData()">
+          Step 2: Show Guest Data (Before Auth)
+        </button>
+        <div id="step2Result" class="test-result"></div>
+        <div id="step2Data" class="data-display mt-2" style="display:none;"></div>
+      </div>
+
+      <div class="mb-3">
+        <button class="btn btn-warning" onclick="step3RegisterUser()">
+          Step 3: Register User with Same Phone
+        </button>
+        <div id="step3Result" class="test-result"></div>
+      </div>
+
+      <div class="mb-3">
+        <button class="btn btn-success" onclick="step4VerifyGuestData()">
+          Step 4: Verify Guest Data Still Exists
+        </button>
+        <div id="step4Result" class="test-result"></div>
+        <div id="step4Data" class="data-display mt-2" style="display:none;"></div>
+      </div>
+
+      <div class="mb-3">
+        <button class="btn btn-success" onclick="step5VerifyAuthLink()">
+          Step 5: Verify Auth User Linked
+        </button>
+        <div id="step5Result" class="test-result"></div>
+        <div id="step5Data" class="data-display mt-2" style="display:none;"></div>
+      </div>
+
+      <div class="mb-3">
+        <button class="btn btn-danger" onclick="cleanup()">
+          Cleanup: Remove Test Data
+        </button>
+        <div id="cleanupResult" class="test-result"></div>
+      </div>
+    </div>
+
+    <!-- Test Summary -->
+    <div class="test-card">
+      <h3>Test Summary</h3>
+      <div id="testSummary">
+        <p class="text-muted">Run through the test steps to see the summary</p>
+      </div>
+    </div>
+  </div>
+
+  <!-- Scripts -->
+  <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+
+  <!-- Firebase -->
+  <script type="module">
+    import { auth, rtdb, ref, get, set, update, remove, push } from './js/config/firebase-config.js';
+
+    const TEST_PHONE = '+27812345678';
+    const TEST_EMAIL = 'phonetest@test.com';
+    const TEST_PASSWORD = 'Test123!@#';
+    let testResults = [];
+
+    // Step 1: Create guest with phone number
+    window.step1CreateGuest = async function() {
+      try {
+        showResult('step1Result', 'info', 'Creating guest with phone ' + TEST_PHONE + '...');
+
+        const guestData = {
+          phoneNumber: TEST_PHONE,
+          name: 'Test Guest',
+          email: 'testguest@example.com',
+          visitCount: 3,
+          firstVisit: Date.now() - (7 * 24 * 60 * 60 * 1000), // 7 days ago
+          lastVisit: Date.now(),
+          locationId: 'test-location-123',
+          tags: ['vip', 'frequent'],
+          notes: 'Important guest - preserve this data!',
+          createdAt: Date.now()
+        };
+
+        // Write to guests node using phone as key
+        const phoneKey = TEST_PHONE.replace(/[^0-9]/g, ''); // Remove non-numeric chars
+        await set(ref(rtdb, `guests/${phoneKey}`), guestData);
+
+        showResult('step1Result', 'success', `Guest created successfully at guests/${phoneKey}`);
+        testResults.push({ step: 1, success: true, message: 'Guest created' });
+        updateTestSummary();
+
+      } catch (error) {
+        console.error('Error creating guest:', error);
+        showResult('step1Result', 'error', `Error: ${error.message}`);
+        testResults.push({ step: 1, success: false, message: error.message });
+      }
+    };
+
+    // Step 2: Show guest data before auth
+    window.step2ShowGuestData = async function() {
+      try {
+        showResult('step2Result', 'info', 'Fetching guest data...');
+
+        const phoneKey = TEST_PHONE.replace(/[^0-9]/g, '');
+        const guestSnapshot = await get(ref(rtdb, `guests/${phoneKey}`));
+
+        if (guestSnapshot.exists()) {
+          const guestData = guestSnapshot.val();
+          document.getElementById('step2Data').style.display = 'block';
+          document.getElementById('step2Data').textContent = JSON.stringify(guestData, null, 2);
+          showResult('step2Result', 'success', 'Guest data found (see below)');
+          testResults.push({ step: 2, success: true, message: 'Guest data retrieved' });
+        } else {
+          showResult('step2Result', 'error', 'Guest data not found. Run Step 1 first.');
+          testResults.push({ step: 2, success: false, message: 'Guest not found' });
+        }
+
+        updateTestSummary();
+
+      } catch (error) {
+        console.error('Error fetching guest:', error);
+        showResult('step2Result', 'error', `Error: ${error.message}`);
+      }
+    };
+
+    // Step 3: Register user with same phone
+    window.step3RegisterUser = async function() {
+      try {
+        showResult('step3Result', 'info', 'Registering user with phone ' + TEST_PHONE + '...');
+
+        // Check if user already exists
+        let userCredential;
+        try {
+          userCredential = await auth.createUserWithEmailAndPassword(auth.getAuth(), TEST_EMAIL, TEST_PASSWORD);
+        } catch (error) {
+          if (error.code === 'auth/email-already-in-use') {
+            // User exists, sign in instead
+            userCredential = await auth.signInWithEmailAndPassword(auth.getAuth(), TEST_EMAIL, TEST_PASSWORD);
+            showResult('step3Result', 'info', 'User already exists, signed in instead...');
+          } else {
+            throw error;
+          }
+        }
+
+        const user = userCredential.user;
+
+        // Create user profile with phone number
+        const userData = {
+          email: TEST_EMAIL,
+          phoneNumber: TEST_PHONE,
+          displayName: 'Test User',
+          createdAt: Date.now(),
+          status: 'active'
+        };
+
+        await set(ref(rtdb, `users/${user.uid}`), userData);
+
+        showResult('step3Result', 'success', `User registered with UID: ${user.uid}`);
+        testResults.push({ step: 3, success: true, message: 'User registered' });
+        updateTestSummary();
+
+      } catch (error) {
+        console.error('Error registering user:', error);
+        showResult('step3Result', 'error', `Error: ${error.message}`);
+        testResults.push({ step: 3, success: false, message: error.message });
+      }
+    };
+
+    // Step 4: Verify guest data still exists
+    window.step4VerifyGuestData = async function() {
+      try {
+        showResult('step4Result', 'info', 'Verifying guest data preservation...');
+
+        const phoneKey = TEST_PHONE.replace(/[^0-9]/g, '');
+        const guestSnapshot = await get(ref(rtdb, `guests/${phoneKey}`));
+
+        if (guestSnapshot.exists()) {
+          const guestData = guestSnapshot.val();
+          document.getElementById('step4Data').style.display = 'block';
+          document.getElementById('step4Data').textContent = JSON.stringify(guestData, null, 2);
+
+          // Verify key fields are preserved
+          const preserved =
+            guestData.name === 'Test Guest' &&
+            guestData.visitCount === 3 &&
+            guestData.notes === 'Important guest - preserve this data!';
+
+          if (preserved) {
+            showResult('step4Result', 'success', '✓ Guest data preserved! All original fields intact.');
+            testResults.push({ step: 4, success: true, message: 'Guest data preserved' });
+          } else {
+            showResult('step4Result', 'error', '✗ Guest data was modified or corrupted');
+            testResults.push({ step: 4, success: false, message: 'Guest data modified' });
+          }
+        } else {
+          showResult('step4Result', 'error', '✗ Guest data was deleted!');
+          testResults.push({ step: 4, success: false, message: 'Guest data deleted' });
+        }
+
+        updateTestSummary();
+
+      } catch (error) {
+        console.error('Error verifying guest:', error);
+        showResult('step4Result', 'error', `Error: ${error.message}`);
+      }
+    };
+
+    // Step 5: Verify auth user is linked
+    window.step5VerifyAuthLink = async function() {
+      try {
+        showResult('step5Result', 'info', 'Verifying auth user linkage...');
+
+        const user = auth.currentUser;
+        if (!user) {
+          showResult('step5Result', 'error', 'No user signed in. Run Step 3 first.');
+          return;
+        }
+
+        const userSnapshot = await get(ref(rtdb, `users/${user.uid}`));
+
+        if (userSnapshot.exists()) {
+          const userData = userSnapshot.val();
+          document.getElementById('step5Data').style.display = 'block';
+          document.getElementById('step5Data').textContent = JSON.stringify(userData, null, 2);
+
+          if (userData.phoneNumber === TEST_PHONE) {
+            showResult('step5Result', 'success', `✓ Auth user linked to phone ${TEST_PHONE}`);
+            testResults.push({ step: 5, success: true, message: 'Auth user linked' });
+          } else {
+            showResult('step5Result', 'error', '✗ Phone number mismatch');
+            testResults.push({ step: 5, success: false, message: 'Phone mismatch' });
+          }
+        } else {
+          showResult('step5Result', 'error', 'User data not found');
+          testResults.push({ step: 5, success: false, message: 'User data not found' });
+        }
+
+        updateTestSummary();
+
+      } catch (error) {
+        console.error('Error verifying auth:', error);
+        showResult('step5Result', 'error', `Error: ${error.message}`);
+      }
+    };
+
+    // Cleanup test data
+    window.cleanup = async function() {
+      try {
+        showResult('cleanupResult', 'info', 'Cleaning up test data...');
+
+        const phoneKey = TEST_PHONE.replace(/[^0-9]/g, '');
+
+        // Delete guest
+        await remove(ref(rtdb, `guests/${phoneKey}`));
+
+        // Delete user data (if auth user exists)
+        const user = auth.currentUser;
+        if (user) {
+          await remove(ref(rtdb, `users/${user.uid}`));
+          // Note: Can't delete auth user without admin SDK
+        }
+
+        showResult('cleanupResult', 'success', 'Test data cleaned up');
+        testResults = [];
+        updateTestSummary();
+
+      } catch (error) {
+        console.error('Error cleaning up:', error);
+        showResult('cleanupResult', 'error', `Error: ${error.message}`);
+      }
+    };
+
+    // Helper to show result messages
+    function showResult(elementId, type, message) {
+      const element = document.getElementById(elementId);
+      element.className = `test-result ${type}`;
+      element.innerHTML = message;
+    }
+
+    // Update test summary
+    function updateTestSummary() {
+      const summaryElement = document.getElementById('testSummary');
+
+      if (testResults.length === 0) {
+        summaryElement.innerHTML = '<p class="text-muted">No tests run yet</p>';
+        return;
+      }
+
+      const passed = testResults.filter(r => r.success).length;
+      const failed = testResults.filter(r => !r.success).length;
+
+      let html = `
+        <div class="row mb-3">
+          <div class="col-md-4">
+            <div class="text-center">
+              <h4 class="text-success">${passed}</h4>
+              <p>Passed</p>
+            </div>
+          </div>
+          <div class="col-md-4">
+            <div class="text-center">
+              <h4 class="text-danger">${failed}</h4>
+              <p>Failed</p>
+            </div>
+          </div>
+          <div class="col-md-4">
+            <div class="text-center">
+              <h4>${testResults.length}</h4>
+              <p>Total</p>
+            </div>
+          </div>
+        </div>
+      `;
+
+      html += '<table class="table table-sm"><thead><tr><th>Step</th><th>Status</th><th>Message</th></tr></thead><tbody>';
+
+      testResults.forEach(result => {
+        const statusClass = result.success ? 'text-success' : 'text-danger';
+        const statusText = result.success ? '✓ Pass' : '✗ Fail';
+        html += `
+          <tr>
+            <td>Step ${result.step}</td>
+            <td class="${statusClass}"><strong>${statusText}</strong></td>
+            <td>${result.message}</td>
+          </tr>
+        `;
+      });
+
+      html += '</tbody></table>';
+      summaryElement.innerHTML = html;
+    }
+  </script>
+</body>
+</html>

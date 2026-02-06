@@ -636,6 +636,81 @@ export async function getLocationQuota() {
   }
 }
 
+/**
+ * Get guest record quota for the current user's subscription
+ * @returns {Promise<Object>} Object with used, max, and remaining counts
+ */
+export async function getGuestQuota() {
+  const user = authManager.getCurrentUser();
+
+  if (!user) {
+    throw new Error('User must be authenticated');
+  }
+
+  try {
+    const snapshot = await get(ref(rtdb, `subscriptions/${user.uid}`));
+    const subscription = snapshot.val();
+
+    if (!subscription) {
+      return { used: 0, max: 500, remaining: 500, unlimited: false };
+    }
+
+    // Count guests owned by this user
+    const guestsSnapshot = await get(ref(rtdb, 'guests'));
+    const allGuests = guestsSnapshot.val() || {};
+
+    // For now, count all guests (in a real system, we'd filter by locationIds)
+    // Later we can add user-specific filtering
+    const guestCount = Object.keys(allGuests).length;
+
+    const maxGuests = subscription.limits?.guestRecords || 500;
+    const isUnlimited = maxGuests === Infinity || maxGuests > 100000;
+
+    return {
+      used: guestCount,
+      max: isUnlimited ? 'unlimited' : maxGuests,
+      remaining: isUnlimited ? 'unlimited' : Math.max(0, maxGuests - guestCount),
+      unlimited: isUnlimited
+    };
+  } catch (error) {
+    console.error('Failed to get guest quota:', error);
+    return { used: 0, max: 500, remaining: 500, unlimited: false, error: error.message };
+  }
+}
+
+/**
+ * Check if user can add a new guest record
+ * @returns {Promise<Object>} Object with canAdd boolean and message
+ */
+export async function canAddGuest() {
+  try {
+    const quota = await getGuestQuota();
+
+    if (quota.unlimited) {
+      return { canAdd: true };
+    }
+
+    if (quota.remaining <= 0) {
+      const user = authManager.getCurrentUser();
+      const snapshot = await get(ref(rtdb, `subscriptions/${user.uid}`));
+      const subscription = snapshot.val();
+      const tierName = SUBSCRIPTION_TIERS[subscription?.tierId]?.name || 'Free';
+
+      return {
+        canAdd: false,
+        message: `Guest limit reached. Your ${tierName} tier allows ${quota.max} guest records. Upgrade to add more locations.`,
+        currentCount: quota.used,
+        limit: quota.max
+      };
+    }
+
+    return { canAdd: true, remaining: quota.remaining };
+  } catch (error) {
+    console.error('Failed to check guest limit:', error);
+    return { canAdd: false, message: 'Error checking guest limit', error: error.message };
+  }
+}
+
 // Create the main service object to expose
 const SubscriptionService = {
   getSubscriptionTiers,
@@ -652,7 +727,10 @@ const SubscriptionService = {
   addLocationToSubscription,
   removeLocationFromSubscription,
   hasLocationAccess,
-  getLocationQuota
+  getLocationQuota,
+  // Guest management
+  getGuestQuota,
+  canAddGuest
 };
 
 // Export both as default and named export for compatibility

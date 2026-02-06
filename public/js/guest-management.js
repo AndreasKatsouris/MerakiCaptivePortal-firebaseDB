@@ -1,5 +1,7 @@
 // Import Firebase dependencies
 import { auth, rtdb, ref, get, push, set, update, remove } from './config/firebase-config.js';
+// Import subscription service for limit checking
+import { canAddGuest } from './modules/access-control/services/subscription-service.js';
 
 /**
  * Normalize phone number format by removing + prefix and whatsapp: prefix
@@ -699,6 +701,35 @@ const guestManagement = {
             },
 
             async showAddGuestModal() {
+                // Check guest limits before showing modal
+                try {
+                    const limitCheck = await canAddGuest();
+
+                    if (!limitCheck.canAdd) {
+                        await Swal.fire({
+                            title: 'Guest Limit Reached',
+                            html: `
+                                <div class="text-center">
+                                    <p>${limitCheck.message}</p>
+                                    <p class="mt-3"><strong>Current: ${limitCheck.currentCount} / ${limitCheck.limit}</strong></p>
+                                </div>
+                            `,
+                            icon: 'warning',
+                            showCancelButton: true,
+                            confirmButtonText: 'Upgrade Plan',
+                            cancelButtonText: 'Close'
+                        }).then((result) => {
+                            if (result.isConfirmed) {
+                                window.location.href = '/user-subscription.html';
+                            }
+                        });
+                        return;
+                    }
+                } catch (error) {
+                    console.error('Error checking guest limits:', error);
+                    // Allow proceeding if limit check fails
+                }
+
                 const { value: formValues } = await Swal.fire({
                     title: 'Add New Guest',
                     html: `
@@ -719,19 +750,19 @@ const guestManagement = {
                     preConfirm: () => {
                         const name = Swal.getPopup().querySelector('#name').value;
                         const phoneNumber = Swal.getPopup().querySelector('#phoneNumber').value;
-                        
+
                         if (!name || !phoneNumber) {
                             Swal.showValidationMessage('Please fill in all fields');
                             return false;
                         }
-                        
+
                         // Validate phone number format
                         const validation = validatePhoneNumber(phoneNumber);
                         if (!validation.isValid) {
                             Swal.showValidationMessage(validation.error);
                             return false;
                         }
-                        
+
                         return { name, phoneNumber: validation.normalized };
                     }
                 });
@@ -741,11 +772,11 @@ const guestManagement = {
                         const now = new Date().toISOString();
                         // Use normalized phone number as database key
                         const guestRef = ref(rtdb, `guests/${formValues.phoneNumber}`);
-                        
+
                         // SAFETY CHECK: Preserve existing guest data to prevent overwrites
                         const existingGuestSnapshot = await get(guestRef);
                         const existingGuestData = existingGuestSnapshot.exists() ? existingGuestSnapshot.val() : {};
-                        
+
                         // Merge existing data with new data
                         const guestData = {
                             // Preserve existing data
@@ -760,10 +791,10 @@ const guestManagement = {
                             tier: existingGuestData.tier || 'Bronze',
                             lastConsentPrompt: null
                         };
-                        
+
                         // Use update() to preserve existing data instead of set()
                         await update(guestRef, guestData);
-                        
+
                         await this.loadGuests();
                         Swal.fire('Success', 'Guest added successfully', 'success');
                     } catch (error) {
