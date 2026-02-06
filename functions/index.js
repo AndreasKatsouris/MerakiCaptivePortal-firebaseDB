@@ -111,6 +111,123 @@ exports.health = onRequest(async (req, res) => {
     }
 });
 
+// Test data endpoint for persistence verification
+exports.createTestData = onRequest(async (req, res) => {
+    try {
+        // Enable CORS
+        res.set('Access-Control-Allow-Origin', '*');
+        res.set('Access-Control-Allow-Methods', 'POST, GET, DELETE');
+        res.set('Access-Control-Allow-Headers', 'Content-Type');
+
+        if (req.method === 'OPTIONS') {
+            res.status(204).send('');
+            return;
+        }
+
+        const db = admin.database();
+
+        if (req.method === 'POST') {
+            // Create test data
+            const { name } = req.body;
+            if (!name) {
+                res.status(400).json({ error: 'Name is required' });
+                return;
+            }
+
+            const testRef = db.ref('test-data').push();
+            await testRef.set({
+                name: name,
+                timestamp: Date.now(),
+                createdAt: new Date().toISOString()
+            });
+
+            res.status(201).json({
+                success: true,
+                id: testRef.key,
+                name: name,
+                message: 'Test data created successfully'
+            });
+        } else if (req.method === 'GET') {
+            // Get test data
+            const { name } = req.query;
+
+            if (name) {
+                // Search for specific test data by name
+                const snapshot = await db.ref('test-data')
+                    .orderByChild('name')
+                    .equalTo(name)
+                    .once('value');
+
+                if (snapshot.exists()) {
+                    const data = snapshot.val();
+                    res.status(200).json({
+                        success: true,
+                        found: true,
+                        data: data
+                    });
+                } else {
+                    res.status(404).json({
+                        success: true,
+                        found: false,
+                        message: 'Test data not found'
+                    });
+                }
+            } else {
+                // Get all test data
+                const snapshot = await db.ref('test-data').once('value');
+                res.status(200).json({
+                    success: true,
+                    data: snapshot.val() || {}
+                });
+            }
+        } else if (req.method === 'DELETE') {
+            // Delete test data
+            const { name } = req.query;
+
+            if (name) {
+                // Delete specific test data by name
+                const snapshot = await db.ref('test-data')
+                    .orderByChild('name')
+                    .equalTo(name)
+                    .once('value');
+
+                if (snapshot.exists()) {
+                    const updates = {};
+                    snapshot.forEach(child => {
+                        updates[child.key] = null;
+                    });
+                    await db.ref('test-data').update(updates);
+
+                    res.status(200).json({
+                        success: true,
+                        message: 'Test data deleted successfully'
+                    });
+                } else {
+                    res.status(404).json({
+                        success: false,
+                        message: 'Test data not found'
+                    });
+                }
+            } else {
+                // Delete all test data
+                await db.ref('test-data').remove();
+                res.status(200).json({
+                    success: true,
+                    message: 'All test data deleted successfully'
+                });
+            }
+        } else {
+            res.status(405).json({ error: 'Method not allowed' });
+        }
+    } catch (error) {
+        console.error('Test data operation failed:', error);
+        res.status(500).json({
+            success: false,
+            error: error.message
+        });
+    }
+});
+
 // Create Express app for WhatsApp webhook with proper middleware
 const whatsappApp = express();
 whatsappApp.use(express.urlencoded({ extended: true })); // Parse form-encoded data
