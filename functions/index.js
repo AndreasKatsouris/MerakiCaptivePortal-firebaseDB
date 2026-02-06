@@ -3105,3 +3105,12 @@ exports.deleteProject = projectManagement.deleteProject;
 exports.getProjects = projectManagement.getProjects;
 exports.manageProjectTasks = projectManagement.manageProjectTasks;
 exports.manageProjectMilestones = projectManagement.manageProjectMilestones;
+
+// ============================================
+// SUBSCRIPTION STATUS MANAGEMENT
+// ============================================
+const subscriptionStatusManager = require('./subscriptionStatusManager');
+exports.checkSubscriptionStatuses = subscriptionStatusManager.checkSubscriptionStatuses;
+exports.triggerSubscriptionStatusCheck = subscriptionStatusManager.triggerSubscriptionStatusCheck;
+exports.onTrialEndDateUpdate = subscriptionStatusManager.onTrialEndDateUpdate;
+exports.onRenewalDateUpdate = subscriptionStatusManager.onRenewalDateUpdate;

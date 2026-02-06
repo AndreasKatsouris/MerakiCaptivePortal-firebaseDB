@@ -150,7 +150,19 @@ export async function getCurrentSubscription() {
 
   try {
     const snapshot = await get(ref(rtdb, `subscriptions/${user.uid}`));
-    const subscription = snapshot.val();
+    let subscription = snapshot.val();
+
+    // Handle expired subscriptions - fall back to free tier
+    if (subscription && subscription.status === 'expired') {
+      console.warn('Access Control: Subscription expired, falling back to free tier');
+      subscription = {
+        ...subscription,
+        tierId: 'free',
+        tier: 'free',
+        features: TIER_LIMITS.free, // Use free tier limits
+        limits: TIER_LIMITS.free
+      };
+    }
 
     // Update cache
     subscriptionCache.data = subscription || { tier: 'free' }; // Default to free tier
