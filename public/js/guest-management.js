@@ -773,27 +773,44 @@ const guestManagement = {
                         // Use normalized phone number as database key
                         const guestRef = ref(rtdb, `guests/${formValues.phoneNumber}`);
 
-                        // SAFETY CHECK: Preserve existing guest data to prevent overwrites
+                        // DUPLICATE CHECK: Prevent duplicate phone numbers
                         const existingGuestSnapshot = await get(guestRef);
-                        const existingGuestData = existingGuestSnapshot.exists() ? existingGuestSnapshot.val() : {};
 
-                        // Merge existing data with new data
+                        if (existingGuestSnapshot.exists()) {
+                            // Guest already exists - show error and prevent creation
+                            const existingGuest = existingGuestSnapshot.val();
+                            await Swal.fire({
+                                title: 'Guest Already Exists',
+                                html: `
+                                    <div class="text-center">
+                                        <p>A guest with this phone number already exists:</p>
+                                        <div class="alert alert-info mt-3">
+                                            <strong>Name:</strong> ${existingGuest.name || 'N/A'}<br>
+                                            <strong>Phone:</strong> ${formatPhoneNumberForDisplay(formValues.phoneNumber)}<br>
+                                            <strong>Created:</strong> ${existingGuest.createdAt ? new Date(existingGuest.createdAt).toLocaleDateString() : 'N/A'}
+                                        </div>
+                                        <p class="mt-3">Please use a different phone number or edit the existing guest.</p>
+                                    </div>
+                                `,
+                                icon: 'error',
+                                confirmButtonText: 'OK'
+                            });
+                            return; // Exit without creating duplicate
+                        }
+
+                        // Create new guest (no existing guest found)
                         const guestData = {
-                            // Preserve existing data
-                            ...existingGuestData,
-                            // Update with new values
                             name: formValues.name,
                             phoneNumber: formValues.phoneNumber, // Store normalized format
+                            createdAt: now,
                             updatedAt: now,
-                            // Only set these if they don't exist
-                            createdAt: existingGuestData.createdAt || now,
-                            consent: existingGuestData.consent !== undefined ? existingGuestData.consent : false,
-                            tier: existingGuestData.tier || 'Bronze',
+                            consent: false,
+                            tier: 'Bronze',
                             lastConsentPrompt: null
                         };
 
-                        // Use update() to preserve existing data instead of set()
-                        await update(guestRef, guestData);
+                        // Use set() for new guests to ensure clean creation
+                        await set(guestRef, guestData);
 
                         await this.loadGuests();
                         Swal.fire('Success', 'Guest added successfully', 'success');

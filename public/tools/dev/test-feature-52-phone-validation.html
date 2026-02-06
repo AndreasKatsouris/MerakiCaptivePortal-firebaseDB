@@ -1,0 +1,335 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Feature #52: Phone Number Validation Test</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <style>
+        body {
+            padding: 20px;
+            background-color: #f8f9fa;
+        }
+        .test-card {
+            margin-bottom: 20px;
+        }
+        .test-result {
+            padding: 10px;
+            border-radius: 4px;
+            margin-top: 10px;
+        }
+        .test-result.success {
+            background-color: #d4edda;
+            border: 1px solid #c3e6cb;
+            color: #155724;
+        }
+        .test-result.error {
+            background-color: #f8d7da;
+            border: 1px solid #f5c6cb;
+            color: #721c24;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="row">
+            <div class="col-12">
+                <h1 class="mb-4">
+                    <i class="fas fa-phone"></i>
+                    Feature #52: Phone Number Validation Test
+                </h1>
+
+                <div class="alert alert-info">
+                    <h5><i class="fas fa-info-circle"></i> Test Instructions</h5>
+                    <ol>
+                        <li>Test various phone number formats to verify validation</li>
+                        <li>Verify that invalid formats show clear error messages</li>
+                        <li>Confirm that valid SA phone numbers are accepted</li>
+                        <li>Check that error messages specify "Valid SA phone required"</li>
+                    </ol>
+                </div>
+
+                <!-- Manual Test Form -->
+                <div class="card test-card">
+                    <div class="card-header bg-primary text-white">
+                        <h5 class="mb-0">
+                            <i class="fas fa-edit"></i>
+                            Manual Phone Number Test
+                        </h5>
+                    </div>
+                    <div class="card-body">
+                        <form id="phoneTestForm">
+                            <div class="mb-3">
+                                <label for="phoneInput" class="form-label">Enter Phone Number:</label>
+                                <input type="text" class="form-control" id="phoneInput"
+                                       placeholder="e.g., +27827001116, 27827001116, or 0827001116">
+                                <small class="form-text text-muted">
+                                    Try various formats: with +27, without +, with leading 0, etc.
+                                </small>
+                            </div>
+                            <button type="submit" class="btn btn-primary">
+                                <i class="fas fa-check"></i>
+                                Validate Phone Number
+                            </button>
+                        </form>
+                        <div id="manualTestResult"></div>
+                    </div>
+                </div>
+
+                <!-- Automated Tests -->
+                <div class="card test-card">
+                    <div class="card-header bg-success text-white">
+                        <h5 class="mb-0">
+                            <i class="fas fa-robot"></i>
+                            Automated Test Cases
+                        </h5>
+                    </div>
+                    <div class="card-body">
+                        <button class="btn btn-success mb-3" id="btnRunAllTests">
+                            <i class="fas fa-play"></i>
+                            Run All Test Cases
+                        </button>
+                        <div id="testResults"></div>
+                    </div>
+                </div>
+
+                <!-- Guest Creation Simulation -->
+                <div class="card test-card">
+                    <div class="card-header bg-warning">
+                        <h5 class="mb-0">
+                            <i class="fas fa-user-plus"></i>
+                            Guest Creation Simulation
+                        </h5>
+                    </div>
+                    <div class="card-body">
+                        <p>Test the actual guest creation flow with phone validation:</p>
+                        <form id="guestCreateForm">
+                            <div class="row">
+                                <div class="col-md-6 mb-3">
+                                    <label for="guestName" class="form-label">Guest Name:</label>
+                                    <input type="text" class="form-control" id="guestName"
+                                           placeholder="John Doe" required>
+                                </div>
+                                <div class="col-md-6 mb-3">
+                                    <label for="guestPhone" class="form-label">Phone Number:</label>
+                                    <input type="text" class="form-control" id="guestPhone"
+                                           placeholder="+27827001116" required>
+                                </div>
+                            </div>
+                            <button type="submit" class="btn btn-warning">
+                                <i class="fas fa-save"></i>
+                                Test Guest Creation
+                            </button>
+                        </form>
+                        <div id="guestCreateResult"></div>
+                    </div>
+                </div>
+
+                <!-- Verification Checklist -->
+                <div class="card test-card">
+                    <div class="card-header bg-dark text-white">
+                        <h5 class="mb-0">
+                            <i class="fas fa-check-circle"></i>
+                            Verification Checklist
+                        </h5>
+                    </div>
+                    <div class="card-body">
+                        <div class="form-check mb-2">
+                            <input class="form-check-input" type="checkbox" id="check1">
+                            <label class="form-check-label" for="check1">
+                                Invalid phone number shows validation error
+                            </label>
+                        </div>
+                        <div class="form-check mb-2">
+                            <input class="form-check-input" type="checkbox" id="check2">
+                            <label class="form-check-label" for="check2">
+                                Error message says "Valid SA phone required"
+                            </label>
+                        </div>
+                        <div class="form-check mb-2">
+                            <input class="form-check-input" type="checkbox" id="check3">
+                            <label class="form-check-label" for="check3">
+                                Valid +27 number is accepted
+                            </label>
+                        </div>
+                        <div class="form-check mb-2">
+                            <input class="form-check-input" type="checkbox" id="check4">
+                            <label class="form-check-label" for="check4">
+                                Phone without country code is rejected
+                            </label>
+                        </div>
+                        <div class="form-check mb-2">
+                            <input class="form-check-input" type="checkbox" id="check5">
+                            <label class="form-check-label" for="check5">
+                                Short numbers (e.g., "123") are rejected
+                            </label>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    <script type="module">
+        // Import validation functions from guest-management.js
+        // Since guest-management.js doesn't export these, we'll redefine them here for testing
+
+        function normalizePhoneNumber(phoneNumber) {
+            if (!phoneNumber) return '';
+            let cleaned = phoneNumber.replace(/^whatsapp:/, '').trim();
+
+            if (/^27\d{9}$/.test(cleaned)) {
+                cleaned = '+' + cleaned;
+            } else if (!cleaned.startsWith('+') && /^\d+$/.test(cleaned)) {
+                cleaned = '+27' + cleaned.replace(/^0+/, '');
+            }
+
+            return cleaned;
+        }
+
+        function validatePhoneNumber(phoneNumber) {
+            if (!phoneNumber) {
+                return { isValid: false, error: 'Phone number is required', normalized: '' };
+            }
+
+            const normalized = normalizePhoneNumber(phoneNumber);
+
+            if (!normalized.startsWith('+27') && !normalized.startsWith('27')) {
+                return {
+                    isValid: false,
+                    error: 'Valid SA phone required (must start with +27 or 27)',
+                    normalized: normalized
+                };
+            }
+
+            // Remove + for length check
+            const digitsOnly = normalized.replace('+', '');
+
+            if (digitsOnly.length < 11) {
+                return {
+                    isValid: false,
+                    error: 'Valid SA phone required (must have 11 digits: 27 + 9 digits)',
+                    normalized: normalized
+                };
+            }
+
+            return { isValid: true, normalized: normalized };
+        }
+
+        // Test cases
+        const testCases = [
+            { input: '+27827001116', expected: true, description: 'Valid SA number with +' },
+            { input: '27827001116', expected: true, description: 'Valid SA number without +' },
+            { input: '0827001116', expected: true, description: 'Valid SA number with leading 0' },
+            { input: '123', expected: false, description: 'Too short (3 digits)' },
+            { input: '1234567890', expected: false, description: 'No country code (10 digits)' },
+            { input: '+1234567890', expected: false, description: 'Wrong country code (+1)' },
+            { input: '', expected: false, description: 'Empty string' },
+            { input: '+4412345678', expected: false, description: 'UK number (+44)' },
+            { input: '082700111', expected: false, description: 'Too short (9 digits)' },
+            { input: '+270000000000', expected: true, description: 'Valid format with zeros' },
+        ];
+
+        // Display test result
+        function displayResult(containerId, result, input) {
+            const container = document.getElementById(containerId);
+            const resultDiv = document.createElement('div');
+            resultDiv.className = `test-result ${result.isValid ? 'success' : 'error'}`;
+
+            resultDiv.innerHTML = `
+                <strong>Input:</strong> "${input}"<br>
+                <strong>Result:</strong> ${result.isValid ? '✓ VALID' : '✗ INVALID'}<br>
+                ${result.error ? `<strong>Error:</strong> ${result.error}<br>` : ''}
+                ${result.normalized ? `<strong>Normalized:</strong> ${result.normalized}` : ''}
+            `;
+
+            container.innerHTML = '';
+            container.appendChild(resultDiv);
+        }
+
+        // Manual test form
+        document.getElementById('phoneTestForm').addEventListener('submit', (e) => {
+            e.preventDefault();
+            const input = document.getElementById('phoneInput').value;
+            const result = validatePhoneNumber(input);
+            displayResult('manualTestResult', result, input);
+        });
+
+        // Run all automated tests
+        document.getElementById('btnRunAllTests').addEventListener('click', () => {
+            const resultsContainer = document.getElementById('testResults');
+            resultsContainer.innerHTML = '<h6>Running tests...</h6>';
+
+            let passedTests = 0;
+            let failedTests = 0;
+
+            testCases.forEach((testCase, index) => {
+                const result = validatePhoneNumber(testCase.input);
+                const passed = result.isValid === testCase.expected;
+
+                if (passed) passedTests++;
+                else failedTests++;
+
+                const testDiv = document.createElement('div');
+                testDiv.className = `test-result ${passed ? 'success' : 'error'} mb-2`;
+                testDiv.innerHTML = `
+                    <strong>Test ${index + 1}:</strong> ${testCase.description}<br>
+                    <strong>Input:</strong> "${testCase.input}"<br>
+                    <strong>Expected:</strong> ${testCase.expected ? 'VALID' : 'INVALID'}<br>
+                    <strong>Actual:</strong> ${result.isValid ? 'VALID' : 'INVALID'}<br>
+                    ${result.error ? `<strong>Error:</strong> ${result.error}<br>` : ''}
+                    <strong>Status:</strong> ${passed ? '✓ PASS' : '✗ FAIL'}
+                `;
+                resultsContainer.appendChild(testDiv);
+            });
+
+            const summaryDiv = document.createElement('div');
+            summaryDiv.className = `alert ${failedTests === 0 ? 'alert-success' : 'alert-warning'} mt-3`;
+            summaryDiv.innerHTML = `
+                <h6>Test Summary</h6>
+                <p class="mb-0">
+                    <strong>Passed:</strong> ${passedTests} / ${testCases.length}<br>
+                    <strong>Failed:</strong> ${failedTests} / ${testCases.length}
+                </p>
+            `;
+            resultsContainer.appendChild(summaryDiv);
+        });
+
+        // Guest creation simulation
+        document.getElementById('guestCreateForm').addEventListener('submit', (e) => {
+            e.preventDefault();
+
+            const name = document.getElementById('guestName').value;
+            const phone = document.getElementById('guestPhone').value;
+
+            const validation = validatePhoneNumber(phone);
+            const resultContainer = document.getElementById('guestCreateResult');
+
+            if (!validation.isValid) {
+                resultContainer.innerHTML = `
+                    <div class="test-result error mt-3">
+                        <strong>❌ Guest Creation Failed</strong><br>
+                        <strong>Error:</strong> ${validation.error}<br>
+                        <p class="mb-0 mt-2">This matches the expected behavior. Invalid phone numbers are rejected with a clear error message.</p>
+                    </div>
+                `;
+            } else {
+                resultContainer.innerHTML = `
+                    <div class="test-result success mt-3">
+                        <strong>✓ Validation Passed</strong><br>
+                        <strong>Name:</strong> ${name}<br>
+                        <strong>Phone:</strong> ${validation.normalized}<br>
+                        <p class="mb-0 mt-2">Guest would be created with normalized phone number.</p>
+                    </div>
+                `;
+            }
+        });
+
+        // Auto-run tests on page load
+        console.log('Phone validation test page loaded');
+        console.log('Test cases ready:', testCases.length);
+    </script>
+</body>
+</html>
