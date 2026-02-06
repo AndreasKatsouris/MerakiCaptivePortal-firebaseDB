@@ -43,6 +43,12 @@
         ".write": "auth != null && (auth.uid === $uid || auth.token.admin === true)"
       }
     },
+    "onboarding-progress": {
+      "$uid": {
+        ".read": "auth != null && (auth.uid === $uid || auth.token.admin === true)",
+        ".write": "auth != null && (auth.uid === $uid || auth.token.admin === true)"
+      }
+    },
     "admin-claims": {
       ".read": "auth != null",
       ".write": "auth != null"

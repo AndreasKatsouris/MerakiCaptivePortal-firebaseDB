@@ -43,9 +43,21 @@ class ErrorHandler {
 
         console.error(`[${context}]`, error);
 
+        // Timeout errors (check first, before network)
+        if (this.isTimeoutError(error)) {
+            this.showTimeoutError(error);
+            return;
+        }
+
         // Network errors
         if (this.isNetworkError(error)) {
             this.showNetworkError('Network error, please check your connection');
+            return;
+        }
+
+        // API/Server errors (500, 400 status codes)
+        if (this.isApiError(error)) {
+            this.showApiError(error);
             return;
         }
 
@@ -108,6 +120,29 @@ class ErrorHandler {
     }
 
     /**
+     * Check if error is timeout-related
+     */
+    isTimeoutError(error) {
+        return error?.isTimeout === true ||
+               error?.name === 'AbortError' ||
+               error?.message?.includes('REQUEST_TIMEOUT') ||
+               error?.message?.includes('timeout') ||
+               error?.message?.includes('ETIMEDOUT');
+    }
+
+    /**
+     * Check if error is API/server error (500, 400 status codes)
+     */
+    isApiError(error) {
+        const message = error?.message || '';
+        return message.includes('SERVER_ERROR') ||
+               message.includes('CLIENT_ERROR') ||
+               message.includes('HTTP 500') ||
+               message.includes('HTTP 4') ||
+               message.includes('HTTP 5');
+    }
+
+    /**
      * Show network error message
      */
     showNetworkError(message = 'Network error, please check your connection') {
@@ -162,6 +197,123 @@ class ErrorHandler {
         const message = error.message || 'An unexpected error occurred';
         this.showErrorToast(message, 'Error');
         this.notifyListeners({ type: 'generic', message });
+    }
+
+    /**
+     * Show API/Server error with clear message
+     */
+    showApiError(error) {
+        const message = error.message || '';
+        let userMessage = 'Server error, please try again';
+
+        // Customize message based on error type
+        if (message.includes('SERVER_ERROR') || message.includes('HTTP 5')) {
+            userMessage = 'Server error, please try again';
+        } else if (message.includes('CLIENT_ERROR') || message.includes('HTTP 4')) {
+            userMessage = 'Request failed. Please check your input and try again';
+        }
+
+        this.showErrorToast(userMessage, 'API Error');
+        this.notifyListeners({ type: 'api', message: userMessage, originalError: error });
+    }
+
+    /**
+     * Show timeout error with retry option
+     */
+    showTimeoutError(error) {
+        const message = 'Request timed out. The server took too long to respond.';
+
+        // Show toast with retry button
+        this.showTimeoutToastWithRetry(message, error);
+        this.notifyListeners({ type: 'timeout', message, error });
+    }
+
+    /**
+     * Show timeout toast with retry button
+     */
+    showTimeoutToastWithRetry(message, error) {
+        // Use Bootstrap modal for better retry UX
+        if (window.bootstrap && window.bootstrap.Modal) {
+            this.createRetryModal(message, error);
+        } else {
+            // Fallback to confirm dialog
+            const retry = confirm(`${message}\n\nWould you like to retry?`);
+            if (retry && error.originalUrl) {
+                this.retryRequest(error.originalUrl, error.originalOptions);
+            }
+        }
+    }
+
+    /**
+     * Create Bootstrap modal with retry button
+     */
+    createRetryModal(message, error) {
+        // Remove existing modal if present
+        const existingModal = document.getElementById('timeoutRetryModal');
+        if (existingModal) {
+            existingModal.remove();
+        }
+
+        // Create modal element
+        const modalHtml = `
+            <div class="modal fade" id="timeoutRetryModal" tabindex="-1" aria-labelledby="timeoutRetryModalLabel" aria-hidden="true">
+                <div class="modal-dialog modal-dialog-centered">
+                    <div class="modal-content">
+                        <div class="modal-header bg-warning text-dark">
+                            <h5 class="modal-title" id="timeoutRetryModalLabel">
+                                <i class="fas fa-clock me-2"></i>Request Timeout
+                            </h5>
+                            <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                        </div>
+                        <div class="modal-body">
+                            <p>${message}</p>
+                            <p class="text-muted mb-0">Would you like to retry the request?</p>
+                        </div>
+                        <div class="modal-footer">
+                            <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                            <button type="button" class="btn btn-primary" id="retryRequestBtn">
+                                <i class="fas fa-redo me-2"></i>Retry
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        `;
+
+        document.body.insertAdjacentHTML('beforeend', modalHtml);
+
+        const modalElement = document.getElementById('timeoutRetryModal');
+        const modal = new window.bootstrap.Modal(modalElement);
+
+        // Handle retry button click
+        document.getElementById('retryRequestBtn').addEventListener('click', () => {
+            modal.hide();
+            if (error.originalUrl) {
+                this.retryRequest(error.originalUrl, error.originalOptions);
+            }
+        });
+
+        // Clean up modal after hide
+        modalElement.addEventListener('hidden.bs.modal', () => {
+            modalElement.remove();
+        });
+
+        modal.show();
+    }
+
+    /**
+     * Retry a failed request
+     */
+    async retryRequest(url, options = {}) {
+        try {
+            this.showSuccessToast('Retrying request...', 'Retry');
+            const response = await this.fetchWithErrorHandling(url, options);
+            this.showSuccessToast('Request successful!', 'Success');
+            return response;
+        } catch (error) {
+            console.error('Retry failed:', error);
+            // Error will be handled by fetchWithErrorHandling
+        }
     }
 
     /**
@@ -274,18 +426,49 @@ class ErrorHandler {
     }
 
     /**
-     * Wrap fetch calls with error handling
+     * Wrap fetch calls with error handling and timeout support
+     * @param {string} url - The URL to fetch
+     * @param {object} options - Fetch options
+     * @param {number} timeout - Timeout in milliseconds (default: 30000)
+     * @returns {Promise<Response>} - The response object
      */
-    async fetchWithErrorHandling(url, options = {}) {
+    async fetchWithErrorHandling(url, options = {}, timeout = 30000) {
         try {
-            const response = await fetch(url, options);
+            // Create abort controller for timeout
+            const controller = new AbortController();
+            const timeoutId = setTimeout(() => controller.abort(), timeout);
 
+            const fetchOptions = {
+                ...options,
+                signal: controller.signal
+            };
+
+            const response = await fetch(url, fetchOptions);
+            clearTimeout(timeoutId);
+
+            // Handle API errors (500, 400, etc.)
             if (!response.ok) {
-                throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+                if (response.status >= 500) {
+                    throw new Error(`SERVER_ERROR: ${response.status}`);
+                } else if (response.status >= 400) {
+                    throw new Error(`CLIENT_ERROR: ${response.status}`);
+                } else {
+                    throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+                }
             }
 
             return response;
         } catch (error) {
+            // Handle timeout
+            if (error.name === 'AbortError') {
+                const timeoutError = new Error('REQUEST_TIMEOUT');
+                timeoutError.isTimeout = true;
+                timeoutError.originalUrl = url;
+                timeoutError.originalOptions = options;
+                this.handleError(timeoutError, 'Request Timeout');
+                throw timeoutError;
+            }
+
             this.handleError(error, 'Fetch Request');
             throw error;
         }
