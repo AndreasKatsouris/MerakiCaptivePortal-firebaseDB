@@ -112,10 +112,7 @@
     "receipts": {
       ".indexOn": ["phoneNumber", "guestPhoneNumber", "locationId", "status", "processedAt", "createdAt"],
       ".read": "auth != null",
-      ".write": "auth != null",
-      "$receiptId": {
-        ".validate": "newData.hasChildren(['guestPhoneNumber', 'totalAmount', 'processedAt'])"
-      }
+      ".write": "auth != null"
     },
     "googleReviews": {
       ".read": "auth != null",
