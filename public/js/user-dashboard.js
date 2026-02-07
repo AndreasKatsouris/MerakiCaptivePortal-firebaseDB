@@ -8,6 +8,7 @@ import { showToast } from './utils/toast.js';
 import { featureAccessControl } from './modules/access-control/services/feature-access-control.js?v=2.1.4-20250605';
 import { runCompleteDatabaseFix, fixUserSubscriptionData } from './utils/subscription-tier-fix.js';
 import { dbPaginator } from './utils/database-paginator.js';
+import { initSessionExpiryHandler } from './auth/session-expiry-handler.js';
 
 class UserDashboard {
     constructor() {
@@ -20,6 +21,9 @@ class UserDashboard {
     }
 
     async init() {
+        // Initialize session expiry handler (Feature #60)
+        initSessionExpiryHandler();
+
         // Show loading overlay initially
         this.showLoadingOverlay();
 

@@ -5,6 +5,7 @@
 
 import { auth, rtdb, ref, get, update, signInWithEmailAndPassword, onAuthStateChanged, set } from './config/firebase-config.js';
 import { showToast } from './utils/toast.js';
+import { getSessionExpiryMessage, getRedirectAfterLogin } from './auth/session-expiry-handler.js';
 
 class UserLoginManager {
     constructor() {
@@ -48,10 +49,17 @@ class UserLoginManager {
     }
 
     checkForMessages() {
-        // Check for redirect messages
+        // Check for session expiry message from sessionStorage (Feature #60)
+        const sessionExpiryMessage = getSessionExpiryMessage();
+        if (sessionExpiryMessage) {
+            this.showAlert(sessionExpiryMessage, 'warning');
+            return;
+        }
+
+        // Check for redirect messages from URL
         const urlParams = new URLSearchParams(window.location.search);
         const message = urlParams.get('message');
-        
+
         if (message === 'logout') {
             this.showAlert('You have been logged out successfully.', 'success');
         } else if (message === 'unauthorized') {
