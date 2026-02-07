@@ -1,0 +1,12 @@
+Total messages: 10 (Errors: 0, Warnings: 0)
+
+[LOG] Firebase config loaded and ready for use @ http://localhost:5000/js/config/firebase-config.js:93
+[LOG] [AdminLogin] Creating AdminLoginComponent instance @ http://localhost:5000/js/admin/login.js:192
+[LOG] [AdminLogin] Initializing AdminLoginComponent @ http://localhost:5000/js/admin/login.js:13
+[LOG] [AdminLogin] Checking existing admin session @ http://localhost:5000/js/admin/login.js:30
+[LOG] [AdminLogin] Initializing auth manager @ http://localhost:5000/js/admin/login.js:33
+[LOG] 🔧 [AuthManager] Initializing authentication state... @ http://localhost:5000/js/auth/auth.js?v=20250131-fix:21
+[LOG] [AdminLogin] Setting up event listeners @ http://localhost:5000/js/admin/login.js:63
+[LOG] [AdminLogin] Component initialized @ http://localhost:5000/js/admin/login.js:23
+[LOG] 🔄 [AuthManager] Auth state changed: No user @ http://localhost:5000/js/auth/auth.js?v=20250131-fix:27
+[LOG] [AdminLogin] No existing user found @ http://localhost:5000/js/admin/login.js:52

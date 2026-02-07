@@ -39,22 +39,27 @@ class UserDashboard {
                     return;
                 }
 
-                // Run database fix to ensure proper subscription data
-                console.log('[Dashboard] Running database fix to ensure proper subscription data...');
-                await runCompleteDatabaseFix();
+                try {
+                    // Run database fix to ensure proper subscription data
+                    console.log('[Dashboard] Running database fix to ensure proper subscription data...');
+                    await runCompleteDatabaseFix();
 
-                // PERFORMANCE OPTIMIZATION: Load user data and check feature access in parallel
-                console.log('[Dashboard] Loading user data and checking feature access in parallel...');
-                await Promise.all([
-                    this.loadUserData(),
-                    this.checkFeatureAccess()
-                ]);
+                    // PERFORMANCE OPTIMIZATION: Load user data and check feature access in parallel
+                    console.log('[Dashboard] Loading user data and checking feature access in parallel...');
+                    await Promise.all([
+                        this.loadUserData(),
+                        this.checkFeatureAccess()
+                    ]);
 
-                // Load dashboard after user data and feature access are ready
-                await this.loadDashboard();
-
-                // Hide loading overlay after everything is loaded
-                this.hideLoadingOverlay();
+                    // Load dashboard after user data and feature access are ready
+                    await this.loadDashboard();
+                } catch (error) {
+                    console.error('[Dashboard] Error loading dashboard:', error);
+                    showToast('Error loading dashboard. Please refresh the page.', 'error');
+                } finally {
+                    // Always hide loading overlay, even if there's an error
+                    this.hideLoadingOverlay();
+                }
             } else {
                 // Redirect to login
                 window.location.href = '/user-login.html?message=unauthorized';

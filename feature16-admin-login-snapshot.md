@@ -1,0 +1,40 @@
+- generic [ref=e4]:
+  - generic [ref=e5]:
+    - img "Laki Sparks" [ref=e6]
+    - heading "Admin Portal" [level=2] [ref=e7]
+    - paragraph [ref=e8]: Enter your credentials to access dashboard
+  - generic [ref=e9]:
+    - generic [ref=e10]:
+      - generic [ref=e11]:
+        - text: Email Address
+        - generic "Use your administrator email address" [ref=e12]: 
+      - generic [ref=e13]:
+        - textbox "Email address" [ref=e14]:
+          - /placeholder: admin@lakisparks.com
+        - generic [ref=e15]: 
+    - generic [ref=e16]:
+      - generic [ref=e17]:
+        - text: Password
+        - generic "Enter your secure password" [ref=e18]: 
+      - generic [ref=e19]:
+        - textbox "Password" [ref=e20]:
+          - /placeholder: ••••••••
+        - button "Toggle password visibility" [ref=e21] [cursor=pointer]:
+          - generic [ref=e22]: 
+    - generic [ref=e23]:
+      - checkbox "Remember me" [ref=e24] [cursor=pointer]
+      - generic [ref=e25] [cursor=pointer]: Remember me for 30 days
+    - button "Sign In" [ref=e26] [cursor=pointer]
+  - generic [ref=e27]: Admin Access Only
+  - generic [ref=e28]:
+    - generic [ref=e29]: Quick Tools
+    - generic [ref=e30]:
+      - link " ROI Calculator" [ref=e31] [cursor=pointer]:
+        - /url: ocean_basket_roi_calculator.html
+        - generic [ref=e32]: 
+        - generic [ref=e33]: ROI Calculator
+      - link " Forgot Password" [ref=e34] [cursor=pointer]:
+        - /url: "#"
+        - generic [ref=e35]: 
+        - generic [ref=e36]: Forgot Password
+  - generic [ref=e37]: Laki Sparks Restaurant Management Platform
