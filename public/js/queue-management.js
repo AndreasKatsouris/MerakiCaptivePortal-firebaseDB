@@ -1289,20 +1289,94 @@ const QueueManagementApp = {
             });
         },
 
+        async fetchGuestInsights(guest) {
+            try {
+                const phoneNumber = guest.phoneNumber || guest.phone;
+                if (!phoneNumber) return null;
+
+                // Fetch guest history from queue_history
+                const historyRef = ref(rtdb, 'queue_history');
+                const historyQuery = query(
+                    historyRef,
+                    orderByChild('phoneNumber'),
+                    equalTo(phoneNumber)
+                );
+                const historySnapshot = await get(historyQuery);
+
+                if (!historySnapshot.exists()) {
+                    return null;
+                }
+
+                const visits = [];
+                const waitTimes = [];
+                historySnapshot.forEach(childSnapshot => {
+                    const visit = childSnapshot.val();
+                    visits.push(visit);
+                    if (visit.waitTime) {
+                        waitTimes.push(visit.waitTime);
+                    }
+                });
+
+                // Calculate insights
+                const avgWaitTime = waitTimes.length > 0
+                    ? Math.round(waitTimes.reduce((a, b) => a + b, 0) / waitTimes.length)
+                    : 0;
+
+                // Find most recent visit
+                const sortedVisits = visits.sort((a, b) =>
+                    (b.timestamp || 0) - (a.timestamp || 0)
+                );
+                const lastVisit = sortedVisits[0]?.timestamp
+                    ? new Date(sortedVisits[0].timestamp).toLocaleDateString()
+                    : 'N/A';
+
+                // Find preferred time (most common hour)
+                const hourCounts = {};
+                visits.forEach(visit => {
+                    if (visit.timestamp) {
+                        const hour = new Date(visit.timestamp).getHours();
+                        hourCounts[hour] = (hourCounts[hour] || 0) + 1;
+                    }
+                });
+                const preferredHour = Object.keys(hourCounts).reduce((a, b) =>
+                    hourCounts[a] > hourCounts[b] ? a : b, 0
+                );
+                const preferredTime = `${preferredHour}:00`;
+
+                // Calculate satisfaction (based on completed vs cancelled)
+                const completed = visits.filter(v => v.status === 'seated' || v.status === 'completed').length;
+                const cancelled = visits.filter(v => v.status === 'cancelled' || v.status === 'no-show').length;
+                const satisfaction = completed > 0 ? (completed / (completed + cancelled)) * 5 : 0;
+
+                return {
+                    visitHistory: visits.length,
+                    avgWaitTime,
+                    lastVisit,
+                    preferredTime,
+                    satisfaction: satisfaction.toFixed(1)
+                };
+            } catch (error) {
+                console.error('Error fetching guest insights:', error);
+                return null;
+            }
+        },
+
         async showGuestInsights(guest) {
             if (!this.canUseAnalytics) {
                 await this.showAnalyticsUpgradePrompt();
                 return;
             }
 
-            // Mock guest insights data for demonstration
-            const insights = {
-                visitHistory: 3,
-                avgWaitTime: 18,
-                lastVisit: '2024-01-15',
-                preferredTime: '7:00 PM',
-                satisfaction: 4.5
-            };
+            // Fetch real guest insights from Firebase
+            const insights = await this.fetchGuestInsights(guest);
+            if (!insights) {
+                Swal.fire({
+                    icon: 'info',
+                    title: 'No Data Available',
+                    text: 'No historical data found for this guest.'
+                });
+                return;
+            }
 
             Swal.fire({
                 title: `Guest Insights: ${guest.name || guest.guestName}`,

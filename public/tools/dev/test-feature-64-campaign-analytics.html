@@ -1,0 +1,440 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Test Feature #64 - Campaign Analytics Real Metrics</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <style>
+        body {
+            padding: 20px;
+            background: #f8f9fa;
+        }
+        .test-container {
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+        .test-section {
+            background: white;
+            padding: 20px;
+            border-radius: 8px;
+            margin-bottom: 20px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        .metric-card {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 20px;
+            border-radius: 8px;
+            text-align: center;
+        }
+        .metric-card h3 {
+            font-size: 3rem;
+            margin: 0;
+            font-weight: bold;
+        }
+        .metric-card p {
+            margin: 5px 0 0 0;
+            opacity: 0.9;
+        }
+        .status-badge {
+            display: inline-block;
+            padding: 4px 12px;
+            border-radius: 4px;
+            font-size: 0.875rem;
+            font-weight: 500;
+        }
+        .status-badge.success {
+            background: #d1f4e0;
+            color: #0d894f;
+        }
+        .status-badge.error {
+            background: #ffe0e0;
+            color: #d93025;
+        }
+        .log-entry {
+            padding: 8px;
+            margin: 4px 0;
+            border-left: 3px solid #6c757d;
+            background: #f8f9fa;
+            font-family: monospace;
+            font-size: 0.875rem;
+        }
+        .log-entry.success {
+            border-color: #28a745;
+        }
+        .log-entry.error {
+            border-color: #dc3545;
+        }
+        .campaign-details {
+            background: #f8f9fa;
+            padding: 15px;
+            border-radius: 8px;
+            margin-top: 10px;
+        }
+    </style>
+</head>
+<body>
+    <div class="test-container">
+        <h1 class="mb-4">
+            <i class="fas fa-chart-line me-2"></i>
+            Feature #64: Campaign Analytics Real Metrics
+        </h1>
+
+        <!-- Test Instructions -->
+        <div class="test-section">
+            <h5><i class="fas fa-clipboard-list me-2"></i>Test Steps</h5>
+            <ol>
+                <li>Create a test campaign with "Feature64Test" in the name</li>
+                <li>Process 3 test receipts that match the campaign criteria</li>
+                <li>Click "Load Campaign Analytics" to fetch real data from Firebase</li>
+                <li>Verify the metrics match the actual Firebase data</li>
+            </ol>
+        </div>
+
+        <!-- Authentication Status -->
+        <div class="test-section">
+            <h5><i class="fas fa-user me-2"></i>Authentication Status</h5>
+            <div id="authStatus">
+                <span class="status-badge">Checking...</span>
+            </div>
+        </div>
+
+        <!-- Actions -->
+        <div class="test-section">
+            <h5><i class="fas fa-play me-2"></i>Actions</h5>
+            <div class="mb-3">
+                <label for="campaignId" class="form-label">Campaign ID (optional - leave blank to search by name)</label>
+                <input type="text" class="form-control" id="campaignId" placeholder="Enter campaign ID or leave blank">
+            </div>
+            <button id="loadAnalytics" class="btn btn-primary me-2">
+                <i class="fas fa-sync me-1"></i>Load Campaign Analytics
+            </button>
+            <button id="createTestCampaign" class="btn btn-success me-2">
+                <i class="fas fa-plus me-1"></i>Create Test Campaign
+            </button>
+            <button id="simulateReceipts" class="btn btn-info">
+                <i class="fas fa-receipt me-1"></i>Simulate 3 Receipts
+            </button>
+        </div>
+
+        <!-- Campaign Analytics Display -->
+        <div class="test-section">
+            <h5><i class="fas fa-chart-bar me-2"></i>Campaign Analytics</h5>
+            <div id="campaignInfo" class="mb-3"></div>
+            <div class="row">
+                <div class="col-md-4 mb-3">
+                    <div class="metric-card" style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);">
+                        <h3 id="receiptsProcessed">-</h3>
+                        <p>Receipts Processed</p>
+                    </div>
+                </div>
+                <div class="col-md-4 mb-3">
+                    <div class="metric-card" style="background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);">
+                        <h3 id="rewardsIssued">-</h3>
+                        <p>Rewards Issued</p>
+                    </div>
+                </div>
+                <div class="col-md-4 mb-3">
+                    <div class="metric-card" style="background: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%);">
+                        <h3 id="totalValue">R 0</h3>
+                        <p>Total Reward Value</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Firebase Data Verification -->
+        <div class="test-section">
+            <h5><i class="fas fa-database me-2"></i>Firebase Raw Data</h5>
+            <pre id="firebaseData" style="background: #f8f9fa; padding: 15px; border-radius: 4px; max-height: 300px; overflow-y: auto;">No data loaded</pre>
+        </div>
+
+        <!-- Test Log -->
+        <div class="test-section">
+            <h5><i class="fas fa-terminal me-2"></i>Test Log</h5>
+            <div id="testLog"></div>
+        </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    <script type="module">
+        import { auth, rtdb, ref, get, push, set, query, orderByChild, equalTo, onAuthStateChanged } from '../../js/config/firebase-config.js';
+
+        let currentUser = null;
+        let testCampaignId = null;
+
+        // Logging helper
+        function log(message, type = 'info') {
+            const logEl = document.getElementById('testLog');
+            const timestamp = new Date().toLocaleTimeString();
+            const entry = document.createElement('div');
+            entry.className = `log-entry ${type}`;
+            entry.textContent = `[${timestamp}] ${message}`;
+            logEl.appendChild(entry);
+            console.log(`[Feature #64] ${message}`);
+        }
+
+        // Check authentication
+        onAuthStateChanged(auth, (user) => {
+            const authStatus = document.getElementById('authStatus');
+            if (user) {
+                currentUser = user;
+                authStatus.innerHTML = `
+                    <span class="status-badge success">
+                        <i class="fas fa-check-circle me-1"></i>
+                        Logged in as ${user.email}
+                    </span>
+                `;
+                log('User authenticated: ' + user.email, 'success');
+            } else {
+                authStatus.innerHTML = `
+                    <span class="status-badge error">
+                        <i class="fas fa-times-circle me-1"></i>
+                        Not logged in
+                    </span>
+                `;
+                log('User not authenticated - please log in', 'error');
+            }
+        });
+
+        // Load campaign analytics
+        async function loadCampaignAnalytics() {
+            if (!currentUser) {
+                log('Cannot load analytics - not authenticated', 'error');
+                return;
+            }
+
+            try {
+                log('=== Loading Campaign Analytics ===');
+
+                const campaignId = document.getElementById('campaignId').value.trim();
+                let targetCampaignId = campaignId || testCampaignId;
+
+                // If no campaign ID, search for Feature64Test campaign
+                if (!targetCampaignId) {
+                    log('No campaign ID provided, searching for Feature64Test campaign...');
+                    const campaignsSnapshot = await get(ref(rtdb, 'campaigns'));
+                    if (campaignsSnapshot.exists()) {
+                        const campaigns = campaignsSnapshot.val();
+                        for (const [id, campaign] of Object.entries(campaigns)) {
+                            if (campaign.name && campaign.name.includes('Feature64Test')) {
+                                targetCampaignId = id;
+                                log(`Found test campaign: ${campaign.name} (${id})`, 'success');
+                                break;
+                            }
+                        }
+                    }
+                }
+
+                if (!targetCampaignId) {
+                    log('No campaign found. Please create a test campaign first.', 'error');
+                    return;
+                }
+
+                log(`Loading analytics for campaign: ${targetCampaignId}`);
+
+                // Get campaign details
+                const campaignRef = ref(rtdb, `campaigns/${targetCampaignId}`);
+                const campaignSnapshot = await get(campaignRef);
+
+                if (!campaignSnapshot.exists()) {
+                    log('Campaign not found in Firebase', 'error');
+                    return;
+                }
+
+                const campaign = campaignSnapshot.val();
+                log('Campaign loaded from Firebase', 'success');
+
+                // Display campaign info
+                const campaignInfo = document.getElementById('campaignInfo');
+                campaignInfo.innerHTML = `
+                    <div class="campaign-details">
+                        <h6><strong>Campaign:</strong> ${campaign.name}</h6>
+                        <p class="mb-1"><strong>ID:</strong> ${targetCampaignId}</p>
+                        <p class="mb-1"><strong>Status:</strong> <span class="badge bg-${campaign.status === 'active' ? 'success' : 'secondary'}">${campaign.status}</span></p>
+                        <p class="mb-0"><strong>Location:</strong> ${campaign.locationId || 'N/A'}</p>
+                    </div>
+                `;
+
+                // Query receipts for this campaign (using Firebase query)
+                log('Querying receipts from Firebase...');
+                const receiptsQuery = query(
+                    ref(rtdb, 'receipts'),
+                    orderByChild('campaignId'),
+                    equalTo(targetCampaignId)
+                );
+                const receiptsSnapshot = await get(receiptsQuery);
+                const receipts = receiptsSnapshot.val() || {};
+                const receiptsCount = Object.keys(receipts).length;
+                log(`Found ${receiptsCount} receipts for this campaign`, 'success');
+
+                // Query rewards for this campaign (using Firebase query)
+                log('Querying rewards from Firebase...');
+                const rewardsQuery = query(
+                    ref(rtdb, 'rewards'),
+                    orderByChild('campaignId'),
+                    equalTo(targetCampaignId)
+                );
+                const rewardsSnapshot = await get(rewardsQuery);
+                const rewards = rewardsSnapshot.val() || {};
+                const rewardsCount = Object.keys(rewards).length;
+                log(`Found ${rewardsCount} rewards for this campaign`, 'success');
+
+                // Calculate total reward value
+                let totalValue = 0;
+                Object.values(rewards).forEach(reward => {
+                    if (reward.value) {
+                        totalValue += reward.value;
+                    }
+                });
+
+                // Update metrics display
+                document.getElementById('receiptsProcessed').textContent = receiptsCount;
+                document.getElementById('rewardsIssued').textContent = rewardsCount;
+                document.getElementById('totalValue').textContent = `R ${totalValue.toFixed(2)}`;
+
+                // Show raw Firebase data
+                const firebaseDataEl = document.getElementById('firebaseData');
+                const rawData = {
+                    campaign: campaign,
+                    receipts: receipts,
+                    rewards: rewards,
+                    metrics: {
+                        receiptsProcessed: receiptsCount,
+                        rewardsIssued: rewardsCount,
+                        totalValue: totalValue
+                    }
+                };
+                firebaseDataEl.textContent = JSON.stringify(rawData, null, 2);
+
+                log('✅ Analytics loaded successfully from Firebase RTDB', 'success');
+                log(`Metrics: ${receiptsCount} receipts, ${rewardsCount} rewards, R${totalValue} total value`, 'success');
+
+            } catch (error) {
+                log('Error loading analytics: ' + error.message, 'error');
+                console.error('Error loading analytics:', error);
+            }
+        }
+
+        // Create test campaign
+        async function createTestCampaign() {
+            if (!currentUser) {
+                log('Cannot create campaign - not authenticated', 'error');
+                return;
+            }
+
+            try {
+                log('=== Creating Test Campaign ===');
+
+                const campaignRef = push(ref(rtdb, 'campaigns'));
+                testCampaignId = campaignRef.key;
+
+                const campaignData = {
+                    id: testCampaignId,
+                    name: 'Feature64Test Campaign',
+                    description: 'Test campaign for analytics verification',
+                    locationId: 'test-location-f64',
+                    status: 'active',
+                    createdAt: Date.now(),
+                    createdBy: currentUser.uid,
+                    startDate: '2025-01-01',
+                    endDate: '2025-12-31',
+                    minPurchaseAmount: 50,
+                    rewardTypes: [{
+                        typeId: 'test-reward-f64',
+                        type: 'percentage_discount',
+                        value: 10,
+                        description: '10% Discount'
+                    }],
+                    testData: true
+                };
+
+                await set(campaignRef, campaignData);
+                log(`✅ Test campaign created: ${testCampaignId}`, 'success');
+                log(`Campaign name: ${campaignData.name}`, 'success');
+
+                document.getElementById('campaignId').value = testCampaignId;
+
+            } catch (error) {
+                log('Error creating campaign: ' + error.message, 'error');
+                console.error('Error creating campaign:', error);
+            }
+        }
+
+        // Simulate receipts
+        async function simulateReceipts() {
+            const campaignId = document.getElementById('campaignId').value.trim() || testCampaignId;
+
+            if (!campaignId) {
+                log('Please create a campaign first', 'error');
+                return;
+            }
+
+            if (!currentUser) {
+                log('Cannot simulate receipts - not authenticated', 'error');
+                return;
+            }
+
+            try {
+                log('=== Simulating 3 Receipts ===');
+
+                for (let i = 1; i <= 3; i++) {
+                    // Create receipt
+                    const receiptRef = push(ref(rtdb, 'receipts'));
+                    const receiptId = receiptRef.key;
+
+                    const receiptData = {
+                        id: receiptId,
+                        campaignId: campaignId,
+                        guestPhone: `+278000064${i}`,
+                        amount: 100 + (i * 10),
+                        items: [`Item ${i}`],
+                        timestamp: Date.now() + (i * 1000),
+                        processed: true,
+                        testData: true
+                    };
+
+                    await set(receiptRef, receiptData);
+                    log(`✅ Receipt ${i} created: R${receiptData.amount}`, 'success');
+
+                    // Create corresponding reward
+                    const rewardRef = push(ref(rtdb, 'rewards'));
+                    const rewardId = rewardRef.key;
+
+                    const rewardData = {
+                        id: rewardId,
+                        campaignId: campaignId,
+                        receiptId: receiptId,
+                        guestPhone: receiptData.guestPhone,
+                        type: 'percentage_discount',
+                        value: 10,
+                        description: '10% Discount',
+                        issuedAt: Date.now() + (i * 1000),
+                        status: 'issued',
+                        testData: true
+                    };
+
+                    await set(rewardRef, rewardData);
+                    log(`✅ Reward ${i} issued: ${rewardData.description}`, 'success');
+                }
+
+                log('✅ All 3 receipts and rewards created successfully', 'success');
+                log('Click "Load Campaign Analytics" to see the results', 'success');
+
+            } catch (error) {
+                log('Error simulating receipts: ' + error.message, 'error');
+                console.error('Error simulating receipts:', error);
+            }
+        }
+
+        // Event listeners
+        document.getElementById('loadAnalytics').addEventListener('click', loadCampaignAnalytics);
+        document.getElementById('createTestCampaign').addEventListener('click', createTestCampaign);
+        document.getElementById('simulateReceipts').addEventListener('click', simulateReceipts);
+
+        log('Test page initialized');
+    </script>
+</body>
+</html>

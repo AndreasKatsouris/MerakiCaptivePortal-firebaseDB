@@ -792,14 +792,14 @@ window.Analytics.FoodCostAnalytics.loadData = async function(dateRange) {
         return await window.Analytics.FoodCostAnalytics._appInstance.loadData(dateRange);
     } else {
         console.log('No mounted instance available, using direct function call');
-        // Create a mock context with the required methods to avoid 'this' binding issues
-        const mockContext = {
+        // Create a standalone context with the required methods to avoid 'this' binding issues
+        const standaloneContext = {
             dateRange: dateRange,
             loading: false,
             error: null,
             processedData: null,
             updateSummary: function(summary) {
-                console.log('Using mock updateSummary with data:', summary);
+                console.log('Using standalone updateSummary with data:', summary);
                 // Store summary in the global namespace
                 if (!window.Analytics.FoodCostAnalytics.summary) {
                     window.Analytics.FoodCostAnalytics.summary = {};
@@ -809,20 +809,20 @@ window.Analytics.FoodCostAnalytics.loadData = async function(dateRange) {
             mounted() {
                 // Load data when component is mounted
                 this.loadData();
-                
+
                 // Load available files
                 this.loadAvailableFiles();
-                
+
                 // Initialize empty file selection
                 this.selectedFileIds = [];
-                
+
                 // Register with namespace if needed
                 window.Analytics.FoodCostAnalytics.Dashboard = this;
             },
         };
-        
-        // Call the method with our mock context
-        return await FoodCostAnalyticsDashboard.methods.loadData.call(mockContext, dateRange);
+
+        // Call the method with our standalone context
+        return await FoodCostAnalyticsDashboard.methods.loadData.call(standaloneContext, dateRange);
     }
 };
 

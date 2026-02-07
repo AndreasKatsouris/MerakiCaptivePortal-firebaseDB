@@ -1706,16 +1706,12 @@ const EnhancedUserSubscriptionManager = {
         });
       }
       
-      // Initialize tier retention chart (mock data for demo)
+      // Initialize tier retention chart
       const retentionCtx = document.getElementById('tierRetentionChart')?.getContext('2d');
       if (retentionCtx && window.Chart) {
         const tierNames = Object.keys(this.availableTiers);
-        const retentionData = {
-          'free': 65,
-          'basic': 75,
-          'pro': 85,
-          'premium': 92
-        };
+        // Calculate retention from actual user data
+        const retentionData = await this.calculateTierRetention(tierNames);
         
         new window.Chart(retentionCtx, {
           type: 'line',
