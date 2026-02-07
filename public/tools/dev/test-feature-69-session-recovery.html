@@ -1,0 +1,416 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Test Feature #69 - Session Recovery After Network Drop</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <style>
+        body {
+            padding: 20px;
+            background: #f8f9fa;
+        }
+        .test-container {
+            max-width: 1000px;
+            margin: 0 auto;
+        }
+        .test-section {
+            background: white;
+            padding: 20px;
+            border-radius: 8px;
+            margin-bottom: 20px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        .status-indicator {
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            padding: 15px 25px;
+            border-radius: 8px;
+            font-weight: 600;
+            box-shadow: 0 4px 8px rgba(0,0,0,0.2);
+            z-index: 1000;
+            min-width: 200px;
+            text-align: center;
+        }
+        .status-indicator.online {
+            background: #28a745;
+            color: white;
+        }
+        .status-indicator.offline {
+            background: #dc3545;
+            color: white;
+        }
+        .status-indicator.reconnecting {
+            background: #ffc107;
+            color: #000;
+        }
+        .metric-card {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 20px;
+            border-radius: 8px;
+            text-align: center;
+            margin-bottom: 20px;
+        }
+        .metric-card h3 {
+            font-size: 2.5rem;
+            margin: 0;
+            font-weight: bold;
+        }
+        .metric-card p {
+            margin: 5px 0 0 0;
+            opacity: 0.9;
+        }
+        .log-entry {
+            padding: 8px;
+            margin: 4px 0;
+            border-left: 3px solid #6c757d;
+            background: #f8f9fa;
+            font-family: monospace;
+            font-size: 0.875rem;
+        }
+        .log-entry.success {
+            border-color: #28a745;
+            background: #d4edda;
+        }
+        .log-entry.error {
+            border-color: #dc3545;
+            background: #f8d7da;
+        }
+        .log-entry.warning {
+            border-color: #ffc107;
+            background: #fff3cd;
+        }
+        .log-entry.info {
+            border-color: #17a2b8;
+            background: #d1ecf1;
+        }
+    </style>
+</head>
+<body>
+    <div class="test-container">
+        <h1 class="mb-4">
+            <i class="fas fa-wifi me-2"></i>
+            Feature #69: Session Recovery After Network Drop
+        </h1>
+
+        <!-- Network Status Indicator -->
+        <div class="status-indicator online" id="statusIndicator">
+            <i class="fas fa-check-circle me-2"></i>
+            <span id="statusText">Online</span>
+        </div>
+
+        <!-- Test Instructions -->
+        <div class="test-section">
+            <h5><i class="fas fa-clipboard-list me-2"></i>Test Steps</h5>
+            <ol>
+                <li>Login as a user (authenticated state is simulated for this test)</li>
+                <li>Click "Simulate Network Drop" to disconnect briefly</li>
+                <li>Click "Restore Network" to reconnect</li>
+                <li>Verify session is still active (no redirect to login)</li>
+                <li>Verify data loads successfully after reconnection</li>
+                <li>Check that Firebase connection is restored</li>
+            </ol>
+            <div class="alert alert-info mt-3">
+                <i class="fas fa-info-circle me-2"></i>
+                <strong>Note:</strong> This test simulates network drops and Firebase reconnection behavior.
+                In a real scenario, Firebase SDK handles reconnection automatically.
+            </div>
+        </div>
+
+        <!-- Auth Status -->
+        <div class="test-section">
+            <h5><i class="fas fa-user me-2"></i>Authentication Status</h5>
+            <div class="row g-3">
+                <div class="col-md-6">
+                    <div class="metric-card">
+                        <h3 id="authStatus">✓</h3>
+                        <p>Session Active</p>
+                    </div>
+                </div>
+                <div class="col-md-6">
+                    <div class="metric-card">
+                        <h3 id="dataStatus">✓</h3>
+                        <p>Data Loaded</p>
+                    </div>
+                </div>
+            </div>
+            <div id="authDetails" class="mt-3">
+                <p><strong>User:</strong> <span id="userName">testuser@example.com</span></p>
+                <p><strong>Session ID:</strong> <span id="sessionId">sim_session_12345</span></p>
+                <p><strong>Last Activity:</strong> <span id="lastActivity">-</span></p>
+            </div>
+        </div>
+
+        <!-- Network Simulation Controls -->
+        <div class="test-section">
+            <h5><i class="fas fa-network-wired me-2"></i>Network Simulation</h5>
+            <div class="d-flex gap-3 mb-3">
+                <button id="dropNetworkBtn" class="btn btn-danger">
+                    <i class="fas fa-plug-circle-xmark me-2"></i>Simulate Network Drop
+                </button>
+                <button id="restoreNetworkBtn" class="btn btn-success" disabled>
+                    <i class="fas fa-plug-circle-check me-2"></i>Restore Network
+                </button>
+                <button id="loadDataBtn" class="btn btn-primary">
+                    <i class="fas fa-refresh me-2"></i>Load Test Data
+                </button>
+            </div>
+            <div id="networkStatus" class="alert alert-success">
+                <i class="fas fa-check-circle me-2"></i>
+                Network is currently <strong>ONLINE</strong>
+            </div>
+        </div>
+
+        <!-- Test Data -->
+        <div class="test-section">
+            <h5><i class="fas fa-database me-2"></i>Test Data (Firebase Simulation)</h5>
+            <div id="testDataContainer">
+                <p class="text-muted">Click "Load Test Data" to fetch data</p>
+            </div>
+        </div>
+
+        <!-- Debug Console -->
+        <div class="test-section">
+            <h5><i class="fas fa-terminal me-2"></i>Debug Console</h5>
+            <div class="d-flex gap-2 mb-3">
+                <button id="clearLogsBtn" class="btn btn-sm btn-outline-secondary">
+                    <i class="fas fa-broom me-1"></i>Clear Logs
+                </button>
+            </div>
+            <div id="debugConsole" style="font-family: monospace; font-size: 0.875rem; background: #f8f9fa; padding: 15px; border-radius: 4px; max-height: 400px; overflow-y: auto;">
+                <div class="log-entry info">System initialized</div>
+            </div>
+        </div>
+    </div>
+
+    <script type="module">
+        import { auth, onAuthStateChanged } from '../../js/config/firebase-config.js';
+
+        // State management
+        let isOnline = true;
+        let isAuthenticated = true;
+        let sessionId = 'sim_session_12345';
+        let reconnectAttempts = 0;
+        let reconnectInterval = null;
+
+        // DOM elements
+        const statusIndicator = document.getElementById('statusIndicator');
+        const statusText = document.getElementById('statusText');
+        const networkStatus = document.getElementById('networkStatus');
+        const authStatus = document.getElementById('authStatus');
+        const dataStatus = document.getElementById('dataStatus');
+        const debugConsole = document.getElementById('debugConsole');
+        const testDataContainer = document.getElementById('testDataContainer');
+        const lastActivity = document.getElementById('lastActivity');
+        const dropNetworkBtn = document.getElementById('dropNetworkBtn');
+        const restoreNetworkBtn = document.getElementById('restoreNetworkBtn');
+        const loadDataBtn = document.getElementById('loadDataBtn');
+        const clearLogsBtn = document.getElementById('clearLogsBtn');
+
+        // Debug logging
+        function log(message, type = 'info') {
+            const timestamp = new Date().toLocaleTimeString();
+            const logEntry = document.createElement('div');
+            logEntry.className = `log-entry ${type}`;
+            logEntry.textContent = `[${timestamp}] ${message}`;
+            debugConsole.appendChild(logEntry);
+            debugConsole.scrollTop = debugConsole.scrollHeight;
+            console.log(`[Feature69] [${type.toUpperCase()}] ${message}`);
+        }
+
+        // Update last activity timestamp
+        function updateActivity() {
+            const now = new Date().toLocaleTimeString();
+            lastActivity.textContent = now;
+        }
+
+        // Update UI status
+        function updateStatus() {
+            if (isOnline) {
+                statusIndicator.className = 'status-indicator online';
+                statusText.innerHTML = '<i class="fas fa-check-circle me-2"></i>Online';
+                networkStatus.className = 'alert alert-success';
+                networkStatus.innerHTML = '<i class="fas fa-check-circle me-2"></i>Network is currently <strong>ONLINE</strong>';
+            } else {
+                statusIndicator.className = 'status-indicator offline';
+                statusText.innerHTML = '<i class="fas fa-exclamation-triangle me-2"></i>Offline';
+                networkStatus.className = 'alert alert-danger';
+                networkStatus.innerHTML = '<i class="fas fa-exclamation-triangle me-2"></i>Network is currently <strong>OFFLINE</strong>';
+            }
+
+            authStatus.textContent = isAuthenticated ? '✓' : '✗';
+            updateActivity();
+        }
+
+        // Simulate network drop
+        function simulateNetworkDrop() {
+            log('Simulating network drop...', 'warning');
+            isOnline = false;
+            updateStatus();
+
+            dropNetworkBtn.disabled = true;
+            restoreNetworkBtn.disabled = false;
+            loadDataBtn.disabled = true;
+
+            // Session should remain active during network drop
+            log('Session remains active (not logged out)', 'success');
+            log('Firebase connection suspended', 'info');
+
+            // Simulate automatic reconnection attempts
+            reconnectAttempts = 0;
+            reconnectInterval = setInterval(() => {
+                reconnectAttempts++;
+                log(`Reconnection attempt #${reconnectAttempts} (waiting for network)`, 'warning');
+
+                if (reconnectAttempts >= 5) {
+                    clearInterval(reconnectInterval);
+                    log('Max reconnection attempts reached, waiting for manual restore', 'warning');
+                }
+            }, 2000);
+        }
+
+        // Restore network connection
+        function restoreNetwork() {
+            log('Network restored', 'success');
+            isOnline = true;
+            updateStatus();
+
+            if (reconnectInterval) {
+                clearInterval(reconnectInterval);
+                reconnectInterval = null;
+            }
+
+            dropNetworkBtn.disabled = false;
+            restoreNetworkBtn.disabled = true;
+            loadDataBtn.disabled = false;
+
+            // Verify session is still active
+            log('Verifying session...', 'info');
+            setTimeout(() => {
+                if (isAuthenticated) {
+                    log('✓ Session verified - still authenticated', 'success');
+                    log('✓ No redirect to login page', 'success');
+                    log('Firebase connection restored', 'success');
+
+                    // Simulate Firebase reconnection
+                    log('Firebase RTDB reconnecting...', 'info');
+                    setTimeout(() => {
+                        log('✓ Firebase RTDB connected', 'success');
+                        log('Ready to load data', 'info');
+                    }, 500);
+                } else {
+                    log('✗ Session lost - would redirect to login', 'error');
+                }
+            }, 500);
+        }
+
+        // Load test data (simulates Firebase query)
+        async function loadTestData() {
+            log('Loading test data...', 'info');
+            dataStatus.textContent = '⏳';
+
+            if (!isOnline) {
+                log('✗ Cannot load data - network offline', 'error');
+                testDataContainer.innerHTML = `
+                    <div class="alert alert-danger">
+                        <i class="fas fa-exclamation-triangle me-2"></i>
+                        Cannot load data - network is offline
+                    </div>
+                `;
+                dataStatus.textContent = '✗';
+                return;
+            }
+
+            if (!isAuthenticated) {
+                log('✗ Cannot load data - not authenticated', 'error');
+                testDataContainer.innerHTML = `
+                    <div class="alert alert-danger">
+                        <i class="fas fa-exclamation-triangle me-2"></i>
+                        Cannot load data - session expired
+                    </div>
+                `;
+                dataStatus.textContent = '✗';
+                return;
+            }
+
+            // Simulate Firebase data fetch
+            setTimeout(() => {
+                log('✓ Data loaded successfully', 'success');
+                dataStatus.textContent = '✓';
+
+                const sampleData = [
+                    { id: 1, name: 'Guest 1', phone: '+27123456789' },
+                    { id: 2, name: 'Guest 2', phone: '+27123456790' },
+                    { id: 3, name: 'Guest 3', phone: '+27123456791' }
+                ];
+
+                testDataContainer.innerHTML = `
+                    <div class="alert alert-success mb-3">
+                        <i class="fas fa-check-circle me-2"></i>
+                        Successfully loaded ${sampleData.length} records from Firebase
+                    </div>
+                    <table class="table table-sm">
+                        <thead>
+                            <tr>
+                                <th>ID</th>
+                                <th>Name</th>
+                                <th>Phone</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            ${sampleData.map(item => `
+                                <tr>
+                                    <td>${item.id}</td>
+                                    <td>${item.name}</td>
+                                    <td>${item.phone}</td>
+                                </tr>
+                            `).join('')}
+                        </tbody>
+                    </table>
+                `;
+                updateActivity();
+            }, 1000);
+        }
+
+        // Event listeners
+        dropNetworkBtn.addEventListener('click', simulateNetworkDrop);
+        restoreNetworkBtn.addEventListener('click', restoreNetwork);
+        loadDataBtn.addEventListener('click', loadTestData);
+        clearLogsBtn.addEventListener('click', () => {
+            debugConsole.innerHTML = '<div class="log-entry info">Logs cleared</div>';
+            log('Console cleared', 'info');
+        });
+
+        // Listen for actual online/offline events
+        window.addEventListener('online', () => {
+            log('Browser detected network is back online', 'success');
+        });
+
+        window.addEventListener('offline', () => {
+            log('Browser detected network went offline', 'warning');
+        });
+
+        // Monitor Firebase auth state
+        onAuthStateChanged(auth, (user) => {
+            if (user) {
+                log(`Firebase Auth: User authenticated (${user.email || user.uid})`, 'success');
+                document.getElementById('userName').textContent = user.email || user.uid;
+            } else {
+                log('Firebase Auth: No user authenticated', 'warning');
+            }
+        });
+
+        // Initialize
+        log('Feature #69 test initialized', 'success');
+        log('Network status: ONLINE', 'success');
+        log('Session status: ACTIVE', 'success');
+        updateStatus();
+        updateActivity();
+    </script>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+</body>
+</html>

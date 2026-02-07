@@ -1,0 +1,301 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Test Feature #68 - Form Data Persistence</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <style>
+        body {
+            padding: 20px;
+            background: #f8f9fa;
+        }
+        .test-container {
+            max-width: 900px;
+            margin: 0 auto;
+        }
+        .test-section {
+            background: white;
+            padding: 20px;
+            border-radius: 8px;
+            margin-bottom: 20px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        .status-badge {
+            display: inline-block;
+            padding: 4px 12px;
+            border-radius: 4px;
+            font-size: 0.875rem;
+            font-weight: 500;
+        }
+        .status-badge.success {
+            background: #d1f4e0;
+            color: #0d894f;
+        }
+        .status-badge.warning {
+            background: #fff3cd;
+            color: #856404;
+        }
+        .status-badge.error {
+            background: #ffe0e0;
+            color: #d93025;
+        }
+        .form-dirty-indicator {
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            padding: 10px 20px;
+            border-radius: 8px;
+            background: #ffc107;
+            color: #000;
+            font-weight: 600;
+            box-shadow: 0 4px 8px rgba(0,0,0,0.2);
+            z-index: 1000;
+            display: none;
+        }
+        .form-dirty-indicator.show {
+            display: block;
+        }
+    </style>
+</head>
+<body>
+    <div class="test-container">
+        <h1 class="mb-4">
+            <i class="fas fa-save me-2"></i>
+            Feature #68: Form Data Persistence Test
+        </h1>
+
+        <!-- Test Instructions -->
+        <div class="test-section">
+            <h5><i class="fas fa-clipboard-list me-2"></i>Test Steps</h5>
+            <ol>
+                <li>Fill in the campaign name and date range fields</li>
+                <li>Try to refresh the page (F5 or click the Refresh button below)</li>
+                <li>Verify browser shows 'unsaved changes' warning dialog</li>
+                <li>Click "Cancel" to stay on page, or "Leave" to confirm refresh</li>
+                <li>If you leave, verify form data is lost (expected behavior)</li>
+                <li>Fill form again and click "Save Campaign" to clear unsaved state</li>
+                <li>Refresh page - should NOT show warning after saving</li>
+            </ol>
+        </div>
+
+        <!-- Unsaved Changes Indicator -->
+        <div class="form-dirty-indicator" id="dirtyIndicator">
+            <i class="fas fa-exclamation-triangle me-2"></i>
+            Unsaved Changes
+        </div>
+
+        <!-- Campaign Form -->
+        <div class="test-section">
+            <h5><i class="fas fa-bullhorn me-2"></i>Create Campaign</h5>
+            <p class="text-muted mb-4">Test form with unsaved changes detection</p>
+
+            <form id="campaignForm">
+                <div class="row g-3">
+                    <div class="col-12">
+                        <label class="form-label fw-bold">Campaign Name *</label>
+                        <input id="campaignName" type="text" class="form-control form-control-lg"
+                               placeholder="Enter campaign name" required>
+                    </div>
+                    <div class="col-md-6">
+                        <label class="form-label fw-bold">Brand Name *</label>
+                        <input id="brandName" type="text" class="form-control"
+                               placeholder="Enter brand name" required>
+                    </div>
+                    <div class="col-md-6">
+                        <label class="form-label">Store Name</label>
+                        <input id="storeName" type="text" class="form-control"
+                               placeholder="Specific store (optional)">
+                    </div>
+                    <div class="col-md-6">
+                        <label class="form-label fw-bold">Start Date *</label>
+                        <input id="startDate" type="date" class="form-control" required>
+                    </div>
+                    <div class="col-md-6">
+                        <label class="form-label fw-bold">End Date *</label>
+                        <input id="endDate" type="date" class="form-control" required>
+                    </div>
+                    <div class="col-12">
+                        <label class="form-label">Minimum Purchase Amount</label>
+                        <div class="input-group">
+                            <span class="input-group-text">R</span>
+                            <input id="minPurchase" type="number" class="form-control"
+                                   placeholder="0.00" min="0" step="0.01">
+                        </div>
+                    </div>
+                    <div class="col-md-6">
+                        <label class="form-label">Campaign Status</label>
+                        <select id="campaignStatus" class="form-select">
+                            <option value="active">Active</option>
+                            <option value="draft" selected>Draft</option>
+                            <option value="inactive">Inactive</option>
+                        </select>
+                    </div>
+                </div>
+
+                <div class="mt-4">
+                    <button type="submit" class="btn btn-primary">
+                        <i class="fas fa-save me-2"></i>Save Campaign
+                    </button>
+                    <button type="button" class="btn btn-secondary" id="refreshBtn">
+                        <i class="fas fa-refresh me-2"></i>Test Refresh
+                    </button>
+                    <button type="button" class="btn btn-outline-secondary" id="resetBtn">
+                        <i class="fas fa-undo me-2"></i>Reset Form
+                    </button>
+                </div>
+            </form>
+        </div>
+
+        <!-- Test Results -->
+        <div class="test-section">
+            <h5><i class="fas fa-clipboard-check me-2"></i>Test Results</h5>
+            <div id="testResults">
+                <div class="alert alert-info">
+                    <i class="fas fa-info-circle me-2"></i>
+                    Fill out the form and try to refresh the page to test the feature.
+                </div>
+            </div>
+        </div>
+
+        <!-- Technical Details -->
+        <div class="test-section">
+            <h5><i class="fas fa-code me-2"></i>Technical Implementation</h5>
+            <ul>
+                <li><strong>beforeunload event:</strong> Triggers browser warning when form is dirty</li>
+                <li><strong>Form state tracking:</strong> Monitors input changes to set dirty flag</li>
+                <li><strong>Save clears state:</strong> Successful save resets dirty flag</li>
+                <li><strong>Browser behavior:</strong> Refresh warning is native browser dialog</li>
+            </ul>
+        </div>
+
+        <!-- Debug Console -->
+        <div class="test-section">
+            <h5><i class="fas fa-terminal me-2"></i>Debug Console</h5>
+            <div id="debugConsole" style="font-family: monospace; font-size: 0.875rem; background: #f8f9fa; padding: 15px; border-radius: 4px; max-height: 300px; overflow-y: auto;">
+                <div style="color: #6c757d;">Debug messages will appear here...</div>
+            </div>
+        </div>
+    </div>
+
+    <script type="module">
+        // Form dirty state tracking
+        let isFormDirty = false;
+        const form = document.getElementById('campaignForm');
+        const dirtyIndicator = document.getElementById('dirtyIndicator');
+        const debugConsole = document.getElementById('debugConsole');
+        const testResults = document.getElementById('testResults');
+
+        // Debug logging function
+        function debug(message, type = 'info') {
+            const timestamp = new Date().toLocaleTimeString();
+            const colors = {
+                info: '#0d6efd',
+                success: '#198754',
+                warning: '#ffc107',
+                error: '#dc3545'
+            };
+            const logEntry = document.createElement('div');
+            logEntry.style.color = colors[type] || colors.info;
+            logEntry.textContent = `[${timestamp}] ${message}`;
+            debugConsole.appendChild(logEntry);
+            debugConsole.scrollTop = debugConsole.scrollHeight;
+            console.log(`[Feature68] ${message}`);
+        }
+
+        // Mark form as dirty when any input changes
+        function markFormDirty() {
+            if (!isFormDirty) {
+                isFormDirty = true;
+                dirtyIndicator.classList.add('show');
+                debug('Form marked as dirty - unsaved changes detected', 'warning');
+            }
+        }
+
+        // Clear dirty state
+        function clearFormDirty() {
+            isFormDirty = false;
+            dirtyIndicator.classList.remove('show');
+            debug('Form dirty state cleared', 'success');
+        }
+
+        // Listen for input changes on all form fields
+        const formInputs = form.querySelectorAll('input, select, textarea');
+        formInputs.forEach(input => {
+            input.addEventListener('input', markFormDirty);
+            input.addEventListener('change', markFormDirty);
+        });
+
+        // beforeunload handler - triggers browser warning
+        window.addEventListener('beforeunload', (event) => {
+            if (isFormDirty) {
+                debug('beforeunload triggered - form has unsaved changes', 'warning');
+                // Standard way to trigger browser warning
+                event.preventDefault();
+                event.returnValue = ''; // Chrome requires returnValue to be set
+                return ''; // Some browsers use the return value
+            }
+        });
+
+        // Form submission handler
+        form.addEventListener('submit', (event) => {
+            event.preventDefault();
+
+            debug('Form submitted - saving campaign', 'info');
+
+            // Simulate save operation
+            const formData = {
+                campaignName: document.getElementById('campaignName').value,
+                brandName: document.getElementById('brandName').value,
+                storeName: document.getElementById('storeName').value,
+                startDate: document.getElementById('startDate').value,
+                endDate: document.getElementById('endDate').value,
+                minPurchase: document.getElementById('minPurchase').value,
+                status: document.getElementById('campaignStatus').value
+            };
+
+            debug('Campaign data: ' + JSON.stringify(formData, null, 2), 'info');
+
+            // Clear dirty state after save
+            clearFormDirty();
+
+            // Show success message
+            testResults.innerHTML = `
+                <div class="alert alert-success">
+                    <i class="fas fa-check-circle me-2"></i>
+                    <strong>Campaign saved successfully!</strong><br>
+                    Form dirty state has been cleared. You can now refresh without warning.
+                </div>
+            `;
+
+            debug('Campaign saved - dirty state cleared', 'success');
+        });
+
+        // Reset button handler
+        document.getElementById('resetBtn').addEventListener('click', () => {
+            form.reset();
+            clearFormDirty();
+            testResults.innerHTML = `
+                <div class="alert alert-info">
+                    <i class="fas fa-info-circle me-2"></i>
+                    Form has been reset. Fill it out again to test unsaved changes.
+                </div>
+            `;
+            debug('Form reset', 'info');
+        });
+
+        // Test refresh button
+        document.getElementById('refreshBtn').addEventListener('click', () => {
+            debug('Manual refresh triggered', 'warning');
+            window.location.reload();
+        });
+
+        // Initial state
+        debug('Feature #68 test page loaded', 'success');
+        debug('Fill out the form to trigger dirty state', 'info');
+    </script>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+</body>
+</html>
