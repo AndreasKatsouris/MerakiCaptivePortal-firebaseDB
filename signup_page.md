@@ -1,0 +1,38 @@
+- generic [ref=e2]:
+  - generic [ref=e3]:
+    - img "Sparks Hospitality" [ref=e5]
+    - heading "Welcome to Sparks Hospitality" [level=1] [ref=e6]
+    - paragraph [ref=e7]: Choose your plan and start transforming your restaurant operations today
+  - generic [ref=e10]:
+    - generic [ref=e12]:
+      - heading "Free" [level=3] [ref=e13]
+      - generic [ref=e14]: $ 0 /month
+      - paragraph [ref=e15]: Basic features for small operations
+      - list
+      - button "Select Free" [ref=e16] [cursor=pointer]
+    - generic [ref=e18]:
+      - heading "Unnamed Tier" [level=3] [ref=e19]
+      - generic [ref=e20]: $ 0 /month
+      - paragraph
+      - list
+      - button "Select This Plan" [ref=e21] [cursor=pointer]
+    - generic [ref=e23]:
+      - heading "Starter" [level=3] [ref=e24]
+      - generic [ref=e25]: $ 49.99 /month
+      - paragraph [ref=e26]: Essential features for growing businesses
+      - list
+      - button "Select Starter" [ref=e27] [cursor=pointer]
+    - generic [ref=e29]:
+      - heading "Professional" [level=3] [ref=e30]
+      - generic [ref=e31]: $ 99.99 /month
+      - paragraph [ref=e32]: Advanced features for established businesses
+      - list
+      - button "Select Professional" [ref=e33] [cursor=pointer]
+    - generic [ref=e35]:
+      - generic [ref=e36]: Most Popular
+      - heading "Enterprise" [level=3] [ref=e37]
+      - generic [ref=e38]: $ 199.99 /month
+      - paragraph [ref=e39]: Complete solution for larger operations
+      - list
+      - button "Select Enterprise" [ref=e40] [cursor=pointer]
+  - text: 

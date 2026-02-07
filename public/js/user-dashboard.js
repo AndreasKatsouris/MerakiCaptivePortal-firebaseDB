@@ -405,6 +405,9 @@ class UserDashboard {
             // Render locations
             this.renderLocations();
 
+            // Populate location dropdown from Firebase (Feature #63)
+            this.populateLocationDropdown();
+
         } catch (error) {
             console.error('Error loading locations:', error);
             showToast('Error loading locations', 'error');
@@ -413,7 +416,7 @@ class UserDashboard {
 
     renderLocations() {
         const locationsList = document.getElementById('locationsList');
-        
+
         if (this.locations.length === 0) {
             locationsList.innerHTML = `
                 <div class="text-center py-5">
@@ -446,6 +449,74 @@ class UserDashboard {
                 </div>
             </div>
         `).join('');
+    }
+
+    /**
+     * Populate location dropdown from Firebase RTDB (Feature #63)
+     * Dynamically renders dropdown items based on user's locations
+     */
+    populateLocationDropdown() {
+        const dropdown = document.querySelector('#locationDropdown + .dropdown-menu');
+
+        if (!dropdown) {
+            console.warn('[Dashboard] Location dropdown not found');
+            return;
+        }
+
+        // Clear existing items (except "All Locations" which we'll rebuild)
+        dropdown.innerHTML = '';
+
+        // Add "All Locations" option
+        const allLocationsItem = document.createElement('li');
+        allLocationsItem.innerHTML = `
+            <a class="dropdown-item active" href="#" data-location="all">
+                <i class="fas fa-globe me-2"></i>All Locations
+            </a>
+        `;
+        dropdown.appendChild(allLocationsItem);
+
+        // Add divider if we have locations
+        if (this.locations.length > 0) {
+            const divider = document.createElement('li');
+            divider.innerHTML = '<hr class="dropdown-divider">';
+            dropdown.appendChild(divider);
+
+            // Add each location
+            this.locations.forEach(location => {
+                const item = document.createElement('li');
+                item.innerHTML = `
+                    <a class="dropdown-item" href="#" data-location="${location.id}">
+                        <i class="fas fa-store me-2"></i>${location.name}
+                    </a>
+                `;
+                dropdown.appendChild(item);
+            });
+        }
+
+        // Add divider before "Manage Locations"
+        const divider2 = document.createElement('li');
+        divider2.innerHTML = '<hr class="dropdown-divider">';
+        dropdown.appendChild(divider2);
+
+        // Add "Manage Locations" link
+        const manageItem = document.createElement('li');
+        manageItem.innerHTML = `
+            <a class="dropdown-item" href="#locations">
+                <i class="fas fa-cog me-2"></i>Manage Locations
+            </a>
+        `;
+        dropdown.appendChild(manageItem);
+
+        // Re-attach event listeners to new dropdown items
+        dropdown.querySelectorAll('.dropdown-item[data-location]').forEach(item => {
+            item.addEventListener('click', (e) => {
+                e.preventDefault();
+                const locationId = e.target.closest('[data-location]').dataset.location;
+                this.handleLocationChange(locationId);
+            });
+        });
+
+        console.log(`[Dashboard] Location dropdown populated with ${this.locations.length} locations from Firebase`);
     }
 
     async loadStatistics() {

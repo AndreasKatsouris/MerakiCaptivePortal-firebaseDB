@@ -1,0 +1,110 @@
+- generic [active] [ref=e1]:
+  - navigation [ref=e2]:
+    - generic "Toggle Sidebar" [ref=e3] [cursor=pointer]:
+      - generic [ref=e4]: 
+    - heading " Sparks" [level=4] [ref=e6]:
+      - generic [ref=e7]: 
+      - text: Sparks
+    - list [ref=e8]:
+      - listitem [ref=e9]:
+        - link " Dashboard" [ref=e10] [cursor=pointer]:
+          - /url: user-dashboard.html
+          - generic [ref=e11]: 
+          - generic [ref=e12]: Dashboard
+      - listitem [ref=e13]:
+        - link " Queue" [ref=e14] [cursor=pointer]:
+          - /url: queue-management.html
+          - generic [ref=e15]: 
+          - generic [ref=e16]: Queue
+      - listitem [ref=e17]:
+        - link " Bookings" [ref=e18] [cursor=pointer]:
+          - /url: bookings.html
+          - generic [ref=e19]: 
+          - generic [ref=e20]: Bookings
+      - listitem [ref=e21]:
+        - link " Guests" [ref=e22] [cursor=pointer]:
+          - /url: guest-management.html
+          - generic [ref=e23]: 
+          - generic [ref=e24]: Guests
+      - listitem [ref=e25]:
+        - link " Food Cost" [ref=e26] [cursor=pointer]:
+          - /url: food-cost-analytics.html
+          - generic [ref=e27]: 
+          - generic [ref=e28]: Food Cost
+      - listitem [ref=e29]:
+        - link " Campaigns" [ref=e30] [cursor=pointer]:
+          - /url: campaigns.html
+          - generic [ref=e31]: 
+          - generic [ref=e32]: Campaigns
+      - listitem [ref=e33]:
+        - link " Analytics" [ref=e34] [cursor=pointer]:
+          - /url: analytics.html
+          - generic [ref=e35]: 
+          - generic [ref=e36]: Analytics
+      - listitem [ref=e37]:
+        - link " Subscription" [ref=e38] [cursor=pointer]:
+          - /url: user-subscription.html
+          - generic [ref=e39]: 
+          - generic [ref=e40]: Subscription
+  - generic [ref=e42]:
+    - navigation "breadcrumb" [ref=e43]:
+      - list [ref=e44]:
+        - listitem [ref=e45]:
+          - link "Dashboard" [ref=e46] [cursor=pointer]:
+            - /url: user-dashboard.html
+        - listitem [ref=e47]: / Guests
+    - generic [ref=e49]:
+      - generic [ref=e50]:
+        - heading "Guest Management" [level=2] [ref=e51]
+        - generic [ref=e52]:
+          - textbox "Search guests (name or phone)..." [ref=e53]
+          - button " Refreshing..." [disabled]:
+            - generic: 
+            - text: Refreshing...
+          - button "+ Add Guest" [ref=e54] [cursor=pointer]:
+            - generic [ref=e55]: +
+            - text: Add Guest
+          - button " Debug" [ref=e56] [cursor=pointer]:
+            - generic [ref=e57]: 
+            - text: Debug
+          - button " Fix Name Consistency" [ref=e58] [cursor=pointer]:
+            - generic [ref=e59]: 
+            - text: Fix Name Consistency
+      - generic [ref=e60]:
+        - generic [ref=e63]:
+          - heading "Total Guests" [level=6] [ref=e64]
+          - heading "0" [level=3] [ref=e65]
+        - generic [ref=e68]:
+          - heading "Active This Month" [level=6] [ref=e69]
+          - heading "0" [level=3] [ref=e70]
+        - generic [ref=e73]:
+          - heading "Avg Engagement" [level=6] [ref=e74]
+          - heading "0%" [level=3] [ref=e75]
+        - generic [ref=e78]:
+          - heading "Total Revenue" [level=6] [ref=e79]
+          - heading "R0.00" [level=3] [ref=e80]
+      - table [ref=e84]:
+        - rowgroup [ref=e85]:
+          - row "Name  Phone  Visit Frequency  Total Spent  Avg. Spend  Engagement  Favorite Store Last Visit Actions" [ref=e86]:
+            - columnheader "Name " [ref=e87]:
+              - text: Name
+              - generic [ref=e88]: 
+            - columnheader "Phone " [ref=e89]:
+              - text: Phone
+              - generic [ref=e90]: 
+            - columnheader "Visit Frequency " [ref=e91]:
+              - text: Visit Frequency
+              - generic [ref=e92]: 
+            - columnheader "Total Spent " [ref=e93]:
+              - text: Total Spent
+              - generic [ref=e94]: 
+            - columnheader "Avg. Spend " [ref=e95]:
+              - text: Avg. Spend
+              - generic [ref=e96]: 
+            - columnheader "Engagement " [ref=e97]:
+              - text: Engagement
+              - generic [ref=e98]: 
+            - columnheader "Favorite Store" [ref=e99]
+            - columnheader "Last Visit" [ref=e100]
+            - columnheader "Actions" [ref=e101]
+        - rowgroup
