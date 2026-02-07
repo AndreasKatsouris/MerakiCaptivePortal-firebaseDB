@@ -27,11 +27,6 @@ const rtdb = getDatabase(app);
 
 // Connect to emulators if running on localhost
 if (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1') {
-    const { connectDatabaseEmulator } = await import('https://www.gstatic.com/firebasejs/10.12.5/firebase-database.js');
-    const { connectAuthEmulator } = await import('https://www.gstatic.com/firebasejs/10.12.5/firebase-auth.js');
-    const { connectFirestoreEmulator } = await import('https://www.gstatic.com/firebasejs/10.12.5/firebase-firestore.js');
-    const { connectFunctionsEmulator } = await import('https://www.gstatic.com/firebasejs/10.12.5/firebase-functions.js');
-
     try {
         connectDatabaseEmulator(rtdb, 'localhost', 9000);
         connectAuthEmulator(auth, 'http://localhost:9099');
