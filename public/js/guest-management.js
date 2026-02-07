@@ -1,5 +1,5 @@
 // Import Firebase dependencies
-import { auth, rtdb, ref, get, push, set, update, remove } from './config/firebase-config.js';
+import { auth, rtdb, ref, get, push, set, update, remove, query, orderByChild, orderByKey, startAt, endAt, equalTo } from './config/firebase-config.js';
 // Import subscription service for limit checking
 import { canAddGuest } from './modules/access-control/services/subscription-service.js';
 
@@ -445,34 +445,24 @@ const guestManagement = {
                     direction: 'asc'
                 },
                 currentAnalyticsGuest: null,
-                showAddGuestModal: false
+                searchDebounceTimer: null
             };
         },
 
         computed: {
             filteredGuests() {
                 if (!Array.isArray(this.guests)) return [];
-                
-                let result = this.guests;
 
-                if (this.searchQuery) {
-                    const query = this.searchQuery.toLowerCase();
-                    result = result.filter(guest => {
-                        const name = guest?.name || '';
-                        const phone = guest?.phoneNumber || '';
-                        const displayPhone = this.formatPhoneForDisplay(phone);
-                        
-                        // Search in name, normalized phone, and display phone
-                        return name.toLowerCase().includes(query) || 
-                               phone.includes(query) || 
-                               displayPhone.includes(query);
-                    });
-                }
+                // Firebase queries handle search and initial ordering
+                // We only need to apply direction (asc/desc) client-side for Firebase-sorted data
+                let result = [...this.guests];
 
                 const key = this.sortConfig?.key || 'name';
                 const direction = this.sortConfig?.direction || 'asc';
 
-                result = [...result].sort((a, b) => {
+                // Apply client-side sorting direction
+                // (Firebase queries are always ascending, so we reverse for descending)
+                result = result.sort((a, b) => {
                     let aVal = this.getSortValue(a, key) || '';
                     let bVal = this.getSortValue(b, key) || '';
 
@@ -540,17 +530,104 @@ const guestManagement = {
                 this.loading = true;
                 this.error = null;
                 try {
-                    const snapshot = await get(ref(rtdb, 'guests'));
-                    const guestsData = snapshot.val() || {};
-                    
+                    console.log('🔄 Loading guests with Firebase query...', {
+                        searchQuery: this.searchQuery,
+                        sortConfig: this.sortConfig
+                    });
+
+                    let guestsQuery = ref(rtdb, 'guests');
+                    let guestsData = {};
+
+                    // Build Firebase query based on search and sort configuration
+                    // Note: Firebase RTDB can only order by one child at a time
+                    if (this.searchQuery && this.searchQuery.trim()) {
+                        const searchTerm = this.searchQuery.trim().toLowerCase();
+                        console.log('🔍 Applying search filter:', searchTerm);
+
+                        // For name search, use orderByChild with startAt/endAt for prefix matching
+                        // Firebase requires the search term to match the beginning of the value
+                        guestsQuery = query(
+                            ref(rtdb, 'guests'),
+                            orderByChild('name'),
+                            startAt(searchTerm),
+                            endAt(searchTerm + '\uf8ff') // Unicode character that sorts after all printable characters
+                        );
+
+                        const snapshot = await get(guestsQuery);
+                        guestsData = snapshot.val() || {};
+                        console.log('📊 Firebase name search results:', Object.keys(guestsData).length);
+
+                        // Additionally search by phone number (key search)
+                        // Check if search term could be a phone number
+                        if (/^\d+/.test(searchTerm)) {
+                            console.log('🔍 Also searching by phone number...');
+                            const allGuestsSnapshot = await get(ref(rtdb, 'guests'));
+                            const allGuests = allGuestsSnapshot.val() || {};
+
+                            // Find guests by phone number (keys that contain the search term)
+                            Object.entries(allGuests).forEach(([phoneKey, guestData]) => {
+                                if (phoneKey.includes(searchTerm) || phoneKey.toLowerCase().includes(searchTerm)) {
+                                    if (!guestsData[phoneKey]) {
+                                        guestsData[phoneKey] = guestData;
+                                        console.log('📞 Found by phone:', phoneKey);
+                                    }
+                                }
+                            });
+                        }
+                    } else if (this.sortConfig?.key) {
+                        // Apply Firebase sorting when no search is active
+                        const sortKey = this.sortConfig.key;
+                        console.log('📊 Applying Firebase sort:', sortKey);
+
+                        // Map UI sort keys to Firebase child keys
+                        if (sortKey === 'phoneNumber') {
+                            // Phone number is the key, so use orderByKey
+                            guestsQuery = query(
+                                ref(rtdb, 'guests'),
+                                orderByKey()
+                            );
+                            const snapshot = await get(guestsQuery);
+                            guestsData = snapshot.val() || {};
+                            console.log('📊 Firebase orderByKey results:', Object.keys(guestsData).length);
+                        } else if (sortKey.startsWith('metrics.')) {
+                            // Metrics are calculated client-side, cannot sort by Firebase
+                            // Load all guests and sort client-side
+                            console.log('📊 Metrics sort - loading all guests for client-side sorting');
+                            const snapshot = await get(ref(rtdb, 'guests'));
+                            guestsData = snapshot.val() || {};
+                            console.log('📊 Loaded guests for metrics sort:', Object.keys(guestsData).length);
+                        } else if (sortKey === 'name' || sortKey === 'createdAt') {
+                            // Sort by name or createdAt using Firebase orderByChild
+                            guestsQuery = query(
+                                ref(rtdb, 'guests'),
+                                orderByChild(sortKey)
+                            );
+                            const snapshot = await get(guestsQuery);
+                            guestsData = snapshot.val() || {};
+                            console.log(`📊 Firebase orderByChild('${sortKey}') results:`, Object.keys(guestsData).length);
+                        } else {
+                            // Unknown sort key - load all guests
+                            console.log('📊 Unknown sort key, loading all guests');
+                            const snapshot = await get(ref(rtdb, 'guests'));
+                            guestsData = snapshot.val() || {};
+                        }
+                    } else {
+                        // No search or sort - load all guests
+                        console.log('📥 Loading all guests (no filters)');
+                        const snapshot = await get(ref(rtdb, 'guests'));
+                        guestsData = snapshot.val() || {};
+                    }
+
+                    console.log('✅ Firebase query complete, processing guests...');
+
                     // Map guests, phoneNumber keys should already be normalized in database
                     const guestPromises = Object.entries(guestsData).map(async ([phoneNumber, data]) => {
                         // Add phoneNumber to data for metrics calculation
                         const guestDataWithPhone = { ...data, phoneNumber };
-                        
+
                         // Get guest receipts and calculate metrics
                         const metrics = await this.calculateGuestMetrics(guestDataWithPhone);
-                        
+
                         return {
                             phoneNumber, // This should already be normalized from database
                             name: data.name && data.name !== 'N/A' ? data.name : '(Name Pending)',
@@ -565,8 +642,11 @@ const guestManagement = {
 
                     // Wait for all guest metrics to be calculated
                     this.guests = await Promise.all(guestPromises);
+                    console.log('✅ Guests loaded and metrics calculated:', this.guests.length);
                 } catch (error) {
-                    console.error('Error loading guests:', error);
+                    console.error('❌ Error loading guests:', error);
+                    console.error('❌ Error message:', error.message);
+                    console.error('❌ Error stack:', error.stack);
                     this.error = 'Failed to load guests. Please try again.';
                     this.guests = [];
                 } finally {
@@ -1460,12 +1540,34 @@ const guestManagement = {
             }
         },
 
+        watch: {
+            searchQuery: {
+                handler(newValue, oldValue) {
+                    console.log('🔍 Search query changed:', newValue);
+                    // Debounce search to avoid too many Firebase queries
+                    if (this.searchDebounceTimer) {
+                        clearTimeout(this.searchDebounceTimer);
+                    }
+                    this.searchDebounceTimer = setTimeout(() => {
+                        this.loadGuests();
+                    }, 300); // 300ms debounce
+                }
+            },
+            sortConfig: {
+                handler(newValue, oldValue) {
+                    console.log('📊 Sort config changed:', newValue);
+                    this.loadGuests();
+                },
+                deep: true
+            }
+        },
+
         mounted() {
             this.loadGuests();
-            
+
             // Initialize tooltips
             const tooltipTriggerList = [].slice.call(document.querySelectorAll('[data-bs-toggle="tooltip"]'));
-            tooltipTriggerList.map(tooltipTriggerEl => 
+            tooltipTriggerList.map(tooltipTriggerEl =>
                 new bootstrap.Tooltip(tooltipTriggerEl)
             );
         }

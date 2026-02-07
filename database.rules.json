@@ -9,7 +9,7 @@
     "guests": {
       ".read": "auth != null",
       ".write": "auth != null && auth.token.admin === true",
-      ".indexOn": ["phoneNumber", "locationId", "createdAt", "email", "nameCollectedAt"],
+      ".indexOn": ["phoneNumber", "locationId", "createdAt", "email", "nameCollectedAt", "name"],
       "$phoneNumber": {
         ".read": "auth != null && (auth.token.phone_number === $phoneNumber || auth.token.admin === true)",
         ".write": "auth != null && (auth.token.phone_number === $phoneNumber || auth.token.admin === true)"
