@@ -1,0 +1,268 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Feature #70: Multi-Tab Auth State Sync Test</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <style>
+        body {
+            padding: 20px;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+        }
+        .status-box {
+            padding: 20px;
+            border-radius: 8px;
+            margin: 20px 0;
+        }
+        .status-online {
+            background: #d4edda;
+            border: 2px solid #28a745;
+        }
+        .status-offline {
+            background: #f8d7da;
+            border: 2px solid #dc3545;
+        }
+        .log-entry {
+            padding: 8px;
+            margin: 4px 0;
+            border-left: 4px solid #007bff;
+            background: #f8f9fa;
+            font-family: 'Courier New', monospace;
+            font-size: 0.9em;
+        }
+        .log-entry.success {
+            border-left-color: #28a745;
+            background: #d4edda;
+        }
+        .log-entry.error {
+            border-left-color: #dc3545;
+            background: #f8d7da;
+        }
+        .log-entry.info {
+            border-left-color: #17a2b8;
+            background: #d1ecf1;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1 class="mb-4">Feature #70: Multi-Tab Auth State Sync</h1>
+
+        <div class="alert alert-info">
+            <strong>Test Instructions:</strong>
+            <ol>
+                <li>Open this page in <strong>Tab 1</strong> (this tab)</li>
+                <li>Open this same page in <strong>Tab 2</strong> (duplicate tab or new tab)</li>
+                <li>Login in Tab 1 using the form below</li>
+                <li>Check Tab 2 - it should detect the login automatically</li>
+                <li>Logout in Tab 1 using the button below</li>
+                <li>Check Tab 2 - it should detect the logout automatically</li>
+            </ol>
+        </div>
+
+        <!-- Current Auth Status -->
+        <div id="authStatus" class="status-box status-offline">
+            <h3>🔒 Auth Status: <span id="statusText">Not Authenticated</span></h3>
+            <div id="userInfo"></div>
+        </div>
+
+        <!-- Login Form -->
+        <div id="loginSection" class="card mb-4">
+            <div class="card-body">
+                <h4 class="card-title">Login Form</h4>
+                <form id="loginForm">
+                    <div class="mb-3">
+                        <label for="email" class="form-label">Email</label>
+                        <input type="email" class="form-control" id="email" value="testuser.free@sparks.test" required>
+                    </div>
+                    <div class="mb-3">
+                        <label for="password" class="form-label">Password</label>
+                        <input type="password" class="form-control" id="password" value="Password123!" required>
+                    </div>
+                    <button type="submit" class="btn btn-primary">Login in This Tab</button>
+                </form>
+            </div>
+        </div>
+
+        <!-- Logout Button -->
+        <div id="logoutSection" class="card mb-4" style="display: none;">
+            <div class="card-body">
+                <h4 class="card-title">Logout</h4>
+                <button id="logoutBtn" class="btn btn-danger">Logout from This Tab</button>
+            </div>
+        </div>
+
+        <!-- Event Log -->
+        <div class="card">
+            <div class="card-body">
+                <h4 class="card-title">Auth State Change Events</h4>
+                <div id="eventLog"></div>
+            </div>
+        </div>
+
+        <!-- Test Results -->
+        <div class="card mt-4">
+            <div class="card-body">
+                <h4 class="card-title">Test Results</h4>
+                <div id="testResults">
+                    <p>Waiting for tests to complete...</p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Firebase SDK -->
+    <script type="module">
+        import { auth, onAuthStateChanged, signInWithEmailAndPassword, signOut } from '/js/config/firebase-config.js';
+
+        // Test state tracking
+        let loginDetectedInOtherTab = false;
+        let logoutDetectedInOtherTab = false;
+        let loginInitiatedLocally = false;
+        let logoutInitiatedLocally = false;
+
+        // Elements
+        const authStatus = document.getElementById('authStatus');
+        const statusText = document.getElementById('statusText');
+        const userInfo = document.getElementById('userInfo');
+        const loginSection = document.getElementById('loginSection');
+        const logoutSection = document.getElementById('logoutSection');
+        const loginForm = document.getElementById('loginForm');
+        const logoutBtn = document.getElementById('logoutBtn');
+        const eventLog = document.getElementById('eventLog');
+        const testResults = document.getElementById('testResults');
+
+        // Log function
+        function addLog(message, type = 'info') {
+            const timestamp = new Date().toLocaleTimeString();
+            const logEntry = document.createElement('div');
+            logEntry.className = `log-entry ${type}`;
+            logEntry.textContent = `[${timestamp}] ${message}`;
+            eventLog.insertBefore(logEntry, eventLog.firstChild);
+        }
+
+        // Update UI based on auth state
+        function updateAuthUI(user) {
+            if (user) {
+                // Logged in
+                authStatus.className = 'status-box status-online';
+                statusText.textContent = 'Authenticated ✓';
+                userInfo.innerHTML = `
+                    <strong>User ID:</strong> ${user.uid}<br>
+                    <strong>Email:</strong> ${user.email}
+                `;
+                loginSection.style.display = 'none';
+                logoutSection.style.display = 'block';
+            } else {
+                // Logged out
+                authStatus.className = 'status-box status-offline';
+                statusText.textContent = 'Not Authenticated';
+                userInfo.innerHTML = '';
+                loginSection.style.display = 'block';
+                logoutSection.style.display = 'none';
+            }
+        }
+
+        // Update test results
+        function updateTestResults() {
+            const results = [];
+
+            if (loginInitiatedLocally && loginDetectedInOtherTab) {
+                results.push('<div class="alert alert-success">✅ Login detected across tabs</div>');
+            } else if (loginInitiatedLocally) {
+                results.push('<div class="alert alert-warning">⏳ Waiting for login detection in other tab...</div>');
+            }
+
+            if (logoutInitiatedLocally && logoutDetectedInOtherTab) {
+                results.push('<div class="alert alert-success">✅ Logout detected across tabs</div>');
+            } else if (logoutInitiatedLocally) {
+                results.push('<div class="alert alert-warning">⏳ Waiting for logout detection in other tab...</div>');
+            }
+
+            if (results.length === 0) {
+                results.push('<div class="alert alert-info">ℹ️ Waiting for tests to begin...</div>');
+            }
+
+            // Overall status
+            if (loginDetectedInOtherTab && logoutDetectedInOtherTab) {
+                results.push('<div class="alert alert-success"><strong>✅ ALL TESTS PASSED - Multi-tab auth sync working correctly!</strong></div>');
+            }
+
+            testResults.innerHTML = results.join('');
+        }
+
+        // Firebase auth state listener
+        onAuthStateChanged(auth, (user) => {
+            const wasInitiatedLocally = loginInitiatedLocally || logoutInitiatedLocally;
+
+            if (user) {
+                addLog(`🔓 Auth state changed: User logged in (${user.email})`, 'success');
+
+                // Check if this was initiated in another tab
+                if (!loginInitiatedLocally && !wasInitiatedLocally) {
+                    addLog('🔄 Login detected from another tab!', 'success');
+                    loginDetectedInOtherTab = true;
+                } else if (loginInitiatedLocally) {
+                    addLog('✅ Login initiated in this tab', 'info');
+                }
+            } else {
+                addLog('🔒 Auth state changed: User logged out', 'error');
+
+                // Check if this was initiated in another tab
+                if (!logoutInitiatedLocally && wasInitiatedLocally) {
+                    addLog('🔄 Logout detected from another tab!', 'error');
+                    logoutDetectedInOtherTab = true;
+                } else if (logoutInitiatedLocally) {
+                    addLog('✅ Logout initiated in this tab', 'info');
+                }
+            }
+
+            updateAuthUI(user);
+            updateTestResults();
+        });
+
+        // Login form handler
+        loginForm.addEventListener('submit', async (e) => {
+            e.preventDefault();
+
+            const email = document.getElementById('email').value;
+            const password = document.getElementById('password').value;
+
+            try {
+                loginInitiatedLocally = true;
+                addLog(`🔑 Attempting login with ${email}...`, 'info');
+
+                const userCredential = await signInWithEmailAndPassword(auth, email, password);
+
+                addLog(`✅ Login successful: ${userCredential.user.email}`, 'success');
+                addLog('📢 Auth state should now sync to all open tabs', 'info');
+            } catch (error) {
+                addLog(`❌ Login failed: ${error.message}`, 'error');
+                loginInitiatedLocally = false;
+            }
+        });
+
+        // Logout button handler
+        logoutBtn.addEventListener('click', async () => {
+            try {
+                logoutInitiatedLocally = true;
+                addLog('🚪 Initiating logout...', 'info');
+
+                await signOut(auth);
+
+                addLog('✅ Logout successful', 'success');
+                addLog('📢 Auth state should now sync to all open tabs', 'info');
+            } catch (error) {
+                addLog(`❌ Logout failed: ${error.message}`, 'error');
+                logoutInitiatedLocally = false;
+            }
+        });
+
+        // Initial log
+        addLog('🚀 Multi-tab auth sync test page loaded', 'info');
+        addLog('📝 Waiting for auth state changes...', 'info');
+        updateTestResults();
+    </script>
+</body>
+</html>
