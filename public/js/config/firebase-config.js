@@ -1,9 +1,9 @@
 // Import Firebase modules
 import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.12.5/firebase-app.js';
-import { getAuth, signInWithEmailAndPassword, signOut, onAuthStateChanged } from 'https://www.gstatic.com/firebasejs/10.12.5/firebase-auth.js';
-import { getFirestore } from 'https://www.gstatic.com/firebasejs/10.12.5/firebase-firestore.js';
-import { getFunctions, httpsCallable } from 'https://www.gstatic.com/firebasejs/10.12.5/firebase-functions.js';
-import { getDatabase, ref, push, set, get, update, remove, query, onValue, off, serverTimestamp, orderByChild, orderByKey, orderByValue, limitToFirst, limitToLast, startAt, startAfter, endAt, endBefore, equalTo } from 'https://www.gstatic.com/firebasejs/10.12.5/firebase-database.js';
+import { getAuth, signInWithEmailAndPassword, signOut, onAuthStateChanged, connectAuthEmulator } from 'https://www.gstatic.com/firebasejs/10.12.5/firebase-auth.js';
+import { getFirestore, connectFirestoreEmulator } from 'https://www.gstatic.com/firebasejs/10.12.5/firebase-firestore.js';
+import { getFunctions, httpsCallable, connectFunctionsEmulator } from 'https://www.gstatic.com/firebasejs/10.12.5/firebase-functions.js';
+import { getDatabase, ref, push, set, get, update, remove, query, onValue, off, serverTimestamp, orderByChild, orderByKey, orderByValue, limitToFirst, limitToLast, startAt, startAfter, endAt, endBefore, equalTo, connectDatabaseEmulator } from 'https://www.gstatic.com/firebasejs/10.12.5/firebase-database.js';
 import { getStorage, ref as storageRef, uploadBytesResumable, getDownloadURL } from 'https://www.gstatic.com/firebasejs/10.12.5/firebase-storage.js';
 
 // Firebase configuration
@@ -24,6 +24,24 @@ const auth = getAuth(app);
 const db = getFirestore(app);
 const functions = getFunctions(app, 'us-central1'); // Properly set the region during initialization
 const rtdb = getDatabase(app);
+
+// Connect to emulators if running on localhost
+if (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1') {
+    const { connectDatabaseEmulator } = await import('https://www.gstatic.com/firebasejs/10.12.5/firebase-database.js');
+    const { connectAuthEmulator } = await import('https://www.gstatic.com/firebasejs/10.12.5/firebase-auth.js');
+    const { connectFirestoreEmulator } = await import('https://www.gstatic.com/firebasejs/10.12.5/firebase-firestore.js');
+    const { connectFunctionsEmulator } = await import('https://www.gstatic.com/firebasejs/10.12.5/firebase-functions.js');
+
+    try {
+        connectDatabaseEmulator(rtdb, 'localhost', 9000);
+        connectAuthEmulator(auth, 'http://localhost:9099');
+        connectFirestoreEmulator(db, 'localhost', 8080);
+        connectFunctionsEmulator(functions, 'localhost', 5001);
+        console.log('✅ Connected to Firebase emulators');
+    } catch (error) {
+        console.warn('⚠️ Could not connect to emulators:', error.message);
+    }
+}
 
 // Export Firebase instances and auth methods
 export {
