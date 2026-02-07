@@ -1,7 +1,9 @@
 // Import Firebase dependencies
-import { auth, rtdb, ref, get, push, set, update, remove, query, orderByChild, orderByKey, startAt, endAt, equalTo } from './config/firebase-config.js';
+import { auth, rtdb, ref, get, push, set, update, remove, query, orderByChild, orderByKey, startAt, endAt, equalTo, limitToFirst, startAfter } from './config/firebase-config.js';
 // Import subscription service for limit checking
 import { canAddGuest } from './modules/access-control/services/subscription-service.js';
+// Import pagination utility
+import { DatabasePaginator } from './utils/database-paginator.js';
 
 /**
  * Normalize phone number format by removing + prefix and whatsapp: prefix
@@ -414,6 +416,47 @@ const guestManagement = {
                                 </tbody>
                             </table>
                         </div>
+
+                        <!-- Pagination Controls -->
+                        <div v-if="pagination.enabled && filteredGuests.length > 0" class="d-flex justify-content-between align-items-center mt-4">
+                            <div class="text-muted">
+                                Showing {{ (pagination.currentPage - 1) * pagination.pageSize + 1 }}
+                                to {{ Math.min(pagination.currentPage * pagination.pageSize, (pagination.currentPage - 1) * pagination.pageSize + filteredGuests.length) }}
+                                of {{ pagination.totalGuests }} guests
+                            </div>
+                            <nav>
+                                <ul class="pagination mb-0">
+                                    <li class="page-item" :class="{ disabled: pagination.currentPage === 1 }">
+                                        <button class="page-link" @click="goToFirstPage" :disabled="pagination.currentPage === 1">
+                                            <i class="fas fa-step-backward"></i> First
+                                        </button>
+                                    </li>
+                                    <li class="page-item" :class="{ disabled: pagination.currentPage === 1 }">
+                                        <button class="page-link" @click="goToPrevPage" :disabled="pagination.currentPage === 1">
+                                            <i class="fas fa-chevron-left"></i> Previous
+                                        </button>
+                                    </li>
+                                    <li class="page-item active">
+                                        <span class="page-link">
+                                            Page {{ pagination.currentPage }}
+                                        </span>
+                                    </li>
+                                    <li class="page-item" :class="{ disabled: !pagination.hasMore }">
+                                        <button class="page-link" @click="goToNextPage" :disabled="!pagination.hasMore">
+                                            Next <i class="fas fa-chevron-right"></i>
+                                        </button>
+                                    </li>
+                                </ul>
+                            </nav>
+                            <div>
+                                <select v-model.number="pagination.pageSize" @change="onPageSizeChange" class="form-select form-select-sm">
+                                    <option :value="10">10 per page</option>
+                                    <option :value="25">25 per page</option>
+                                    <option :value="50">50 per page</option>
+                                    <option :value="100">100 per page</option>
+                                </select>
+                            </div>
+                        </div>
                     </div>
                 </div>
 
@@ -445,7 +488,18 @@ const guestManagement = {
                     direction: 'asc'
                 },
                 currentAnalyticsGuest: null,
-                searchDebounceTimer: null
+                searchDebounceTimer: null,
+                // Pagination state
+                pagination: {
+                    enabled: true,
+                    currentPage: 1,
+                    pageSize: 25,
+                    totalGuests: 0,
+                    hasMore: false,
+                    lastKey: null,
+                    paginationHistory: [] // Track keys for going back
+                },
+                paginator: new DatabasePaginator()
             };
         },
 
@@ -532,7 +586,12 @@ const guestManagement = {
                 try {
                     console.log('🔄 Loading guests with Firebase query...', {
                         searchQuery: this.searchQuery,
-                        sortConfig: this.sortConfig
+                        sortConfig: this.sortConfig,
+                        pagination: {
+                            currentPage: this.pagination.currentPage,
+                            pageSize: this.pagination.pageSize,
+                            lastKey: this.pagination.lastKey
+                        }
                     });
 
                     let guestsQuery = ref(rtdb, 'guests');
@@ -580,45 +639,126 @@ const guestManagement = {
                         console.log('📊 Applying Firebase sort:', sortKey);
 
                         // Map UI sort keys to Firebase child keys
+                        // PAGINATION: Use limitToFirst() for all queries
                         if (sortKey === 'phoneNumber') {
-                            // Phone number is the key, so use orderByKey
-                            guestsQuery = query(
-                                ref(rtdb, 'guests'),
-                                orderByKey()
-                            );
+                            // Phone number is the key, so use orderByKey with pagination
+                            if (this.pagination.lastKey && this.pagination.currentPage > 1) {
+                                guestsQuery = query(
+                                    ref(rtdb, 'guests'),
+                                    orderByKey(),
+                                    startAfter(this.pagination.lastKey),
+                                    limitToFirst(this.pagination.pageSize + 1) // +1 to check hasMore
+                                );
+                            } else {
+                                guestsQuery = query(
+                                    ref(rtdb, 'guests'),
+                                    orderByKey(),
+                                    limitToFirst(this.pagination.pageSize + 1)
+                                );
+                            }
                             const snapshot = await get(guestsQuery);
                             guestsData = snapshot.val() || {};
-                            console.log('📊 Firebase orderByKey results:', Object.keys(guestsData).length);
+                            console.log(`📊 Firebase orderByKey with limitToFirst(${this.pagination.pageSize}) results:`, Object.keys(guestsData).length);
                         } else if (sortKey.startsWith('metrics.')) {
                             // Metrics are calculated client-side, cannot sort by Firebase
-                            // Load all guests and sort client-side
-                            console.log('📊 Metrics sort - loading all guests for client-side sorting');
-                            const snapshot = await get(ref(rtdb, 'guests'));
-                            guestsData = snapshot.val() || {};
-                            console.log('📊 Loaded guests for metrics sort:', Object.keys(guestsData).length);
-                        } else if (sortKey === 'name' || sortKey === 'createdAt') {
-                            // Sort by name or createdAt using Firebase orderByChild
-                            guestsQuery = query(
-                                ref(rtdb, 'guests'),
-                                orderByChild(sortKey)
-                            );
+                            // Load paginated guests and sort client-side
+                            console.log(`📊 Metrics sort - loading page ${this.pagination.currentPage} for client-side sorting`);
+                            if (this.pagination.lastKey && this.pagination.currentPage > 1) {
+                                guestsQuery = query(
+                                    ref(rtdb, 'guests'),
+                                    orderByKey(),
+                                    startAfter(this.pagination.lastKey),
+                                    limitToFirst(this.pagination.pageSize + 1)
+                                );
+                            } else {
+                                guestsQuery = query(
+                                    ref(rtdb, 'guests'),
+                                    orderByKey(),
+                                    limitToFirst(this.pagination.pageSize + 1)
+                                );
+                            }
                             const snapshot = await get(guestsQuery);
                             guestsData = snapshot.val() || {};
-                            console.log(`📊 Firebase orderByChild('${sortKey}') results:`, Object.keys(guestsData).length);
+                            console.log(`📊 Loaded ${Object.keys(guestsData).length} guests for metrics sort (page ${this.pagination.currentPage})`);
+                        } else if (sortKey === 'name' || sortKey === 'createdAt') {
+                            // Sort by name or createdAt using Firebase orderByChild with pagination
+                            if (this.pagination.lastKey && this.pagination.currentPage > 1) {
+                                guestsQuery = query(
+                                    ref(rtdb, 'guests'),
+                                    orderByChild(sortKey),
+                                    startAfter(this.pagination.lastKey),
+                                    limitToFirst(this.pagination.pageSize + 1)
+                                );
+                            } else {
+                                guestsQuery = query(
+                                    ref(rtdb, 'guests'),
+                                    orderByChild(sortKey),
+                                    limitToFirst(this.pagination.pageSize + 1)
+                                );
+                            }
+                            const snapshot = await get(guestsQuery);
+                            guestsData = snapshot.val() || {};
+                            console.log(`📊 Firebase orderByChild('${sortKey}') with limitToFirst(${this.pagination.pageSize}) results:`, Object.keys(guestsData).length);
                         } else {
-                            // Unknown sort key - load all guests
-                            console.log('📊 Unknown sort key, loading all guests');
-                            const snapshot = await get(ref(rtdb, 'guests'));
+                            // Unknown sort key - load paginated guests
+                            console.log(`📊 Unknown sort key, loading page ${this.pagination.currentPage}`);
+                            if (this.pagination.lastKey && this.pagination.currentPage > 1) {
+                                guestsQuery = query(
+                                    ref(rtdb, 'guests'),
+                                    orderByKey(),
+                                    startAfter(this.pagination.lastKey),
+                                    limitToFirst(this.pagination.pageSize + 1)
+                                );
+                            } else {
+                                guestsQuery = query(
+                                    ref(rtdb, 'guests'),
+                                    orderByKey(),
+                                    limitToFirst(this.pagination.pageSize + 1)
+                                );
+                            }
+                            const snapshot = await get(guestsQuery);
                             guestsData = snapshot.val() || {};
                         }
                     } else {
-                        // No search or sort - load all guests
-                        console.log('📥 Loading all guests (no filters)');
-                        const snapshot = await get(ref(rtdb, 'guests'));
+                        // No search or sort - load paginated guests
+                        console.log(`📥 Loading page ${this.pagination.currentPage} (${this.pagination.pageSize} guests)`);
+                        if (this.pagination.lastKey && this.pagination.currentPage > 1) {
+                            guestsQuery = query(
+                                ref(rtdb, 'guests'),
+                                orderByKey(),
+                                startAfter(this.pagination.lastKey),
+                                limitToFirst(this.pagination.pageSize + 1)
+                            );
+                        } else {
+                            guestsQuery = query(
+                                ref(rtdb, 'guests'),
+                                orderByKey(),
+                                limitToFirst(this.pagination.pageSize + 1)
+                            );
+                        }
+                        const snapshot = await get(guestsQuery);
                         guestsData = snapshot.val() || {};
                     }
 
                     console.log('✅ Firebase query complete, processing guests...');
+
+                    // Handle pagination: Check if we have more data (we fetched pageSize + 1)
+                    const guestKeys = Object.keys(guestsData);
+                    this.pagination.hasMore = guestKeys.length > this.pagination.pageSize;
+
+                    if (this.pagination.hasMore) {
+                        // Remove the extra item (used to detect "has more")
+                        const lastKeyToRemove = guestKeys.pop();
+                        delete guestsData[lastKeyToRemove];
+                        console.log('📄 Pagination: More data available, removed extra item');
+                    }
+
+                    // Store last key for next page navigation
+                    const remainingKeys = Object.keys(guestsData);
+                    if (remainingKeys.length > 0) {
+                        this.pagination.lastKey = remainingKeys[remainingKeys.length - 1];
+                        console.log('📄 Pagination: Last key for next page:', this.pagination.lastKey);
+                    }
 
                     // Map guests, phoneNumber keys should already be normalized in database
                     const guestPromises = Object.entries(guestsData).map(async ([phoneNumber, data]) => {
@@ -643,6 +783,12 @@ const guestManagement = {
                     // Wait for all guest metrics to be calculated
                     this.guests = await Promise.all(guestPromises);
                     console.log('✅ Guests loaded and metrics calculated:', this.guests.length);
+
+                    // Update total count (for pagination display)
+                    // Only do this on first page to avoid unnecessary queries
+                    if (this.pagination.currentPage === 1 || this.pagination.totalGuests === 0) {
+                        await this.updateTotalGuestCount();
+                    }
                 } catch (error) {
                     console.error('❌ Error loading guests:', error);
                     console.error('❌ Error message:', error.message);
@@ -651,6 +797,17 @@ const guestManagement = {
                     this.guests = [];
                 } finally {
                     this.loading = false;
+                }
+            },
+
+            async updateTotalGuestCount() {
+                try {
+                    const snapshot = await get(ref(rtdb, 'guests'));
+                    this.pagination.totalGuests = snapshot.exists() ? Object.keys(snapshot.val()).length : 0;
+                    console.log('📊 Total guests in database:', this.pagination.totalGuests);
+                } catch (error) {
+                    console.error('Error getting total guest count:', error);
+                    this.pagination.totalGuests = 0;
                 }
             },
 
@@ -1372,6 +1529,41 @@ const guestManagement = {
                     console.error('❌ Debug error:', error);
                     Swal.fire('Error', 'Failed to debug guest data', 'error');
                 }
+            },
+
+            // Pagination methods
+            async goToFirstPage() {
+                this.pagination.currentPage = 1;
+                this.pagination.lastKey = null;
+                this.pagination.paginationHistory = [];
+                await this.loadGuests();
+            },
+
+            async goToPrevPage() {
+                if (this.pagination.currentPage > 1) {
+                    this.pagination.currentPage--;
+                    // Restore previous page key
+                    const historyIndex = this.pagination.currentPage - 2;
+                    this.pagination.lastKey = historyIndex >= 0 ? this.pagination.paginationHistory[historyIndex] : null;
+                    await this.loadGuests();
+                }
+            },
+
+            async goToNextPage() {
+                if (this.pagination.hasMore) {
+                    // Store current last key in history before moving forward
+                    this.pagination.paginationHistory[this.pagination.currentPage - 1] = this.pagination.lastKey;
+                    this.pagination.currentPage++;
+                    await this.loadGuests();
+                }
+            },
+
+            async onPageSizeChange() {
+                // Reset to first page when page size changes
+                this.pagination.currentPage = 1;
+                this.pagination.lastKey = null;
+                this.pagination.paginationHistory = [];
+                await this.loadGuests();
             },
 
             async fixDataConsistency() {

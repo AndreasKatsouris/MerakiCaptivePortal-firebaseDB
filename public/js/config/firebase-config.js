@@ -3,7 +3,7 @@ import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.12.5/fireba
 import { getAuth, signInWithEmailAndPassword, signOut, onAuthStateChanged } from 'https://www.gstatic.com/firebasejs/10.12.5/firebase-auth.js';
 import { getFirestore } from 'https://www.gstatic.com/firebasejs/10.12.5/firebase-firestore.js';
 import { getFunctions, httpsCallable } from 'https://www.gstatic.com/firebasejs/10.12.5/firebase-functions.js';
-import { getDatabase, ref, push, set, get, update, remove, query, onValue, off, serverTimestamp, orderByChild, orderByKey, orderByValue, limitToFirst, limitToLast, startAt, endAt, equalTo } from 'https://www.gstatic.com/firebasejs/10.12.5/firebase-database.js';
+import { getDatabase, ref, push, set, get, update, remove, query, onValue, off, serverTimestamp, orderByChild, orderByKey, orderByValue, limitToFirst, limitToLast, startAt, startAfter, endAt, endBefore, equalTo } from 'https://www.gstatic.com/firebasejs/10.12.5/firebase-database.js';
 import { getStorage, ref as storageRef, uploadBytesResumable, getDownloadURL } from 'https://www.gstatic.com/firebasejs/10.12.5/firebase-storage.js';
 
 // Firebase configuration
@@ -51,7 +51,9 @@ export {
     limitToFirst,
     limitToLast,
     startAt,
+    startAfter,
     endAt,
+    endBefore,
     equalTo,
     serverTimestamp
 };
@@ -79,7 +81,9 @@ window.firebaseExports = {
     limitToFirst,
     limitToLast,
     startAt,
+    startAfter,
     endAt,
+    endBefore,
     equalTo,
     serverTimestamp
 };
