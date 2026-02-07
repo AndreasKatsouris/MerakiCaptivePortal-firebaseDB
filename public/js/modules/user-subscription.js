@@ -385,8 +385,16 @@ class UserSubscriptionManager {
                            };
         
         // Update header
-        document.getElementById('accountStatus').textContent = 
-            this.subscription.status === 'active' ? 'Active Account' : 'Inactive';
+        let statusText = 'Inactive';
+        if (this.subscription.status === 'active') {
+            statusText = 'Active Account';
+        } else if (this.subscription.status === 'trial') {
+            const daysRemaining = this.subscription.trialEndDate
+                ? Math.ceil((this.subscription.trialEndDate - Date.now()) / (24 * 60 * 60 * 1000))
+                : 0;
+            statusText = daysRemaining > 0 ? `Trial (${daysRemaining} days left)` : 'Trial Expired';
+        }
+        document.getElementById('accountStatus').textContent = statusText;
         
         // Update plan details
         document.getElementById('currentPlanName').textContent = currentTier.name;
