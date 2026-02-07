@@ -299,32 +299,50 @@ const guestManagement = {
                 <!-- Main Table (Enhanced) -->
                 <div class="card">
                     <div class="card-body">
-                        <div class="table-responsive">
+                        <!-- Empty State -->
+                        <div v-if="filteredGuests.length === 0 && !loading" class="text-center py-5">
+                            <div class="mb-4">
+                                <i class="fas fa-users" style="font-size: 4rem; color: #ccc;"></i>
+                            </div>
+                            <h4 class="text-muted mb-3">No guests yet</h4>
+                            <p class="text-muted mb-4">
+                                {{ searchQuery ? 'No guests match your search criteria.' : 'Start building your guest database by adding your first guest.' }}
+                            </p>
+                            <button v-if="!searchQuery" @click="showAddGuestModal" class="btn btn-primary btn-lg">
+                                <i class="fas fa-plus me-2"></i>Add Guest
+                            </button>
+                            <button v-else @click="searchQuery = ''" class="btn btn-outline-secondary">
+                                <i class="fas fa-times me-2"></i>Clear Search
+                            </button>
+                        </div>
+
+                        <!-- Guest Table -->
+                        <div v-else class="table-responsive">
                             <table class="table">
                                 <thead>
                                     <tr>
                                         <th @click="sort('name')">
-                                            Name 
+                                            Name
                                             <i :class="getSortIcon('name')"></i>
                                         </th>
                                         <th @click="sort('phoneNumber')">
-                                            Phone 
+                                            Phone
                                             <i :class="getSortIcon('phoneNumber')"></i>
                                         </th>
                                         <th @click="sort('metrics.visitCount')">
-                                            Visit Frequency 
+                                            Visit Frequency
                                             <i :class="getSortIcon('metrics.visitCount')"></i>
                                         </th>
                                         <th @click="sort('metrics.totalSpent')">
-                                            Total Spent 
+                                            Total Spent
                                             <i :class="getSortIcon('metrics.totalSpent')"></i>
                                         </th>
                                         <th @click="sort('metrics.averageSpend')">
-                                            Avg. Spend 
+                                            Avg. Spend
                                             <i :class="getSortIcon('metrics.averageSpend')"></i>
                                         </th>
                                         <th @click="sort('metrics.engagementScore')">
-                                            Engagement 
+                                            Engagement
                                             <i :class="getSortIcon('metrics.engagementScore')"></i>
                                         </th>
                                         <th>Favorite Store</th>
@@ -349,8 +367,8 @@ const guestManagement = {
                                         <td>
                                             <div class="d-flex align-items-center">
                                                 <div class="progress flex-grow-1" style="height: 8px;">
-                                                    <div 
-                                                        class="progress-bar" 
+                                                    <div
+                                                        class="progress-bar"
                                                         :class="getEngagementClass(guest.metrics?.engagementScore || 0)"
                                                         :style="{ width: (guest.metrics?.engagementScore || 0) + '%' }"
                                                     ></div>
@@ -362,29 +380,29 @@ const guestManagement = {
                                         <td>{{ formatDate(guest.metrics?.lastVisit) }}</td>
                                         <td>
                                             <div class="btn-group btn-group-sm">
-                                                <button 
-                                                    @click="viewGuest(guest)" 
+                                                <button
+                                                    @click="viewGuest(guest)"
                                                     class="btn btn-info"
                                                     title="View Guest"
                                                 >
                                                     <i class="fas fa-eye"></i>
                                                 </button>
-                                                <button 
-                                                    @click="viewAnalytics(guest)" 
+                                                <button
+                                                    @click="viewAnalytics(guest)"
                                                     class="btn btn-primary"
                                                     title="View Analytics"
                                                 >
                                                     <i class="fas fa-chart-line"></i>
                                                 </button>
-                                                <button 
-                                                    @click="editGuest(guest)" 
+                                                <button
+                                                    @click="editGuest(guest)"
                                                     class="btn btn-warning"
                                                     title="Edit Guest"
                                                 >
                                                     <i class="fas fa-edit"></i>
                                                 </button>
-                                                <button 
-                                                    @click="deleteGuest(guest)" 
+                                                <button
+                                                    @click="deleteGuest(guest)"
                                                     class="btn btn-danger"
                                                     title="Delete Guest"
                                                 >

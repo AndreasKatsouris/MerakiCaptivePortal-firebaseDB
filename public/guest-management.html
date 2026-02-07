@@ -257,74 +257,18 @@
                 </ol>
             </nav>
 
-            <!-- Header -->
-            <div class="d-flex justify-content-between align-items-center mb-4">
-                <h2><i class="fas fa-users me-2"></i>Guest Management</h2>
-                <button class="btn btn-primary">
-                    <i class="fas fa-plus me-2"></i>Add Guest
-                </button>
-            </div>
-
-            <!-- Guests List -->
-            <div id="guestsList">
-                <!-- Sample Guest Cards -->
-                <div class="guest-card" onclick="window.location.href='guest-detail.html?id=1&name=John+Doe'">
-                    <div class="d-flex align-items-center">
-                        <div class="guest-avatar me-3">JD</div>
-                        <div class="flex-grow-1">
-                            <h5 class="mb-1">John Doe</h5>
-                            <p class="text-muted mb-0">
-                                <i class="fas fa-envelope me-2"></i>john.doe@example.com
-                                <i class="fas fa-phone ms-3 me-2"></i>+27 82 123 4567
-                            </p>
-                        </div>
-                        <div class="text-end">
-                            <span class="badge bg-success">Active</span>
-                            <p class="text-muted mb-0 mt-2"><small>Last visit: 2 days ago</small></p>
-                        </div>
-                    </div>
-                </div>
-
-                <div class="guest-card" onclick="window.location.href='guest-detail.html?id=2&name=Jane+Smith'">
-                    <div class="d-flex align-items-center">
-                        <div class="guest-avatar me-3">JS</div>
-                        <div class="flex-grow-1">
-                            <h5 class="mb-1">Jane Smith</h5>
-                            <p class="text-muted mb-0">
-                                <i class="fas fa-envelope me-2"></i>jane.smith@example.com
-                                <i class="fas fa-phone ms-3 me-2"></i>+27 82 987 6543
-                            </p>
-                        </div>
-                        <div class="text-end">
-                            <span class="badge bg-success">Active</span>
-                            <p class="text-muted mb-0 mt-2"><small>Last visit: 1 week ago</small></p>
-                        </div>
-                    </div>
-                </div>
-
-                <div class="guest-card" onclick="window.location.href='guest-detail.html?id=3&name=Mike+Johnson'">
-                    <div class="d-flex align-items-center">
-                        <div class="guest-avatar me-3">MJ</div>
-                        <div class="flex-grow-1">
-                            <h5 class="mb-1">Mike Johnson</h5>
-                            <p class="text-muted mb-0">
-                                <i class="fas fa-envelope me-2"></i>mike.j@example.com
-                                <i class="fas fa-phone ms-3 me-2"></i>+27 82 555 1234
-                            </p>
-                        </div>
-                        <div class="text-end">
-                            <span class="badge bg-secondary">Inactive</span>
-                            <p class="text-muted mb-0 mt-2"><small>Last visit: 3 months ago</small></p>
-                        </div>
-                    </div>
-                </div>
-            </div>
+            <!-- Vue.js Guest Management App -->
+            <div id="guest-management-app"></div>
         </div>
     </div>
 
     <!-- Scripts -->
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+
+    <!-- Vue.js 3 -->
+    <script src="https://unpkg.com/vue@3/dist/vue.global.js"></script>
+
     <script>
         // Sidebar toggle functionality
         document.addEventListener('DOMContentLoaded', function() {
@@ -352,6 +296,15 @@
                     localStorage.setItem('sidebarCollapsed', 'false');
                 }
             });
+        });
+    </script>
+
+    <!-- Initialize Guest Management Vue App -->
+    <script type="module">
+        import { initializeGuestManagement } from './js/guest-management.js';
+
+        document.addEventListener('DOMContentLoaded', function() {
+            initializeGuestManagement();
         });
     </script>
 </body>
