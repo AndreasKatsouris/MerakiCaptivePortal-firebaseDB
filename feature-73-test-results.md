@@ -1,0 +1,64 @@
+- generic [active] [ref=e1]:
+  - generic [ref=e2]:
+    - generic [ref=e3]:
+      - 'heading " Feature #73: URL with Invalid ID Shows Error" [level=1] [ref=e4]':
+        - generic [ref=e5]: 
+        - text: "Feature #73: URL with Invalid ID Shows Error"
+      - paragraph [ref=e6]: Testing that malformed URL parameters are handled gracefully with proper error messages.
+      - generic [ref=e7]:
+        - strong [ref=e8]: "Test Scenario:"
+        - text: "Navigate to /guest-detail.html?id=INVALID_ID_123 and verify:"
+        - list [ref=e9]:
+          - listitem [ref=e10]: "Error message displays: \"Guest not found\""
+          - listitem [ref=e11]: No application crash or console errors
+          - listitem [ref=e12]: Link provided to return to guest list
+          - listitem [ref=e13]: Graceful handling of missing or invalid data
+    - generic [ref=e14]:
+      - heading "Test Cases" [level=3] [ref=e15]
+      - generic [ref=e16]:
+        - 'heading "PENDING Test 1: Invalid ID" [level=5] [ref=e17]':
+          - generic [ref=e18]: PENDING
+          - text: "Test 1: Invalid ID"
+        - paragraph [ref=e19]:
+          - text: "Test URL:"
+          - code [ref=e20]: /guest-detail.html?id=INVALID_ID_123
+        - button " Run Test" [ref=e21] [cursor=pointer]:
+          - generic [ref=e22]: 
+          - text: Run Test
+      - generic [ref=e23]:
+        - 'heading "PENDING Test 2: Missing ID Parameter" [level=5] [ref=e24]':
+          - generic [ref=e25]: PENDING
+          - text: "Test 2: Missing ID Parameter"
+        - paragraph [ref=e26]:
+          - text: "Test URL:"
+          - code [ref=e27]: /guest-detail.html
+        - button " Run Test" [ref=e28] [cursor=pointer]:
+          - generic [ref=e29]: 
+          - text: Run Test
+      - generic [ref=e30]:
+        - 'heading "PENDING Test 3: Non-existent ID" [level=5] [ref=e31]':
+          - generic [ref=e32]: PENDING
+          - text: "Test 3: Non-existent ID"
+        - paragraph [ref=e33]:
+          - text: "Test URL:"
+          - code [ref=e34]: /guest-detail.html?id=nonexistent-guest-999
+        - button " Run Test" [ref=e35] [cursor=pointer]:
+          - generic [ref=e36]: 
+          - text: Run Test
+    - generic [ref=e37]:
+      - heading "Simulated Error Display" [level=3] [ref=e38]
+      - paragraph [ref=e39]: "This is how the error should appear when an invalid ID is provided:"
+      - generic [ref=e40]:
+        - generic [ref=e42]:
+          - generic [ref=e43]: 
+          - generic [ref=e44]:
+            - heading "Guest Not Found" [level=5] [ref=e45]
+            - paragraph [ref=e46]: The guest with ID "INVALID_ID_123" could not be found.
+        - link " Return to Guest List" [ref=e48] [cursor=pointer]:
+          - /url: ../../guest-management.html
+          - generic [ref=e49]: 
+          - text: Return to Guest List
+    - generic [ref=e50]:
+      - heading "Test Results Summary" [level=3] [ref=e51]
+      - paragraph [ref=e53]: Run tests to see results...
+  - paragraph [ref=e54]: Running in emulator mode. Do not use with production credentials.

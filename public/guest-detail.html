@@ -365,40 +365,103 @@
 
     <!-- Scripts -->
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
-    <script>
+    <script type="module">
+        import { auth, rtdb, onAuthStateChanged } from './js/config/firebase-config.js';
+        import { ref, get } from 'https://www.gstatic.com/firebasejs/10.12.5/firebase-database.js';
+
         // Get guest info from URL parameters
         const urlParams = new URLSearchParams(window.location.search);
         const guestId = urlParams.get('id');
-        const guestName = urlParams.get('name') || 'Guest Name';
 
-        // Update page with guest info
-        document.getElementById('guestName').textContent = guestName;
-        document.getElementById('guestNameBreadcrumb').textContent = guestName;
-
-        // Generate initials for avatar
-        const initials = guestName.split(' ').map(n => n[0]).join('').toUpperCase();
-        document.getElementById('guestAvatar').textContent = initials;
-
-        // Mock data based on guest name
-        const guestData = {
-            'John Doe': {
-                email: 'john.doe@example.com',
-                phone: '+27 82 123 4567'
-            },
-            'Jane Smith': {
-                email: 'jane.smith@example.com',
-                phone: '+27 82 987 6543'
-            },
-            'Mike Johnson': {
-                email: 'mike.j@example.com',
-                phone: '+27 82 555 1234'
-            }
-        };
-
-        if (guestData[guestName]) {
-            document.getElementById('guestEmail').textContent = guestData[guestName].email;
-            document.getElementById('guestPhone').textContent = guestData[guestName].phone;
+        // Show error function
+        function showGuestNotFound() {
+            const mainContainer = document.querySelector('.main-container .container-fluid');
+            mainContainer.innerHTML = `
+                <div class="alert alert-danger d-flex align-items-center" role="alert">
+                    <i class="fas fa-exclamation-triangle me-3 fs-4"></i>
+                    <div>
+                        <h5 class="mb-1">Guest Not Found</h5>
+                        <p class="mb-0">The guest with ID "${guestId || 'unknown'}" could not be found.</p>
+                    </div>
+                </div>
+                <div class="text-center mt-4">
+                    <a href="guest-management.html" class="btn btn-primary">
+                        <i class="fas fa-arrow-left me-2"></i>Return to Guest List
+                    </a>
+                </div>
+            `;
         }
+
+        // Load guest data from Firebase
+        async function loadGuestData(user) {
+            if (!guestId) {
+                showGuestNotFound();
+                return;
+            }
+
+            try {
+                // Query Firebase for guest data
+                const guestRef = ref(rtdb, `guests/${guestId}`);
+                const snapshot = await get(guestRef);
+
+                if (!snapshot.exists()) {
+                    showGuestNotFound();
+                    return;
+                }
+
+                const guestData = snapshot.val();
+
+                // Update page with real guest info
+                const guestName = guestData.name || guestData.displayName || 'Unknown Guest';
+                document.getElementById('guestName').textContent = guestName;
+                document.getElementById('guestNameBreadcrumb').textContent = guestName;
+
+                // Generate initials for avatar
+                const initials = guestName.split(' ').map(n => n[0]).join('').toUpperCase().substring(0, 2);
+                document.getElementById('guestAvatar').textContent = initials || 'GN';
+
+                // Update contact info
+                if (guestData.email) {
+                    document.getElementById('guestEmail').textContent = guestData.email;
+                } else {
+                    document.getElementById('guestEmail').textContent = 'Not provided';
+                }
+
+                if (guestData.phone || guestData.phoneNumber) {
+                    document.getElementById('guestPhone').textContent = guestData.phone || guestData.phoneNumber;
+                } else {
+                    document.getElementById('guestPhone').textContent = 'Not provided';
+                }
+
+                // Update last visit info if available
+                if (guestData.lastVisit || guestData.lastWifiLogin) {
+                    const lastVisitDate = new Date(guestData.lastVisit || guestData.lastWifiLogin);
+                    const timeDiff = Date.now() - lastVisitDate.getTime();
+                    const daysDiff = Math.floor(timeDiff / (1000 * 60 * 60 * 24));
+
+                    let lastVisitText = '';
+                    if (daysDiff === 0) lastVisitText = 'Today';
+                    else if (daysDiff === 1) lastVisitText = '1 day ago';
+                    else if (daysDiff < 30) lastVisitText = `${daysDiff} days ago`;
+                    else lastVisitText = lastVisitDate.toLocaleDateString();
+
+                    document.querySelector('.info-value:has(#guestPhone) ~ .info-value span').textContent = lastVisitText;
+                }
+
+            } catch (error) {
+                console.error('Error loading guest data:', error);
+                showGuestNotFound();
+            }
+        }
+
+        // Check authentication and load data
+        onAuthStateChanged(auth, (user) => {
+            if (!user) {
+                window.location.href = '/user-login.html?message=unauthorized';
+                return;
+            }
+            loadGuestData(user);
+        });
 
         // Sidebar toggle functionality
         document.addEventListener('DOMContentLoaded', function() {
