@@ -360,7 +360,7 @@
                 console.log('User authenticated:', user.uid);
 
                 // Check feature access
-                const accessResult = await featureAccessControl.checkFeatureAccess('salesForecasting');
+                const accessResult = await featureAccessControl.checkFeatureAccess('salesForecastingBasic');
 
                 if (!accessResult.hasAccess) {
                     console.log('User does not have access to sales forecasting');
@@ -368,9 +368,9 @@
                     // Show upgrade prompt
                     try {
                         if (typeof featureAccessControl.showUpgradePrompt === 'function') {
-                            await featureAccessControl.showUpgradePrompt('salesForecasting');
+                            await featureAccessControl.showUpgradePrompt('salesForecastingBasic');
                         } else if (typeof featureAccessControl.showAccessDeniedMessage === 'function') {
-                            await featureAccessControl.showAccessDeniedMessage('salesForecasting');
+                            await featureAccessControl.showAccessDeniedMessage('salesForecastingBasic');
                         }
                     } catch (upgradeError) {
                         console.error('Error showing upgrade prompt:', upgradeError);

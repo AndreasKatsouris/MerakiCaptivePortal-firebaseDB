@@ -5,7 +5,7 @@
  * Addresses the user dashboard synchronization problem by ensuring consistent data structure
  */
 
-import { rtdb, ref, set, get, update, auth, onAuthStateChanged } from '../config/firebase-config.js';
+import { rtdb, ref, set, get, update, remove, auth, onAuthStateChanged } from '../config/firebase-config.js';
 
 // Default tier definitions with proper structure
 const DEFAULT_SUBSCRIPTION_TIERS = {
@@ -107,37 +107,48 @@ const DEFAULT_SUBSCRIPTION_TIERS = {
 
 /**
  * Initialize subscription tier data in Firebase
+ * @returns {Promise<{success: boolean, hasAdminAccess: boolean}>}
  */
 export async function initializeSubscriptionTiers() {
     console.log('[TierFix] Initializing subscription tier data...');
-    
+
     try {
         // Check if tiers already exist
         const tiersSnapshot = await get(ref(rtdb, 'subscriptionTiers'));
-        
+
         if (!tiersSnapshot.exists()) {
             console.log('[TierFix] No existing tiers found, creating default tiers...');
-            await set(ref(rtdb, 'subscriptionTiers'), DEFAULT_SUBSCRIPTION_TIERS);
-            console.log('[TierFix] Default subscription tiers created successfully');
+            try {
+                await set(ref(rtdb, 'subscriptionTiers'), DEFAULT_SUBSCRIPTION_TIERS);
+                console.log('[TierFix] Default subscription tiers created successfully');
+                return { success: true, hasAdminAccess: true };
+            } catch (error) {
+                if (error.code === 'PERMISSION_DENIED') {
+                    console.log('[TierFix] No admin privileges - cannot create subscription tiers');
+                    return { success: false, hasAdminAccess: false };
+                }
+                throw error;
+            }
         } else {
             console.log('[TierFix] Subscription tiers already exist');
             // Optionally update existing tiers with missing fields
-            await updateExistingTiers();
+            const updateResult = await updateExistingTiers();
+            return updateResult;
         }
-        
-        return true;
+
     } catch (error) {
         console.error('[TierFix] Error initializing subscription tiers:', error);
-        return false;
+        return { success: false, hasAdminAccess: false };
     }
 }
 
 /**
  * Update existing tiers to ensure they have all required fields
+ * @returns {Promise<{success: boolean, hasAdminAccess: boolean}>}
  */
 async function updateExistingTiers() {
     console.log('[TierFix] Updating existing tiers...');
-    
+
     try {
         // First check if user has admin privileges by testing write access to subscriptionTiers
         const testRef = ref(rtdb, 'subscriptionTiers/test-permission');
@@ -147,15 +158,15 @@ async function updateExistingTiers() {
         } catch (permissionError) {
             if (permissionError.code === 'PERMISSION_DENIED') {
                 console.log('[TierFix] No admin privileges - skipping tier updates (subscription tiers are read-only for regular users)');
-                return;
+                return { success: true, hasAdminAccess: false };
             }
             throw permissionError;
         }
         const tiersSnapshot = await get(ref(rtdb, 'subscriptionTiers'));
         const existingTiers = tiersSnapshot.val();
-        
+
         const updates = {};
-        
+
         // Ensure each tier has all required fields
         Object.entries(DEFAULT_SUBSCRIPTION_TIERS).forEach(([tierId, defaultTier]) => {
             if (!existingTiers[tierId]) {
@@ -177,11 +188,11 @@ async function updateExistingTiers() {
                     },
                     updatedAt: Date.now()
                 };
-                
+
                 updates[`subscriptionTiers/${tierId}`] = updatedTier;
             }
         });
-        
+
         if (Object.keys(updates).length > 0) {
             // Try to update individual tier nodes instead of root to avoid permission issues
             const updatePromises = [];
@@ -193,7 +204,7 @@ async function updateExistingTiers() {
                     );
                 }
             }
-            
+
             if (updatePromises.length > 0) {
                 await Promise.all(updatePromises);
                 console.log('[TierFix] Updated', updatePromises.length, 'tier nodes individually');
@@ -203,12 +214,16 @@ async function updateExistingTiers() {
                 console.log('[TierFix] Updated', Object.keys(updates).length, 'tiers via root');
             }
         }
-        
+
+        return { success: true, hasAdminAccess: true };
+
     } catch (error) {
         if (error.code === 'PERMISSION_DENIED') {
             console.log('[TierFix] Permission denied for tier updates (requires admin privileges) - skipping tier updates');
+            return { success: true, hasAdminAccess: false };
         } else {
             console.error('[TierFix] Error updating existing tiers:', error);
+            return { success: false, hasAdminAccess: false };
         }
     }
 }
@@ -400,27 +415,34 @@ export async function createTestUserWithSubscription(email, tierId = 'free') {
  */
 export async function runCompleteDatabaseFix() {
     console.log('[TierFix] Running complete database fix...');
-    
+
     try {
         // Step 1: Initialize subscription tiers
         console.log('[TierFix] Step 1: Initializing subscription tiers...');
-        await initializeSubscriptionTiers();
-        
-        // Step 2: Fix all user subscriptions
-        console.log('[TierFix] Step 2: Fixing all user subscriptions...');
-        await fixAllUserSubscriptions();
-        
-        console.log('[TierFix] ✅ Complete database fix completed successfully!');
-        
+        const tierResult = await initializeSubscriptionTiers();
+
+        // Step 2: Fix all user subscriptions (only if user has admin access)
+        if (tierResult.hasAdminAccess) {
+            console.log('[TierFix] Step 2: Fixing all user subscriptions...');
+            await fixAllUserSubscriptions();
+            console.log('[TierFix] ✅ Complete database fix completed successfully!');
+        } else {
+            console.log('[TierFix] No admin privileges - skipping user subscription fixes');
+            console.log('[TierFix] ✅ Database fix completed (admin-only steps skipped)');
+        }
+
         return {
             success: true,
-            message: 'Database fix completed successfully',
+            message: tierResult.hasAdminAccess
+                ? 'Database fix completed successfully'
+                : 'Database fix completed (admin-only steps skipped)',
+            hasAdminAccess: tierResult.hasAdminAccess,
             timestamp: Date.now()
         };
-        
+
     } catch (error) {
         console.error('[TierFix] ❌ Error during complete database fix:', error);
-        
+
         return {
             success: false,
             message: 'Database fix failed: ' + error.message,
