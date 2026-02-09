@@ -13,8 +13,10 @@ export class SalesDataService {
      * @param {string} userId - Current user ID
      */
     constructor(userId) {
+        if (!userId) {
+            throw new Error('User ID is required for SalesDataService');
+        }
         this.userId = userId;
-        console.log('[SalesDataService] Initialized for user:', userId);
     }
 
     // ==========================================
@@ -29,6 +31,25 @@ export class SalesDataService {
      * @returns {Promise<Object>} Save result with salesDataId
      */
     async saveHistoricalData(locationId, dailyData, options = {}) {
+        // Input validation
+        if (!locationId) {
+            throw new Error('Location ID is required');
+        }
+
+        if (!Array.isArray(dailyData) || dailyData.length === 0) {
+            throw new Error('Daily data must be a non-empty array');
+        }
+
+        // Validate data structure
+        for (const record of dailyData) {
+            if (!record.date) {
+                throw new Error('Each record must have a date field');
+            }
+            if (typeof record.revenue !== 'number' || record.revenue < 0) {
+                throw new Error('Each record must have a valid non-negative revenue');
+            }
+        }
+
         try {
             const salesDataRef = push(ref(rtdb, 'salesData'));
             const salesDataId = salesDataRef.key;
@@ -64,8 +85,6 @@ export class SalesDataService {
 
             // Update index
             await this.updateSalesDataIndex(salesDataId, locationId, this.userId);
-
-            console.log('[SalesDataService] Saved historical data:', salesDataId);
 
             return {
                 salesDataId,

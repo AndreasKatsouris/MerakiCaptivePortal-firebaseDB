@@ -14,7 +14,6 @@ export class ForecastAnalytics {
      */
     constructor(userId) {
         this.userId = userId;
-        console.log('[ForecastAnalytics] Initialized');
     }
 
     /**
@@ -185,19 +184,29 @@ export class ForecastAnalytics {
 
             // Calculate errors
             const error = actualRevenue - predictedRevenue;
-            const percentError = actualRevenue > 0 ? Math.abs(error / actualRevenue) * 100 : 0;
 
-            absolutePercentErrors.push(percentError);
+            // Calculate percentage error (MAPE component)
+            // When actual is zero, we can't calculate percentage error meaningfully
+            // Skip zero actuals from MAPE calculation but include in other metrics
+            if (actualRevenue > 0) {
+                const percentError = (Math.abs(error) / actualRevenue) * 100;
+                absolutePercentErrors.push(percentError);
+            }
+
             squaredErrors.push(error * error);
             absoluteErrors.push(Math.abs(error));
             signedErrors.push(error);
 
             // Store day-level results
+            const dayPercentError = actualRevenue > 0
+                ? ((Math.abs(error) / actualRevenue) * 100).toFixed(1)
+                : 'N/A';
+
             comparison.dayResults[date] = {
                 predicted: predictedRevenue,
                 actual: actualRevenue,
                 error,
-                percentError: percentError.toFixed(1)
+                percentError: dayPercentError
             };
 
             // Accumulate totals
@@ -321,15 +330,22 @@ export class ForecastAnalytics {
      * Update patterns based on comparison results
      * @param {Object} currentPatterns - Current learned patterns
      * @param {Object} comparison - New comparison data
-     * @returns {Object} Updated patterns
+     * @returns {Object} Updated patterns (new object, not mutated)
      */
     updatePatterns(currentPatterns, comparison) {
-        const patterns = { ...currentPatterns };
-
-        // Initialize weekday factors if not present
-        if (!patterns.weekdayFactors) {
-            patterns.weekdayFactors = { 0: 1, 1: 1, 2: 1, 3: 1, 4: 1, 5: 1, 6: 1 };
-        }
+        // Deep clone to avoid mutations
+        const patterns = {
+            ...currentPatterns,
+            weekdayFactors: currentPatterns.weekdayFactors
+                ? { ...currentPatterns.weekdayFactors }
+                : { 0: 1, 1: 1, 2: 1, 3: 1, 4: 1, 5: 1, 6: 1 },
+            monthlySeasonality: currentPatterns.monthlySeasonality
+                ? { ...currentPatterns.monthlySeasonality }
+                : {},
+            holidayEffects: currentPatterns.holidayEffects
+                ? { ...currentPatterns.holidayEffects }
+                : {}
+        };
 
         // Learn weekday adjustments from errors
         const weekdayErrors = { 0: [], 1: [], 2: [], 3: [], 4: [], 5: [], 6: [] };
@@ -345,17 +361,23 @@ export class ForecastAnalytics {
             }
         }
 
-        // Update factors with exponential moving average
-        const alpha = 0.3; // Learning rate
+        // Update factors with exponential moving average (learning rate 0.3)
+        // Higher alpha = faster learning, lower alpha = more stable
+        const LEARNING_RATE = 0.3;
+        const updatedWeekdayFactors = { ...patterns.weekdayFactors };
+
         for (const [day, errors] of Object.entries(weekdayErrors)) {
             if (errors.length > 0) {
                 const avgError = errors.reduce((a, b) => a + b, 0) / errors.length;
                 const currentFactor = patterns.weekdayFactors[day] || 1;
-                patterns.weekdayFactors[day] = currentFactor * (1 - alpha) + avgError * alpha;
+                updatedWeekdayFactors[day] = currentFactor * (1 - LEARNING_RATE) + avgError * LEARNING_RATE;
             }
         }
 
-        return patterns;
+        return {
+            ...patterns,
+            weekdayFactors: updatedWeekdayFactors
+        };
     }
 
     /**

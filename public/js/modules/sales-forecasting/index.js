@@ -12,6 +12,7 @@
 import { SalesDataService } from './sales-data-service.js';
 import { ForecastEngine } from './forecast-engine.js';
 import { ForecastAnalytics } from './forecast-analytics.js';
+import ChartConfig from './chart-config.js';
 
 export class SalesForecastingModule {
     /**
@@ -39,6 +40,17 @@ export class SalesForecastingModule {
         this.savedDataSets = [];
         this.currentForecast = null;
         this.currentView = 'upload'; // 'upload', 'forecast', 'adjust', 'compare', 'analytics'
+
+        // Chart instances for cleanup
+        this.chartInstances = {
+            forecast: null,
+            comparison: null,
+            methodPerformance: null,
+            seasonal: null
+        };
+
+        // Chart configuration
+        this.chartConfig = ChartConfig;
 
         console.log('[SalesForecastingModule] Initialized');
     }
@@ -192,12 +204,21 @@ export class SalesForecastingModule {
                 adjustments
             );
 
-            // Update local state
+            // Update local state immutably
+            const updatedPredictions = { ...this.currentForecast.predictions };
             Object.entries(adjustments).forEach(([date, adjustment]) => {
-                if (this.currentForecast.predictions[date]) {
-                    this.currentForecast.predictions[date].adjusted = adjustment;
+                if (updatedPredictions[date]) {
+                    updatedPredictions[date] = {
+                        ...updatedPredictions[date],
+                        adjusted: adjustment
+                    };
                 }
             });
+
+            this.currentForecast = {
+                ...this.currentForecast,
+                predictions: updatedPredictions
+            };
 
             return this.currentForecast;
         } catch (error) {
@@ -848,6 +869,156 @@ export class SalesForecastingModule {
                 </div>
             `;
         }
+    }
+
+    /**
+     * Render forecast chart
+     */
+    renderForecastChart() {
+        if (!this.currentForecast) {
+            console.warn('[SalesForecastingModule] No forecast data to render');
+            return;
+        }
+
+        const canvas = document.getElementById('sf-forecast-chart');
+        if (!canvas) {
+            console.error('[SalesForecastingModule] Forecast chart canvas not found');
+            return;
+        }
+
+        // Destroy existing chart
+        if (this.chartInstances.forecast) {
+            this.chartConfig.destroyChart(this.chartInstances.forecast);
+        }
+
+        // Prepare data
+        const historicalData = this.historicalData.map(d => ({
+            date: new Date(d.date),
+            revenue: d.revenue
+        }));
+
+        const forecastData = Object.entries(this.currentForecast.predictions || {}).map(([date, pred]) => ({
+            date: new Date(date),
+            revenue: pred.adjusted?.revenue || pred.original?.revenue || pred.revenue,
+            confidenceInterval: pred.confidenceInterval
+        }));
+
+        // Create chart
+        const config = this.chartConfig.createForecastChartConfig(
+            historicalData,
+            forecastData,
+            {
+                showConfidenceInterval: this.currentForecast.confidenceLevel > 0,
+                chartTitle: '',
+                isCurrency: true
+            }
+        );
+
+        const ctx = canvas.getContext('2d');
+        this.chartInstances.forecast = new Chart(ctx, config);
+
+        console.log('[SalesForecastingModule] Forecast chart rendered');
+    }
+
+    /**
+     * Render comparison chart (forecast vs actuals)
+     */
+    renderComparisonChart(actualData) {
+        if (!this.currentForecast) {
+            console.warn('[SalesForecastingModule] No forecast data to compare');
+            return;
+        }
+
+        const canvas = document.getElementById('sf-comparison-chart');
+        if (!canvas) {
+            console.error('[SalesForecastingModule] Comparison chart canvas not found');
+            return;
+        }
+
+        // Destroy existing chart
+        if (this.chartInstances.comparison) {
+            this.chartConfig.destroyChart(this.chartInstances.comparison);
+        }
+
+        // Prepare forecast data
+        const forecastData = Object.entries(this.currentForecast.predictions || {}).map(([date, pred]) => ({
+            date: new Date(date),
+            revenue: pred.adjusted?.revenue || pred.original?.revenue || pred.revenue
+        }));
+
+        // Create chart
+        const config = this.chartConfig.createComparisonChartConfig(
+            forecastData,
+            actualData,
+            {
+                chartTitle: '',
+                isCurrency: true
+            }
+        );
+
+        const ctx = canvas.getContext('2d');
+        this.chartInstances.comparison = new Chart(ctx, config);
+
+        console.log('[SalesForecastingModule] Comparison chart rendered');
+    }
+
+    /**
+     * Render method performance chart
+     */
+    renderMethodPerformanceChart(methodData) {
+        const canvas = document.getElementById('sf-method-chart');
+        if (!canvas) {
+            console.error('[SalesForecastingModule] Method chart canvas not found');
+            return;
+        }
+
+        // Destroy existing chart
+        if (this.chartInstances.methodPerformance) {
+            this.chartConfig.destroyChart(this.chartInstances.methodPerformance);
+        }
+
+        // Create chart
+        const config = this.chartConfig.createMethodPerformanceChart(methodData);
+        const ctx = canvas.getContext('2d');
+        this.chartInstances.methodPerformance = new Chart(ctx, config);
+
+        console.log('[SalesForecastingModule] Method performance chart rendered');
+    }
+
+    /**
+     * Render seasonal pattern chart
+     */
+    renderSeasonalPatternChart(seasonalData) {
+        const canvas = document.getElementById('sf-seasonal-chart');
+        if (!canvas) {
+            console.error('[SalesForecastingModule] Seasonal chart canvas not found');
+            return;
+        }
+
+        // Destroy existing chart
+        if (this.chartInstances.seasonal) {
+            this.chartConfig.destroyChart(this.chartInstances.seasonal);
+        }
+
+        // Create chart
+        const config = this.chartConfig.createSeasonalPatternChart(seasonalData);
+        const ctx = canvas.getContext('2d');
+        this.chartInstances.seasonal = new Chart(ctx, config);
+
+        console.log('[SalesForecastingModule] Seasonal pattern chart rendered');
+    }
+
+    /**
+     * Clean up all chart instances
+     */
+    destroyAllCharts() {
+        Object.keys(this.chartInstances).forEach(key => {
+            if (this.chartInstances[key]) {
+                this.chartConfig.destroyChart(this.chartInstances[key]);
+                this.chartInstances[key] = null;
+            }
+        });
+        console.log('[SalesForecastingModule] All charts destroyed');
     }
 }
 

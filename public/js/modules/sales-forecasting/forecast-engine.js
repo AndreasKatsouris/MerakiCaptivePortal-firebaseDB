@@ -8,7 +8,6 @@
 export class ForecastEngine {
     constructor() {
         this.analyticsData = null;
-        console.log('[ForecastEngine] Initialized');
     }
 
     /**
@@ -26,6 +25,19 @@ export class ForecastEngine {
      * @returns {Object} Forecast results with predictions
      */
     async generateForecast(historicalData, config) {
+        // Input validation
+        if (!historicalData || !Array.isArray(historicalData)) {
+            throw new Error('Historical data must be a non-empty array');
+        }
+
+        if (historicalData.length === 0) {
+            throw new Error('Historical data is required for forecasting');
+        }
+
+        if (!config || typeof config !== 'object') {
+            throw new Error('Config must be a valid object');
+        }
+
         const {
             method = 'seasonal',
             horizon = 30,
@@ -33,8 +45,14 @@ export class ForecastEngine {
             startDate = null
         } = config;
 
-        if (!historicalData || historicalData.length === 0) {
-            throw new Error('Historical data is required for forecasting');
+        // Validate horizon
+        if (typeof horizon !== 'number' || horizon < 1 || horizon > 365) {
+            throw new Error('Horizon must be a number between 1 and 365');
+        }
+
+        // Validate confidence level
+        if (![0, 80, 90, 95, 99].includes(confidenceLevel)) {
+            throw new Error('Confidence level must be 0, 80, 90, 95, or 99');
         }
 
         // Normalize and sort data
@@ -43,6 +61,13 @@ export class ForecastEngine {
         let predictions;
 
         switch (method) {
+            case 'year_over_year':
+            case 'yoy':
+                predictions = this.yearOverYearForecast(normalizedData, horizon, startDate);
+                break;
+            case 'moving_average':
+                predictions = this.movingAverageForecast(normalizedData, horizon, startDate);
+                break;
             case 'simple_trend':
                 predictions = this.linearRegressionForecast(normalizedData, horizon, startDate);
                 break;
@@ -97,10 +122,187 @@ export class ForecastEngine {
     }
 
     /**
+     * Year-over-Year forecast
+     * Uses same day from last year + growth rate
+     */
+    yearOverYearForecast(data, horizon, startDate = null) {
+        if (data.length < 7) {
+            throw new Error('Year-over-Year forecast requires at least 7 days of historical data');
+        }
+
+        // Helper to format date as YYYY-MM-DD
+        const formatDateKey = (date) => {
+            const d = new Date(date);
+            const year = d.getFullYear();
+            const month = String(d.getMonth() + 1).padStart(2, '0');
+            const day = String(d.getDate()).padStart(2, '0');
+            return `${year}-${month}-${day}`;
+        };
+
+        // Build lookup map by date for quick access
+        const historicByDate = {};
+        data.forEach(d => {
+            const dateStr = formatDateKey(d.date);
+            historicByDate[dateStr] = d;
+        });
+
+        // Build average by day of week as fallback
+        const weekdayAverages = {};
+        const weekdayCounts = {};
+        data.forEach(d => {
+            const dayOfWeek = d.date.getDay();
+            if (!weekdayAverages[dayOfWeek]) {
+                weekdayAverages[dayOfWeek] = 0;
+                weekdayCounts[dayOfWeek] = 0;
+            }
+            weekdayAverages[dayOfWeek] += d.revenue;
+            weekdayCounts[dayOfWeek]++;
+        });
+        Object.keys(weekdayAverages).forEach(day => {
+            weekdayAverages[day] /= weekdayCounts[day];
+        });
+
+        // Calculate YoY growth rate from available data
+        let yoyGrowthRate = 0.05; // Default 5% growth
+        const yearAgoData = [];
+        data.forEach(d => {
+            const oneYearEarlier = new Date(d.date);
+            oneYearEarlier.setFullYear(oneYearEarlier.getFullYear() - 1);
+            const yearAgoKey = formatDateKey(oneYearEarlier);
+            if (historicByDate[yearAgoKey]) {
+                yearAgoData.push({
+                    current: d.revenue,
+                    yearAgo: historicByDate[yearAgoKey].revenue
+                });
+            }
+        });
+
+        if (yearAgoData.length > 0) {
+            const avgCurrent = yearAgoData.reduce((sum, d) => sum + d.current, 0) / yearAgoData.length;
+            const avgYearAgo = yearAgoData.reduce((sum, d) => sum + d.yearAgo, 0) / yearAgoData.length;
+            if (avgYearAgo > 0) {
+                yoyGrowthRate = (avgCurrent - avgYearAgo) / avgYearAgo;
+            }
+        }
+
+        // Generate predictions
+        const predictions = [];
+        const lastDate = startDate ? new Date(startDate) : data[data.length - 1].date;
+        const avgTransactionRatio = this.calculateAvgTransactionRatio(data);
+        const historicalAvgSpend = this.calculateHistoricalAvgSpend(data);
+
+        for (let i = 0; i < horizon; i++) {
+            const forecastDate = new Date(lastDate);
+            forecastDate.setDate(forecastDate.getDate() + i + 1);
+
+            // Look for same day last year
+            const oneYearEarlier = new Date(forecastDate);
+            oneYearEarlier.setFullYear(oneYearEarlier.getFullYear() - 1);
+            const yearAgoKey = formatDateKey(oneYearEarlier);
+
+            let predictedRevenue;
+            if (historicByDate[yearAgoKey]) {
+                // Apply growth rate to last year's value
+                predictedRevenue = historicByDate[yearAgoKey].revenue * (1 + yoyGrowthRate);
+            } else {
+                // Fallback to day-of-week average with growth
+                const dayOfWeek = forecastDate.getDay();
+                predictedRevenue = (weekdayAverages[dayOfWeek] || 0) * (1 + yoyGrowthRate);
+            }
+
+            const predictedTransactions = Math.round(predictedRevenue * avgTransactionRatio);
+            const avgSpend = predictedTransactions > 0
+                ? predictedRevenue / predictedTransactions
+                : historicalAvgSpend;
+
+            predictions.push({
+                date: forecastDate,
+                revenue: Math.max(0, predictedRevenue),
+                transactionQty: predictedTransactions,
+                avgSpend
+            });
+        }
+
+        return predictions;
+    }
+
+    /**
+     * Moving Average forecast
+     * Uses weighted moving average with trend
+     */
+    movingAverageForecast(data, horizon, startDate = null) {
+        if (data.length < 7) {
+            throw new Error('Moving Average forecast requires at least 7 days of historical data');
+        }
+
+        const revenues = data.map(d => d.revenue);
+        const windowSize = Math.min(14, revenues.length); // 2-week window
+
+        // Create linear weights (more recent = higher weight)
+        const weights = [];
+        let weightSum = 0;
+        for (let i = 0; i < windowSize; i++) {
+            const weight = i + 1;
+            weights.push(weight);
+            weightSum += weight;
+        }
+
+        // Calculate weighted average of recent data
+        const recentData = revenues.slice(-windowSize);
+        let weightedSum = 0;
+        for (let i = 0; i < windowSize; i++) {
+            weightedSum += recentData[i] * weights[i];
+        }
+        const baseRevenue = weightedSum / weightSum;
+
+        // Calculate trend from comparing two windows
+        let trend = 0;
+        if (revenues.length >= windowSize * 2) {
+            const previousWindow = revenues.slice(-windowSize * 2, -windowSize);
+            let previousWeightedSum = 0;
+            for (let i = 0; i < windowSize; i++) {
+                previousWeightedSum += previousWindow[i] * weights[i];
+            }
+            const previousAvg = previousWeightedSum / weightSum;
+            trend = (baseRevenue - previousAvg) / windowSize;
+        }
+
+        // Generate predictions
+        const predictions = [];
+        const lastDate = startDate ? new Date(startDate) : data[data.length - 1].date;
+        const avgTransactionRatio = this.calculateAvgTransactionRatio(data);
+        const historicalAvgSpend = this.calculateHistoricalAvgSpend(data);
+
+        for (let i = 0; i < horizon; i++) {
+            const forecastDate = new Date(lastDate);
+            forecastDate.setDate(forecastDate.getDate() + i + 1);
+
+            const predictedRevenue = Math.max(0, baseRevenue + (trend * (i + 1)));
+            const predictedTransactions = Math.round(predictedRevenue * avgTransactionRatio);
+            const avgSpend = predictedTransactions > 0
+                ? predictedRevenue / predictedTransactions
+                : historicalAvgSpend;
+
+            predictions.push({
+                date: forecastDate,
+                revenue: predictedRevenue,
+                transactionQty: predictedTransactions,
+                avgSpend
+            });
+        }
+
+        return predictions;
+    }
+
+    /**
      * Linear regression forecast
      * Uses least squares regression for trend projection
      */
     linearRegressionForecast(data, horizon, startDate = null) {
+        if (data.length < 2) {
+            throw new Error('Linear regression requires at least 2 data points');
+        }
+
         const n = data.length;
         const revenues = data.map(d => d.revenue);
 
@@ -113,11 +315,20 @@ export class ForecastEngine {
             sumX2 += i * i;
         }
 
-        const slope = (n * sumXY - sumX * sumY) / (n * sumX2 - sumX * sumX);
+        // Check for division by zero
+        const denominator = n * sumX2 - sumX * sumX;
+        if (Math.abs(denominator) < 1e-10) {
+            throw new Error('Cannot calculate regression - data points are collinear');
+        }
+
+        const slope = (n * sumXY - sumX * sumY) / denominator;
         const intercept = (sumY - slope * sumX) / n;
 
         // Calculate transaction ratio for projections
         const avgTransactionRatio = this.calculateAvgTransactionRatio(data);
+
+        // Calculate historical average spend as fallback
+        const historicalAvgSpend = this.calculateHistoricalAvgSpend(data);
 
         // Generate predictions
         const predictions = [];
@@ -130,7 +341,9 @@ export class ForecastEngine {
             const dayIndex = n + i;
             const predictedRevenue = Math.max(0, intercept + slope * dayIndex);
             const predictedTransactions = Math.round(predictedRevenue * avgTransactionRatio);
-            const avgSpend = predictedTransactions > 0 ? predictedRevenue / predictedTransactions : 0;
+            const avgSpend = predictedTransactions > 0
+                ? predictedRevenue / predictedTransactions
+                : historicalAvgSpend;
 
             predictions.push({
                 date: forecastDate,
@@ -148,6 +361,11 @@ export class ForecastEngine {
      * Single exponential smoothing with configurable alpha
      */
     exponentialSmoothingForecast(data, horizon, startDate = null, alpha = 0.3) {
+        // Validate alpha parameter
+        if (alpha <= 0 || alpha >= 1) {
+            throw new Error('Alpha must be between 0 and 1 (exclusive)');
+        }
+
         const revenues = data.map(d => d.revenue);
 
         // Calculate smoothed values
@@ -295,6 +513,7 @@ export class ForecastEngine {
 
     /**
      * Apply confidence intervals to predictions
+     * Uses growing uncertainty based on forecast horizon
      */
     applyConfidenceIntervals(predictions, historicalData, confidenceLevel) {
         const stdDev = this.calculateStdDev(historicalData.map(d => d.revenue));
@@ -308,9 +527,14 @@ export class ForecastEngine {
         };
         const zScore = zScores[confidenceLevel] || 1.96;
 
+        // Calculate uncertainty growth rate based on data volatility
+        const volatility = this.calculateVolatility(historicalData);
+        const baseUncertaintyGrowth = Math.max(0.05, Math.min(0.15, volatility));
+
         return predictions.map((pred, i) => {
-            // Increase uncertainty as we forecast further
-            const uncertaintyGrowth = Math.sqrt(1 + i * 0.1);
+            // Increase uncertainty as we forecast further into the future
+            // Using square root of time is standard in financial forecasting
+            const uncertaintyGrowth = Math.sqrt(1 + i * baseUncertaintyGrowth);
             const margin = stdDev * zScore * uncertaintyGrowth;
 
             return {
@@ -487,7 +711,12 @@ export class ForecastEngine {
         const recentAvg = recentWeek.reduce((sum, d) => sum + d.revenue, 0) / recentWeek.length;
         const previousAvg = previousWeek.reduce((sum, d) => sum + d.revenue, 0) / previousWeek.length;
 
-        return previousAvg > 0 ? (recentAvg - previousAvg) / previousAvg : 0;
+        // Handle division by zero
+        if (previousAvg === 0) {
+            return recentAvg > 0 ? 1 : 0; // If we went from 0 to positive, assume 100% growth
+        }
+
+        return (recentAvg - previousAvg) / previousAvg;
     }
 
     calculateVolatility(data) {
@@ -511,10 +740,28 @@ export class ForecastEngine {
 
     calculateAvgTransactionRatio(data) {
         const validData = data.filter(d => d.revenue > 0 && d.transactions > 0);
-        if (validData.length === 0) return 0.007; // Default fallback
+        if (validData.length === 0) {
+            // Calculate fallback from total revenue and transactions
+            const totalRevenue = data.reduce((sum, d) => sum + d.revenue, 0);
+            const totalTransactions = data.reduce((sum, d) => sum + d.transactions, 0);
+            if (totalRevenue > 0 && totalTransactions > 0) {
+                return totalTransactions / totalRevenue;
+            }
+            // Absolute fallback based on typical restaurant metrics (1 transaction per R140)
+            return 1 / 140;
+        }
 
         const totalRatio = validData.reduce((sum, d) => sum + (d.transactions / d.revenue), 0);
         return totalRatio / validData.length;
+    }
+
+    calculateHistoricalAvgSpend(data) {
+        const validData = data.filter(d => d.avgSpend > 0);
+        if (validData.length === 0) {
+            return 0;
+        }
+        const totalAvgSpend = validData.reduce((sum, d) => sum + d.avgSpend, 0);
+        return totalAvgSpend / validData.length;
     }
 
     calculatePatternStrength(patterns) {

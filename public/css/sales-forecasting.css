@@ -1,10 +1,15 @@
 /**
  * Sales Forecasting Module - Styles
+ * Version: 2.1.5-20250606
+ *
+ * Production-ready styles for the user-facing Sales Forecasting module
+ * Follows platform design system with Bootstrap 5 conventions
  */
 
 /* Main container */
 .sales-forecasting-module {
     padding: 0;
+    min-height: 600px;
 }
 
 /* Header */
@@ -112,7 +117,7 @@
     max-height: 100%;
 }
 
-/* Cards enhancement */
+/* Cards enhancement - Production styling */
 .sf-upload-view .card,
 .sf-forecast-view .card,
 .sf-compare-view .card,
@@ -120,7 +125,8 @@
     border: none;
     border-radius: 12px;
     box-shadow: 0 2px 12px rgba(0, 0, 0, 0.08);
-    transition: box-shadow 0.2s ease;
+    transition: box-shadow 0.2s ease, transform 0.2s ease;
+    background: white;
 }
 
 .sf-upload-view .card:hover,
@@ -128,6 +134,7 @@
 .sf-compare-view .card:hover,
 .sf-analytics-view .card:hover {
     box-shadow: 0 4px 20px rgba(0, 0, 0, 0.12);
+    transform: translateY(-2px);
 }
 
 .card-header {
@@ -442,4 +449,384 @@
     opacity: 1;
     visibility: visible;
     bottom: calc(100% + 0.5rem);
+}
+
+/* Chart.js Platform Conventions */
+.sf-chart-wrapper {
+    position: relative;
+    background: white;
+    padding: 1.5rem;
+    border-radius: 12px;
+}
+
+.sf-chart-title {
+    font-size: 1.125rem;
+    font-weight: 600;
+    color: #2c3e50;
+    margin-bottom: 1rem;
+    padding-bottom: 0.75rem;
+    border-bottom: 2px solid #e9ecef;
+}
+
+/* Chart legend positioning */
+.sf-chart-legend {
+    display: flex;
+    justify-content: center;
+    flex-wrap: wrap;
+    gap: 1.5rem;
+    margin-top: 1rem;
+    padding-top: 1rem;
+    border-top: 1px solid #e9ecef;
+}
+
+.sf-chart-legend-item {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    font-size: 0.875rem;
+    color: #6c757d;
+}
+
+.sf-chart-legend-color {
+    width: 20px;
+    height: 12px;
+    border-radius: 2px;
+    flex-shrink: 0;
+}
+
+/* Button group enhancements */
+.sf-button-group {
+    display: flex;
+    gap: 0.75rem;
+    flex-wrap: wrap;
+}
+
+.sf-button-group .btn {
+    flex: 1;
+    min-width: 120px;
+}
+
+/* Form control enhancements */
+.sf-form-group {
+    margin-bottom: 1.25rem;
+}
+
+.sf-form-label {
+    display: block;
+    font-weight: 600;
+    color: #2c3e50;
+    margin-bottom: 0.5rem;
+    font-size: 0.9rem;
+}
+
+.sf-form-control {
+    display: block;
+    width: 100%;
+    padding: 0.75rem;
+    font-size: 1rem;
+    font-weight: 400;
+    line-height: 1.5;
+    color: #495057;
+    background-color: white;
+    border: 1px solid #ced4da;
+    border-radius: 8px;
+    transition: border-color 0.15s ease-in-out, box-shadow 0.15s ease-in-out;
+}
+
+.sf-form-control:focus {
+    border-color: #667eea;
+    outline: 0;
+    box-shadow: 0 0 0 0.2rem rgba(102, 126, 234, 0.25);
+}
+
+.sf-form-control:disabled {
+    background-color: #e9ecef;
+    opacity: 0.6;
+    cursor: not-allowed;
+}
+
+/* Info box for helpful tips */
+.sf-info-box {
+    background: rgba(102, 126, 234, 0.05);
+    border-left: 4px solid #667eea;
+    border-radius: 8px;
+    padding: 1rem 1.25rem;
+    margin-bottom: 1.5rem;
+}
+
+.sf-info-box i {
+    color: #667eea;
+    margin-right: 0.5rem;
+}
+
+.sf-info-box p {
+    margin: 0;
+    color: #2c3e50;
+}
+
+/* Success box */
+.sf-success-box {
+    background: rgba(40, 167, 69, 0.05);
+    border-left: 4px solid #28a745;
+    border-radius: 8px;
+    padding: 1rem 1.25rem;
+    margin-bottom: 1.5rem;
+}
+
+.sf-success-box i {
+    color: #28a745;
+    margin-right: 0.5rem;
+}
+
+/* Warning box */
+.sf-warning-box {
+    background: rgba(255, 193, 7, 0.05);
+    border-left: 4px solid #ffc107;
+    border-radius: 8px;
+    padding: 1rem 1.25rem;
+    margin-bottom: 1.5rem;
+}
+
+.sf-warning-box i {
+    color: #ffc107;
+    margin-right: 0.5rem;
+}
+
+/* Error box */
+.sf-error-box {
+    background: rgba(220, 53, 69, 0.05);
+    border-left: 4px solid #dc3545;
+    border-radius: 8px;
+    padding: 1rem 1.25rem;
+    margin-bottom: 1.5rem;
+}
+
+.sf-error-box i {
+    color: #dc3545;
+    margin-right: 0.5rem;
+}
+
+/* Data quality indicators */
+.sf-quality-indicator {
+    display: inline-flex;
+    align-items: center;
+    padding: 0.375rem 0.75rem;
+    border-radius: 20px;
+    font-size: 0.875rem;
+    font-weight: 600;
+    gap: 0.375rem;
+}
+
+.sf-quality-indicator.excellent {
+    background: rgba(40, 167, 69, 0.1);
+    color: #28a745;
+}
+
+.sf-quality-indicator.good {
+    background: rgba(23, 162, 184, 0.1);
+    color: #17a2b8;
+}
+
+.sf-quality-indicator.fair {
+    background: rgba(255, 193, 7, 0.1);
+    color: #d39e00;
+}
+
+.sf-quality-indicator.poor {
+    background: rgba(220, 53, 69, 0.1);
+    color: #dc3545;
+}
+
+/* Progress indicator */
+.sf-progress {
+    height: 8px;
+    border-radius: 4px;
+    background: #e9ecef;
+    overflow: hidden;
+    margin-bottom: 0.5rem;
+}
+
+.sf-progress-bar {
+    height: 100%;
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    transition: width 0.3s ease;
+}
+
+/* Metric cards for analytics */
+.sf-metric-card {
+    text-align: center;
+    padding: 1.5rem;
+    border-radius: 12px;
+    background: white;
+    border: 1px solid #e9ecef;
+    transition: all 0.2s ease;
+}
+
+.sf-metric-card:hover {
+    border-color: #667eea;
+    box-shadow: 0 4px 12px rgba(102, 126, 234, 0.15);
+    transform: translateY(-2px);
+}
+
+.sf-metric-value {
+    font-size: 2.5rem;
+    font-weight: 700;
+    color: #2c3e50;
+    margin-bottom: 0.5rem;
+    line-height: 1;
+}
+
+.sf-metric-label {
+    font-size: 0.875rem;
+    color: #6c757d;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    font-weight: 600;
+}
+
+.sf-metric-change {
+    font-size: 0.875rem;
+    font-weight: 600;
+    margin-top: 0.5rem;
+}
+
+.sf-metric-change.positive {
+    color: #28a745;
+}
+
+.sf-metric-change.negative {
+    color: #dc3545;
+}
+
+/* Table enhancements for forecast data */
+.sf-table {
+    width: 100%;
+    margin-bottom: 1rem;
+    color: #212529;
+    border-collapse: collapse;
+}
+
+.sf-table thead th {
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    color: white;
+    font-weight: 600;
+    text-align: left;
+    padding: 1rem;
+    border: none;
+    white-space: nowrap;
+}
+
+.sf-table tbody td {
+    padding: 0.875rem 1rem;
+    border-bottom: 1px solid #e9ecef;
+    vertical-align: middle;
+}
+
+.sf-table tbody tr:hover {
+    background-color: #f8f9fa;
+}
+
+.sf-table tbody tr:last-child td {
+    border-bottom: none;
+}
+
+/* Responsive table wrapper */
+.sf-table-responsive {
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+    margin-bottom: 1.5rem;
+}
+
+/* Enhanced mobile responsive */
+@media (max-width: 576px) {
+    .sf-header {
+        padding: 1rem 0;
+    }
+
+    .sf-header h2 {
+        font-size: 1.5rem;
+    }
+
+    .sf-tabs .nav-link {
+        padding: 0.5rem 0.625rem;
+        font-size: 0.85rem;
+    }
+
+    .sf-chart-container {
+        height: 220px;
+    }
+
+    .sf-metric-value {
+        font-size: 1.875rem;
+    }
+
+    .sf-button-group .btn {
+        min-width: 100%;
+    }
+
+    .sf-upload-zone {
+        padding: 1.5rem;
+    }
+
+    .sf-upload-zone h5 {
+        font-size: 1rem;
+    }
+
+    .sf-table thead th {
+        padding: 0.75rem 0.5rem;
+        font-size: 0.875rem;
+    }
+
+    .sf-table tbody td {
+        padding: 0.75rem 0.5rem;
+        font-size: 0.875rem;
+    }
+}
+
+/* Print styles */
+@media print {
+    .sf-header,
+    .sf-tabs,
+    .sf-upload-zone,
+    .sf-button-group,
+    button,
+    .btn {
+        display: none !important;
+    }
+
+    .sf-chart-container {
+        page-break-inside: avoid;
+    }
+
+    .card {
+        box-shadow: none !important;
+        border: 1px solid #dee2e6 !important;
+        page-break-inside: avoid;
+    }
+}
+
+/* High contrast mode support */
+@media (prefers-contrast: high) {
+    .sf-tabs .nav-link.active {
+        border-bottom-width: 4px;
+    }
+
+    .sf-form-control:focus {
+        box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.5);
+    }
+
+    button:focus-visible {
+        outline: 3px solid #667eea;
+    }
+}
+
+/* Reduced motion support */
+@media (prefers-reduced-motion: reduce) {
+    *,
+    *::before,
+    *::after {
+        animation-duration: 0.01ms !important;
+        animation-iteration-count: 1 !important;
+        transition-duration: 0.01ms !important;
+    }
 }

@@ -1,0 +1,447 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate" />
+    <meta http-equiv="Pragma" content="no-cache" />
+    <meta http-equiv="Expires" content="0" />
+    <title>Sales Forecasting - Sparks Hospitality</title>
+
+    <!-- Bootstrap CSS -->
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <!-- Font Awesome -->
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <!-- Table Fixes -->
+    <link href="css/table-fixes.css?v=2.1.5-20250606" rel="stylesheet">
+    <!-- Sales Forecasting Module CSS -->
+    <link href="css/sales-forecasting.css?v=2.1.5-20250606" rel="stylesheet">
+
+    <!-- Chart.js -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <!-- SweetAlert2 -->
+    <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+
+    <style>
+        body {
+            background-color: #f8f9fa;
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+        }
+
+        /* Dashboard Header */
+        .dashboard-header {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 2rem 0;
+            margin-bottom: 2rem;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+        }
+
+        .back-link {
+            color: white;
+            text-decoration: none;
+            display: inline-flex;
+            align-items: center;
+            gap: 0.5rem;
+            margin-bottom: 1rem;
+            transition: opacity 0.2s;
+        }
+
+        .back-link:hover {
+            color: white;
+            opacity: 0.8;
+        }
+
+        .dashboard-header h1 {
+            font-size: 2.5rem;
+            font-weight: 700;
+            margin-bottom: 0.5rem;
+        }
+
+        .dashboard-header p {
+            font-size: 1.1rem;
+            opacity: 0.9;
+            margin-bottom: 0;
+        }
+
+        /* Loading state */
+        .loading-container {
+            min-height: 400px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .spinner-border {
+            width: 3rem;
+            height: 3rem;
+            color: #667eea;
+        }
+
+        /* Empty state */
+        .empty-state {
+            text-align: center;
+            padding: 4rem 2rem;
+        }
+
+        .empty-state i {
+            font-size: 4rem;
+            color: #dee2e6;
+            margin-bottom: 1.5rem;
+        }
+
+        .empty-state h3 {
+            color: #6c757d;
+            margin-bottom: 1rem;
+        }
+
+        .empty-state p {
+            color: #adb5bd;
+            max-width: 500px;
+            margin: 0 auto 2rem;
+        }
+
+        /* Toast notifications */
+        .toast-container {
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            z-index: 9999;
+        }
+
+        /* Skeleton loader */
+        .skeleton {
+            background: linear-gradient(
+                90deg,
+                #f0f0f0 25%,
+                #e0e0e0 50%,
+                #f0f0f0 75%
+            );
+            background-size: 200% 100%;
+            animation: loading 1.5s infinite;
+            border-radius: 4px;
+        }
+
+        @keyframes loading {
+            0% {
+                background-position: 200% 0;
+            }
+            100% {
+                background-position: -200% 0;
+            }
+        }
+
+        .skeleton-text {
+            height: 1rem;
+            margin-bottom: 0.5rem;
+        }
+
+        .skeleton-card {
+            height: 200px;
+            border-radius: 12px;
+        }
+
+        /* Responsive adjustments */
+        @media (max-width: 768px) {
+            .dashboard-header h1 {
+                font-size: 1.75rem;
+            }
+
+            .dashboard-header p {
+                font-size: 1rem;
+            }
+        }
+
+        /* Accessibility improvements */
+        .sr-only {
+            position: absolute;
+            width: 1px;
+            height: 1px;
+            padding: 0;
+            margin: -1px;
+            overflow: hidden;
+            clip: rect(0,0,0,0);
+            white-space: nowrap;
+            border: 0;
+        }
+
+        /* Focus visible for keyboard navigation */
+        button:focus-visible,
+        input:focus-visible,
+        select:focus-visible,
+        a:focus-visible {
+            outline: 2px solid #667eea;
+            outline-offset: 2px;
+        }
+    </style>
+</head>
+<body>
+    <!-- Toast Container -->
+    <div class="toast-container" id="toast-container" aria-live="polite" aria-atomic="true"></div>
+
+    <!-- Dashboard Header -->
+    <div class="dashboard-header">
+        <div class="container">
+            <a href="/user-dashboard.html" class="back-link" aria-label="Back to Dashboard">
+                <i class="fas fa-arrow-left" aria-hidden="true"></i>
+                <span>Back to Dashboard</span>
+            </a>
+            <h1>
+                <i class="fas fa-chart-line me-2" aria-hidden="true"></i>
+                Sales Forecasting
+            </h1>
+            <p>AI-powered sales predictions with multiple forecasting methods</p>
+        </div>
+    </div>
+
+    <!-- Main Content -->
+    <div class="container">
+        <div class="row">
+            <div class="col-12">
+                <!-- Module Container -->
+                <div id="sales-forecasting-container" role="main">
+                    <!-- Loading State -->
+                    <div class="loading-container">
+                        <div class="spinner-border" role="status">
+                            <span class="sr-only">Loading Sales Forecasting Module...</span>
+                        </div>
+                        <p class="mt-3 text-muted">Initializing Sales Forecasting...</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Bootstrap JS Bundle -->
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+
+    <!-- Module Initialization Script -->
+    <script type="module">
+        import { auth, onAuthStateChanged } from './js/config/firebase-config.js';
+        import { featureAccessControl } from './js/modules/access-control/services/feature-access-control.js';
+        import SalesForecastingModule from './js/modules/sales-forecasting/index.js?v=2.1.5-20250606';
+
+        /**
+         * Show toast notification
+         */
+        function showToast(message, type = 'info') {
+            const toastContainer = document.getElementById('toast-container');
+            const toastId = `toast-${Date.now()}`;
+
+            const bgClass = {
+                success: 'bg-success',
+                error: 'bg-danger',
+                warning: 'bg-warning',
+                info: 'bg-info'
+            }[type] || 'bg-info';
+
+            const icon = {
+                success: 'fa-check-circle',
+                error: 'fa-exclamation-circle',
+                warning: 'fa-exclamation-triangle',
+                info: 'fa-info-circle'
+            }[type] || 'fa-info-circle';
+
+            const toastHtml = `
+                <div id="${toastId}" class="toast align-items-center text-white ${bgClass} border-0" role="alert" aria-live="assertive" aria-atomic="true">
+                    <div class="d-flex">
+                        <div class="toast-body">
+                            <i class="fas ${icon} me-2"></i>
+                            ${message}
+                        </div>
+                        <button type="button" class="btn-close btn-close-white me-2 m-auto" data-bs-dismiss="toast" aria-label="Close"></button>
+                    </div>
+                </div>
+            `;
+
+            toastContainer.insertAdjacentHTML('beforeend', toastHtml);
+            const toastElement = document.getElementById(toastId);
+            const toast = new bootstrap.Toast(toastElement, { delay: 5000 });
+            toast.show();
+
+            // Remove from DOM after hidden
+            toastElement.addEventListener('hidden.bs.toast', () => {
+                toastElement.remove();
+            });
+        }
+
+        /**
+         * Show loading state
+         */
+        function showLoading(container) {
+            container.innerHTML = `
+                <div class="loading-container">
+                    <div class="spinner-border" role="status">
+                        <span class="sr-only">Loading...</span>
+                    </div>
+                    <p class="mt-3 text-muted">Loading Sales Forecasting Module...</p>
+                </div>
+            `;
+        }
+
+        /**
+         * Show error state
+         */
+        function showError(container, message) {
+            container.innerHTML = `
+                <div class="alert alert-danger" role="alert">
+                    <h4 class="alert-heading">
+                        <i class="fas fa-exclamation-triangle me-2"></i>
+                        Error
+                    </h4>
+                    <p class="mb-0">${message}</p>
+                </div>
+            `;
+        }
+
+        /**
+         * Show access denied state
+         */
+        function showAccessDenied(container) {
+            container.innerHTML = `
+                <div class="empty-state">
+                    <i class="fas fa-lock"></i>
+                    <h3>Feature Locked</h3>
+                    <p>Sales Forecasting requires a higher subscription tier. Please upgrade your plan to access this feature.</p>
+                    <button class="btn btn-primary" onclick="window.location.href='/user-dashboard.html'">
+                        <i class="fas fa-arrow-left me-2"></i>
+                        Return to Dashboard
+                    </button>
+                </div>
+            `;
+        }
+
+        /**
+         * Get user locations from database
+         */
+        async function getUserLocations(userId) {
+            try {
+                const { database, ref, get } = await import('./js/config/firebase-config.js');
+                const locationsRef = ref(database, `users/${userId}/locations`);
+                const snapshot = await get(locationsRef);
+
+                if (!snapshot.exists()) {
+                    return [];
+                }
+
+                const locationsData = snapshot.val();
+                return Object.entries(locationsData).map(([id, data]) => ({
+                    id,
+                    name: data.name || 'Unnamed Location',
+                    ...data
+                }));
+            } catch (error) {
+                console.error('Error fetching user locations:', error);
+                return [];
+            }
+        }
+
+        /**
+         * Initialize the application
+         */
+        async function initializeApp() {
+            const container = document.getElementById('sales-forecasting-container');
+
+            try {
+                // Wait for authentication
+                const user = await new Promise((resolve, reject) => {
+                    const unsubscribe = onAuthStateChanged(auth, (user) => {
+                        unsubscribe();
+                        if (user) {
+                            resolve(user);
+                        } else {
+                            reject(new Error('Not authenticated'));
+                        }
+                    }, reject);
+                });
+
+                console.log('User authenticated:', user.uid);
+
+                // Check feature access
+                const accessResult = await featureAccessControl.checkFeatureAccess('salesForecasting');
+
+                if (!accessResult.hasAccess) {
+                    console.log('User does not have access to sales forecasting');
+
+                    // Show upgrade prompt
+                    try {
+                        if (typeof featureAccessControl.showUpgradePrompt === 'function') {
+                            await featureAccessControl.showUpgradePrompt('salesForecasting');
+                        } else if (typeof featureAccessControl.showAccessDeniedMessage === 'function') {
+                            await featureAccessControl.showAccessDeniedMessage('salesForecasting');
+                        }
+                    } catch (upgradeError) {
+                        console.error('Error showing upgrade prompt:', upgradeError);
+                    }
+
+                    showAccessDenied(container);
+
+                    // Redirect after 5 seconds
+                    setTimeout(() => {
+                        window.location.href = '/user-dashboard.html';
+                    }, 5000);
+
+                    return;
+                }
+
+                console.log('User has access to sales forecasting');
+
+                // Get user's locations
+                const locations = await getUserLocations(user.uid);
+
+                if (locations.length === 0) {
+                    container.innerHTML = `
+                        <div class="empty-state">
+                            <i class="fas fa-map-marker-alt"></i>
+                            <h3>No Locations Found</h3>
+                            <p>You need at least one location to use sales forecasting. Please add a location first.</p>
+                            <button class="btn btn-primary" onclick="window.location.href='/user-dashboard.html'">
+                                <i class="fas fa-arrow-left me-2"></i>
+                                Return to Dashboard
+                            </button>
+                        </div>
+                    `;
+                    return;
+                }
+
+                // Initialize the Sales Forecasting Module
+                const moduleInstance = new SalesForecastingModule({
+                    containerId: 'sales-forecasting-container',
+                    locations: locations,
+                    userId: user.uid,
+                    isAdmin: false
+                });
+
+                await moduleInstance.initialize();
+
+                console.log('Sales Forecasting Module initialized successfully');
+                showToast('Sales Forecasting Module loaded successfully', 'success');
+
+                // Expose module instance for debugging
+                window.salesForecastingModule = moduleInstance;
+
+            } catch (error) {
+                console.error('Error initializing sales forecasting:', error);
+
+                if (error.message === 'Not authenticated') {
+                    window.location.href = '/user-login.html?message=unauthorized&redirect=/sales-forecasting.html';
+                } else {
+                    showError(container, `Failed to initialize Sales Forecasting: ${error.message}`);
+                    showToast(`Initialization error: ${error.message}`, 'error');
+                }
+            }
+        }
+
+        // Initialize on DOM ready
+        document.addEventListener('DOMContentLoaded', initializeApp);
+
+        // Handle visibility change for potential refresh
+        document.addEventListener('visibilitychange', () => {
+            if (!document.hidden && window.salesForecastingModule) {
+                console.log('Page became visible, module already loaded');
+            }
+        });
+    </script>
+</body>
+</html>
