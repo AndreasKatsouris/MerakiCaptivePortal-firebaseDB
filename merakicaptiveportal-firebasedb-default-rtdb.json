@@ -1901,6 +1901,96 @@
       "version": "3.0"
     }
   },
+  "subscriptionTiers": {
+    "bronze": {
+      "name": "Bronze",
+      "monthlyPrice": 0,
+      "description": "Perfect for single-location restaurants getting started",
+      "features": {
+        "locations": 1,
+        "users": 2,
+        "guestProfiles": 500,
+        "campaigns": 2,
+        "analytics": false,
+        "apiAccess": false,
+        "support": "Email"
+      },
+      "limits": {
+        "maxLocations": 1,
+        "maxUsers": 2,
+        "maxGuests": 500,
+        "maxCampaigns": 2,
+        "whatsappNumbers": 1,
+        "receiptsPerMonth": 100
+      }
+    },
+    "silver": {
+      "name": "Silver",
+      "monthlyPrice": 499,
+      "description": "Growing restaurants with multiple locations",
+      "features": {
+        "locations": 3,
+        "users": 5,
+        "guestProfiles": 2000,
+        "campaigns": 5,
+        "analytics": true,
+        "apiAccess": false,
+        "support": "Email & Chat"
+      },
+      "limits": {
+        "maxLocations": 3,
+        "maxUsers": 5,
+        "maxGuests": 2000,
+        "maxCampaigns": 5,
+        "whatsappNumbers": 3,
+        "receiptsPerMonth": 500
+      }
+    },
+    "gold": {
+      "name": "Gold",
+      "monthlyPrice": 999,
+      "description": "Multi-location operators with advanced needs",
+      "features": {
+        "locations": 10,
+        "users": 15,
+        "guestProfiles": 10000,
+        "campaigns": -1,
+        "analytics": true,
+        "apiAccess": true,
+        "support": "Priority Support"
+      },
+      "limits": {
+        "maxLocations": 10,
+        "maxUsers": 15,
+        "maxGuests": 10000,
+        "maxCampaigns": -1,
+        "whatsappNumbers": 10,
+        "receiptsPerMonth": 2000
+      }
+    },
+    "platinum": {
+      "name": "Platinum",
+      "monthlyPrice": 1999,
+      "description": "Enterprise franchise groups at scale",
+      "features": {
+        "locations": -1,
+        "users": -1,
+        "guestProfiles": -1,
+        "campaigns": -1,
+        "analytics": true,
+        "apiAccess": true,
+        "support": "Dedicated Account Manager"
+      },
+      "limits": {
+        "maxLocations": -1,
+        "maxUsers": -1,
+        "maxGuests": -1,
+        "maxCampaigns": -1,
+        "whatsappNumbers": -1,
+        "receiptsPerMonth": -1
+      }
+    }
+  },
   "users": {
     "OTnjPiIxRNejaJuaxoPrbFBw3L42": {
       "email": "andreas@askgroupholdings.com",
