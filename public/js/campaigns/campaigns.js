@@ -1557,9 +1557,35 @@ export function initializeCampaignManagement() {
 
                 if (result.isConfirmed) {
                     try {
-                        await remove(ref(rtdb, `campaigns/${campaign.id}`));
+                        // CASCADE DELETE: Clean up campaign references
+                        const campaignId = campaign.id;
+
+                        // 1. Get all receipts that reference this campaign
+                        const receiptsRef = ref(rtdb, 'receipts');
+                        const receiptsSnapshot = await get(receiptsRef);
+
+                        if (receiptsSnapshot.exists()) {
+                            const receipts = receiptsSnapshot.val();
+                            const updates = {};
+
+                            // Null out campaignId for all receipts referencing this campaign
+                            Object.entries(receipts).forEach(([receiptId, receipt]) => {
+                                if (receipt.campaignId === campaignId) {
+                                    updates[`receipts/${receiptId}/campaignId`] = null;
+                                }
+                            });
+
+                            // Apply updates if any receipts need to be cleaned up
+                            if (Object.keys(updates).length > 0) {
+                                await update(ref(rtdb), updates);
+                            }
+                        }
+
+                        // 2. Delete the campaign itself
+                        await remove(ref(rtdb, `campaigns/${campaignId}`));
+
                         await this.loadCampaigns();
-                        Swal.fire('Deleted!', 'Campaign has been deleted.', 'success');
+                        Swal.fire('Deleted!', 'Campaign and references have been removed.', 'success');
                     } catch (error) {
                         console.error('Error deleting campaign:', error);
                         Swal.fire('Error', 'Failed to delete campaign', 'error');

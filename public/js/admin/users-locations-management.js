@@ -1774,8 +1774,15 @@ export class UsersLocationsManagement {
         if (!this.locationToDelete) return;
 
         try {
-            // Delete the location
-            await remove(ref(rtdb, `locations/${this.locationToDelete}`));
+            // CASCADE DELETE: Remove all associated data
+            const locationId = this.locationToDelete;
+
+            // 1. Delete all queues for this location
+            const queuesRef = ref(rtdb, `queues/${locationId}`);
+            await remove(queuesRef);
+
+            // 2. Delete the location itself
+            await remove(ref(rtdb, `locations/${locationId}`));
 
             // Close modal
             const modalElement = document.getElementById('deleteLocationModal');
@@ -1785,7 +1792,7 @@ export class UsersLocationsManagement {
             }
 
             // Show success message
-            this.showSuccessMessage('Location deleted successfully');
+            this.showSuccessMessage('Location and associated data deleted successfully');
 
             this.locationToDelete = null;
 

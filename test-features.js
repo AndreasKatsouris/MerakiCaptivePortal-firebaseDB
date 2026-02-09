@@ -33,9 +33,9 @@ async function testFeature6() {
   });
 
   try {
-    // Step 1: Open browser to localhost:5173
-    console.log('Step 1: Navigating to http://localhost:5173');
-    await page.goto('http://localhost:5173', { waitUntil: 'networkidle', timeout: 30000 });
+    // Step 1: Open browser to localhost:5177
+    console.log('Step 1: Navigating to http://localhost:5177');
+    await page.goto('http://localhost:5177', { waitUntil: 'networkidle', timeout: 30000 });
 
     // Wait for page to be fully loaded
     await page.waitForLoadState('domcontentloaded');
@@ -102,7 +102,7 @@ async function testFeature7() {
   try {
     // Step 1: Load application homepage
     console.log('Step 1: Loading application homepage...');
-    await page.goto('http://localhost:5173', { waitUntil: 'networkidle', timeout: 30000 });
+    await page.goto('http://localhost:5177', { waitUntil: 'networkidle', timeout: 30000 });
     await page.waitForLoadState('domcontentloaded');
     await page.waitForTimeout(1000);
 
