@@ -26,7 +26,8 @@ const functions = getFunctions(app, 'us-central1'); // Properly set the region d
 const rtdb = getDatabase(app);
 
 // Connect to emulators if running on localhost
-if (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1') {
+// TEMPORARILY DISABLED for Feature #83/#84 testing - emulators not running
+if (false && (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1')) {
     try {
         connectDatabaseEmulator(rtdb, 'localhost', 9000);
         connectAuthEmulator(auth, 'http://localhost:9099');
