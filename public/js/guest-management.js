@@ -511,7 +511,10 @@ const guestManagement = {
                     lastKey: null,
                     paginationHistory: [] // Track keys for going back
                 },
-                paginator: new DatabasePaginator()
+                paginator: new DatabasePaginator(),
+                // Idempotency flags to prevent double-click issues
+                isSubmittingGuest: false,
+                isDeletingGuest: false
             };
         },
 
@@ -1027,7 +1030,8 @@ const guestManagement = {
                 try {
                     const limitCheck = await canAddGuest();
 
-                    if (!limitCheck.canAdd) {
+                    // Only block if the limit is truly reached (not an error case)
+                    if (!limitCheck.canAdd && !limitCheck.error) {
                         await Swal.fire({
                             title: 'Guest Limit Reached',
                             html: `
@@ -1046,6 +1050,10 @@ const guestManagement = {
                             }
                         });
                         return;
+                    }
+                    // If there's an error checking the limit, allow proceeding
+                    if (limitCheck.error) {
+                        console.warn('Guest limit check failed, allowing guest creation:', limitCheck.error);
                     }
                 } catch (error) {
                     console.error('Error checking guest limits:', error);
@@ -1070,6 +1078,12 @@ const guestManagement = {
                     confirmButtonText: 'Add',
                     cancelButtonText: 'Cancel',
                     preConfirm: () => {
+                        // Prevent double submission
+                        if (this.isSubmittingGuest) {
+                            Swal.showValidationMessage('Please wait, submitting...');
+                            return false;
+                        }
+
                         const name = Swal.getPopup().querySelector('#name').value;
                         const phoneNumber = Swal.getPopup().querySelector('#phoneNumber').value;
 
@@ -1090,6 +1104,13 @@ const guestManagement = {
                 });
 
                 if (formValues) {
+                    // Prevent double submission with flag
+                    if (this.isSubmittingGuest) {
+                        console.warn('Guest submission already in progress, ignoring duplicate request');
+                        return;
+                    }
+
+                    this.isSubmittingGuest = true;
                     try {
                         const now = new Date().toISOString();
                         // Use normalized phone number as database key
@@ -1139,6 +1160,9 @@ const guestManagement = {
                     } catch (error) {
                         console.error('Error adding guest:', error);
                         Swal.fire('Error', 'Failed to add guest', 'error');
+                    } finally {
+                        // Always reset the flag, even if error occurred
+                        this.isSubmittingGuest = false;
                     }
                 }
             },
@@ -1375,6 +1399,12 @@ const guestManagement = {
             },
 
             async deleteGuest(guest) {
+                // Prevent double deletion
+                if (this.isDeletingGuest) {
+                    console.warn('Delete operation already in progress, ignoring duplicate request');
+                    return;
+                }
+
                 console.log('🗑️ Starting guest deletion process...');
                 console.log('Guest data:', {
                     name: guest.name,
@@ -1402,6 +1432,8 @@ const guestManagement = {
                 });
 
                 if (result.isConfirmed) {
+                    // Set the flag to prevent duplicate deletes
+                    this.isDeletingGuest = true;
                     try {
                         console.log('✅ User confirmed deletion, proceeding...');
                         
@@ -1482,6 +1514,9 @@ const guestManagement = {
                             code: error.code
                         });
                         Swal.fire('Error', `Failed to delete guest: ${error.message}`, 'error');
+                    } finally {
+                        // Always reset the flag, even if error occurred
+                        this.isDeletingGuest = false;
                     }
                 }
             },
