@@ -46,7 +46,8 @@ const SUBSCRIPTION_TIERS = {
       campaignsBasic: true,
       rewardsBasic: true,
       whatsappBasic: true,
-      multiLocation: true
+      multiLocation: true,
+      salesForecastingBasic: true
     },
     limits: {
       guestRecords: 2000,
@@ -73,7 +74,8 @@ const SUBSCRIPTION_TIERS = {
       foodCostBasic: true,
       bookingManagement: true,
       bookingAdvanced: true,
-      bookingAnalytics: true
+      bookingAnalytics: true,
+      salesForecastingAdvanced: true
     },
     limits: {
       guestRecords: 10000,
@@ -92,7 +94,8 @@ const SUBSCRIPTION_TIERS = {
       // All professional features plus these
       campaignsCustom: true,
       rewardsCustom: true,
-      advancedFoodCostCalculation: true
+      advancedFoodCostCalculation: true,
+      salesForecastingAnalytics: true
     },
     limits: {
       guestRecords: Infinity,
