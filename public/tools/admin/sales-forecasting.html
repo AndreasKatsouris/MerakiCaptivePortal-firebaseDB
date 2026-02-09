@@ -1106,15 +1106,15 @@
         let configModified = false;         // Config changed and regenerated
         let valuesModified = false;         // Manual adjustments applied
 
-        // Initialize admin authentication
+        // Initialize with optional authentication for user-facing version
         async function initializeAdminAuth() {
-            console.log('[SalesForecasting] Starting admin authentication...');
+            console.log('[SalesForecasting] Starting initialization...');
 
             try {
                 // Wait for Firebase auth to be ready
                 await new Promise((resolve) => {
                     const unsubscribe = onAuthStateChanged(auth, (user) => {
-                        console.log('[SalesForecasting] Auth state ready, user:', user ? user.email : 'null');
+                        console.log('[SalesForecasting] Auth state ready, user:', user ? user.email : 'guest');
                         unsubscribe();
                         resolve();
                     });
@@ -1123,44 +1123,48 @@
                 // Get current user directly from Firebase auth
                 const user = auth.currentUser;
 
-                if (!user) {
-                    console.log('[SalesForecasting] No user found, redirecting...');
-                    window.location.href = '../admin-dashboard.html';
-                    return;
+                if (user) {
+                    currentUser = user;
+                    await user.getIdToken(true);
+                    console.log('[SalesForecasting] Authenticated user:', user.email);
+
+                    // Initialize module services with user
+                    dataService = new SalesDataService(user.uid);
+                    analytics = new ForecastAnalytics(user.uid);
+                } else {
+                    console.log('[SalesForecasting] Guest mode - limited features');
+                    // Initialize module services without user (guest mode)
+                    dataService = new SalesDataService(null);
+                    analytics = new ForecastAnalytics(null);
                 }
 
-                currentUser = user;
-                await user.getIdToken(true);
-
-                const hasAdminAccess = await AdminClaims.verifyAdminStatus(user);
-
-                if (!hasAdminAccess) {
-                    console.warn('[SalesForecasting] User does not have admin privileges');
-                    window.location.href = '../admin-dashboard.html';
-                    return;
-                }
-
-                console.log('[SalesForecasting] Admin verification successful');
+                // Always allow access - this is now a user-facing tool
                 document.body.classList.add('admin-verified');
                 document.getElementById('loadingOverlay').classList.add('hidden');
 
-                // Initialize module services
-                dataService = new SalesDataService(user.uid);
+                // Initialize forecast engine (no auth required)
                 forecastEngine = new ForecastEngine();
-                analytics = new ForecastAnalytics(user.uid);
 
-                // Load locations
+                // Load locations (may be limited for guest users)
                 await loadLocations();
 
                 // Initialize page features
                 initializePageFeatures();
 
-                // Load analytics for recommendations
-                await loadLocationAnalytics();
+                // Load analytics for recommendations (if authenticated)
+                if (user) {
+                    await loadLocationAnalytics();
+                }
 
             } catch (error) {
-                console.error('[SalesForecasting] Authentication error:', error);
-                window.location.href = '../admin-dashboard.html';
+                console.error('[SalesForecasting] Initialization error:', error);
+                // Don't redirect - show error message instead and allow guest access
+                document.body.classList.add('admin-verified');
+                document.getElementById('loadingOverlay').classList.add('hidden');
+                // Show error toast if available
+                if (window.showToast) {
+                    showToast('Some features may be limited. Please sign in for full access.', 'warning');
+                }
             }
         }
 
