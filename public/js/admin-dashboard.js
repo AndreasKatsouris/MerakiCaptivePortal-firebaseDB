@@ -214,6 +214,43 @@ import { authManager } from './auth/auth.js?v=20250131-fix';
 import { initializeAdminTierManagement } from './modules/access-control/admin/tier-management.js';
 import { initializeEnhancedUserSubscriptionManager, cleanupEnhancedUserSubscriptionManager } from './modules/access-control/admin/enhanced-user-subscription-manager.js';
 
+// CRITICAL: Admin Page Guard - Prevent unauthorized access
+// Hide page content immediately
+if (document.body) {
+    document.body.style.display = 'none';
+}
+
+// Set up auth guard listener
+console.log('[AdminDashboard] Setting up authentication guard...');
+auth.onAuthStateChanged(async (user) => {
+    console.log('[AdminDashboard] Auth state:', user ? `User ${user.uid}` : 'No user');
+
+    if (!user) {
+        console.warn('[AdminDashboard] No user - redirecting to login');
+        window.location.href = '/admin-login.html';
+        return;
+    }
+
+    try {
+        const isAdmin = await AdminClaims.verifyAdminStatus(user);
+        if (!isAdmin) {
+            console.error('[AdminDashboard] Not an admin - access denied');
+            alert('Access Denied: Admin privileges required');
+            await auth.signOut();
+            window.location.href = '/admin-login.html';
+            return;
+        }
+
+        console.log('[AdminDashboard] Admin verified - showing page');
+        if (document.body) {
+            document.body.style.display = 'block';
+        }
+    } catch (error) {
+        console.error('[AdminDashboard] Auth verification error:', error);
+        window.location.href = '/admin-login.html';
+    }
+});
+
 async function verifyAdminAccess() {
     const hasAccess = await AdminClaims.checkAndRedirect();
     if (!hasAccess) {

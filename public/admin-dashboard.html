@@ -37,6 +37,9 @@
     <!-- Custom Scripts - Load in proper order -->
     <script type="module" src="js/config/firebase-config.js"></script>
 
+    <!-- CRITICAL: Admin Authentication Guard - MUST load early -->
+    <script type="module" src="js/auth/admin-page-guard.js"></script>
+
     <!-- Phone Number Protection Utilities -->
     <script src="js/utils/phone-number-protection.js"></script>
     <script src="js/utils/phone-number-monitoring.js"></script>
@@ -177,6 +180,11 @@
     <script type="module" src="js/modules/access-control/admin/enhanced-user-subscription-manager.js"></script>
 
     <style>
+        /* CRITICAL: Hide page until authentication verified */
+        body.auth-checking {
+            display: none !important;
+        }
+
         /* Vue.js related styles */
         [v-cloak] {
             display: none;
@@ -275,7 +283,9 @@
     </style>
 </head>
 
-<body>
+<body style="display: none;">
+    <!-- Admin Page Guard script loaded in <head> will show body after auth verification -->
+
     <!-- Main container -->
     <div class="wrapper">
         <!-- Sidebar -->

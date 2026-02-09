@@ -1,0 +1,256 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Test: Shareable Filter URLs - Feature #75</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <style>
+        body {
+            padding: 40px;
+            background-color: #f8f9fa;
+        }
+        .demo-box {
+            background: white;
+            padding: 30px;
+            border-radius: 8px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+            margin-bottom: 30px;
+        }
+        .test-result {
+            padding: 15px;
+            border-radius: 5px;
+            margin-top: 15px;
+        }
+        .test-result.success {
+            background-color: #d1e7dd;
+            border: 1px solid #0f5132;
+            color: #0f5132;
+        }
+        .test-result.info {
+            background-color: #cfe2ff;
+            border: 1px solid: #084298;
+            color: #084298;
+        }
+        .url-display {
+            background-color: #f8f9fa;
+            padding: 10px;
+            border-radius: 4px;
+            font-family: monospace;
+            word-break: break-all;
+        }
+        .guest-item {
+            padding: 10px;
+            border: 1px solid #dee2e6;
+            border-radius: 4px;
+            margin-bottom: 8px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        .guest-item.active {
+            background-color: #d1e7dd;
+        }
+        .guest-item.inactive {
+            background-color: #f8d7da;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1 class="mb-4">Feature #75: Shareable Filter URLs Test</h1>
+
+        <div class="demo-box">
+            <h3>Test Controls</h3>
+            <div class="mb-3">
+                <label class="form-label">Status Filter:</label>
+                <select id="statusFilter" class="form-select" style="max-width: 200px;">
+                    <option value="all">All Guests</option>
+                    <option value="active">Active</option>
+                    <option value="inactive">Inactive</option>
+                </select>
+            </div>
+
+            <div class="mb-3">
+                <label class="form-label">Search:</label>
+                <input type="text" id="searchInput" class="form-control" placeholder="Search guests..." style="max-width: 300px;">
+            </div>
+
+            <button id="applyFiltersBtn" class="btn btn-primary">Apply Filters & Update URL</button>
+            <button id="resetBtn" class="btn btn-secondary">Reset</button>
+        </div>
+
+        <div class="demo-box">
+            <h3>Current URL</h3>
+            <div class="url-display" id="currentUrl"></div>
+
+            <div class="test-result info mt-3">
+                <strong>✓ URL Parameters Detected:</strong>
+                <div id="urlParams" class="mt-2"></div>
+            </div>
+        </div>
+
+        <div class="demo-box">
+            <h3>Test Data (Mock Guests)</h3>
+            <div id="guestList"></div>
+
+            <div class="test-result success mt-3">
+                <strong id="filterResultText"></strong>
+            </div>
+        </div>
+
+        <div class="demo-box">
+            <h3>Feature #75 Verification Steps</h3>
+            <ol>
+                <li>✓ Select a filter from the dropdown (e.g., "Active")</li>
+                <li>✓ Click "Apply Filters & Update URL"</li>
+                <li>✓ Notice the URL includes ?status=active</li>
+                <li>✓ Copy the URL from the address bar</li>
+                <li>✓ Open it in a new tab (or refresh this page)</li>
+                <li>✓ Verify the filter is pre-applied from URL</li>
+                <li>✓ Verify the guest list is filtered correctly</li>
+            </ol>
+        </div>
+    </div>
+
+    <script>
+        // Mock guest data with status
+        const mockGuests = [
+            { id: 1, name: "John Doe", phone: "+27821234567", lastVisit: new Date(Date.now() - 10 * 24 * 60 * 60 * 1000), status: "active" },
+            { id: 2, name: "Jane Smith", phone: "+27827654321", lastVisit: new Date(Date.now() - 120 * 24 * 60 * 60 * 1000), status: "inactive" },
+            { id: 3, name: "Bob Johnson", phone: "+27829876543", lastVisit: new Date(Date.now() - 5 * 24 * 60 * 60 * 1000), status: "active" },
+            { id: 4, name: "Alice Williams", phone: "+27821112222", lastVisit: new Date(Date.now() - 200 * 24 * 60 * 60 * 1000), status: "inactive" },
+            { id: 5, name: "Charlie Brown", phone: "+27823334444", lastVisit: new Date(Date.now() - 15 * 24 * 60 * 60 * 1000), status: "active" }
+        ];
+
+        let currentFilter = 'all';
+        let currentSearch = '';
+
+        // Read filters from URL on page load
+        function readFiltersFromURL() {
+            const urlParams = new URLSearchParams(window.location.search);
+            const status = urlParams.get('status');
+            const search = urlParams.get('search');
+
+            if (status && ['all', 'active', 'inactive'].includes(status)) {
+                currentFilter = status;
+                document.getElementById('statusFilter').value = status;
+                console.log('📋 Applied status filter from URL:', status);
+            }
+
+            if (search) {
+                currentSearch = search;
+                document.getElementById('searchInput').value = search;
+                console.log('🔍 Applied search filter from URL:', search);
+            }
+
+            updateURLDisplay();
+            renderGuestList();
+        }
+
+        // Update URL with current filters
+        function updateURLWithFilters() {
+            const url = new URL(window.location.href);
+
+            if (currentFilter && currentFilter !== 'all') {
+                url.searchParams.set('status', currentFilter);
+            } else {
+                url.searchParams.delete('status');
+            }
+
+            if (currentSearch && currentSearch.trim()) {
+                url.searchParams.set('search', currentSearch.trim());
+            } else {
+                url.searchParams.delete('search');
+            }
+
+            // Update URL without reloading
+            window.history.pushState({}, '', url);
+            console.log('🔗 Updated URL with filters');
+
+            updateURLDisplay();
+        }
+
+        // Update URL display
+        function updateURLDisplay() {
+            document.getElementById('currentUrl').textContent = window.location.href;
+
+            const urlParams = new URLSearchParams(window.location.search);
+            const params = [];
+            for (const [key, value] of urlParams) {
+                params.push(`${key} = "${value}"`);
+            }
+
+            document.getElementById('urlParams').innerHTML = params.length > 0
+                ? params.map(p => `<div>• ${p}</div>`).join('')
+                : '<div><em>No parameters</em></div>';
+        }
+
+        // Render filtered guest list
+        function renderGuestList() {
+            const guestListEl = document.getElementById('guestList');
+
+            let filteredGuests = mockGuests.filter(guest => {
+                // Apply status filter
+                if (currentFilter !== 'all' && guest.status !== currentFilter) {
+                    return false;
+                }
+
+                // Apply search filter
+                if (currentSearch && currentSearch.trim()) {
+                    const searchLower = currentSearch.toLowerCase();
+                    return guest.name.toLowerCase().includes(searchLower) ||
+                           guest.phone.includes(searchLower);
+                }
+
+                return true;
+            });
+
+            if (filteredGuests.length === 0) {
+                guestListEl.innerHTML = '<div class="text-muted">No guests match the current filters</div>';
+            } else {
+                guestListEl.innerHTML = filteredGuests.map(guest => `
+                    <div class="guest-item ${guest.status}">
+                        <div>
+                            <strong>${guest.name}</strong><br>
+                            <small>${guest.phone} • Last visit: ${guest.lastVisit.toLocaleDateString()}</small>
+                        </div>
+                        <span class="badge bg-${guest.status === 'active' ? 'success' : 'secondary'}">
+                            ${guest.status.toUpperCase()}
+                        </span>
+                    </div>
+                `).join('');
+            }
+
+            // Update result text
+            const totalGuests = mockGuests.length;
+            const displayedGuests = filteredGuests.length;
+            const filterText = currentFilter !== 'all' ? ` (${currentFilter})` : '';
+            const searchText = currentSearch ? ` matching "${currentSearch}"` : '';
+
+            document.getElementById('filterResultText').textContent =
+                `Showing ${displayedGuests} of ${totalGuests} guests${filterText}${searchText}`;
+        }
+
+        // Event listeners
+        document.getElementById('applyFiltersBtn').addEventListener('click', () => {
+            currentFilter = document.getElementById('statusFilter').value;
+            currentSearch = document.getElementById('searchInput').value;
+            updateURLWithFilters();
+            renderGuestList();
+        });
+
+        document.getElementById('resetBtn').addEventListener('click', () => {
+            currentFilter = 'all';
+            currentSearch = '';
+            document.getElementById('statusFilter').value = 'all';
+            document.getElementById('searchInput').value = '';
+            updateURLWithFilters();
+            renderGuestList();
+        });
+
+        // Initialize on page load
+        readFiltersFromURL();
+    </script>
+</body>
+</html>

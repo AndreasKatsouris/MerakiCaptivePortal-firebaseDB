@@ -1,0 +1,6 @@
+Total messages: 24 (Errors: 3, Warnings: 0)
+Returning 3 messages for level "error"
+
+[ERROR] [JavaScript Error: "Cross-Origin Request Blocked: The Same Origin Policy disallows reading the remote resource at http://localhost:9099/identitytoolkit.googleapis.com/v1/accounts:signInWithPassword?key=AIzaSyBf96GNLhtz6FDdbLxIW9efh98WG__eQmk. (Reason: CORS request did not succeed). Status code: (null)."] @ :0
+[ERROR] [AdminLogin] Login error: Error @ http://localhost:5000/js/admin/login.js:114
+[ERROR] [JavaScript Error: "Cross-Origin Request Blocked: The Same Origin Policy disallows reading the remote resource at http://localhost:9099/identitytoolkit.googleapis.com/v1/accounts:signInWithPassword?key=AIzaSyBf96GNLhtz6FDdbLxIW9efh98WG__eQmk. (Reason: CORS request did not succeed). Status code: (null)."] @ :0

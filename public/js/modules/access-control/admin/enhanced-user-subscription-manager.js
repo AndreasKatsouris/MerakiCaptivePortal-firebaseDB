@@ -269,8 +269,8 @@ const EnhancedUserSubscriptionManager = {
         case 'tiers':
           await this.loadTierDefinitions();
           await this.loadRecentTierChanges();
-          this.$nextTick(() => {
-            this.initializeTierCharts();
+          this.$nextTick(async () => {
+            await this.initializeTierCharts();
           });
           break;
         case 'lifecycle':
@@ -1699,7 +1699,7 @@ const EnhancedUserSubscriptionManager = {
       }
     },
     
-    initializeTierCharts() {
+    async initializeTierCharts() {
       // Initialize tier revenue chart
       const revenueCtx = document.getElementById('tierRevenueChart')?.getContext('2d');
       if (revenueCtx && window.Chart) {
@@ -1709,7 +1709,7 @@ const EnhancedUserSubscriptionManager = {
           const userCount = this.dashboardMetrics.tierDistribution[tierId] || 0;
           return (tier.monthlyPrice || 0) * userCount;
         });
-        
+
         new window.Chart(revenueCtx, {
           type: 'bar',
           data: {
@@ -1740,7 +1740,7 @@ const EnhancedUserSubscriptionManager = {
           }
         });
       }
-      
+
       // Initialize tier retention chart
       const retentionCtx = document.getElementById('tierRetentionChart')?.getContext('2d');
       if (retentionCtx && window.Chart) {

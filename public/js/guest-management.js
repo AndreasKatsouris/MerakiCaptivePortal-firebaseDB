@@ -224,19 +224,30 @@ const guestManagement = {
                 <div class="d-flex justify-content-between align-items-center mb-4">
                     <h2>Guest Management</h2>
                     <div class="d-flex gap-2">
-                        <input 
-                            type="text" 
-                            v-model="searchQuery" 
-                            class="form-control" 
+                        <select
+                            v-model="statusFilter"
+                            @change="applyStatusFilter"
+                            class="form-select"
+                            style="width: auto;"
+                            title="Filter by guest status"
+                        >
+                            <option value="all">All Guests</option>
+                            <option value="active">Active</option>
+                            <option value="inactive">Inactive</option>
+                        </select>
+                        <input
+                            type="text"
+                            v-model="searchQuery"
+                            class="form-control"
                             placeholder="Search guests (name or phone)..."
                         >
-                        <button 
-                            @click="refreshData" 
+                        <button
+                            @click="refreshData"
                             class="btn btn-outline-primary"
                             title="Refresh guest data"
                             :disabled="loading"
                         >
-                            <i class="fas" :class="loading ? 'fa-spinner fa-spin' : 'fa-sync-alt'"></i> 
+                            <i class="fas" :class="loading ? 'fa-spinner fa-spin' : 'fa-sync-alt'"></i>
                             {{ loading ? 'Refreshing...' : 'Refresh' }}
                         </button>
                         <button 
@@ -483,6 +494,7 @@ const guestManagement = {
                 loading: false,
                 error: null,
                 searchQuery: '',
+                statusFilter: 'all', // Filter for guest status (all, active, inactive)
                 sortConfig: {
                     key: 'name',
                     direction: 'asc'
@@ -510,6 +522,22 @@ const guestManagement = {
                 // Firebase queries handle search and initial ordering
                 // We only need to apply direction (asc/desc) client-side for Firebase-sorted data
                 let result = [...this.guests];
+
+                // Apply status filter
+                if (this.statusFilter && this.statusFilter !== 'all') {
+                    const ninetyDaysAgo = Date.now() - (90 * 24 * 60 * 60 * 1000);
+                    result = result.filter(guest => {
+                        const lastVisit = guest?.metrics?.lastVisit;
+                        const hasRecentActivity = lastVisit && new Date(lastVisit).getTime() > ninetyDaysAgo;
+
+                        if (this.statusFilter === 'active') {
+                            return hasRecentActivity;
+                        } else if (this.statusFilter === 'inactive') {
+                            return !hasRecentActivity;
+                        }
+                        return true;
+                    });
+                }
 
                 const key = this.sortConfig?.key || 'name';
                 const direction = this.sortConfig?.direction || 'asc';
@@ -560,6 +588,45 @@ const guestManagement = {
         methods: {
             formatPhoneForDisplay(phoneNumber) {
                 return formatPhoneNumberForDisplay(phoneNumber);
+            },
+
+            /**
+             * Read filter values from URL parameters and apply them
+             */
+            readFiltersFromURL() {
+                const urlParams = new URLSearchParams(window.location.search);
+                const statusParam = urlParams.get('status');
+
+                if (statusParam && ['all', 'active', 'inactive'].includes(statusParam)) {
+                    this.statusFilter = statusParam;
+                    console.log('📋 Applied filter from URL:', statusParam);
+                }
+            },
+
+            /**
+             * Update URL when status filter changes
+             */
+            updateURLWithFilters() {
+                const url = new URL(window.location.href);
+
+                if (this.statusFilter && this.statusFilter !== 'all') {
+                    url.searchParams.set('status', this.statusFilter);
+                } else {
+                    url.searchParams.delete('status');
+                }
+
+                // Update URL without reloading the page
+                window.history.pushState({}, '', url);
+                console.log('🔗 Updated URL with filter:', this.statusFilter);
+            },
+
+            /**
+             * Handle status filter change
+             */
+            applyStatusFilter() {
+                console.log('🎯 Status filter changed to:', this.statusFilter);
+                this.updateURLWithFilters();
+                this.loadGuests();
             },
 
             async refreshData() {
@@ -1755,6 +1822,9 @@ const guestManagement = {
         },
 
         mounted() {
+            // Read URL parameters and apply filters
+            this.readFiltersFromURL();
+
             this.loadGuests();
 
             // Initialize tooltips

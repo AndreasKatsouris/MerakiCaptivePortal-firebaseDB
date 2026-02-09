@@ -118,7 +118,7 @@ class UserDashboard {
             'qmsWhatsAppIntegration',
             'qmsAnalytics',
             'qmsAutomation',
-            'salesForecasting'
+            'salesForecastingBasic'
         ];
 
         // PERFORMANCE OPTIMIZATION: Parallel feature checking instead of sequential
@@ -1172,20 +1172,20 @@ class UserDashboard {
         // Handle Sales Forecasting action
         const salesForecastingAction = document.getElementById('salesForecastingAction');
         if (salesForecastingAction) {
-            console.log('Sales Forecasting card found, feature access:', this.featureAccess.salesForecasting);
+            console.log('Sales Forecasting card found, feature access:', this.featureAccess.salesForecastingBasic);
 
             // Remove all existing event listeners by cloning the element
             const newSalesForecastingAction = salesForecastingAction.cloneNode(true);
             salesForecastingAction.parentNode.replaceChild(newSalesForecastingAction, salesForecastingAction);
 
-            if (!this.featureAccess.salesForecasting) {
+            if (!this.featureAccess.salesForecastingBasic) {
                 newSalesForecastingAction.classList.add('locked');
                 newSalesForecastingAction.title = 'Upgrade to access sales forecasting';
                 newSalesForecastingAction.removeAttribute('href');
                 newSalesForecastingAction.addEventListener('click', (e) => {
                     e.preventDefault();
                     console.log('Sales Forecasting clicked - showing upgrade prompt');
-                    featureAccessControl.showUpgradePrompt('salesForecasting');
+                    featureAccessControl.showUpgradePrompt('salesForecastingBasic');
                 });
             } else {
                 // If user has access, navigate to sales forecasting
