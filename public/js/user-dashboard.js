@@ -117,7 +117,8 @@ class UserDashboard {
             'qmsAdvanced',
             'qmsWhatsAppIntegration',
             'qmsAnalytics',
-            'qmsAutomation'
+            'qmsAutomation',
+            'salesForecasting'
         ];
 
         // PERFORMANCE OPTIMIZATION: Parallel feature checking instead of sequential
@@ -1167,7 +1168,39 @@ class UserDashboard {
         } else {
             console.log('QMS Basic card not found in DOM');
         }
-        
+
+        // Handle Sales Forecasting action
+        const salesForecastingAction = document.getElementById('salesForecastingAction');
+        if (salesForecastingAction) {
+            console.log('Sales Forecasting card found, feature access:', this.featureAccess.salesForecasting);
+
+            // Remove all existing event listeners by cloning the element
+            const newSalesForecastingAction = salesForecastingAction.cloneNode(true);
+            salesForecastingAction.parentNode.replaceChild(newSalesForecastingAction, salesForecastingAction);
+
+            if (!this.featureAccess.salesForecasting) {
+                newSalesForecastingAction.classList.add('locked');
+                newSalesForecastingAction.title = 'Upgrade to access sales forecasting';
+                newSalesForecastingAction.removeAttribute('href');
+                newSalesForecastingAction.addEventListener('click', (e) => {
+                    e.preventDefault();
+                    console.log('Sales Forecasting clicked - showing upgrade prompt');
+                    featureAccessControl.showUpgradePrompt('salesForecasting');
+                });
+            } else {
+                // If user has access, navigate to sales forecasting
+                newSalesForecastingAction.classList.remove('locked');
+                newSalesForecastingAction.removeAttribute('href');
+                newSalesForecastingAction.addEventListener('click', (e) => {
+                    e.preventDefault();
+                    console.log('Sales Forecasting clicked - navigating to sales forecasting page');
+                    window.location.href = '/sales-forecasting.html';
+                });
+            }
+        } else {
+            console.log('Sales Forecasting card not found in DOM');
+        }
+
         // Hide statistics if no analytics access
         if (!this.featureAccess.analyticsBasic) {
             const statsCards = document.querySelectorAll('.stat-card');

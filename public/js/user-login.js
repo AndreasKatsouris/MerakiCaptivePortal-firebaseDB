@@ -231,11 +231,8 @@ class UserLoginManager {
             console.error('Login error:', error);
 
             // Handle specific error cases
-            if (error.code === 'auth/user-not-found') {
-                this.showAlert('No account found with this email address.', 'danger');
-            } else if (error.code === 'auth/wrong-password') {
-                this.showAlert('Incorrect password. Please try again.', 'danger');
-            } else if (error.code === 'auth/invalid-credential') {
+            // Use generic message for security - don't reveal if account exists
+            if (error.code === 'auth/user-not-found' || error.code === 'auth/wrong-password' || error.code === 'auth/invalid-credential') {
                 this.showAlert('Invalid credentials', 'danger');
             } else if (error.code === 'auth/invalid-email') {
                 this.showAlert('Invalid email address format.', 'danger');
