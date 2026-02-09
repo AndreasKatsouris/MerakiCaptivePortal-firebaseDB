@@ -1,0 +1,10 @@
+[GET] http://localhost:5000/ => [200] OK
+[GET] https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap => [200] 
+[GET] https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css => [200] 
+[GET] http://localhost:5000/css/landing-page.css => [200] OK
+[GET] http://localhost:5000/img/platfrm_logo.png => [200] OK
+[GET] http://localhost:5000/img/ob-bg.jpg => [200] OK
+[GET] https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/webfonts/fa-solid-900.woff2 => [200] 
+[GET] https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/webfonts/fa-brands-400.woff2 => [200] 
+[GET] http://localhost:5000/img/platfrm_logo.png => [200] OK
+[GET] http://localhost:5000/img/platfrm_logo.png => [200] OK

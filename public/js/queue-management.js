@@ -236,18 +236,21 @@ const QueueManagementApp = {
                                     </td>
                                     <td>
                                         <div class="btn-group" role="group">
-                                            <button type="button" 
-                                                    class="btn btn-sm" 
+                                            <button type="button"
+                                                    class="btn btn-sm"
                                                     :class="canUseWhatsAppIntegration ? 'btn-outline-info' : 'btn-outline-secondary'"
                                                     @click="notifyGuest(guest)"
-                                                    :disabled="guest.status === 'called' || guest.status === 'seated' || !canUseWhatsAppIntegration"
+                                                    :disabled="guest.status === 'called' || guest.status === 'seated' || !canUseWhatsAppIntegration || isGuestActionLoading(guest.id, 'notify')"
                                                     :title="!canUseWhatsAppIntegration ? 'WhatsApp notifications require Starter plan or higher' : ''">
-                                                <i class="fas fa-bell"></i>
+                                                <span v-if="isGuestActionLoading(guest.id, 'notify')" class="spinner-border spinner-border-sm me-1"></span>
+                                                <i v-else class="fas fa-bell"></i>
                                                 <i v-if="!canUseWhatsAppIntegration" class="fas fa-lock ms-1" style="font-size: 0.7em;"></i>
                                             </button>
-                                            <button type="button" class="btn btn-sm btn-outline-danger" 
-                                                    @click="removeGuest(guest)">
-                                                <i class="fas fa-trash"></i>
+                                            <button type="button" class="btn btn-sm btn-outline-danger"
+                                                    @click="removeGuest(guest)"
+                                                    :disabled="isGuestActionLoading(guest.id, 'remove')">
+                                                <span v-if="isGuestActionLoading(guest.id, 'remove')" class="spinner-border spinner-border-sm me-1"></span>
+                                                <i v-else class="fas fa-trash"></i>
                                             </button>
                                         </div>
                                     </td>
@@ -405,7 +408,9 @@ const QueueManagementApp = {
             queueUsage: {
                 todayEntries: 0,
                 activeLocations: 0
-            }
+            },
+            // Per-guest loading states for action buttons
+            guestActionStates: {}
         };
     },
     computed: {
@@ -481,6 +486,21 @@ const QueueManagementApp = {
         this.cleanupListeners();
     },
     methods: {
+        // Helper methods for per-guest action loading states
+        setGuestActionLoading(guestId, action, isLoading) {
+            const key = `${guestId}_${action}`;
+            if (isLoading) {
+                this.guestActionStates[key] = true;
+            } else {
+                delete this.guestActionStates[key];
+            }
+        },
+
+        isGuestActionLoading(guestId, action) {
+            const key = `${guestId}_${action}`;
+            return this.guestActionStates[key] === true;
+        },
+
         async loadLocations() {
             try {
                 const currentUser = auth.currentUser;
@@ -735,6 +755,9 @@ const QueueManagementApp = {
 
             if (result.isConfirmed) {
                 try {
+                    // Set loading state for this specific guest's remove button
+                    this.setGuestActionLoading(guest.id, 'remove', true);
+
                     const guestRef = ref(rtdb, `queues/${guest.location}/${guest.date}/entries/${guest.id}`);
                     await update(guestRef, {
                         status: 'removed',
@@ -754,6 +777,9 @@ const QueueManagementApp = {
                 } catch (error) {
                     console.error('Error removing guest:', error);
                     Swal.fire('Error!', 'Failed to remove guest from queue', 'error');
+                } finally {
+                    // Clear loading state
+                    this.setGuestActionLoading(guest.id, 'remove', false);
                 }
             }
         },
@@ -777,6 +803,9 @@ const QueueManagementApp = {
 
             if (result.isConfirmed) {
                 try {
+                    // Set loading state for this specific guest's notify button
+                    this.setGuestActionLoading(guest.id, 'notify', true);
+
                     // Update guest status to 'called'
                     const guestRef = ref(rtdb, `queues/${guest.location}/${guest.date}/entries/${guest.id}`);
                     await update(guestRef, {
@@ -800,6 +829,9 @@ const QueueManagementApp = {
                 } catch (error) {
                     console.error('Error notifying guest:', error);
                     Swal.fire('Error!', 'Failed to send notification', 'error');
+                } finally {
+                    // Clear loading state
+                    this.setGuestActionLoading(guest.id, 'notify', false);
                 }
             }
         },

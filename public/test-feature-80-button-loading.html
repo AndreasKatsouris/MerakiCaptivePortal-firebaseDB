@@ -1,0 +1,195 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Feature #80 Test - Button Loading States</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <style>
+        body {
+            padding: 20px;
+            background-color: #f8f9fa;
+        }
+        .test-section {
+            background: white;
+            padding: 30px;
+            border-radius: 10px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+            margin-bottom: 20px;
+        }
+        .result {
+            margin-top: 20px;
+            padding: 15px;
+            border-radius: 5px;
+        }
+        .result.success {
+            background-color: #d4edda;
+            border: 1px solid #c3e6cb;
+            color: #155724;
+        }
+        .result.error {
+            background-color: #f8d7da;
+            border: 1px solid #f5c6cb;
+            color: #721c24;
+        }
+        .test-guest-row {
+            padding: 15px;
+            background-color: #f8f9fa;
+            border-radius: 5px;
+            margin-bottom: 10px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="test-section">
+            <h1>Feature #80: Button Loading States Test</h1>
+            <p class="lead">This page demonstrates that action buttons are disabled and show loading states while requests are in flight.</p>
+
+            <div class="alert alert-info">
+                <h5><i class="fas fa-info-circle me-2"></i>Test Scenario</h5>
+                <p>Queue management buttons (Notify Guest, Remove Guest) should:</p>
+                <ol>
+                    <li>Show a loading spinner when clicked</li>
+                    <li>Be disabled during the API call (prevent double-clicks)</li>
+                    <li>Re-enable after the operation completes</li>
+                </ol>
+            </div>
+        </div>
+
+        <div class="test-section" id="app">
+            <h3>Simulated Queue Entries</h3>
+            <p>Click the action buttons to see loading states in action.</p>
+
+            <div v-for="guest in guests" :key="guest.id" class="test-guest-row">
+                <div class="row align-items-center">
+                    <div class="col-md-3">
+                        <strong>{{ guest.name }}</strong><br>
+                        <small class="text-muted">{{ guest.phone }}</small>
+                    </div>
+                    <div class="col-md-3">
+                        Party Size: {{ guest.partySize }}<br>
+                        <span class="badge bg-info">{{ guest.status }}</span>
+                    </div>
+                    <div class="col-md-6 text-end">
+                        <div class="btn-group" role="group">
+                            <button type="button"
+                                    class="btn btn-sm btn-outline-info"
+                                    @click="notifyGuest(guest)"
+                                    :disabled="isGuestActionLoading(guest.id, 'notify')">
+                                <span v-if="isGuestActionLoading(guest.id, 'notify')" class="spinner-border spinner-border-sm me-1"></span>
+                                <i v-else class="fas fa-bell"></i>
+                                {{ isGuestActionLoading(guest.id, 'notify') ? 'Sending...' : 'Notify' }}
+                            </button>
+                            <button type="button"
+                                    class="btn btn-sm btn-outline-danger"
+                                    @click="removeGuest(guest)"
+                                    :disabled="isGuestActionLoading(guest.id, 'remove')">
+                                <span v-if="isGuestActionLoading(guest.id, 'remove')" class="spinner-border spinner-border-sm me-1"></span>
+                                <i v-else class="fas fa-trash"></i>
+                                {{ isGuestActionLoading(guest.id, 'remove') ? 'Removing...' : 'Remove' }}
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="result" v-if="lastAction" :class="lastAction.success ? 'success' : 'error'">
+                <strong>Last Action:</strong> {{ lastAction.message }}
+            </div>
+        </div>
+
+        <div class="test-section">
+            <h3>✅ Verification Checklist</h3>
+            <ul>
+                <li>Click "Notify" button - should show spinner and "Sending..." text</li>
+                <li>Button should be disabled during the 2-second simulated API call</li>
+                <li>Clicking same button rapidly should have no effect (button disabled)</li>
+                <li>After completion, button should re-enable</li>
+                <li>Same behavior for "Remove" button</li>
+                <li>Multiple guest buttons can be clicked independently</li>
+            </ul>
+        </div>
+    </div>
+
+    <script src="https://unpkg.com/vue@3/dist/vue.global.js"></script>
+    <script>
+        const { createApp } = Vue;
+
+        createApp({
+            data() {
+                return {
+                    guests: [
+                        { id: 'guest-1', name: 'John Doe', phone: '+27821234567', partySize: 2, status: 'waiting' },
+                        { id: 'guest-2', name: 'Jane Smith', phone: '+27827654321', partySize: 4, status: 'waiting' },
+                        { id: 'guest-3', name: 'Bob Johnson', phone: '+27829876543', partySize: 3, status: 'waiting' }
+                    ],
+                    guestActionStates: {},
+                    lastAction: null
+                };
+            },
+            methods: {
+                setGuestActionLoading(guestId, action, isLoading) {
+                    const key = `${guestId}_${action}`;
+                    if (isLoading) {
+                        this.guestActionStates[key] = true;
+                    } else {
+                        delete this.guestActionStates[key];
+                    }
+                },
+
+                isGuestActionLoading(guestId, action) {
+                    const key = `${guestId}_${action}`;
+                    return this.guestActionStates[key] === true;
+                },
+
+                async notifyGuest(guest) {
+                    try {
+                        // Set loading state
+                        this.setGuestActionLoading(guest.id, 'notify', true);
+                        this.lastAction = { success: true, message: `Notifying ${guest.name}...` };
+
+                        // Simulate API call (2 seconds)
+                        await new Promise(resolve => setTimeout(resolve, 2000));
+
+                        // Update status
+                        guest.status = 'called';
+                        this.lastAction = { success: true, message: `✅ Successfully notified ${guest.name} via WhatsApp` };
+
+                    } catch (error) {
+                        this.lastAction = { success: false, message: `❌ Error notifying ${guest.name}` };
+                    } finally {
+                        // Clear loading state
+                        this.setGuestActionLoading(guest.id, 'notify', false);
+                    }
+                },
+
+                async removeGuest(guest) {
+                    try {
+                        // Set loading state
+                        this.setGuestActionLoading(guest.id, 'remove', true);
+                        this.lastAction = { success: true, message: `Removing ${guest.name}...` };
+
+                        // Simulate API call (2 seconds)
+                        await new Promise(resolve => setTimeout(resolve, 2000));
+
+                        // Remove from list
+                        const index = this.guests.indexOf(guest);
+                        if (index > -1) {
+                            this.guests.splice(index, 1);
+                        }
+                        this.lastAction = { success: true, message: `✅ Successfully removed ${guest.name} from queue` };
+
+                    } catch (error) {
+                        this.lastAction = { success: false, message: `❌ Error removing ${guest.name}` };
+                    } finally {
+                        // Clear loading state
+                        this.setGuestActionLoading(guest.id, 'remove', false);
+                    }
+                }
+            }
+        }).mount('#app');
+    </script>
+</body>
+</html>
