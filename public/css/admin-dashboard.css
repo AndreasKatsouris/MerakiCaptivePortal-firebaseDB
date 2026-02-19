@@ -32,6 +32,8 @@ body {
     color: white;
     position: fixed;
     height: 100vh;
+    overflow-y: auto;
+    padding-bottom: 80px;
     z-index: 1000;
     transition: all 0.3s;
 }
