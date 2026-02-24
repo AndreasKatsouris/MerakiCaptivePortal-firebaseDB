@@ -5,6 +5,37 @@
  * Provides consistent Chart.js configurations matching the platform design system
  */
 
+// Import Chart.js components with explicit registration for ESM usage
+import {
+    Chart,
+    CategoryScale,
+    LinearScale,
+    PointElement,
+    LineElement,
+    BarElement,
+    BarController,
+    LineController,
+    Filler,
+    Tooltip,
+    Legend,
+    Title
+} from 'https://cdn.jsdelivr.net/npm/chart.js/+esm';
+
+// Register all required Chart.js components for ESM usage
+Chart.register(
+    CategoryScale,
+    LinearScale,
+    PointElement,
+    LineElement,
+    BarElement,
+    BarController,
+    LineController,
+    Filler,
+    Tooltip,
+    Legend,
+    Title
+);
+
 /**
  * Platform color scheme
  */
@@ -199,27 +230,43 @@ export function createForecastChartConfig(historicalData, forecastData, options 
         isCurrency = true
     } = options;
 
+    // Build unified label array from both historical and forecast dates
+    const formatLabel = (d) => {
+        const dt = d.date instanceof Date ? d.date : new Date(d.date);
+        return dt.toLocaleDateString('en-ZA', { month: 'short', day: 'numeric' });
+    };
+    const historicalLabels = historicalData.map(formatLabel);
+    const forecastLabels = forecastData.map(formatLabel);
+    const labels = [...historicalLabels, ...forecastLabels];
+
+    // Historical values padded with nulls for forecast range
+    const historicalValues = [
+        ...historicalData.map(d => d.revenue),
+        ...forecastData.map(() => null)
+    ];
+
+    // Forecast values padded with nulls for historical range
+    const forecastValues = [
+        ...historicalData.map(() => null),
+        ...forecastData.map(d => d.predicted ?? d.revenue)
+    ];
+
     const datasets = [
         {
             label: 'Historical Sales',
-            data: historicalData.map(d => ({
-                x: d.date,
-                y: d.revenue
-            })),
+            data: historicalValues,
             borderColor: CHART_COLORS.success,
             backgroundColor: CHART_COLORS.success,
             pointBackgroundColor: '#fff',
             pointBorderColor: CHART_COLORS.success,
             tension: 0.3,
             fill: false,
-            order: 1
+            order: 1,
+            spanGaps: false
         },
         {
             label: 'Forecast',
-            data: forecastData.map(d => ({
-                x: d.date,
-                y: d.revenue
-            })),
+            data: forecastValues,
             borderColor: CHART_COLORS.primary,
             backgroundColor: CHART_COLORS.primary,
             pointBackgroundColor: '#fff',
@@ -227,18 +274,24 @@ export function createForecastChartConfig(historicalData, forecastData, options 
             borderDash: [5, 5],
             tension: 0.3,
             fill: false,
-            order: 2
+            order: 2,
+            spanGaps: false
         }
     ];
 
     // Add confidence interval if available
-    if (showConfidenceInterval && forecastData[0]?.confidenceInterval) {
+    if (showConfidenceInterval && forecastData[0]?.confidenceLower != null) {
+        const upperValues = [
+            ...historicalData.map(() => null),
+            ...forecastData.map(d => d.confidenceUpper)
+        ];
+        const lowerValues = [
+            ...historicalData.map(() => null),
+            ...forecastData.map(d => d.confidenceLower)
+        ];
         datasets.push({
             label: 'Confidence Interval',
-            data: forecastData.map(d => ({
-                x: d.date,
-                y: d.confidenceInterval.upper
-            })),
+            data: upperValues,
             borderColor: 'transparent',
             backgroundColor: CHART_COLORS.primaryAlpha,
             fill: '+1',
@@ -247,10 +300,7 @@ export function createForecastChartConfig(historicalData, forecastData, options 
         });
         datasets.push({
             label: 'Lower Bound',
-            data: forecastData.map(d => ({
-                x: d.date,
-                y: d.confidenceInterval.lower
-            })),
+            data: lowerValues,
             borderColor: 'transparent',
             backgroundColor: CHART_COLORS.primaryAlpha,
             fill: false,
@@ -275,17 +325,10 @@ export function createForecastChartConfig(historicalData, forecastData, options 
         }
     };
     chartOptions.isCurrency = isCurrency;
-    chartOptions.scales.x.type = 'time';
-    chartOptions.scales.x.time = {
-        unit: 'day',
-        displayFormats: {
-            day: 'MMM d'
-        }
-    };
 
     return {
         type: 'line',
-        data: { datasets },
+        data: { labels, datasets },
         options: chartOptions
     };
 }
@@ -299,13 +342,28 @@ export function createComparisonChartConfig(forecastData, actualData, options = 
         isCurrency = true
     } = options;
 
+    // Build labels from the union of forecast and actual dates
+    const formatLabel = (d) => {
+        const dt = d.date instanceof Date ? d.date : new Date(d.date);
+        return dt.toLocaleDateString('en-ZA', { month: 'short', day: 'numeric' });
+    };
+
+    // Use forecast dates as primary labels, map actuals into same positions
+    const labels = forecastData.map(formatLabel);
+    const forecastValues = forecastData.map(d => d.predicted ?? d.revenue);
+
+    // Build a date-indexed map for actuals
+    const actualMap = {};
+    for (const d of actualData) {
+        const label = formatLabel(d);
+        actualMap[label] = d.revenue;
+    }
+    const actualValues = labels.map(label => actualMap[label] ?? null);
+
     const datasets = [
         {
             label: 'Forecast',
-            data: forecastData.map(d => ({
-                x: d.date,
-                y: d.revenue
-            })),
+            data: forecastValues,
             borderColor: CHART_COLORS.primary,
             backgroundColor: CHART_COLORS.primaryAlpha,
             tension: 0.3,
@@ -313,10 +371,7 @@ export function createComparisonChartConfig(forecastData, actualData, options = 
         },
         {
             label: 'Actual',
-            data: actualData.map(d => ({
-                x: d.date,
-                y: d.revenue
-            })),
+            data: actualValues,
             borderColor: CHART_COLORS.success,
             backgroundColor: CHART_COLORS.successAlpha,
             tension: 0.3,
@@ -340,17 +395,10 @@ export function createComparisonChartConfig(forecastData, actualData, options = 
         }
     };
     chartOptions.isCurrency = isCurrency;
-    chartOptions.scales.x.type = 'time';
-    chartOptions.scales.x.time = {
-        unit: 'day',
-        displayFormats: {
-            day: 'MMM d'
-        }
-    };
 
     return {
         type: 'line',
-        data: { datasets },
+        data: { labels, datasets },
         options: chartOptions
     };
 }
@@ -471,7 +519,11 @@ export function destroyChart(chartInstance) {
     }
 }
 
+// Re-export Chart so consumers use the same registered instance
+export { Chart };
+
 export default {
+    Chart,
     CHART_COLORS,
     CHART_FONTS,
     createGradient,

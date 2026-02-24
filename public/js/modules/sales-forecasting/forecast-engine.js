@@ -42,7 +42,8 @@ export class ForecastEngine {
             method = 'seasonal',
             horizon = 30,
             confidenceLevel = 95,
-            startDate = null
+            startDate = null,
+            growthRateOverride = null
         } = config;
 
         // Validate horizon
@@ -63,7 +64,7 @@ export class ForecastEngine {
         switch (method) {
             case 'year_over_year':
             case 'yoy':
-                predictions = this.yearOverYearForecast(normalizedData, horizon, startDate);
+                predictions = this.yearOverYearForecast(normalizedData, horizon, startDate, growthRateOverride);
                 break;
             case 'moving_average':
                 predictions = this.movingAverageForecast(normalizedData, horizon, startDate);
@@ -111,21 +112,39 @@ export class ForecastEngine {
      * Normalize input data to consistent format
      */
     normalizeData(data) {
-        return data.map(item => ({
-            date: item.date instanceof Date ? item.date : new Date(item.date),
-            revenue: parseFloat(item.revenue || 0),
-            transactions: parseInt(item.transactions || item.transaction_qty || item.transactionQty || 0),
-            avgSpend: parseFloat(item.avgSpend || item.avg_spend || 0)
-        })).filter(item =>
-            !isNaN(item.date.getTime()) && item.revenue > 0
+        const beforeCount = data.length;
+        const normalized = data.map(item => {
+            const parsedDate = item.date instanceof Date ? item.date : new Date(item.date);
+            if (isNaN(parsedDate.getTime())) {
+                console.warn('[ForecastEngine] Invalid date skipped:', item.date);
+                return null;
+            }
+            return {
+                date: parsedDate,
+                revenue: parseFloat(item.revenue || 0),
+                transactions: parseInt(item.transactions || item.transaction_qty || item.transactionQty || 0),
+                avgSpend: parseFloat(item.avgSpend || item.avg_spend || 0)
+            };
+        }).filter(item =>
+            item !== null && !isNaN(item.date.getTime()) && item.revenue >= 0
         ).sort((a, b) => a.date - b.date);
+
+        console.group('[SalesForecasting Debug] normalizeData');
+        console.log('Records before filter:', beforeCount);
+        console.log('Records after filter:', normalized.length);
+        const _dbgNorm = d => ({ date: d.date.toISOString().split('T')[0], revenue: d.revenue, transactions: d.transactions });
+        console.log('First 3 normalized:', normalized.slice(0, 3).map(_dbgNorm));
+        console.log('Last 3 normalized:', normalized.slice(-3).map(_dbgNorm));
+        console.groupEnd();
+
+        return normalized;
     }
 
     /**
      * Year-over-Year forecast
      * Uses same day from last year + growth rate
      */
-    yearOverYearForecast(data, horizon, startDate = null) {
+    yearOverYearForecast(data, horizon, startDate = null, growthRateOverride = null) {
         if (data.length < 7) {
             throw new Error('Year-over-Year forecast requires at least 7 days of historical data');
         }
@@ -185,9 +204,20 @@ export class ForecastEngine {
             }
         }
 
+        // User-specified override takes precedence over auto-calculated rate
+        if (growthRateOverride !== null && isFinite(growthRateOverride)) {
+            yoyGrowthRate = growthRateOverride;
+        }
+
         // Generate predictions
         const predictions = [];
-        const lastDate = startDate ? new Date(startDate) : data[data.length - 1].date;
+        let lastDate;
+        if (startDate) {
+            lastDate = new Date(startDate);
+            lastDate.setDate(lastDate.getDate() - 1); // startDate = first forecast day, lastDate = day before
+        } else {
+            lastDate = data[data.length - 1].date;
+        }
         const avgTransactionRatio = this.calculateAvgTransactionRatio(data);
         const historicalAvgSpend = this.calculateHistoricalAvgSpend(data);
 
@@ -217,8 +247,8 @@ export class ForecastEngine {
 
             predictions.push({
                 date: forecastDate,
-                revenue: Math.max(0, predictedRevenue),
-                transactionQty: predictedTransactions,
+                predicted: Math.max(0, predictedRevenue),
+                transactions: predictedTransactions,
                 avgSpend
             });
         }
@@ -269,7 +299,13 @@ export class ForecastEngine {
 
         // Generate predictions
         const predictions = [];
-        const lastDate = startDate ? new Date(startDate) : data[data.length - 1].date;
+        let lastDate;
+        if (startDate) {
+            lastDate = new Date(startDate);
+            lastDate.setDate(lastDate.getDate() - 1); // startDate = first forecast day, lastDate = day before
+        } else {
+            lastDate = data[data.length - 1].date;
+        }
         const avgTransactionRatio = this.calculateAvgTransactionRatio(data);
         const historicalAvgSpend = this.calculateHistoricalAvgSpend(data);
 
@@ -285,8 +321,8 @@ export class ForecastEngine {
 
             predictions.push({
                 date: forecastDate,
-                revenue: predictedRevenue,
-                transactionQty: predictedTransactions,
+                predicted: predictedRevenue,
+                transactions: predictedTransactions,
                 avgSpend
             });
         }
@@ -315,13 +351,17 @@ export class ForecastEngine {
             sumX2 += i * i;
         }
 
-        // Check for division by zero
+        // Check for division by zero with increased tolerance
         const denominator = n * sumX2 - sumX * sumX;
-        if (Math.abs(denominator) < 1e-10) {
-            throw new Error('Cannot calculate regression - data points are collinear');
+        if (Math.abs(denominator) < 1e-6) {
+            throw new Error('Cannot calculate regression - insufficient data variance');
         }
 
         const slope = (n * sumXY - sumX * sumY) / denominator;
+        if (!isFinite(slope)) {
+            throw new Error('Regression calculation produced invalid result');
+        }
+
         const intercept = (sumY - slope * sumX) / n;
 
         // Calculate transaction ratio for projections
@@ -332,7 +372,13 @@ export class ForecastEngine {
 
         // Generate predictions
         const predictions = [];
-        const lastDate = startDate ? new Date(startDate) : data[data.length - 1].date;
+        let lastDate;
+        if (startDate) {
+            lastDate = new Date(startDate);
+            lastDate.setDate(lastDate.getDate() - 1); // startDate = first forecast day, lastDate = day before
+        } else {
+            lastDate = data[data.length - 1].date;
+        }
 
         for (let i = 0; i < horizon; i++) {
             const forecastDate = new Date(lastDate);
@@ -347,8 +393,8 @@ export class ForecastEngine {
 
             predictions.push({
                 date: forecastDate,
-                revenue: predictedRevenue,
-                transactionQty: predictedTransactions,
+                predicted: predictedRevenue,
+                transactions: predictedTransactions,
                 avgSpend
             });
         }
@@ -382,7 +428,13 @@ export class ForecastEngine {
         const avgTransactionRatio = this.calculateAvgTransactionRatio(data);
 
         const predictions = [];
-        const lastDate = startDate ? new Date(startDate) : data[data.length - 1].date;
+        let lastDate;
+        if (startDate) {
+            lastDate = new Date(startDate);
+            lastDate.setDate(lastDate.getDate() - 1); // startDate = first forecast day, lastDate = day before
+        } else {
+            lastDate = data[data.length - 1].date;
+        }
 
         for (let i = 0; i < horizon; i++) {
             const forecastDate = new Date(lastDate);
@@ -396,8 +448,8 @@ export class ForecastEngine {
 
             predictions.push({
                 date: forecastDate,
-                revenue: predictedRevenue,
-                transactionQty: predictedTransactions,
+                predicted: predictedRevenue,
+                transactions: predictedTransactions,
                 avgSpend
             });
         }
@@ -420,10 +472,23 @@ export class ForecastEngine {
         const lastPeriod = data.slice(-28); // Last 4 weeks
         const baseValue = lastPeriod.reduce((sum, d) => sum + d.revenue, 0) / lastPeriod.length;
 
+        console.group('[SalesForecasting Debug] SeasonalForecast');
+        console.log('baseValue (avg last 28 days):', Math.round(baseValue));
+        console.log('last28 date range:', lastPeriod[0]?.date.toISOString().split('T')[0], '→', lastPeriod[lastPeriod.length-1]?.date.toISOString().split('T')[0]);
+        console.log('trendSlope:', trendSlope.toFixed(4));
+        console.log('weeklyPatterns:', Object.fromEntries(Object.entries(weeklyPatterns).map(([k,v]) => [['Sun','Mon','Tue','Wed','Thu','Fri','Sat'][k], v.toFixed(3)])));
+        console.groupEnd();
+
         const avgTransactionRatio = this.calculateAvgTransactionRatio(data);
 
         const predictions = [];
-        const lastDate = startDate ? new Date(startDate) : data[data.length - 1].date;
+        let lastDate;
+        if (startDate) {
+            lastDate = new Date(startDate);
+            lastDate.setDate(lastDate.getDate() - 1); // startDate = first forecast day, lastDate = day before
+        } else {
+            lastDate = data[data.length - 1].date;
+        }
 
         for (let i = 0; i < horizon; i++) {
             const forecastDate = new Date(lastDate);
@@ -440,8 +505,8 @@ export class ForecastEngine {
 
             predictions.push({
                 date: forecastDate,
-                revenue: predictedRevenue,
-                transactionQty: predictedTransactions,
+                predicted: predictedRevenue,
+                transactions: predictedTransactions,
                 avgSpend
             });
         }
@@ -474,7 +539,13 @@ export class ForecastEngine {
         const avgTransactionRatio = this.calculateAvgTransactionRatio(data);
 
         const predictions = [];
-        const lastDate = startDate ? new Date(startDate) : data[data.length - 1].date;
+        let lastDate;
+        if (startDate) {
+            lastDate = new Date(startDate);
+            lastDate.setDate(lastDate.getDate() - 1); // startDate = first forecast day, lastDate = day before
+        } else {
+            lastDate = data[data.length - 1].date;
+        }
 
         for (let i = 0; i < horizon; i++) {
             const forecastDate = new Date(lastDate);
@@ -502,8 +573,8 @@ export class ForecastEngine {
 
             predictions.push({
                 date: forecastDate,
-                revenue: predictedRevenue,
-                transactionQty: predictedTransactions,
+                predicted: predictedRevenue,
+                transactions: predictedTransactions,
                 avgSpend
             });
         }
@@ -539,8 +610,8 @@ export class ForecastEngine {
 
             return {
                 ...pred,
-                confidenceLower: Math.max(0, pred.revenue - margin),
-                confidenceUpper: pred.revenue + margin
+                confidenceLower: Math.max(0, pred.predicted - margin),
+                confidenceUpper: pred.predicted + margin
             };
         });
     }
@@ -552,7 +623,7 @@ export class ForecastEngine {
         if (!patterns) return predictions;
 
         return predictions.map(pred => {
-            let adjustedRevenue = pred.revenue;
+            let adjustedRevenue = pred.predicted;
 
             // Apply learned weekday factors
             if (patterns.weekdayFactors) {
@@ -560,7 +631,7 @@ export class ForecastEngine {
                 const factor = patterns.weekdayFactors[dayOfWeek];
                 if (factor && factor !== 1) {
                     // Blend learned factor with current prediction
-                    adjustedRevenue = pred.revenue * (0.7 + 0.3 * factor);
+                    adjustedRevenue = pred.predicted * (0.7 + 0.3 * factor);
                 }
             }
 
@@ -575,9 +646,7 @@ export class ForecastEngine {
 
             // Check for holiday effects
             if (patterns.holidayEffects) {
-                const dateStr = pred.date.toISOString().split('T')[0];
                 for (const [holiday, factor] of Object.entries(patterns.holidayEffects)) {
-                    // Simple check - in production this would be more sophisticated
                     if (this.isNearHoliday(pred.date, holiday)) {
                         adjustedRevenue *= factor;
                         break;
@@ -587,8 +656,8 @@ export class ForecastEngine {
 
             return {
                 ...pred,
-                revenue: adjustedRevenue,
-                avgSpend: pred.transactionQty > 0 ? adjustedRevenue / pred.transactionQty : pred.avgSpend
+                predicted: adjustedRevenue,
+                avgSpend: pred.transactions > 0 ? adjustedRevenue / pred.transactions : pred.avgSpend
             };
         });
     }
@@ -781,20 +850,80 @@ export class ForecastEngine {
     }
 
     isNearHoliday(date, holiday) {
-        // Simplified holiday detection
-        // In production, this would use a proper holiday calendar
-        const month = date.getMonth() + 1;
-        const day = date.getDate();
+        const year = date.getFullYear();
 
-        const holidays = {
-            'Christmas': { month: 12, days: [24, 25, 26] },
-            'Easter': { month: 4, days: [18, 19, 20, 21] }, // Approximate
-            'NewYear': { month: 1, days: [1, 2] }
+        // Calculate Easter using Anonymous Gregorian algorithm
+        const calculateEaster = (y) => {
+            const a = y % 19;
+            const b = Math.floor(y / 100);
+            const c = y % 100;
+            const d = Math.floor(b / 4);
+            const e = b % 4;
+            const f = Math.floor((b + 8) / 25);
+            const g = Math.floor((b - f + 1) / 3);
+            const h = (19 * a + b - d - g + 15) % 30;
+            const i = Math.floor(c / 4);
+            const k = c % 4;
+            const l = (32 + 2 * e + 2 * i - h - k) % 7;
+            const m = Math.floor((a + 11 * h + 22 * l) / 451);
+            const eMonth = Math.floor((h + l - 7 * m + 114) / 31);
+            const eDay = ((h + l - 7 * m + 114) % 31) + 1;
+            return new Date(y, eMonth - 1, eDay);
         };
 
-        const holidayDef = holidays[holiday];
-        if (holidayDef) {
-            return month === holidayDef.month && holidayDef.days.includes(day);
+        // South African public holidays
+        const getHolidays = (y) => {
+            const easter = calculateEaster(y);
+            const goodFriday = new Date(easter);
+            goodFriday.setDate(easter.getDate() - 2);
+            const familyDay = new Date(easter);
+            familyDay.setDate(easter.getDate() + 1);
+
+            const fixed = [
+                { name: 'NewYear', month: 1, day: 1 },
+                { name: 'HumanRightsDay', month: 3, day: 21 },
+                { name: 'FreedomDay', month: 4, day: 27 },
+                { name: 'WorkersDay', month: 5, day: 1 },
+                { name: 'YouthDay', month: 6, day: 16 },
+                { name: 'WomensDay', month: 8, day: 9 },
+                { name: 'HeritageDay', month: 9, day: 24 },
+                { name: 'DayOfReconciliation', month: 12, day: 16 },
+                { name: 'Christmas', month: 12, day: 25 },
+                { name: 'DayOfGoodwill', month: 12, day: 26 }
+            ];
+
+            const holidays = [];
+            for (const h of fixed) {
+                const d = new Date(y, h.month - 1, h.day);
+                holidays.push({ name: h.name, date: d });
+                // Bridge day: if falls on Sunday, Monday is observed
+                if (d.getDay() === 0) {
+                    const bridge = new Date(d);
+                    bridge.setDate(bridge.getDate() + 1);
+                    holidays.push({ name: h.name + '_bridge', date: bridge });
+                }
+            }
+
+            holidays.push({ name: 'GoodFriday', date: goodFriday });
+            holidays.push({ name: 'FamilyDay', date: familyDay });
+            holidays.push({ name: 'Easter', date: easter });
+
+            return holidays;
+        };
+
+        const holidays = getHolidays(year);
+        const dateMs = date.getTime();
+
+        for (const h of holidays) {
+            // Match if holiday name contains the search term (case-insensitive)
+            if (holiday && !h.name.toLowerCase().includes(holiday.toLowerCase())) {
+                continue;
+            }
+            // Within 1 day of the holiday
+            const diffDays = Math.abs(dateMs - h.date.getTime()) / (1000 * 60 * 60 * 24);
+            if (diffDays <= 1) {
+                return true;
+            }
         }
 
         return false;

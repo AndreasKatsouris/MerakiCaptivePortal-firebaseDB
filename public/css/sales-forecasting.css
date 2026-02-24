@@ -307,6 +307,39 @@
     height: 3rem;
 }
 
+/* Loading overlay for async operations */
+.sf-loading-overlay {
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: rgba(255, 255, 255, 0.85);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    z-index: 10;
+    border-radius: inherit;
+}
+
+.sf-loading-overlay .spinner-border {
+    width: 2.5rem;
+    height: 2.5rem;
+    color: #667eea;
+}
+
+.sf-loading-overlay .sf-loading-text {
+    margin-top: 0.75rem;
+    font-weight: 500;
+    color: #6c757d;
+    font-size: 0.9rem;
+}
+
+.sf-content {
+    position: relative;
+}
+
 /* Empty states */
 .sf-empty-state {
     text-align: center;

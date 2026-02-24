@@ -18,8 +18,7 @@
     <!-- Sales Forecasting Module CSS -->
     <link href="css/sales-forecasting.css?v=2.1.5-20250606" rel="stylesheet">
 
-    <!-- Chart.js -->
-    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <!-- Chart.js loaded via ES module import in chart-config.js (with date adapter) -->
     <!-- SweetAlert2 -->
     <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
 
@@ -223,6 +222,11 @@
         import { featureAccessControl } from './js/modules/access-control/services/feature-access-control.js';
         import SalesForecastingModule from './js/modules/sales-forecasting/index.js?v=2.1.5-20250606';
 
+        function escapeHtml(str) {
+            if (str == null) return '';
+            return String(str).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#039;');
+        }
+
         /**
          * Show toast notification
          */
@@ -249,7 +253,7 @@
                     <div class="d-flex">
                         <div class="toast-body">
                             <i class="fas ${icon} me-2"></i>
-                            ${message}
+                            ${escapeHtml(message)}
                         </div>
                         <button type="button" class="btn-close btn-close-white me-2 m-auto" data-bs-dismiss="toast" aria-label="Close"></button>
                     </div>
@@ -291,7 +295,7 @@
                         <i class="fas fa-exclamation-triangle me-2"></i>
                         Error
                     </h4>
-                    <p class="mb-0">${message}</p>
+                    <p class="mb-0">${escapeHtml(message)}</p>
                 </div>
             `;
         }
@@ -318,26 +322,40 @@
          */
         async function getUserLocations(userId) {
             try {
-                const { database, ref, get } = await import('./js/config/firebase-config.js');
-                const locationsRef = ref(database, `users/${userId}/locations`);
-                const snapshot = await get(locationsRef);
+                const { rtdb, ref, get } = await import('./js/config/firebase-config.js');
+                
+                // Step 1: Get location IDs from userLocations node
+                const userLocationsRef = ref(rtdb, `userLocations/${userId}`);
+                const userLocationsSnapshot = await get(userLocationsRef);
 
-                if (!snapshot.exists()) {
+                if (!userLocationsSnapshot.exists()) {
+                    console.log('[SalesForecasting] No locations found for user');
                     return [];
                 }
 
-                const locationsData = snapshot.val();
-                return Object.entries(locationsData).map(([id, data]) => ({
-                    id,
-                    name: data.name || 'Unnamed Location',
-                    ...data
-                }));
+                const locationIds = Object.keys(userLocationsSnapshot.val());
+                console.log(`[SalesForecasting] Found ${locationIds.length} location(s) for user`);
+
+                // Step 2: Fetch actual location details in parallel
+                const locationPromises = locationIds.map(async (locationId) => {
+                    const locationSnapshot = await get(ref(rtdb, `locations/${locationId}`));
+                    if (locationSnapshot.exists()) {
+                        return {
+                            id: locationId,
+                            ...locationSnapshot.val()
+                        };
+                    }
+                    return null;
+                });
+
+                const locations = (await Promise.all(locationPromises)).filter(loc => loc !== null);
+                console.log(`[SalesForecasting] Loaded ${locations.length} location(s) with details`);
+                return locations;
             } catch (error) {
                 console.error('Error fetching user locations:', error);
                 return [];
             }
         }
-
         /**
          * Initialize the application
          */
@@ -446,4 +464,3 @@
     </script>
 </body>
 
-</html>

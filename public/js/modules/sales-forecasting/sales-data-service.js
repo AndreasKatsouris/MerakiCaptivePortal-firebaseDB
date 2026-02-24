@@ -65,7 +65,7 @@ export class SalesDataService {
             };
 
             // Get location name
-            const locationName = options.locationName || await this.getLocationName(locationId);
+            const locationName = options.locationName ?? await this.getLocationName(locationId);
 
             // Prepare the data record
             const salesDataRecord = {
@@ -125,7 +125,7 @@ export class SalesDataService {
                         locationId: data.locationId,
                         locationName: data.locationName,
                         uploadedAt: data.uploadedAt,
-                        dateRange: data.dateRange,
+                        dateRange: data.dateRange || { startDate: 'N/A', endDate: 'N/A' },
                         recordCount: data.recordCount,
                         summary: data.summary
                     });
@@ -169,32 +169,114 @@ export class SalesDataService {
     }
 
     /**
+     * Update historical data metadata
+     * @param {string} salesDataId - Sales data ID
+     * @param {Object} updates - Fields to update (e.g., { dateRange: { startDate, endDate } })
+     * @returns {Promise<void>}
+     */
+    async updateHistoricalDataMetadata(salesDataId, updates) {
+        try {
+            const dataRef = ref(rtdb, `salesData/${salesDataId}`);
+            const snapshot = await get(dataRef);
+
+            if (!snapshot.exists()) {
+                throw new Error('Sales data not found');
+            }
+
+            // Whitelist allowed metadata fields to prevent arbitrary overwrites
+            const allowedFields = ['name', 'description', 'notes', 'tags', 'dateRange'];
+            const sanitized = {};
+            for (const key of allowedFields) {
+                if (updates[key] !== undefined) {
+                    sanitized[key] = updates[key];
+                }
+            }
+
+            await update(dataRef, {
+                ...sanitized,
+                updatedAt: Date.now()
+            });
+
+            console.log(`[SalesDataService] Updated metadata for ${salesDataId}`);
+        } catch (error) {
+            console.error('[SalesDataService] Error updating historical data metadata:', error);
+            throw error;
+        }
+    }
+
+    /**
      * Delete historical data set
      * @param {string} salesDataId - Sales data ID
      */
     async deleteHistoricalData(salesDataId) {
         try {
-            // Get the data first to get location info
             const dataRef = ref(rtdb, `salesData/${salesDataId}`);
             const snapshot = await get(dataRef);
 
             if (snapshot.exists()) {
                 const data = snapshot.val();
-
-                // Remove from index
-                const indexRef = ref(rtdb, `salesDataIndex/byLocation/${data.locationId}/${salesDataId}`);
-                await remove(indexRef);
-
-                const userIndexRef = ref(rtdb, `salesDataIndex/byUser/${this.userId}/${salesDataId}`);
-                await remove(userIndexRef);
+                // Atomic multi-path delete
+                const updates = {
+                    [`salesData/${salesDataId}`]: null,
+                    [`salesDataIndex/byLocation/${data.locationId}/${salesDataId}`]: null,
+                    [`salesDataIndex/byUser/${this.userId}/${salesDataId}`]: null
+                };
+                await update(ref(rtdb), updates);
+            } else {
+                await remove(dataRef);
             }
-
-            // Remove the data
-            await remove(dataRef);
 
             console.log('[SalesDataService] Deleted historical data:', salesDataId);
         } catch (error) {
             console.error('[SalesDataService] Error deleting historical data:', error);
+            throw error;
+        }
+    }
+
+    /**
+     * Get list of saved forecasts for a location (one-time fetch)
+     * @param {string} locationId - Location ID
+     * @returns {Promise<Array>} List of forecast summaries
+     */
+    async getSavedForecastsList(locationId) {
+        try {
+            const indexRef = ref(rtdb, `forecastIndex/byLocation/${locationId}`);
+            const snapshot = await get(indexRef);
+
+            if (!snapshot.exists()) {
+                return [];
+            }
+
+            const forecastIds = Object.keys(snapshot.val());
+            const forecasts = [];
+
+            for (const id of forecastIds) {
+                const forecastRef = ref(rtdb, `forecasts/${id}`);
+                const forecastSnapshot = await get(forecastRef);
+
+                if (forecastSnapshot.exists()) {
+                    const data = forecastSnapshot.val();
+                    forecasts.push({
+                        id,
+                        locationId: data.locationId,
+                        createdAt: data.createdAt,
+                        updatedAt: data.updatedAt,
+                        status: data.status || 'draft',
+                        method: data.config?.method || 'Unknown',
+                        horizon: data.config?.horizon || 'N/A',
+                        name: data.metadata?.name || 'Unnamed Forecast',
+                        description: data.metadata?.description || '',
+                        summary: data.summary || {},
+                        salesDataId: data.salesDataId
+                    });
+                }
+            }
+
+            // Sort by creation date descending
+            const sorted = [...forecasts].sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0));
+            return sorted;
+        } catch (error) {
+            console.error('[SalesDataService] Error getting saved forecasts list:', error);
             throw error;
         }
     }
@@ -281,22 +363,35 @@ export class SalesDataService {
     }
 
     /**
-     * Update forecast name and description
+     * Update forecast name, description, and status
      * @param {string} forecastId - Forecast ID
-     * @param {Object} updates - {name, description}
+     * @param {Object} updates - {name, description, status}
      * @returns {Promise<void>}
      */
     async updateForecastMetadata(forecastId, updates) {
         try {
             console.log('[SalesDataService] Updating forecast metadata:', forecastId);
 
-            const metadataRef = ref(rtdb, `forecasts/${forecastId}/metadata`);
+            const updatePayload = {};
 
-            await update(metadataRef, {
-                name: updates.name,
-                description: updates.description || '',
-                updatedAt: Date.now()
-            });
+            // Update metadata
+            if (updates.name !== undefined || updates.description !== undefined) {
+                const metadataRef = ref(rtdb, `forecasts/${forecastId}/metadata`);
+                await update(metadataRef, {
+                    name: updates.name,
+                    description: updates.description || '',
+                    updatedAt: Date.now()
+                });
+            }
+
+            // Update status if provided
+            if (updates.status !== undefined) {
+                const statusRef = ref(rtdb, `forecasts/${forecastId}/status`);
+                await update(ref(rtdb), {
+                    [`forecasts/${forecastId}/status`]: updates.status,
+                    [`forecasts/${forecastId}/updatedAt`]: Date.now()
+                });
+            }
 
             console.log('[SalesDataService] Forecast metadata updated');
         } catch (error) {
@@ -314,26 +409,23 @@ export class SalesDataService {
         try {
             console.log('[SalesDataService] Deleting forecast:', forecastId);
 
-            // Get forecast to find location
             const forecastRef = ref(rtdb, `forecasts/${forecastId}`);
             const snapshot = await get(forecastRef);
 
             if (snapshot.exists()) {
                 const forecast = snapshot.val();
-
-                // Remove from location index
+                // Atomic multi-path delete
+                const updates = {
+                    [`forecasts/${forecastId}`]: null,
+                    [`forecastIndex/byUser/${this.userId}/${forecastId}`]: null
+                };
                 if (forecast.locationId) {
-                    const locationIndexRef = ref(rtdb, `forecastIndex/byLocation/${forecast.locationId}/${forecastId}`);
-                    await remove(locationIndexRef);
+                    updates[`forecastIndex/byLocation/${forecast.locationId}/${forecastId}`] = null;
                 }
-
-                // Remove from user index
-                const userIndexRef = ref(rtdb, `forecastIndex/byUser/${this.userId}/${forecastId}`);
-                await remove(userIndexRef);
+                await update(ref(rtdb), updates);
+            } else {
+                await remove(forecastRef);
             }
-
-            // Remove the forecast
-            await remove(forecastRef);
 
             console.log('[SalesDataService] Forecast deleted');
         } catch (error) {
@@ -355,13 +447,17 @@ export class SalesDataService {
      * @returns {Promise<Object>} Save result with forecastId
      */
     async saveForecast(locationId, salesDataId, forecast, metadata = {}) {
+        if (!locationId) {
+            throw new Error('Location ID is required to save a forecast');
+        }
+
         try {
             const forecastRef = push(ref(rtdb, 'forecasts'));
             const forecastId = forecastRef.key;
             const timestamp = Date.now();
 
             // Get location name
-            const locationName = metadata.locationName || await this.getLocationName(locationId);
+            const locationName = metadata.locationName ?? await this.getLocationName(locationId);
 
             // Calculate summary
             const summary = this.calculateForecastSummary(forecast.predictions);
@@ -543,6 +639,10 @@ export class SalesDataService {
      * @returns {Promise<Object>} Save result with actualId
      */
     async saveActuals(forecastId, dailyActuals) {
+        if (!forecastId) {
+            throw new Error('Forecast ID is required to save actuals');
+        }
+
         try {
             const actualRef = push(ref(rtdb, 'forecastActuals'));
             const actualId = actualRef.key;
@@ -553,6 +653,10 @@ export class SalesDataService {
 
             // Get the forecast to get location info
             const forecast = await this.getForecast(forecastId);
+
+            if (!forecast.locationId) {
+                throw new Error('Forecast is missing locationId - cannot save actuals');
+            }
 
             console.log('[SalesDataService] Forecast location:', forecast.locationId);
             console.log('[SalesDataService] Forecast predictions sample (first 2 keys):');
@@ -607,26 +711,25 @@ export class SalesDataService {
      */
     async getActuals(forecastId) {
         try {
-            // Query actuals by forecastId
-            const actualsRef = ref(rtdb, 'forecastActuals');
-            const snapshot = await get(actualsRef);
+            // Query actuals by forecastId using indexed query
+            const actualsQuery = query(
+                ref(rtdb, 'forecastActuals'),
+                orderByChild('forecastId'),
+                equalTo(forecastId)
+            );
+            const snapshot = await get(actualsQuery);
 
             if (!snapshot.exists()) {
                 return null;
             }
 
-            const allActuals = snapshot.val();
-            for (const [id, actuals] of Object.entries(allActuals)) {
-                if (actuals.forecastId === forecastId) {
-                    return {
-                        id,
-                        ...actuals,
-                        dailyActualsArray: this.dailyDataToArray(actuals.dailyActuals)
-                    };
-                }
-            }
-
-            return null;
+            const results = snapshot.val();
+            const [id, actuals] = Object.entries(results)[0];
+            return {
+                id,
+                ...actuals,
+                dailyActualsArray: this.dailyDataToArray(actuals.dailyActuals)
+            };
         } catch (error) {
             console.error('[SalesDataService] Error getting actuals:', error);
             throw error;
@@ -660,25 +763,24 @@ export class SalesDataService {
      */
     async getActualsForLocation(locationId) {
         try {
-            console.log('[SalesDataService] Getting actuals for location:', locationId);
-            const actualsRef = ref(rtdb, 'forecastActuals');
-            const snapshot = await get(actualsRef);
+            // Use indexed query instead of downloading entire collection
+            const actualsQuery = query(
+                ref(rtdb, 'forecastActuals'),
+                orderByChild('locationId'),
+                equalTo(locationId)
+            );
+            const snapshot = await get(actualsQuery);
 
             if (!snapshot.exists()) {
-                console.log('[SalesDataService] No actuals found in database');
                 return [];
             }
 
-            const allActuals = snapshot.val();
-            console.log('[SalesDataService] Total actuals in database:', Object.keys(allActuals).length);
+            const matchedActuals = snapshot.val();
+            const entries = Object.entries(matchedActuals);
 
-            const locationActuals = [];
-
-            for (const [id, actuals] of Object.entries(allActuals)) {
-                console.log('[SalesDataService] Checking actual:', id, 'locationId:', actuals.locationId, 'vs', locationId);
-
-                if (actuals.locationId === locationId) {
-                    // Get the forecast name to display with actuals
+            // Fetch forecast names in parallel
+            const locationActuals = await Promise.all(
+                entries.map(async ([id, actuals]) => {
                     let forecastName = 'Unknown Forecast';
                     try {
                         const forecast = await this.getForecast(actuals.forecastId);
@@ -687,16 +789,14 @@ export class SalesDataService {
                         console.warn('[SalesDataService] Could not get forecast name for actuals:', id, err);
                     }
 
-                    locationActuals.push({
+                    return {
                         id,
                         ...actuals,
                         forecastName,
                         recordCount: Object.keys(actuals.dailyActuals || {}).length
-                    });
-                }
-            }
-
-            console.log('[SalesDataService] Found', locationActuals.length, 'actuals for location:', locationId);
+                    };
+                })
+            );
 
             // Sort by uploadedAt descending
             locationActuals.sort((a, b) => b.uploadedAt - a.uploadedAt);
@@ -847,13 +947,13 @@ export class SalesDataService {
                 ? pred.date
                 : pred.date.toISOString().split('T')[0];
 
-            // Support both forecast structure (predicted) and original structure (revenue)
+            // Canonical format: predicted, transactions, avgSpend, confidence bounds
             formatted[dateKey] = {
-                predicted: pred.predicted || pred.revenue,
+                predicted: pred.predicted || pred.revenue || 0,
+                transactions: pred.transactions || pred.transactionQty || 0,
+                avgSpend: pred.avgSpend || 0,
                 confidenceLower: pred.confidenceLower,
-                confidenceUpper: pred.confidenceUpper,
-                transactionQty: pred.transactionQty || 0,
-                avgSpend: pred.avgSpend || 0
+                confidenceUpper: pred.confidenceUpper
             };
         }
 
@@ -873,7 +973,7 @@ export class SalesDataService {
      * Calculate total predicted revenue
      */
     calculateTotalPredictedRevenue(predictions) {
-        return predictions.reduce((sum, p) => sum + (p.revenue || 0), 0);
+        return predictions.reduce((sum, p) => sum + (p.predicted || p.revenue || 0), 0);
     }
 
     /**
@@ -944,20 +1044,34 @@ export class SalesDataService {
     }
 
     /**
+     * Safely extract revenue from any prediction format
+     * @param {Object} pred - Prediction object with varying structure
+     * @returns {number} Revenue value
+     */
+    getPredictionRevenue(pred) {
+        return pred?.adjusted?.revenue ?? pred?.predicted ?? 0;
+    }
+
+    /**
      * Calculate summary metrics from forecast data
      * @param {Array} forecastData - Array of forecast predictions
      * @returns {Object} Summary metrics
      */
     calculateForecastSummary(forecastData) {
-        if (!forecastData || forecastData.length === 0) {
+        // Handle both array and object input
+        let dataArray = forecastData;
+        if (!Array.isArray(forecastData)) {
+            dataArray = Object.values(forecastData || {});
+        }
+        if (!dataArray || dataArray.length === 0) {
             return null;
         }
 
-        const totalRevenue = forecastData.reduce((sum, d) => sum + (d.predicted || 0), 0);
-        const avgDaily = totalRevenue / forecastData.length;
+        const totalRevenue = dataArray.reduce((sum, d) => sum + (d.predicted || 0), 0);
+        const avgDaily = totalRevenue / dataArray.length;
 
-        const growth = forecastData.length > 1
-            ? ((forecastData[forecastData.length - 1].predicted / forecastData[0].predicted - 1) * 100)
+        const growth = dataArray.length > 1
+            ? ((dataArray[dataArray.length - 1].predicted / dataArray[0].predicted - 1) * 100)
             : 0;
 
         return {
@@ -965,11 +1079,16 @@ export class SalesDataService {
             avgDailyRevenue: Math.round(avgDaily),
             predictedGrowth: parseFloat(growth.toFixed(1)),
             dateRange: {
-                start: forecastData[0]?.date,
-                end: forecastData[forecastData.length - 1]?.date
+                start: dataArray[0]?.date,
+                end: dataArray[dataArray.length - 1]?.date
             }
         };
     }
+}
+
+// Export the helper function
+export function getPredictionRevenue(pred) {
+    return pred?.adjusted?.revenue ?? pred?.predicted ?? 0;
 }
 
 export default SalesDataService;

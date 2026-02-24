@@ -1,11 +1,12 @@
 /**
  * Forecast Analytics
- * 
+ *
  * Handles accuracy calculation, pattern learning, and analytics
  * for improving forecast quality over time.
  */
 
 import { rtdb, ref, get, set, update } from '../../config/firebase-config.js';
+import { getPredictionRevenue } from './sales-data-service.js';
 
 export class ForecastAnalytics {
     /**
@@ -84,7 +85,7 @@ export class ForecastAnalytics {
             });
 
             // Calculate metrics
-            const comparison = this.compareForecstWithActuals(
+            const comparison = this.compareForecastWithActuals(
                 forecast.predictions,
                 actuals.dailyActuals
             );
@@ -121,7 +122,7 @@ export class ForecastAnalytics {
      * @param {Object} dailyActuals - Actual sales data (indexed by date)
      * @returns {Object} Comparison metrics
      */
-    compareForecstWithActuals(predictions, dailyActuals) {
+    compareForecastWithActuals(predictions, dailyActuals) {
         console.log('[ForecastAnalytics] ===== COMPARING FORECAST WITH ACTUALS =====');
         console.log('[ForecastAnalytics] Predictions keys count:', Object.keys(predictions || {}).length);
         console.log('[ForecastAnalytics] Actuals keys count:', Object.keys(dailyActuals || {}).length);
@@ -165,8 +166,8 @@ export class ForecastAnalytics {
             comparison.daysCompared++;
 
             // Get predicted value (use adjusted if available)
-            const predictedRevenue = prediction.adjusted?.revenue || prediction.original?.revenue || prediction.predicted || 0;
-            const predictedTransactions = prediction.adjusted?.transactions || prediction.original?.transactions || prediction.transactionQty || 0;
+            const predictedRevenue = getPredictionRevenue(prediction);
+            const predictedTransactions = prediction.adjusted?.transactions ?? prediction.transactions ?? prediction.transactionQty ?? 0;
 
             const actualRevenue = actual.revenue || 0;
             const actualTransactions = actual.transactions || 0;
