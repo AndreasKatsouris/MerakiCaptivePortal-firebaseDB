@@ -124,7 +124,7 @@ export async function initializeRoss() {
             locationId = token.claims.locationId || null;
         }
     } catch (e) {
-        console.warn('[ROSS] Could not read locationId from claims:', e.message);
+        console.error('[ROSS] Could not read locationId from claims:', e.message);
     }
     if (!locationId) {
         const params = new URLSearchParams(window.location.search);
@@ -335,14 +335,14 @@ export async function initializeRoss() {
             </ul>
 
             <!-- Empty state -->
-            <div v-if="filteredTemplates().length === 0" class="text-center py-5 text-muted">
+            <div v-if="filteredTemplates.length === 0" class="text-center py-5 text-muted">
                 <i class="fas fa-book fa-3x mb-3"></i>
                 <p>No templates found.</p>
             </div>
 
             <!-- Template cards -->
             <div class="row g-3">
-                <div v-for="tmpl in filteredTemplates()" :key="tmpl.templateId"
+                <div v-for="tmpl in filteredTemplates" :key="tmpl.templateId"
                     class="col-md-6 col-lg-4">
                     <div class="card border-0 shadow-sm h-100">
                         <div class="card-body">
@@ -497,13 +497,13 @@ export async function initializeRoss() {
                 </select>
             </div>
 
-            <div v-if="!filteredWorkflows().length" class="text-center py-5 text-muted">
+            <div v-if="!filteredWorkflows.length" class="text-center py-5 text-muted">
                 <i class="fas fa-tasks fa-3x mb-3"></i>
                 <p>No workflows found.</p>
             </div>
 
             <div class="row g-3">
-                <div v-for="wf in filteredWorkflows()" :key="wf.workflowId" class="col-md-6">
+                <div v-for="wf in filteredWorkflows" :key="wf.workflowId" class="col-md-6">
                     <div class="card border-0 shadow-sm h-100">
                         <div class="card-body">
                             <div class="d-flex justify-content-between align-items-start mb-2">
@@ -888,6 +888,19 @@ export async function initializeRoss() {
                 if (!this.selectedWorkflow) return [];
                 return Object.values(this.selectedWorkflow.history || {})
                     .sort((a, b) => (b.completedAt || 0) - (a.completedAt || 0));
+            },
+            filteredTemplates() {
+                if (this.templateFilter === 'all') return this.templates;
+                return this.templates.filter(t => t.category === this.templateFilter);
+            },
+            filteredWorkflows() {
+                return this.workflows.filter(w => {
+                    const catOk = this.workflowFilter.category === 'all'
+                        || w.category === this.workflowFilter.category;
+                    const statusOk = this.workflowFilter.status === 'all'
+                        || w.status === this.workflowFilter.status;
+                    return catOk && statusOk;
+                });
             }
         },
 
@@ -906,6 +919,8 @@ export async function initializeRoss() {
                     this.loadWorkflows();
                 } else if (tab === 'reports') {
                     this.loadReports();
+                } else if (tab === 'staff') {
+                    this.loadStaff();
                 }
             },
 
@@ -941,34 +956,24 @@ export async function initializeRoss() {
             buildAlerts(workflowList) {
                 const now = Date.now();
                 const soon = now + 24 * 60 * 60 * 1000;
-                const alerts = [];
 
-                for (const wf of workflowList) {
-                    const entries = Object.entries(wf.tasks || {});
-                    for (const [taskId, task] of entries) {
-                        if (!task.dueDate || task.status === 'completed') continue;
-                        if (task.dueDate < now) {
-                            alerts.push({
-                                taskId,
-                                taskName: task.title || task.name || 'Unnamed task',
-                                workflowName: wf.name || 'Unnamed workflow',
-                                dueDate: task.dueDate,
-                                type: 'overdue'
-                            });
-                        } else if (task.dueDate <= soon) {
-                            alerts.push({
-                                taskId,
-                                taskName: task.title || task.name || 'Unnamed task',
-                                workflowName: wf.name || 'Unnamed workflow',
-                                dueDate: task.dueDate,
-                                type: 'soon'
-                            });
-                        }
-                    }
-                }
+                const alerts = workflowList.flatMap(wf =>
+                    Object.entries(wf.tasks || {}).flatMap(([taskId, task]) => {
+                        if (!task.dueDate || task.status === 'completed') return [];
+                        const base = {
+                            taskId,
+                            taskName: task.title || task.name || 'Unnamed task',
+                            workflowName: wf.name || 'Unnamed workflow',
+                            dueDate: task.dueDate
+                        };
+                        if (task.dueDate < now) return [{ ...base, type: 'overdue' }];
+                        if (task.dueDate <= soon) return [{ ...base, type: 'soon' }];
+                        return [];
+                    })
+                );
 
                 // Overdue first, then soon; ascending by dueDate within each group
-                return alerts.sort((a, b) => {
+                return [...alerts].sort((a, b) => {
                     if (a.type !== b.type) return a.type === 'overdue' ? -1 : 1;
                     return a.dueDate - b.dueDate;
                 });
@@ -1008,24 +1013,21 @@ export async function initializeRoss() {
                 const ts = todayStart.getTime();
                 const te = todayEnd.getTime();
 
-                const tasks = [];
-                for (const wf of workflowList) {
-                    const entries = Object.entries(wf.tasks || {});
-                    for (const [taskId, task] of entries) {
-                        if (task.dueDate && task.dueDate >= ts && task.dueDate <= te) {
-                            tasks.push({
-                                taskId,
-                                workflowId: wf.workflowId || wf.id,
-                                workflowName: wf.name || 'Unnamed workflow',
-                                title: task.title || task.name || 'Unnamed task',
-                                status: task.status || 'pending',
-                                dueDate: task.dueDate,
-                                completing: false
-                            });
-                        }
-                    }
-                }
-                return tasks.sort((a, b) => a.dueDate - b.dueDate);
+                const tasks = workflowList.flatMap(wf =>
+                    Object.entries(wf.tasks || {}).flatMap(([taskId, task]) => {
+                        if (!task.dueDate || task.dueDate < ts || task.dueDate > te) return [];
+                        return [{
+                            taskId,
+                            workflowId: wf.workflowId || wf.id,
+                            workflowName: wf.name || 'Unnamed workflow',
+                            title: task.title || task.name || 'Unnamed task',
+                            status: task.status || 'pending',
+                            dueDate: task.dueDate,
+                            completing: false
+                        }];
+                    })
+                );
+                return [...tasks].sort((a, b) => a.dueDate - b.dueDate);
             },
 
             async completeTask(task) {
@@ -1095,11 +1097,6 @@ export async function initializeRoss() {
                 } catch (e) {
                     this.isSuperAdmin = false;
                 }
-            },
-
-            filteredTemplates() {
-                if (this.templateFilter === 'all') return this.templates;
-                return this.templates.filter(t => t.category === this.templateFilter);
             },
 
             async activateTemplate(template) {
@@ -1198,16 +1195,6 @@ export async function initializeRoss() {
                 }
             },
 
-            filteredWorkflows() {
-                return this.workflows.filter(w => {
-                    const catOk = this.workflowFilter.category === 'all'
-                        || w.category === this.workflowFilter.category;
-                    const statusOk = this.workflowFilter.status === 'all'
-                        || w.status === this.workflowFilter.status;
-                    return catOk && statusOk;
-                });
-            },
-
             openWorkflow(workflow) {
                 this.selectedWorkflow = { ...workflow };
                 this.workflowDetailTab = 'tasks';
@@ -1229,7 +1216,7 @@ export async function initializeRoss() {
                 });
                 if (!result.isConfirmed) return;
                 try {
-                    await rossService.completeTask(wf.locationId, wf.workflowId, task._taskId);
+                    await rossService.completeTask(rossState.locationId, wf.workflowId, task._taskId);
                     const updatedTasks = { ...wf.tasks };
                     updatedTasks[task._taskId] = {
                         ...updatedTasks[task._taskId],
@@ -1254,7 +1241,7 @@ export async function initializeRoss() {
                 });
                 if (!result.isConfirmed) return;
                 try {
-                    await rossService.deleteWorkflow(workflow.locationId, workflow.workflowId);
+                    await rossService.deleteWorkflow(rossState.locationId, workflow.workflowId);
                     this.workflows = this.workflows.filter(w => w.workflowId !== workflow.workflowId);
                     await Swal.fire('Deleted', 'Workflow removed.', 'success');
                 } catch (err) {
@@ -1267,7 +1254,7 @@ export async function initializeRoss() {
                 const newStatus = workflow.status === 'active' ? 'paused' : 'active';
                 try {
                     await rossService.updateWorkflow(
-                        workflow.locationId, workflow.workflowId, { status: newStatus }
+                        rossState.locationId, workflow.workflowId, { status: newStatus }
                     );
                     this.workflows = this.workflows.map(w =>
                         w.workflowId === workflow.workflowId ? { ...w, status: newStatus } : w
@@ -1323,6 +1310,10 @@ export async function initializeRoss() {
                 }
                 if (!this.builder.name.trim() || !this.builder.nextDueDate) {
                     await Swal.fire('Incomplete', 'Please complete all required fields.', 'warning');
+                    return;
+                }
+                if (this.builder.subtasks.length === 0) {
+                    await Swal.fire('Required', 'Please add at least one subtask.', 'warning');
                     return;
                 }
                 try {
@@ -1582,6 +1573,7 @@ export async function initializeRoss() {
             this.loadOverview();
             if (rossState.locationId) {
                 this.staffLocationId = rossState.locationId;
+                this.loadStaff();
             }
         }
     });
