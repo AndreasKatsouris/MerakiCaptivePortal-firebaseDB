@@ -4,8 +4,8 @@
  * Views: Overview | Template Library | My Workflows | Workflow Builder | Reports | Staff
  */
 
+import { auth, rtdb, ref, onValue } from '../../config/firebase-config.js';
 import { rossService } from './services/ross-service.js';
-import { auth } from '../../config/firebase-config.js';
 
 // ---------------------------------------------------------------------------
 // Module state
@@ -47,6 +47,15 @@ function formatDateTime(ts) {
         minute: '2-digit'
     });
 }
+
+const CATEGORY_ICONS = {
+    Opening:  'fas fa-sun',
+    Closing:  'fas fa-moon',
+    Cleaning: 'fas fa-broom',
+    Service:  'fas fa-concierge-bell',
+    Kitchen:  'fas fa-utensils',
+    Admin:    'fas fa-clipboard-list'
+};
 
 // ---------------------------------------------------------------------------
 // initializeRoss
@@ -99,38 +108,38 @@ export async function initializeRoss() {
     <div class="ross-nav-tabs mb-4">
         <ul class="nav nav-tabs">
             <li class="nav-item">
-                <button class="nav-link" :class="{ active: currentView === 'overview' }"
-                    @click="switchView('overview')">
+                <button class="nav-link" :class="{ active: currentTab === 'overview' }"
+                    @click="switchTab('overview')">
                     <i class="fas fa-tachometer-alt me-1"></i>Overview
                 </button>
             </li>
             <li class="nav-item">
-                <button class="nav-link" :class="{ active: currentView === 'templates' }"
-                    @click="switchView('templates')">
+                <button class="nav-link" :class="{ active: currentTab === 'templates' }"
+                    @click="switchTab('templates')">
                     <i class="fas fa-layer-group me-1"></i>Template Library
                 </button>
             </li>
             <li class="nav-item">
-                <button class="nav-link" :class="{ active: currentView === 'workflows' }"
-                    @click="switchView('workflows')">
+                <button class="nav-link" :class="{ active: currentTab === 'workflows' }"
+                    @click="switchTab('workflows')">
                     <i class="fas fa-project-diagram me-1"></i>My Workflows
                 </button>
             </li>
             <li class="nav-item">
-                <button class="nav-link" :class="{ active: currentView === 'builder' }"
-                    @click="switchView('builder')">
+                <button class="nav-link" :class="{ active: currentTab === 'builder' }"
+                    @click="switchTab('builder')">
                     <i class="fas fa-tools me-1"></i>Workflow Builder
                 </button>
             </li>
             <li class="nav-item">
-                <button class="nav-link" :class="{ active: currentView === 'reports' }"
-                    @click="switchView('reports')">
+                <button class="nav-link" :class="{ active: currentTab === 'reports' }"
+                    @click="switchTab('reports')">
                     <i class="fas fa-chart-bar me-1"></i>Reports
                 </button>
             </li>
             <li class="nav-item">
-                <button class="nav-link" :class="{ active: currentView === 'staff' }"
-                    @click="switchView('staff')">
+                <button class="nav-link" :class="{ active: currentTab === 'staff' }"
+                    @click="switchTab('staff')">
                     <i class="fas fa-users me-1"></i>Staff
                 </button>
             </li>
@@ -140,10 +149,10 @@ export async function initializeRoss() {
     <!-- ================================================================
          VIEW 1 — Overview Dashboard
     ================================================================ -->
-    <div v-if="currentView === 'overview'">
+    <div v-if="currentTab === 'overview'">
 
         <!-- Loading -->
-        <div v-if="loading" class="text-center py-5">
+        <div v-if="overviewLoading" class="text-center py-5">
             <div class="spinner-border text-primary" role="status">
                 <span class="visually-hidden">Loading...</span>
             </div>
@@ -151,119 +160,94 @@ export async function initializeRoss() {
         </div>
 
         <!-- Error -->
-        <div v-else-if="error" class="alert alert-danger">
-            <i class="fas fa-exclamation-circle me-2"></i>{{ error }}
+        <div v-else-if="overviewError" class="alert alert-danger">
+            <i class="fas fa-exclamation-circle me-2"></i>{{ overviewError }}
             <button class="btn btn-sm btn-outline-danger ms-3" @click="loadOverview">Retry</button>
         </div>
 
         <!-- Content -->
         <div v-else>
 
-            <!-- Stat Cards -->
+            <!-- Section A: Alert strip — overdue (red) + due-soon (amber) -->
+            <div v-if="visibleAlerts.length > 0" class="mb-4">
+                <div v-for="alert in visibleAlerts" :key="alert.taskId"
+                    class="alert alert-dismissible fade show mb-2"
+                    :class="alert.type === 'overdue' ? 'alert-danger' : 'alert-warning'"
+                    role="alert">
+                    <i class="me-2"
+                        :class="alert.type === 'overdue' ? 'fas fa-exclamation-circle' : 'fas fa-clock'"></i>
+                    <strong v-if="alert.type === 'overdue'">Overdue:</strong>
+                    <strong v-else>Due Soon:</strong>
+                    {{ alert.taskName }} &mdash; <em>{{ alert.workflowName }}</em>
+                    <span class="ms-2 text-muted small">({{ formatDate(alert.dueDate) }})</span>
+                    <button type="button" class="btn-close" @click="dismissAlert(alert.taskId)"></button>
+                </div>
+            </div>
+
+            <!-- Section B: Category summary cards (6) -->
             <div class="row g-3 mb-4">
-                <div class="col-6 col-md-3">
+                <div v-for="cat in categoryStats" :key="cat.name" class="col-6 col-md-4 col-lg-2">
                     <div class="card text-center h-100 border-0 shadow-sm">
-                        <div class="card-body">
-                            <div class="stat-icon text-primary mb-2">
-                                <i class="fas fa-project-diagram fa-2x"></i>
+                        <div class="card-body py-3">
+                            <i :class="[cat.icon, 'fa-lg', 'mb-2',
+                                cat.activeCount > 0 ? 'text-primary' : 'text-muted']"></i>
+                            <div class="fw-bold small mb-1">{{ cat.name }}</div>
+                            <div class="h5 mb-0">{{ cat.activeCount }}</div>
+                            <small class="text-muted">active</small>
+                            <div class="progress mt-2" style="height:4px">
+                                <div class="progress-bar bg-success"
+                                    :style="{ width: cat.completionPct + '%' }"></div>
                             </div>
-                            <h3 class="mb-0 fw-bold">{{ overviewStats.activeWorkflows }}</h3>
-                            <small class="text-muted">Active Workflows</small>
-                        </div>
-                    </div>
-                </div>
-                <div class="col-6 col-md-3">
-                    <div class="card text-center h-100 border-0 shadow-sm">
-                        <div class="card-body">
-                            <div class="stat-icon text-success mb-2">
-                                <i class="fas fa-check-circle fa-2x"></i>
-                            </div>
-                            <h3 class="mb-0 fw-bold">{{ overviewStats.completedToday }}</h3>
-                            <small class="text-muted">Completed Today</small>
-                        </div>
-                    </div>
-                </div>
-                <div class="col-6 col-md-3">
-                    <div class="card text-center h-100 border-0 shadow-sm">
-                        <div class="card-body">
-                            <div class="stat-icon text-warning mb-2">
-                                <i class="fas fa-clock fa-2x"></i>
-                            </div>
-                            <h3 class="mb-0 fw-bold">{{ overviewStats.pendingTasks }}</h3>
-                            <small class="text-muted">Pending Tasks</small>
-                        </div>
-                    </div>
-                </div>
-                <div class="col-6 col-md-3">
-                    <div class="card text-center h-100 border-0 shadow-sm">
-                        <div class="card-body">
-                            <div class="stat-icon text-info mb-2">
-                                <i class="fas fa-user-check fa-2x"></i>
-                            </div>
-                            <h3 class="mb-0 fw-bold">{{ overviewStats.staffOnDuty }}</h3>
-                            <small class="text-muted">Staff On Duty</small>
+                            <small class="text-muted">{{ cat.completionPct }}% done</small>
                         </div>
                     </div>
                 </div>
             </div>
 
-            <!-- Active Workflows Table -->
+            <!-- Section C: Today's Tasks quick list -->
             <div class="card mb-4 shadow-sm">
                 <div class="card-header d-flex justify-content-between align-items-center">
-                    <h6 class="mb-0"><i class="fas fa-project-diagram me-2"></i>Active Workflows</h6>
-                    <button class="btn btn-sm btn-primary" @click="switchView('workflows')">
-                        <i class="fas fa-list me-1"></i>View All
-                    </button>
+                    <h6 class="mb-0">
+                        <i class="fas fa-calendar-day me-2"></i>Today's Tasks
+                    </h6>
+                    <span class="badge bg-primary">{{ todayTasks.length }}</span>
                 </div>
                 <div class="card-body p-0">
-                    <div v-if="activeWorkflows.length === 0" class="text-center py-4">
-                        <i class="fas fa-inbox fa-2x text-muted mb-2"></i>
-                        <p class="text-muted mb-0">No active workflows</p>
-                        <button class="btn btn-sm btn-outline-primary mt-2" @click="switchView('templates')">
-                            Start from a Template
-                        </button>
+                    <div v-if="todayTasks.length === 0" class="text-center py-4">
+                        <i class="fas fa-check-circle fa-2x text-success mb-2"></i>
+                        <p class="text-muted mb-0">No tasks due today</p>
                     </div>
                     <div v-else class="table-responsive">
                         <table class="table table-hover mb-0">
                             <thead class="table-light">
                                 <tr>
+                                    <th>Task</th>
                                     <th>Workflow</th>
-                                    <th>Template</th>
-                                    <th style="width:180px">Progress</th>
                                     <th>Status</th>
-                                    <th>Actions</th>
+                                    <th></th>
                                 </tr>
                             </thead>
                             <tbody>
-                                <tr v-for="wf in activeWorkflows" :key="wf.workflowId">
+                                <tr v-for="task in todayTasks" :key="task.taskId">
+                                    <td>{{ task.title }}</td>
+                                    <td class="text-muted small">{{ task.workflowName }}</td>
                                     <td>
-                                        <strong>{{ wf.name }}</strong>
-                                        <div class="small text-muted">{{ formatDate(wf.createdAt) }}</div>
-                                    </td>
-                                    <td>
-                                        <span class="badge bg-secondary">{{ wf.templateName || 'Custom' }}</span>
-                                    </td>
-                                    <td>
-                                        <div class="d-flex align-items-center gap-2">
-                                            <div class="progress flex-grow-1" style="height:8px">
-                                                <div class="progress-bar"
-                                                    :class="progressBarClass(wf.progress)"
-                                                    :style="{ width: (wf.progress || 0) + '%' }">
-                                                </div>
-                                            </div>
-                                            <small class="text-muted">{{ wf.progress || 0 }}%</small>
-                                        </div>
-                                    </td>
-                                    <td>
-                                        <span class="badge" :class="workflowStatusClass(wf.status)">
-                                            {{ formatStatus(wf.status) }}
+                                        <span class="badge" :class="taskStatusClass(task.status)">
+                                            {{ formatStatus(task.status) }}
                                         </span>
                                     </td>
                                     <td>
-                                        <button class="btn btn-sm btn-outline-primary"
-                                            @click="switchView('workflows')">
-                                            <i class="fas fa-eye me-1"></i>View
+                                        <button v-if="task.status !== 'completed'"
+                                            class="btn btn-sm btn-outline-success"
+                                            :disabled="task.completing"
+                                            @click="completeTask(task)">
+                                            <span v-if="task.completing"
+                                                class="spinner-border spinner-border-sm me-1"></span>
+                                            <i v-else class="fas fa-check me-1"></i>Complete
                                         </button>
+                                        <span v-else class="text-success small">
+                                            <i class="fas fa-check-circle me-1"></i>Done
+                                        </span>
                                     </td>
                                 </tr>
                             </tbody>
@@ -272,28 +256,14 @@ export async function initializeRoss() {
                 </div>
             </div>
 
-            <!-- Recent Activity -->
-            <div class="card shadow-sm">
-                <div class="card-header">
-                    <h6 class="mb-0"><i class="fas fa-history me-2"></i>Recent Activity</h6>
-                </div>
-                <div class="card-body">
-                    <div v-if="recentActivity.length === 0" class="text-center py-3">
-                        <p class="text-muted mb-0">No recent activity</p>
-                    </div>
-                    <ul v-else class="list-group list-group-flush">
-                        <li v-for="(item, idx) in recentActivity" :key="idx"
-                            class="list-group-item px-0 py-2 d-flex align-items-start gap-3">
-                            <span class="badge rounded-pill mt-1" :class="activityBadgeClass(item.type)">
-                                <i :class="activityIcon(item.type)"></i>
-                            </span>
-                            <div class="flex-grow-1">
-                                <div>{{ item.description }}</div>
-                                <small class="text-muted">{{ formatDateTime(item.timestamp) }}</small>
-                            </div>
-                        </li>
-                    </ul>
-                </div>
+            <!-- Section D: Quick-action buttons -->
+            <div class="d-flex gap-3">
+                <button class="btn btn-primary" @click="switchTab('templates')">
+                    <i class="fas fa-layer-group me-2"></i>Activate Template
+                </button>
+                <button class="btn btn-outline-primary" @click="switchTab('builder')">
+                    <i class="fas fa-tools me-2"></i>Create Workflow
+                </button>
             </div>
 
         </div>
@@ -302,9 +272,9 @@ export async function initializeRoss() {
     <!-- ================================================================
          VIEW 2 — Template Library (placeholder, built in Task 9)
     ================================================================ -->
-    <div v-if="currentView === 'templates'">
+    <div v-if="currentTab === 'templates'">
         <div class="text-center py-5">
-            <div v-if="viewLoading" class="spinner-border text-primary" role="status"></div>
+            <div v-if="tabLoading" class="spinner-border text-primary" role="status"></div>
             <template v-else>
                 <i class="fas fa-layer-group fa-3x text-muted mb-3"></i>
                 <h5>Template Library</h5>
@@ -316,9 +286,9 @@ export async function initializeRoss() {
     <!-- ================================================================
          VIEW 3 — My Workflows (placeholder, built in Task 10)
     ================================================================ -->
-    <div v-if="currentView === 'workflows'">
+    <div v-if="currentTab === 'workflows'">
         <div class="text-center py-5">
-            <div v-if="viewLoading" class="spinner-border text-primary" role="status"></div>
+            <div v-if="tabLoading" class="spinner-border text-primary" role="status"></div>
             <template v-else>
                 <i class="fas fa-project-diagram fa-3x text-muted mb-3"></i>
                 <h5>My Workflows</h5>
@@ -330,9 +300,9 @@ export async function initializeRoss() {
     <!-- ================================================================
          VIEW 4 — Workflow Builder (placeholder, built in Task 11)
     ================================================================ -->
-    <div v-if="currentView === 'builder'">
+    <div v-if="currentTab === 'builder'">
         <div class="text-center py-5">
-            <div v-if="viewLoading" class="spinner-border text-primary" role="status"></div>
+            <div v-if="tabLoading" class="spinner-border text-primary" role="status"></div>
             <template v-else>
                 <i class="fas fa-tools fa-3x text-muted mb-3"></i>
                 <h5>Workflow Builder</h5>
@@ -344,9 +314,9 @@ export async function initializeRoss() {
     <!-- ================================================================
          VIEW 5 — Reports (placeholder, built in Task 12)
     ================================================================ -->
-    <div v-if="currentView === 'reports'">
+    <div v-if="currentTab === 'reports'">
         <div class="text-center py-5">
-            <div v-if="viewLoading" class="spinner-border text-primary" role="status"></div>
+            <div v-if="tabLoading" class="spinner-border text-primary" role="status"></div>
             <template v-else>
                 <i class="fas fa-chart-bar fa-3x text-muted mb-3"></i>
                 <h5>Reports</h5>
@@ -358,9 +328,9 @@ export async function initializeRoss() {
     <!-- ================================================================
          VIEW 6 — Staff Management (placeholder, built in Task 12b)
     ================================================================ -->
-    <div v-if="currentView === 'staff'">
+    <div v-if="currentTab === 'staff'">
         <div class="text-center py-5">
-            <div v-if="viewLoading" class="spinner-border text-primary" role="status"></div>
+            <div v-if="tabLoading" class="spinner-border text-primary" role="status"></div>
             <template v-else>
                 <i class="fas fa-users fa-3x text-muted mb-3"></i>
                 <h5>Staff Management</h5>
@@ -375,30 +345,40 @@ export async function initializeRoss() {
         data() {
             return {
                 // Navigation
-                currentView: 'overview',
-                viewLoading: false,
+                currentTab: 'overview',
+                tabLoading: false,
+
+                // Shared across views (populated in mounted + per-tab loaders)
+                locations: [],
+                templates: [],
+                workflows: [],
+                staff: [],
 
                 // View 1 — Overview
-                loading: false,
-                error: null,
-                overviewStats: {
-                    activeWorkflows: 0,
-                    completedToday: 0,
-                    pendingTasks: 0,
-                    staffOnDuty: 0
-                },
-                activeWorkflows: [],
-                recentActivity: []
+                overviewLoading: false,
+                overviewError: null,
+                overdueAlerts: [],
+                categoryStats: [],
+                todayTasks: [],
+                dismissedAlerts: []
             };
+        },
+
+        computed: {
+            visibleAlerts() {
+                return this.overdueAlerts
+                    .filter(a => !this.dismissedAlerts.includes(a.taskId))
+                    .slice(0, 5);
+            }
         },
 
         methods: {
             // ------------------------------------------------------------------
             // Navigation
             // ------------------------------------------------------------------
-            switchView(view) {
-                this.currentView = view;
-                if (view === 'overview') {
+            switchTab(tab) {
+                this.currentTab = tab;
+                if (tab === 'overview') {
                     this.loadOverview();
                 }
             },
@@ -408,116 +388,181 @@ export async function initializeRoss() {
             // ------------------------------------------------------------------
             async loadOverview() {
                 if (!rossState.locationId) {
-                    this.error = 'No location selected. Please select a location first.';
+                    this.overviewError = 'No location selected. Please select a location first.';
                     return;
                 }
 
-                this.loading = true;
-                this.error = null;
+                this.overviewLoading = true;
+                this.overviewError = null;
 
                 try {
-                    const workflows = await rossService.getWorkflows(rossState.locationId);
-                    const workflowList = Array.isArray(workflows) ? workflows : Object.values(workflows || {});
+                    const raw = await rossService.getWorkflows(rossState.locationId);
+                    const workflowList = Array.isArray(raw) ? raw : Object.values(raw || {});
+                    this.workflows = workflowList;
 
-                    const todayStart = new Date();
-                    todayStart.setHours(0, 0, 0, 0);
-                    const todayTs = todayStart.getTime();
-
-                    const active = workflowList.filter(w => w.status === 'active' || w.status === 'in_progress');
-                    const completedToday = workflowList.filter(
-                        w => w.status === 'completed' && w.completedAt && w.completedAt >= todayTs
-                    );
-
-                    // Count pending tasks across all active workflows
-                    let pendingTasks = 0;
-                    for (const wf of active) {
-                        const tasks = Object.values(wf.tasks || {});
-                        pendingTasks += tasks.filter(t => t.status === 'pending' || t.status === 'todo').length;
-                    }
-
-                    this.overviewStats = {
-                        activeWorkflows: active.length,
-                        completedToday: completedToday.length,
-                        pendingTasks,
-                        staffOnDuty: 0  // populated by staff view; placeholder here
-                    };
-
-                    this.activeWorkflows = active.slice(0, 10).map(wf => ({
-                        ...wf,
-                        progress: this.calcProgress(wf)
-                    }));
-
-                    // Build recent activity from latest workflows
-                    const sorted = [...workflowList].sort((a, b) => (b.updatedAt || 0) - (a.updatedAt || 0));
-                    this.recentActivity = sorted.slice(0, 5).map(wf => ({
-                        type: wf.status,
-                        description: `Workflow "${wf.name}" — ${this.formatStatus(wf.status)}`,
-                        timestamp: wf.updatedAt || wf.createdAt
-                    }));
+                    this.overdueAlerts = this.buildAlerts(workflowList);
+                    this.categoryStats = this.buildCategoryStats(workflowList);
+                    this.todayTasks = this.buildTodayTasks(workflowList);
 
                 } catch (err) {
                     console.error('[ROSS] loadOverview error:', err);
-                    this.error = 'Failed to load overview: ' + err.message;
+                    this.overviewError = 'Failed to load overview: ' + err.message;
                 } finally {
-                    this.loading = false;
+                    this.overviewLoading = false;
                 }
+            },
+
+            buildAlerts(workflowList) {
+                const now = Date.now();
+                const soon = now + 24 * 60 * 60 * 1000;
+                const alerts = [];
+
+                for (const wf of workflowList) {
+                    const entries = Object.entries(wf.tasks || {});
+                    for (const [taskId, task] of entries) {
+                        if (!task.dueDate || task.status === 'completed') continue;
+                        if (task.dueDate < now) {
+                            alerts.push({
+                                taskId,
+                                taskName: task.title || task.name || 'Unnamed task',
+                                workflowName: wf.name || 'Unnamed workflow',
+                                dueDate: task.dueDate,
+                                type: 'overdue'
+                            });
+                        } else if (task.dueDate <= soon) {
+                            alerts.push({
+                                taskId,
+                                taskName: task.title || task.name || 'Unnamed task',
+                                workflowName: wf.name || 'Unnamed workflow',
+                                dueDate: task.dueDate,
+                                type: 'soon'
+                            });
+                        }
+                    }
+                }
+
+                // Overdue first, then soon; ascending by dueDate within each group
+                return alerts.sort((a, b) => {
+                    if (a.type !== b.type) return a.type === 'overdue' ? -1 : 1;
+                    return a.dueDate - b.dueDate;
+                });
+            },
+
+            buildCategoryStats(workflowList) {
+                const categories = ['Opening', 'Closing', 'Cleaning', 'Service', 'Kitchen', 'Admin'];
+                return categories.map(name => {
+                    const catWfs = workflowList.filter(
+                        wf => (wf.category || '').toLowerCase() === name.toLowerCase()
+                    );
+                    const active = catWfs.filter(
+                        wf => wf.status === 'active' || wf.status === 'in_progress'
+                    );
+                    let totalTasks = 0;
+                    let doneTasks = 0;
+                    for (const wf of catWfs) {
+                        const tasks = Object.values(wf.tasks || {});
+                        totalTasks += tasks.length;
+                        doneTasks += tasks.filter(
+                            t => t.status === 'completed' || t.status === 'done'
+                        ).length;
+                    }
+                    return {
+                        name,
+                        icon: CATEGORY_ICONS[name] || 'fas fa-folder',
+                        activeCount: active.length,
+                        completionPct: totalTasks > 0
+                            ? Math.round((doneTasks / totalTasks) * 100)
+                            : 0
+                    };
+                });
+            },
+
+            buildTodayTasks(workflowList) {
+                const todayStart = new Date();
+                todayStart.setHours(0, 0, 0, 0);
+                const todayEnd = new Date();
+                todayEnd.setHours(23, 59, 59, 999);
+                const ts = todayStart.getTime();
+                const te = todayEnd.getTime();
+
+                const tasks = [];
+                for (const wf of workflowList) {
+                    const entries = Object.entries(wf.tasks || {});
+                    for (const [taskId, task] of entries) {
+                        if (task.dueDate && task.dueDate >= ts && task.dueDate <= te) {
+                            tasks.push({
+                                taskId,
+                                workflowId: wf.workflowId || wf.id,
+                                workflowName: wf.name || 'Unnamed workflow',
+                                title: task.title || task.name || 'Unnamed task',
+                                status: task.status || 'pending',
+                                dueDate: task.dueDate,
+                                completing: false
+                            });
+                        }
+                    }
+                }
+                return tasks.sort((a, b) => a.dueDate - b.dueDate);
+            },
+
+            async completeTask(task) {
+                if (!rossState.locationId) return;
+
+                // Immutable flag update
+                this.todayTasks = this.todayTasks.map(t =>
+                    t.taskId === task.taskId ? { ...t, completing: true } : t
+                );
+
+                try {
+                    await rossService.completeTask(
+                        rossState.locationId,
+                        task.workflowId,
+                        task.taskId
+                    );
+                    await Swal.fire({
+                        toast: true,
+                        position: 'top-end',
+                        icon: 'success',
+                        title: 'Task completed',
+                        showConfirmButton: false,
+                        timer: 2000
+                    });
+                    await this.loadOverview();
+                } catch (err) {
+                    console.error('[ROSS] completeTask error:', err);
+                    await Swal.fire('Error', 'Failed to complete task: ' + err.message, 'error');
+                    this.todayTasks = this.todayTasks.map(t =>
+                        t.taskId === task.taskId ? { ...t, completing: false } : t
+                    );
+                }
+            },
+
+            dismissAlert(taskId) {
+                this.dismissedAlerts = [...this.dismissedAlerts, taskId];
             },
 
             // ------------------------------------------------------------------
             // Helpers
             // ------------------------------------------------------------------
-            calcProgress(wf) {
-                const tasks = Object.values(wf.tasks || {});
-                if (tasks.length === 0) return 0;
-                const done = tasks.filter(t => t.status === 'completed' || t.status === 'done').length;
-                return Math.round((done / tasks.length) * 100);
-            },
-
             formatDate,
             formatDateTime,
+            escapeHtml,
 
             formatStatus(status) {
                 if (!status) return 'Unknown';
                 return status.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase());
             },
 
-            workflowStatusClass(status) {
-                const map = {
-                    active: 'bg-success',
-                    in_progress: 'bg-primary',
-                    completed: 'bg-secondary',
-                    paused: 'bg-warning text-dark',
-                    cancelled: 'bg-danger'
-                };
-                return map[status] || 'bg-secondary';
-            },
-
-            progressBarClass(pct) {
-                if (pct >= 80) return 'bg-success';
-                if (pct >= 40) return 'bg-primary';
-                return 'bg-warning';
-            },
-
-            activityBadgeClass(type) {
+            taskStatusClass(status) {
                 const map = {
                     completed: 'bg-success',
-                    active: 'bg-primary',
-                    in_progress: 'bg-primary',
-                    paused: 'bg-warning text-dark',
-                    cancelled: 'bg-danger'
+                    done:       'bg-success',
+                    in_progress:'bg-primary',
+                    pending:    'bg-secondary',
+                    todo:       'bg-secondary',
+                    blocked:    'bg-danger'
                 };
-                return map[type] || 'bg-secondary';
-            },
-
-            activityIcon(type) {
-                const map = {
-                    completed: 'fas fa-check',
-                    active: 'fas fa-play',
-                    in_progress: 'fas fa-spinner',
-                    paused: 'fas fa-pause',
-                    cancelled: 'fas fa-times'
-                };
-                return map[type] || 'fas fa-circle';
+                return map[status] || 'bg-secondary';
             }
         },
 
