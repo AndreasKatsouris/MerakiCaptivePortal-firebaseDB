@@ -4,7 +4,7 @@
  * Views: Overview | Template Library | My Workflows | Workflow Builder | Reports | Staff
  */
 
-import { auth, rtdb, ref, onValue } from '../../config/firebase-config.js';
+import { auth, rtdb, ref, get, onValue } from '../../config/firebase-config.js';
 import { rossService } from './services/ross-service.js';
 
 // ---------------------------------------------------------------------------
@@ -136,6 +136,23 @@ export async function initializeRoss() {
     rossState.app = Vue.createApp({
         template: `
 <div class="ross-module">
+
+    <!-- ================================================================
+         Location Picker (shown when admin has no locationId claim)
+    ================================================================ -->
+    <div v-if="showLocationPicker" class="card shadow-sm mb-4 border-warning">
+        <div class="card-body d-flex align-items-center gap-3 flex-wrap">
+            <i class="fas fa-map-marker-alt text-warning fa-lg"></i>
+            <span class="fw-semibold">Select Location:</span>
+            <select class="form-select w-auto" v-model="pickedLocationId" @change="applyPickedLocation">
+                <option value="">-- choose a location --</option>
+                <option v-for="loc in availableLocations" :key="loc.id" :value="loc.id">{{ loc.name }}</option>
+            </select>
+            <span v-if="locationsLoading" class="text-muted small">
+                <span class="spinner-border spinner-border-sm me-1"></span>Loading...
+            </span>
+        </div>
+    </div>
 
     <!-- ================================================================
          Navigation Tabs
@@ -824,6 +841,11 @@ export async function initializeRoss() {
                 currentTab: 'overview',
                 tabLoading: false,
 
+                // Location picker (for admins without a locationId claim)
+                availableLocations: [],
+                locationsLoading: false,
+                pickedLocationId: '',
+
                 // Shared across views (populated in mounted + per-tab loaders)
                 locations: [],
                 templates: [],
@@ -873,6 +895,9 @@ export async function initializeRoss() {
         },
 
         computed: {
+            showLocationPicker() {
+                return !rossState.locationId;
+            },
             visibleAlerts() {
                 return this.overdueAlerts
                     .filter(a => !this.dismissedAlerts.includes(a.taskId))
@@ -1084,6 +1109,27 @@ export async function initializeRoss() {
                 } finally {
                     this.tabLoading = false;
                 }
+            },
+
+            async loadAvailableLocations() {
+                this.locationsLoading = true;
+                try {
+                    const snap = await get(ref(rtdb, 'locations'));
+                    const raw = snap.val() || {};
+                    this.availableLocations = Object.entries(raw)
+                        .map(([id, loc]) => ({ id, name: loc.name || id }))
+                        .sort((a, b) => a.name.localeCompare(b.name));
+                } catch (err) {
+                    console.error('[ROSS] loadAvailableLocations error:', err);
+                } finally {
+                    this.locationsLoading = false;
+                }
+            },
+
+            applyPickedLocation() {
+                if (!this.pickedLocationId) return;
+                rossState.locationId = this.pickedLocationId;
+                this.loadOverview();
             },
 
             async checkSuperAdmin() {
@@ -1570,10 +1616,12 @@ export async function initializeRoss() {
 
         mounted() {
             this.checkSuperAdmin();
-            this.loadOverview();
             if (rossState.locationId) {
                 this.staffLocationId = rossState.locationId;
                 this.loadStaff();
+                this.loadOverview();
+            } else {
+                this.loadAvailableLocations();
             }
         }
     });
