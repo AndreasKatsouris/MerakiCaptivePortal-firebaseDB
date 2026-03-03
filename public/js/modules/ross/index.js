@@ -750,16 +750,68 @@ export async function initializeRoss() {
     </div>
 
     <!-- ================================================================
-         VIEW 6 — Staff Management (placeholder, built in Task 12b)
+         VIEW 6 — Staff Management
     ================================================================ -->
     <div v-if="currentTab === 'staff'">
-        <div class="text-center py-5">
-            <div v-if="tabLoading" class="spinner-border text-primary" role="status"></div>
-            <template v-else>
-                <i class="fas fa-users fa-3x text-muted mb-3"></i>
-                <h5>Staff Management</h5>
-                <p class="text-muted">Coming soon...</p>
-            </template>
+        <div class="d-flex justify-content-between align-items-center mb-4">
+            <h5 class="mb-0">
+                <i class="fas fa-users me-2 text-primary"></i>Staff Management
+            </h5>
+            <button class="btn btn-primary btn-sm" @click="showAddStaffModal()">
+                <i class="fas fa-plus me-1"></i>Add Staff Member
+            </button>
+        </div>
+
+        <!-- Location selector (auto-populated from current session location) -->
+        <div v-if="!staffLocationId" class="alert alert-warning">
+            No location detected. Please ensure you are logged in with a location assigned.
+        </div>
+
+        <!-- Staff list -->
+        <div v-if="staffLoading" class="text-center py-4">
+            <div class="spinner-border text-primary" role="status">
+                <span class="visually-hidden">Loading...</span>
+            </div>
+        </div>
+        <div v-else-if="!staffLocationId" class="text-center py-4 text-muted">
+            <i class="fas fa-map-marker-alt fa-2x mb-2"></i>
+            <p>Select a location to manage staff</p>
+        </div>
+        <div v-else-if="staffMembers.length === 0" class="text-center py-4 text-muted">
+            <i class="fas fa-users fa-2x mb-2"></i>
+            <p>No staff members yet. Add your first staff member.</p>
+        </div>
+        <div v-else class="row g-3">
+            <div v-for="member in staffMembers" :key="member.staffId" class="col-md-4">
+                <div class="card h-100 border-0 shadow-sm">
+                    <div class="card-body">
+                        <div class="d-flex justify-content-between align-items-start">
+                            <div>
+                                <h6 class="card-title mb-1">{{ member.name }}</h6>
+                                <span class="badge bg-secondary">{{ member.role || 'No role' }}</span>
+                            </div>
+                            <div class="btn-group btn-group-sm">
+                                <button class="btn btn-outline-primary"
+                                    @click="editStaff(member)" title="Edit">
+                                    <i class="fas fa-edit"></i>
+                                </button>
+                                <button class="btn btn-outline-danger"
+                                    @click="deleteStaff(member)" title="Delete">
+                                    <i class="fas fa-trash"></i>
+                                </button>
+                            </div>
+                        </div>
+                        <div class="mt-2 small text-muted">
+                            <div v-if="member.phone">
+                                <i class="fas fa-phone me-1"></i>{{ member.phone }}
+                            </div>
+                            <div v-if="member.email">
+                                <i class="fas fa-envelope me-1"></i>{{ member.email }}
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
         </div>
     </div>
 
@@ -1326,6 +1378,169 @@ export async function initializeRoss() {
             },
 
             // ------------------------------------------------------------------
+            // View 6 — Staff Management
+            // ------------------------------------------------------------------
+            async loadStaff() {
+                if (!this.staffLocationId) { this.staffMembers = []; return; }
+                this.staffLoading = true;
+                try {
+                    const raw = await rossService.getStaff(this.staffLocationId);
+                    this.staffMembers = Array.isArray(raw)
+                        ? raw
+                        : Array.isArray(raw?.staff)
+                            ? raw.staff
+                            : Object.values(raw || {});
+                } catch (err) {
+                    console.error('[ROSS] loadStaff error:', err);
+                    await Swal.fire({ icon: 'error', title: 'Error', text: escapeHtml(err.message) });
+                } finally {
+                    this.staffLoading = false;
+                }
+            },
+
+            async showAddStaffModal() {
+                if (!this.staffLocationId) {
+                    await Swal.fire({ icon: 'warning', title: 'Select a location first' });
+                    return;
+                }
+                const { value } = await Swal.fire({
+                    title: 'Add Staff Member',
+                    html: `
+                        <div class="text-start">
+                            <div class="mb-2">
+                                <label class="form-label">Name <span class="text-danger">*</span></label>
+                                <input id="swal-name" class="form-control" placeholder="e.g. Sipho Dlamini">
+                            </div>
+                            <div class="mb-2">
+                                <label class="form-label">Role</label>
+                                <input id="swal-role" class="form-control" placeholder="e.g. Floor Manager">
+                            </div>
+                            <div class="mb-2">
+                                <label class="form-label">Phone</label>
+                                <input id="swal-phone" class="form-control" placeholder="+27821234567">
+                            </div>
+                            <div class="mb-2">
+                                <label class="form-label">Email</label>
+                                <input id="swal-email" class="form-control" placeholder="staff@restaurant.co.za">
+                            </div>
+                        </div>`,
+                    showCancelButton: true,
+                    confirmButtonText: 'Add',
+                    preConfirm: () => {
+                        const name = document.getElementById('swal-name').value.trim();
+                        if (!name) {
+                            Swal.showValidationMessage('Name is required');
+                            return false;
+                        }
+                        return {
+                            name,
+                            role: document.getElementById('swal-role').value.trim(),
+                            phone: document.getElementById('swal-phone').value.trim() || null,
+                            email: document.getElementById('swal-email').value.trim() || null
+                        };
+                    }
+                });
+                if (!value) return;
+                try {
+                    await rossService.manageStaff({
+                        locationId: this.staffLocationId, action: 'create', staffData: value
+                    });
+                    await this.loadStaff();
+                    await Swal.fire({
+                        icon: 'success', title: 'Staff member added',
+                        timer: 1500, showConfirmButton: false
+                    });
+                } catch (err) {
+                    console.error('[ROSS] showAddStaffModal error:', err);
+                    await Swal.fire({ icon: 'error', title: 'Error', text: escapeHtml(err.message) });
+                }
+            },
+
+            async editStaff(member) {
+                const { value } = await Swal.fire({
+                    title: 'Edit Staff Member',
+                    html: `
+                        <div class="text-start">
+                            <div class="mb-2">
+                                <label class="form-label">Name <span class="text-danger">*</span></label>
+                                <input id="swal-name" class="form-control" value="${escapeHtml(member.name)}">
+                            </div>
+                            <div class="mb-2">
+                                <label class="form-label">Role</label>
+                                <input id="swal-role" class="form-control" value="${escapeHtml(member.role || '')}">
+                            </div>
+                            <div class="mb-2">
+                                <label class="form-label">Phone</label>
+                                <input id="swal-phone" class="form-control" value="${escapeHtml(member.phone || '')}">
+                            </div>
+                            <div class="mb-2">
+                                <label class="form-label">Email</label>
+                                <input id="swal-email" class="form-control" value="${escapeHtml(member.email || '')}">
+                            </div>
+                        </div>`,
+                    showCancelButton: true,
+                    confirmButtonText: 'Save',
+                    preConfirm: () => {
+                        const name = document.getElementById('swal-name').value.trim();
+                        if (!name) {
+                            Swal.showValidationMessage('Name is required');
+                            return false;
+                        }
+                        return {
+                            name,
+                            role: document.getElementById('swal-role').value.trim(),
+                            phone: document.getElementById('swal-phone').value.trim() || null,
+                            email: document.getElementById('swal-email').value.trim() || null
+                        };
+                    }
+                });
+                if (!value) return;
+                try {
+                    await rossService.manageStaff({
+                        locationId: this.staffLocationId,
+                        action: 'update',
+                        staffId: member.staffId,
+                        staffData: value
+                    });
+                    await this.loadStaff();
+                    await Swal.fire({
+                        icon: 'success', title: 'Updated',
+                        timer: 1500, showConfirmButton: false
+                    });
+                } catch (err) {
+                    console.error('[ROSS] editStaff error:', err);
+                    await Swal.fire({ icon: 'error', title: 'Error', text: escapeHtml(err.message) });
+                }
+            },
+
+            async deleteStaff(member) {
+                const confirmed = await Swal.fire({
+                    title: `Delete ${escapeHtml(member.name)}?`,
+                    text: 'This cannot be undone.',
+                    icon: 'warning',
+                    showCancelButton: true,
+                    confirmButtonColor: '#dc3545',
+                    confirmButtonText: 'Delete'
+                });
+                if (!confirmed.isConfirmed) return;
+                try {
+                    await rossService.manageStaff({
+                        locationId: this.staffLocationId,
+                        action: 'delete',
+                        staffId: member.staffId
+                    });
+                    await this.loadStaff();
+                    await Swal.fire({
+                        icon: 'success', title: 'Deleted',
+                        timer: 1500, showConfirmButton: false
+                    });
+                } catch (err) {
+                    console.error('[ROSS] deleteStaff error:', err);
+                    await Swal.fire({ icon: 'error', title: 'Error', text: escapeHtml(err.message) });
+                }
+            },
+
+            // ------------------------------------------------------------------
             // Helpers
             // ------------------------------------------------------------------
             getCategoryLabel(key) {
@@ -1365,6 +1580,9 @@ export async function initializeRoss() {
         mounted() {
             this.checkSuperAdmin();
             this.loadOverview();
+            if (rossState.locationId) {
+                this.staffLocationId = rossState.locationId;
+            }
         }
     });
 
