@@ -3107,6 +3107,26 @@ exports.manageProjectTasks = projectManagement.manageProjectTasks;
 exports.manageProjectMilestones = projectManagement.manageProjectMilestones;
 
 // ============================================
+// ROSS — RESTAURANT OS SERVICE FUNCTIONS
+// ============================================
+const ross = require('./ross');
+exports.rossGetTemplates = ross.rossGetTemplates;
+exports.rossCreateTemplate = ross.rossCreateTemplate;
+exports.rossUpdateTemplate = ross.rossUpdateTemplate;
+exports.rossDeleteTemplate = ross.rossDeleteTemplate;
+exports.rossActivateWorkflow = ross.rossActivateWorkflow;
+exports.rossCreateWorkflow = ross.rossCreateWorkflow;
+exports.rossUpdateWorkflow = ross.rossUpdateWorkflow;
+exports.rossDeleteWorkflow = ross.rossDeleteWorkflow;
+exports.rossGetWorkflows = ross.rossGetWorkflows;
+exports.rossManageTask = ross.rossManageTask;
+exports.rossCompleteTask = ross.rossCompleteTask;
+exports.rossGetReports = ross.rossGetReports;
+exports.rossScheduledReminder = ross.rossScheduledReminder;
+exports.rossManageStaff = ross.rossManageStaff;
+exports.rossGetStaff = ross.rossGetStaff;
+
+// ============================================
 // SUBSCRIPTION STATUS MANAGEMENT
 // ============================================
 const subscriptionStatusManager = require('./subscriptionStatusManager');
