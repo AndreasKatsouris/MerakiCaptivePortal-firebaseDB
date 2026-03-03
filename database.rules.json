@@ -319,6 +319,31 @@
           ".write": true
         }
       }
+    },
+    "compliance": {
+      ".read": "auth != null && auth.token.admin === true",
+      ".write": "auth != null && auth.token.admin === true",
+      "entities": {
+        ".indexOn": ["status", "cipcStatus", "oversight"],
+        "$entityId": {
+          ".validate": "newData.hasChildren(['registrationNumber', 'name', 'status', 'type'])"
+        }
+      },
+      "filings": {
+        ".indexOn": ["status", "dueDate"],
+        "$year": {
+          ".validate": "$year.matches(/^[0-9]{4}$/)",
+          "$entityId": {
+            ".validate": "$entityId.matches(/^[A-Za-z0-9_-]+$/)",
+            "$obligationId": {
+              ".validate": "newData.hasChildren(['status', 'updatedAt', 'updatedBy'])"
+            }
+          }
+        }
+      },
+      "settings": {
+        ".validate": "newData.hasChild('reminders')"
+      }
     }
   }
 }

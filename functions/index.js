@@ -3114,3 +3114,9 @@ exports.checkSubscriptionStatuses = subscriptionStatusManager.checkSubscriptionS
 exports.triggerSubscriptionStatusCheck = subscriptionStatusManager.triggerSubscriptionStatusCheck;
 exports.onTrialEndDateUpdate = subscriptionStatusManager.onTrialEndDateUpdate;
 exports.onRenewalDateUpdate = subscriptionStatusManager.onRenewalDateUpdate;
+
+// ============================================
+// COMPLIANCE SEED DATA (temporary — remove after seeding)
+// ============================================
+const complianceSeed = require('./seedComplianceData');
+exports.seedComplianceData = complianceSeed.seedComplianceData;
