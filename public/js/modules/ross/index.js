@@ -551,16 +551,128 @@ export async function initializeRoss() {
     </div>
 
     <!-- ================================================================
-         VIEW 4 — Workflow Builder (placeholder, built in Task 11)
+         VIEW 4 — Workflow Builder
     ================================================================ -->
     <div v-if="currentTab === 'builder'">
-        <div class="text-center py-5">
-            <div v-if="tabLoading" class="spinner-border text-primary" role="status"></div>
-            <template v-else>
-                <i class="fas fa-tools fa-3x text-muted mb-3"></i>
-                <h5>Workflow Builder</h5>
-                <p class="text-muted">Coming soon...</p>
-            </template>
+        <div class="card border-0 shadow-sm" style="max-width:680px">
+            <div class="card-header bg-white border-0">
+                <div class="d-flex justify-content-between align-items-center">
+                    <h6 class="mb-0">
+                        <i class="fas fa-tools me-2"></i>Build Custom Workflow
+                    </h6>
+                    <span class="text-muted small">Step {{ builder.step }} of 4</span>
+                </div>
+                <div class="progress mt-2" style="height:4px">
+                    <div class="progress-bar bg-primary"
+                        :style="'width:' + (builder.step / 4 * 100) + '%'"></div>
+                </div>
+            </div>
+            <div class="card-body">
+
+                <!-- Step 1: Name & Category -->
+                <div v-if="builder.step === 1">
+                    <h6 class="mb-3">Name &amp; Category</h6>
+                    <div class="mb-3">
+                        <label class="form-label">Workflow Name <span class="text-danger">*</span></label>
+                        <input class="form-control" v-model="builder.name"
+                            placeholder="e.g. Monthly Supplier Payment Run">
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Category</label>
+                        <select class="form-select" v-model="builder.category">
+                            <option v-for="(label, key) in CATEGORY_LABELS" :key="key" :value="key">
+                                {{ label }}
+                            </option>
+                        </select>
+                    </div>
+                </div>
+
+                <!-- Step 2: Recurrence & Due Date -->
+                <div v-if="builder.step === 2">
+                    <h6 class="mb-3">Recurrence &amp; Due Date</h6>
+                    <div class="mb-3">
+                        <label class="form-label">Recurrence</label>
+                        <select class="form-select" v-model="builder.recurrence">
+                            <option value="once">Once</option>
+                            <option value="daily">Daily</option>
+                            <option value="weekly">Weekly</option>
+                            <option value="monthly">Monthly</option>
+                            <option value="quarterly">Quarterly</option>
+                            <option value="annually">Annual</option>
+                        </select>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Next Due Date <span class="text-danger">*</span></label>
+                        <input type="date" class="form-control" v-model="builder.nextDueDate">
+                    </div>
+                </div>
+
+                <!-- Step 3: Subtasks -->
+                <div v-if="builder.step === 3">
+                    <h6 class="mb-3">Subtasks</h6>
+                    <div class="input-group mb-2">
+                        <input class="form-control" v-model="builderSubtaskInput"
+                            placeholder="Subtask title" @keyup.enter="builderAddSubtask()">
+                        <button class="btn btn-outline-primary" @click="builderAddSubtask()">
+                            <i class="fas fa-plus"></i>
+                        </button>
+                    </div>
+                    <ul class="list-group">
+                        <li v-for="(st, i) in builder.subtasks" :key="i"
+                            class="list-group-item d-flex justify-content-between align-items-center">
+                            <span>
+                                <span class="badge bg-secondary me-2">{{ i + 1 }}</span>
+                                {{ st.title }}
+                            </span>
+                            <button class="btn btn-sm btn-outline-danger"
+                                @click="builderRemoveSubtask(i)">
+                                <i class="fas fa-times"></i>
+                            </button>
+                        </li>
+                    </ul>
+                    <p v-if="!builder.subtasks.length" class="text-muted small mt-2">
+                        No subtasks yet — add at least one.
+                    </p>
+                </div>
+
+                <!-- Step 4: Notifications & Confirm -->
+                <div v-if="builder.step === 4">
+                    <h6 class="mb-3">Notification Settings</h6>
+                    <div class="mb-3">
+                        <label class="form-label">Alert days before due date</label>
+                        <div v-for="days in [90, 60, 30, 14, 7, 3, 1]" :key="days" class="form-check">
+                            <input class="form-check-input" type="checkbox" :value="days"
+                                v-model="builder.daysBeforeAlert" :id="'alert-day-' + days">
+                            <label class="form-check-label" :for="'alert-day-' + days">
+                                {{ days }} day{{ days !== 1 ? 's' : '' }} before
+                            </label>
+                        </div>
+                    </div>
+                    <hr>
+                    <h6 class="mb-2 text-muted">Review</h6>
+                    <ul class="list-unstyled small">
+                        <li><strong>Name:</strong> {{ builder.name }}</li>
+                        <li><strong>Category:</strong> {{ getCategoryLabel(builder.category) }}</li>
+                        <li><strong>Recurrence:</strong> {{ getRecurrenceLabel(builder.recurrence) }}</li>
+                        <li><strong>Due:</strong> {{ builder.nextDueDate }}</li>
+                        <li><strong>Subtasks:</strong> {{ builder.subtasks.length }}</li>
+                    </ul>
+                </div>
+
+            </div>
+            <div class="card-footer bg-white border-0 d-flex justify-content-between">
+                <button v-if="builder.step > 1" class="btn btn-outline-secondary"
+                    @click="builderPrevStep()">
+                    <i class="fas fa-arrow-left me-1"></i>Back
+                </button>
+                <div v-else></div>
+                <button v-if="builder.step < 4" class="btn btn-primary" @click="builderNextStep()">
+                    Next <i class="fas fa-arrow-right ms-1"></i>
+                </button>
+                <button v-if="builder.step === 4" class="btn btn-success" @click="builderSave()">
+                    <i class="fas fa-check me-1"></i>Create Workflow
+                </button>
+            </div>
         </div>
     </div>
 
@@ -1055,6 +1167,81 @@ export async function initializeRoss() {
                 } catch (err) {
                     console.error('[ROSS] pauseResumeWorkflow error:', err);
                     await Swal.fire('Error', 'Could not update workflow status.', 'error');
+                }
+            },
+
+            // ------------------------------------------------------------------
+            // View 4 — Workflow Builder
+            // ------------------------------------------------------------------
+            builderNextStep() {
+                if (this.builder.step === 1 && !this.builder.name.trim()) {
+                    Swal.fire('Required', 'Please enter a workflow name.', 'warning');
+                    return;
+                }
+                if (this.builder.step === 2 && !this.builder.nextDueDate) {
+                    Swal.fire('Required', 'Please select a due date.', 'warning');
+                    return;
+                }
+                this.builder = { ...this.builder, step: this.builder.step + 1 };
+            },
+
+            builderPrevStep() {
+                this.builder = { ...this.builder, step: this.builder.step - 1 };
+            },
+
+            builderAddSubtask() {
+                const title = this.builderSubtaskInput.trim();
+                if (!title) return;
+                const newSubtasks = [
+                    ...this.builder.subtasks,
+                    { title, order: this.builder.subtasks.length + 1, dueDate: null }
+                ];
+                this.builder = { ...this.builder, subtasks: newSubtasks };
+                this.builderSubtaskInput = '';
+            },
+
+            builderRemoveSubtask(index) {
+                const newSubtasks = this.builder.subtasks.filter((_, i) => i !== index);
+                this.builder = { ...this.builder, subtasks: newSubtasks };
+            },
+
+            async builderSave() {
+                if (!rossState.locationId) {
+                    await Swal.fire('No Location', 'Please select a location first.', 'warning');
+                    return;
+                }
+                if (!this.builder.name.trim() || !this.builder.nextDueDate) {
+                    await Swal.fire('Incomplete', 'Please complete all required fields.', 'warning');
+                    return;
+                }
+                try {
+                    const nextDueDate = new Date(this.builder.nextDueDate).getTime();
+                    const subtasks = this.builder.subtasks.map((s, i) => ({
+                        ...s,
+                        order: i + 1,
+                        dueDate: nextDueDate
+                    }));
+                    await rossService.createWorkflow({
+                        name: this.builder.name,
+                        category: this.builder.category,
+                        recurrence: this.builder.recurrence,
+                        locationId: rossState.locationId,
+                        nextDueDate,
+                        subtasks,
+                        daysBeforeAlert: this.builder.daysBeforeAlert,
+                        notifyPhone: this.builder.notifyPhone || null,
+                        notifyEmail: this.builder.notifyEmail || null
+                    });
+                    await Swal.fire('Created!', 'Your workflow is now active.', 'success');
+                    this.builder = {
+                        step: 1, name: '', category: 'operations', recurrence: 'monthly',
+                        nextDueDate: '', subtasks: [], daysBeforeAlert: [30, 7],
+                        notifyPhone: '', notifyEmail: ''
+                    };
+                    this.switchTab('workflows');
+                } catch (err) {
+                    console.error('[ROSS] builderSave error:', err);
+                    await Swal.fire('Error', 'Failed to create workflow. Please try again.', 'error');
                 }
             },
 
