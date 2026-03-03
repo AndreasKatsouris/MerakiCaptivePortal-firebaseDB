@@ -3,7 +3,8 @@
  * Handles automatic status updates for subscriptions based on expiration dates
  */
 
-const functions = require('firebase-functions');
+const functions = require('firebase-functions/v2');
+const { onValueWritten } = require('firebase-functions/v2/database');
 const admin = require('firebase-admin');
 
 // Get database reference (will be initialized when admin is ready)
@@ -187,10 +188,10 @@ exports.triggerSubscriptionStatusCheck = functions.https.onCall(
 /**
  * Database trigger: Check subscription status when trialEndDate is updated
  */
-exports.onTrialEndDateUpdate = functions.database
-  .ref('subscriptions/{userId}/trialEndDate')
-  .onWrite(async (change, context) => {
-    const { userId } = context.params;
+exports.onTrialEndDateUpdate = onValueWritten(
+  'subscriptions/{userId}/trialEndDate',
+  async (event) => {
+    const { userId } = event.params;
 
     try {
       // Get the full subscription
@@ -219,10 +220,10 @@ exports.onTrialEndDateUpdate = functions.database
 /**
  * Database trigger: Check subscription status when renewalDate is updated
  */
-exports.onRenewalDateUpdate = functions.database
-  .ref('subscriptions/{userId}/renewalDate')
-  .onWrite(async (change, context) => {
-    const { userId } = context.params;
+exports.onRenewalDateUpdate = onValueWritten(
+  'subscriptions/{userId}/renewalDate',
+  async (event) => {
+    const { userId } = event.params;
 
     try {
       // Get the full subscription
