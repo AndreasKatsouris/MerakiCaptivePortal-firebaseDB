@@ -677,16 +677,75 @@ export async function initializeRoss() {
     </div>
 
     <!-- ================================================================
-         VIEW 5 — Reports (placeholder, built in Task 12)
+         VIEW 5 — Reports
     ================================================================ -->
     <div v-if="currentTab === 'reports'">
-        <div class="text-center py-5">
-            <div v-if="tabLoading" class="spinner-border text-primary" role="status"></div>
-            <template v-else>
-                <i class="fas fa-chart-bar fa-3x text-muted mb-3"></i>
-                <h5>Reports</h5>
-                <p class="text-muted">Coming soon...</p>
-            </template>
+
+        <!-- Loading -->
+        <div v-if="tabLoading" class="text-center py-5">
+            <div class="spinner-border text-primary" role="status">
+                <span class="visually-hidden">Loading...</span>
+            </div>
+            <p class="mt-2 text-muted">Loading reports...</p>
+        </div>
+
+        <!-- Content -->
+        <div v-else>
+            <div v-if="!reportData.length" class="text-center py-5 text-muted">
+                <i class="fas fa-chart-bar fa-3x mb-3"></i>
+                <p>No workflow data to report yet.</p>
+            </div>
+            <div v-else>
+                <h6 class="mb-3">Completion Rate by Workflow</h6>
+                <div class="table-responsive">
+                    <table class="table table-hover align-middle">
+                        <thead class="table-light">
+                            <tr>
+                                <th>Workflow</th>
+                                <th>Category</th>
+                                <th>Recurrence</th>
+                                <th>Tasks</th>
+                                <th>Completion</th>
+                                <th>Next Due</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr v-for="row in reportData" :key="row.workflowId">
+                                <td>{{ row.name }}</td>
+                                <td>
+                                    <span class="badge bg-secondary">
+                                        {{ getCategoryLabel(row.category) }}
+                                    </span>
+                                </td>
+                                <td>{{ getRecurrenceLabel(row.recurrence) }}</td>
+                                <td>{{ row.tasksCompleted }} / {{ row.tasksTotal }}</td>
+                                <td>
+                                    <div class="d-flex align-items-center gap-2">
+                                        <div class="progress flex-grow-1"
+                                            style="height:8px;min-width:80px">
+                                            <div class="progress-bar"
+                                                :class="row.completionRate === 100
+                                                    ? 'bg-success' : 'bg-primary'"
+                                                :style="'width:' + row.completionRate + '%'">
+                                            </div>
+                                        </div>
+                                        <span class="small text-muted">{{ row.completionRate }}%</span>
+                                    </div>
+                                </td>
+                                <td>
+                                    <span :class="'badge bg-' + getDueSeverity(daysUntil(row.nextDueDate))">
+                                        {{ formatDate(row.nextDueDate) }}
+                                    </span>
+                                </td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+                <p class="text-muted small mt-2">
+                    <i class="fas fa-info-circle me-1"></i>
+                    Advanced charts and multi-location comparison coming in Phase 3.
+                </p>
+            </div>
         </div>
     </div>
 
@@ -1242,6 +1301,27 @@ export async function initializeRoss() {
                 } catch (err) {
                     console.error('[ROSS] builderSave error:', err);
                     await Swal.fire('Error', 'Failed to create workflow. Please try again.', 'error');
+                }
+            },
+
+            // ------------------------------------------------------------------
+            // View 5 — Reports
+            // ------------------------------------------------------------------
+            async loadReports() {
+                if (!rossState.locationId) return;
+                this.tabLoading = true;
+                try {
+                    const raw = await rossService.getReports(rossState.locationId);
+                    this.reportData = Array.isArray(raw)
+                        ? raw
+                        : Array.isArray(raw?.report)
+                            ? raw.report
+                            : Object.values(raw || {});
+                } catch (err) {
+                    console.error('[ROSS] loadReports error:', err);
+                    await Swal.fire('Error', 'Failed to load reports: ' + err.message, 'error');
+                } finally {
+                    this.tabLoading = false;
                 }
             },
 
