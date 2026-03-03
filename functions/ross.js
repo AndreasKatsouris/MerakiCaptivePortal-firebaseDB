@@ -152,6 +152,13 @@ exports.rossUpdateTemplate = onRequest(async (req, res) => {
             const snapshot = await templateRef.once('value');
             if (!snapshot.exists()) return res.status(404).json({ error: 'Template not found' });
 
+            if (updates.category !== undefined && !VALID_CATEGORIES.includes(updates.category)) {
+                return res.status(400).json({ error: 'Invalid category' });
+            }
+            if (updates.recurrence !== undefined && !VALID_RECURRENCES.includes(updates.recurrence)) {
+                return res.status(400).json({ error: 'Invalid recurrence' });
+            }
+
             const allowedFields = ['name', 'category', 'description', 'recurrence', 'daysBeforeAlert', 'subtasks', 'tags'];
             const sanitized = { updatedAt: Date.now() };
             allowedFields.forEach(field => {
@@ -472,6 +479,8 @@ exports.rossManageTask = onRequest(async (req, res) => {
             const snap = await locationRef.once('value');
             if (!snap.exists()) return res.status(404).json({ error: 'Workflow location not found' });
 
+            if (!taskData) return res.status(400).json({ error: 'Task data is required' });
+
             const tasksRef = locationRef.child('tasks');
             const now = Date.now();
 
@@ -669,7 +678,6 @@ exports.rossScheduledReminder = onSchedule('0 5 * * *', async () => {
                     };
 
                     await db.ref(`notifications/${ownerId}`).push(notification);
-                    console.log(`[rossScheduledReminder] Alert for workflow ${workflow.workflowId} loc ${locationId} (${daysUntilDue}d)`);
                 }
             }
         }
@@ -691,13 +699,13 @@ exports.rossManageStaff = onRequest(async (req, res) => {
         if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' });
         try {
             const decodedToken = await verifyAuthToken(req);
-            await verifyAdmin(decodedToken);
+            const { uid } = await verifyAdmin(decodedToken);
 
             const data = req.body.data || req.body;
             const { locationId, action, staffId, staffData } = data;
             if (!locationId) return res.status(400).json({ error: 'Location ID is required' });
 
-            const staffRef = db.ref(`ross/staff/${locationId}`);
+            const staffRef = db.ref(`ross/staff/${uid}/${locationId}`);
             const now = Date.now();
 
             switch (action) {
@@ -749,13 +757,13 @@ exports.rossGetStaff = onRequest(async (req, res) => {
         if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' });
         try {
             const decodedToken = await verifyAuthToken(req);
-            await verifyAdmin(decodedToken);
+            const { uid } = await verifyAdmin(decodedToken);
 
             const data = req.body.data || req.body;
             const { locationId } = data;
             if (!locationId) return res.status(400).json({ error: 'Location ID is required' });
 
-            const snap = await db.ref(`ross/staff/${locationId}`).once('value');
+            const snap = await db.ref(`ross/staff/${uid}/${locationId}`).once('value');
             const staff = Object.values(snap.val() || {});
             staff.sort((a, b) => (a.name || '').localeCompare(b.name || ''));
             res.json({ result: { success: true, staff } });
