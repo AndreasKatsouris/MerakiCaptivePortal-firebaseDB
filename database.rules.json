@@ -344,6 +344,24 @@
       "settings": {
         ".validate": "newData.hasChild('reminders')"
       }
+    },
+    "ross": {
+      "templates": {
+        ".read": "auth != null && root.child('admins').child(auth.uid).exists()",
+        ".write": "auth != null && root.child('admins').child(auth.uid).child('superAdmin').val() === true"
+      },
+      "workflows": {
+        "$ownerId": {
+          ".read": "auth != null && auth.uid === $ownerId && root.child('admins').child(auth.uid).exists()",
+          ".write": "auth != null && auth.uid === $ownerId && root.child('admins').child(auth.uid).exists()"
+        }
+      },
+      "staff": {
+        "$locationId": {
+          ".read": "auth != null && root.child('admins').child(auth.uid).exists()",
+          ".write": "auth != null && root.child('admins').child(auth.uid).exists()"
+        }
+      }
     }
   }
 }
