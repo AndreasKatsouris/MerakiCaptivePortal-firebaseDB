@@ -3,7 +3,7 @@
  * Handles automatic status updates for subscriptions based on expiration dates
  */
 
-const functions = require('firebase-functions/v2');
+const functions = require('firebase-functions');
 const admin = require('firebase-admin');
 
 // Get database reference (will be initialized when admin is ready)
