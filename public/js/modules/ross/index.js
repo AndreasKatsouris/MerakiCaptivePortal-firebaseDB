@@ -48,6 +48,25 @@ function formatDateTime(ts) {
     });
 }
 
+function daysUntil(ts) {
+    if (!ts) return null;
+    return Math.round((ts - Date.now()) / 86400000);
+}
+
+function getDueSeverity(days) {
+    if (days === null) return 'secondary';
+    if (days < 0) return 'danger';
+    if (days <= 7) return 'danger';
+    if (days <= 30) return 'warning';
+    return 'success';
+}
+
+function calcProgress(tasks) {
+    const list = Object.values(tasks || {});
+    if (!list.length) return 0;
+    return Math.round((list.filter(t => t.status === 'completed').length / list.length) * 100);
+}
+
 const CATEGORY_LABELS = {
     compliance:  'Compliance',
     operations:  'Operations',
@@ -370,16 +389,164 @@ export async function initializeRoss() {
     </div>
 
     <!-- ================================================================
-         VIEW 3 — My Workflows (placeholder, built in Task 10)
+         VIEW 3 — My Workflows
     ================================================================ -->
     <div v-if="currentTab === 'workflows'">
-        <div class="text-center py-5">
-            <div v-if="tabLoading" class="spinner-border text-primary" role="status"></div>
-            <template v-else>
-                <i class="fas fa-project-diagram fa-3x text-muted mb-3"></i>
-                <h5>My Workflows</h5>
-                <p class="text-muted">Coming soon...</p>
-            </template>
+
+        <!-- Loading -->
+        <div v-if="tabLoading" class="text-center py-5">
+            <div class="spinner-border text-primary" role="status">
+                <span class="visually-hidden">Loading...</span>
+            </div>
+            <p class="mt-2 text-muted">Loading workflows...</p>
+        </div>
+
+        <!-- Workflow Detail View -->
+        <div v-else-if="selectedWorkflow">
+            <div class="d-flex align-items-center mb-3">
+                <button class="btn btn-sm btn-outline-secondary me-3" @click="closeWorkflowDetail()">
+                    <i class="fas fa-arrow-left me-1"></i>Back
+                </button>
+                <h5 class="mb-0">{{ selectedWorkflow.name }}</h5>
+                <span class="badge ms-2"
+                    :class="selectedWorkflow.status === 'active' ? 'bg-success' : 'bg-secondary'">
+                    {{ selectedWorkflow.status }}
+                </span>
+            </div>
+
+            <!-- Detail Sub-tabs -->
+            <ul class="nav nav-tabs mb-3">
+                <li class="nav-item">
+                    <button class="nav-link"
+                        :class="{ active: workflowDetailTab === 'tasks' }"
+                        @click="workflowDetailTab = 'tasks'">Tasks</button>
+                </li>
+                <li class="nav-item">
+                    <button class="nav-link"
+                        :class="{ active: workflowDetailTab === 'history' }"
+                        @click="workflowDetailTab = 'history'">History</button>
+                </li>
+            </ul>
+
+            <!-- Tasks Sub-view -->
+            <div v-if="workflowDetailTab === 'tasks'">
+                <div v-if="!selectedWorkflowTasks.length" class="text-center py-4 text-muted">
+                    No tasks configured.
+                </div>
+                <ul v-else class="list-group">
+                    <li v-for="task in selectedWorkflowTasks" :key="task._taskId"
+                        class="list-group-item d-flex justify-content-between align-items-center">
+                        <div>
+                            <span :class="task.status === 'completed'
+                                ? 'text-decoration-line-through text-muted' : ''">
+                                {{ task.title }}
+                            </span>
+                            <br>
+                            <small class="text-muted">Due: {{ formatDate(task.dueDate) }}</small>
+                        </div>
+                        <button v-if="task.status !== 'completed'"
+                            class="btn btn-sm btn-outline-success"
+                            @click="markTaskComplete(task)">
+                            <i class="fas fa-check me-1"></i>Complete
+                        </button>
+                        <span v-else class="badge bg-success">
+                            <i class="fas fa-check me-1"></i>Done
+                        </span>
+                    </li>
+                </ul>
+            </div>
+
+            <!-- History Sub-view -->
+            <div v-if="workflowDetailTab === 'history'">
+                <div v-if="!selectedWorkflowHistory.length" class="text-center py-4 text-muted">
+                    No completion history yet.
+                </div>
+                <ul v-else class="list-group">
+                    <li v-for="record in selectedWorkflowHistory" :key="record.cycleId"
+                        class="list-group-item d-flex justify-content-between">
+                        <span>{{ record.period }}</span>
+                        <span>
+                            <span :class="'badge ' + (record.completionRate === 100
+                                ? 'bg-success' : 'bg-warning text-dark')">
+                                {{ record.completionRate }}%
+                            </span>
+                            <span v-if="record.onTime" class="badge bg-success ms-1">On Time</span>
+                            <span v-else class="badge bg-danger ms-1">Late</span>
+                        </span>
+                    </li>
+                </ul>
+            </div>
+        </div>
+
+        <!-- Workflow List View -->
+        <div v-else>
+            <!-- Filters -->
+            <div class="d-flex gap-2 mb-3 flex-wrap">
+                <select class="form-select form-select-sm" style="width:auto"
+                    v-model="workflowFilter.category">
+                    <option value="all">All Categories</option>
+                    <option v-for="(label, key) in CATEGORY_LABELS" :key="key" :value="key">
+                        {{ label }}
+                    </option>
+                </select>
+                <select class="form-select form-select-sm" style="width:auto"
+                    v-model="workflowFilter.status">
+                    <option value="all">All Statuses</option>
+                    <option value="active">Active</option>
+                    <option value="paused">Paused</option>
+                </select>
+            </div>
+
+            <div v-if="!filteredWorkflows().length" class="text-center py-5 text-muted">
+                <i class="fas fa-tasks fa-3x mb-3"></i>
+                <p>No workflows found.</p>
+            </div>
+
+            <div class="row g-3">
+                <div v-for="wf in filteredWorkflows()" :key="wf.workflowId" class="col-md-6">
+                    <div class="card border-0 shadow-sm h-100">
+                        <div class="card-body">
+                            <div class="d-flex justify-content-between align-items-start mb-2">
+                                <h6 class="card-title mb-0">{{ wf.name }}</h6>
+                                <span :class="'badge bg-' + getDueSeverity(daysUntil(wf.nextDueDate))">
+                                    {{ daysUntil(wf.nextDueDate) !== null && daysUntil(wf.nextDueDate) < 0
+                                        ? 'Overdue'
+                                        : daysUntil(wf.nextDueDate) === 0 ? 'Due Today'
+                                        : 'Due in ' + daysUntil(wf.nextDueDate) + 'd' }}
+                                </span>
+                            </div>
+                            <div class="text-muted small mb-2">
+                                <i :class="['fas', getCategoryIcon(wf.category), 'me-1']"></i>
+                                {{ getCategoryLabel(wf.category) }}
+                                &bull; {{ getRecurrenceLabel(wf.recurrence) }}
+                                &bull; {{ formatDate(wf.nextDueDate) }}
+                            </div>
+                            <div class="progress mb-1" style="height:6px">
+                                <div class="progress-bar"
+                                    :style="'width:' + calcProgress(wf.tasks) + '%'"
+                                    :class="calcProgress(wf.tasks) === 100 ? 'bg-success' : 'bg-primary'">
+                                </div>
+                            </div>
+                            <small class="text-muted">{{ calcProgress(wf.tasks) }}% complete</small>
+                        </div>
+                        <div class="card-footer bg-white border-0 d-flex gap-1">
+                            <button class="btn btn-primary btn-sm flex-grow-1"
+                                @click="openWorkflow(wf)">
+                                <i class="fas fa-eye me-1"></i>View
+                            </button>
+                            <button class="btn btn-outline-secondary btn-sm"
+                                @click="pauseResumeWorkflow(wf)"
+                                :title="wf.status === 'active' ? 'Pause' : 'Resume'">
+                                <i :class="'fas ' + (wf.status === 'active' ? 'fa-pause' : 'fa-play')"></i>
+                            </button>
+                            <button class="btn btn-outline-danger btn-sm"
+                                @click="deleteWorkflow(wf)" title="Delete">
+                                <i class="fas fa-trash"></i>
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
         </div>
     </div>
 
@@ -451,7 +618,34 @@ export async function initializeRoss() {
                 // View 2 — Template Library
                 templateFilter: 'all',
                 isSuperAdmin: false,
-                CATEGORY_LABELS
+                CATEGORY_LABELS,
+
+                // View 3 — My Workflows
+                workflowFilter: { category: 'all', status: 'all' },
+                selectedWorkflow: null,
+                workflowDetailTab: 'tasks',
+
+                // View 4 — Workflow Builder
+                builder: {
+                    step: 1,
+                    name: '',
+                    category: 'operations',
+                    recurrence: 'monthly',
+                    nextDueDate: '',
+                    subtasks: [],
+                    daysBeforeAlert: [30, 7],
+                    notifyPhone: '',
+                    notifyEmail: ''
+                },
+                builderSubtaskInput: '',
+
+                // View 5 — Reports
+                reportData: [],
+
+                // View 6 — Staff Management
+                staffLocationId: '',
+                staffMembers: [],
+                staffLoading: false
             };
         },
 
@@ -460,6 +654,17 @@ export async function initializeRoss() {
                 return this.overdueAlerts
                     .filter(a => !this.dismissedAlerts.includes(a.taskId))
                     .slice(0, 5);
+            },
+            selectedWorkflowTasks() {
+                if (!this.selectedWorkflow) return [];
+                return Object.entries(this.selectedWorkflow.tasks || {})
+                    .map(([id, t]) => ({ ...t, _taskId: id }))
+                    .sort((a, b) => (a.order || 0) - (b.order || 0));
+            },
+            selectedWorkflowHistory() {
+                if (!this.selectedWorkflow) return [];
+                return Object.values(this.selectedWorkflow.history || {})
+                    .sort((a, b) => (b.completedAt || 0) - (a.completedAt || 0));
             }
         },
 
@@ -473,6 +678,11 @@ export async function initializeRoss() {
                     this.loadOverview();
                 } else if (tab === 'templates') {
                     this.loadTemplates();
+                } else if (tab === 'workflows') {
+                    this.selectedWorkflow = null;
+                    this.loadWorkflows();
+                } else if (tab === 'reports') {
+                    this.loadReports();
                 }
             },
 
@@ -745,6 +955,110 @@ export async function initializeRoss() {
             },
 
             // ------------------------------------------------------------------
+            // View 3 — My Workflows
+            // ------------------------------------------------------------------
+            async loadWorkflows() {
+                if (!rossState.locationId) return;
+                this.tabLoading = true;
+                try {
+                    const raw = await rossService.getWorkflows(rossState.locationId);
+                    this.workflows = Array.isArray(raw)
+                        ? raw
+                        : Array.isArray(raw?.workflows)
+                            ? raw.workflows
+                            : Object.values(raw || {});
+                } catch (err) {
+                    console.error('[ROSS] loadWorkflows error:', err);
+                    await Swal.fire('Error', 'Failed to load workflows: ' + err.message, 'error');
+                } finally {
+                    this.tabLoading = false;
+                }
+            },
+
+            filteredWorkflows() {
+                return this.workflows.filter(w => {
+                    const catOk = this.workflowFilter.category === 'all'
+                        || w.category === this.workflowFilter.category;
+                    const statusOk = this.workflowFilter.status === 'all'
+                        || w.status === this.workflowFilter.status;
+                    return catOk && statusOk;
+                });
+            },
+
+            openWorkflow(workflow) {
+                this.selectedWorkflow = { ...workflow };
+                this.workflowDetailTab = 'tasks';
+            },
+
+            closeWorkflowDetail() {
+                this.selectedWorkflow = null;
+                this.loadWorkflows();
+            },
+
+            async markTaskComplete(task) {
+                const wf = this.selectedWorkflow;
+                const result = await Swal.fire({
+                    title: 'Mark Task Complete?',
+                    text: task.title,
+                    icon: 'question',
+                    showCancelButton: true,
+                    confirmButtonText: 'Complete'
+                });
+                if (!result.isConfirmed) return;
+                try {
+                    await rossService.completeTask(wf.locationId, wf.workflowId, task._taskId);
+                    const updatedTasks = { ...wf.tasks };
+                    updatedTasks[task._taskId] = {
+                        ...updatedTasks[task._taskId],
+                        status: 'completed',
+                        completedAt: Date.now()
+                    };
+                    this.selectedWorkflow = { ...wf, tasks: updatedTasks };
+                } catch (err) {
+                    console.error('[ROSS] markTaskComplete error:', err);
+                    await Swal.fire('Error', 'Could not complete task. Please try again.', 'error');
+                }
+            },
+
+            async deleteWorkflow(workflow) {
+                const result = await Swal.fire({
+                    title: 'Delete Workflow?',
+                    text: `"${workflow.name}" and all its task history will be permanently deleted.`,
+                    icon: 'warning',
+                    showCancelButton: true,
+                    confirmButtonText: 'Delete',
+                    confirmButtonColor: '#dc3545'
+                });
+                if (!result.isConfirmed) return;
+                try {
+                    await rossService.deleteWorkflow(workflow.locationId, workflow.workflowId);
+                    this.workflows = this.workflows.filter(w => w.workflowId !== workflow.workflowId);
+                    await Swal.fire('Deleted', 'Workflow removed.', 'success');
+                } catch (err) {
+                    console.error('[ROSS] deleteWorkflow error:', err);
+                    await Swal.fire('Error', 'Failed to delete workflow.', 'error');
+                }
+            },
+
+            async pauseResumeWorkflow(workflow) {
+                const newStatus = workflow.status === 'active' ? 'paused' : 'active';
+                try {
+                    await rossService.updateWorkflow(
+                        workflow.locationId, workflow.workflowId, { status: newStatus }
+                    );
+                    this.workflows = this.workflows.map(w =>
+                        w.workflowId === workflow.workflowId ? { ...w, status: newStatus } : w
+                    );
+                    if (this.selectedWorkflow?.workflowId === workflow.workflowId) {
+                        this.selectedWorkflow = { ...this.selectedWorkflow, status: newStatus };
+                    }
+                } catch (err) {
+                    console.error('[ROSS] pauseResumeWorkflow error:', err);
+                    await Swal.fire('Error', 'Could not update workflow status.', 'error');
+                }
+            },
+
+            // ------------------------------------------------------------------
             // Helpers
             // ------------------------------------------------------------------
             getCategoryLabel(key) {
@@ -756,6 +1070,9 @@ export async function initializeRoss() {
             getRecurrenceLabel(key) {
                 return RECURRENCE_LABELS[key] || key;
             },
+            daysUntil,
+            getDueSeverity,
+            calcProgress,
             formatDate,
             formatDateTime,
             escapeHtml,
