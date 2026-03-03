@@ -48,21 +48,37 @@ function formatDateTime(ts) {
     });
 }
 
+const CATEGORY_LABELS = {
+    compliance:  'Compliance',
+    operations:  'Operations',
+    growth:      'Growth',
+    finance:     'Finance',
+    hr:          'HR & People',
+    maintenance: 'Maintenance'
+};
+
 const CATEGORY_ICONS = {
-    Opening:  'fas fa-sun',
-    Closing:  'fas fa-moon',
-    Cleaning: 'fas fa-broom',
-    Service:  'fas fa-concierge-bell',
-    Kitchen:  'fas fa-utensils',
-    Admin:    'fas fa-clipboard-list'
+    compliance:  'fa-shield-alt',
+    operations:  'fa-cogs',
+    growth:      'fa-chart-line',
+    finance:     'fa-dollar-sign',
+    hr:          'fa-users',
+    maintenance: 'fa-wrench'
+};
+
+const RECURRENCE_LABELS = {
+    once:      'Once',
+    daily:     'Daily',
+    weekly:    'Weekly',
+    monthly:   'Monthly',
+    quarterly: 'Quarterly',
+    annually:  'Annual'
 };
 
 // ---------------------------------------------------------------------------
 // initializeRoss
 // ---------------------------------------------------------------------------
 export async function initializeRoss() {
-    console.log('[ROSS] Initializing...');
-
     const container = document.getElementById('ross-app');
     if (!container) {
         console.error('[ROSS] Container #ross-app not found');
@@ -270,16 +286,86 @@ export async function initializeRoss() {
     </div>
 
     <!-- ================================================================
-         VIEW 2 — Template Library (placeholder, built in Task 9)
+         VIEW 2 — Template Library
     ================================================================ -->
     <div v-if="currentTab === 'templates'">
-        <div class="text-center py-5">
-            <div v-if="tabLoading" class="spinner-border text-primary" role="status"></div>
-            <template v-else>
-                <i class="fas fa-layer-group fa-3x text-muted mb-3"></i>
-                <h5>Template Library</h5>
-                <p class="text-muted">Coming soon...</p>
-            </template>
+
+        <!-- Loading -->
+        <div v-if="tabLoading" class="text-center py-5">
+            <div class="spinner-border text-primary" role="status">
+                <span class="visually-hidden">Loading...</span>
+            </div>
+            <p class="mt-2 text-muted">Loading templates...</p>
+        </div>
+
+        <!-- Content -->
+        <div v-else>
+
+            <!-- Category filter pills -->
+            <ul class="nav nav-pills mb-4 flex-wrap gap-1">
+                <li class="nav-item">
+                    <button class="nav-link py-1 px-3"
+                        :class="{ active: templateFilter === 'all' }"
+                        @click="templateFilter = 'all'">All</button>
+                </li>
+                <li v-for="(label, key) in CATEGORY_LABELS" :key="key" class="nav-item">
+                    <button class="nav-link py-1 px-3"
+                        :class="{ active: templateFilter === key }"
+                        @click="templateFilter = key">{{ label }}</button>
+                </li>
+            </ul>
+
+            <!-- Empty state -->
+            <div v-if="filteredTemplates().length === 0" class="text-center py-5 text-muted">
+                <i class="fas fa-book fa-3x mb-3"></i>
+                <p>No templates found.</p>
+            </div>
+
+            <!-- Template cards -->
+            <div class="row g-3">
+                <div v-for="tmpl in filteredTemplates()" :key="tmpl.templateId"
+                    class="col-md-6 col-lg-4">
+                    <div class="card border-0 shadow-sm h-100">
+                        <div class="card-body">
+                            <div class="d-flex justify-content-between align-items-start mb-2">
+                                <h6 class="card-title mb-0">{{ tmpl.name }}</h6>
+                                <span class="badge bg-secondary ms-2">
+                                    {{ getRecurrenceLabel(tmpl.recurrence) }}
+                                </span>
+                            </div>
+                            <p class="text-muted small mb-2">{{ tmpl.description }}</p>
+                            <div class="text-muted small">
+                                <i :class="['fas', getCategoryIcon(tmpl.category), 'me-1']"></i>
+                                {{ getCategoryLabel(tmpl.category) }}
+                                &bull;
+                                {{ (tmpl.subtasks || []).length }} subtasks
+                            </div>
+                        </div>
+                        <div class="card-footer bg-white border-0 d-flex gap-2">
+                            <button class="btn btn-primary btn-sm flex-grow-1"
+                                @click="activateTemplate(tmpl)">
+                                <i class="fas fa-play me-1"></i>Activate
+                            </button>
+                            <button v-if="isSuperAdmin" class="btn btn-outline-secondary btn-sm"
+                                @click="openEditTemplate(tmpl)" title="Edit template">
+                                <i class="fas fa-edit"></i>
+                            </button>
+                            <button v-if="isSuperAdmin" class="btn btn-outline-danger btn-sm"
+                                @click="deleteTemplate(tmpl)" title="Delete template">
+                                <i class="fas fa-trash"></i>
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Super Admin: add template -->
+            <div v-if="isSuperAdmin" class="mt-4">
+                <button class="btn btn-outline-primary" @click="openCreateTemplate()">
+                    <i class="fas fa-plus me-1"></i>Add Template
+                </button>
+            </div>
+
         </div>
     </div>
 
@@ -360,7 +446,12 @@ export async function initializeRoss() {
                 overdueAlerts: [],
                 categoryStats: [],
                 todayTasks: [],
-                dismissedAlerts: []
+                dismissedAlerts: [],
+
+                // View 2 — Template Library
+                templateFilter: 'all',
+                isSuperAdmin: false,
+                CATEGORY_LABELS
             };
         },
 
@@ -380,6 +471,8 @@ export async function initializeRoss() {
                 this.currentTab = tab;
                 if (tab === 'overview') {
                     this.loadOverview();
+                } else if (tab === 'templates') {
+                    this.loadTemplates();
                 }
             },
 
@@ -449,11 +542,8 @@ export async function initializeRoss() {
             },
 
             buildCategoryStats(workflowList) {
-                const categories = ['Opening', 'Closing', 'Cleaning', 'Service', 'Kitchen', 'Admin'];
-                return categories.map(name => {
-                    const catWfs = workflowList.filter(
-                        wf => (wf.category || '').toLowerCase() === name.toLowerCase()
-                    );
+                return Object.keys(CATEGORY_LABELS).map(cat => {
+                    const catWfs = workflowList.filter(wf => (wf.category || '') === cat);
                     const active = catWfs.filter(
                         wf => wf.status === 'active' || wf.status === 'in_progress'
                     );
@@ -467,8 +557,8 @@ export async function initializeRoss() {
                         ).length;
                     }
                     return {
-                        name,
-                        icon: CATEGORY_ICONS[name] || 'fas fa-folder',
+                        name: CATEGORY_LABELS[cat],
+                        icon: 'fas ' + (CATEGORY_ICONS[cat] || 'fa-folder'),
                         activeCount: active.length,
                         completionPct: totalTasks > 0
                             ? Math.round((doneTasks / totalTasks) * 100)
@@ -542,8 +632,130 @@ export async function initializeRoss() {
             },
 
             // ------------------------------------------------------------------
+            // View 2 — Template Library
+            // ------------------------------------------------------------------
+            async loadTemplates() {
+                this.tabLoading = true;
+                try {
+                    const raw = await rossService.getTemplates();
+                    this.templates = Array.isArray(raw)
+                        ? raw
+                        : Array.isArray(raw?.templates)
+                            ? raw.templates
+                            : Object.values(raw || {});
+                } catch (err) {
+                    console.error('[ROSS] loadTemplates error:', err);
+                    await Swal.fire('Error', 'Failed to load templates: ' + err.message, 'error');
+                } finally {
+                    this.tabLoading = false;
+                }
+            },
+
+            async checkSuperAdmin() {
+                try {
+                    const user = auth.currentUser;
+                    if (!user) return;
+                    const snap = await new Promise(resolve => {
+                        onValue(ref(rtdb, `admins/${user.uid}`), resolve, { onlyOnce: true });
+                    });
+                    this.isSuperAdmin = !!(snap.val() && snap.val().superAdmin);
+                } catch (e) {
+                    this.isSuperAdmin = false;
+                }
+            },
+
+            filteredTemplates() {
+                if (this.templateFilter === 'all') return this.templates;
+                return this.templates.filter(t => t.category === this.templateFilter);
+            },
+
+            async activateTemplate(template) {
+                if (!rossState.locationId) {
+                    await Swal.fire('No Location', 'Please select a location first.', 'warning');
+                    return;
+                }
+                const { value: formValues } = await Swal.fire({
+                    title: 'Activate Template',
+                    html: `
+                        <p class="text-start mb-3">Activating: <strong>${escapeHtml(template.name)}</strong></p>
+                        <div class="mb-3 text-start">
+                            <label class="form-label fw-semibold">Workflow Name (optional)</label>
+                            <input id="swal-wf-name" class="swal2-input"
+                                placeholder="${escapeHtml(template.name)}"
+                                value="${escapeHtml(template.name)}">
+                        </div>
+                        <div class="mb-3 text-start">
+                            <label class="form-label fw-semibold">Next Due Date <span class="text-danger">*</span></label>
+                            <input id="swal-wf-date" type="date" class="swal2-input">
+                        </div>`,
+                    showCancelButton: true,
+                    confirmButtonText: 'Activate',
+                    preConfirm: () => {
+                        const name = document.getElementById('swal-wf-name').value.trim();
+                        const date = document.getElementById('swal-wf-date').value;
+                        if (!date) {
+                            Swal.showValidationMessage('Please select a due date');
+                            return false;
+                        }
+                        return { name: name || template.name, nextDueDate: new Date(date).getTime() };
+                    }
+                });
+                if (!formValues) return;
+                try {
+                    await rossService.activateWorkflow({
+                        templateId: template.templateId,
+                        locationId: rossState.locationId,
+                        name: formValues.name,
+                        nextDueDate: formValues.nextDueDate
+                    });
+                    await Swal.fire('Activated!', `${escapeHtml(template.name)} is now active.`, 'success');
+                    this.switchTab('workflows');
+                } catch (err) {
+                    console.error('[ROSS] activateTemplate error:', err);
+                    await Swal.fire('Error', 'Failed to activate workflow. Please try again.', 'error');
+                }
+            },
+
+            async deleteTemplate(template) {
+                const result = await Swal.fire({
+                    title: 'Delete Template?',
+                    text: `This will permanently delete "${template.name}". Existing workflows are not affected.`,
+                    icon: 'warning',
+                    showCancelButton: true,
+                    confirmButtonText: 'Delete',
+                    confirmButtonColor: '#dc3545'
+                });
+                if (!result.isConfirmed) return;
+                try {
+                    await rossService.deleteTemplate(template.templateId);
+                    this.templates = this.templates.filter(t => t.templateId !== template.templateId);
+                    await Swal.fire('Deleted', 'Template removed.', 'success');
+                } catch (err) {
+                    console.error('[ROSS] deleteTemplate error:', err);
+                    await Swal.fire('Error', 'Failed to delete template.', 'error');
+                }
+            },
+
+            async openEditTemplate() {
+                await Swal.fire('Coming Soon', 'Template editing will be added in a future update.', 'info');
+            },
+
+            async openCreateTemplate() {
+                await Swal.fire('Coming Soon', 'Template creation will be added in a future update.', 'info');
+            },
+
+            // ------------------------------------------------------------------
             // Helpers
             // ------------------------------------------------------------------
+            getCategoryLabel(key) {
+                return CATEGORY_LABELS[key] || key;
+            },
+            getCategoryIcon(key) {
+                return CATEGORY_ICONS[key] || 'fa-circle';
+            },
+            getRecurrenceLabel(key) {
+                return RECURRENCE_LABELS[key] || key;
+            },
             formatDate,
             formatDateTime,
             escapeHtml,
@@ -567,13 +779,12 @@ export async function initializeRoss() {
         },
 
         mounted() {
-            console.log('[ROSS] Vue app mounted, locationId:', rossState.locationId);
+            this.checkSuperAdmin();
             this.loadOverview();
         }
     });
 
     rossState.app.mount(container);
-    console.log('[ROSS] Initialized successfully');
     return rossState.app;
 }
 
@@ -581,8 +792,6 @@ export async function initializeRoss() {
 // cleanupRoss
 // ---------------------------------------------------------------------------
 export function cleanupRoss() {
-    console.log('[ROSS] Cleaning up...');
-
     if (rossState.app) {
         try {
             rossState.app.unmount();
