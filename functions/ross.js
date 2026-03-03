@@ -448,3 +448,320 @@ exports.rossGetWorkflows = onRequest(async (req, res) => {
         }
     });
 });
+
+// ============================================
+// TASK OPERATIONS
+// ============================================
+
+/**
+ * Manage tasks within a workflow location (create / update / delete)
+ * Access: All admins
+ */
+exports.rossManageTask = onRequest(async (req, res) => {
+    return cors(req, res, async () => {
+        if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' });
+        try {
+            const decodedToken = await verifyAuthToken(req);
+            const { uid } = await verifyAdmin(decodedToken);
+
+            const data = req.body.data || req.body;
+            const { workflowId, locationId, action, taskId, taskData } = data;
+            if (!workflowId || !locationId) return res.status(400).json({ error: 'Workflow ID and Location ID are required' });
+
+            const locationRef = db.ref(`ross/workflows/${uid}/${workflowId}/locations/${locationId}`);
+            const snap = await locationRef.once('value');
+            if (!snap.exists()) return res.status(404).json({ error: 'Workflow location not found' });
+
+            const tasksRef = locationRef.child('tasks');
+            const now = Date.now();
+
+            switch (action) {
+                case 'create': {
+                    const newTaskId = generateId();
+                    const task = {
+                        title: taskData.title?.trim() || 'Untitled Task',
+                        status: 'pending',
+                        dueDate: taskData.dueDate || null,
+                        completedAt: null,
+                        assignedTo: taskData.assignedTo || null,
+                        order: taskData.order || 1
+                    };
+                    await tasksRef.child(newTaskId).set(task);
+                    await db.ref(`ross/workflows/${uid}/${workflowId}`).update({ updatedAt: now });
+                    return res.json({ result: { success: true, taskId: newTaskId, task } });
+                }
+                case 'update': {
+                    if (!taskId) return res.status(400).json({ error: 'Task ID required for update' });
+                    const allowedTaskFields = ['title', 'status', 'dueDate', 'assignedTo', 'order'];
+                    const updates = {};
+                    allowedTaskFields.forEach(f => { if (taskData[f] !== undefined) updates[f] = taskData[f]; });
+                    await tasksRef.child(taskId).update(updates);
+                    await db.ref(`ross/workflows/${uid}/${workflowId}`).update({ updatedAt: now });
+                    return res.json({ result: { success: true, taskId } });
+                }
+                case 'delete': {
+                    if (!taskId) return res.status(400).json({ error: 'Task ID required for delete' });
+                    await tasksRef.child(taskId).remove();
+                    await db.ref(`ross/workflows/${uid}/${workflowId}`).update({ updatedAt: now });
+                    return res.json({ result: { success: true, taskId } });
+                }
+                default:
+                    return res.status(400).json({ error: 'Invalid action. Use create, update, or delete' });
+            }
+        } catch (error) {
+            console.error('[rossManageTask] Error:', error.message);
+            res.status(error.message.includes('Admin') ? 403 : 401).json({ error: error.message });
+        }
+    });
+});
+
+/**
+ * Mark a task as complete for a specific location
+ * Access: All admins
+ */
+exports.rossCompleteTask = onRequest(async (req, res) => {
+    return cors(req, res, async () => {
+        if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' });
+        try {
+            const decodedToken = await verifyAuthToken(req);
+            const { uid } = await verifyAdmin(decodedToken);
+
+            const data = req.body.data || req.body;
+            const { workflowId, locationId, taskId } = data;
+            if (!workflowId || !locationId || !taskId) {
+                return res.status(400).json({ error: 'Workflow ID, Location ID, and Task ID are required' });
+            }
+
+            const now = Date.now();
+            const taskRef = db.ref(`ross/workflows/${uid}/${workflowId}/locations/${locationId}/tasks/${taskId}`);
+            const taskSnap = await taskRef.once('value');
+            if (!taskSnap.exists()) return res.status(404).json({ error: 'Task not found' });
+
+            await taskRef.update({ status: 'completed', completedAt: now });
+            await db.ref(`ross/workflows/${uid}/${workflowId}`).update({ updatedAt: now });
+
+            // Check if all tasks for this location are complete
+            const locationSnap = await db.ref(`ross/workflows/${uid}/${workflowId}/locations/${locationId}`).once('value');
+            const locationData = locationSnap.val();
+            if (locationData && locationData.tasks) {
+                const allTasks = Object.values(locationData.tasks);
+                const completedCount = allTasks.filter(t => t.status === 'completed').length;
+                if (completedCount === allTasks.length) {
+                    const workflowSnap = await db.ref(`ross/workflows/${uid}/${workflowId}`).once('value');
+                    const workflow = workflowSnap.val();
+                    const cycleId = `${new Date().getFullYear()}-${workflow.recurrence}`;
+                    const historyRecord = {
+                        cycleId,
+                        period: String(new Date().getFullYear()),
+                        completedAt: now,
+                        tasksTotal: allTasks.length,
+                        tasksCompleted: allTasks.length,
+                        completionRate: 100,
+                        onTime: now <= (locationData.nextDueDate || now)
+                    };
+                    await db.ref(`ross/workflows/${uid}/${workflowId}/locations/${locationId}/history/${cycleId}`).set(historyRecord);
+                }
+            }
+
+            res.json({ result: { success: true, taskId } });
+        } catch (error) {
+            console.error('[rossCompleteTask] Error:', error.message);
+            res.status(error.message.includes('Admin') ? 403 : 401).json({ error: error.message });
+        }
+    });
+});
+
+/**
+ * Fetch completion reports for an owner (across all workflows + locations)
+ * Access: All admins
+ */
+exports.rossGetReports = onRequest(async (req, res) => {
+    return cors(req, res, async () => {
+        if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' });
+        try {
+            const decodedToken = await verifyAuthToken(req);
+            const { uid } = await verifyAdmin(decodedToken);
+
+            const data = req.body.data || req.body;
+            const { locationId } = data || {};
+
+            const workflowsSnap = await db.ref(`ross/workflows/${uid}`).once('value');
+            const workflows = Object.values(workflowsSnap.val() || {});
+
+            const report = [];
+            workflows.forEach(workflow => {
+                const locationEntries = locationId
+                    ? (workflow.locations && workflow.locations[locationId] ? { [locationId]: workflow.locations[locationId] } : {})
+                    : (workflow.locations || {});
+
+                Object.entries(locationEntries).forEach(([locId, locData]) => {
+                    const tasks = locData.tasks ? Object.values(locData.tasks) : [];
+                    const completedTasks = tasks.filter(t => t.status === 'completed').length;
+                    const history = locData.history ? Object.values(locData.history) : [];
+                    report.push({
+                        workflowId: workflow.workflowId,
+                        name: workflow.name,
+                        category: workflow.category,
+                        recurrence: workflow.recurrence,
+                        locationId: locId,
+                        locationName: locData.locationName,
+                        status: locData.status,
+                        nextDueDate: locData.nextDueDate,
+                        tasksTotal: tasks.length,
+                        tasksCompleted: completedTasks,
+                        completionRate: tasks.length > 0 ? Math.round((completedTasks / tasks.length) * 100) : 0,
+                        history
+                    });
+                });
+            });
+
+            res.json({ result: { success: true, report } });
+        } catch (error) {
+            console.error('[rossGetReports] Error:', error.message);
+            res.status(error.message.includes('Admin') ? 403 : 401).json({ error: error.message });
+        }
+    });
+});
+
+// ============================================
+// SCHEDULED REMINDER (Phase 1 — in-app only)
+// ============================================
+
+/**
+ * Daily scheduler — runs at 07:00 SAST (UTC+2 = 05:00 UTC)
+ * Scans all active workflows and writes in-app notifications for due alerts
+ */
+exports.rossScheduledReminder = onSchedule('0 5 * * *', async () => {
+    const now = Date.now();
+    const oneDayMs = 86400000;
+
+    try {
+        const ownersSnap = await db.ref('ross/workflows').once('value');
+        const ownerMap = ownersSnap.val() || {};
+
+        for (const [ownerId, ownerWorkflows] of Object.entries(ownerMap)) {
+            for (const workflow of Object.values(ownerWorkflows)) {
+                const locations = workflow.locations || {};
+                for (const [locationId, locData] of Object.entries(locations)) {
+                    if (locData.status !== 'active') continue;
+
+                    const daysUntilDue = Math.round((locData.nextDueDate - now) / oneDayMs);
+                    const alertDays = workflow.daysBeforeAlert || [30, 7, 1];
+
+                    if (!alertDays.includes(daysUntilDue)) continue;
+
+                    const tasks = locData.tasks ? Object.values(locData.tasks) : [];
+                    const remaining = tasks.filter(t => t.status !== 'completed').length;
+
+                    const notification = {
+                        type: 'ross_reminder',
+                        workflowId: workflow.workflowId,
+                        workflowName: workflow.name,
+                        locationId,
+                        locationName: locData.locationName,
+                        daysUntilDue,
+                        nextDueDate: locData.nextDueDate,
+                        tasksRemaining: remaining,
+                        tasksTotal: tasks.length,
+                        channel: 'in_app',
+                        createdAt: now,
+                        read: false
+                    };
+
+                    await db.ref(`notifications/${ownerId}`).push(notification);
+                    console.log(`[rossScheduledReminder] Alert for workflow ${workflow.workflowId} loc ${locationId} (${daysUntilDue}d)`);
+                }
+            }
+        }
+    } catch (error) {
+        console.error('[rossScheduledReminder] Error:', error);
+    }
+});
+
+// ============================================
+// STAFF OPERATIONS (per location)
+// ============================================
+
+/**
+ * CRUD for staff members per location
+ * Access: All admins
+ */
+exports.rossManageStaff = onRequest(async (req, res) => {
+    return cors(req, res, async () => {
+        if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' });
+        try {
+            const decodedToken = await verifyAuthToken(req);
+            await verifyAdmin(decodedToken);
+
+            const data = req.body.data || req.body;
+            const { locationId, action, staffId, staffData } = data;
+            if (!locationId) return res.status(400).json({ error: 'Location ID is required' });
+
+            const staffRef = db.ref(`ross/staff/${locationId}`);
+            const now = Date.now();
+
+            switch (action) {
+                case 'create': {
+                    if (!staffData?.name?.trim()) return res.status(400).json({ error: 'Staff name is required' });
+                    const newStaffId = generateId();
+                    const member = {
+                        staffId: newStaffId,
+                        locationId,
+                        name: staffData.name.trim(),
+                        role: staffData.role?.trim() || '',
+                        phone: staffData.phone || null,
+                        email: staffData.email || null,
+                        notificationChannels: staffData.notificationChannels || ['in_app'],
+                        createdAt: now
+                    };
+                    await staffRef.child(newStaffId).set(member);
+                    return res.json({ result: { success: true, staffId: newStaffId, member } });
+                }
+                case 'update': {
+                    if (!staffId) return res.status(400).json({ error: 'Staff ID required for update' });
+                    const allowedFields = ['name', 'role', 'phone', 'email', 'notificationChannels'];
+                    const updates = { updatedAt: now };
+                    allowedFields.forEach(f => { if (staffData[f] !== undefined) updates[f] = staffData[f]; });
+                    await staffRef.child(staffId).update(updates);
+                    return res.json({ result: { success: true, staffId } });
+                }
+                case 'delete': {
+                    if (!staffId) return res.status(400).json({ error: 'Staff ID required for delete' });
+                    await staffRef.child(staffId).remove();
+                    return res.json({ result: { success: true, staffId } });
+                }
+                default:
+                    return res.status(400).json({ error: 'Invalid action. Use create, update, or delete' });
+            }
+        } catch (error) {
+            console.error('[rossManageStaff] Error:', error.message);
+            res.status(error.message.includes('Admin') ? 403 : 401).json({ error: error.message });
+        }
+    });
+});
+
+/**
+ * Fetch all staff members for a location
+ * Access: All admins
+ */
+exports.rossGetStaff = onRequest(async (req, res) => {
+    return cors(req, res, async () => {
+        if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' });
+        try {
+            const decodedToken = await verifyAuthToken(req);
+            await verifyAdmin(decodedToken);
+
+            const data = req.body.data || req.body;
+            const { locationId } = data;
+            if (!locationId) return res.status(400).json({ error: 'Location ID is required' });
+
+            const snap = await db.ref(`ross/staff/${locationId}`).once('value');
+            const staff = Object.values(snap.val() || {});
+            staff.sort((a, b) => (a.name || '').localeCompare(b.name || ''));
+            res.json({ result: { success: true, staff } });
+        } catch (error) {
+            console.error('[rossGetStaff] Error:', error.message);
+            res.status(error.message.includes('Admin') ? 403 : 401).json({ error: error.message });
+        }
+    });
+});
