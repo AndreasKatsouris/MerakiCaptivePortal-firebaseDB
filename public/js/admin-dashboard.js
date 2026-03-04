@@ -1443,6 +1443,16 @@ class AdminDashboard {
                     break;
                 }
 
+                case 'corporateComplianceContent':
+                    if (!this.sectionInitialized.corporateComplianceContent) {
+                        const frame = document.getElementById('corporateComplianceFrame');
+                        if (frame) {
+                            frame.src = '/corporate-compliance.html';
+                        }
+                        this.sectionInitialized.corporateComplianceContent = true;
+                    }
+                    break;
+
                 // Add other cases here...
             }
         } catch (error) {
