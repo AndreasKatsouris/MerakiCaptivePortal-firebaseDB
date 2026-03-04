@@ -1,0 +1,400 @@
+﻿storename,ccnt,Category,prod,name,unit,OpeningQty,Opening ,PurchasesQty,Purchases,ClosingQty,Closing,UsageQty,Usage
+The Grove,BEV,Beer & Ciders,10851,amstel,EACH,4, R44.00 ,0, R-   ,0, R-   ,4, R44.00 
+The Grove,BEV,Beer & Ciders,10054,carling black label,EACH,29, R297.25 ,0, R-   ,6, R61.50 ,23, R235.75 
+The Grove,BEV,Beer & Ciders,10055,castle,EACH,26, R241.54 ,0, R-   ,14, R130.06 ,12, R111.48 
+The Grove,BEV,Beer & Ciders,11558,castle free,EACH,18, R157.14 ,0, R-   ,18, R157.14 ,0, R-   
+The Grove,BEV,Beer & Ciders,10853,castle lite,EACH,30, R308.70 ,32, R400.35 ,31, R336.66 ,31, R372.39 
+The Grove,BEV,Beer & Ciders,11323,corona 355ml,EACH,8, R105.20 ,48, R631.30 ,28, R368.20 ,28, R368.30 
+The Grove,BEV,Beer & Ciders,10976,draught castle lite keg 1lt,LITER,7, R177.80 ,130," R4,431.41 ",71," R1,883.63 ",66," R2,725.58 "
+The Grove,BEV,Beer & Ciders,11339,draught heineken keg 1lt,LT,30, R966.00 ,26," R1,234.94 ",16, R627.52 ,40," R1,573.42 "
+The Grove,BEV,Beer & Ciders,10855,flying fish lemon,EACH,25, R269.00 ,0, R-   ,13, R139.88 ,12, R129.12 
+The Grove,BEV,Beer & Ciders,10858,hansa,EACH,12, R111.48 ,0, R-   ,11, R102.19 ,1, R9.29 
+The Grove,BEV,Beer & Ciders,10859,heineken,EACH,5, R60.00 ,24, R301.81 ,21, R264.18 ,8, R97.63 
+The Grove,BEV,Beer & Ciders,13022,heineken non alc,EACH,18, R216.00 ,0, R-   ,9, R108.00 ,9, R108.00 
+The Grove,BEV,Beer & Ciders,10860,hunters dry,EACH,8, R96.96 ,24, R306.78 ,21, R268.38 ,11, R135.36 
+The Grove,BEV,Beer & Ciders,10861,hunters gold,EACH,5, R60.60 ,12, R159.20 ,6, R79.62 ,11, R140.18 
+The Grove,BEV,Beer & Ciders,10863,savanna light,EACH,11, R153.89 ,24, R349.66 ,15, R218.55 ,20, R285.00 
+The Grove,BEV,Beer & Ciders,10060,savannah dry,EACH,62, R867.38 ,24, R349.66 ,23, R335.11 ,63, R881.93 
+The Grove,BEV,Beer & Ciders,13056,savannah lemon 0,EACH,22, R307.78 ,0, R-   ,11, R153.89 ,11, R153.89 
+The Grove,BEV,Beer & Ciders,10061,windhoek draught botle can,EACH,16, R214.24 ,24, R324.97 ,8, R108.32 ,32, R430.89 
+The Grove,BEV,Beer & Ciders,10062,windhoek lager,EACH,3, R40.17 ,24, R335.30 ,21, R293.37 ,6, R82.10 
+The Grove,BEV,Cold Bev,10096,juice cocktail 350ml,EACH,23, R349.60 ,18, R273.60 ,17, R258.40 ,24, R364.80 
+The Grove,BEV,Cold Bev,10101,juice mango 350ml,EACH,33, R501.60 ,18, R273.60 ,14, R212.80 ,37, R562.40 
+The Grove,BEV,Cold Bev,10102,juice orange 350ml,EACH,28, R425.60 ,18, R273.60 ,18, R273.60 ,28, R425.60 
+The Grove,BEV,Cold Bev,10073,large appletiser,EACH,42, R603.96 ,84," R1,220.55 ",46, R661.48 ,80," R1,163.03 "
+The Grove,BEV,Cold Bev,10090,large bos i/tea lemon,EACH,36, R405.72 ,24, R286.94 ,30, R358.80 ,30, R333.86 
+The Grove,BEV,Cold Bev,10091,large bos i/tea peach,EACH,39, R439.53 ,24, R286.94 ,25, R299.00 ,38, R427.47 
+The Grove,BEV,Cold Bev,10074,large coca cola,EACH,129," R1,222.92 ",354," R3,413.71 ",180," R1,706.40 ",303," R2,930.23 "
+The Grove,BEV,Cold Bev,10955,large coke zero,EACH,32, R303.36 ,216," R2,048.03 ",81, R767.88 ,167," R1,583.51 "
+The Grove,BEV,Cold Bev,10076,large creme soda,EACH,22, R208.56 ,72, R682.35 ,41, R388.68 ,53, R502.23 
+The Grove,BEV,Cold Bev,10078,large fanta orange,EACH,22, R208.56 ,0, R-   ,6, R56.88 ,16, R151.68 
+The Grove,BEV,Cold Bev,10079,large grapetiser red,EACH,23, R330.74 ,96," R1,380.84 ",42, R603.96 ,77," R1,107.62 "
+The Grove,BEV,Cold Bev,10081,large sprite,EACH,28, R265.44 ,24, R227.94 ,9, R85.32 ,43, R408.06 
+The Grove,BEV,Cold Bev,10082,large sprite zero,EACH,19, R180.12 ,48, R455.39 ,23, R218.04 ,44, R417.47 
+The Grove,BEV,Cold Bev,10086,rose kola tonic tot,TOT,91, R127.40 ,240, R327.18 ,70, R98.00 ,261, R356.58 
+The Grove,BEV,Cold Bev,10087,roses lime tot,TOT,1, R1.39 ,90, R121.50 ,34, R47.60 ,57, R75.29 
+The Grove,BEV,Cold Bev,10088,roses passion fruit tot,TOT,132, R184.80 ,420, R574.95 ,189, R264.60 ,363, R495.15 
+The Grove,BEV,Cold Bev,13689,slo jo clas choc flav pwdr 1kg,Kg,0, R-   ,3, R420.00 ,0, R-   ,3, R420.00 
+The Grove,BEV,Cold Bev,13558,slo jo strawberry daiquri frui,LITRE,6.44, R721.28 ,11," R1,232.00 ",6.2, R694.40 ,11.24," R1,258.88 "
+The Grove,BEV,Cold Bev,13313,slojo mojito mint syrup 1l ,LTR,2.51, R306.22 ,4, R488.00 ,3.64, R444.08 ,2.87, R350.14 
+The Grove,BEV,Cold Bev,13415,slojo watermelon syrup 1lt,LITRE,5.3, R646.60 ,2, R244.00 ,2.78, R339.16 ,4.52, R551.44 
+The Grove,BEV,Cold Bev,10070,small dry lemon,EACH,5, R38.05 ,24, R182.53 ,17, R129.37 ,12, R91.21 
+The Grove,BEV,Cold Bev,13460,small f&l grapefruit tonic,EACH,7, R45.92 ,0, R-   ,1, R6.56 ,6, R39.36 
+The Grove,BEV,Cold Bev,13459,small f&l sf indian tonic ,EACH,24, R157.44 ,0, R-   ,24, R157.44 ,0, R-   
+The Grove,BEV,Cold Bev,10072,small lemonade,EACH,78, R593.58 ,312," R2,373.69 ",98, R745.78 ,292," R2,221.49 "
+The Grove,BEV,Cold Bev,10114,small red bull,EACH,25, R339.25 ,0, R-   ,15, R203.55 ,10, R135.70 
+The Grove,BEV,Cold Bev,10066,small soda water,EACH,24, R182.64 ,72, R548.39 ,26, R197.86 ,70, R533.17 
+The Grove,BEV,Cold Bev,10064,small tomato cocktail,EACH,27, R527.58 ,0, R-   ,26, R508.04 ,1, R19.54 
+The Grove,BEV,Cold Bev,10068,small tonic water,EACH,24, R182.64 ,24, R182.53 ,26, R197.86 ,22, R167.31 
+The Grove,BEV,Cold Bev,10071,smalll ginger ale,EACH,14, R106.54 ,24, R182.93 ,18, R136.98 ,20, R152.49 
+The Grove,BEV,Cold Bev,13548,sparklng ginger flavourd drink,EACH,37, R393.31 ,24, R255.00 ,37, R393.31 ,24, R255.00 
+The Grove,BEV,Cold Bev,13545,sparklng grapefruit flav drink,EACH,33, R350.79 ,72, R765.00 ,46, R488.98 ,59, R626.81 
+The Grove,BEV,Cold Bev,13547,sparklng peach flavoured drink,EACH,0, R-   ,48, R510.00 ,42, R446.46 ,6, R63.54 
+The Grove,BEV,Cold Bev,13546,sparklng rose flavoured drink,EACH,14, R602.00 ,0, R-   ,13, R559.00 ,1, R43.00 
+The Grove,BEV,Cold Bev,10118,syrup cranberry prt 1lt,LITRE,3.9, R493.55 ,0, R-   ,2.3, R291.07 ,1.6, R202.48 
+The Grove,BEV,Cold Bev,10115,syrup ms banana prt 1lt,LITRE,1.01, R59.59 ,0, R-   ,1, R59.00 ,0.01, R0.59 
+The Grove,BEV,Cold Bev,10116,syrup ms bubble gum prt 1lt,LITRE,2.05, R120.95 ,0, R-   ,2.23, R131.57 ,-0.18,-R10.62 
+The Grove,BEV,Cold Bev,10117,syrup ms chocolate prt 1lt,LITRE,1.07, R63.13 ,1, R59.00 ,2.17, R128.03 ,-0.1,-R5.90 
+The Grove,BEV,Cold Bev,13112,syrup ms strawberry prt 1lt,LITRE,1.08, R63.72 ,1, R59.00 ,1.38, R81.42 ,0.7, R41.30 
+The Grove,BEV,Cold Bev,13544,syrup ocean's limeade 1lt,LITRE,5.31, R608.79 ,4, R458.58 ,3.21, R368.03 ,6.1, R699.34 
+The Grove,BEV,Cold Bev,11436,syrup pina colada (1l),LT,2.69, R330.87 ,3, R369.00 ,2, R246.00 ,3.69, R453.87 
+The Grove,BEV,Cold Bev,13543,syrup white peach fruit 1lt,LITRE,2.4, R403.20 ,2, R275.88 ,2.31, R388.08 ,2.09, R291.00 
+The Grove,BEV,Cold Bev,10128,water sparkling small,EACH,60, R337.80 ,120, R675.00 ,86, R484.18 ,94, R528.62 
+The Grove,BEV,Cold Bev,10130,water still large,EACH,19, R193.23 ,72, R732.00 ,48, R488.16 ,43, R437.07 
+The Grove,BEV,Cold Bev,10131,water still small,EACH,62, R349.06 ,168, R945.00 ,112, R630.56 ,118, R663.50 
+The Grove,BEV,Hot Bev,11414,coffee decaf ground ob 1kg,KG,0.35, R105.00 ,0, R-   ,0, R-   ,0.35, R105.00 
+The Grove,BEV,Hot Bev,11413,coffee espresso beans ob 1kg,KG,0.86, R246.78 ,4," R1,147.80 ",2.12, R697.48 ,2.74, R697.10 
+The Grove,BEV,Hot Bev,11357,hot chocolate,KG,0.32, R43.82 ,0, R-   ,0.21, R28.76 ,0.11, R15.06 
+The Grove,BEV,Hot Bev,10623,sugar sachet's brown ob case,CASE,1.45, R558.25 ,0, R-   ,1, R385.00 ,0.45, R173.25 
+The Grove,BEV,Hot Bev,10624,sugar sachet's white ob case,CASE,0.22, R84.70 ,1, R385.00 ,1.25, R481.25 ,-0.03,-R11.55 
+The Grove,BEV,Hot Bev,10180,tea five roses tagless prt eac,EACH,258, R136.74 ,0, R-   ,205, R108.65 ,53, R28.09 
+The Grove,BEV,Hot Bev,10182,tea rooibos tagless prt each,EACH,102, R63.24 ,0, R-   ,62, R38.44 ,40, R24.80 
+The Grove,BEV,Spirits,10889,amarula tot,TOT,32, R138.24 ,0, R-   ,0, R-   ,32, R138.24 
+The Grove,BEV,Spirits,10965,angostura bitters 118ml,BTL,1.89, R463.35 ,0, R-   ,0.84, R205.93 ,1.05, R257.42 
+The Grove,BEV,Spirits,10133,bacardi tot,TOT,43, R288.96 ,150," R1,008.60 ",52, R349.44 ,141, R948.12 
+The Grove,BEV,Spirits,10134,bells tot,TOT,47, R317.72 ,0, R-   ,29, R196.04 ,18, R121.68 
+The Grove,BEV,Spirits,10868,brandy 1920 tot,TOT,18, R148.50 ,0, R-   ,18, R148.50 ,0, R-   
+The Grove,BEV,Spirits,10135,cane mainstay tot,TOT,32, R159.36 ,0, R-   ,32, R159.36 ,0, R-   
+The Grove,BEV,Spirits,10898,cape velvet tot,TOT,14, R55.30 ,0, R-   ,14, R55.30 ,0, R-   
+The Grove,BEV,Spirits,10883,captain morgan tot,TOT,16, R92.96 ,0, R-   ,6, R34.86 ,10, R58.10 
+The Grove,BEV,Spirits,10901,frangelico tot,TOT,25, R184.00 ,0, R-   ,24, R176.64 ,1, R7.36 
+The Grove,BEV,Spirits,10877,gordons gin tot,TOT,53, R263.41 ,30, R149.07 ,42, R208.74 ,41, R203.74 
+The Grove,BEV,Spirits,10902,grappa tot,TOT,17, R161.84 ,0, R-   ,16, R152.32 ,1, R9.52 
+The Grove,BEV,Spirits,10140,j & b tot,TOT,31, R199.95 ,0, R-   ,15, R96.75 ,16, R103.20 
+The Grove,BEV,Spirits,10881,jack daniels tot,TOT,35, R332.85 ,0, R-   ,27, R256.77 ,8, R76.08 
+The Grove,BEV,Spirits,10903,jagermeister tot,TOT,18, R154.44 ,0, R-   ,5, R42.90 ,13, R111.54 
+The Grove,BEV,Spirits,10141,jameson irish tot,TOT,35, R365.05 ,30, R312.96 ,26, R271.18 ,39, R406.83 
+The Grove,BEV,Spirits,10142,johnnie walker black label tot,TOT,38, R476.52 ,0, R-   ,34, R426.36 ,4, R50.16 
+The Grove,BEV,Spirits,10143,johnnie walker red label tot,TOT,16, R124.80 ,0, R-   ,13, R101.40 ,3, R23.40 
+The Grove,BEV,Spirits,10904,kahlua tot,TOT,12, R92.40 ,30, R230.94 ,11, R84.70 ,31, R238.64 
+The Grove,BEV,Spirits,10870,klipdrif red tot,TOT,3, R15.18 ,30, R159.20 ,27, R143.37 ,6, R31.01 
+The Grove,BEV,Spirits,10989,malibu tot,TOT,15, R76.50 ,0, R-   ,15, R76.50 ,0, R-   
+The Grove,BEV,Spirits,10144,peppermint tot,TOT,1, R4.06 ,0, R-   ,1, R4.06 ,0, R-   
+The Grove,BEV,Spirits,13451,pienaar & son empire gin,TOT,10, R86.90 ,0, R-   ,10, R86.90 ,0, R-   
+The Grove,BEV,Spirits,10145,port alesverloren tot,TOT,29, R86.71 ,0, R-   ,29, R86.71 ,0, R-   
+The Grove,BEV,Spirits,10146,red heart tot,TOT,18, R102.24 ,0, R-   ,18, R102.24 ,0, R-   
+The Grove,BEV,Spirits,10875,richelieu tot,TOT,13, R69.68 ,60, R374.26 ,42, R235.62 ,31, R208.32 
+The Grove,BEV,Spirits,10147,sherry old brown tot,TOT,18, R21.42 ,0, R-   ,18, R21.42 ,0, R-   
+The Grove,BEV,Spirits,10878,smirnoff vodka tot,TOT,27, R124.74 ,60, R279.04 ,46, R212.52 ,41, R191.26 
+The Grove,BEV,Spirits,11008,spiced gold tot,TOT,14, R68.74 ,0, R-   ,13, R63.83 ,1, R4.91 
+The Grove,BEV,Spirits,10148,strawberry liquor tot,TOT,40, R114.40 ,0, R-   ,40, R114.40 ,0, R-   
+The Grove,BEV,Spirits,10885,stroh tot,TOT,40, R403.20 ,0, R-   ,40, R403.20 ,0, R-   
+The Grove,BEV,Spirits,11340,tanqueray gin tot,TOT,20, R170.20 ,0, R-   ,19, R161.69 ,1, R8.51 
+The Grove,BEV,Spirits,10149,teq jose cuervo gold tot,TOT,22, R181.72 ,0, R-   ,6, R49.56 ,16, R132.16 
+The Grove,BEV,Spirits,10932,teq jose silver tot,TOT,20, R165.20 ,30, R247.65 ,28, R231.28 ,22, R181.57 
+The Grove,BEV,Wine,13560,alvi's drift blnc de blnc brut,EACH,2, R197.56 ,0, R-   ,1, R98.78 ,1, R98.78 
+The Grove,BEV,Wine,11075,alvi's drift chenin blanc btl,BTL,4.44, R257.79 ,14, R848.78 ,6.33, R391.45 ,12.11, R715.12 
+The Grove,BEV,Wine,13561,arniston bay rose 750ml,EACH,3.77, R242.52 ,6, R385.08 ,4.33, R278.55 ,5.44, R349.05 
+The Grove,BEV,Wine,13570,arniston bay sauv blanc 750ml,EACH,2.67, R171.76 ,8, R516.32 ,5.66, R371.41 ,5.01, R316.67 
+The Grove,BEV,Wine,13564,arniston bay shiraz 750ml,EACH,3, R192.21 ,6, R393.72 ,5, R328.10 ,4, R257.83 
+The Grove,BEV,Wine,11081,beyerskloof pinotage btl,BTL,1.66, R131.77 ,1, R84.01 ,1.22, R102.49 ,1.44, R113.29 
+The Grove,BEV,Wine,13247,de grendal rose btl,BTL,2, R137.34 ,0, R-   ,2, R137.34 ,0, R-   
+The Grove,BEV,Wine,13245,diemersdal sauv blanc btl,BTL,5, R347.70 ,0, R-   ,5, R347.70 ,0, R-   
+The Grove,BEV,Wine,13568,diemersdal unwooded card 750ml,EACH,3, R204.03 ,0, R-   ,0, R-   ,3, R204.03 
+The Grove,BEV,Wine,10154,durbanville hills chard btl,BTL,2.33, R143.85 ,8, R529.33 ,4.66, R309.89 ,5.67, R363.29 
+The Grove,BEV,Wine,13453,durbanville hills spark wine,BTL,9, R676.17 ,0, R-   ,9, R676.17 ,0, R-   
+The Grove,BEV,Wine,11076,durbaville hills sav blanc bt,BTL,12.66, R781.63 ,12, R782.04 ,8.1, R527.88 ,16.56," R1,035.79 "
+The Grove,BEV,Wine,10156,graca btl,BTL,6.21, R276.78 ,18, R863.84 ,9.66, R463.58 ,14.55, R677.04 
+The Grove,BEV,Wine,13115,graca rose btl,BTL,7.22, R328.44 ,0, R-   ,7.22, R328.44 ,0, R-   
+The Grove,BEV,Wine,13000,graham beck brut mcc,BTL,1, R155.64 ,0, R-   ,1, R155.64 ,0, R-   
+The Grove,BEV,Wine,10157,jc le roux domaine btl,BTL,3, R206.94 ,4, R289.72 ,4, R289.72 ,3, R206.94 
+The Grove,BEV,Wine,13730,ken forester old vintage res,ea,4, R507.64 ,0, R-   ,4, R507.64 ,0, R-   
+The Grove,BEV,Wine,13567,laborie chardonnay 750ml,EACH,2.88, R160.96 ,12, R712.56 ,7, R415.66 ,7.88, R457.86 
+The Grove,BEV,Wine,13572,lavenir pinotage,EACH,7, R493.85 ,0, R-   ,6, R423.30 ,1, R70.55 
+The Grove,BEV,Wine,13252,marras swart shiraz btl,BTL,2, R132.12 ,0, R-   ,2, R132.12 ,0, R-   
+The Grove,BEV,Wine,13243,marras swartland chen btl,BTL,0, R-   ,3, R208.62 ,3, R208.62 ,0, R-   
+The Grove,BEV,Wine,11080,ned baronne btl,BTL,6.33, R388.35 ,4, R259.04 ,4, R259.04 ,6.33, R388.35 
+The Grove,BEV,Wine,10920,ned stein 750ml,BTL,6.33, R330.24 ,0, R-   ,4.88, R254.59 ,1.45, R75.65 
+The Grove,BEV,Wine,10163,nederburg rose btl,BTL,6.87, R351.26 ,6, R327.07 ,1.99, R108.47 ,10.88, R569.86 
+The Grove,BEV,Wine,10164,nitida sauv blanc btl,BTL,0.22, R17.10 ,0, R-   ,0.22, R17.10 ,0, R-   
+The Grove,BEV,Wine,13554,ob dry white 750ml,EACH,31.36, R940.80 ,24, R720.00 ,8.66, R259.80 ,46.7," R1,401.00 "
+The Grove,BEV,Wine,13556,ob red 750ml,EACH,20.88, R626.40 ,0, R-   ,4.66, R139.80 ,16.22, R486.60 
+The Grove,BEV,Wine,13557,ob rose 750ml,EACH,10.66, R319.80 ,0, R-   ,0.55, R16.50 ,10.11, R303.30 
+The Grove,BEV,Wine,10168,pierre jourdan tranquille btl,BTL,0.66, R38.99 ,4, R250.32 ,0, R-   ,4.66, R289.31 
+The Grove,BEV,Wine,10983,pongracz,BTL,4, R528.84 ,0, R-   ,4, R528.84 ,0, R-   
+The Grove,BEV,Wine,13563,robertson sweet red 750ml,EACH,0, R-   ,9, R413.19 ,5, R229.55 ,4, R183.64 
+The Grove,BEV,Wine,10170,robertsons sweet rose btl,BTL,2.66, R113.58 ,8, R367.28 ,6.33, R290.61 ,4.33, R190.25 
+The Grove,BEV,Wine,11555,rupert & roth classique,BTL,3, R482.43 ,0, R-   ,3, R482.43 ,0, R-   
+The Grove,BEV,Wine,13244,secateurs chenin btl,BTL,0.33, R25.57 ,0, R-   ,0.33, R25.57 ,0, R-   
+The Grove,BEV,Wine,13010,simonsig chenin btl,BTL,5.01, R304.86 ,6, R385.98 ,3.66, R235.45 ,7.35, R455.39 
+The Grove,BEV,Wine,13562,simonsig rose 750ml,EACH,5.66, R782.27 ,0, R-   ,4.66, R644.06 ,1, R138.21 
+The Grove,BEV,Wine,13569,stellenrust chen blanc 750ml,EACH,3, R189.03 ,0, R-   ,3, R189.03 ,0, R-   
+The Grove,BEV,Wine,10173,two oceans cab merlot btl,BTL,3.66, R166.02 ,0, R-   ,2, R90.72 ,1.66, R75.30 
+The Grove,BEV,Wine,10174,two oceans sauv blanc btl,BTL,1.65, R74.84 ,44," R2,134.87 ",20.33, R992.51 ,25.32," R1,217.20 "
+The Grove,BEV,Wine,10175,v loveren river red btl,BTL,3.33, R147.52 ,0, R-   ,3.33, R147.52 ,0, R-   
+The Grove,BEV,Wine,13565,van loveren colombar 750ml,EACH,0, R-   ,6, R274.91 ,4.88, R223.60 ,1.12, R51.31 
+The Grove,BEV,Wine,13566,van lovern sav blnc 750ml,EACH,4, R234.84 ,6, R330.71 ,2, R110.24 ,8, R455.31 
+The Grove,BEV,Wine,13246,wolftrap red btl,BTL,1, R50.11 ,0, R-   ,1, R50.11 ,0, R-   
+The Grove,EXP,Administration Costs,11155,administration costs,EACH,0, R-   ,38," R3,485.00 ",0, R-   ,38," R3,485.00 "
+The Grove,EXP,Cashup Variance,9999999998,cashup variance,,0, R-   ,15,-R736.95 ,0, R-   ,15,-R736.95 
+The Grove,EXP,Cleaning & Laundry,11405,all purpose cleaner lt,LT,4, R256.12 ,0, R-   ,0, R-   ,4, R256.12 
+The Grove,EXP,Cleaning & Laundry,11066,auto rinse (25lt),LITRE,0, R-   ,25, R715.00 ,0, R-   ,25, R715.00 
+The Grove,EXP,Cleaning & Laundry,11065,auto wash ( 25lt),LITRE,0, R-   ,25, R685.00 ,0, R-   ,25, R685.00 
+The Grove,EXP,Cleaning & Laundry,13150,bacterex - 200 x15g sachet,EACH,0, R-   ,400, R399.55 ,0, R-   ,400, R399.55 
+The Grove,EXP,Cleaning & Laundry,13191,best - 25l,LITRE,0, R-   ,125," R2,946.95 ",0, R-   ,125," R2,946.95 "
+The Grove,EXP,Cleaning & Laundry,13170,blk abrasive scouring pads 10,EACH,0, R-   ,2, R115.41 ,0, R-   ,2, R115.41 
+The Grove,EXP,Cleaning & Laundry,11473,cleaning materials,EACH,0, R-   ,5, R317.89 ,0, R-   ,5, R317.89 
+The Grove,EXP,Cleaning & Laundry,10546,folded paper towels,EACH,0, R-   ,1, R279.95 ,0, R-   ,1, R279.95 
+The Grove,EXP,Cleaning & Laundry,11309,green dishwash lt,LT,0, R-   ,10, R104.17 ,0, R-   ,10, R104.17 
+The Grove,EXP,Cleaning & Laundry,13029,green pads,PACK,0, R-   ,2, R79.90 ,0, R-   ,2, R79.90 
+The Grove,EXP,Cleaning & Laundry,10535,haccp cloth red 50,PKT,0, R-   ,2, R159.90 ,0, R-   ,2, R159.90 
+The Grove,EXP,Cleaning & Laundry,13189,hygen f29 - 5l,LITRE,0, R-   ,20, R488.76 ,0, R-   ,20, R488.76 
+The Grove,EXP,Cleaning & Laundry,10534,mop caps 100,PKT,0, R-   ,1, R29.93 ,0, R-   ,1, R29.93 
+The Grove,EXP,Cleaning & Laundry,13194,ob50 p - 5l,EACH,0, R-   ,1, R143.77 ,0, R-   ,1, R143.77 
+The Grove,EXP,Cleaning & Laundry,13198,ovenklean plus- 5l,EACH,0, R-   ,2, R320.92 ,0, R-   ,2, R320.92 
+The Grove,EXP,Cleaning & Laundry,10544,paper towels (roll),EACH,0, R-   ,12," R1,398.12 ",0, R-   ,12," R1,398.12 "
+The Grove,EXP,Cleaning & Laundry,13514,refresher wipes,CS,0, R-   ,1, R402.30 ,0, R-   ,1, R402.30 
+The Grove,EXP,Cleaning & Laundry,10533,refuse bags pkt 200,PKT,0, R-   ,1, R214.99 ,0, R-   ,1, R214.99 
+The Grove,EXP,Cleaning & Laundry,13186,steriklens - 6x1lkk,EACH,0, R-   ,1, R686.80 ,0, R-   ,1, R686.80 
+The Grove,EXP,Cleaning & Laundry,10543,toilet paper 2 ply,PKT,0, R-   ,2, R589.90 ,0, R-   ,2, R589.90 
+The Grove,EXP,Cleaning & Laundry,13180,towel tidy fold 1 ply 20 x 100,EACH,0, R-   ,1, R497.34 ,0, R-   ,1, R497.34 
+The Grove,EXP,Cleaning & Laundry,11350,window cleaning,EACH,0, R-   ,1, R250.00 ,0, R-   ,1, R250.00 
+The Grove,EXP,Computer Repairs,11148,computer repairs,EACH,0, R-   ,1, R250.00 ,0, R-   ,1, R250.00 
+The Grove,EXP,Cutlery & Crockery,10707,beer glass,EACH,0, R-   ,24, R892.77 ,0, R-   ,24, R892.77 
+The Grove,EXP,Cutlery & Crockery,10647,bread basket 24cm,EACH,0, R-   ,20, R578.00 ,0, R-   ,20, R578.00 
+The Grove,EXP,Cutlery & Crockery,10713,caraffes 250ml,EACH,0, R-   ,48," R1,028.04 ",0, R-   ,48," R1,028.04 "
+The Grove,EXP,Cutlery & Crockery,10712,glass 140ml liquid dessert cas,EACH,0, R-   ,12, R338.66 ,0, R-   ,12, R338.66 
+The Grove,EXP,Cutlery & Crockery,13681,ob plate 21.5cm steel blue,Ea,0, R-   ,24," R2,496.00 ",0, R-   ,24," R2,496.00 "
+The Grove,EXP,Cutlery & Crockery,10637,sauce bowls 6.5cm,EACH,0, R-   ,36, R187.20 ,0, R-   ,36, R187.20 
+The Grove,EXP,Cutlery & Crockery,13719,vinisimo wine 43cl (2x12),Ea,0, R-   ,96," R1,760.01 ",0, R-   ,96," R1,760.01 "
+The Grove,EXP,Cutlery & Crockery,10711,wine glasses 300ml,EACH,0, R-   ,24, R458.93 ,0, R-   ,24, R458.93 
+The Grove,EXP,Deposit,11067,clean drum deposits ,EACH,0, R-   ,2, R140.00 ,0, R-   ,2, R140.00 
+The Grove,EXP,Discounts & Returns,11525,crate deposit,EACH,0, R-   ,2, R200.00 ,0, R-   ,2, R200.00 
+The Grove,EXP,Discounts & Returns,11527,discounts,EACH,0, R-   ,2,-R175.43 ,0, R-   ,2,-R175.43 
+The Grove,EXP,Discounts & Returns,11528,draught keg deposit,EACH,0, R-   ,-1,-R313.05 ,0, R-   ,-1,-R313.05 
+The Grove,EXP,Discounts & Returns,11529,suremix gas cylinder deposit,EACH,0, R-   ,3, R345.00 ,0, R-   ,3, R345.00 
+The Grove,EXP,Freight & Delivery,11141,delivery,EACH,0, R-   ,7, R341.83 ,0, R-   ,7, R341.83 
+The Grove,EXP,Occupational Cost,11517,refuse removal,EACH,0, R-   ,3," R1,291.92 ",0, R-   ,3," R1,291.92 "
+The Grove,EXP,Occupational Cost,11160,repairs & maintenance,EACH,0, R-   ,4," R4,231.30 ",0, R-   ,4," R4,231.30 "
+The Grove,EXP,Operational Cost,11475,cutlery & crockery,EACH,0, R-   ,5, R130.00 ,0, R-   ,5, R130.00 
+The Grove,EXP,Operational Cost,11349,laundry,EACH,0, R-   ,1," R1,500.00 ",0, R-   ,1," R1,500.00 "
+The Grove,EXP,Operational Cost,11199,pest contol,EACH,0, R-   ,1," R3,739.13 ",0, R-   ,1," R3,739.13 "
+The Grove,EXP,Operational Cost,11193,promotions,EACH,0, R-   ,24," R5,061.89 ",0, R-   ,24," R5,061.89 "
+The Grove,EXP,Operational Cost,11113,stationary,EACH,0, R-   ,7, R127.75 ,0, R-   ,7, R127.75 
+The Grove,EXP,Packaging & Consumab,10744,bags butcher 15 x 25,PACKET,0, R-   ,8, R151.60 ,0, R-   ,8, R151.60 
+The Grove,EXP,Packaging & Consumab,10762,fomo no. 41 sleeve x 75,EACH,0, R-   ,300, R287.55 ,0, R-   ,300, R287.55 
+The Grove,EXP,Packaging & Consumab,13738,ob table overlay 800x800,Cs,0, R-   ,3," R3,315.00 ",0, R-   ,3," R3,315.00 "
+The Grove,EXP,Packaging & Consumab,13522,ocean basket 500ml tubs & lids,EACH,0, R-   ,3," R1,128.73 ",0, R-   ,3," R1,128.73 "
+The Grove,EXP,Packaging & Consumab,13602,ocean basket earth straws cs,CS,0, R-   ,1, R320.00 ,0, R-   ,1, R320.00 
+The Grove,EXP,Packaging & Consumab,10767,platter  box one  (100),EACH,0, R-   ,300," R2,832.84 ",0, R-   ,300," R2,832.84 "
+The Grove,EXP,Packaging & Consumab,10768,platter box two  (100),EACH,0, R-   ,300," R3,273.36 ",0, R-   ,300," R3,273.36 "
+The Grove,EXP,Packaging & Consumab,10749,salad tub 500ml one piece x 25,EACH,0, R-   ,1, R66.87 ,0, R-   ,1, R66.87 
+The Grove,EXP,Packaging & Consumab,10770,serviettes ob logo case,CASE,0, R-   ,4, R900.00 ,0, R-   ,4, R900.00 
+The Grove,EXP,Packaging & Consumab,10766,take away box (100),EACH,0, R-   ,600," R3,479.95 ",0, R-   ,600," R3,479.95 "
+The Grove,EXP,Packaging & Consumab,13250,taw coffee cup,EACH,0, R-   ,500, R899.91 ,0, R-   ,500, R899.91 
+The Grove,EXP,Packaging & Consumab,13251,taw coffee lids,EACH,0, R-   ,500, R295.00 ,0, R-   ,500, R295.00 
+The Grove,EXP,Packaging & Consumab,10750,tub & lid 35ml (250's),CASE,0, R-   ,7," R1,082.50 ",0, R-   ,7," R1,082.50 "
+The Grove,EXP,Staff Cost,11501,staff first aid,EACH,0, R-   ,2," R1,004.08 ",0, R-   ,2," R1,004.08 "
+The Grove,EXP,Staff Cost,11505,training,EACH,0, R-   ,4," R2,774.00 ",0, R-   ,4," R2,774.00 "
+The Grove,EXP,Staff Cost,11424,uniforms,EACH,0, R-   ,1, R382.60 ,0, R-   ,1, R382.60 
+The Grove,EXP,Staff Meal Staff,11176,staff meal,EACH,0, R-   ,10, R634.67 ,0, R-   ,10, R634.67 
+The Grove,EXP,Staff Meals Managers,11174,staff meals managers,EACH,0, R-   ,6, R956.33 ,0, R-   ,6, R956.33 
+The Grove,EXP,Staff Transport,11173,staff transport,EACH,0, R-   ,89," R2,670.00 ",0, R-   ,89," R2,670.00 "
+The Grove,EXP,Stationary,11125,thermal till rolls,EACH,0, R-   ,51, R929.90 ,0, R-   ,51, R929.90 
+The Grove,EXP,"Wages UIF,RSC,ETC",11108,i.o.u,MONTH,0, R-   ,20," R19,024.00 ",0, R-   ,20," R19,024.00 "
+The Grove,EXP,Water,11327,soda water 1lt,EACH,0, R-   ,35, R444.68 ,2, R27.46 ,33, R417.22 
+The Grove,EXP,Water,10127,water sparkling large,EACH,22, R234.74 ,96," R1,024.00 ",65, R693.55 ,53, R565.19 
+The Grove,FOOD,Calamari,10196,boston squid bulk kg,KG,332.34," R24,413.70 ",432.16," R31,746.00 ",266," R19,540.36 ",498.5," R36,619.34 "
+The Grove,FOOD,Calamari,10202,calamari heads prt 55g,EACH,59, R405.33 ,0, R-   ,114, R793.44 ,-55,-R388.11 
+The Grove,FOOD,Calamari,13603,calamari strip 0%glaze 50x110g,EACH,328," R3,913.04 ",350," R4,177.23 ",231," R2,755.83 ",447," R5,334.44 "
+The Grove,FOOD,Calamari,13549,calamari strips  50x100 prt ea,EACH,0, R-   ,0, R-   ,0, R-   ,0, R-   
+The Grove,FOOD,Calamari,10201,calamari tubes prt 110g,EACH,107," R1,363.18 ",0, R-   ,200," R2,792.00 ",-93,"-R1,428.82 "
+The Grove,FOOD,Condiments,13417,almonds flakes liberty select ,KG,1.44, R316.80 ,1, R220.00 ,0.95, R209.00 ,1.49, R327.80 
+The Grove,FOOD,Condiments,10621,canderel sticks regular each,EACH,1040, R260.00 ,0, R-   ,1100, R275.00 ,-60,-R15.00 
+The Grove,FOOD,Condiments,13625,cape malay curry spice,Kg,0.42, R123.06 ,0.65, R26.08 ,0.45, R131.85 ,0.62, R17.29 
+The Grove,FOOD,Condiments,13540,capers in brine with added vin,KG,2, R118.00 ,0, R-   ,2, R118.00 ,0, R-   
+The Grove,FOOD,Condiments,10625,chopsticks disposable each,EACH,380, R163.40 ,760, R449.16 ,520, R223.60 ,620, R388.96 
+The Grove,FOOD,Condiments,10599,dill cucumber whole 2.5kg,EACH,5, R400.00 ,0, R-   ,3, R240.00 ,2, R160.00 
+The Grove,FOOD,Condiments,13731,dried peaches,Kg,0.44, R46.60 ,0.01, R26.08 ,0.22, R23.30 ,0.23, R49.38 
+The Grove,FOOD,Condiments,10612,garlic crushed prt kg,KG,10, R293.90 ,0, R-   ,12, R352.68 ,-2,-R58.78 
+The Grove,FOOD,Condiments,13061,garlic granules 1.1kg,EACH,3, R336.36 ,12," R1,480.00 ",9," R1,109.97 ",6, R706.39 
+The Grove,FOOD,Condiments,13435,herby lemon sauce 6x250ml,EACH,2, R54.00 ,0, R-   ,2, R54.00 ,0, R-   
+The Grove,FOOD,Condiments,10600,lemon juice 100% (2x5lt),LITRE,38.1," R1,043.56 ",12, R400.77 ,13, R224.90 ,37.1," R1,219.43 "
+The Grove,FOOD,Condiments,10602,mayonaise kg,KG,100," R2,900.00 ",0, R-   ,60," R1,740.00 ",40," R1,160.00 "
+The Grove,FOOD,Condiments,10618,mediterranean salsa prt kg,KG,6," R1,440.00 ",0, R-   ,5," R1,200.00 ",1, R240.00 
+The Grove,FOOD,Condiments,10597,mediterranean sauce  6x1l,LITRE,8.36, R372.44 ,0, R-   ,5, R222.75 ,3.36, R149.69 
+The Grove,FOOD,Condiments,13716,ob aoili & apricot curry (1l) ,Ltr,1, R91.66 ,0, R-   ,1, R91.66 ,0, R-   
+The Grove,FOOD,Condiments,13646,ob cape malay creamy compnd,Kg,2.94, R583.62 ,0, R-   ,2.94, R583.62 ,0, R-   
+The Grove,FOOD,Condiments,13437,ob paprika onion crumb 4x750g,KG,20.63," R2,063.00 ",0, R-   ,6.54, R654.00 ,14.09," R1,409.00 "
+The Grove,FOOD,Condiments,13684,orange vinaigrette 5l inner,Ltr,3.5, R178.50 ,0, R-   ,2.15, R109.65 ,1.35, R68.85 
+The Grove,FOOD,Condiments,10613,peri peri sauce ob 125ml,BTL,12, R136.56 ,0, R-   ,7, R79.66 ,5, R56.90 
+The Grove,FOOD,Condiments,13427,ponzu sauce 6x 250ml,EACH,4, R144.16 ,6, R216.26 ,8.1, R291.92 ,1.9, R68.50 
+The Grove,FOOD,Condiments,13705,royal kalahari salt&pepp 400g,Kg,0.33, R11.47 ,0, R-   ,0.13, R4.52 ,0.2, R6.95 
+The Grove,FOOD,Condiments,13542,spicy summer sauce (6x1kg) ob,LITRE,6.16, R770.00 ,0, R-   ,4, R500.00 ,2.16, R270.00 
+The Grove,FOOD,Condiments,13701,staffords stuffed green olives,Kg,3.04, R529.02 ,4.08, R710.00 ,4.42, R769.17 ,2.7, R469.85 
+The Grove,FOOD,Condiments,13436,sweet chili mayo 6x250ml,EACH,12.4, R290.41 ,12, R281.03 ,10, R234.20 ,14.4, R337.24 
+The Grove,FOOD,Condiments,10604,sweet chilli sauce 375ml,BTL,0, R-   ,0, R-   ,3, R65.55 ,-3,-R65.55 
+The Grove,FOOD,Condiments,13430,sweet soy 6x250ml,EACH,5.92, R242.25 ,0, R-   ,4, R163.68 ,1.92, R78.57 
+The Grove,FOOD,Condiments,10622,sweets ob  per case,CASE,0, R-   ,4," R1,182.44 ",3.35, R990.29 ,0.65, R192.15 
+The Grove,FOOD,Condiments,10605,tabasco green 60ml,BTL,0, R-   ,1, R39.95 ,2, R79.90 ,-1,-R39.95 
+The Grove,FOOD,Condiments,10606,tabasco red 60ml,BTL,0, R-   ,1, R39.95 ,1, R39.95 ,0, R-   
+The Grove,FOOD,Condiments,10850,tomato sauce 1lt,LITRE,10, R604.50 ,6.3, R380.84 ,7.7, R465.47 ,8.6, R519.87 
+The Grove,FOOD,Condiments,10607,vinegar balsamic 1lt,LITRE,7.08, R520.59 ,0, R-   ,6, R441.18 ,1.08, R79.41 
+The Grove,FOOD,Condiments,13433,vinegar sachets 400x5ml,CASE,0, R-   ,0, R-   ,0.35, R15.58 ,-0.35,-R15.58 
+The Grove,FOOD,Condiments,10946,vinegar white prt 1lt,LITRE,12.02, R72.00 ,0, R-   ,7.1, R42.53 ,4.92, R29.47 
+The Grove,FOOD,Condiments,13432,zesty mayo 6x250ml,EACH,11.88, R314.11 ,6, R158.64 ,12, R317.28 ,5.88, R155.47 
+The Grove,FOOD,Dairy,10210,butter mini prt kg,KG,21.63," R4,323.84 ",17.5," R3,498.24 ",14," R2,798.60 ",25.13," R5,023.48 "
+The Grove,FOOD,Dairy,10214,cream prt 1lt,LITRE,44," R2,591.16 ",48," R2,826.85 ",41," R2,414.49 ",51," R3,003.52 "
+The Grove,FOOD,Dairy,10216,halloumi cheese prt kg,KG,1.2, R167.33 ,30.8," R4,156.00 ",18.7," R2,607.53 ",13.3," R1,715.80 "
+The Grove,FOOD,Dairy,13541,herb butter 10 x (10 x 25g),KG,1.05, R253.84 ,0, R-   ,0.34, R82.20 ,0.71, R171.64 
+The Grove,FOOD,Dairy,13441,kiri cream cheese 10x12x18g,EACH,105, R266.70 ,0, R-   ,25.7, R65.28 ,79.3, R201.42 
+The Grove,FOOD,Dairy,10213,margarine romi prt 500g,EACH,116," R1,372.28 ",270," R3,195.00 ",176," R2,082.08 ",210," R2,485.20 "
+The Grove,FOOD,Dairy,10219,milk fresh prt 1lt,LITRE,22, R353.98 ,167," R2,229.95 ",38, R600.78 ,151," R1,983.15 "
+The Grove,FOOD,Dairy,10220,yogurt prt 1lt,LITRE,0, R-   ,1, R46.08 ,0, R-   ,1, R46.08 
+The Grove,FOOD,Desserts,13495,apple crumble tart (30x121g),EACH,11, R132.00 ,0, R-   ,11, R132.00 ,0, R-   
+The Grove,FOOD,Desserts,13699,biscuit tots 2 x 1kg ,Kg,2, R450.00 ,0, R-   ,2, R450.00 ,0, R-   
+The Grove,FOOD,Desserts,13631,cape malva pudding (24x122g),Each,33, R479.16 ,0, R-   ,23, R333.96 ,10, R145.20 
+The Grove,FOOD,Desserts,10241,chocolate lava cake prt each,EACH,24, R540.48 ,22, R495.50 ,21, R472.92 ,25, R563.06 
+The Grove,FOOD,Desserts,13275,dulce de leche portion 1l,LITRE,0.82, R155.80 ,0, R-   ,0.5, R95.00 ,0.32, R60.80 
+The Grove,FOOD,Desserts,10226,greek baklava prt each,EACH,38, R249.28 ,48, R630.00 ,78, R511.68 ,8, R367.60 
+The Grove,FOOD,Desserts,10228,ice cream prt 1lt,LITRE,110," R1,566.40 ",110," R1,712.96 ",90," R1,281.60 ",130," R1,997.76 "
+The Grove,FOOD,Desserts,13698,maringues mni roste multi colr,Kg,0.45, R400.50 ,0, R-   ,0.45, R400.50 ,0, R-   
+The Grove,FOOD,Desserts,13718,ob koeksister bites (1 x 500g),Kg,2, R86.00 ,0.5, R43.00 ,1.45, R62.35 ,1.05, R66.65 
+The Grove,FOOD,Desserts,13735,slo jo dekadent freezo powder,kg,1.76, R246.40 ,0, R-   ,3, R420.00 ,-1.24,-R173.60 
+The Grove,FOOD,Desserts,13736,slo jo white chocolate powder,kg,1.88, R376.00 ,0, R-   ,0.63, R126.00 ,1.25, R250.00 
+The Grove,FOOD,Desserts,13450,slo-jo chocolate fudge sauc1lt,LITRE,1.04, R181.44 ,1, R174.46 ,2, R348.92 ,0.04, R6.98 
+The Grove,FOOD,Desserts,13696,staffords lemon curd 500g,Kg,1, R100.00 ,0, R-   ,0.88, R88.00 ,0.12, R12.00 
+The Grove,FOOD,Dry Goods,10370,cajun spice ob prt kg,KG,2.38, R259.42 ,0, R-   ,2.15, R234.35 ,0.23, R25.07 
+The Grove,FOOD,Dry Goods,10374,dry mix ob prt 1.65kg,EACH,38," R1,748.00 ",40," R1,840.00 ",29," R1,334.00 ",49," R2,254.00 "
+The Grove,FOOD,Dry Goods,10372,fish spice ob kg,KG,8.36, R610.28 ,10, R730.00 ,12.96, R946.08 ,5.4, R394.20 
+The Grove,FOOD,Dry Goods,10377,flour cake kg,KG,0.04, R0.60 ,20, R319.97 ,0.04, R0.64 ,20, R319.93 
+The Grove,FOOD,Dry Goods,11105,honey 500ml,BTL,2.34, R98.16 ,4, R167.80 ,3, R125.85 ,3.34, R140.11 
+The Grove,FOOD,Dry Goods,13348,ob batter mix 12x0.666kg,EACH,36, R885.60 ,48," R1,020.00 ",37, R786.25 ,47," R1,119.35 "
+The Grove,FOOD,Dry Goods,13523,ob chip spice (4x1kg),KG,4.78, R210.32 ,0, R-   ,1.48, R260.48 ,3.3,-R50.16 
+The Grove,FOOD,Dry Goods,13052,paprika dusting,KG,1, R46.60 ,0, R-   ,0, R-   ,1, R46.60 
+The Grove,FOOD,Dry Goods,10365,pepper corn black kg,KG,4.5," R1,053.00 ",0, R-   ,3.5, R819.00 ,1, R234.00 
+The Grove,FOOD,Dry Goods,10366,salt coarse kg,KG,6, R33.90 ,0, R-   ,5.4, R30.51 ,0.6, R3.39 
+The Grove,FOOD,Dry Goods,10369,salt fine kg,KG,0.02, R0.14 ,0, R-   ,0, R-   ,0.02, R0.14 
+The Grove,FOOD,Dry Goods,10373,spicemate ob prt kg,KG,6.88, R502.24 ,10, R730.00 ,9.8, R715.40 ,7.08, R516.84 
+The Grove,FOOD,Dry Goods,10951,sugar white portion kg,KG,0, R-   ,5, R116.51 ,0, R-   ,5, R116.51 
+The Grove,FOOD,Fish,13308,frozen seabream (1x10kg),KG,0, R-   ,0, R-   ,0, R-   ,0, R-   
+The Grove,FOOD,Fish,10449,ob select 100g prt,EACH,6, R56.40 ,0, R-   ,56, R588.00 ,-50,-R531.60 
+The Grove,FOOD,Fish,13500,ob select 200g prt,EACH,76," R1,428.80 ",0, R-   ,75," R1,410.00 ",1, R18.80 
+The Grove,FOOD,Fish,10379,ob select bulk kg,KG,130," R12,285.00 ",100," R10,500.00 ",200," R21,000.00 ",30," R1,785.00 "
+The Grove,FOOD,Fish,13758,west coast soles (350-400g)5kg,Kg,0, R-   ,10," R1,700.00 ",0, R-   ,10," R1,700.00 "
+The Grove,FOOD,Hake,10256,hake 100g prt,EACH,66, R720.06 ,0, R-   ,3, R25.92 ,63, R694.14 
+The Grove,FOOD,Hake,10257,hake 200g prt,EACH,144," R2,455.20 ",0, R-   ,82," R1,771.20 ",62, R684.00 
+The Grove,FOOD,Hake,13411,hake baby whole each,EACH,10, R60.40 ,0, R-   ,10, R60.40 ,0, R-   
+The Grove,FOOD,Hake,10248,hake fillets 2/4,KG,70," R8,732.50 ",80," R8,400.00 ",0, R-   ,150," R17,132.50 "
+The Grove,FOOD,Hake,11442,hake fillets 3/4 (1x5kg),KG,80," R8,640.00 ",300," R32,400.00 ",110," R11,880.00 ",270," R29,160.00 "
+The Grove,FOOD,Hake,13640,hake postada 300g prt,Each,12, R177.96 ,0, R-   ,12, R177.96 ,0, R-   
+The Grove,FOOD,Kingklip,10278,kingklip 200g prt,EACH,1, R46.32 ,0, R-   ,4, R221.92 ,-3,-R175.60 
+The Grove,FOOD,Kingklip,11211,kingklip 300g prt,EACH,2, R138.94 ,0, R-   ,0, R-   ,2, R138.94 
+The Grove,FOOD,Kingklip,10271,kingklip fillets 1x10kg,KG,14," R3,080.00 ",30," R6,600.00 ",15.95," R3,509.00 ",28.05," R6,171.00 "
+The Grove,FOOD,Mussels,10282,mussel half shell bulk kg,KG,55," R5,445.00 ",72," R7,920.00 ",38.35," R4,218.50 ",88.65," R9,146.50 "
+The Grove,FOOD,Mussels,10287,mussel half shell prt each,EACH,22, R43.56 ,0, R-   ,45, R99.00 ,-23,-R55.44 
+The Grove,FOOD,Oil,13405,kemfry (31x200gr sachets),EACH,60," R3,039.00 ",0, R-   ,48," R2,431.20 ",12, R607.80 
+The Grove,FOOD,Oil,10730,oil ob palm prt 1lt,LITRE,135," R4,320.00 ",240," R6,720.00 ",105," R2,940.00 ",270," R8,100.00 "
+The Grove,FOOD,Oil,10731,olive oil  extra virgin 1lt,LITRE,4, R360.00 ,5, R450.00 ,7.2, R648.00 ,1.8, R162.00 
+The Grove,FOOD,Oil,13695,willow crk lemn flav olive oil,Ltr,4.4," R1,126.40 ",0, R-   ,2.1, R537.60 ,2.3, R588.80 
+The Grove,FOOD,Oysters,10842,oyster prt each,EACH,110," R1,199.00 ",180," R2,180.00 ",105," R1,144.50 ",185," R2,234.50 "
+The Grove,FOOD,Prawns,10454,prawn king argentina shrimps l,KG,8," R1,940.00 ",10," R1,900.00 ",8," R2,640.00 ",10," R1,200.00 "
+The Grove,FOOD,Prawns,10478,prawn prince each,EACH,58, R167.04 ,0, R-   ,490," R1,430.80 ",-432,"-R1,263.76 "
+The Grove,FOOD,Prawns,10463,prawn prince vannamei ob,KG,162," R22,680.00 ",288," R40,320.00 ",152," R21,280.00 ",298," R41,720.00 "
+The Grove,FOOD,Prawns,10473,prawn queen 21/25 20% ,KG,1.6, R330.00 ,12," R1,980.00 ",6," R1,237.50 ",7.6," R1,072.50 "
+The Grove,FOOD,Prawns,10479,prawn queen each,EACH,26, R178.88 ,0, R-   ,29, R260.13 ,-3,-R81.25 
+The Grove,FOOD,Prawns,10967,prawn sushi each,EACH,401," R1,170.92 ",0, R-   ,382," R1,115.44 ",19, R55.48 
+The Grove,FOOD,Recipe,13708,rcp avo crema,Kg,1.2, R67.78 ,0, R-   ,0.82, R38.91 ,0.38, R28.87 
+The Grove,FOOD,Recipe,10528,rcp bread rolls ob each cooked,EACH,140, R82.60 ,0, R-   ,120, R70.80 ,20, R11.80 
+The Grove,FOOD,Recipe,13709,rcp brined zucchini,Kg,1.86, R70.07 ,0, R-   ,1.4, R52.74 ,0.46, R17.33 
+The Grove,FOOD,Recipe,10620,rcp chilli sauce prt 1lt,LITRE,3.9, R110.64 ,0, R-   ,8.5, R403.33 ,-4.6,-R292.69 
+The Grove,FOOD,Recipe,10486,rcp chunky med salsa prt kg,KG,0.85, R11.60 ,0, R-   ,0.17, R2.32 ,0.68, R9.28 
+The Grove,FOOD,Recipe,13715,rcp coronation sauce halaal,Kg,0, R-   ,0, R-   ,1, R43.98 ,-1,-R43.98 
+The Grove,FOOD,Recipe,13712,rcp couscous lemon & herb base,Kg,4.86, R189.15 ,0, R-   ,2.24, R87.18 ,2.62, R101.97 
+The Grove,FOOD,Recipe,11418,rcp creamy garlic sauce 1lt,LT,2.9, R80.74 ,0, R-   ,0.55, R15.03 ,2.35, R65.71 
+The Grove,FOOD,Recipe,10487,rcp creamy lemon sauce prt 1lt,LITRE,3, R80.85 ,0, R-   ,2.85, R81.11 ,0.15,-R0.26 
+The Grove,FOOD,Recipe,13284,rcp crunchy onion crumbs,KG,1.39, R89.36 ,0.5, R264.75 ,1.3, R79.42 ,0.59, R274.69 
+The Grove,FOOD,Recipe,13062,rcp garlic rehydrate prt kg,KG,4, R95.12 ,0, R-   ,0, R-   ,4, R95.12 
+The Grove,FOOD,Recipe,10483,rcp garlic sauce prt 1ltr,LITRE,2.2, R60.98 ,0, R-   ,1.4, R38.81 ,0.8, R22.17 
+The Grove,FOOD,Recipe,13281,rcp grilled veg kg,KG,6.1, R166.59 ,0, R-   ,0.97, R30.09 ,5.13, R136.50 
+The Grove,FOOD,Recipe,10485,rcp herb mayo prt kg,KG,0.38, R28.92 ,0, R-   ,0, R-   ,0.38, R28.92 
+The Grove,FOOD,Recipe,11419,rcp ob mix portion 1lt,LT,5, R151.75 ,0, R-   ,0, R-   ,5, R151.75 
+The Grove,FOOD,Recipe,13669,rcp pickled cucumber,KG,2.3, R107.11 ,0, R-   ,3.1, R144.37 ,-0.8,-R37.26 
+The Grove,FOOD,Recipe,10490,rcp pickled red onions prt kg ,KG,3.09, R47.56 ,0, R-   ,1.1, R16.93 ,1.99, R30.63 
+The Grove,FOOD,Recipe,10491,rcp ponzu sauce sushi prt 1lt,LITRE,0.75, R38.48 ,0, R-   ,0.3, R15.39 ,0.45, R23.09 
+The Grove,FOOD,Recipe,13737,rcp prawn pre-spice mix prep,kg,2.2, R10.67 ,0, R-   ,0, R-   ,2.2, R10.67 
+The Grove,FOOD,Recipe,10493,rcp rice sushi cooked prt kg ,KG,3.14, R69.02 ,0, R-   ,13.2, R279.58 ,-10.06,-R210.56 
+The Grove,FOOD,Recipe,10494,rcp salad dressing prt 1ltr ,LITRE,9.39, R703.40 ,0, R-   ,3.13, R234.47 ,6.26, R468.93 
+The Grove,FOOD,Recipe,10495,rcp salad mix prt kg ,KG,3.14, R75.99 ,0, R-   ,0, R-   ,3.14, R75.99 
+The Grove,FOOD,Recipe,11116,rcp sweet chill mayo prt 1ltr,LITRE,1, R71.15 ,0, R-   ,0.25, R17.79 ,0.75, R53.36 
+The Grove,FOOD,Recipe,11087,rcp sweet soy prt 1lt,LT,0.75, R47.60 ,0, R-   ,0.22, R13.96 ,0.53, R33.64 
+The Grove,FOOD,Recipe,10496,rcp tartare sauce prt 1ltr ,LITRE,13.6, R385.70 ,0, R-   ,9.2, R260.64 ,4.4, R125.06 
+The Grove,FOOD,Recipe,13710,rcp vegetable ribbons,Kg,1.65, R38.51 ,0, R-   ,1.45, R33.84 ,0.2, R4.67 
+The Grove,FOOD,Recipe,10502,rcp wasabi mix sushi prt kg ,KG,0.47, R39.01 ,0, R-   ,0.61, R50.63 ,-0.14,-R11.62 
+The Grove,FOOD,Recipe,10504,rcp zesty mayo sauce prt 1l,LITRE,0.05, R1.38 ,0, R-   ,0.2, R5.51 ,-0.15,-R4.13 
+The Grove,FOOD,Salad,13226,falafel prt each,EACH,68, R152.32 ,0, R-   ,33, R73.92 ,35, R78.40 
+The Grove,FOOD,Salad,13129,falalfel balls,PACKET,1, R134.19 ,0, R-   ,1, R134.19 ,0, R-   
+The Grove,FOOD,Salad,10512,feta cheese prt kg,KG,22.64," R1,882.06 ",16," R1,330.00 ",19.7," R1,637.66 ",18.94," R1,574.40 "
+The Grove,FOOD,Salad,10507,oil ob salad  prt 1lt,LITRE,10, R375.50 ,45," R1,204.95 ",20, R751.00 ,35, R829.45 
+The Grove,FOOD,Salad,10511,olives ob prt kg,KG,8.36, R721.05 ,8, R690.00 ,8.1, R698.63 ,8.26, R712.42 
+The Grove,FOOD,Salad,10615,tarama kg,KG,3, R288.00 ,1, R96.00 ,3, R288.00 ,1, R96.00 
+The Grove,FOOD,Salad,10616,tzatziki kg,KG,5, R480.00 ,4, R384.00 ,4.5, R432.00 ,4.5, R432.00 
+The Grove,FOOD,Sole,11411,sole 550+ -portion kg,EACH,0, R-   ,0, R-   ,14, R915.32 ,-14,-R915.32 
+The Grove,FOOD,Starch,11115,bread mix prt 1.35kg,EACH,44," R1,870.00 ",78," R3,740.00 ",50," R2,125.00 ",72," R3,485.00 "
+The Grove,FOOD,Starch,10481,chip kg,KG,280," R10,080.00 ",510," R19,440.00 ",240," R8,640.00 ",550," R20,880.00 "
+The Grove,FOOD,Starch,13690,couscous martino  1kg  inner,Kg,1, R51.00 ,4, R204.00 ,2.45, R124.95 ,2.55, R130.05 
+The Grove,FOOD,Starch,13739,"ob  25 x 4,5"" broiche bun",ea,26, R232.96 ,60, R448.00 ,46, R257.60 ,40, R423.36 
+The Grove,FOOD,Starch,13424,quinoa 50x100g,PACKET,23," R7,820.00 ",0, R-   ,23," R7,820.00 ",0, R-   
+The Grove,FOOD,Starch,10526,rcp rice cooked prt kg,KG,6, R64.20 ,0, R-   ,1.98, R22.73 ,4.02, R41.47 
+The Grove,FOOD,Starch,13426,rice noodles 2kg inner,KG,1.1, R53.32 ,0, R-   ,1, R48.47 ,0.1, R4.85 
+The Grove,FOOD,Starch,11403,rice ob uncooked prt kg,KG,52.5," R1,494.15 ",0, R-   ,50," R1,423.00 ",2.5, R71.15 
+The Grove,FOOD,Starch,10518,rice uncooked kg,KG,0, R-   ,90," R2,561.79 ",0, R-   ,90," R2,561.79 "
+The Grove,FOOD,Starch,13019,wrap tortilla portion each,EACH,90, R530.10 ,0, R-   ,90, R530.10 ,0, R-   
+The Grove,FOOD,Sushi,10848,caviar prt kg,KG,1.02, R576.30 ,0, R-   ,0.88, R497.20 ,0.14, R79.10 
+The Grove,FOOD,Sushi,10327,ginger pickled prt kg,KG,8, R284.08 ,30," R1,065.26 ",25.5, R905.51 ,12.5, R443.83 
+The Grove,FOOD,Sushi,13574,kikomn tamari glt fr soy 6x150,EACH,4, R272.00 ,0, R-   ,4, R272.00 ,0, R-   
+The Grove,FOOD,Sushi,10326,mayo japanese 450g,BTL,2, R180.00 ,2, R180.00 ,3, R270.00 ,1, R90.00 
+The Grove,FOOD,Sushi,10336,rice sushi uncooked kg,KG,31," R1,064.54 ",30," R1,030.27 ",30," R1,030.20 ",31," R1,064.61 "
+The Grove,FOOD,Sushi,10316,salmon norwegian blk,KG,0, R-   ,40.8," R9,073.00 ",0, R-   ,40.8," R9,073.00 "
+The Grove,FOOD,Sushi,11092,salmon prt kg,KG,11.32," R3,511.80 ",0, R-   ,12.54," R3,572.40 ",-1.22,-R60.60 
+The Grove,FOOD,Sushi,10329,seaweed roasted each,EACH,440," R1,056.00 ",0, R-   ,80, R192.00 ,360, R864.00 
+The Grove,FOOD,Sushi,10322,sesame prt kg,KG,0.69, R91.18 ,0, R-   ,0.55, R72.68 ,0.14, R18.50 
+The Grove,FOOD,Sushi,11319,soy sauce green 150ml,EACH,5, R340.00 ,0, R-   ,4, R272.00 ,1, R68.00 
+The Grove,FOOD,Sushi,10330,soy sauce green prt 1lt,LITRE,25," R1,774.75 ",0, R-   ,21," R1,490.79 ",4, R283.96 
+The Grove,FOOD,Sushi,11320,soy sauce red 150ml,EACH,6, R276.00 ,0, R-   ,3, R138.00 ,3, R138.00 
+The Grove,FOOD,Sushi,10331,soy sauce red prt 1lt,LITRE,22.1," R1,158.92 ",0, R-   ,15, R786.60 ,7.1, R372.32 
+The Grove,FOOD,Sushi,10337,vinegar rice 1lt,LITRE,9, R414.00 ,20, R920.00 ,8.5, R391.00 ,20.5, R943.00 
+The Grove,FOOD,Sushi,10332,wasabi powder prt kg,EACH,0.85, R131.75 ,2, R310.00 ,1.25, R193.75 ,1.6, R248.00 
+The Grove,FOOD,Vegetables,10345,avocado prt kg,KG,25.62," R2,014.50 ",35.7," R2,449.10 ",17.6," R1,105.10 ",43.72," R3,358.50 "
+The Grove,FOOD,Vegetables,10936,baby marrow prt kg,KG,8.35, R277.55 ,9.65, R527.55 ,0, R-   ,18, R805.10 
+The Grove,FOOD,Vegetables,10362,butternut kg bulk,KG,2.4, R45.36 ,5, R94.50 ,0, R-   ,7.4, R139.86 
+The Grove,FOOD,Vegetables,10221,butternut prt kg,KG,0, R-   ,5, R94.50 ,0, R-   ,5, R94.50 
+The Grove,FOOD,Vegetables,10347,carrots kg,KG,8.2, R92.66 ,5, R64.90 ,5.1, R66.20 ,8.1, R91.36 
+The Grove,FOOD,Vegetables,10348,chillies veg kg,KG,10.9, R466.63 ,25.9," R1,028.90 ",0, R-   ,36.8," R1,495.53 "
+The Grove,FOOD,Vegetables,13713,chives veg prt kg,Kg,0.02, R1.40 ,0.44, R43.97 ,0.04, R27.98 ,0.42, R17.39 
+The Grove,FOOD,Vegetables,10349,cucumber prt kg,KG,40.59," R1,469.36 ",59.2," R2,079.20 ",11.15, R403.63 ,88.64," R3,144.93 "
+The Grove,FOOD,Vegetables,13714,dill veg prt kg,Kg,0.02, R9.99 ,0, R-   ,0.01, R5.00 ,0.01, R4.99 
+The Grove,FOOD,Vegetables,10350,green pepper kg,KG,5.75, R149.39 ,15.7, R499.70 ,1.6, R62.50 ,19.85, R586.59 
+The Grove,FOOD,Vegetables,10351,lemons veg prt kg,KG,60, R600.00 ,140," R1,340.00 ",68, R612.00 ,132," R1,328.00 "
+The Grove,FOOD,Vegetables,11085,lettuce rocket prt kg,KG,0.15, R46.86 ,0, R-   ,0.05, R15.62 ,0.1, R31.24 
+The Grove,FOOD,Vegetables,13706,mccain sweet potato fries,Kg,0.99, R54.40 ,2, R68.69 ,0, R-   ,2.99, R123.09 
+The Grove,FOOD,Vegetables,10342,med veg kg,KG,0, R-   ,0, R-   ,0.7, R23.19 ,-0.7,-R23.19 
+The Grove,FOOD,Vegetables,10352,mint sprigs veg kg,KG,0.02, R6.25 ,1.08, R118.92 ,0.02, R12.99 ,1.08, R112.18 
+The Grove,FOOD,Vegetables,10353,onions prt kg,KG,16, R110.72 ,0, R-   ,2.15, R14.88 ,13.85, R95.84 
+The Grove,FOOD,Vegetables,10354,onions red portion kg,KG,1.55, R14.85 ,3, R86.70 ,3.16, R91.32 ,1.39, R10.23 
+The Grove,FOOD,Vegetables,10355,origanum prt kg,KG,1.09, R93.20 ,0, R-   ,1.54, R131.67 ,-0.45,-R38.47 
+The Grove,FOOD,Vegetables,10356,parsley veg prt kg,KG,0.02, R0.93 ,0.42, R25.98 ,0.18, R116.91 ,0.26,-R90.00 
+The Grove,FOOD,Vegetables,11386,red pepper kg,KG,7.09, R273.53 ,0, R-   ,0.08, R3.09 ,7.01, R270.44 
+The Grove,FOOD,Vegetables,10357,spring onions prt kg,KG,0.25, R2.15 ,0, R-   ,0.12, R1.03 ,0.13, R1.12 
+The Grove,FOOD,Vegetables,13665,tomatoes cherry  kg,Kg,1.55, R84.86 ,2.3, R109.50 ,1.6, R76.18 ,2.25, R118.18 
+The Grove,FOOD,Vegetables,10359,tomatoes prt kg,KG,39.85, R691.80 ,8.5, R319.80 ,22.9, R861.50 ,25.45, R150.10 

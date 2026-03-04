@@ -1,0 +1,124 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Firebase Path Test</title>
+    <script type="module">
+        import { auth, rtdb, ref, get, set, remove } from '../js/config/firebase-config.js';
+        
+        async function testFirebasePaths() {
+            const output = document.getElementById('output');
+            
+            try {
+                // Wait for auth
+                await new Promise((resolve) => {
+                    auth.onAuthStateChanged((user) => {
+                        if (user) resolve(user);
+                    });
+                });
+                
+                const user = auth.currentUser;
+                if (!user) {
+                    output.innerHTML = '<p style="color: red;">No user authenticated</p>';
+                    return;
+                }
+                
+                output.innerHTML += `<h2>Testing Different Firebase Paths</h2>`;
+                output.innerHTML += `<p>User: ${user.email} (${user.uid})</p>`;
+                
+                const timestamp = new Date().toISOString().replace(/[-:T.]/g, '').slice(0, 14);
+                const locationId = '-OS-LnAWQUNA_zeR-UJG'; // Valid location
+                
+                // Test different path structures
+                const testPaths = [
+                    {
+                        name: 'User-specific stockUsage path',
+                        path: `stockUsage/${user.uid}/TEST_${timestamp}`,
+                        data: {
+                            timestamp: Date.now(),
+                            selectedLocationId: locationId,
+                            test: true
+                        }
+                    },
+                    {
+                        name: 'Location-specific stockUsage path',
+                        path: `stockUsage/${locationId}/TEST_${timestamp}`,
+                        data: {
+                            userId: user.uid,
+                            timestamp: Date.now(),
+                            test: true
+                        }
+                    },
+                    {
+                        name: 'User locations sub-path',
+                        path: `userLocations/${user.uid}/${locationId}/stockUsage/TEST_${timestamp}`,
+                        data: {
+                            timestamp: Date.now(),
+                            test: true
+                        }
+                    },
+                    {
+                        name: 'Locations sub-path',
+                        path: `locations/${locationId}/stockUsage/TEST_${timestamp}`,
+                        data: {
+                            userId: user.uid,
+                            timestamp: Date.now(),
+                            test: true
+                        }
+                    }
+                ];
+                
+                for (const testCase of testPaths) {
+                    output.innerHTML += `<h3>${testCase.name}</h3>`;
+                    output.innerHTML += `<p>Path: <code>${testCase.path}</code></p>`;
+                    
+                    try {
+                        const testRef = ref(rtdb, testCase.path);
+                        await set(testRef, testCase.data);
+                        output.innerHTML += '<p style="color: green;">✓ Write successful!</p>';
+                        
+                        // Try to read it back
+                        const readSnapshot = await get(testRef);
+                        if (readSnapshot.exists()) {
+                            output.innerHTML += '<p style="color: green;">✓ Read successful!</p>';
+                        }
+                        
+                        // Clean up
+                        await remove(testRef);
+                        output.innerHTML += '<p style="color: green;">✓ Cleanup successful!</p>';
+                    } catch (error) {
+                        output.innerHTML += `<p style="color: red;">✗ Failed: ${error.message}</p>`;
+                    }
+                }
+                
+                // Also check if we need to check permissions first
+                output.innerHTML += `<h3>Checking User Location Permissions</h3>`;
+                try {
+                    const userLocationRef = ref(rtdb, `userLocations/${user.uid}/${locationId}`);
+                    const permSnapshot = await get(userLocationRef);
+                    if (permSnapshot.exists()) {
+                        output.innerHTML += `<p style="color: green;">✓ User has access to location ${locationId}</p>`;
+                        output.innerHTML += `<p>Permission data: <pre>${JSON.stringify(permSnapshot.val(), null, 2)}</pre></p>`;
+                    } else {
+                        output.innerHTML += `<p style="color: orange;">⚠ No explicit permission for location ${locationId}</p>`;
+                    }
+                } catch (error) {
+                    output.innerHTML += `<p style="color: red;">✗ Error checking permissions: ${error.message}</p>`;
+                }
+                
+            } catch (error) {
+                output.innerHTML += `<p style="color: red;">Error: ${error.message}</p>`;
+                console.error('Test error:', error);
+            }
+        }
+        
+        // Run test on load
+        window.addEventListener('load', testFirebasePaths);
+    </script>
+</head>
+<body>
+    <h1>Firebase Path Test</h1>
+    <div id="output">Loading...</div>
+</body>
+</html>

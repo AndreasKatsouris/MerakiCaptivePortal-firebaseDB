@@ -1,0 +1,219 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Test Subscription Page</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <style>
+        body {
+            padding: 20px;
+            background-color: #f8f9fa;
+        }
+        .test-card {
+            background: white;
+            padding: 30px;
+            border-radius: 10px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+            margin-bottom: 20px;
+        }
+        .status-badge {
+            display: inline-block;
+            padding: 5px 15px;
+            border-radius: 20px;
+            font-size: 0.9rem;
+            font-weight: 600;
+        }
+        .status-badge.success {
+            background: #d1fae5;
+            color: #065f46;
+        }
+        .status-badge.error {
+            background: #fee2e2;
+            color: #991b1b;
+        }
+        .status-badge.pending {
+            background: #fef3c7;
+            color: #92400e;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1 class="mb-4">Subscription System Test</h1>
+        
+        <div class="test-card">
+            <h3>Quick Navigation</h3>
+            <div class="d-grid gap-2 d-md-flex">
+                            <a href="../user-dashboard.html" class="btn btn-primary">User Dashboard</a>
+            <a href="../user-subscription.html" class="btn btn-success">Subscription Page</a>
+            <a href="../admin-dashboard.html" class="btn btn-warning">Admin Dashboard</a>
+            <a href="test-tier-access.html" class="btn btn-info">Test Tier Access</a>
+            </div>
+        </div>
+
+        <div class="test-card">
+            <h3>Current User Status</h3>
+            <p><strong>Logged in as:</strong> <span id="currentUser">Checking...</span></p>
+            <p><strong>Subscription:</strong> <span id="subscriptionStatus" class="status-badge pending">Loading...</span></p>
+            <p><strong>Tier:</strong> <span id="currentTier">Loading...</span></p>
+            <p><strong>Features Access:</strong> <span id="featureCount">Loading...</span></p>
+        </div>
+
+        <div class="test-card">
+            <h3>Quick Actions</h3>
+            <div class="row g-3">
+                <div class="col-md-6">
+                    <button class="btn btn-outline-primary w-100" onclick="testFeatureAccess()">
+                        Test Feature Access
+                    </button>
+                </div>
+                <div class="col-md-6">
+                    <button class="btn btn-outline-success w-100" onclick="upgradeToProTier()">
+                        Quick Upgrade to Professional
+                    </button>
+                </div>
+                <div class="col-md-6">
+                    <button class="btn btn-outline-warning w-100" onclick="clearSubscriptionCache()">
+                        Clear Cache
+                    </button>
+                </div>
+                <div class="col-md-6">
+                    <button class="btn btn-outline-danger w-100" onclick="resetToFreeTier()">
+                        Reset to Free Tier
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <div class="test-card">
+            <h3>Test Results</h3>
+            <div id="testResults" class="mt-3">
+                <p class="text-muted">No tests run yet.</p>
+            </div>
+        </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+    <script type="module">
+        import { auth, rtdb, ref, get, set, update } from '../js/config/firebase-config.js';
+        import { featureAccessControl } from '../js/modules/access-control/services/feature-access-control.js';
+        
+        // Check current user
+        auth.onAuthStateChanged(async (user) => {
+            if (user) {
+                document.getElementById('currentUser').textContent = user.email;
+                await loadSubscriptionInfo(user);
+            } else {
+                document.getElementById('currentUser').textContent = 'Not logged in';
+                document.getElementById('subscriptionStatus').textContent = 'N/A';
+                document.getElementById('subscriptionStatus').className = 'status-badge error';
+            }
+        });
+
+        async function loadSubscriptionInfo(user) {
+            try {
+                const subscriptionRef = ref(rtdb, `subscriptions/${user.uid}`);
+                const snapshot = await get(subscriptionRef);
+                const subscription = snapshot.val();
+                
+                if (subscription) {
+                    document.getElementById('subscriptionStatus').textContent = 'Active';
+                    document.getElementById('subscriptionStatus').className = 'status-badge success';
+                    document.getElementById('currentTier').textContent = subscription.tierId || 'free';
+                    
+                    // Count features
+                    const tierRef = ref(rtdb, `tiers/${subscription.tierId}`);
+                    const tierSnapshot = await get(tierRef);
+                    const tier = tierSnapshot.val();
+                    
+                    if (tier && tier.features) {
+                        const enabledFeatures = Object.values(tier.features).filter(f => f === true).length;
+                        document.getElementById('featureCount').textContent = `${enabledFeatures} features enabled`;
+                    }
+                } else {
+                    document.getElementById('subscriptionStatus').textContent = 'No subscription';
+                    document.getElementById('subscriptionStatus').className = 'status-badge error';
+                    document.getElementById('currentTier').textContent = 'None';
+                }
+            } catch (error) {
+                console.error('Error loading subscription:', error);
+                document.getElementById('subscriptionStatus').textContent = 'Error';
+                document.getElementById('subscriptionStatus').className = 'status-badge error';
+            }
+        }
+
+        // Global functions
+        window.testFeatureAccess = async () => {
+            const features = ['wifiBasic', 'whatsappBasic', 'campaignAdvanced', 'analyticsRealtime'];
+            let results = '<h5>Feature Access Test Results:</h5><ul>';
+            
+            for (const feature of features) {
+                const access = await featureAccessControl.checkFeatureAccess(feature);
+                results += `<li><strong>${feature}:</strong> ${access.hasAccess ? '✅ Allowed' : '❌ Denied'}</li>`;
+            }
+            
+            results += '</ul>';
+            document.getElementById('testResults').innerHTML = results;
+        };
+
+        window.upgradeToProTier = async () => {
+            if (!auth.currentUser) {
+                Swal.fire('Error', 'Please log in first', 'error');
+                return;
+            }
+            
+            try {
+                await update(ref(rtdb, `subscriptions/${auth.currentUser.uid}`), {
+                    tierId: 'professional',
+                    updatedAt: Date.now()
+                });
+                
+                featureAccessControl.clearCache();
+                
+                Swal.fire('Success', 'Upgraded to Professional tier!', 'success');
+                window.location.reload();
+            } catch (error) {
+                Swal.fire('Error', 'Failed to upgrade: ' + error.message, 'error');
+            }
+        };
+
+        window.clearSubscriptionCache = () => {
+            featureAccessControl.clearCache();
+            Swal.fire('Success', 'Cache cleared!', 'success');
+        };
+
+        window.resetToFreeTier = async () => {
+            if (!auth.currentUser) {
+                Swal.fire('Error', 'Please log in first', 'error');
+                return;
+            }
+            
+            const result = await Swal.fire({
+                title: 'Reset to Free Tier?',
+                text: 'This will remove all premium features',
+                icon: 'warning',
+                showCancelButton: true,
+                confirmButtonColor: '#d33',
+                confirmButtonText: 'Yes, reset'
+            });
+            
+            if (result.isConfirmed) {
+                try {
+                    await update(ref(rtdb, `subscriptions/${auth.currentUser.uid}`), {
+                        tierId: 'free',
+                        updatedAt: Date.now()
+                    });
+                    
+                    featureAccessControl.clearCache();
+                    
+                    Swal.fire('Success', 'Reset to Free tier!', 'success');
+                    window.location.reload();
+                } catch (error) {
+                    Swal.fire('Error', 'Failed to reset: ' + error.message, 'error');
+                }
+            }
+        };
+    </script>
+</body>
+</html>

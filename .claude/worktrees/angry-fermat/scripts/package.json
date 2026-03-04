@@ -1,0 +1,10 @@
+{
+  "name": "meraki-db-scripts",
+  "version": "1.0.0",
+  "description": "Database management scripts for Meraki Captive Portal",
+  "main": "clearData.js",
+  "dependencies": {
+    "firebase-admin": "^13.1.0"
+  }
+}
+

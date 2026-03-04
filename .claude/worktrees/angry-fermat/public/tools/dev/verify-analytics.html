@@ -1,0 +1,96 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Verify Food Cost Analytics</title>
+    
+    <!-- Bootstrap CSS -->
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" rel="stylesheet">
+    
+    <!-- Font Awesome -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+</head>
+<body>
+    <div class="container py-5">
+        <h1 class="mb-4">Food Cost Analytics - Quick Verification</h1>
+        
+        <div class="card mb-4">
+            <div class="card-header bg-primary text-white">
+                <h5 class="mb-0"><i class="fas fa-check-circle me-2"></i>Analytics Feature Status</h5>
+            </div>
+            <div class="card-body">
+                <h6>Fixed Issues:</h6>
+                <ul class="list-group list-group-flush">
+                    <li class="list-group-item">
+                        <i class="fas fa-check text-success me-2"></i>
+                        <strong>Chart Canvas Elements:</strong> Added delays and proper error handling for chart rendering
+                    </li>
+                    <li class="list-group-item">
+                        <i class="fas fa-check text-success me-2"></i>
+                        <strong>"undefined" Item Names:</strong> Fixed to use multiple field name fallbacks (itemName, description, name, itemCode)
+                    </li>
+                    <li class="list-group-item">
+                        <i class="fas fa-check text-success me-2"></i>
+                        <strong>Chart Memory Leaks:</strong> Added proper chart destruction before re-rendering
+                    </li>
+                    <li class="list-group-item">
+                        <i class="fas fa-check text-success me-2"></i>
+                        <strong>Debug Mode:</strong> Added debug panel to inspect data
+                    </li>
+                </ul>
+            </div>
+        </div>
+        
+        <div class="card">
+            <div class="card-header bg-success text-white">
+                <h5 class="mb-0"><i class="fas fa-rocket me-2"></i>Next Steps</h5>
+            </div>
+            <div class="card-body">
+                <ol>
+                    <li class="mb-2">
+                        <strong>Test the Analytics Dashboard:</strong>
+                        <a href="test-food-cost-analytics.html?debug=true" class="btn btn-sm btn-primary ms-2" target="_blank">
+                            <i class="fas fa-chart-line me-1"></i>Open Analytics (Debug Mode)
+                        </a>
+                    </li>
+                    <li class="mb-2">
+                        <strong>Generate Fresh Test Data:</strong>
+                        <a href="generate-test-stock-data.html" class="btn btn-sm btn-success ms-2" target="_blank">
+                            <i class="fas fa-database me-1"></i>Generate Data
+                        </a>
+                    </li>
+                    <li class="mb-2">
+                        <strong>View Without Debug:</strong>
+                        <a href="test-food-cost-analytics.html" class="btn btn-sm btn-info ms-2" target="_blank">
+                            <i class="fas fa-eye me-1"></i>Normal View
+                        </a>
+                    </li>
+                </ol>
+                
+                <hr>
+                
+                <h6>Expected Results:</h6>
+                <ul>
+                    <li>✅ All 4 charts should render properly (Cost Trend, Category Breakdown, Top Items, Waste Trend)</li>
+                    <li>✅ Recommendations should show actual item names (not "undefined")</li>
+                    <li>✅ KPIs should calculate correctly based on your data</li>
+                    <li>✅ No canvas element errors in console</li>
+                </ul>
+                
+                <hr>
+                
+                <h6>Tips:</h6>
+                <ul>
+                    <li>Use the bug icon (🐛) to toggle debug mode and see raw data</li>
+                    <li>Click refresh (🔄) to reload data after making changes</li>
+                    <li>Make sure location IDs match when generating test data</li>
+                </ul>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Bootstrap Bundle JS -->
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/js/bootstrap.bundle.min.js"></script>
+</body>
+</html> 

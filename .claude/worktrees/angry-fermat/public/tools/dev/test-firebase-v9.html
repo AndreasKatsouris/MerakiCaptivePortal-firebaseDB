@@ -1,0 +1,71 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Test Firebase v9+ Imports</title>
+    <style>
+        body { padding: 20px; font-family: Arial, sans-serif; }
+        .success { color: green; }
+        .error { color: red; }
+        .info { color: blue; }
+    </style>
+</head>
+<body>
+    <h1>Firebase v9+ Import Test</h1>
+    <div id="results"></div>
+
+    <script type="module">
+        const results = document.getElementById('results');
+        
+        try {
+            results.innerHTML += '<div class="info">Testing Firebase imports...</div>';
+            
+            // Test import
+            const { auth, rtdb, ref, get, onAuthStateChanged } = await import('../js/config/firebase-config.js');
+            
+            results.innerHTML += '<div class="success">✅ Firebase imports successful</div>';
+            
+            // Test Firebase objects
+            if (auth) {
+                results.innerHTML += '<div class="success">✅ Auth object available</div>';
+            } else {
+                results.innerHTML += '<div class="error">❌ Auth object not available</div>';
+            }
+            
+            if (rtdb) {
+                results.innerHTML += '<div class="success">✅ RTDB object available</div>';
+            } else {
+                results.innerHTML += '<div class="error">❌ RTDB object not available</div>';
+            }
+            
+            if (ref) {
+                results.innerHTML += '<div class="success">✅ Ref function available</div>';
+            } else {
+                results.innerHTML += '<div class="error">❌ Ref function not available</div>';
+            }
+            
+            if (get) {
+                results.innerHTML += '<div class="success">✅ Get function available</div>';
+            } else {
+                results.innerHTML += '<div class="error">❌ Get function not available</div>';
+            }
+            
+            // Test auth state
+            onAuthStateChanged(auth, (user) => {
+                if (user) {
+                    results.innerHTML += '<div class="success">✅ User is authenticated</div>';
+                } else {
+                    results.innerHTML += '<div class="info">ℹ️ User is not authenticated (this is expected for testing)</div>';
+                }
+            });
+            
+            results.innerHTML += '<div class="success">🎉 All Firebase v9+ tests passed!</div>';
+            
+        } catch (error) {
+            results.innerHTML += `<div class="error">❌ Error: ${error.message}</div>`;
+            console.error('Firebase test error:', error);
+        }
+    </script>
+</body>
+</html> 

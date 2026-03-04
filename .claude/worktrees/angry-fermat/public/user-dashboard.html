@@ -1,0 +1,1053 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>User Dashboard - Laki Sparks</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link href="css/table-fixes.css" rel="stylesheet">
+    <style>
+        :root {
+            --sidebar-width: 250px;
+            --sidebar-collapsed-width: 70px;
+        }
+
+        body {
+            background-color: #f8f9fa;
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+        }
+
+        /* Sidebar Styles */
+        .sidebar {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: var(--sidebar-width);
+            height: 100vh;
+            background: linear-gradient(180deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            z-index: 1040;
+            transition: all 0.3s ease;
+            overflow-x: hidden;
+            overflow-y: auto;
+            display: none; /* Hidden by default, shown on desktop */
+        }
+
+        .sidebar.collapsed {
+            width: var(--sidebar-collapsed-width);
+        }
+
+        .sidebar .sidebar-header {
+            padding: 20px;
+            background: rgba(0, 0, 0, 0.1);
+            border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+        }
+
+        .sidebar .sidebar-header h4 {
+            margin: 0;
+            font-weight: 700;
+            font-size: 1.2rem;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+
+        .sidebar.collapsed .sidebar-header h4 {
+            font-size: 1.5rem;
+        }
+
+        .sidebar.collapsed .sidebar-header h4 .me-2 {
+            margin-right: 0 !important;
+        }
+
+        .sidebar.collapsed .sidebar-header h4 span {
+            display: none;
+        }
+
+        .sidebar-nav {
+            padding: 20px 0;
+        }
+
+        .sidebar .nav-link {
+            color: rgba(255, 255, 255, 0.85);
+            padding: 15px 20px;
+            transition: all 0.3s ease;
+            border-left: 3px solid transparent;
+            display: flex;
+            align-items: center;
+            white-space: nowrap;
+        }
+
+        .sidebar .nav-link:hover {
+            background: rgba(255, 255, 255, 0.1);
+            color: white;
+            border-left-color: white;
+        }
+
+        .sidebar .nav-link.active {
+            background: rgba(255, 255, 255, 0.15);
+            color: white;
+            border-left-color: white;
+            font-weight: 600;
+        }
+
+        .sidebar .nav-link i {
+            margin-right: 12px;
+            width: 24px;
+            text-align: center;
+            font-size: 1.1rem;
+            flex-shrink: 0;
+        }
+
+        .sidebar.collapsed .nav-link span {
+            display: none;
+        }
+
+        .sidebar.collapsed .nav-link {
+            padding: 15px;
+            justify-content: center;
+        }
+
+        .sidebar.collapsed .nav-link i {
+            margin-right: 0;
+            font-size: 1.3rem;
+        }
+
+        .sidebar-toggle {
+            position: absolute;
+            top: 20px;
+            right: -15px;
+            width: 30px;
+            height: 30px;
+            background: white;
+            border: 2px solid #667eea;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            color: #667eea;
+            font-size: 0.8rem;
+            transition: all 0.3s ease;
+            z-index: 1050;
+        }
+
+        .sidebar-toggle:hover {
+            transform: scale(1.1);
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
+        }
+
+        /* Show sidebar on desktop */
+        @media (min-width: 992px) {
+            .sidebar {
+                display: block;
+            }
+
+            body {
+                padding-left: var(--sidebar-width);
+            }
+
+            body.sidebar-collapsed {
+                padding-left: var(--sidebar-collapsed-width);
+            }
+        }
+
+        .navbar {
+            background-color: white;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        .navbar-brand {
+            font-weight: 700;
+            color: #667eea !important;
+        }
+        .main-container {
+            margin-top: 80px;
+            padding: 20px;
+            transition: margin-left 0.3s ease;
+        }
+
+        @media (min-width: 992px) {
+            .main-container {
+                margin-left: 0; /* Body padding handles the offset */
+            }
+        }
+        .dashboard-card {
+            background: white;
+            border-radius: 10px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.05);
+            padding: 25px;
+            margin-bottom: 20px;
+            transition: transform 0.2s;
+        }
+        .dashboard-card:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 5px 20px rgba(0,0,0,0.1);
+        }
+        .stat-card {
+            text-align: center;
+            padding: 20px;
+        }
+        .stat-card h3 {
+            font-size: 2.5rem;
+            font-weight: 700;
+            color: #667eea;
+            margin-bottom: 5px;
+        }
+        .stat-card p {
+            color: #666;
+            margin-bottom: 0;
+        }
+        .location-card {
+            border: 1px solid #e0e0e0;
+            border-radius: 8px;
+            padding: 20px;
+            margin-bottom: 15px;
+            position: relative;
+        }
+        .location-card h5 {
+            margin-bottom: 10px;
+            color: #333;
+        }
+        .location-card .badge {
+            position: absolute;
+            top: 20px;
+            right: 20px;
+        }
+        .add-location-btn {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border: none;
+            padding: 12px 24px;
+            border-radius: 8px;
+            font-weight: 600;
+            transition: all 0.3s ease;
+        }
+        .add-location-btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(0,0,0,0.2);
+        }
+        .subscription-info {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border-radius: 10px;
+            padding: 30px;
+            margin-bottom: 30px;
+        }
+        .subscription-info h4 {
+            margin-bottom: 20px;
+        }
+        .subscription-details {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            flex-wrap: wrap;
+        }
+        .subscription-details .detail {
+            margin-bottom: 10px;
+        }
+        .subscription-details .detail label {
+            font-weight: 600;
+            opacity: 0.9;
+        }
+        .subscription-details .detail span {
+            display: block;
+            font-size: 1.2rem;
+        }
+        .upgrade-btn {
+            background: white;
+            color: #667eea;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 6px;
+            font-weight: 600;
+            transition: all 0.3s ease;
+        }
+        .upgrade-btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 3px 10px rgba(0,0,0,0.2);
+        }
+        .quick-actions {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 15px;
+            margin-bottom: 30px;
+        }
+        .action-card {
+            background: white;
+            border: 2px solid #e0e0e0;
+            border-radius: 8px;
+            padding: 20px;
+            text-align: center;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            text-decoration: none;
+            color: inherit;
+        }
+        .action-card:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 5px 15px rgba(102, 126, 234, 0.3);
+        }
+        .action-card.locked {
+            opacity: 0.6;
+            cursor: not-allowed;
+            position: relative;
+        }
+        .action-card.locked::after {
+            content: '\f023';
+            font-family: 'Font Awesome 6 Free';
+            font-weight: 900;
+            position: absolute;
+            top: 10px;
+            right: 10px;
+            color: #6c757d;
+            font-size: 1.2rem;
+        }
+        .action-card.locked:hover {
+            transform: none;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+        }
+        .action-card i {
+            font-size: 2.5rem;
+            color: #667eea;
+            margin-bottom: 10px;
+        }
+        .action-card h6 {
+            margin-bottom: 5px;
+            font-weight: 600;
+        }
+        .action-card p {
+            font-size: 0.85rem;
+            color: #666;
+            margin-bottom: 0;
+        }
+        .feature-badges {
+            margin-top: 10px;
+        }
+        .feature-badge {
+            display: inline-block;
+            padding: 3px 8px;
+            margin: 2px;
+            border-radius: 12px;
+            font-size: 0.75rem;
+            background-color: #667eea;
+            color: white;
+        }
+        .feature-badge.locked {
+            background-color: #6c757d;
+            text-decoration: line-through;
+        }
+
+        /* Top navigation bar styles */
+        .navbar .navbar-nav {
+            align-items: center;
+            gap: 15px;
+        }
+
+        .location-selector {
+            position: relative;
+        }
+
+        .location-selector .dropdown-toggle {
+            background: #f8f9fa;
+            border: 1px solid #dee2e6;
+            border-radius: 6px;
+            padding: 8px 15px;
+            color: #333;
+            font-weight: 500;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .location-selector .dropdown-toggle:hover {
+            background: #e9ecef;
+            border-color: #adb5bd;
+        }
+
+        .location-selector .dropdown-menu {
+            min-width: 250px;
+        }
+
+        .notification-bell {
+            position: relative;
+            padding: 8px 12px;
+            color: #495057;
+            font-size: 1.2rem;
+            cursor: pointer;
+            border-radius: 6px;
+            transition: all 0.2s;
+        }
+
+        .notification-bell:hover {
+            background: #f8f9fa;
+            color: #667eea;
+        }
+
+        .notification-bell .badge {
+            position: absolute;
+            top: 2px;
+            right: 2px;
+            padding: 3px 6px;
+            font-size: 0.65rem;
+            background: #dc3545;
+            border-radius: 10px;
+        }
+
+        .search-box {
+            position: relative;
+            max-width: 300px;
+        }
+
+        .search-box input {
+            padding: 8px 35px 8px 15px;
+            border: 1px solid #dee2e6;
+            border-radius: 6px;
+            width: 100%;
+            transition: all 0.2s;
+        }
+
+        .search-box input:focus {
+            outline: none;
+            border-color: #667eea;
+            box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
+        }
+
+        .search-box i {
+            position: absolute;
+            right: 12px;
+            top: 50%;
+            transform: translateY(-50%);
+            color: #6c757d;
+        }
+
+        .user-profile-dropdown .dropdown-toggle {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            padding: 6px 12px;
+            border-radius: 6px;
+            color: #333;
+            font-weight: 500;
+        }
+
+        .user-profile-dropdown .dropdown-toggle:hover {
+            background: #f8f9fa;
+        }
+
+        .user-profile-dropdown .dropdown-toggle::after {
+            margin-left: 5px;
+        }
+
+        /* Loading Overlay Styles */
+        .page-loading-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(255, 255, 255, 0.95);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            z-index: 9999;
+            transition: opacity 0.3s ease;
+        }
+
+        .page-loading-overlay.hidden {
+            opacity: 0;
+            pointer-events: none;
+        }
+
+        .loading-content {
+            text-align: center;
+        }
+
+        .loading-spinner {
+            width: 60px;
+            height: 60px;
+            border: 4px solid #f3f3f3;
+            border-top: 4px solid #667eea;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+            margin: 0 auto 20px;
+        }
+
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+
+        .loading-text {
+            color: #667eea;
+            font-size: 1.1rem;
+            font-weight: 600;
+            margin-bottom: 10px;
+        }
+
+        .loading-subtext {
+            color: #6c757d;
+            font-size: 0.9rem;
+        }
+
+        /* Mobile Bottom Navigation */
+        .mobile-bottom-nav {
+            display: flex;
+            position: fixed;
+            bottom: 0;
+            left: 0;
+            right: 0;
+            height: 65px;
+            background: white;
+            border-top: 1px solid #e0e0e0;
+            box-shadow: 0 -2px 10px rgba(0,0,0,0.1);
+            z-index: 1050;
+            justify-content: space-around;
+            align-items: center;
+            padding: 0 10px;
+        }
+
+        .mobile-bottom-nav .nav-item {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            text-decoration: none;
+            color: #6c757d;
+            font-size: 0.75rem;
+            padding: 8px 5px;
+            transition: all 0.2s ease;
+            border-radius: 8px;
+        }
+
+        .mobile-bottom-nav .nav-item i {
+            font-size: 1.3rem;
+            margin-bottom: 4px;
+        }
+
+        .mobile-bottom-nav .nav-item.active {
+            color: #667eea;
+            background: rgba(102, 126, 234, 0.1);
+        }
+
+        .mobile-bottom-nav .nav-item:hover {
+            color: #667eea;
+            background: rgba(102, 126, 234, 0.05);
+        }
+
+        /* Mobile Menu Button (Hamburger) */
+        .mobile-menu-btn {
+            position: relative;
+        }
+
+        .mobile-menu-btn .badge {
+            position: absolute;
+            top: -5px;
+            right: -5px;
+            background: #dc3545;
+            color: white;
+            font-size: 0.6rem;
+            padding: 2px 5px;
+            border-radius: 10px;
+        }
+
+        /* Hide bottom nav on desktop */
+        @media (min-width: 992px) {
+            .mobile-bottom-nav {
+                display: none;
+            }
+        }
+
+        /* Add padding to body on mobile to prevent content from being hidden behind bottom nav */
+        @media (max-width: 991px) {
+            body {
+                padding-bottom: 75px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <!-- Loading Overlay -->
+    <div id="pageLoadingOverlay" class="page-loading-overlay">
+        <div class="loading-content">
+            <div class="loading-spinner"></div>
+            <div class="loading-text">Loading Dashboard</div>
+            <div class="loading-subtext">Fetching your data...</div>
+        </div>
+    </div>
+
+    <!-- Sidebar Navigation -->
+    <nav id="sidebar" class="sidebar">
+        <div class="sidebar-toggle" id="sidebarToggle" title="Toggle Sidebar">
+            <i class="fas fa-chevron-left"></i>
+        </div>
+        <div class="sidebar-header">
+            <h4><i class="fas fa-bolt me-2"></i><span>Sparks</span></h4>
+        </div>
+
+        <ul class="nav flex-column sidebar-nav">
+            <li class="nav-item">
+                <a href="user-dashboard.html" class="nav-link active">
+                    <i class="fas fa-home"></i>
+                    <span>Dashboard</span>
+                </a>
+            </li>
+            <li class="nav-item">
+                <a href="queue-management.html" class="nav-link">
+                    <i class="fas fa-clock"></i>
+                    <span>Queue</span>
+                </a>
+            </li>
+            <li class="nav-item">
+                <a href="bookings.html" class="nav-link">
+                    <i class="fas fa-calendar-alt"></i>
+                    <span>Bookings</span>
+                </a>
+            </li>
+            <li class="nav-item">
+                <a href="guest-management.html" class="nav-link">
+                    <i class="fas fa-users"></i>
+                    <span>Guests</span>
+                </a>
+            </li>
+            <li class="nav-item">
+                <a href="food-cost-analytics.html" class="nav-link">
+                    <i class="fas fa-chart-pie"></i>
+                    <span>Food Cost</span>
+                </a>
+            </li>
+            <li class="nav-item">
+                <a href="campaigns.html" class="nav-link">
+                    <i class="fas fa-bullhorn"></i>
+                    <span>Campaigns</span>
+                </a>
+            </li>
+            <li class="nav-item">
+                <a href="analytics.html" class="nav-link">
+                    <i class="fas fa-chart-line"></i>
+                    <span>Analytics</span>
+                </a>
+            </li>
+            <li class="nav-item">
+                <a href="sales-forecasting.html" class="nav-link">
+                    <i class="fas fa-chart-area"></i>
+                    <span>Sales Forecasting</span>
+                </a>
+            </li>
+            <li class="nav-item">
+                <a href="corporate-compliance.html" class="nav-link">
+                    <i class="fas fa-building"></i>
+                    <span>Compliance</span>
+                </a>
+            </li>
+            <li class="nav-item">
+                <a href="user-subscription.html" class="nav-link">
+                    <i class="fas fa-crown"></i>
+                    <span>Subscription</span>
+                </a>
+            </li>
+        </ul>
+    </nav>
+
+    <!-- Top Navigation Bar -->
+    <nav class="navbar navbar-expand-lg navbar-light fixed-top">
+        <div class="container-fluid">
+            <a class="navbar-brand" href="#">
+                <i class="fas fa-bolt me-2"></i>Sparks Hospitality
+            </a>
+            <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav">
+                <span class="navbar-toggler-icon"></span>
+            </button>
+            <div class="collapse navbar-collapse" id="navbarNav">
+                <ul class="navbar-nav ms-auto">
+                    <!-- Location Selector -->
+                    <li class="nav-item dropdown location-selector">
+                        <button class="btn dropdown-toggle" type="button" id="locationDropdown" data-bs-toggle="dropdown" aria-expanded="false">
+                            <i class="fas fa-map-marker-alt"></i>
+                            <span id="selectedLocationName">All Locations</span>
+                        </button>
+                        <ul class="dropdown-menu" aria-labelledby="locationDropdown">
+                            <li><a class="dropdown-item active" href="#" data-location="all">
+                                <i class="fas fa-globe me-2"></i>All Locations
+                            </a></li>
+                            <li><hr class="dropdown-divider"></li>
+                            <li><a class="dropdown-item" href="#" data-location="1">
+                                <i class="fas fa-store me-2"></i>Main Restaurant
+                            </a></li>
+                            <li><a class="dropdown-item" href="#" data-location="2">
+                                <i class="fas fa-store me-2"></i>Downtown Branch
+                            </a></li>
+                            <li><hr class="dropdown-divider"></li>
+                            <li><a class="dropdown-item text-primary" href="#locations">
+                                <i class="fas fa-plus-circle me-2"></i>Manage Locations
+                            </a></li>
+                        </ul>
+                    </li>
+
+                    <!-- Search -->
+                    <li class="nav-item search-box d-none d-lg-block">
+                        <input type="text" class="form-control" id="globalSearch" placeholder="Search...">
+                        <i class="fas fa-search"></i>
+                    </li>
+
+                    <!-- Notifications Bell -->
+                    <li class="nav-item dropdown">
+                        <a class="notification-bell" href="#" id="notificationDropdown" role="button" data-bs-toggle="dropdown" aria-expanded="false">
+                            <i class="fas fa-bell"></i>
+                            <span class="badge" id="notificationCount">3</span>
+                        </a>
+                        <ul class="dropdown-menu dropdown-menu-end" aria-labelledby="notificationDropdown" style="min-width: 300px;">
+                            <li class="dropdown-header d-flex justify-content-between align-items-center">
+                                <span>Notifications</span>
+                                <a href="#" class="text-primary" style="font-size: 0.85rem;">Mark all read</a>
+                            </li>
+                            <li><hr class="dropdown-divider"></li>
+                            <li>
+                                <a class="dropdown-item" href="#">
+                                    <div class="d-flex">
+                                        <i class="fas fa-users text-primary me-2" style="margin-top: 3px;"></i>
+                                        <div>
+                                            <strong>New guest added to queue</strong>
+                                            <p class="mb-0 text-muted" style="font-size: 0.85rem;">Party of 4 at Main Restaurant</p>
+                                            <small class="text-muted">5 minutes ago</small>
+                                        </div>
+                                    </div>
+                                </a>
+                            </li>
+                            <li><hr class="dropdown-divider"></li>
+                            <li>
+                                <a class="dropdown-item" href="#">
+                                    <div class="d-flex">
+                                        <i class="fas fa-receipt text-success me-2" style="margin-top: 3px;"></i>
+                                        <div>
+                                            <strong>Receipt processed</strong>
+                                            <p class="mb-0 text-muted" style="font-size: 0.85rem;">Reward issued to customer</p>
+                                            <small class="text-muted">1 hour ago</small>
+                                        </div>
+                                    </div>
+                                </a>
+                            </li>
+                            <li><hr class="dropdown-divider"></li>
+                            <li>
+                                <a class="dropdown-item" href="#">
+                                    <div class="d-flex">
+                                        <i class="fas fa-chart-line text-warning me-2" style="margin-top: 3px;"></i>
+                                        <div>
+                                            <strong>Food cost alert</strong>
+                                            <p class="mb-0 text-muted" style="font-size: 0.85rem;">Costs above target this week</p>
+                                            <small class="text-muted">3 hours ago</small>
+                                        </div>
+                                    </div>
+                                </a>
+                            </li>
+                            <li><hr class="dropdown-divider"></li>
+                            <li class="text-center">
+                                <a href="#notifications" class="dropdown-item text-primary">View all notifications</a>
+                            </li>
+                        </ul>
+                    </li>
+
+                    <!-- User Profile -->
+                    <li class="nav-item dropdown user-profile-dropdown">
+                        <a class="dropdown-toggle" href="#" id="userDropdown" role="button" data-bs-toggle="dropdown" aria-expanded="false">
+                            <i class="fas fa-user-circle me-1"></i>
+                            <span id="userDisplayName">User</span>
+                        </a>
+                        <ul class="dropdown-menu dropdown-menu-end" aria-labelledby="userDropdown">
+                            <li><a class="dropdown-item" href="#profile">
+                                <i class="fas fa-user me-2"></i>Profile
+                            </a></li>
+                            <li><a class="dropdown-item" href="user-subscription.html">
+                                <i class="fas fa-crown me-2"></i>Subscription
+                            </a></li>
+                            <li><a class="dropdown-item" href="#settings">
+                                <i class="fas fa-cog me-2"></i>Settings
+                            </a></li>
+                            <li><hr class="dropdown-divider"></li>
+                            <li><a class="dropdown-item" href="#" id="logoutBtn">
+                                <i class="fas fa-sign-out-alt me-2"></i>Logout
+                            </a></li>
+                        </ul>
+                    </li>
+                </ul>
+            </div>
+        </div>
+    </nav>
+
+    <!-- Main Container -->
+    <div class="main-container">
+        <div class="container-fluid">
+            <!-- Welcome Section -->
+            <div class="row mb-4">
+                <div class="col">
+                    <h2>Welcome back, <span id="welcomeUserName">User</span>!</h2>
+                    <p class="text-muted">Here's what's happening with your business today.</p>
+                </div>
+            </div>
+
+            <!-- Subscription Info -->
+            <div class="subscription-info" id="subscriptionInfo">
+                <h4>Your Subscription</h4>
+                <div class="subscription-details">
+                    <div class="detail">
+                        <label>Current Plan</label>
+                        <span id="currentPlan">Loading...</span>
+                    </div>
+                    <div class="detail">
+                        <label>Status</label>
+                        <span id="subscriptionStatus">Loading...</span>
+                    </div>
+                    <div class="detail">
+                        <label>Locations</label>
+                        <span id="locationCount">0 / 0</span>
+                    </div>
+                    <div class="detail">
+                        <a href="user-subscription.html" class="upgrade-btn" style="text-decoration: none;">Manage Subscription</a>
+                    </div>
+                    <div class="feature-badges" id="featureBadges">
+                        <!-- Feature badges will be inserted here dynamically -->
+                    </div>
+                </div>
+            </div>
+
+            <!-- Quick Actions -->
+            <div class="quick-actions">
+                <a href="#" class="action-card" id="addLocationAction">
+                    <i class="fas fa-plus-circle"></i>
+                    <h6>Add Location</h6>
+                    <p>Set up a new business location</p>
+                </a>
+                <a href="user-subscription.html" class="action-card">
+                    <i class="fas fa-credit-card"></i>
+                    <h6>Manage Subscription</h6>
+                    <p>View plan & usage details</p>
+                </a>
+                <a href="#" class="action-card">
+                    <i class="fas fa-chart-line"></i>
+                    <h6>View Analytics</h6>
+                    <p>Check your performance metrics</p>
+                </a>
+                <a href="#" class="action-card">
+                    <i class="fas fa-bullhorn"></i>
+                    <h6>Create Campaign</h6>
+                    <p>Launch a new marketing campaign</p>
+                </a>
+                <a href="#" class="action-card">
+                    <i class="fas fa-users"></i>
+                    <h6>Guest Insights</h6>
+                    <p>View customer analytics</p>
+                </a>
+                <a href="#" class="action-card" id="foodCostBasicAction">
+                    <i class="fas fa-utensils"></i>
+                    <h6>Food Cost Management</h6>
+                    <p>Track food costs & inventory</p>
+                </a>
+                <a href="#" class="action-card" id="foodCostAdvancedAction">
+                    <i class="fas fa-chart-pie"></i>
+                    <h6>Advanced Food Analytics</h6>
+                    <p>Recipe costing & waste tracking</p>
+                </a>
+                <a href="#" class="action-card" id="foodCostAnalyticsAction">
+                    <i class="fas fa-chart-line"></i>
+                    <h6>Food Cost Analytics</h6>
+                    <p>Industry KPIs & insights</p>
+                </a>
+                <a href="#" class="action-card" id="qmsBasicAction">
+                    <i class="fas fa-clock"></i>
+                    <h6>Queue Management</h6>
+                    <p>Manage customer queues & wait times</p>
+                </a>
+                <a href="#" class="action-card" id="salesForecastingAction">
+                    <i class="fas fa-chart-area"></i>
+                    <h6>Sales Forecasting</h6>
+                    <p>AI-powered sales predictions & insights</p>
+                </a>
+            </div>
+
+            <!-- Statistics -->
+            <div class="row mb-4">
+                <div class="col-md-3">
+                    <div class="dashboard-card stat-card">
+                        <h3 id="totalGuests">0</h3>
+                        <p>Total Guests</p>
+                    </div>
+                </div>
+                <div class="col-md-3">
+                    <div class="dashboard-card stat-card">
+                        <h3 id="activeCampaigns">0</h3>
+                        <p>Active Campaigns</p>
+                    </div>
+                </div>
+                <div class="col-md-3">
+                    <div class="dashboard-card stat-card">
+                        <h3 id="totalRewards">0</h3>
+                        <p>Rewards Issued</p>
+                    </div>
+                </div>
+                <div class="col-md-3">
+                    <div class="dashboard-card stat-card">
+                        <h3 id="engagementRate">0%</h3>
+                        <p>Engagement Rate</p>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Locations Section -->
+            <div class="dashboard-card">
+                <div class="d-flex justify-content-between align-items-center mb-4">
+                    <h4>Your Locations</h4>
+                    <button class="add-location-btn" id="addLocationBtn">
+                        <i class="fas fa-plus me-2"></i>Add Location
+                    </button>
+                </div>
+                <div id="locationsList">
+                    <!-- Locations will be dynamically loaded here -->
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Add Location Modal -->
+    <div class="modal fade" id="addLocationModal" tabindex="-1">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">Add New Location</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <form id="addLocationForm">
+                        <div class="mb-3">
+                            <label for="locationName" class="form-label">Location Name</label>
+                            <input type="text" class="form-control" id="locationName" required>
+                        </div>
+                        <div class="mb-3">
+                            <label for="locationAddress" class="form-label">Address</label>
+                            <input type="text" class="form-control" id="locationAddress" required>
+                        </div>
+                        <div class="mb-3">
+                            <label for="locationPhone" class="form-label">Phone Number</label>
+                            <input type="tel" class="form-control" id="locationPhone" required>
+                        </div>
+                        <div class="mb-3">
+                            <label for="locationType" class="form-label">Location Type</label>
+                            <select class="form-select" id="locationType" required>
+                                <option value="">Select Type</option>
+                                <option value="restaurant">Restaurant</option>
+                                <option value="cafe">Cafe</option>
+                                <option value="bar">Bar</option>
+                                <option value="hotel">Hotel</option>
+                                <option value="retail">Retail Store</option>
+                                <option value="other">Other</option>
+                            </select>
+                        </div>
+                        <div class="mb-3">
+                            <label for="locationTimezone" class="form-label">Timezone</label>
+                            <select class="form-select" id="locationTimezone" required>
+                                <option value="UTC">UTC</option>
+                                <option value="America/New_York">Eastern Time</option>
+                                <option value="America/Chicago">Central Time</option>
+                                <option value="America/Denver">Mountain Time</option>
+                                <option value="America/Los_Angeles">Pacific Time</option>
+                                <option value="Europe/London">London</option>
+                                <option value="Europe/Paris">Paris</option>
+                                <option value="Asia/Tokyo">Tokyo</option>
+                            </select>
+                        </div>
+                    </form>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                    <button type="button" class="btn btn-primary" id="saveLocationBtn">
+                        <span id="saveLocationBtnText">Save Location</span>
+                        <span id="saveLocationSpinner" class="spinner-border spinner-border-sm ms-2" style="display: none;"></span>
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Scripts -->
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+    <script type="module" src="/js/user-dashboard.js?v=2.1.4-20250605"></script>
+
+    <!-- Sidebar Toggle Script -->
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            const sidebar = document.getElementById('sidebar');
+            const sidebarToggle = document.getElementById('sidebarToggle');
+            const body = document.body;
+
+            // Load sidebar state from localStorage
+            const sidebarCollapsed = localStorage.getItem('sidebarCollapsed') === 'true';
+            if (sidebarCollapsed) {
+                sidebar.classList.add('collapsed');
+                body.classList.add('sidebar-collapsed');
+                sidebarToggle.querySelector('i').classList.replace('fa-chevron-left', 'fa-chevron-right');
+            }
+
+            // Toggle sidebar
+            sidebarToggle.addEventListener('click', function() {
+                sidebar.classList.toggle('collapsed');
+                body.classList.toggle('sidebar-collapsed');
+
+                const icon = sidebarToggle.querySelector('i');
+                if (sidebar.classList.contains('collapsed')) {
+                    icon.classList.replace('fa-chevron-left', 'fa-chevron-right');
+                    localStorage.setItem('sidebarCollapsed', 'true');
+                } else {
+                    icon.classList.replace('fa-chevron-right', 'fa-chevron-left');
+                    localStorage.setItem('sidebarCollapsed', 'false');
+                }
+            });
+
+            // Set active nav link based on current page
+            const currentPage = window.location.pathname.split('/').pop() || 'user-dashboard.html';
+            document.querySelectorAll('.sidebar .nav-link').forEach(link => {
+                const href = link.getAttribute('href');
+                if (href === currentPage) {
+                    link.classList.add('active');
+                } else {
+                    link.classList.remove('active');
+                }
+            });
+
+            // Set active nav link for mobile bottom navigation
+            document.querySelectorAll('.mobile-bottom-nav .nav-item').forEach(link => {
+                const href = link.getAttribute('href');
+                if (href === currentPage) {
+                    link.classList.add('active');
+                } else {
+                    link.classList.remove('active');
+                }
+            });
+        });
+    </script>
+
+    <!-- Mobile Bottom Navigation -->
+    <nav class="mobile-bottom-nav">
+        <a href="user-dashboard.html" class="nav-item">
+            <i class="fas fa-home"></i>
+            <span>Home</span>
+        </a>
+        <a href="queue-management.html" class="nav-item">
+            <i class="fas fa-clock"></i>
+            <span>Queue</span>
+        </a>
+        <a href="guest-management.html" class="nav-item">
+            <i class="fas fa-users"></i>
+            <span>Guests</span>
+        </a>
+        <a href="analytics.html" class="nav-item">
+            <i class="fas fa-chart-line"></i>
+            <span>Analytics</span>
+        </a>
+        <a href="#" class="nav-item mobile-menu-btn" id="mobileMenuBtn">
+            <i class="fas fa-bars"></i>
+            <span>Menu</span>
+        </a>
+    </nav>
+</body>
+</html>

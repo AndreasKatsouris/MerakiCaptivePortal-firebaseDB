@@ -34,8 +34,16 @@ function normalizeDate(dateStr) {
     if (!dateStr) return null;
     const str = dateStr.trim();
 
+    // Already ISO YYYY-MM-DD
     if (/^\d{4}-\d{2}-\d{2}$/.test(str)) return str;
 
+    // YYYY/MM/DD or YYYY-MM-DD with slashes (safe: no timezone ambiguity)
+    const isoSlash = str.match(/^(\d{4})[\/](\d{2})[\/](\d{2})$/);
+    if (isoSlash) {
+        return `${isoSlash[1]}-${isoSlash[2]}-${isoSlash[3]}`;
+    }
+
+    // DD/MM/YYYY or MM/DD/YYYY
     const match = str.match(/^(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{4})$/);
     if (match) {
         const [, a, b, year] = match;
@@ -52,9 +60,13 @@ function normalizeDate(dateStr) {
         return `${year}-${String(numB).padStart(2, '0')}-${String(numA).padStart(2, '0')}`;
     }
 
-    const d = new Date(str);
+    // Last resort — force local-time parse to avoid UTC midnight offset
+    const d = new Date(str + (str.includes('T') ? '' : 'T00:00:00'));
     if (!isNaN(d.getTime())) {
-        return d.toISOString().split('T')[0];
+        const y = d.getFullYear();
+        const m = String(d.getMonth() + 1).padStart(2, '0');
+        const day = String(d.getDate()).padStart(2, '0');
+        return `${y}-${m}-${day}`;
     }
     return null;
 }
@@ -124,6 +136,18 @@ export class SalesForecastingModule {
         this.currentForecast = null;
         this.currentView = 'upload'; // 'upload', 'forecast', 'adjust', 'compare', 'analytics'
         this.historicalFilter = 'all'; // period filter for historical viewer
+        this.historicalCustomStart = null; // custom range start (YYYY-MM-DD)
+        this.historicalCustomEnd = null;   // custom range end (YYYY-MM-DD)
+
+        // Forecast form config — persisted across re-renders
+        this.forecastConfig = {
+            method: 'seasonal',
+            horizon: '30',
+            confidenceLevel: '95',
+            growthRate: 5,
+            customStartDate: null,
+            customEndDate: null
+        };
 
         // Chart instances for cleanup
         this.chartInstances = {
@@ -727,18 +751,18 @@ export class SalesForecastingModule {
                                 <div class="mb-3">
                                     <label class="form-label">Forecast Method</label>
                                     <select id="sf-method" class="form-select">
-                                        <option value="yoy">Year-over-Year</option>
-                                        <option value="seasonal" selected>Seasonal Analysis</option>
-                                        <option value="moving_average">Moving Average</option>
-                                        <option value="simple_trend">Simple Trend (Linear)</option>
-                                        <option value="exponential">Exponential Growth</option>
-                                        <option value="ml_based">ML-Based (Ensemble)</option>
+                                        <option value="yoy" ${this.forecastConfig.method === 'yoy' ? 'selected' : ''}>Year-over-Year</option>
+                                        <option value="seasonal" ${this.forecastConfig.method === 'seasonal' ? 'selected' : ''}>Seasonal Analysis</option>
+                                        <option value="moving_average" ${this.forecastConfig.method === 'moving_average' ? 'selected' : ''}>Moving Average</option>
+                                        <option value="simple_trend" ${this.forecastConfig.method === 'simple_trend' ? 'selected' : ''}>Simple Trend (Linear)</option>
+                                        <option value="exponential" ${this.forecastConfig.method === 'exponential' ? 'selected' : ''}>Exponential Growth</option>
+                                        <option value="ml_based" ${this.forecastConfig.method === 'ml_based' ? 'selected' : ''}>ML-Based (Ensemble)</option>
                                     </select>
                                 </div>
-                                <div id="sf-growth-rate-row" class="mb-3" style="display:none">
+                                <div id="sf-growth-rate-row" class="mb-3" style="display:${this.forecastConfig.method === 'yoy' ? 'block' : 'none'}">
                                     <label class="form-label">Target Growth % <small class="text-muted">(vs last year)</small></label>
                                     <div class="input-group">
-                                        <input type="number" id="sf-growth-rate" class="form-control" value="5" min="-50" max="100" step="0.5">
+                                        <input type="number" id="sf-growth-rate" class="form-control" value="${this.forecastConfig.growthRate}" min="-50" max="100" step="0.5">
                                         <span class="input-group-text">%</span>
                                     </div>
                                     <small class="text-muted">Menu price increases, inflation, growth targets</small>
@@ -746,27 +770,27 @@ export class SalesForecastingModule {
                                 <div class="mb-3">
                                     <label class="form-label">Forecast Horizon</label>
                                     <select id="sf-horizon" class="form-select">
-                                        <option value="7">1 Week</option>
-                                        <option value="14">2 Weeks</option>
-                                        <option value="30" selected>1 Month</option>
-                                        <option value="60">2 Months</option>
-                                        <option value="90">3 Months</option>
-                                        <option value="custom">Custom Date Range</option>
+                                        <option value="7" ${this.forecastConfig.horizon === '7' ? 'selected' : ''}>1 Week</option>
+                                        <option value="14" ${this.forecastConfig.horizon === '14' ? 'selected' : ''}>2 Weeks</option>
+                                        <option value="30" ${this.forecastConfig.horizon === '30' ? 'selected' : ''}>1 Month</option>
+                                        <option value="60" ${this.forecastConfig.horizon === '60' ? 'selected' : ''}>2 Months</option>
+                                        <option value="90" ${this.forecastConfig.horizon === '90' ? 'selected' : ''}>3 Months</option>
+                                        <option value="custom" ${this.forecastConfig.horizon === 'custom' ? 'selected' : ''}>Custom Date Range</option>
                                     </select>
                                 </div>
-                                <div id="sf-custom-dates" class="mb-3" style="display:none">
+                                <div id="sf-custom-dates" class="mb-3" style="display:${this.forecastConfig.horizon === 'custom' ? 'block' : 'none'}">
                                     <label class="form-label">Start Date</label>
-                                    <input type="date" id="sf-forecast-start" class="form-control mb-2">
+                                    <input type="date" id="sf-forecast-start" class="form-control mb-2" value="${this.forecastConfig.customStartDate || ''}">
                                     <label class="form-label">End Date</label>
-                                    <input type="date" id="sf-forecast-end" class="form-control">
+                                    <input type="date" id="sf-forecast-end" class="form-control" value="${this.forecastConfig.customEndDate || ''}">
                                 </div>
                                 <div class="mb-3">
                                     <label class="form-label">Confidence Interval</label>
                                     <select id="sf-confidence" class="form-select">
-                                        <option value="0">None</option>
-                                        <option value="80">80%</option>
-                                        <option value="90">90%</option>
-                                        <option value="95" selected>95%</option>
+                                        <option value="0" ${this.forecastConfig.confidenceLevel === '0' ? 'selected' : ''}>None</option>
+                                        <option value="80" ${this.forecastConfig.confidenceLevel === '80' ? 'selected' : ''}>80%</option>
+                                        <option value="90" ${this.forecastConfig.confidenceLevel === '90' ? 'selected' : ''}>90%</option>
+                                        <option value="95" ${this.forecastConfig.confidenceLevel === '95' ? 'selected' : ''}>95%</option>
                                     </select>
                                 </div>
                                 <div class="mt-4">
@@ -818,7 +842,7 @@ export class SalesForecastingModule {
             .sort(([a], [b]) => a.localeCompare(b))
             .map(([date, pred]) => {
                 const displayDate = date.match(/^\d{4}-\d{2}-\d{2}$/)
-                    ? new Date(date + 'T00:00:00').toLocaleDateString('en-ZA', { day: '2-digit', month: 'short', year: 'numeric' })
+                    ? new Date(date + 'T00:00:00').toLocaleDateString('en-ZA', { weekday: 'short', day: '2-digit', month: 'short', year: 'numeric' })
                     : date;
                 const predicted = pred.adjusted?.revenue ?? pred.predicted ?? 0;
                 const transactions = pred.adjusted?.transactions ?? pred.transactions ?? 0;
@@ -841,7 +865,8 @@ export class SalesForecastingModule {
                     <div class="card-header">
                         <h6 class="mb-0"><i class="fas fa-table me-2"></i>Forecast Summary</h6>
                     </div>
-                    <div class="card-body p-0">
+                    <div class="card-body">
+                        ${this._buildForecastSummary(this.currentForecast.predictions)}
                         <div class="table-responsive">
                             <table class="table table-sm table-striped mb-0">
                                 <thead class="table-light">
@@ -876,23 +901,34 @@ export class SalesForecastingModule {
         return `
             <div class="mt-3">
                 <div class="card">
-                    <div class="card-header d-flex justify-content-between align-items-center flex-wrap gap-2">
-                        <h6 class="mb-0"><i class="fas fa-history me-2"></i>Historical Data Preview
-                            <span class="badge bg-secondary ms-1">${total.toLocaleString('en-ZA')}</span>
-                        </h6>
-                        <div class="d-flex align-items-center gap-2">
-                            <select id="sf-hist-filter" class="form-select form-select-sm" style="width:auto">
-                                <option value="week" ${currentFilter === 'week' ? 'selected' : ''}>Last 7 Days</option>
-                                <option value="month" ${currentFilter === 'month' ? 'selected' : ''}>Last 30 Days</option>
-                                <option value="quarter" ${currentFilter === 'quarter' ? 'selected' : ''}>Last Quarter</option>
-                                <option value="year" ${currentFilter === 'year' ? 'selected' : ''}>Last Year</option>
-                                <option value="all" ${currentFilter === 'all' ? 'selected' : ''}>All Records</option>
-                            </select>
-                            <button class="btn btn-sm btn-outline-secondary" type="button"
-                                    data-bs-toggle="collapse" data-bs-target="#sf-historical-table-collapse"
-                                    aria-expanded="false">
-                                <i class="fas fa-chevron-down"></i>
-                            </button>
+                    <div class="card-header">
+                        <div class="d-flex justify-content-between align-items-center flex-wrap gap-2">
+                            <h6 class="mb-0"><i class="fas fa-history me-2"></i>Historical Data Preview
+                                <span class="badge bg-secondary ms-1">${total.toLocaleString('en-ZA')}</span>
+                            </h6>
+                            <div class="d-flex align-items-center gap-2">
+                                <select id="sf-hist-filter" class="form-select form-select-sm" style="width:auto">
+                                    <option value="week" ${currentFilter === 'week' ? 'selected' : ''}>Last 7 Days</option>
+                                    <option value="month" ${currentFilter === 'month' ? 'selected' : ''}>Last 30 Days</option>
+                                    <option value="quarter" ${currentFilter === 'quarter' ? 'selected' : ''}>Last Quarter</option>
+                                    <option value="year" ${currentFilter === 'year' ? 'selected' : ''}>Last Year</option>
+                                    <option value="all" ${currentFilter === 'all' ? 'selected' : ''}>All Records</option>
+                                    <option value="custom" ${currentFilter === 'custom' ? 'selected' : ''}>Custom Range</option>
+                                </select>
+                                <button class="btn btn-sm btn-outline-secondary" type="button"
+                                        data-bs-toggle="collapse" data-bs-target="#sf-historical-table-collapse"
+                                        aria-expanded="false">
+                                    <i class="fas fa-chevron-down"></i>
+                                </button>
+                            </div>
+                        </div>
+                        <div id="sf-hist-custom-range" class="d-flex align-items-center gap-2 mt-2 flex-wrap" style="display:${currentFilter === 'custom' ? 'flex' : 'none'}!important">
+                            <input type="date" id="sf-hist-start" class="form-control form-control-sm" style="width:auto"
+                                   value="${this.historicalCustomStart || ''}">
+                            <span class="text-muted small">to</span>
+                            <input type="date" id="sf-hist-end" class="form-control form-control-sm" style="width:auto"
+                                   value="${this.historicalCustomEnd || ''}">
+                            <button id="sf-hist-apply" class="btn btn-sm btn-primary">Apply</button>
                         </div>
                     </div>
                     <div class="collapse" id="sf-historical-table-collapse">
@@ -977,7 +1013,7 @@ export class SalesForecastingModule {
 
             // Format date for display (YYYY-MM-DD -> localised)
             const displayDate = date.match(/^\d{4}-\d{2}-\d{2}$/)
-                ? new Date(date + 'T00:00:00').toLocaleDateString('en-ZA', { day: '2-digit', month: 'short', year: 'numeric' })
+                ? new Date(date + 'T00:00:00').toLocaleDateString('en-ZA', { weekday: 'short', day: '2-digit', month: 'short', year: 'numeric' })
                 : date;
 
             return `
@@ -1294,7 +1330,30 @@ export class SalesForecastingModule {
 
         // Historical data period filter
         const histFilterEl = container.querySelector('#sf-hist-filter');
-        histFilterEl?.addEventListener('change', () => this.refreshHistoricalTable());
+        histFilterEl?.addEventListener('change', () => {
+            const customRangeEl = document.getElementById('sf-hist-custom-range');
+            if (customRangeEl) {
+                customRangeEl.style.display = histFilterEl.value === 'custom' ? 'flex' : 'none';
+            }
+            if (histFilterEl.value !== 'custom') {
+                this.refreshHistoricalTable();
+            }
+        });
+
+        // Custom range Apply button
+        container.querySelector('#sf-hist-apply')?.addEventListener('click', () => {
+            const startEl = document.getElementById('sf-hist-start');
+            const endEl = document.getElementById('sf-hist-end');
+            if (!startEl?.value || !endEl?.value) {
+                Swal.fire('Error', 'Please select both a start and end date', 'warning');
+                return;
+            }
+            if (new Date(endEl.value) < new Date(startEl.value)) {
+                Swal.fire('Error', 'End date must be on or after start date', 'warning');
+                return;
+            }
+            this.refreshHistoricalTable();
+        });
 
         // Adjustment inputs
         container.querySelectorAll('.sf-adjust-revenue, .sf-adjust-transactions, .sf-adjust-reason')
@@ -1359,7 +1418,14 @@ export class SalesForecastingModule {
 
             const dateIdx = headers.findIndex(h => h === 'date' || h === 'day');
             const revenueIdx = headers.findIndex(h => h === 'revenue' || h === 'sales' || h === 'total' || h === 'amount');
-            const transIdx = headers.findIndex(h => h === 'transactions' || h === 'covers' || h === 'count');
+            const transIdx = headers.findIndex(h =>
+                h === 'transaction_qty' || h === 'transactions' || h === 'transaction_count' ||
+                h === 'qty' || h === 'covers' || h === 'count'
+            );
+            const avgSpendIdx = headers.findIndex(h =>
+                h === 'avg_spend' || h === 'average_spend' || h === 'avgspend' ||
+                h === 'avg spend' || h === 'spend_per_cover' || h === 'spend'
+            );
 
             if (dateIdx === -1 || revenueIdx === -1) {
                 Swal.fire('Error', 'CSV must contain "date" and "revenue" (or "sales"/"total"/"amount") columns', 'error');
@@ -1372,8 +1438,11 @@ export class SalesForecastingModule {
                 const revenue = parseFloat(cols[revenueIdx]);
                 if (date && !isNaN(revenue)) {
                     const entry = { date, revenue };
-                    if (transIdx !== -1 && cols[transIdx]) {
+                    if (transIdx !== -1 && cols[transIdx] != null) {
                         entry.transactions = parseInt(cols[transIdx], 10) || 0;
+                    }
+                    if (avgSpendIdx !== -1 && cols[avgSpendIdx] != null) {
+                        entry.avgSpend = parseFloat(cols[avgSpendIdx]) || 0;
                     }
                     data.push(entry);
                 }
@@ -1434,13 +1503,12 @@ export class SalesForecastingModule {
             const methodSelect = document.getElementById('sf-method');
             const horizonSelect = document.getElementById('sf-horizon');
             const confidenceSelect = document.getElementById('sf-confidence');
+            const growthRateEl = document.getElementById('sf-growth-rate');
 
             const method = methodSelect?.value || 'seasonal';
             const confidenceLevel = parseFloat(confidenceSelect?.value) || 95;
-            const growthRateEl = document.getElementById('sf-growth-rate');
-            const growthRateOverride = method === 'yoy' && growthRateEl
-                ? parseFloat(growthRateEl.value) / 100
-                : null;
+            const growthRate = growthRateEl ? (parseFloat(growthRateEl.value) ?? 5) : 5;
+            const growthRateOverride = method === 'yoy' ? growthRate / 100 : null;
 
             let horizon;
             let customStartDate = null;
@@ -1464,7 +1532,8 @@ export class SalesForecastingModule {
                     return;
                 }
 
-                horizon = Math.ceil((end - start) / (1000 * 60 * 60 * 24));
+                // +1 makes end date inclusive (1–31 Mar = 31 days, not 30)
+                horizon = Math.ceil((end - start) / (1000 * 60 * 60 * 24)) + 1;
                 if (horizon > 365) {
                     Swal.fire('Error', 'Custom range cannot exceed 365 days', 'warning');
                     return;
@@ -1484,11 +1553,28 @@ export class SalesForecastingModule {
             console.log('Last 3 records:', this.historicalData.slice(-3).map(_dbgMap));
             console.groupEnd();
 
+            // Persist form config so re-renders don't reset the user's selections
+            this.forecastConfig = {
+                method,
+                horizon: horizonSelect?.value || '30',
+                confidenceLevel: String(confidenceLevel),
+                growthRate: isNaN(growthRate) ? 5 : growthRate,
+                customStartDate: customStartDate || null,
+                customEndDate: customEndDate || null
+            };
+
+            // Exclude closed days (R0 revenue) so they don't corrupt averages or YoY base values
+            const tradingDays = this.historicalData.filter(d => (d.revenue ?? 0) > 0);
+            const closedDays = this.historicalData.length - tradingDays.length;
+            if (closedDays > 0) {
+                console.log(`[SalesForecasting] Excluded ${closedDays} closed day(s) (R0 revenue) from forecast input`);
+            }
+
             this.showLoading('Generating forecast...');
             let forecast;
             try {
                 forecast = await this.forecastEngine.generateForecast(
-                    this.historicalData,
+                    tradingDays,
                     {
                         method,
                         horizon,
@@ -2384,6 +2470,13 @@ export class SalesForecastingModule {
         const filterEl = document.getElementById('sf-hist-filter');
         if (filterEl) this.historicalFilter = filterEl.value;
 
+        if (this.historicalFilter === 'custom') {
+            const startEl = document.getElementById('sf-hist-start');
+            const endEl = document.getElementById('sf-hist-end');
+            this.historicalCustomStart = startEl?.value || null;
+            this.historicalCustomEnd = endEl?.value || null;
+        }
+
         const bodyEl = document.getElementById('sf-hist-table-body');
         const summaryEl = document.getElementById('sf-hist-summary');
         if (!bodyEl || !this.historicalData?.length) return;
@@ -2396,23 +2489,32 @@ export class SalesForecastingModule {
     _getFilteredHistoricalData() {
         if (!this.historicalData?.length) return [];
 
-        const now = new Date();
-        const cutoffs = {
-            week: 7, month: 30, quarter: 90, year: 365
-        };
+        const sorted = (arr) => [...arr].sort((a, b) => new Date(b.date) - new Date(a.date));
+
+        if (this.historicalFilter === 'custom') {
+            if (!this.historicalCustomStart || !this.historicalCustomEnd) {
+                return sorted(this.historicalData);
+            }
+            const start = new Date(this.historicalCustomStart + 'T00:00:00');
+            const end = new Date(this.historicalCustomEnd + 'T23:59:59');
+            return sorted(this.historicalData.filter(d => {
+                const dt = d.date instanceof Date ? d.date : new Date(d.date);
+                return dt >= start && dt <= end;
+            }));
+        }
+
+        const cutoffs = { week: 7, month: 30, quarter: 90, year: 365 };
         const days = cutoffs[this.historicalFilter];
 
-        if (!days) return [...this.historicalData].sort((a, b) => new Date(b.date) - new Date(a.date));
+        if (!days) return sorted(this.historicalData);
 
-        const cutoff = new Date(now);
+        const cutoff = new Date();
         cutoff.setDate(cutoff.getDate() - days);
 
-        return [...this.historicalData]
-            .filter(d => {
-                const dt = d.date instanceof Date ? d.date : new Date(d.date);
-                return dt >= cutoff;
-            })
-            .sort((a, b) => new Date(b.date) - new Date(a.date));
+        return sorted(this.historicalData.filter(d => {
+            const dt = d.date instanceof Date ? d.date : new Date(d.date);
+            return dt >= cutoff;
+        }));
     }
 
     _buildHistoricalRows(data) {
@@ -2421,9 +2523,14 @@ export class SalesForecastingModule {
         return data.map(d => {
             const dt = d.date instanceof Date ? d.date : new Date(d.date);
             const displayDate = isNaN(dt.getTime()) ? escapeHtml(String(d.date))
-                : dt.toLocaleDateString('en-ZA', { day: '2-digit', month: 'short', year: 'numeric' });
-            return `<tr>
-                <td>${displayDate}</td>
+                : dt.toLocaleDateString('en-ZA', { weekday: 'short', day: '2-digit', month: 'short', year: 'numeric' });
+            const isClosed = (d.revenue ?? 0) === 0;
+            const rowClass = isClosed ? ' class="text-muted"' : '';
+            const dateCell = isClosed
+                ? `${displayDate} <span class="badge bg-secondary ms-1" style="font-size:0.65rem">Closed</span>`
+                : displayDate;
+            return `<tr${rowClass} style="${isClosed ? 'opacity:0.55' : ''}">
+                <td>${dateCell}</td>
                 <td>${fmt(d.revenue ?? 0)}</td>
                 <td>${Number(d.transactions ?? 0).toLocaleString('en-ZA')}</td>
                 <td>${fmt(d.avgSpend ?? 0)}</td>
@@ -2431,13 +2538,83 @@ export class SalesForecastingModule {
         }).join('');
     }
 
+    _buildForecastSummary(predictions) {
+        const entries = Object.entries(predictions || {});
+        if (!entries.length) return '';
+
+        const fmt = v => `R ${Number(v).toLocaleString('en-ZA', { maximumFractionDigits: 0 })}`;
+
+        let totalRevenue = 0;
+        let totalSpend = 0;
+        let spendCount = 0;
+        let peakRevenue = 0;
+        let peakDate = null;
+
+        for (const [date, pred] of entries) {
+            const revenue = pred.adjusted?.revenue ?? pred.predicted ?? 0;
+            const spend = pred.adjusted?.avgSpend ?? pred.avgSpend ?? 0;
+            totalRevenue += revenue;
+            if (spend > 0) { totalSpend += spend; spendCount++; }
+            if (revenue > peakRevenue) { peakRevenue = revenue; peakDate = date; }
+        }
+
+        const days = entries.length;
+        const avgDaily = days > 0 ? totalRevenue / days : 0;
+        const avgSpend = spendCount > 0 ? totalSpend / spendCount : 0;
+        const peakDt = peakDate ? new Date(peakDate + 'T00:00:00') : null;
+        const peakLabel = peakDt
+            ? peakDt.toLocaleDateString('en-ZA', { day: '2-digit', month: 'short' })
+            : '—';
+
+        return `
+            <div class="row g-2 mb-3">
+                <div class="col-6 col-md">
+                    <div class="p-2 bg-light rounded text-center">
+                        <div class="fw-bold small">${fmt(totalRevenue)}</div>
+                        <div class="text-muted" style="font-size:0.75rem">Total Forecast</div>
+                    </div>
+                </div>
+                <div class="col-6 col-md">
+                    <div class="p-2 bg-light rounded text-center">
+                        <div class="fw-bold small">${fmt(avgDaily)}</div>
+                        <div class="text-muted" style="font-size:0.75rem">Avg Daily</div>
+                    </div>
+                </div>
+                <div class="col-6 col-md">
+                    <div class="p-2 bg-light rounded text-center">
+                        <div class="fw-bold small">${fmt(peakRevenue)}</div>
+                        <div class="text-muted" style="font-size:0.75rem">Peak Day (${escapeHtml(peakLabel)})</div>
+                    </div>
+                </div>
+                <div class="col-6 col-md">
+                    <div class="p-2 bg-light rounded text-center">
+                        <div class="fw-bold small">${fmt(avgSpend)}</div>
+                        <div class="text-muted" style="font-size:0.75rem">Avg Spend</div>
+                    </div>
+                </div>
+                <div class="col-6 col-md">
+                    <div class="p-2 bg-light rounded text-center">
+                        <div class="fw-bold small">${days.toLocaleString('en-ZA')}</div>
+                        <div class="text-muted" style="font-size:0.75rem">Forecast Days</div>
+                    </div>
+                </div>
+            </div>`;
+    }
+
     _buildHistoricalSummary(data) {
         if (!data.length) return '';
         const fmt = v => `R ${Number(v).toLocaleString('en-ZA', { maximumFractionDigits: 0 })}`;
-        const totalRevenue = data.reduce((s, d) => s + (d.revenue ?? 0), 0);
-        const avgDaily = totalRevenue / data.length;
-        const bestDay = data.reduce((best, d) => (d.revenue ?? 0) > (best.revenue ?? 0) ? d : best, data[0]);
-        const bestDt = bestDay.date instanceof Date ? bestDay.date : new Date(bestDay.date);
+        const tradingDays = data.filter(d => (d.revenue ?? 0) > 0);
+        const closedCount = data.length - tradingDays.length;
+        const totalRevenue = tradingDays.reduce((s, d) => s + (d.revenue ?? 0), 0);
+        // Avg daily uses only trading days so closed days don't drag the number down
+        const avgDaily = tradingDays.length > 0 ? totalRevenue / tradingDays.length : 0;
+        const bestDay = tradingDays.length > 0
+            ? tradingDays.reduce((best, d) => (d.revenue ?? 0) > (best.revenue ?? 0) ? d : best, tradingDays[0])
+            : null;
+        const recordsLabel = closedCount > 0
+            ? `${data.length.toLocaleString('en-ZA')} <small class="text-muted">(${closedCount} closed)</small>`
+            : data.length.toLocaleString('en-ZA');
         return `
             <div class="row g-2 mb-2">
                 <div class="col-6 col-md-3">
@@ -2449,18 +2626,18 @@ export class SalesForecastingModule {
                 <div class="col-6 col-md-3">
                     <div class="p-2 bg-light rounded text-center">
                         <div class="fw-bold small">${fmt(avgDaily)}</div>
-                        <div class="text-muted" style="font-size:0.75rem">Avg Daily</div>
+                        <div class="text-muted" style="font-size:0.75rem">Avg Daily (trading)</div>
                     </div>
                 </div>
                 <div class="col-6 col-md-3">
                     <div class="p-2 bg-light rounded text-center">
-                        <div class="fw-bold small">${fmt(bestDay.revenue ?? 0)}</div>
+                        <div class="fw-bold small">${bestDay ? fmt(bestDay.revenue ?? 0) : '—'}</div>
                         <div class="text-muted" style="font-size:0.75rem">Best Day</div>
                     </div>
                 </div>
                 <div class="col-6 col-md-3">
                     <div class="p-2 bg-light rounded text-center">
-                        <div class="fw-bold small">${data.length.toLocaleString('en-ZA')}</div>
+                        <div class="fw-bold small">${recordsLabel}</div>
                         <div class="text-muted" style="font-size:0.75rem">Records</div>
                     </div>
                 </div>

@@ -1,0 +1,104 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Temporary Setup - Clear Data</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+</head>
+<body class="bg-light">
+    <div class="container mt-5">
+        <div class="row justify-content-center">
+            <div class="col-md-6">
+                <div class="card shadow">
+                    <div class="card-body">
+                        <h2 class="card-title text-center mb-4">Clear Database</h2>
+                        <div class="alert alert-warning">
+                            <strong>Warning!</strong> This will clear all scanning data. This action cannot be undone!
+                        </div>
+                        <form id="setupForm">
+                            <div class="mb-3">
+                                <label for="setupSecret" class="form-label">Setup Secret</label>
+                                <input type="password" 
+                                       class="form-control" 
+                                       id="setupSecret" 
+                                       required
+                                       autocomplete="current-password">
+                                <div class="form-text">Enter the temporary setup secret</div>
+                            </div>
+
+                            <div id="error-message" class="alert alert-danger" style="display: none;"></div>
+                            <div id="success-message" class="alert alert-success" style="display: none;"></div>
+                            
+                            <div class="d-grid gap-2">
+                                <button type="submit" class="btn btn-danger" id="submitBtn">
+                                    Clear Database
+                                </button>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const form = document.getElementById('setupForm');
+        const errorDiv = document.getElementById('error-message');
+        const successDiv = document.getElementById('success-message');
+        const submitBtn = document.getElementById('submitBtn');
+
+        function showError(message) {
+            errorDiv.textContent = message;
+            errorDiv.style.display = 'block';
+            successDiv.style.display = 'none';
+        }
+
+        function showSuccess(message) {
+            successDiv.textContent = message;
+            successDiv.style.display = 'block';
+            errorDiv.style.display = 'none';
+        }
+
+        form.addEventListener('submit', async (e) => {
+            e.preventDefault();
+            
+            if (!confirm('Are you absolutely sure? This will delete all scanning data!')) {
+                return;
+            }
+            
+            const setupSecret = document.getElementById('setupSecret').value;
+
+            // Disable form while processing
+            submitBtn.disabled = true;
+            submitBtn.textContent = 'Clearing...';
+
+            try {
+                const response = await fetch('/tempClearData', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({
+                        setupSecret
+                    })
+                });
+
+                const data = await response.json();
+
+                if (!response.ok) {
+                    throw new Error(data.error || 'Failed to clear data');
+                }
+
+                showSuccess(`Successfully cleared ${data.recordsCleared} records at ${new Date(data.timestamp).toLocaleString()}`);
+                form.reset();
+            } catch (error) {
+                showError(error.message);
+            } finally {
+                submitBtn.disabled = false;
+                submitBtn.textContent = 'Clear Database';
+            }
+        });
+    </script>
+</body>
+</html>

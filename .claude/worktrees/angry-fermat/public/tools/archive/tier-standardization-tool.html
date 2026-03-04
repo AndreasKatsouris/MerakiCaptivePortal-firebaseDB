@@ -1,0 +1,284 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Tier Standardization Tool</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <style>
+        .log-container {
+            background: #1a1a1a;
+            color: #00ff00;
+            font-family: monospace;
+            padding: 20px;
+            border-radius: 8px;
+            height: 400px;
+            overflow-y: auto;
+        }
+        .success { color: #00ff00; }
+        .error { color: #ff4444; }
+        .warning { color: #ffaa00; }
+        .info { color: #4488ff; }
+    </style>
+</head>
+<body>
+    <div class="container mt-4">
+        <div class="row">
+            <div class="col-12">
+                <h1 class="mb-4">🔧 Tier Standardization Tool</h1>
+                <div class="alert alert-info">
+                    <h5>Purpose: Fix tier/tierId Field Conflicts</h5>
+                    <p>This tool standardizes subscription data to use only the <code>tier</code> field, removing conflicting <code>tierId</code> fields.</p>
+                </div>
+                
+                <div class="card mb-4">
+                    <div class="card-header">
+                        <h5>🔍 Current Database State</h5>
+                    </div>
+                    <div class="card-body">
+                        <button class="btn btn-primary" onclick="analyzeDatabase()">Analyze Current Subscriptions</button>
+                        <div id="analysis-results" class="mt-3"></div>
+                    </div>
+                </div>
+
+                <div class="card mb-4">
+                    <div class="card-header">
+                        <h5>🚀 Tier Standardization</h5>
+                    </div>
+                    <div class="card-body">
+                        <div class="alert alert-warning">
+                            <strong>⚠️ Safety Check:</strong> This will modify subscription data. Only 2 users in database = Low Risk.
+                        </div>
+                        <button class="btn btn-success" onclick="standardizeTiers()">🔧 Standardize All Tiers</button>
+                        <button class="btn btn-secondary ms-2" onclick="rollbackChanges()" disabled id="rollback-btn">↩️ Rollback Changes</button>
+                    </div>
+                </div>
+
+                <div class="card">
+                    <div class="card-header">
+                        <h5>📝 Operation Log</h5>
+                    </div>
+                    <div class="card-body">
+                        <div id="operation-log" class="log-container">
+                            Ready for tier standardization...\n
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script type="module">
+        import { rtdb, ref, get, update, set, remove } from '../js/config/firebase-config.js';
+
+        let backupData = {};
+
+        window.log = function(message, type = 'info') {
+            const logContainer = document.getElementById('operation-log');
+            const timestamp = new Date().toLocaleTimeString();
+            const className = type;
+            logContainer.innerHTML += `<div class="${className}">[${timestamp}] ${message}</div>`;
+            logContainer.scrollTop = logContainer.scrollHeight;
+        };
+
+        window.analyzeDatabase = async function() {
+            log('🔍 Starting database analysis...', 'info');
+            
+            try {
+                const subscriptionsRef = ref(rtdb, 'subscriptions');
+                const snapshot = await get(subscriptionsRef);
+                
+                if (!snapshot.exists()) {
+                    log('❌ No subscriptions found in database', 'error');
+                    return;
+                }
+
+                const subscriptions = snapshot.val();
+                const userIds = Object.keys(subscriptions);
+                
+                log(`📊 Found ${userIds.length} users in database`, 'success');
+                
+                const conflicts = [];
+                const analysis = {
+                    totalUsers: userIds.length,
+                    hasOnlyTier: 0,
+                    hasOnlyTierId: 0,
+                    hasBothFields: 0,
+                    hasConflicts: 0
+                };
+
+                userIds.forEach(userId => {
+                    const sub = subscriptions[userId];
+                    const hasTier = sub.tier !== undefined;
+                    const hasTierId = sub.tierId !== undefined;
+                    
+                    if (hasTier && !hasTierId) {
+                        analysis.hasOnlyTier++;
+                    } else if (!hasTier && hasTierId) {
+                        analysis.hasOnlyTierId++;
+                    } else if (hasTier && hasTierId) {
+                        analysis.hasBothFields++;
+                        if (sub.tier !== sub.tierId) {
+                            analysis.hasConflicts++;
+                            conflicts.push({
+                                userId,
+                                tier: sub.tier,
+                                tierId: sub.tierId
+                            });
+                        }
+                    }
+                });
+
+                log('📈 Analysis Results:', 'success');
+                log(`   - Users with only 'tier': ${analysis.hasOnlyTier}`, 'info');
+                log(`   - Users with only 'tierId': ${analysis.hasOnlyTierId}`, 'info');
+                log(`   - Users with both fields: ${analysis.hasBothFields}`, 'warning');
+                log(`   - Users with conflicts: ${analysis.hasConflicts}`, analysis.hasConflicts > 0 ? 'error' : 'success');
+
+                if (conflicts.length > 0) {
+                    log('🔥 CONFLICTS DETECTED:', 'error');
+                    conflicts.forEach(conflict => {
+                        log(`   User ${conflict.userId}: tier="${conflict.tier}" vs tierId="${conflict.tierId}"`, 'error');
+                    });
+                }
+
+                // Update UI
+                const resultsDiv = document.getElementById('analysis-results');
+                resultsDiv.innerHTML = `
+                    <div class="alert alert-${conflicts.length > 0 ? 'danger' : 'success'}">
+                        <h6>Analysis Complete</h6>
+                        <ul class="mb-0">
+                            <li>Total Users: ${analysis.totalUsers}</li>
+                            <li>Only 'tier' field: ${analysis.hasOnlyTier}</li>
+                            <li>Only 'tierId' field: ${analysis.hasOnlyTierId}</li>
+                            <li>Both fields: ${analysis.hasBothFields}</li>
+                            <li class="text-danger">Conflicts: ${analysis.hasConflicts}</li>
+                        </ul>
+                    </div>
+                `;
+
+            } catch (error) {
+                log(`❌ Analysis failed: ${error.message}`, 'error');
+            }
+        };
+
+        window.standardizeTiers = async function() {
+            log('🚀 Starting tier standardization process...', 'info');
+            
+            try {
+                // Get all subscriptions
+                const subscriptionsRef = ref(rtdb, 'subscriptions');
+                const snapshot = await get(subscriptionsRef);
+                
+                if (!snapshot.exists()) {
+                    log('❌ No subscriptions found', 'error');
+                    return;
+                }
+
+                const subscriptions = snapshot.val();
+                backupData = JSON.parse(JSON.stringify(subscriptions)); // Deep copy for backup
+                
+                log('💾 Created backup of subscription data', 'success');
+                
+                const userIds = Object.keys(subscriptions);
+                log(`🔧 Processing ${userIds.length} users...`, 'info');
+                
+                const updates = {};
+                let standardized = 0;
+                let errors = 0;
+
+                userIds.forEach(userId => {
+                    const sub = subscriptions[userId];
+                    const hasTier = sub.tier !== undefined;
+                    const hasTierId = sub.tierId !== undefined;
+                    
+                    try {
+                        if (hasTier && hasTierId) {
+                            // Both fields exist - prioritize 'tier' and remove 'tierId'
+                            log(`🔄 User ${userId}: Removing tierId="${sub.tierId}", keeping tier="${sub.tier}"`, 'warning');
+                            updates[`subscriptions/${userId}/tierId`] = null; // Remove tierId
+                        } else if (!hasTier && hasTierId) {
+                            // Only tierId exists - migrate to tier
+                            log(`📝 User ${userId}: Migrating tierId="${sub.tierId}" to tier`, 'info');
+                            updates[`subscriptions/${userId}/tier`] = sub.tierId;
+                            updates[`subscriptions/${userId}/tierId`] = null; // Remove tierId
+                        } else if (hasTier && !hasTierId) {
+                            // Only tier exists - already standardized
+                            log(`✅ User ${userId}: Already standardized (tier="${sub.tier}")`, 'success');
+                        } else {
+                            // Neither field exists - set default
+                            log(`⚠️ User ${userId}: No tier field found, setting to 'free'`, 'warning');
+                            updates[`subscriptions/${userId}/tier`] = 'free';
+                        }
+                        standardized++;
+                    } catch (error) {
+                        log(`❌ User ${userId}: Processing error - ${error.message}`, 'error');
+                        errors++;
+                    }
+                });
+
+                if (Object.keys(updates).length === 0) {
+                    log('✅ All users already standardized - no changes needed', 'success');
+                    return;
+                }
+
+                log(`📤 Applying ${Object.keys(updates).length} database updates...`, 'info');
+                
+                // Apply all updates in one transaction
+                await update(ref(rtdb), updates);
+                
+                log('🎉 TIER STANDARDIZATION COMPLETE!', 'success');
+                log(`   - Users processed: ${standardized}`, 'success');
+                log(`   - Errors: ${errors}`, errors > 0 ? 'error' : 'success');
+                log('   - All users now use only the "tier" field', 'success');
+                
+                // Enable rollback button
+                document.getElementById('rollback-btn').disabled = false;
+                
+                // Re-analyze to show results
+                setTimeout(() => {
+                    log('🔍 Running post-migration analysis...', 'info');
+                    analyzeDatabase();
+                }, 1000);
+                
+            } catch (error) {
+                log(`❌ Standardization failed: ${error.message}`, 'error');
+            }
+        };
+
+        window.rollbackChanges = async function() {
+            if (Object.keys(backupData).length === 0) {
+                log('❌ No backup data available for rollback', 'error');
+                return;
+            }
+            
+            log('↩️ Starting rollback process...', 'warning');
+            
+            try {
+                const subscriptionsRef = ref(rtdb, 'subscriptions');
+                await set(subscriptionsRef, backupData);
+                
+                log('✅ Rollback complete - database restored to previous state', 'success');
+                
+                // Disable rollback button
+                document.getElementById('rollback-btn').disabled = true;
+                backupData = {};
+                
+                // Re-analyze to show current state
+                setTimeout(analyzeDatabase, 500);
+                
+            } catch (error) {
+                log(`❌ Rollback failed: ${error.message}`, 'error');
+            }
+        };
+
+        // Auto-analyze on page load
+        window.addEventListener('load', () => {
+            setTimeout(() => {
+                log('🔍 Running initial database analysis...', 'info');
+                analyzeDatabase();
+            }, 1000);
+        });
+    </script>
+</body>
+</html>

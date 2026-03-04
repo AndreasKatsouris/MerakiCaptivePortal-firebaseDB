@@ -1,0 +1,148 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Quick Location Diagnostic</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+</head>
+<body>
+    <div class="container mt-5">
+        <h1>Quick Location Diagnostic</h1>
+        <p>This page provides a quick test for location matching issues.</p>
+        
+        <div class="card">
+            <div class="card-body">
+                <h5>Test Ocean Basket Brits Location Matching</h5>
+                <button id="testBtn" class="btn btn-primary">Run Test</button>
+                <div id="results" class="mt-3"></div>
+            </div>
+        </div>
+    </div>
+
+    <script type="module">
+        import { auth, rtdb, ref, get, onAuthStateChanged } from '../js/config/firebase-config.js';
+
+        document.getElementById('testBtn').addEventListener('click', async () => {
+            const resultsDiv = document.getElementById('results');
+            resultsDiv.innerHTML = '<div class="spinner-border"></div> Testing...';
+            
+            try {
+                // Test 1: Check location data
+                console.log('=== QUICK LOCATION DIAGNOSTIC ===');
+                
+                const locationId = '-OSKL7AJj6ErxYy3jgpD';
+                const locationRef = ref(rtdb, `locations/${locationId}`);
+                const locationSnapshot = await get(locationRef);
+                
+                let html = '<h6>Test Results:</h6>';
+                
+                if (locationSnapshot.exists()) {
+                    const locationData = locationSnapshot.val();
+                    html += `<div class="alert alert-success">✅ Location found: ${JSON.stringify(locationData)}</div>`;
+                    
+                    // Test 2: Check historical data in old structure
+                    const oldDataRef = ref(rtdb, `locations/${locationId}/stockUsage`);
+                    const oldDataSnapshot = await get(oldDataRef);
+                    
+                    if (oldDataSnapshot.exists()) {
+                        const oldData = oldDataSnapshot.val();
+                        html += `<div class="alert alert-info">📊 Old structure data: ${Object.keys(oldData).length} records</div>`;
+                    } else {
+                        html += `<div class="alert alert-warning">⚠️ No data in old structure (locations/${locationId}/stockUsage)</div>`;
+                    }
+                    
+                    // Test 3: Check historical data in new structure
+                    const newDataRef = ref(rtdb, 'stockData');
+                    const newDataSnapshot = await get(newDataRef);
+                    
+                    if (newDataSnapshot.exists()) {
+                        const newData = newDataSnapshot.val();
+                        const matchingRecords = Object.values(newData).filter(record => 
+                            record.locationId === locationId || 
+                            record.selectedLocationId === locationId ||
+                            record.storeName === locationData.name ||
+                            record.storeName === locationData.displayName
+                        );
+                        html += `<div class="alert alert-info">🗄️ New structure data: ${matchingRecords.length} matching records out of ${Object.keys(newData).length} total</div>`;
+                    } else {
+                        html += `<div class="alert alert-warning">⚠️ No data in new structure (stockData)</div>`;
+                    }
+                    
+                    // Test 4: Test Historical Usage Service
+                    try {
+                        const HistoricalUsageServiceModule = await import('../js/modules/food-cost/services/historical-usage-service.js');
+                        const HistoricalUsageService = HistoricalUsageServiceModule.default;
+                        
+                        // Test with location ID (using 365 days to catch future-dated test data)
+                        const historicalDataById = await HistoricalUsageService.getHistoricalData(locationId, { lookbackDays: 365 });
+                        html += `<div class="alert alert-primary">🔍 Historical Service (ID): ${historicalDataById.length} records</div>`;
+                        
+                        // Test with location name
+                        if (locationData.name) {
+                            const historicalDataByName = await HistoricalUsageService.getHistoricalData(locationData.name, { lookbackDays: 365 });
+                            html += `<div class="alert alert-primary">🔍 Historical Service (Name "${locationData.name}"): ${historicalDataByName.length} records</div>`;
+                        }
+                        
+                        // Test with display name
+                        if (locationData.displayName && locationData.displayName !== locationData.name) {
+                            const historicalDataByDisplayName = await HistoricalUsageService.getHistoricalData(locationData.displayName, { lookbackDays: 365 });
+                            html += `<div class="alert alert-primary">🔍 Historical Service (Display Name "${locationData.displayName}"): ${historicalDataByDisplayName.length} records</div>`;
+                        }
+                        
+                        // Test 5: Test Enhanced generateHistoricalSummaries (the actual method used by Advanced PO)
+                        const mockStockItems = [
+                            { itemCode: '10851', description: 'amstel' },
+                            { itemCode: '10001', description: 'test item' }
+                        ];
+                        
+                        console.log('=== TESTING ENHANCED HISTORICAL SUMMARIES ===');
+                        
+                        // Clear cache to ensure fresh data
+                        HistoricalUsageService.clearCache();
+                        console.log('Cache cleared for fresh testing');
+                        
+                        // First, let's examine the structure of the historical data
+                        const sampleHistoricalData = await HistoricalUsageService.getHistoricalData(locationId, { lookbackDays: 30 });
+                        if (sampleHistoricalData.length > 0) {
+                            console.log('Sample historical record structure:', sampleHistoricalData[0]);
+                            if (sampleHistoricalData[0].stockItems && Array.isArray(sampleHistoricalData[0].stockItems) && sampleHistoricalData[0].stockItems.length > 0) {
+                                console.log('Sample stock item structure:', sampleHistoricalData[0].stockItems[0]);
+                            }
+                        }
+                        
+                        const historicalSummaries = await HistoricalUsageService.generateHistoricalSummaries(locationId, mockStockItems, { lookbackDays: 365 });
+                        
+                        html += `<div class="alert alert-success">🎯 <strong>Enhanced Historical Summaries</strong>: Found data for ${Object.keys(historicalSummaries).length} items out of ${mockStockItems.length} tested</div>`;
+                        
+                        if (Object.keys(historicalSummaries).length > 0) {
+                            html += `<div class="alert alert-info">📊 Items with data: ${Object.keys(historicalSummaries).join(', ')}</div>`;
+                        } else {
+                            html += `<div class="alert alert-warning">⚠️ No item data found. This suggests the historical records may not have 'usage' field or the data structure is different.</div>`;
+                        }
+                        
+                    } catch (serviceError) {
+                        html += `<div class="alert alert-danger">❌ Historical Service Error: ${serviceError.message}</div>`;
+                    }
+                    
+                } else {
+                    html += `<div class="alert alert-danger">❌ Location ${locationId} not found</div>`;
+                }
+                
+                resultsDiv.innerHTML = html;
+                
+            } catch (error) {
+                resultsDiv.innerHTML = `<div class="alert alert-danger">Error: ${error.message}</div>`;
+                console.error('Diagnostic error:', error);
+            }
+        });
+
+        // Auto-login check
+        onAuthStateChanged(auth, (user) => {
+            if (!user) {
+                document.getElementById('results').innerHTML = '<div class="alert alert-warning">Please login first</div>';
+            }
+        });
+    </script>
+</body>
+</html> 

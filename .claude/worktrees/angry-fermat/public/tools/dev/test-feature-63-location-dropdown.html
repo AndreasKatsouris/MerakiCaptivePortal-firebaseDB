@@ -1,0 +1,362 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Test Feature #63 - Location Dropdown from RTDB</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <style>
+        body {
+            padding: 20px;
+            background: #f8f9fa;
+        }
+        .test-container {
+            max-width: 800px;
+            margin: 0 auto;
+        }
+        .test-section {
+            background: white;
+            padding: 20px;
+            border-radius: 8px;
+            margin-bottom: 20px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        .status-badge {
+            display: inline-block;
+            padding: 4px 12px;
+            border-radius: 4px;
+            font-size: 0.875rem;
+            font-weight: 500;
+        }
+        .status-badge.success {
+            background: #d1f4e0;
+            color: #0d894f;
+        }
+        .status-badge.error {
+            background: #ffe0e0;
+            color: #d93025;
+        }
+        .log-entry {
+            padding: 8px;
+            margin: 4px 0;
+            border-left: 3px solid #6c757d;
+            background: #f8f9fa;
+            font-family: monospace;
+            font-size: 0.875rem;
+        }
+        .log-entry.success {
+            border-color: #28a745;
+        }
+        .log-entry.error {
+            border-color: #dc3545;
+        }
+    </style>
+</head>
+<body>
+    <div class="test-container">
+        <h1 class="mb-4">
+            <i class="fas fa-vial me-2"></i>
+            Feature #63: Location Dropdown from RTDB
+        </h1>
+
+        <!-- Test Instructions -->
+        <div class="test-section">
+            <h5><i class="fas fa-clipboard-list me-2"></i>Test Steps</h5>
+            <ol>
+                <li>Verify you're logged in as a user with locations</li>
+                <li>Click "Load Dashboard" to initialize</li>
+                <li>Check that location dropdown is populated from Firebase</li>
+                <li>Verify dropdown items match Firebase locations node</li>
+                <li>Test clicking on different locations</li>
+            </ol>
+        </div>
+
+        <!-- Authentication Status -->
+        <div class="test-section">
+            <h5><i class="fas fa-user me-2"></i>Authentication Status</h5>
+            <div id="authStatus">
+                <span class="status-badge">Checking...</span>
+            </div>
+        </div>
+
+        <!-- Actions -->
+        <div class="test-section">
+            <h5><i class="fas fa-play me-2"></i>Actions</h5>
+            <button id="loadDashboard" class="btn btn-primary me-2">
+                <i class="fas fa-sync me-1"></i>Load Dashboard
+            </button>
+            <button id="inspectDropdown" class="btn btn-secondary me-2">
+                <i class="fas fa-search me-1"></i>Inspect Dropdown
+            </button>
+            <button id="checkFirebase" class="btn btn-info">
+                <i class="fas fa-database me-1"></i>Check Firebase Data
+            </button>
+        </div>
+
+        <!-- Location Dropdown Test -->
+        <div class="test-section">
+            <h5><i class="fas fa-map-marker-alt me-2"></i>Location Dropdown</h5>
+            <div class="location-selector">
+                <button class="btn btn-outline-secondary dropdown-toggle" type="button" id="locationDropdown" data-bs-toggle="dropdown" aria-expanded="false">
+                    <i class="fas fa-map-marker-alt"></i>
+                    <span id="selectedLocationName">All Locations</span>
+                </button>
+                <ul class="dropdown-menu" aria-labelledby="locationDropdown" id="locationDropdownMenu">
+                    <!-- Will be populated dynamically -->
+                </ul>
+            </div>
+        </div>
+
+        <!-- Firebase Data -->
+        <div class="test-section">
+            <h5><i class="fas fa-database me-2"></i>Firebase Locations Data</h5>
+            <div id="firebaseData" style="font-family: monospace; white-space: pre-wrap; background: #f8f9fa; padding: 15px; border-radius: 4px;"></div>
+        </div>
+
+        <!-- Dropdown Content -->
+        <div class="test-section">
+            <h5><i class="fas fa-list me-2"></i>Dropdown Content</h5>
+            <div id="dropdownContent" style="font-family: monospace; white-space: pre-wrap; background: #f8f9fa; padding: 15px; border-radius: 4px;"></div>
+        </div>
+
+        <!-- Test Log -->
+        <div class="test-section">
+            <h5><i class="fas fa-terminal me-2"></i>Test Log</h5>
+            <div id="testLog"></div>
+        </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    <script type="module">
+        import { auth, rtdb, ref, get, onAuthStateChanged } from '../../js/config/firebase-config.js';
+
+        let currentUser = null;
+        let locations = [];
+
+        // Logging helper
+        function log(message, type = 'info') {
+            const logEl = document.getElementById('testLog');
+            const timestamp = new Date().toLocaleTimeString();
+            const entry = document.createElement('div');
+            entry.className = `log-entry ${type}`;
+            entry.textContent = `[${timestamp}] ${message}`;
+            logEl.appendChild(entry);
+            console.log(`[Feature #63] ${message}`);
+        }
+
+        // Check authentication
+        onAuthStateChanged(auth, (user) => {
+            const authStatus = document.getElementById('authStatus');
+            if (user) {
+                currentUser = user;
+                authStatus.innerHTML = `
+                    <span class="status-badge success">
+                        <i class="fas fa-check-circle me-1"></i>
+                        Logged in as ${user.email}
+                    </span>
+                `;
+                log('User authenticated: ' + user.email, 'success');
+            } else {
+                authStatus.innerHTML = `
+                    <span class="status-badge error">
+                        <i class="fas fa-times-circle me-1"></i>
+                        Not logged in
+                    </span>
+                `;
+                log('User not authenticated - please log in', 'error');
+            }
+        });
+
+        // Load locations from Firebase
+        async function loadLocations() {
+            if (!currentUser) {
+                log('Cannot load locations - not authenticated', 'error');
+                return;
+            }
+
+            try {
+                log('Loading locations from Firebase RTDB...');
+
+                // Get user's locations
+                const userLocationsRef = ref(rtdb, `userLocations/${currentUser.uid}`);
+                const userLocationsSnapshot = await get(userLocationsRef);
+
+                if (!userLocationsSnapshot.exists()) {
+                    log('No locations found for user', 'error');
+                    return;
+                }
+
+                const userLocationsData = userLocationsSnapshot.val();
+                const locationIds = Object.keys(userLocationsData);
+                log(`Found ${locationIds.length} location IDs`);
+
+                // Load location details in parallel
+                const locationPromises = locationIds.map(async (locationId) => {
+                    const locationRef = ref(rtdb, `locations/${locationId}`);
+                    const locationSnapshot = await get(locationRef);
+                    if (locationSnapshot.exists()) {
+                        return {
+                            id: locationId,
+                            ...locationSnapshot.val()
+                        };
+                    }
+                    return null;
+                });
+
+                const locationResults = await Promise.all(locationPromises);
+                locations = locationResults.filter(loc => loc !== null);
+
+                log(`Loaded ${locations.length} locations successfully`, 'success');
+
+                // Display Firebase data
+                const firebaseDataEl = document.getElementById('firebaseData');
+                firebaseDataEl.textContent = JSON.stringify(locations, null, 2);
+
+                // Populate dropdown
+                populateLocationDropdown();
+
+            } catch (error) {
+                log('Error loading locations: ' + error.message, 'error');
+                console.error('Error loading locations:', error);
+            }
+        }
+
+        // Populate location dropdown
+        function populateLocationDropdown() {
+            log('Populating location dropdown...');
+
+            const dropdown = document.getElementById('locationDropdownMenu');
+
+            // Clear existing items
+            dropdown.innerHTML = '';
+
+            // Add "All Locations" option
+            const allLocationsItem = document.createElement('li');
+            allLocationsItem.innerHTML = `
+                <a class="dropdown-item active" href="#" data-location="all">
+                    <i class="fas fa-globe me-2"></i>All Locations
+                </a>
+            `;
+            dropdown.appendChild(allLocationsItem);
+
+            // Add divider
+            const divider = document.createElement('li');
+            divider.innerHTML = '<hr class="dropdown-divider">';
+            dropdown.appendChild(divider);
+
+            // Add location items
+            if (locations.length === 0) {
+                const noLocationsItem = document.createElement('li');
+                noLocationsItem.innerHTML = `
+                    <span class="dropdown-item text-muted">
+                        <i class="fas fa-info-circle me-2"></i>No locations found
+                    </span>
+                `;
+                dropdown.appendChild(noLocationsItem);
+                log('No locations to populate in dropdown', 'error');
+            } else {
+                locations.forEach(location => {
+                    const item = document.createElement('li');
+                    item.innerHTML = `
+                        <a class="dropdown-item" href="#" data-location="${location.id}">
+                            <i class="fas fa-store me-2"></i>${location.name}
+                        </a>
+                    `;
+                    dropdown.appendChild(item);
+                    log(`Added location to dropdown: ${location.name}`, 'success');
+                });
+            }
+
+            // Add event listeners to dropdown items
+            dropdown.querySelectorAll('.dropdown-item[data-location]').forEach(item => {
+                item.addEventListener('click', (e) => {
+                    e.preventDefault();
+                    const locationId = e.target.closest('[data-location]').dataset.location;
+                    handleLocationChange(locationId);
+                });
+            });
+
+            log(`Dropdown populated with ${locations.length} locations`, 'success');
+            inspectDropdown();
+        }
+
+        // Handle location change
+        function handleLocationChange(locationId) {
+            log(`Location selected: ${locationId}`);
+
+            const selectedNameEl = document.getElementById('selectedLocationName');
+            const clickedItem = document.querySelector(`[data-location="${locationId}"]`);
+
+            if (selectedNameEl && clickedItem) {
+                selectedNameEl.textContent = clickedItem.textContent.trim();
+            }
+
+            // Update active state
+            document.querySelectorAll('.dropdown-item[data-location]').forEach(item => {
+                item.classList.remove('active');
+            });
+            if (clickedItem) {
+                clickedItem.classList.add('active');
+            }
+
+            log(`Selected location name: ${clickedItem?.textContent.trim()}`, 'success');
+        }
+
+        // Inspect dropdown content
+        function inspectDropdown() {
+            const dropdown = document.getElementById('locationDropdownMenu');
+            const items = dropdown.querySelectorAll('.dropdown-item');
+
+            let content = `Total dropdown items: ${items.length}\n\n`;
+            items.forEach((item, index) => {
+                const locationId = item.getAttribute('data-location') || 'N/A';
+                const text = item.textContent.trim();
+                content += `${index + 1}. [${locationId}] ${text}\n`;
+            });
+
+            document.getElementById('dropdownContent').textContent = content;
+            log(`Inspected ${items.length} dropdown items`);
+        }
+
+        // Event listeners
+        document.getElementById('loadDashboard').addEventListener('click', async () => {
+            log('=== Loading Dashboard ===');
+            await loadLocations();
+        });
+
+        document.getElementById('inspectDropdown').addEventListener('click', () => {
+            inspectDropdown();
+        });
+
+        document.getElementById('checkFirebase').addEventListener('click', async () => {
+            if (!currentUser) {
+                log('Cannot check Firebase - not authenticated', 'error');
+                return;
+            }
+
+            try {
+                log('Checking Firebase data...');
+
+                const userLocationsRef = ref(rtdb, `userLocations/${currentUser.uid}`);
+                const snapshot = await get(userLocationsRef);
+
+                if (snapshot.exists()) {
+                    const data = snapshot.val();
+                    log('Firebase userLocations data:', 'success');
+                    console.log('userLocations data:', data);
+
+                    const firebaseDataEl = document.getElementById('firebaseData');
+                    firebaseDataEl.textContent = JSON.stringify(data, null, 2);
+                } else {
+                    log('No userLocations data found', 'error');
+                }
+            } catch (error) {
+                log('Error checking Firebase: ' + error.message, 'error');
+            }
+        });
+
+        log('Test page initialized');
+    </script>
+</body>
+</html>

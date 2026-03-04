@@ -1,0 +1,140 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Setup Admin User</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
+</head>
+<body>
+    <div class="container mt-5">
+        <h1>Setup Admin User</h1>
+        <p>This utility will set up or fix admin privileges for the current user.</p>
+        
+        <div id="status" class="alert alert-info">Checking authentication...</div>
+        
+        <div id="actions" class="mt-3" style="display: none;">
+            <button id="makeAdminBtn" class="btn btn-danger">Make Me Admin</button>
+            <button id="checkStatusBtn" class="btn btn-primary ms-2">Check Status</button>
+        </div>
+        
+        <div id="userInfo" class="mt-4"></div>
+    </div>
+
+    <script type="module">
+        import { auth, rtdb, ref, get, set, update, onAuthStateChanged } from '../js/config/firebase-config.js';
+        
+        const statusDiv = document.getElementById('status');
+        const actionsDiv = document.getElementById('actions');
+        const userInfoDiv = document.getElementById('userInfo');
+        const makeAdminBtn = document.getElementById('makeAdminBtn');
+        const checkStatusBtn = document.getElementById('checkStatusBtn');
+        
+        let currentUser = null;
+        
+        async function checkUserStatus() {
+            if (!currentUser) return;
+            
+            const userSnapshot = await get(ref(rtdb, `users/${currentUser.uid}`));
+            const userData = userSnapshot.val();
+            
+            let html = `
+                <div class="card">
+                    <div class="card-header">Current User Information</div>
+                    <div class="card-body">
+                        <p><strong>Email:</strong> ${currentUser.email}</p>
+                        <p><strong>UID:</strong> ${currentUser.uid}</p>
+            `;
+            
+            if (userData) {
+                html += `
+                        <p><strong>Role:</strong> ${userData.role || 'undefined'}</p>
+                        <p><strong>isAdmin:</strong> ${userData.isAdmin || 'false'}</p>
+                        <p><strong>Created:</strong> ${userData.createdAt ? new Date(userData.createdAt).toLocaleString() : 'N/A'}</p>
+                `;
+                
+                if (userData.role === 'admin' || userData.isAdmin === true) {
+                    html += '<p class="text-success"><strong>Status:</strong> ✓ Admin privileges active</p>';
+                } else {
+                    html += '<p class="text-warning"><strong>Status:</strong> ⚠ No admin privileges</p>';
+                }
+            } else {
+                html += '<p class="text-danger"><strong>Status:</strong> No user profile found</p>';
+            }
+            
+            html += `
+                    </div>
+                </div>
+            `;
+            
+            userInfoDiv.innerHTML = html;
+        }
+        
+        onAuthStateChanged(auth, async (user) => {
+            if (!user) {
+                statusDiv.className = 'alert alert-danger';
+                statusDiv.textContent = 'Not logged in. Please login first.';
+                actionsDiv.style.display = 'none';
+                return;
+            }
+            
+            currentUser = user;
+            statusDiv.className = 'alert alert-success';
+            statusDiv.textContent = `Logged in as: ${user.email}`;
+            actionsDiv.style.display = 'block';
+            
+            await checkUserStatus();
+        });
+        
+        makeAdminBtn.addEventListener('click', async () => {
+            if (!currentUser) return;
+            
+            makeAdminBtn.disabled = true;
+            makeAdminBtn.textContent = 'Processing...';
+            
+            try {
+                const adminData = {
+                    uid: currentUser.uid,
+                    email: currentUser.email,
+                    role: 'admin',
+                    isAdmin: true,
+                    displayName: currentUser.displayName || 'Admin User',
+                    updatedAt: Date.now()
+                };
+                
+                // Check if user exists
+                const userSnapshot = await get(ref(rtdb, `users/${currentUser.uid}`));
+                const userData = userSnapshot.val();
+                
+                if (userData) {
+                    // Update existing user
+                    await update(ref(rtdb, `users/${currentUser.uid}`), {
+                        role: 'admin',
+                        isAdmin: true,
+                        updatedAt: Date.now()
+                    });
+                } else {
+                    // Create new user
+                    adminData.createdAt = Date.now();
+                    await set(ref(rtdb, `users/${currentUser.uid}`), adminData);
+                }
+                
+                statusDiv.className = 'alert alert-success';
+                statusDiv.innerHTML = '<strong>Success!</strong> Admin privileges have been granted.';
+                
+                await checkUserStatus();
+                
+            } catch (error) {
+                console.error('Error setting admin privileges:', error);
+                statusDiv.className = 'alert alert-danger';
+                statusDiv.innerHTML = `<strong>Error:</strong> ${error.message}`;
+            } finally {
+                makeAdminBtn.disabled = false;
+                makeAdminBtn.textContent = 'Make Me Admin';
+            }
+        });
+        
+        checkStatusBtn.addEventListener('click', checkUserStatus);
+    </script>
+</body>
+</html>

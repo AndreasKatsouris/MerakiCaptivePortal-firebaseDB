@@ -1,0 +1,724 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Purchase Order Workflow Diagnostic</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+    <style>
+        body {
+            padding: 20px;
+            background-color: #f8f9fa;
+        }
+        .diagnostic-section {
+            margin-bottom: 30px;
+            padding: 20px;
+            background: white;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        .step-result {
+            padding: 15px;
+            margin: 10px 0;
+            border-radius: 5px;
+            border-left: 4px solid #28a745;
+            background-color: #d4edda;
+        }
+        .step-failure {
+            border-left-color: #dc3545;
+            background-color: #f8d7da;
+        }
+        .step-warning {
+            border-left-color: #ffc107;
+            background-color: #fff3cd;
+        }
+        .data-preview {
+            max-height: 400px;
+            overflow-y: auto;
+            background: #f8f9fa;
+            padding: 15px;
+            border-radius: 5px;
+            font-family: monospace;
+            font-size: 12px;
+            white-space: pre-wrap;
+        }
+        .location-info {
+            background: #e9ecef;
+            padding: 15px;
+            border-radius: 5px;
+            margin-bottom: 20px;
+        }
+        .comparison-table {
+            font-size: 12px;
+        }
+        .comparison-table th, .comparison-table td {
+            padding: 8px;
+            border: 1px solid #dee2e6;
+        }
+        .match-highlight {
+            background-color: #d4edda !important;
+        }
+        .mismatch-highlight {
+            background-color: #f8d7da !important;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="row">
+            <div class="col-12">
+                <h1 class="display-4">Purchase Order Workflow Diagnostic</h1>
+                <p class="lead">Step-by-step analysis of Purchase Order workflow to identify location matching issues.</p>
+                
+                <!-- Location Selection -->
+                <div class="location-info">
+                    <h5><i class="fas fa-map-marker-alt"></i> Target Locations</h5>
+                    <div class="row">
+                        <div class="col-md-6">
+                            <label>Problem Location (Ocean Basket Brits):</label>
+                            <select class="form-select" id="problemLocationSelect">
+                                <option value="">Loading locations...</option>
+                            </select>
+                        </div>
+                        <div class="col-md-6">
+                            <label>Working Location (Comparison):</label>
+                            <select class="form-select" id="workingLocationSelect">
+                                <option value="">Loading locations...</option>
+                            </select>
+                        </div>
+                    </div>
+                    <button class="btn btn-primary mt-3" onclick="startDiagnostic()">
+                        <i class="fas fa-play"></i> Start Diagnostic
+                    </button>
+                </div>
+
+                <!-- Step 1: Location Data Analysis -->
+                <div class="diagnostic-section">
+                    <h3><i class="fas fa-database text-primary"></i> Step 1: Location Data Analysis</h3>
+                    <p>Analyze how locations are stored and identified in the database.</p>
+                    <div id="locationAnalysis" class="mt-3"></div>
+                </div>
+
+                <!-- Step 2: Historical Data Storage -->
+                <div class="diagnostic-section">
+                    <h3><i class="fas fa-archive text-info"></i> Step 2: Historical Data Storage</h3>
+                    <p>Examine how historical stock data is stored for each location.</p>
+                    <div id="historicalStorage" class="mt-3"></div>
+                </div>
+
+                <!-- Step 3: Location Selection Process -->
+                <div class="diagnostic-section">
+                    <h3><i class="fas fa-mouse-pointer text-warning"></i> Step 3: Location Selection Process</h3>
+                    <p>Trace how the location is selected and passed to the Purchase Order system.</p>
+                    <div id="locationSelection" class="mt-3"></div>
+                </div>
+
+                <!-- Step 4: Historical Data Retrieval -->
+                <div class="diagnostic-section">
+                    <h3><i class="fas fa-search text-success"></i> Step 4: Historical Data Retrieval</h3>
+                    <p>Test the Historical Usage Service with different location identifiers.</p>
+                    <div id="dataRetrieval" class="mt-3"></div>
+                </div>
+
+                <!-- Step 5: Purchase Order Logic -->
+                <div class="diagnostic-section">
+                    <h3><i class="fas fa-calculator text-danger"></i> Step 5: Purchase Order Logic</h3>
+                    <p>Analyze the Purchase Order calculation logic for both basic and advanced modes.</p>
+                    <div id="purchaseOrderLogic" class="mt-3"></div>
+                </div>
+
+                <!-- Step 6: Location Matching Strategies -->
+                <div class="diagnostic-section">
+                    <h3><i class="fas fa-link text-secondary"></i> Step 6: Location Matching Analysis</h3>
+                    <p>Compare different location matching strategies and identify the best approach.</p>
+                    <div id="matchingStrategies" class="mt-3"></div>
+                </div>
+
+                <!-- Summary and Recommendations -->
+                <div class="diagnostic-section">
+                    <h3><i class="fas fa-clipboard-check text-dark"></i> Summary & Recommendations</h3>
+                    <div id="diagnosticSummary">
+                        <p>Run the diagnostic to see recommendations for fixing the location matching issue.</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    <script type="module">
+        import { auth, rtdb, ref, get, onAuthStateChanged } from '../js/config/firebase-config.js';
+
+        let problemLocation = null;
+        let workingLocation = null;
+        let diagnosticResults = {};
+
+        // Initialize
+        window.addEventListener('DOMContentLoaded', () => {
+            onAuthStateChanged(auth, (user) => {
+                if (!user) {
+                    alert('Please login as an admin to use this diagnostic tool');
+                    window.location.href = '/admin-login.html';
+                    return;
+                }
+                
+                loadLocations();
+            });
+        });
+
+        async function loadLocations() {
+            try {
+                const locationsRef = ref(rtdb, 'locations');
+                const snapshot = await get(locationsRef);
+                
+                if (snapshot.exists()) {
+                    const locations = snapshot.val();
+                    const problemSelect = document.getElementById('problemLocationSelect');
+                    const workingSelect = document.getElementById('workingLocationSelect');
+                    
+                    problemSelect.innerHTML = '<option value="">Select problem location...</option>';
+                    workingSelect.innerHTML = '<option value="">Select working location...</option>';
+                    
+                    Object.entries(locations).forEach(([id, data]) => {
+                        const displayName = data.name || data.displayName || `Location ${id}`;
+                        
+                        const problemOption = document.createElement('option');
+                        problemOption.value = id;
+                        problemOption.textContent = `${displayName} (${id})`;
+                        problemSelect.appendChild(problemOption);
+                        
+                        const workingOption = document.createElement('option');
+                        workingOption.value = id;
+                        workingOption.textContent = `${displayName} (${id})`;
+                        workingSelect.appendChild(workingOption);
+                    });
+                    
+                    // Auto-select Ocean Basket Brits as problem location
+                    const britOption = Array.from(problemSelect.options).find(opt => 
+                        opt.textContent.toLowerCase().includes('brits') || 
+                        opt.value === '-OSKL7AJj6ErxYy3jgpD'
+                    );
+                    if (britOption) {
+                        britOption.selected = true;
+                    }
+                } else {
+                    document.getElementById('problemLocationSelect').innerHTML = '<option value="">No locations found</option>';
+                    document.getElementById('workingLocationSelect').innerHTML = '<option value="">No locations found</option>';
+                }
+            } catch (error) {
+                console.error('Error loading locations:', error);
+            }
+        }
+
+        window.startDiagnostic = async function() {
+            problemLocation = document.getElementById('problemLocationSelect').value;
+            workingLocation = document.getElementById('workingLocationSelect').value;
+            
+            if (!problemLocation) {
+                alert('Please select a problem location');
+                return;
+            }
+            
+            // Run all diagnostic steps
+            await step1_LocationDataAnalysis();
+            await step2_HistoricalDataStorage();
+            await step3_LocationSelectionProcess();
+            await step4_HistoricalDataRetrieval();
+            await step5_PurchaseOrderLogic();
+            await step6_LocationMatchingAnalysis();
+            
+            generateSummary();
+        };
+
+        // Step 1: Location Data Analysis
+        async function step1_LocationDataAnalysis() {
+            const output = document.getElementById('locationAnalysis');
+            output.innerHTML = '<div class="spinner-border spinner-border-sm"></div> Analyzing location data...';
+            
+            try {
+                const results = {
+                    problemLocation: null,
+                    workingLocation: null,
+                    locationFields: []
+                };
+                
+                // Get problem location data
+                const problemRef = ref(rtdb, `locations/${problemLocation}`);
+                const problemSnapshot = await get(problemRef);
+                if (problemSnapshot.exists()) {
+                    results.problemLocation = problemSnapshot.val();
+                }
+                
+                // Get working location data (if selected)
+                if (workingLocation) {
+                    const workingRef = ref(rtdb, `locations/${workingLocation}`);
+                    const workingSnapshot = await get(workingRef);
+                    if (workingSnapshot.exists()) {
+                        results.workingLocation = workingSnapshot.val();
+                    }
+                }
+                
+                // Identify all possible location identifier fields
+                const allFields = new Set();
+                if (results.problemLocation) {
+                    Object.keys(results.problemLocation).forEach(key => allFields.add(key));
+                }
+                if (results.workingLocation) {
+                    Object.keys(results.workingLocation).forEach(key => allFields.add(key));
+                }
+                
+                results.locationFields = Array.from(allFields);
+                diagnosticResults.step1 = results;
+                
+                let html = '<div class="step-result">';
+                html += '<h6><i class="fas fa-check-circle"></i> Location Data Retrieved</h6>';
+                html += '</div>';
+                
+                // Create comparison table
+                html += '<table class="table table-sm comparison-table">';
+                html += '<thead><tr><th>Field</th><th>Problem Location</th>';
+                if (workingLocation) html += '<th>Working Location</th>';
+                html += '</tr></thead><tbody>';
+                
+                results.locationFields.forEach(field => {
+                    const problemValue = results.problemLocation?.[field] || 'N/A';
+                    const workingValue = results.workingLocation?.[field] || 'N/A';
+                    
+                    html += '<tr>';
+                    html += `<td><strong>${field}</strong></td>`;
+                    html += `<td>${JSON.stringify(problemValue)}</td>`;
+                    if (workingLocation) html += `<td>${JSON.stringify(workingValue)}</td>`;
+                    html += '</tr>';
+                });
+                
+                html += '</tbody></table>';
+                
+                output.innerHTML = html;
+                
+            } catch (error) {
+                output.innerHTML = `<div class="step-failure">
+                    <h6><i class="fas fa-times-circle"></i> Step 1 Failed</h6>
+                    <p>Error: ${error.message}</p>
+                </div>`;
+            }
+        }
+
+        // Step 2: Historical Data Storage
+        async function step2_HistoricalDataStorage() {
+            const output = document.getElementById('historicalStorage');
+            output.innerHTML = '<div class="spinner-border spinner-border-sm"></div> Analyzing historical data storage...';
+            
+            try {
+                const results = {
+                    oldStructure: { problem: 0, working: 0 },
+                    newStructure: { problem: 0, working: 0 },
+                    sampleRecords: { problem: null, working: null }
+                };
+                
+                // Check old structure for problem location
+                const problemOldRef = ref(rtdb, `locations/${problemLocation}/stockUsage`);
+                const problemOldSnapshot = await get(problemOldRef);
+                if (problemOldSnapshot.exists()) {
+                    const data = problemOldSnapshot.val();
+                    results.oldStructure.problem = Object.keys(data).length;
+                    results.sampleRecords.problem = Object.values(data)[0];
+                }
+                
+                // Check old structure for working location
+                if (workingLocation) {
+                    const workingOldRef = ref(rtdb, `locations/${workingLocation}/stockUsage`);
+                    const workingOldSnapshot = await get(workingOldRef);
+                    if (workingOldSnapshot.exists()) {
+                        const data = workingOldSnapshot.val();
+                        results.oldStructure.working = Object.keys(data).length;
+                        results.sampleRecords.working = Object.values(data)[0];
+                    }
+                }
+                
+                // Check new structure
+                const newStockRef = ref(rtdb, 'stockData');
+                const newStockSnapshot = await get(newStockRef);
+                if (newStockSnapshot.exists()) {
+                    const stockData = newStockSnapshot.val();
+                    
+                    // Count records for problem location
+                    const problemRecords = Object.values(stockData).filter(record => 
+                        record.locationId === problemLocation
+                    );
+                    results.newStructure.problem = problemRecords.length;
+                    
+                    // Count records for working location
+                    if (workingLocation) {
+                        const workingRecords = Object.values(stockData).filter(record => 
+                            record.locationId === workingLocation
+                        );
+                        results.newStructure.working = workingRecords.length;
+                    }
+                }
+                
+                diagnosticResults.step2 = results;
+                
+                let html = '<div class="step-result">';
+                html += '<h6><i class="fas fa-check-circle"></i> Historical Data Storage Analysis</h6>';
+                html += '</div>';
+                
+                // Create data summary table
+                html += '<table class="table table-sm comparison-table">';
+                html += '<thead><tr><th>Structure</th><th>Problem Location</th>';
+                if (workingLocation) html += '<th>Working Location</th>';
+                html += '</tr></thead><tbody>';
+                
+                html += '<tr>';
+                html += '<td><strong>Old Structure (locations/.../stockUsage)</strong></td>';
+                html += `<td>${results.oldStructure.problem} records</td>`;
+                if (workingLocation) html += `<td>${results.oldStructure.working} records</td>`;
+                html += '</tr>';
+                
+                html += '<tr>';
+                html += '<td><strong>New Structure (stockData)</strong></td>';
+                html += `<td>${results.newStructure.problem} records</td>`;
+                if (workingLocation) html += `<td>${results.newStructure.working} records</td>`;
+                html += '</tr>';
+                
+                html += '</tbody></table>';
+                
+                // Show sample record structure
+                if (results.sampleRecords.problem) {
+                    html += '<div class="mt-3">';
+                    html += '<h6>Sample Record from Problem Location:</h6>';
+                    html += '<div class="data-preview">';
+                    html += JSON.stringify(results.sampleRecords.problem, null, 2);
+                    html += '</div>';
+                    html += '</div>';
+                }
+                
+                output.innerHTML = html;
+                
+            } catch (error) {
+                output.innerHTML = `<div class="step-failure">
+                    <h6><i class="fas fa-times-circle"></i> Step 2 Failed</h6>
+                    <p>Error: ${error.message}</p>
+                </div>`;
+            }
+        }
+
+        // Step 3: Location Selection Process
+        async function step3_LocationSelectionProcess() {
+            const output = document.getElementById('locationSelection');
+            output.innerHTML = '<div class="spinner-border spinner-border-sm"></div> Analyzing location selection process...';
+            
+            try {
+                const results = {
+                    locationId: problemLocation,
+                    locationData: diagnosticResults.step1?.problemLocation,
+                    possibleIdentifiers: []
+                };
+                
+                // Extract all possible identifiers for this location
+                if (results.locationData) {
+                    results.possibleIdentifiers = [
+                        { type: 'Location ID', value: problemLocation },
+                        { type: 'Name', value: results.locationData.name || 'N/A' },
+                        { type: 'Display Name', value: results.locationData.displayName || 'N/A' },
+                        { type: 'Address', value: results.locationData.address || 'N/A' },
+                        { type: 'Code', value: results.locationData.code || 'N/A' }
+                    ];
+                }
+                
+                diagnosticResults.step3 = results;
+                
+                let html = '<div class="step-result">';
+                html += '<h6><i class="fas fa-check-circle"></i> Location Selection Analysis</h6>';
+                html += '</div>';
+                
+                html += '<h6>Possible Location Identifiers:</h6>';
+                html += '<table class="table table-sm comparison-table">';
+                html += '<thead><tr><th>Identifier Type</th><th>Value</th><th>Notes</th></tr></thead><tbody>';
+                
+                results.possibleIdentifiers.forEach(identifier => {
+                    const notes = identifier.type === 'Location ID' ? 'Used by database' :
+                                 identifier.type === 'Name' ? 'Used by Historical Service' :
+                                 identifier.type === 'Display Name' ? 'Used by UI' : '';
+                    
+                    html += '<tr>';
+                    html += `<td><strong>${identifier.type}</strong></td>`;
+                    html += `<td>${identifier.value}</td>`;
+                    html += `<td><em>${notes}</em></td>`;
+                    html += '</tr>';
+                });
+                
+                html += '</tbody></table>';
+                
+                output.innerHTML = html;
+                
+            } catch (error) {
+                output.innerHTML = `<div class="step-failure">
+                    <h6><i class="fas fa-times-circle"></i> Step 3 Failed</h6>
+                    <p>Error: ${error.message}</p>
+                </div>`;
+            }
+        }
+
+        // Step 4: Historical Data Retrieval
+        async function step4_HistoricalDataRetrieval() {
+            const output = document.getElementById('dataRetrieval');
+            output.innerHTML = '<div class="spinner-border spinner-border-sm"></div> Testing historical data retrieval...';
+            
+            try {
+                // Import the Historical Usage Service
+                const HistoricalUsageServiceModule = await import('../js/modules/food-cost/services/historical-usage-service.js');
+                const HistoricalUsageService = HistoricalUsageServiceModule.default;
+                
+                const results = {
+                    testResults: []
+                };
+                
+                // Test different identifier strategies
+                const identifiers = diagnosticResults.step3?.possibleIdentifiers || [];
+                
+                for (const identifier of identifiers) {
+                    if (identifier.value && identifier.value !== 'N/A') {
+                        try {
+                            const historicalData = await HistoricalUsageService.getHistoricalData(identifier.value, { lookbackDays: 30 });
+                            
+                            results.testResults.push({
+                                identifier: identifier.type,
+                                value: identifier.value,
+                                success: true,
+                                recordCount: historicalData ? historicalData.length : 0,
+                                error: null
+                            });
+                        } catch (error) {
+                            results.testResults.push({
+                                identifier: identifier.type,
+                                value: identifier.value,
+                                success: false,
+                                recordCount: 0,
+                                error: error.message
+                            });
+                        }
+                    }
+                }
+                
+                diagnosticResults.step4 = results;
+                
+                let html = '<div class="step-result">';
+                html += '<h6><i class="fas fa-check-circle"></i> Historical Data Retrieval Test</h6>';
+                html += '</div>';
+                
+                html += '<h6>Test Results by Identifier:</h6>';
+                html += '<table class="table table-sm comparison-table">';
+                html += '<thead><tr><th>Identifier Type</th><th>Value</th><th>Result</th><th>Records Found</th><th>Error</th></tr></thead><tbody>';
+                
+                results.testResults.forEach(test => {
+                    const rowClass = test.success && test.recordCount > 0 ? 'match-highlight' : 
+                                    test.success ? 'step-warning' : 'mismatch-highlight';
+                    
+                    html += `<tr class="${rowClass}">`;
+                    html += `<td><strong>${test.identifier}</strong></td>`;
+                    html += `<td>${test.value}</td>`;
+                    html += `<td>${test.success ? '✅ Success' : '❌ Failed'}</td>`;
+                    html += `<td>${test.recordCount}</td>`;
+                    html += `<td>${test.error || 'None'}</td>`;
+                    html += '</tr>';
+                });
+                
+                html += '</tbody></table>';
+                
+                output.innerHTML = html;
+                
+            } catch (error) {
+                output.innerHTML = `<div class="step-failure">
+                    <h6><i class="fas fa-times-circle"></i> Step 4 Failed</h6>
+                    <p>Error: ${error.message}</p>
+                </div>`;
+            }
+        }
+
+        // Step 5: Purchase Order Logic
+        async function step5_PurchaseOrderLogic() {
+            const output = document.getElementById('purchaseOrderLogic');
+            output.innerHTML = '<div class="spinner-border spinner-border-sm"></div> Analyzing Purchase Order logic...';
+            
+            try {
+                const results = {
+                    basicLogic: 'Uses static multipliers and basic calculations',
+                    advancedLogic: 'Uses Historical Usage Service to get actual usage patterns',
+                    identifierUsed: 'Location name (storeName or displayName)',
+                    criticalPath: [
+                        'User selects location in Food Cost Analytics',
+                        'Location name is stored in component state',
+                        'Advanced PO modal opens',
+                        'Modal calls Historical Usage Service with location name',
+                        'Service searches for matching records',
+                        'Records are used for calculations'
+                    ]
+                };
+                
+                diagnosticResults.step5 = results;
+                
+                let html = '<div class="step-result">';
+                html += '<h6><i class="fas fa-check-circle"></i> Purchase Order Logic Analysis</h6>';
+                html += '</div>';
+                
+                html += '<div class="row">';
+                html += '<div class="col-md-6">';
+                html += '<h6>Basic Purchase Order:</h6>';
+                html += '<p>' + results.basicLogic + '</p>';
+                html += '</div>';
+                html += '<div class="col-md-6">';
+                html += '<h6>Advanced Purchase Order:</h6>';
+                html += '<p>' + results.advancedLogic + '</p>';
+                html += '</div>';
+                html += '</div>';
+                
+                html += '<h6>Critical Path for Advanced PO:</h6>';
+                html += '<ol>';
+                results.criticalPath.forEach(step => {
+                    html += `<li>${step}</li>`;
+                });
+                html += '</ol>';
+                
+                html += '<div class="alert alert-warning">';
+                html += '<strong>Key Insight:</strong> The Advanced Purchase Order uses the location <strong>name</strong> ';
+                html += '(not ID) to search for historical data. If the name doesn\'t match exactly, no data will be found.';
+                html += '</div>';
+                
+                output.innerHTML = html;
+                
+            } catch (error) {
+                output.innerHTML = `<div class="step-failure">
+                    <h6><i class="fas fa-times-circle"></i> Step 5 Failed</h6>
+                    <p>Error: ${error.message}</p>
+                </div>`;
+            }
+        }
+
+        // Step 6: Location Matching Analysis
+        async function step6_LocationMatchingAnalysis() {
+            const output = document.getElementById('matchingStrategies');
+            output.innerHTML = '<div class="spinner-border spinner-border-sm"></div> Analyzing location matching strategies...';
+            
+            try {
+                const step4Results = diagnosticResults.step4?.testResults || [];
+                const workingIdentifiers = step4Results.filter(test => test.success && test.recordCount > 0);
+                const failingIdentifiers = step4Results.filter(test => !test.success || test.recordCount === 0);
+                
+                const results = {
+                    workingIdentifiers,
+                    failingIdentifiers,
+                    recommendations: []
+                };
+                
+                // Generate recommendations
+                if (workingIdentifiers.length > 0) {
+                    results.recommendations.push({
+                        type: 'success',
+                        title: 'Working Identifiers Found',
+                        description: `The following identifiers successfully retrieve historical data: ${workingIdentifiers.map(w => w.identifier).join(', ')}`
+                    });
+                    
+                    results.recommendations.push({
+                        type: 'action',
+                        title: 'Update Food Cost Analytics',
+                        description: `Modify the location selection to use "${workingIdentifiers[0].value}" instead of the current identifier`
+                    });
+                } else {
+                    results.recommendations.push({
+                        type: 'error',
+                        title: 'No Working Identifiers',
+                        description: 'None of the location identifiers successfully retrieve historical data'
+                    });
+                    
+                    results.recommendations.push({
+                        type: 'action',
+                        title: 'Check Data Migration',
+                        description: 'Verify that data was properly migrated for this location'
+                    });
+                }
+                
+                diagnosticResults.step6 = results;
+                
+                let html = '<div class="step-result">';
+                html += '<h6><i class="fas fa-check-circle"></i> Location Matching Analysis Complete</h6>';
+                html += '</div>';
+                
+                if (workingIdentifiers.length > 0) {
+                    html += '<div class="alert alert-success">';
+                    html += '<h6>✅ Working Identifiers:</h6>';
+                    workingIdentifiers.forEach(identifier => {
+                        html += `<p><strong>${identifier.identifier}:</strong> "${identifier.value}" (${identifier.recordCount} records)</p>`;
+                    });
+                    html += '</div>';
+                }
+                
+                if (failingIdentifiers.length > 0) {
+                    html += '<div class="alert alert-danger">';
+                    html += '<h6>❌ Failing Identifiers:</h6>';
+                    failingIdentifiers.forEach(identifier => {
+                        html += `<p><strong>${identifier.identifier}:</strong> "${identifier.value}" (${identifier.error || 'No records found'})</p>`;
+                    });
+                    html += '</div>';
+                }
+                
+                html += '<h6>Recommendations:</h6>';
+                results.recommendations.forEach(rec => {
+                    const alertClass = rec.type === 'success' ? 'alert-success' : 
+                                     rec.type === 'error' ? 'alert-danger' : 'alert-info';
+                    html += `<div class="alert ${alertClass}">`;
+                    html += `<strong>${rec.title}:</strong> ${rec.description}`;
+                    html += '</div>';
+                });
+                
+                output.innerHTML = html;
+                
+            } catch (error) {
+                output.innerHTML = `<div class="step-failure">
+                    <h6><i class="fas fa-times-circle"></i> Step 6 Failed</h6>
+                    <p>Error: ${error.message}</p>
+                </div>`;
+            }
+        }
+
+        // Generate Summary
+        function generateSummary() {
+            const summaryDiv = document.getElementById('diagnosticSummary');
+            
+            const step4Results = diagnosticResults.step4?.testResults || [];
+            const workingIdentifiers = step4Results.filter(test => test.success && test.recordCount > 0);
+            
+            let html = '<div class="alert alert-info">';
+            html += '<h5><i class="fas fa-clipboard-check"></i> Diagnostic Summary</h5>';
+            
+            if (workingIdentifiers.length > 0) {
+                html += '<div class="alert alert-success">';
+                html += '<h6>🎉 Root Cause Identified!</h6>';
+                html += `<p>The Advanced Purchase Order is likely using the wrong location identifier. `;
+                html += `Historical data CAN be found using: <strong>${workingIdentifiers[0].value}</strong></p>`;
+                html += '<p><strong>Next Steps:</strong></p>';
+                html += '<ol>';
+                html += '<li>Verify which identifier the Food Cost Analytics is passing to the Advanced PO</li>';
+                html += '<li>Update the location selection logic to use the working identifier</li>';
+                html += '<li>Test the Advanced Purchase Order again</li>';
+                html += '</ol>';
+                html += '</div>';
+            } else {
+                html += '<div class="alert alert-warning">';
+                html += '<h6>⚠️ No Working Identifiers Found</h6>';
+                html += '<p>None of the location identifiers successfully retrieve historical data.</p>';
+                html += '<p>This suggests either:</p>';
+                html += '<ul>';
+                html += '<li>Data migration issue for this specific location</li>';
+                html += '<li>Permissions issue preventing data access</li>';
+                html += '<li>Data stored under a different identifier</li>';
+                html += '</ul>';
+                html += '</div>';
+            }
+            
+            html += '</div>';
+            summaryDiv.innerHTML = html;
+        }
+    </script>
+</body>
+</html> 

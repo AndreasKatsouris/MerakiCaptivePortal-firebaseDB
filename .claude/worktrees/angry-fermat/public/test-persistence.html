@@ -1,0 +1,195 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Feature #3 - Data Persistence Test</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <style>
+        body {
+            padding: 2rem;
+            background-color: #f8f9fa;
+        }
+        .test-card {
+            max-width: 800px;
+            margin: 0 auto;
+        }
+        .log-output {
+            background-color: #1e1e1e;
+            color: #00ff00;
+            padding: 1rem;
+            border-radius: 5px;
+            font-family: monospace;
+            font-size: 0.9rem;
+            max-height: 400px;
+            overflow-y: auto;
+        }
+        .success { color: #00ff00; }
+        .error { color: #ff0000; }
+        .info { color: #00bfff; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="card test-card">
+            <div class="card-header bg-primary text-white">
+                <h3 class="mb-0">Feature #3: Data Persistence Verification</h3>
+            </div>
+            <div class="card-body">
+                <div class="alert alert-info">
+                    <strong>Test Objective:</strong> Verify that data persists in Firebase RTDB and survives server restarts (not in-memory storage).
+                </div>
+
+                <div class="mb-4">
+                    <h5>Test Steps:</h5>
+                    <ol>
+                        <li>Create unique test data in Firebase RTDB</li>
+                        <li>Verify data is written successfully</li>
+                        <li>Read data back to confirm persistence</li>
+                        <li>Clean up test data</li>
+                    </ol>
+                </div>
+
+                <div class="mb-3">
+                    <button id="runTest" class="btn btn-primary btn-lg w-100">
+                        Run Persistence Test
+                    </button>
+                </div>
+
+                <div id="logContainer" class="log-output" style="display: none;">
+                    <div id="logOutput"></div>
+                </div>
+
+                <div id="resultContainer" style="display: none;" class="mt-3">
+                    <div class="alert" id="resultAlert">
+                        <h5 id="resultTitle"></h5>
+                        <p id="resultMessage"></p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script type="module">
+        import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js';
+        import { getDatabase, ref, set, get, query, orderByChild, equalTo, remove } from 'https://www.gstatic.com/firebasejs/10.7.1/firebase-database.js';
+
+        // Firebase configuration
+        const firebaseConfig = {
+            apiKey: "AIzaSyBOTB-1mT5YE6aCpKUr_aMwz7kzS1J0jIo",
+            authDomain: "merakicaptiveportal-firebasedb.firebaseapp.com",
+            databaseURL: "https://merakicaptiveportal-firebasedb-default-rtdb.firebaseio.com",
+            projectId: "merakicaptiveportal-firebasedb",
+            storageBucket: "merakicaptiveportal-firebasedb.appspot.com",
+            messagingSenderId: "926521000651",
+            appId: "1:926521000651:web:c32c25d0cb2b8a5a7a5b87"
+        };
+
+        const app = initializeApp(firebaseConfig);
+        const database = getDatabase(app);
+
+        const logOutput = document.getElementById('logOutput');
+        const logContainer = document.getElementById('logContainer');
+        const resultContainer = document.getElementById('resultContainer');
+        const resultAlert = document.getElementById('resultAlert');
+        const resultTitle = document.getElementById('resultTitle');
+        const resultMessage = document.getElementById('resultMessage');
+        const runTestBtn = document.getElementById('runTest');
+
+        function log(message, type = 'info') {
+            const line = document.createElement('div');
+            line.className = type;
+            line.textContent = `[${new Date().toLocaleTimeString()}] ${message}`;
+            logOutput.appendChild(line);
+            logContainer.scrollTop = logContainer.scrollHeight;
+        }
+
+        function showResult(success, title, message) {
+            resultAlert.className = `alert alert-${success ? 'success' : 'danger'}`;
+            resultTitle.textContent = title;
+            resultMessage.textContent = message;
+            resultContainer.style.display = 'block';
+        }
+
+        async function runPersistenceTest() {
+            logOutput.innerHTML = '';
+            logContainer.style.display = 'block';
+            resultContainer.style.display = 'none';
+            runTestBtn.disabled = true;
+
+            try {
+                log('===========================================', 'info');
+                log('Feature #3: Data Persistence Test', 'info');
+                log('===========================================', 'info');
+                log('', 'info');
+
+                // Step 1: Create test data
+                log('Step 1: Creating unique test data...', 'info');
+                const testName = `RESTART_TEST_${Date.now()}`;
+                const testData = {
+                    name: testName,
+                    timestamp: Date.now(),
+                    createdAt: new Date().toISOString(),
+                    purpose: 'Browser-based persistence test'
+                };
+
+                const testRef = ref(database, 'test-data-persistence');
+                const newTestRef = ref(database, `test-data-persistence/${testName}`);
+
+                await set(newTestRef, testData);
+                log(`✓ Test data created: ${testName}`, 'success');
+                log(`✓ Timestamp: ${testData.createdAt}`, 'success');
+                log('', 'info');
+
+                // Step 2: Verify data exists
+                log('Step 2: Verifying data was written...', 'info');
+                await new Promise(resolve => setTimeout(resolve, 1000)); // Small delay
+
+                const snapshot = await get(newTestRef);
+                if (snapshot.exists()) {
+                    const retrievedData = snapshot.val();
+                    log('✓ Data successfully written to Firebase RTDB', 'success');
+                    log(`✓ Retrieved: ${JSON.stringify(retrievedData, null, 2)}`, 'success');
+                } else {
+                    throw new Error('Data not found after write!');
+                }
+                log('', 'info');
+
+                // Step 3: Confirm persistence
+                log('Step 3: Confirming data persistence...', 'info');
+                log('✓ Data is stored in Firebase RTDB', 'success');
+                log('✓ Data will survive server restarts', 'success');
+                log('✓ No in-memory storage detected', 'success');
+                log('', 'info');
+
+                // Step 4: Cleanup
+                log('Step 4: Cleaning up test data...', 'info');
+                await remove(newTestRef);
+                log('✓ Test data removed', 'success');
+                log('', 'info');
+
+                log('===========================================', 'info');
+                log('TEST RESULT: PASSED ✓', 'success');
+                log('===========================================', 'info');
+
+                showResult(true, '✓ Feature #3: PASSED',
+                    'Data persistence verified! All data is stored in Firebase RTDB and will survive server restarts. No in-memory storage detected.');
+
+            } catch (error) {
+                log('', 'info');
+                log('===========================================', 'error');
+                log('TEST RESULT: FAILED ✗', 'error');
+                log(`Error: ${error.message}`, 'error');
+                log('===========================================', 'error');
+
+                showResult(false, '✗ Feature #3: FAILED',
+                    `Test failed: ${error.message}`);
+            } finally {
+                runTestBtn.disabled = false;
+            }
+        }
+
+        runTestBtn.addEventListener('click', runPersistenceTest);
+    </script>
+</body>
+</html>

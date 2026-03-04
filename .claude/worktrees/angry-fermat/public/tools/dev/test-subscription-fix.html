@@ -1,0 +1,209 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Subscription Tier Fix Test</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+</head>
+<body>
+    <div class="container mt-5">
+        <div class="row justify-content-center">
+            <div class="col-md-8">
+                <div class="card">
+                    <div class="card-header">
+                        <h4><i class="fas fa-cogs me-2"></i>Subscription Tier Fix Test</h4>
+                    </div>
+                    <div class="card-body">
+                        <div class="alert alert-info">
+                            <h5><i class="fas fa-info-circle me-2"></i>Purpose</h5>
+                            <p>This page tests the subscription tier synchronization fix for the user dashboard.</p>
+                        </div>
+                        
+                        <div class="row">
+                            <div class="col-md-6">
+                                <h5>Test Actions</h5>
+                                <div class="d-grid gap-2">
+                                    <button class="btn btn-primary" onclick="runDatabaseFix()">
+                                        <i class="fas fa-database me-2"></i>Run Database Fix
+                                    </button>
+                                    <button class="btn btn-success" onclick="testSubscriptionFix()">
+                                        <i class="fas fa-user-check me-2"></i>Test Subscription Fix
+                                    </button>
+                                    <button class="btn btn-warning" onclick="testFeatureAccess()">
+                                        <i class="fas fa-key me-2"></i>Test Feature Access
+                                    </button>
+                                    <button class="btn btn-info" onclick="runAllTests()">
+                                        <i class="fas fa-play-circle me-2"></i>Run All Tests
+                                    </button>
+                                </div>
+                            </div>
+                            <div class="col-md-6">
+                                <h5>Quick Debug</h5>
+                                <div class="d-grid gap-2">
+                                    <button class="btn btn-outline-primary" onclick="checkCurrentUser()">
+                                        <i class="fas fa-user me-2"></i>Check Current User
+                                    </button>
+                                    <button class="btn btn-outline-success" onclick="checkSubscriptionTiers()">
+                                        <i class="fas fa-list me-2"></i>Check Subscription Tiers
+                                    </button>
+                                    <button class="btn btn-outline-warning" onclick="checkUserSubscription()">
+                                        <i class="fas fa-user-cog me-2"></i>Check User Subscription
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <div class="mt-4">
+                            <h5>Test Results</h5>
+                            <div id="testResults" class="border rounded p-3 bg-light" style="height: 300px; overflow-y: auto;">
+                                <small class="text-muted">Test results will appear here...</small>
+                            </div>
+                        </div>
+                        
+                        <div class="mt-3">
+                            <button class="btn btn-secondary btn-sm" onclick="clearResults()">
+                                <i class="fas fa-trash me-2"></i>Clear Results
+                            </button>
+                            <button class="btn btn-primary btn-sm" onclick="window.location.href='../user-dashboard.html'">
+                                <i class="fas fa-external-link-alt me-2"></i>Go to User Dashboard
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script type="module">
+        import { runCompleteDatabaseFix, createTestUserWithSubscription, fixUserSubscriptionData } from '../js/utils/subscription-tier-fix.js';
+        import { runAllTests, testSubscriptionFix, testFeatureAccess } from './test-subscription-fix.js';
+        import { auth, rtdb, ref, get, onAuthStateChanged } from '../js/config/firebase-config.js';
+
+        // Log function
+        function log(message, type = 'info') {
+            const results = document.getElementById('testResults');
+            const timestamp = new Date().toLocaleTimeString();
+            const icon = type === 'error' ? 'fas fa-times-circle text-danger' : 
+                        type === 'success' ? 'fas fa-check-circle text-success' : 
+                        'fas fa-info-circle text-primary';
+            
+            results.innerHTML += `<div class="mb-2"><i class="${icon} me-2"></i><small class="text-muted">[${timestamp}]</small> ${message}</div>`;
+            results.scrollTop = results.scrollHeight;
+        }
+
+        // Make functions available globally
+        window.log = log;
+        
+        window.runDatabaseFix = async function() {
+            log('🔧 Running database fix...');
+            try {
+                const result = await runCompleteDatabaseFix();
+                log('✅ Database fix completed: ' + result.message, 'success');
+            } catch (error) {
+                log('❌ Database fix failed: ' + error.message, 'error');
+            }
+        };
+
+        window.testSubscriptionFix = async function() {
+            log('🧪 Testing subscription fix...');
+            try {
+                await testSubscriptionFix();
+                log('✅ Subscription fix test completed', 'success');
+            } catch (error) {
+                log('❌ Subscription fix test failed: ' + error.message, 'error');
+            }
+        };
+
+        window.testFeatureAccess = async function() {
+            log('🔑 Testing feature access...');
+            try {
+                await testFeatureAccess();
+                log('✅ Feature access test completed', 'success');
+            } catch (error) {
+                log('❌ Feature access test failed: ' + error.message, 'error');
+            }
+        };
+
+        window.runAllTests = async function() {
+            log('🚀 Running all tests...');
+            try {
+                await runAllTests();
+                log('✅ All tests completed', 'success');
+            } catch (error) {
+                log('❌ Tests failed: ' + error.message, 'error');
+            }
+        };
+
+        window.checkCurrentUser = function() {
+            onAuthStateChanged(auth, (user) => {
+                if (user) {
+                    log('👤 Current user: ' + user.email + ' (ID: ' + user.uid + ')');
+                } else {
+                    log('👤 No user authenticated');
+                }
+            });
+        };
+
+        window.checkSubscriptionTiers = async function() {
+            log('📋 Checking subscription tiers...');
+            try {
+                const tiersSnapshot = await get(ref(rtdb, 'subscriptionTiers'));
+                const tiers = tiersSnapshot.val();
+                if (tiers) {
+                    log('📋 Available tiers: ' + Object.keys(tiers).join(', '));
+                    Object.entries(tiers).forEach(([id, tier]) => {
+                        log(`  - ${id}: ${tier.name} ($${tier.monthlyPrice}/month)`);
+                    });
+                } else {
+                    log('📋 No subscription tiers found');
+                }
+            } catch (error) {
+                log('❌ Error checking tiers: ' + error.message, 'error');
+            }
+        };
+
+        window.checkUserSubscription = async function() {
+            onAuthStateChanged(auth, async (user) => {
+                if (user) {
+                    log('🔍 Checking subscription for user: ' + user.email);
+                    try {
+                        const subscriptionSnapshot = await get(ref(rtdb, `subscriptions/${user.uid}`));
+                        const subscription = subscriptionSnapshot.val();
+                        if (subscription) {
+                            log('📄 User subscription: ' + JSON.stringify(subscription, null, 2));
+                            
+                            // Check tier details
+                            if (subscription.tierId) {
+                                const tierSnapshot = await get(ref(rtdb, `subscriptionTiers/${subscription.tierId}`));
+                                const tier = tierSnapshot.val();
+                                if (tier) {
+                                    log('🎯 Tier details: ' + tier.name + ' - ' + tier.description);
+                                    log('✨ Features: ' + Object.keys(tier.features || {}).join(', '));
+                                } else {
+                                    log('❌ Tier data not found for tierId: ' + subscription.tierId, 'error');
+                                }
+                            }
+                        } else {
+                            log('❌ No subscription found for user', 'error');
+                        }
+                    } catch (error) {
+                        log('❌ Error checking subscription: ' + error.message, 'error');
+                    }
+                } else {
+                    log('❌ No user authenticated', 'error');
+                }
+            });
+        };
+
+        window.clearResults = function() {
+            document.getElementById('testResults').innerHTML = '<small class="text-muted">Test results will appear here...</small>';
+        };
+
+        // Initialize
+        log('🔧 Subscription Tier Fix Test page loaded');
+        log('📝 Click buttons above to test the fix');
+    </script>
+</body>
+</html>

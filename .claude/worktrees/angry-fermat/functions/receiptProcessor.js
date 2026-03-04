@@ -1,0 +1,1503 @@
+const vision = require('@google-cloud/vision');
+const functions = require('firebase-functions');
+const {
+    rtdb,
+    ref,
+    get,
+    set,
+    push,
+    storage,
+    bucket
+} = require('./config/firebase-admin.js');
+
+// For Node.js versions that don't have fetch built-in
+const fetch = globalThis.fetch || require('node-fetch');
+
+// Template-based extraction (NEW)
+const { extractWithTemplates } = require('./templateBasedExtraction');
+
+// Feature flag for template-based extraction
+const USE_TEMPLATE_EXTRACTION = process.env.USE_TEMPLATE_EXTRACTION !== 'false'; // Default: enabled
+
+/**
+ * Process a receipt image with Google Cloud Vision OCR and parse the text WITHOUT saving to database
+ * @param {string} imageUrl - URL of the receipt image
+ * @param {string} phoneNumber - Phone number of the guest
+ * @returns {Promise<object>} - Parsed and validated receipt data (not saved)
+ */
+async function processReceiptWithoutSaving(imageUrl, phoneNumber) {
+    try {
+        console.log('Starting receipt processing for:', { imageUrl, phoneNumber });
+
+        // Detect text in image
+        const [result] = await detectReceiptText(imageUrl);
+
+        // Enhanced validation for OCR results
+        if (!result) {
+            throw new Error(
+                'Failed to process the receipt image. Please try taking another photo with:\n' +
+                '• Good lighting\n' +
+                '• No glare\n' +
+                '• The receipt lying flat\n' +
+                '• All text clearly visible'
+            );
+        }
+
+        if (!result.textAnnotations || result.textAnnotations.length === 0) {
+            throw new Error(
+                'No text could be detected in the image. This might be because:\n' +
+                '• The image is too blurry\n' +
+                '• The lighting is too dark or there is glare\n' +
+                '• The receipt text is not clearly visible\n' +
+                'Please try taking another photo making sure the receipt is well-lit and clearly visible.'
+            );
+        }
+
+        const fullText = result.textAnnotations[0].description;
+        if (!fullText || fullText.trim().length === 0) {
+            throw new Error('The receipt appears to be blank or the text is not readable. Please try taking another photo.');
+        }
+
+        console.log('Extracted full text:', fullText);
+
+        // Log raw OCR text to Firebase for debugging (optional - can be enabled when troubleshooting)
+        const debugLogging = true; // Set to false in production to save database writes
+        if (debugLogging) {
+            try {
+                const debugRef = ref(rtdb, `debug/ocr-logs/${Date.now()}`);
+                await set(debugRef, {
+                    timestamp: Date.now(),
+                    phoneNumber: phoneNumber,
+                    imageUrl: imageUrl,
+                    rawOcrText: fullText,
+                    textLength: fullText.length
+                });
+                console.log('📝 OCR debug log saved to Firebase for analysis');
+            } catch (debugError) {
+                console.warn('Failed to save OCR debug log:', debugError.message);
+                // Don't fail the entire process if debug logging fails
+            }
+        }
+
+        // NEW: Try template-based extraction first (if enabled)
+        if (USE_TEMPLATE_EXTRACTION) {
+            console.log('🎯 Attempting template-based extraction...');
+
+            const templateResult = await extractWithTemplates(fullText, null);
+
+            if (templateResult.success && templateResult.confidence >= 0.7) {
+                console.log(`✅ Template extraction succeeded: "${templateResult.templateUsed.name}" with ${(templateResult.confidence * 100).toFixed(1)}% confidence`);
+
+                // Return template-extracted data
+                const receiptData = {
+                    ...templateResult.extractedData,
+                    imageUrl: imageUrl,
+                    processedAt: Date.now(),
+                    guestPhoneNumber: phoneNumber,
+                    status: 'pending_validation',
+                    rawText: fullText,
+                    extractionMethod: 'template',
+                    templateId: templateResult.templateUsed.id,
+                    templateName: templateResult.templateUsed.name,
+                    confidence: templateResult.confidence,
+                    // Ensure items is always an array (even if empty) - items are optional
+                    items: templateResult.extractedData.items || [],
+                    subtotal: templateResult.extractedData.subtotal || 0
+                };
+
+                // Validate ONLY essential fields (items are optional)
+                const missingFields = [];
+                if (!receiptData.date) missingFields.push('receipt date');
+                if (!receiptData.invoiceNumber) missingFields.push('invoice/receipt number');
+                if (!receiptData.totalAmount) missingFields.push('total amount');
+
+                if (missingFields.length > 0) {
+                    console.warn('Template extraction missing critical fields:', missingFields);
+                    console.log('⚠️ Falling back to legacy extraction due to missing critical fields');
+                    // Fall through to legacy extraction
+                } else {
+                    // Validate receipt date
+                    if (receiptData.date && !validateReceiptDate(receiptData.date)) {
+                        throw new Error(
+                            'This receipt is not from the current month. Please submit receipts within the same month of purchase.'
+                        );
+                    }
+
+                    console.log('✅ Template extraction complete and validated');
+                    console.log(`   Items extracted: ${receiptData.items.length} items`);
+                    return receiptData;
+                }
+            } else {
+                console.log(`⚠️ Template extraction failed or low confidence (${(templateResult.confidence * 100).toFixed(1)}%): ${templateResult.reason || 'unknown'}`);
+                console.log('Falling back to legacy extraction...');
+            }
+        } else {
+            console.log('⚠️ Template extraction disabled via feature flag, using legacy extraction');
+        }
+
+        // LEGACY EXTRACTION (fallback)
+        console.log('🔧 Using legacy extraction methods...');
+
+        // Extract store details
+        const storeDetails = await extractStoreDetails(fullText);
+        console.log('Extracted store details:', storeDetails);
+
+        // Log extraction success/failure for monitoring
+        console.log('🔍 Store Details Extraction Status:', {
+            brandFound: storeDetails.brandName !== 'Unknown Brand',
+            locationFound: storeDetails.storeName !== 'Unknown Location',
+            brandName: storeDetails.brandName,
+            storeName: storeDetails.storeName
+        });
+
+        if (storeDetails.brandName === 'Unknown Brand') {
+            throw new Error(
+                'Could not identify the restaurant brand on this receipt. Please ensure:\n' +
+                '• The restaurant name is clearly visible at the top\n' +
+                '• There is no glare or damage covering the header\n' +
+                '• The image captures the entire receipt'
+            );
+        }
+
+        // Parse items section
+        const { items, subtotal } = await extractItems(fullText);
+        console.log('Extracted items:', items);
+        console.log('🛒 Items Extraction Status:', {
+            itemCount: items.length,
+            subtotal: subtotal,
+            hasItems: items.length > 0
+        });
+
+        if (items.length === 0) {
+            throw new Error(
+                'Could not find any items on this receipt. Please ensure:\n' +
+                '• The items list is clearly visible\n' +
+                '• There is no damage or folding in the middle of the receipt\n' +
+                '• All item names and prices are readable'
+            );
+        }
+
+        // Extract receipt details
+        const details = extractReceiptDetails(fullText);
+        console.log('Extracted receipt details:', details);
+        console.log('📋 Receipt Details Extraction Status:', {
+            hasDate: !!details.date,
+            hasTime: !!details.time,
+            hasInvoice: !!details.invoiceNumber,
+            hasTotalAmount: !!details.totalAmount && details.totalAmount > 0,
+            hasWaiter: !!details.waiterName,
+            hasTable: !!details.tableNumber,
+            details: {
+                date: details.date,
+                time: details.time,
+                invoice: details.invoiceNumber,
+                total: details.totalAmount,
+                waiter: details.waiterName,
+                table: details.tableNumber
+            }
+        });
+
+        if (!details.totalAmount || details.totalAmount <= 0) {
+            // Enhanced error with debugging information
+            console.error('Total amount detection failed:', {
+                totalAmount: details.totalAmount,
+                extractedDetails: details,
+                receiptTextSample: fullText.substring(0, 500) + '...'
+            });
+
+            throw new Error(
+                'Could not find the total amount on this receipt. Please ensure:\n' +
+                '• The bottom portion of the receipt is included\n' +
+                '• The total amount is clearly visible\n' +
+                '• There is no damage or folding at the bottom\n' +
+                '• Try taking the photo with better lighting\n' +
+                '• Make sure the receipt is completely flat'
+            );
+        }
+
+        // Construct receipt data
+        const receiptData = {
+            invoiceNumber: details.invoiceNumber,
+            brandName: storeDetails.brandName,
+            storeName: storeDetails.storeName,
+            storeAddress: storeDetails.storeAddress,
+            fullStoreName: storeDetails.fullStoreName,
+            date: details.date,
+            time: details.time,
+            waiterName: details.waiterName,
+            tableNumber: details.tableNumber,
+            items: items,
+            subtotal: subtotal,
+            vatAmount: details.vatAmount,
+            totalAmount: details.totalAmount,
+            imageUrl: imageUrl,
+            processedAt: Date.now(),
+            guestPhoneNumber: phoneNumber,
+            status: 'pending_validation',
+            rawText: fullText
+        };
+
+        console.log('Final parsed receipt data:', receiptData);
+
+        // Validate essential fields
+        const missingFields = [];
+        if (!receiptData.date) missingFields.push('receipt date');
+        if (!receiptData.invoiceNumber) missingFields.push('invoice/receipt number');
+        if (!receiptData.totalAmount) missingFields.push('total amount');
+
+        if (missingFields.length > 0) {
+            console.warn('Missing receipt fields:', missingFields);
+        }
+
+        // Validate receipt date
+        if (receiptData.date && !validateReceiptDate(receiptData.date)) {
+            throw new Error(
+                'This receipt is not from the current month. Please submit receipts within the same month of purchase.'
+            );
+        }
+
+        // Return extracted data without saving
+        return receiptData;
+
+    } catch (error) {
+        console.error('Error processing receipt:', error);
+
+        // Enhance error message if it's not already user-friendly
+        if (!error.message.includes('Please') && !error.message.includes('This might be')) {
+            error.message = 'We had trouble processing your receipt. Please take another photo ensuring:\n' +
+                '• Good lighting with no glare\n' +
+                '• Receipt is flat and not folded\n' +
+                '• All text is clear and readable\n' +
+                '• The entire receipt is captured';
+        }
+
+        throw error;
+    }
+}
+
+/**
+ * Process a receipt image with Google Cloud Vision OCR and parse the text (legacy function for backward compatibility)
+ * @param {string} imageUrl - URL of the receipt image
+ * @param {string} phoneNumber - Phone number of the guest
+ * @returns {Promise<object>} - Parsed and saved receipt data
+ */
+async function processReceipt(imageUrl, phoneNumber) {
+    try {
+        // Step 1: Extract data without saving
+        const extractedData = await processReceiptWithoutSaving(imageUrl, phoneNumber);
+
+        // Step 2: Save the extracted data
+        const savedReceipt = await saveReceiptData(extractedData, phoneNumber);
+
+        return savedReceipt;
+    } catch (error) {
+        console.error('Error in processReceipt:', error);
+        throw error;
+    }
+}
+
+/**
+ * Detect text in receipt image using Vision API
+ * @param {string} imageUrl - URL of the receipt image
+ * @returns {Promise<Array>} - Vision API detection result
+ */
+async function detectReceiptText(imageUrl) {
+    try {
+        console.log('Starting text detection for URL:', imageUrl);
+        const client = new vision.ImageAnnotatorClient();
+
+        // Check if this is a Twilio Media URL that needs authentication
+        if (imageUrl.includes('twilio.com')) {
+            console.log('Detected Twilio media URL, downloading and uploading to Firebase Storage first');
+            const processedImageUrl = await downloadAndStoreImage(imageUrl);
+            console.log('Using processed image URL:', processedImageUrl);
+            return await client.textDetection(processedImageUrl);
+        } else {
+            // Direct URL processing
+            console.log('Processing image URL directly');
+            return await client.textDetection(imageUrl);
+        }
+    } catch (error) {
+        console.error('Text detection failed:', error);
+        console.error('Error details:', {
+            message: error.message,
+            code: error.code,
+            details: error.details
+        });
+
+        if (error.code === 3 || error.message.includes('INVALID_ARGUMENT')) {
+            throw new Error('Unable to access the image. Please try uploading the photo again.');
+        } else if (error.code === 7 || error.message.includes('PERMISSION_DENIED')) {
+            throw new Error('Permission denied accessing the image. Please try again.');
+        } else {
+            throw new Error('Unable to detect text in receipt image. Please ensure the image is clear and try again.');
+        }
+    }
+}
+
+/**
+ * Download image from Twilio and store in Firebase Storage
+ * @param {string} twilioUrl - Twilio media URL
+ * @returns {Promise<string>} - Public Firebase Storage URL
+ */
+async function downloadAndStoreImage(twilioUrl) {
+    try {
+        console.log('🔽 Starting image download from Twilio URL:', twilioUrl);
+
+        // Get Twilio credentials from environment variables (Firebase Functions v2)
+        const accountSid = process.env.TWILIO_SID;
+        const authToken = process.env.TWILIO_TOKEN;
+
+        console.log('📝 Twilio credentials check:', {
+            hasSid: !!accountSid,
+            hasToken: !!authToken,
+            sidLength: accountSid?.length || 0
+        });
+
+        if (!accountSid || !authToken) {
+            console.error('❌ Missing Twilio credentials');
+            throw new Error('Missing Twilio configuration');
+        }
+
+        // Download image with authentication
+        console.log('🔐 Setting up authentication for Twilio request...');
+        const auth = Buffer.from(`${accountSid}:${authToken}`).toString('base64');
+
+        console.log('📡 Fetching image from Twilio...');
+        const response = await fetch(twilioUrl, {
+            headers: {
+                'Authorization': `Basic ${auth}`
+            }
+        });
+
+        console.log('📡 Twilio response:', {
+            status: response.status,
+            statusText: response.statusText,
+            contentType: response.headers.get('content-type'),
+            contentLength: response.headers.get('content-length')
+        });
+
+        if (!response.ok) {
+            throw new Error(`Failed to download image: ${response.status} ${response.statusText}`);
+        }
+
+        console.log('💾 Converting response to buffer...');
+        const imageBuffer = await response.arrayBuffer();
+        const buffer = Buffer.from(imageBuffer);
+
+        console.log('✅ Image downloaded successfully:', {
+            size: buffer.length,
+            sizeKB: Math.round(buffer.length / 1024),
+            isValidSize: buffer.length > 0
+        });
+
+        // Generate unique filename
+        const timestamp = Date.now();
+        const filename = `receipts/${timestamp}_receipt.jpg`;
+
+        // Upload to Firebase Storage
+        console.log('☁️ Uploading to Firebase Storage:', filename);
+        const file = bucket.file(filename);
+        await file.save(buffer, {
+            metadata: {
+                contentType: 'image/jpeg',
+                metadata: {
+                    source: 'twilio_whatsapp',
+                    originalUrl: twilioUrl,
+                    uploadedAt: new Date().toISOString()
+                }
+            }
+        });
+
+        console.log('📤 Upload complete, making file public...');
+
+        // Make file publicly readable
+        await file.makePublic();
+
+        // Get public URL
+        const publicUrl = `https://storage.googleapis.com/${bucket.name}/${filename}`;
+        console.log('🌐 Public URL generated:', publicUrl);
+
+        return publicUrl;
+
+    } catch (error) {
+        console.error('💥 Error in downloadAndStoreImage:', error);
+        console.error('💥 Error stack:', error.stack);
+        throw new Error(`Failed to process image from WhatsApp: ${error.message}`);
+    }
+}
+
+/**
+ * Extract store details from receipt text
+ * @param {string} fullText - Full text from receipt
+ * @returns {Promise<object>} - Store details
+ */
+async function extractStoreDetails(fullText) {
+    const lines = fullText.split('\n').map(line => line.trim());
+    const activeBrands = await fetchActiveBrands();
+    let brandName = '';
+    let storeName = '';
+    let storeAddress = '';
+    let brandLineIndex = -1;
+
+    console.log('Processing lines for store details:', lines.slice(0, 5));
+
+    // Look for brand name in first few lines (enhanced for Ocean Basket)
+    for (let i = 0; i < Math.min(8, lines.length); i++) {
+        const line = lines[i].toLowerCase();
+        const originalLine = lines[i];
+
+        // Special handling for Ocean Basket (prioritize full name over abbreviation)
+        if (line.includes('ocean basket') || (line.trim() === 'ob' && lines[i + 1]?.toLowerCase().includes('ocean') && !lines.some(l => l.toLowerCase().includes('ocean basket')))) {
+            brandName = 'Ocean Basket';
+            brandLineIndex = i;
+
+            // Check if location identifier is on the same line as brand name
+            // Pattern: "OCEAN BASKET THE GROVE" or "OCEAN BASKET - THE GROVE"
+            const sameLine = originalLine.trim();
+            const oceanBasketPattern = /^OCEAN\s+BASKET\s+(.+)$/i;
+            const sameLineMatch = sameLine.match(oceanBasketPattern);
+
+            if (sameLineMatch) {
+                // Extract location from same line
+                const locationPart = sameLineMatch[1].trim();
+                // Clean up common separators and format properly
+                storeName = normalizeLocationName(locationPart.replace(/^[-\s]+|[-\s]+$/g, '').trim());
+                console.log('Found Ocean Basket location on same line:', storeName);
+            }
+            break;
+        }
+
+        // Standard brand matching with same-line location extraction
+        for (const brand of activeBrands) {
+            if (line.includes(brand.toLowerCase())) {
+                brandName = brand;
+                brandLineIndex = i;
+
+                // Check if location identifier is on the same line as brand name
+                const brandPattern = new RegExp(`^${brand.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\s+(.+)$`, 'i');
+                const sameLineMatch = originalLine.match(brandPattern);
+
+                if (sameLineMatch) {
+                    // Extract location from same line
+                    const locationPart = sameLineMatch[1].trim();
+                    // Clean up common separators and format properly
+                    storeName = normalizeLocationName(locationPart.replace(/^[-\s]+|[-\s]+$/g, '').trim());
+                    console.log(`Found ${brand} location on same line:`, storeName);
+                }
+                break;
+            }
+        }
+        if (brandName) break;
+    }
+
+    // If we found the brand name but no store name on same line, look at the next 2-3 lines
+    if (brandLineIndex !== -1 && !storeName) {
+        console.log('DEBUG: Brand found at line', brandLineIndex, '- searching next lines for location');
+
+        // Check next 3 lines for location name
+        for (let i = 1; i <= 3 && brandLineIndex + i < lines.length; i++) {
+            const nextLine = lines[brandLineIndex + i].trim();
+
+            // Skip empty lines and address lines
+            if (!nextLine || nextLine.match(/SHOP|MALL|CENTRE|CENTER|STREET|RD|ROAD|AVE|AVENUE|^\d+/i)) {
+                console.log(`DEBUG: Skipping line ${brandLineIndex + i}: "${nextLine}" (likely address or empty)`);
+                continue;
+            }
+
+            // Skip obvious non-location lines (VAT numbers, phone numbers, etc.)
+            if (nextLine.match(/VAT|REG|TEL|PHONE|EMAIL|WWW|\d{10,}/i)) {
+                console.log(`DEBUG: Skipping line ${brandLineIndex + i}: "${nextLine}" (likely business info)`);
+                continue;
+            }
+
+            // This should be the location name
+            storeName = normalizeLocationName(nextLine);
+            console.log(`DEBUG: Found store location on line ${brandLineIndex + i}:`, storeName);
+            break;
+        }
+
+        // If still no store name found, check if next line exists
+        if (!storeName && brandLineIndex + 1 < lines.length) {
+            const nextLine = lines[brandLineIndex + 1].trim();
+            console.log('DEBUG: Fallback - using next line as location:', nextLine);
+            storeName = normalizeLocationName(nextLine);
+        }
+    }
+
+    // Look for address in subsequent lines
+    for (let i = brandLineIndex + 2; i < Math.min(brandLineIndex + 5, lines.length); i++) {
+        const line = lines[i];
+        if (line.match(/SHOP|MALL|CENTRE|CENTER|STREET|RD|ROAD|AVE|AVENUE/i)) {
+            storeAddress = line.trim();
+            break;
+        }
+    }
+
+    const storeDetails = {
+        brandName: brandName || 'Unknown Brand',
+        storeName: storeName || 'Unknown Location',
+        storeAddress: storeAddress || '',
+        fullStoreName: `${brandName} ${storeName}`.trim()
+    };
+
+    console.log('Extracted store details:', storeDetails);
+    return storeDetails;
+}
+
+/**
+ * Extract items from receipt text
+ * @param {string} fullText - Full text from receipt
+ * @returns {Promise<object>} - Items and subtotal
+ */
+async function extractItems(fullText) {
+    const lines = fullText.split('\n').map(line => line.trim());
+    const items = [];
+    let inItemsSection = false;
+    let subtotal = 0;
+    let currentItem = {
+        name: null,
+        quantity: null,
+        unitPrice: null,
+        totalPrice: null
+    };
+
+    console.log('Starting item extraction. Total lines:', lines.length);
+
+    for (let i = 0; i < lines.length; i++) {
+        const line = lines[i];
+        console.log(`\nProcessing line ${i}:`, line);
+        console.log('Line with visible whitespace:', debugWhitespace(line));
+
+        // Look for section markers and skip header lines
+        if (line.match(/^ITEM$/i) || line.match(/^(SIGNATURE|BEVERAGE|FOOD)$/i)) {
+            console.log('Found start of items section:', line);
+            inItemsSection = true;
+            // Skip the header lines including Ocean Basket style headers
+            while (i < lines.length - 1 &&
+                (lines[i + 1].match(/^(QTY|PRICE|VALUE)$/i) ||
+                    lines[i + 1].match(/^-+$/))) {
+                console.log('Skipping header line:', lines[i + 1]);
+                i++;
+            }
+            continue;
+        }
+
+        // Enhanced end-of-items detection for Ocean Basket and other formats
+        if (line.match(/^(Bill Excl|Bill Total|SUMMARY|=+)$/i)) {
+            console.log('Found end of items section:', line);
+            inItemsSection = false;
+            // Save any pending item
+            if (currentItem.name && currentItem.quantity && currentItem.unitPrice) {
+                saveCurrentItem();
+            }
+            continue;
+        }
+
+        // Process items
+        if (inItemsSection && line) {
+            console.log('Processing potential item line:', line);
+
+            // Enhanced Ocean Basket format detection: "Item Name  Qty  Price  Total"
+            const oceanBasketMatch = line.match(/^(.+?)\s+(\d+)\s+(\d+\.\d{2})\s+(\d+\.\d{2})$/);
+            if (oceanBasketMatch) {
+                console.log('Found Ocean Basket format item:', oceanBasketMatch);
+                const [, name, qty, price, total] = oceanBasketMatch;
+                items.push({
+                    name: cleanItemName(name),
+                    quantity: parseInt(qty, 10),
+                    unitPrice: parseFloat(price),
+                    totalPrice: parseFloat(total)
+                });
+                subtotal += parseFloat(total);
+                continue;
+            }
+
+            // Check if line is a simple integer (quantity)
+            if (/^\d+$/.test(line)) {
+                console.log('Found quantity:', line);
+                if (currentItem.name && !currentItem.quantity) {
+                    currentItem.quantity = parseInt(line, 10);
+                }
+            }
+            // Check if line is a price (number with decimal)
+            else if (/^\d+\.\d{2}$/.test(line)) {
+                console.log('Found price:', line);
+                const price = parseFloat(line);
+                if (currentItem.name) {
+                    if (!currentItem.unitPrice) {
+                        currentItem.unitPrice = price;
+                    } else if (!currentItem.totalPrice) {
+                        currentItem.totalPrice = price;
+                        saveCurrentItem();
+                    }
+                }
+            }
+            // If not a number, must be an item name
+            else if (line.length > 0 && !line.match(/^-+$/)) {
+                console.log('Found item name:', line);
+                // Save any previous item if complete
+                if (currentItem.name && currentItem.unitPrice) {
+                    // If no quantity specified, assume 1
+                    if (!currentItem.quantity) {
+                        currentItem.quantity = 1;
+                    }
+                    saveCurrentItem();
+                }
+                // Start new item
+                currentItem = {
+                    name: cleanItemName(line),
+                    quantity: null,
+                    unitPrice: null,
+                    totalPrice: null
+                };
+
+                // Check next few lines for Ocean Basket multi-line format
+                let lookahead = 1;
+                let foundQty = false, foundPrice = false, foundTotal = false;
+
+                while (lookahead <= 3 && i + lookahead < lines.length) {
+                    const nextLine = lines[i + lookahead].trim();
+
+                    // Look for quantity (single digit)
+                    if (/^\d+$/.test(nextLine) && !foundQty) {
+                        currentItem.quantity = parseInt(nextLine, 10);
+                        foundQty = true;
+                        i += lookahead;
+                        lookahead = 1;
+                        continue;
+                    }
+                    // Look for prices
+                    else if (/^\d+\.\d{2}$/.test(nextLine)) {
+                        if (!foundPrice) {
+                            currentItem.unitPrice = parseFloat(nextLine);
+                            foundPrice = true;
+                            i += lookahead;
+                            lookahead = 1;
+                            continue;
+                        } else if (!foundTotal) {
+                            currentItem.totalPrice = parseFloat(nextLine);
+                            foundTotal = true;
+                            i += lookahead;
+                            saveCurrentItem();
+                            break;
+                        }
+                    }
+                    lookahead++;
+                }
+
+                // If we didn't find a complete item through lookahead, try legacy method
+                if (!foundPrice && i < lines.length - 1) {
+                    const nextLine = lines[i + 1].trim();
+                    if (/^\d+\.\d{2}$/.test(nextLine)) {
+                        currentItem.unitPrice = parseFloat(nextLine);
+                        i++; // Skip the price line since we've handled it
+
+                        // Check if there's a second price (total)
+                        if (i < lines.length - 1) {
+                            const totalLine = lines[i + 1].trim();
+                            if (/^\d+\.\d{2}$/.test(totalLine)) {
+                                currentItem.totalPrice = parseFloat(totalLine);
+                                i++; // Skip the total line
+                            }
+                        }
+
+                        // If we found a price, assume quantity 1 and save
+                        if (!currentItem.quantity) currentItem.quantity = 1;
+                        saveCurrentItem();
+                    } else if (nextLine.toLowerCase() === 'n/c') {
+                        // Handle no-charge items
+                        currentItem.quantity = 1;
+                        currentItem.unitPrice = 0;
+                        currentItem.totalPrice = 0;
+                        i++; // Skip the n/c line
+                        saveCurrentItem();
+                    }
+                }
+            }
+        }
+    }
+
+    function saveCurrentItem() {
+        console.log('Saving current item:', currentItem);
+        if (!isNaN(currentItem.quantity) &&
+            !isNaN(currentItem.unitPrice) &&
+            (currentItem.totalPrice === 0 || !isNaN(currentItem.totalPrice)) &&  // Allow 0 for n/c items
+            currentItem.name.length > 0) {
+            console.log('Item validation passed, adding to list');
+            items.push({ ...currentItem });
+            subtotal += currentItem.totalPrice;
+        } else {
+            console.warn('Item validation failed:', {
+                hasValidQuantity: !isNaN(currentItem.quantity),
+                hasValidUnitPrice: !isNaN(currentItem.unitPrice),
+                hasValidTotalPrice: !isNaN(currentItem.totalPrice),
+                hasValidName: currentItem.name.length > 0
+            });
+        }
+        // Reset current item
+        currentItem = {
+            name: null,
+            quantity: null,
+            unitPrice: null,
+            totalPrice: null
+        };
+    }
+
+    console.log('\nExtraction complete. Results:', {
+        itemCount: items.length,
+        subtotal: subtotal,
+        items: JSON.stringify(items, null, 2)
+    });
+
+    return { items, subtotal };
+}
+
+function cleanItemName(name) {
+    return name
+        .replace(/\s+/g, ' ')  // Replace multiple spaces with single space
+        .replace(/[^\w\s()-]/g, '')  // Remove special characters except parentheses and hyphen
+        .replace(/\s*\(\d+\)\s*$/, '')  // Remove trailing parenthetical numbers
+        .trim();
+}
+
+function debugWhitespace(str) {
+    return str.replace(/ /g, '·').replace(/\t/g, '→');
+}
+
+/**
+ * Normalize location name to match campaign format
+ * Converts "THE GROVE" to "The Grove", "MENLYN PARK" to "Menlyn Park", etc.
+ * @param {string} locationName - Raw location name from OCR
+ * @returns {string} - Normalized location name
+ */
+function normalizeLocationName(locationName) {
+    if (!locationName || typeof locationName !== 'string') {
+        return locationName;
+    }
+
+    // Common location name mappings for known locations
+    const locationMappings = {
+        'THE GROVE': 'The Grove',
+        'GROVE MALL': 'Grove Mall',
+        'MENLYN PARK': 'Menlyn Park',
+        'WATERFRONT': 'Waterfront',
+        'CANAL WALK': 'Canal Walk',
+        'SANDTON CITY': 'Sandton City',
+        'EASTGATE': 'Eastgate',
+        'FOURWAYS': 'Fourways',
+        'ROSEBANK': 'Rosebank',
+        'HYDE PARK': 'Hyde Park',
+        'BROOKLYN': 'Brooklyn',
+        'CENTURION': 'Centurion',
+        'PRETORIA': 'Pretoria',
+        'CAPE TOWN': 'Cape Town',
+        'JOHANNESBURG': 'Johannesburg',
+        'DURBAN': 'Durban'
+    };
+
+    const upperLocationName = locationName.toUpperCase();
+
+    // Check if we have a specific mapping for this location
+    if (locationMappings[upperLocationName]) {
+        console.log(`Normalized location: "${locationName}" -> "${locationMappings[upperLocationName]}"`);
+        return locationMappings[upperLocationName];
+    }
+
+    // If no specific mapping, apply title case formatting
+    const titleCased = locationName.toLowerCase().replace(/\b\w/g, l => l.toUpperCase());
+
+    // Handle common word exceptions
+    const normalized = titleCased
+        .replace(/\bThe\b/g, 'The')
+        .replace(/\bAnd\b/g, 'and')
+        .replace(/\bOf\b/g, 'of')
+        .replace(/\bIn\b/g, 'in')
+        .replace(/\bAt\b/g, 'at')
+        .replace(/\bTo\b/g, 'to')
+        .replace(/\bFor\b/g, 'for')
+        .replace(/\bWith\b/g, 'with')
+        .replace(/\bOn\b/g, 'on')
+        .replace(/\bBy\b/g, 'by');
+
+    if (normalized !== locationName) {
+        console.log(`Normalized location: "${locationName}" -> "${normalized}"`);
+    }
+
+    return normalized;
+}
+
+/**
+ * Extract receipt details from text
+ * @param {string} fullText - Full text from receipt
+ * @returns {object} - Receipt details
+ */
+function extractReceiptDetails(fullText) {
+    const details = {};
+
+    //====================================  DATE & TIME  =============================
+    console.log('=== RECEIPT DETAILS EXTRACTION ===');
+    console.log('Full Receipt Text (START):\n', fullText);
+    console.log('Full Receipt Text Length:', fullText.length);
+
+    // Logging helper function
+    function logMatch(name, regex, text) {
+        const match = text.match(regex);
+        console.log(`${name} Regex:`, regex);
+        console.log(`${name} Match:`, match);
+        return match;
+    }
+
+    const extractionStrategies = [
+        // Strategy 1: Specific Pilot POS style integrated date and time (with optional colon and spaces)
+        () => {
+            // Updated regex to handle "TIME :" with optional spaces after colon
+            const timeRegex = /TIME\s*:?\s*(\d{2}\/\d{2}\/\d{4})\s+(\d{2}:\d{2})\s+TO\s+(\d{2}:\d{2})/i;
+            const match = logMatch('Pilot POS', timeRegex, fullText);
+
+            if (match) {
+                console.log('Pilot Receipt Integrated Date/Time Strategy Matched');
+                return {
+                    date: match[1],
+                    time: match[2],
+                    endTime: match[3]
+                };
+            }
+            return null;
+        },
+
+        // Strategy 2: Separate Date and Time fields (with flexible spacing)
+        () => {
+            const dateRegex = /(?:DATE|DT)\s*:?\s*(\d{2}\/\d{2}\/\d{4})/i;
+            const timeRegex = /(?:TIME|TM)\s*:?\s*(\d{2}:\d{2})(?:\s+TO\s+(\d{2}:\d{2}))?/i;
+
+            const dateMatch = logMatch('Separate Date', dateRegex, fullText);
+            const timeMatch = logMatch('Separate Time', timeRegex, fullText);
+
+            if (dateMatch || timeMatch) {
+                console.log('Separate Date/Time Strategy Matched');
+                return {
+                    date: dateMatch ? dateMatch[1] : null,
+                    time: timeMatch ? timeMatch[1] : null,
+                    endTime: timeMatch && timeMatch[2] ? timeMatch[2] : null
+                };
+            }
+            return null;
+        },
+
+        // Strategy 3: Generic date formats
+        () => {
+            const datePatterns = [
+                /(\d{2}\/\d{2}\/\d{4})/g,  // DD/MM/YYYY or MM/DD/YYYY
+                /(\d{2}-\d{2}-\d{4})/g,     // DD-MM-YYYY or MM-DD-YYYY
+                /(\d{1,2}\s+(?:Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)[a-z]*\s+\d{4})/ig,  // 15 Jan 2024
+                /(\d{1,2}\/\d{1,2}\/\d{4})/g,  // D/M/YYYY or DD/M/YYYY
+                /(\d{4}-\d{2}-\d{2})/g,        // YYYY-MM-DD
+                /(\d{4}\/\d{2}\/\d{2})/g       // YYYY/MM/DD
+            ];
+
+            const timePatterns = [
+                /(\d{2}:\d{2}(?::\d{2})?)/g,  // HH:MM or HH:MM:SS
+                /(\d{1,2}:\d{2}\s*(?:AM|PM))/ig  // H:MM AM/PM
+            ];
+
+            // Try all date patterns and get all matches
+            let allDateMatches = [];
+            for (const pattern of datePatterns) {
+                const matches = Array.from(fullText.matchAll(pattern));
+                allDateMatches = allDateMatches.concat(matches.map(m => m[1]));
+            }
+
+            if (allDateMatches.length > 0) {
+                console.log('Found date candidates:', allDateMatches);
+                // Use the first valid-looking date
+                const selectedDate = allDateMatches[0];
+                console.log('Selected date:', selectedDate);
+
+                // Find time matches
+                let allTimeMatches = [];
+                for (const pattern of timePatterns) {
+                    const matches = Array.from(fullText.matchAll(pattern));
+                    allTimeMatches = allTimeMatches.concat(matches.map(m => m[1]));
+                }
+
+                console.log('Found time candidates:', allTimeMatches);
+                const selectedTime = allTimeMatches.length > 0 ? allTimeMatches[0] : null;
+
+                return {
+                    date: selectedDate,
+                    time: selectedTime
+                };
+            }
+            return null;
+        },
+
+        // Strategy 4: Fallback - any date-like pattern
+        () => {
+            console.log('Trying fallback date extraction...');
+            // Look for any sequence that could be a date
+            const fallbackPatterns = [
+                /(\d{1,2}[\/\-\.]\d{1,2}[\/\-\.]\d{2,4})/g,  // Any D/M/Y pattern
+                /(\d{2,4}[\/\-\.]\d{1,2}[\/\-\.]\d{1,2})/g   // Any Y/M/D pattern
+            ];
+
+            for (const pattern of fallbackPatterns) {
+                const matches = Array.from(fullText.matchAll(pattern));
+                if (matches.length > 0) {
+                    console.log('Fallback date found:', matches[0][1]);
+                    return {
+                        date: matches[0][1],
+                        time: null
+                    };
+                }
+            }
+            return null;
+        }
+    ];
+
+    // Try each extraction strategy
+    let dateTimeFound = false;
+    for (const strategy of extractionStrategies) {
+        const result = strategy();
+        if (result) {
+            details.date = result.date || details.date;
+            details.time = result.time || details.time;
+            details.endTime = result.endTime || details.endTime;
+            dateTimeFound = true;
+            console.log('Successfully extracted date/time:', {
+                date: details.date,
+                time: details.time,
+                endTime: details.endTime
+            });
+            break;
+        }
+    }
+
+    if (!dateTimeFound) {
+        console.warn('Failed to extract date/time from receipt');
+        console.warn('📄 Receipt text preview for date debugging:', fullText.slice(0, 800));
+
+        // Log some sample lines that might contain dates
+        const lines = fullText.split('\n');
+        const potentialDateLines = lines.filter(line =>
+            /\d/.test(line) && line.length < 50
+        ).slice(0, 10);
+        console.warn('📋 Lines that might contain dates:', potentialDateLines);
+    }
+
+    //====================================  END =============================    
+    // Extract invoice number with multiple patterns
+    const invoicePatterns = [
+        /(?:PRO-FORMA\s+)?INVOICE:?\s*#?\s*(\d+)/i,      // INVOICE: 123456
+        /RECEIPT\s*#?\s*(\d+)/i,                          // RECEIPT # 123456
+        /PRO-FORMA INVOICE:\s*(\d+)/i,                    // PRO-FORMA INVOICE: 123456
+        /(?:BILL|TXN|TRANS|TRANSACTION)\s*#?\s*(\d+)/i,   // BILL # 123456, TXN 123456
+        /(?:REF|REFERENCE)\s*#?\s*(\d+)/i,                // REF # 123456
+        /ORDER\s*#?\s*(\d+)/i,                            // ORDER # 123456
+        /#\s*(\d{6,})/i,                                  // # 123456 (6+ digits)
+        /(?:^|\s)(\d{6,})(?:\s|$)/m                       // Any 6+ digit number on its own line
+    ];
+
+    let invoiceMatch = null;
+    for (const pattern of invoicePatterns) {
+        invoiceMatch = fullText.match(pattern);
+        if (invoiceMatch) {
+            console.log('Found invoice number with pattern:', pattern, 'Result:', invoiceMatch[1]);
+            break;
+        }
+    }
+    details.invoiceNumber = invoiceMatch ? invoiceMatch[1] : null;
+
+    if (!details.invoiceNumber) {
+        console.warn('⚠️ No invoice number found with any pattern');
+        console.warn('📄 Receipt text preview for debugging:', fullText.slice(0, 500));
+
+        // Last resort: look for any standalone number sequence that could be an invoice
+        const numberMatch = fullText.match(/(\d{5,})/);
+        if (numberMatch) {
+            console.log('🔄 Using fallback number as invoice:', numberMatch[1]);
+            details.invoiceNumber = numberMatch[1];
+        }
+    }
+
+
+
+    // Extract waiter and table info (enhanced for Ocean Basket format)
+    const waiterMatch = fullText.match(/WAITER:?\s*(.+?)(?:\s*\(|\n|$)/i);
+    const tableMatch = fullText.match(/TABLE:?\s*(\d+)/i);
+
+    // Ocean Basket specific waiter format: "WAITER: SIHLE (40)"
+    const oceanBasketWaiterMatch = fullText.match(/WAITER:\s*([A-Z]+)\s*\(\d+\)/i);
+
+    details.waiterName = oceanBasketWaiterMatch ? oceanBasketWaiterMatch[1].trim() :
+        (waiterMatch ? waiterMatch[1].trim() : null);
+    details.tableNumber = tableMatch ? tableMatch[1] : null;
+
+    // Extract amounts with enhanced total amount detection
+    const vatMatch = fullText.match(/VAT\s+\d+%\s+\(already included\)\s+(\d+\.\d{2})/i);
+
+    // Enhanced total amount detection with multiple fallback patterns
+    const totalPatterns = [
+        // Pattern 1: Traditional formats - Bill Total followed by amount on same line
+        /Bill\s+Total\s+(\d+\.\d{2})/i,
+        /Bill Total\s*(\d+\.\d{2})/i,
+
+        // Pattern 2: Multi-line format where Bill Total is on separate line
+        /Bill Total\s*\n[^\d]*?(\d+\.\d{2})/i,
+
+        // Pattern 3: Bill Total followed by VAT info, then amount
+        /Bill Total\s*\n.*?VAT.*?\n.*?(\d+\.\d{2})/i,
+
+        // Pattern 4: Ocean Basket specific - Bill Total followed by VAT on next line, then amount
+        /Bill Total\s*\n\s*VAT[^\n]*\n\s*(\d+\.\d{2})/i,
+
+        // Pattern 5: Ocean Basket specific - Bill Total with VAT info inline
+        /Bill Total\s*\n\s*VAT[^\n]*?(\d+\.\d{2})/i,
+
+        // Pattern 6: Total followed by amount (case insensitive)
+        /\bTOTAL\s*:?\s*(\d+\.\d{2})/i,
+
+        // Pattern 7: Amount Total patterns
+        /Amount\s+Total\s*:?\s*(\d+\.\d{2})/i,
+
+        // Pattern 8: Final Total patterns
+        /Final\s+Total\s*:?\s*(\d+\.\d{2})/i,
+
+        // Pattern 9: Grand Total patterns
+        /Grand\s+Total\s*:?\s*(\d+\.\d{2})/i,
+
+        // Pattern 10: Sum Total patterns
+        /Sum\s+Total\s*:?\s*(\d+\.\d{2})/i
+    ];
+
+    let totalMatch = null;
+    let detectedAmount = null;
+
+    for (const pattern of totalPatterns) {
+        totalMatch = fullText.match(pattern);
+        if (totalMatch) {
+            detectedAmount = totalMatch[1];
+            console.log('Found total amount with pattern:', pattern, 'Result:', detectedAmount);
+
+            // Validate: make sure this isn't from SUMMARY section
+            // Extract context around the match to check if it's in SUMMARY section
+            const matchIndex = fullText.indexOf(totalMatch[0]);
+            const contextBefore = fullText.substring(Math.max(0, matchIndex - 50), matchIndex);
+            const contextAfter = fullText.substring(matchIndex, Math.min(fullText.length, matchIndex + 100));
+
+            console.log('Context before match:', contextBefore);
+            console.log('Context after match:', contextAfter);
+
+            // Check if this amount is in the SUMMARY section
+            if (contextBefore.match(/SUMMARY|PROMO|BEVERAGE|FOOD|DESSERT/i) &&
+                !contextBefore.match(/Bill Total/i)) {
+                console.log('⚠️ Amount appears to be in SUMMARY section, skipping...');
+                totalMatch = null; // Reset and try next pattern
+                continue;
+            }
+
+            break; // Found valid total
+        }
+    }
+
+    // If no total found with patterns, try a more sophisticated approach
+    if (!totalMatch) {
+        console.log('No total found with standard patterns, trying advanced detection...');
+
+        // Look for "Bill Total" and then search for the next valid amount
+        const billTotalIndex = fullText.toLowerCase().indexOf('bill total');
+        if (billTotalIndex !== -1) {
+            // Get text after "Bill Total" but before "SUMMARY" section
+            let textAfterBillTotal = fullText.substring(billTotalIndex);
+
+            // If there's a SUMMARY section, only search before it
+            const summaryIndex = textAfterBillTotal.toUpperCase().indexOf('SUMMARY');
+            if (summaryIndex !== -1) {
+                textAfterBillTotal = textAfterBillTotal.substring(0, summaryIndex);
+                console.log('Searching for total before SUMMARY section');
+            }
+
+            const amountMatches = textAfterBillTotal.match(/(\d+\.\d{2})/g);
+
+            if (amountMatches && amountMatches.length > 0) {
+                // Get the first amount after "Bill Total" (before SUMMARY)
+                detectedAmount = amountMatches[0];
+                console.log('Found total using advanced detection:', detectedAmount);
+                totalMatch = [null, detectedAmount]; // Simulate match array
+            }
+        }
+    }
+
+    // Final fallback: look for any large amount that could be a total (but not in SUMMARY)
+    if (!totalMatch) {
+        console.log('Trying final fallback - looking for large amounts...');
+
+        // Split text into sections to avoid SUMMARY section
+        const summaryIndex = fullText.toUpperCase().indexOf('SUMMARY');
+        const searchText = summaryIndex !== -1 ? fullText.substring(0, summaryIndex) : fullText;
+
+        const allAmounts = searchText.match(/(\d+\.\d{2})/g);
+
+        if (allAmounts && allAmounts.length > 0) {
+            // Find the largest amount (likely to be the total)
+            const amounts = allAmounts.map(a => parseFloat(a));
+            const maxAmount = Math.max(...amounts);
+
+            // Only use if it's a reasonable total (over 10.00)
+            if (maxAmount >= 10.00) {
+                console.log('Using largest amount as total:', maxAmount);
+                totalMatch = [null, maxAmount.toFixed(2)];
+                detectedAmount = maxAmount.toFixed(2);
+            }
+        }
+    }
+
+    details.vatAmount = vatMatch ? parseFloat(vatMatch[1]) : 0;
+    details.totalAmount = totalMatch ? parseFloat(detectedAmount || totalMatch[1]) : 0;
+
+    // Additional validation logging
+    console.log('💰 Total Amount Extraction Results:', {
+        totalAmount: details.totalAmount,
+        vatAmount: details.vatAmount,
+        extractionMethod: totalMatch ? 'Pattern matched' : 'Not found'
+    });
+
+    // Final logging of extracted details
+    console.log('=== EXTRACTED DETAILS ===');
+    console.log(JSON.stringify(details, null, 2));
+    console.log('=== VALIDATION STATUS ===');
+    console.log({
+        hasValidTotal: details.totalAmount && details.totalAmount > 0,
+        hasValidDate: !!details.date,
+        hasValidInvoice: !!details.invoiceNumber,
+        totalAmount: details.totalAmount,
+        vatAmount: details.vatAmount
+    });
+    console.log('=== END OF EXTRACTION ===');
+    return details;
+}
+
+/**
+ * Fetch active brands from Firebase
+ * @returns {Promise<Set>} - Set of active brand names
+ */
+async function fetchActiveBrands() {
+    try {
+        // Use simple string path
+        const snapshot = await get(ref(rtdb, 'campaigns'));
+        const campaigns = snapshot.val();
+
+        if (!campaigns) {
+            console.log('No active campaigns found');
+            return new Set();
+        }
+
+        // Extract unique brand names from campaigns
+        const brands = new Set();
+        Object.values(campaigns).forEach(campaign => {
+            if (campaign?.brandName && typeof campaign.brandName === 'string') {
+                brands.add(campaign.brandName.toLowerCase().trim());
+            }
+        });
+
+        console.log('Fetched active brands:', Array.from(brands));
+        return brands;
+    } catch (error) {
+        console.error('Error fetching active brands:', error);
+        throw new Error('Failed to fetch active brands');
+    }
+}
+
+/**
+ * Save receipt data to Firebase
+ * @param {object} receiptData - Processed receipt data
+ * @returns {Promise<object>} - Saved receipt data with ID
+ */
+async function saveReceiptData(receiptData) {
+    try {
+        if (!receiptData || typeof receiptData !== 'object') {
+            throw new Error('Invalid receipt data');
+        }
+
+        // Validate and standardize date/time
+        const standardizedDate = validateAndStandardizeDate(receiptData.date);
+        const standardizedTime = validateAndStandardizeTime(receiptData.time);
+        const standardizedEndTime = validateAndStandardizeTime(receiptData.endTime);
+
+        if (!standardizedDate) {
+            console.warn('Invalid or missing date in receipt:', receiptData.date);
+        }
+        if (!standardizedTime) {
+            console.warn('Invalid or missing time in receipt:', receiptData.time);
+        }
+
+        // Ensure guestPhoneNumber is a string
+        if (!receiptData.guestPhoneNumber || typeof receiptData.guestPhoneNumber !== 'string') {
+            throw new Error('Invalid guest phone number');
+        }
+
+        // Clean phone number to ensure valid path
+        const cleanPhoneNumber = String(receiptData.guestPhoneNumber).replace(/[^\w\d]/g, '');
+
+        // Always generate proper Firebase ID using push
+        const receiptRef = push(rtdb, 'receipts');
+        const receiptId = receiptRef.key;
+
+        if (!receiptId) {
+            throw new Error('Failed to generate receipt ID');
+        }
+
+        // Prepare receipt data with defaults for missing fields
+        const dataToSave = {
+            ...receiptData,
+            id: receiptId,
+            date: standardizedDate || receiptData.date,  // Keep original if standardization fails
+            time: standardizedTime || receiptData.time,  // Keep original if standardization fails
+            endTime: standardizedEndTime || receiptData.endTime,
+            createdAt: Date.now(),
+            status: receiptData.status || 'pending_validation',
+            guestPhoneNumber: cleanPhoneNumber
+        };
+
+        // Remove undefined values (Firebase doesn't allow them)
+        // Remove undefined values and fix null values before saving to Firebase
+        Object.keys(dataToSave).forEach(key => {
+            if (dataToSave[key] === undefined) {
+                delete dataToSave[key];
+            }
+            // Also remove null values that Firebase doesn't handle well
+            if (dataToSave[key] === null) {
+                delete dataToSave[key];
+            }
+        });
+
+        // Ensure all required fields have valid values
+        if (!dataToSave.date && standardizedDate) {
+            dataToSave.date = standardizedDate;
+        }
+        if (!dataToSave.invoiceNumber && receiptData.invoiceNumber) {
+            dataToSave.invoiceNumber = receiptData.invoiceNumber;
+        }
+
+        console.log('🧹 Data cleaned for Firebase save:', {
+            hasDate: !!dataToSave.date,
+            hasInvoiceNumber: !!dataToSave.invoiceNumber,
+            hasEndTime: !!dataToSave.endTime,
+            receiptId: receiptId
+        });
+
+        // Save to receipts collection using the proper reference
+        await set(receiptRef, dataToSave);
+
+        // Create lightweight guest receipt index - just points to main receipt
+        await set(ref(rtdb, `guest-receipts/${cleanPhoneNumber}/${receiptId}`), {
+            receiptId: receiptId,
+            createdAt: Date.now(),
+            // Only store minimal data for indexing - full data is in main receipts collection
+            invoiceNumber: receiptData.invoiceNumber,
+            totalAmount: receiptData.totalAmount || 0,
+            status: dataToSave.status
+        });
+
+        console.log('Receipt data saved successfully:', {
+            receiptId,
+            phoneNumber: cleanPhoneNumber,
+            date: standardizedDate,
+            time: standardizedTime
+        });
+
+        return dataToSave;
+    } catch (error) {
+        console.error('Error saving receipt:', error);
+        throw new Error('Failed to save receipt data');
+    }
+}
+
+/**
+ * Validate and standardize date string
+ * @param {string} dateStr - Date string in DD/MM/YYYY format
+ * @returns {string|null} - ISO date string or null if invalid
+ */
+function validateAndStandardizeDate(dateStr) {
+    if (!dateStr) return null;
+
+    // Parse DD/MM/YYYY format
+    const parts = dateStr.split('/');
+    if (parts.length !== 3) return null;
+
+    const day = parseInt(parts[0], 10);
+    const month = parseInt(parts[1], 10);
+    const year = parseInt(parts[2], 10);
+
+    // Basic validation
+    if (isNaN(day) || isNaN(month) || isNaN(year)) return null;
+    if (month < 1 || month > 12) return null;
+    if (day < 1 || day > 31) return null;
+    if (year < 2020 || year > 2030) return null;
+
+    // Create date object for further validation
+    const date = new Date(year, month - 1, day);
+    if (date.getFullYear() !== year || date.getMonth() !== month - 1 || date.getDate() !== day) {
+        return null; // Invalid date (e.g., 31/04/2024)
+    }
+
+    // Return ISO format date
+    return date.toISOString().split('T')[0];
+}
+
+/**
+ * Validate and standardize time string
+ * @param {string} timeStr - Time string in HH:MM format
+ * @returns {string|null} - Standardized time or null if invalid
+ */
+function validateAndStandardizeTime(timeStr) {
+    if (!timeStr) return null;
+
+    const parts = timeStr.split(':');
+    if (parts.length !== 2) return null;
+
+    const hours = parseInt(parts[0], 10);
+    const minutes = parseInt(parts[1], 10);
+
+    // Basic validation
+    if (isNaN(hours) || isNaN(minutes)) return null;
+    if (hours < 0 || hours > 23) return null;
+    if (minutes < 0 || minutes > 59) return null;
+
+    // Return standardized format
+    return `${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}`;
+}
+
+/**
+ * Test receipt processing functionality
+ * @param {string} imageUrl - URL of the receipt image
+ * @param {string} phoneNumber - Guest phone number
+ * @returns {Promise<object>} - Test results
+ */
+async function testReceiptProcessing(imageUrl, phoneNumber) {
+    try {
+        console.log('=== Starting Receipt Processing Test ===');
+
+        // Test brand fetching
+        console.log('\nTesting Brand Fetching:');
+        const brands = await fetchActiveBrands();
+        console.log('Active Brands:', brands);
+
+        // Test text detection
+        console.log('\nTesting Text Detection:');
+        const [result] = await detectReceiptText(imageUrl);
+        const fullText = result.textAnnotations[0].description;
+        console.log('Detected Text Sample:', fullText.slice(0, 200) + '...');
+
+        // Test store details extraction
+        console.log('\nTesting Store Details Extraction:');
+        const storeDetails = await extractStoreDetails(fullText);
+        console.log('Extracted Store Details:', storeDetails);
+
+        // Test full receipt processing
+        console.log('\nTesting Full Receipt Processing:');
+        const processedReceipt = await processReceipt(imageUrl, phoneNumber);
+        console.log('Processed Receipt:', processedReceipt);
+
+        return {
+            success: true,
+            brands,
+            storeDetails,
+            processedReceipt
+        };
+    } catch (error) {
+        console.error('Receipt Processing Test Failed:', error);
+        return {
+            success: false,
+            error: error.message
+        };
+    }
+}
+
+/**
+ * Validates if receipt date is within the current month
+ * @param {string} receiptDate - Date from receipt (format: MM/DD/YYYY or DD/MM/YYYY)
+ * @returns {boolean} - True if date is valid and within current month
+ */
+function validateReceiptDate(receiptDate) {
+    try {
+        const [part1, part2, year] = receiptDate.split('/').map(Number);
+        const currentDate = new Date();
+        const currentMonth = currentDate.getMonth() + 1; // 1-based month
+        const currentYear = currentDate.getFullYear();
+
+        console.log('Date validation input:', {
+            receiptDate,
+            part1,
+            part2,
+            year,
+            currentMonth,
+            currentYear
+        });
+
+        // Check if parts could be valid months (1-12)
+        const couldBeMonth = part1 >= 1 && part1 <= 12;
+        const part2CouldBeMonth = part2 >= 1 && part2 <= 12;
+
+        // If current month matches either possible month interpretation,
+        // prioritize that interpretation
+        if (currentMonth === part1 && couldBeMonth) {
+            // Interpret as MM/DD/YYYY
+            console.log('Interpreting as MM/DD/YYYY (current month matches first part)');
+            return year === currentYear;
+        }
+
+        if (currentMonth === part2 && part2CouldBeMonth) {
+            // Interpret as DD/MM/YYYY
+            console.log('Interpreting as DD/MM/YYYY (current month matches second part)');
+            return year === currentYear;
+        }
+
+        // If no interpretation matches current month, reject
+        console.log('Date not in current month:', {
+            interpretedAsMMDD: { month: part1, day: part2 },
+            interpretedAsDDMM: { month: part2, day: part1 },
+            currentMonth
+        });
+        return false;
+
+    } catch (error) {
+        console.error('Date validation error:', {
+            error: error.message,
+            receiptDate
+        });
+        return false;
+    }
+}
+
+/**
+ * Test the enhanced total amount detection logic
+ * @param {string} testText - Sample receipt text to test
+ * @returns {object} - Test results
+ */
+function testTotalAmountDetection(testText) {
+    console.log('=== TESTING TOTAL AMOUNT DETECTION ===');
+    console.log('Test text:', testText);
+
+    const details = extractReceiptDetails(testText);
+
+    console.log('Test Results:', {
+        totalAmount: details.totalAmount,
+        vatAmount: details.vatAmount,
+        success: details.totalAmount > 0
+    });
+
+    return {
+        totalAmount: details.totalAmount,
+        vatAmount: details.vatAmount,
+        success: details.totalAmount > 0
+    };
+}
+
+module.exports = {
+    processReceipt,
+    processReceiptWithoutSaving,
+    saveReceiptData,
+    testReceiptProcessing,
+    testTotalAmountDetection
+};

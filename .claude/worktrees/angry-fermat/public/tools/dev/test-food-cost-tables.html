@@ -1,0 +1,208 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Food Cost Module Table Header Test</title>
+    
+    <!-- Bootstrap CSS -->
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <!-- CSS files that cause issues -->
+    <link href="../css/food-cost-dashboard.css" rel="stylesheet">
+    <!-- Table Fixes CSS - This should fix all issues -->
+    <link href="../css/table-fixes.css" rel="stylesheet">
+    
+    <style>
+        /* Simulate modal overlay styles */
+        .modal-overlay {
+            background: rgba(0, 0, 0, 0.5);
+            padding: 20px;
+            margin: 20px 0;
+        }
+        .modal-content {
+            background: white;
+            padding: 20px;
+            border-radius: 8px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container mt-5">
+        <h1>Food Cost Module Table Header Visibility Test</h1>
+        <p>This page tests table header visibility in the Food Cost module components.</p>
+        
+        <div class="alert alert-info">
+            <strong>Test Focus:</strong> All tables below should have dark text on light gray headers, not white text on white background.
+        </div>
+        
+        <!-- Test 1: Stock Data Table Style -->
+        <div class="card mb-4">
+            <div class="card-header">
+                <h3>Stock Data Table (thead-light class)</h3>
+            </div>
+            <div class="card-body">
+                <div class="table-responsive">
+                    <table class="table table-bordered table-hover table-sm">
+                        <thead class="thead-light">
+                            <tr>
+                                <th>Item Code</th>
+                                <th>Description</th>
+                                <th class="text-right">Opening Qty</th>
+                                <th class="text-right">Purchase Qty</th>
+                                <th class="text-right">Closing Qty</th>
+                                <th class="text-right">Usage</th>
+                                <th class="text-right">Unit Cost</th>
+                                <th class="text-center">Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr>
+                                <td>ITEM001</td>
+                                <td>Sample Item</td>
+                                <td class="text-right">100.00</td>
+                                <td class="text-right">50.00</td>
+                                <td class="text-right">120.00</td>
+                                <td class="text-right">30.00</td>
+                                <td class="text-right">5.50</td>
+                                <td class="text-center">
+                                    <button class="btn btn-sm btn-outline-info">
+                                        <i class="fas fa-calculator"></i>
+                                    </button>
+                                </td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Test 2: Purchase Order Modal Style -->
+        <div class="card mb-4">
+            <div class="card-header">
+                <h3>Purchase Order Modal Table</h3>
+            </div>
+            <div class="card-body">
+                <!-- Simulate modal overlay -->
+                <div class="modal-overlay">
+                    <div class="modal-content">
+                        <h5>Supplier Breakdown</h5>
+                        <div class="table-responsive">
+                            <table class="table table-sm table-striped table-hover mb-0">
+                                <thead class="thead-light">
+                                    <tr>
+                                        <th>Supplier</th>
+                                        <th class="text-center">Items</th>
+                                        <th class="text-right">Total Cost</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    <tr>
+                                        <td>Supplier A</td>
+                                        <td class="text-center">15</td>
+                                        <td class="text-right">1,250.00</td>
+                                    </tr>
+                                    <tr>
+                                        <td>Supplier B</td>
+                                        <td class="text-center">8</td>
+                                        <td class="text-right">750.00</td>
+                                    </tr>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Test 3: Inside food-cost-dashboard container -->
+        <div class="card mb-4">
+            <div class="card-header">
+                <h3>Table inside food-cost-dashboard Container</h3>
+            </div>
+            <div class="card-body">
+                <div class="food-cost-dashboard">
+                    <div class="table-responsive">
+                        <table class="table table-bordered">
+                            <thead class="thead-light">
+                                <tr>
+                                    <th>Column 1</th>
+                                    <th>Column 2</th>
+                                    <th>Column 3</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <tr>
+                                    <td>Data 1</td>
+                                    <td>Data 2</td>
+                                    <td>Data 3</td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Test 4: All Bootstrap table classes -->
+        <div class="card mb-4">
+            <div class="card-header">
+                <h3>Various Table Header Classes</h3>
+            </div>
+            <div class="card-body">
+                <div class="row">
+                    <div class="col-md-6 mb-3">
+                        <h5>thead-light</h5>
+                        <table class="table table-sm">
+                            <thead class="thead-light">
+                                <tr>
+                                    <th>Header 1</th>
+                                    <th>Header 2</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <tr>
+                                    <td>Data</td>
+                                    <td>Data</td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                    
+                    <div class="col-md-6 mb-3">
+                        <h5>table-light on thead</h5>
+                        <table class="table table-sm">
+                            <thead class="table-light">
+                                <tr>
+                                    <th>Header 1</th>
+                                    <th>Header 2</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <tr>
+                                    <td>Data</td>
+                                    <td>Data</td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <div class="alert alert-success mt-4">
+            <h4>Expected Results:</h4>
+            <ul>
+                <li>All table headers should have <strong>dark gray text</strong> (#495057)</li>
+                <li>All table headers should have <strong>light gray background</strong> (#f8f9fa)</li>
+                <li>Headers should be clearly readable with good contrast</li>
+                <li>No white text on white background issues</li>
+            </ul>
+        </div>
+        
+        <div class="mt-4">
+                    <p><a href="test-table-visibility.html" class="btn btn-secondary">View General Table Tests</a></p>
+        <p><a href="../js/modules/food-cost/cost-driver.html" class="btn btn-primary">Go to Cost Driver Page</a></p>
+        </div>
+    </div>
+</body>
+</html> 

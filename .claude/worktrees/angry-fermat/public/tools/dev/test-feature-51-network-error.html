@@ -1,0 +1,288 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Feature #51: Network Error Handling Test</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <style>
+        body {
+            padding: 20px;
+            background-color: #f8f9fa;
+        }
+        .test-card {
+            margin-bottom: 20px;
+        }
+        .status-indicator {
+            display: inline-block;
+            width: 12px;
+            height: 12px;
+            border-radius: 50%;
+            margin-right: 8px;
+        }
+        .status-online {
+            background-color: #28a745;
+        }
+        .status-offline {
+            background-color: #dc3545;
+        }
+        .log-output {
+            background-color: #f8f9fa;
+            border: 1px solid #dee2e6;
+            border-radius: 4px;
+            padding: 15px;
+            max-height: 300px;
+            overflow-y: auto;
+            font-family: 'Courier New', monospace;
+            font-size: 0.9rem;
+        }
+        .log-entry {
+            margin-bottom: 5px;
+        }
+        .log-error {
+            color: #dc3545;
+        }
+        .log-success {
+            color: #28a745;
+        }
+        .log-info {
+            color: #0d6efd;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="row">
+            <div class="col-12">
+                <h1 class="mb-4">
+                    <i class="fas fa-network-wired"></i>
+                    Feature #51: Network Error Handling Test
+                </h1>
+
+                <div class="alert alert-info">
+                    <h5><i class="fas fa-info-circle"></i> Test Instructions</h5>
+                    <ol>
+                        <li>Click "Simulate Network Error" to test error handling</li>
+                        <li>Check the browser console for error messages</li>
+                        <li>Verify that user-friendly error toast appears</li>
+                        <li>Use DevTools Network tab to simulate offline mode</li>
+                        <li>Try "Test Firebase Request" while offline</li>
+                    </ol>
+                </div>
+
+                <!-- Network Status -->
+                <div class="card test-card">
+                    <div class="card-header bg-primary text-white">
+                        <h5 class="mb-0">
+                            <i class="fas fa-signal"></i>
+                            Network Status
+                        </h5>
+                    </div>
+                    <div class="card-body">
+                        <div class="d-flex align-items-center mb-3">
+                            <span class="status-indicator" id="statusIndicator"></span>
+                            <strong id="connectionStatus">Checking...</strong>
+                        </div>
+                        <p id="statusMessage" class="mb-0"></p>
+                    </div>
+                </div>
+
+                <!-- Test Controls -->
+                <div class="card test-card">
+                    <div class="card-header bg-success text-white">
+                        <h5 class="mb-0">
+                            <i class="fas fa-play-circle"></i>
+                            Test Controls
+                        </h5>
+                    </div>
+                    <div class="card-body">
+                        <div class="row g-3">
+                            <div class="col-md-6">
+                                <button class="btn btn-danger w-100" id="btnSimulateNetworkError">
+                                    <i class="fas fa-exclamation-triangle"></i>
+                                    Simulate Network Error
+                                </button>
+                            </div>
+                            <div class="col-md-6">
+                                <button class="btn btn-warning w-100" id="btnSimulateFirebaseError">
+                                    <i class="fas fa-database"></i>
+                                    Test Firebase Request
+                                </button>
+                            </div>
+                            <div class="col-md-6">
+                                <button class="btn btn-info w-100" id="btnTestOffline">
+                                    <i class="fas fa-wifi-slash"></i>
+                                    Test Invalid URL
+                                </button>
+                            </div>
+                            <div class="col-md-6">
+                                <button class="btn btn-secondary w-100" id="btnClearLog">
+                                    <i class="fas fa-eraser"></i>
+                                    Clear Log
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Test Log -->
+                <div class="card test-card">
+                    <div class="card-header bg-dark text-white">
+                        <h5 class="mb-0">
+                            <i class="fas fa-terminal"></i>
+                            Test Log
+                        </h5>
+                    </div>
+                    <div class="card-body">
+                        <div class="log-output" id="logOutput">
+                            <div class="log-entry log-info">Test initialized...</div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Verification Checklist -->
+                <div class="card test-card">
+                    <div class="card-header bg-warning">
+                        <h5 class="mb-0">
+                            <i class="fas fa-check-circle"></i>
+                            Verification Checklist
+                        </h5>
+                    </div>
+                    <div class="card-body">
+                        <div class="form-check mb-2">
+                            <input class="form-check-input" type="checkbox" id="check1">
+                            <label class="form-check-label" for="check1">
+                                Network error shows user-friendly message
+                            </label>
+                        </div>
+                        <div class="form-check mb-2">
+                            <input class="form-check-input" type="checkbox" id="check2">
+                            <label class="form-check-label" for="check2">
+                                No uncaught exceptions in console
+                            </label>
+                        </div>
+                        <div class="form-check mb-2">
+                            <input class="form-check-input" type="checkbox" id="check3">
+                            <label class="form-check-label" for="check3">
+                                Toast notification appears with error message
+                            </label>
+                        </div>
+                        <div class="form-check mb-2">
+                            <input class="form-check-input" type="checkbox" id="check4">
+                            <label class="form-check-label" for="check4">
+                                Offline/online status changes are detected
+                            </label>
+                        </div>
+                        <div class="form-check mb-2">
+                            <input class="form-check-input" type="checkbox" id="check5">
+                            <label class="form-check-label" for="check5">
+                                Error handler gracefully handles Firebase errors
+                            </label>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    <script type="module">
+        import { errorHandler } from '../../js/utils/error-handler.js';
+        import { rtdb, ref, get } from '../../js/config/firebase-config.js';
+
+        // DOM elements
+        const statusIndicator = document.getElementById('statusIndicator');
+        const connectionStatus = document.getElementById('connectionStatus');
+        const statusMessage = document.getElementById('statusMessage');
+        const logOutput = document.getElementById('logOutput');
+
+        // Log function
+        function log(message, type = 'info') {
+            const entry = document.createElement('div');
+            entry.className = `log-entry log-${type}`;
+            entry.textContent = `[${new Date().toLocaleTimeString()}] ${message}`;
+            logOutput.appendChild(entry);
+            logOutput.scrollTop = logOutput.scrollHeight;
+            console.log(`[Test] ${message}`);
+        }
+
+        // Update network status display
+        function updateNetworkStatus() {
+            const isOnline = navigator.onLine;
+            statusIndicator.className = `status-indicator ${isOnline ? 'status-online' : 'status-offline'}`;
+            connectionStatus.textContent = isOnline ? 'Online' : 'Offline';
+            statusMessage.textContent = isOnline
+                ? 'You are connected to the internet'
+                : 'You are offline. Network requests will fail.';
+
+            log(`Network status: ${isOnline ? 'ONLINE' : 'OFFLINE'}`, isOnline ? 'success' : 'error');
+        }
+
+        // Test: Simulate network error
+        document.getElementById('btnSimulateNetworkError').addEventListener('click', async () => {
+            log('Simulating network error...', 'info');
+
+            try {
+                // Try to fetch from non-existent endpoint
+                await fetch('https://invalid-domain-that-does-not-exist-12345.com/api/test');
+            } catch (error) {
+                log('Network error caught!', 'error');
+                errorHandler.handleError(error, 'Network Test');
+            }
+        });
+
+        // Test: Firebase request
+        document.getElementById('btnSimulateFirebaseError').addEventListener('click', async () => {
+            log('Testing Firebase request...', 'info');
+
+            try {
+                // Try to access Firebase
+                const testRef = ref(rtdb, 'test-connection');
+                const snapshot = await get(testRef);
+                log('Firebase request successful!', 'success');
+            } catch (error) {
+                log('Firebase error caught!', 'error');
+                errorHandler.handleError(error, 'Firebase Test');
+            }
+        });
+
+        // Test: Invalid URL
+        document.getElementById('btnTestOffline').addEventListener('click', async () => {
+            log('Testing invalid URL fetch...', 'info');
+
+            try {
+                const response = await fetch('https://httpstat.us/500');
+                log(`Response status: ${response.status}`, response.ok ? 'success' : 'error');
+            } catch (error) {
+                log('Fetch error caught!', 'error');
+                errorHandler.handleError(error, 'Fetch Test');
+            }
+        });
+
+        // Clear log
+        document.getElementById('btnClearLog').addEventListener('click', () => {
+            logOutput.innerHTML = '<div class="log-entry log-info">Log cleared...</div>';
+        });
+
+        // Listen to online/offline events
+        window.addEventListener('online', () => {
+            updateNetworkStatus();
+        });
+
+        window.addEventListener('offline', () => {
+            updateNetworkStatus();
+        });
+
+        // Listen to error handler events
+        errorHandler.addListener((errorInfo) => {
+            log(`Error Handler: ${errorInfo.type} - ${errorInfo.message}`, 'error');
+        });
+
+        // Initialize
+        updateNetworkStatus();
+        log('Test page initialized', 'success');
+        log('Global error handler is active', 'success');
+    </script>
+</body>
+</html>

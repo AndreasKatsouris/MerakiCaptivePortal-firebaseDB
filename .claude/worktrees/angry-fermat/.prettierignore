@@ -1,0 +1,16 @@
+# Ignore build output
+node_modules
+dist
+build
+public/lib
+
+# Ignore Firebase
+.firebase
+firebase-debug.log
+
+# Ignore minified files
+*.min.js
+*.min.css
+
+# Ignore generated files
+*.compiled.*

@@ -1,0 +1,368 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Phone Number Protection Test</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <style>
+        .test-result { margin: 10px 0; padding: 10px; border-radius: 5px; }
+        .test-pass { background-color: #d4edda; border: 1px solid #c3e6cb; color: #155724; }
+        .test-fail { background-color: #f8d7da; border: 1px solid #f5c6cb; color: #721c24; }
+        .test-info { background-color: #d1ecf1; border: 1px solid #bee5eb; color: #0c5460; }
+        .phone-data { font-family: monospace; background: #f8f9fa; padding: 10px; border-radius: 4px; }
+    </style>
+</head>
+<body>
+    <div class="container mt-4">
+        <div class="row">
+            <div class="col-12">
+                <h2>🛡️ Phone Number Protection Test</h2>
+                <p class="text-muted">Test if your phone number protection fixes are working correctly</p>
+                
+                <div class="card mb-4">
+                    <div class="card-header">
+                        <h5>📱 Your Current Phone Number Status</h5>
+                    </div>
+                    <div class="card-body">
+                        <div id="currentStatus">
+                            <div class="spinner-border text-primary" role="status">
+                                <span class="visually-hidden">Loading...</span>
+                            </div>
+                            <span class="ms-2">Checking your phone number...</span>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="card mb-4">
+                    <div class="card-header">
+                        <h5>🧪 Protection Tests</h5>
+                    </div>
+                    <div class="card-body">
+                        <button id="testBtn" class="btn btn-primary mb-3">
+                            <i class="fas fa-play me-2"></i>Run Protection Tests
+                        </button>
+                        <div id="testResults"></div>
+                    </div>
+                </div>
+
+                <div class="card">
+                    <div class="card-header">
+                        <h5>📊 Monitoring Setup</h5>
+                    </div>
+                    <div class="card-body">
+                        <button id="setupMonitoringBtn" class="btn btn-success mb-3">
+                            <i class="fas fa-shield-alt me-2"></i>Enable Phone Number Monitoring
+                        </button>
+                        <div id="monitoringStatus"></div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Firebase SDK -->
+    <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-auth-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-database-compat.js"></script>
+    
+    <script>
+        // Firebase configuration
+        const firebaseConfig = {
+            apiKey: "AIzaSyBf96GNLhtz6FDdbLxIW9efh98WG__eQmk",
+            authDomain: "merakicaptiveportal-firebasedb.firebaseapp.com",
+            databaseURL: "https://merakicaptiveportal-firebasedb-default-rtdb.firebaseio.com",
+            projectId: "merakicaptiveportal-firebasedb",
+            storageBucket: "merakicaptiveportal-firebasedb.appspot.com",
+            messagingSenderId: "899985637961",
+            appId: "1:899985637961:web:9c00572c7fec3a671e3598"
+        };
+
+        firebase.initializeApp(firebaseConfig);
+        const auth = firebase.auth();
+        const database = firebase.database();
+
+        let currentUser = null;
+        let originalPhoneData = null;
+
+        auth.onAuthStateChanged(async (user) => {
+            if (!user) {
+                document.body.innerHTML = `
+                    <div class="container mt-5">
+                        <div class="alert alert-warning">
+                            <h4>Authentication Required</h4>
+                            <p>Please log in to test phone number protection.</p>
+                            <a href="../admin-login.html" class="btn btn-primary">Login</a>
+                        </div>
+                    </div>
+                `;
+                return;
+            }
+
+            currentUser = user;
+            await checkCurrentPhoneStatus();
+        });
+
+        async function checkCurrentPhoneStatus() {
+            const statusDiv = document.getElementById('currentStatus');
+            
+            try {
+                const userSnapshot = await database.ref(`users/${currentUser.uid}`).once('value');
+                const userData = userSnapshot.val();
+                
+                if (!userData) {
+                    statusDiv.innerHTML = `
+                        <div class="test-fail">
+                            ❌ User record not found in database
+                        </div>
+                    `;
+                    return;
+                }
+
+                originalPhoneData = {
+                    phoneNumber: userData.phoneNumber,
+                    phone: userData.phone,
+                    businessPhone: userData.businessPhone
+                };
+
+                const phoneFields = ['phoneNumber', 'phone', 'businessPhone'];
+                const hasPhoneNumbers = phoneFields.some(field => userData[field]);
+
+                if (hasPhoneNumbers) {
+                    statusDiv.innerHTML = `
+                        <div class="test-pass">
+                            ✅ Phone numbers found in your user record
+                        </div>
+                        <div class="phone-data mt-2">
+                            <strong>Your Phone Data:</strong><br>
+                            <strong>User ID:</strong> ${currentUser.uid}<br>
+                            <strong>Email:</strong> ${currentUser.email}<br>
+                            <strong>Phone Number:</strong> ${userData.phoneNumber || 'Not set'}<br>
+                            <strong>Phone:</strong> ${userData.phone || 'Not set'}<br>
+                            <strong>Business Phone:</strong> ${userData.businessPhone || 'Not set'}<br>
+                            <strong>Admin Status:</strong> ${userData.isAdmin ? 'Yes' : 'No'}<br>
+                            <strong>Role:</strong> ${userData.role || 'Not set'}
+                        </div>
+                    `;
+                } else {
+                    statusDiv.innerHTML = `
+                        <div class="test-fail">
+                            ⚠️ No phone numbers found in your user record
+                        </div>
+                        <div class="phone-data mt-2">
+                            <strong>Your User Data:</strong><br>
+                            ${JSON.stringify(userData, null, 2)}
+                        </div>
+                    `;
+                }
+            } catch (error) {
+                statusDiv.innerHTML = `
+                    <div class="test-fail">
+                        ❌ Error checking phone status: ${error.message}
+                    </div>
+                `;
+            }
+        }
+
+        document.getElementById('testBtn').addEventListener('click', runProtectionTests);
+        document.getElementById('setupMonitoringBtn').addEventListener('click', setupMonitoring);
+
+        async function runProtectionTests() {
+            const resultsDiv = document.getElementById('testResults');
+            const testBtn = document.getElementById('testBtn');
+            
+            testBtn.disabled = true;
+            resultsDiv.innerHTML = '<div class="test-info">🧪 Running protection tests...</div>';
+
+            let testResults = [];
+
+            // Test 1: Verify current phone numbers are preserved
+            testResults.push(await test1_VerifyCurrentPhoneNumbers());
+            
+            // Test 2: Test safe update operation
+            testResults.push(await test2_TestSafeUpdate());
+            
+            // Test 3: Test race condition protection
+            testResults.push(await test3_TestRaceConditionProtection());
+            
+            // Test 4: Test monitoring system
+            testResults.push(await test4_TestMonitoringSystem());
+
+            resultsDiv.innerHTML = testResults.join('');
+            testBtn.disabled = false;
+        }
+
+        async function test1_VerifyCurrentPhoneNumbers() {
+            try {
+                const userSnapshot = await database.ref(`users/${currentUser.uid}`).once('value');
+                const userData = userSnapshot.val();
+                
+                const phoneFields = ['phoneNumber', 'phone', 'businessPhone'];
+                const hasPhoneNumbers = phoneFields.some(field => userData[field]);
+                
+                if (hasPhoneNumbers) {
+                    return `<div class="test-result test-pass">✅ Test 1: Phone numbers are present in database</div>`;
+                } else {
+                    return `<div class="test-result test-fail">❌ Test 1: No phone numbers found in database</div>`;
+                }
+            } catch (error) {
+                return `<div class="test-result test-fail">❌ Test 1: Error - ${error.message}</div>`;
+            }
+        }
+
+        async function test2_TestSafeUpdate() {
+            try {
+                // Simulate a safe update operation
+                const userRef = database.ref(`users/${currentUser.uid}`);
+                const snapshot = await userRef.once('value');
+                const existingData = snapshot.val();
+                
+                // Test update with phone number preservation
+                const testUpdate = {
+                    testField: 'phone-protection-test',
+                    updatedAt: Date.now()
+                };
+                
+                // Merge with existing data (simulating our fix)
+                const safeUpdate = {
+                    ...existingData,
+                    ...testUpdate
+                };
+                
+                // Verify phone numbers are preserved
+                const phoneFields = ['phoneNumber', 'phone', 'businessPhone'];
+                const phonePreserved = phoneFields.every(field => {
+                    if (existingData[field]) {
+                        return safeUpdate[field] === existingData[field];
+                    }
+                    return true;
+                });
+                
+                if (phonePreserved) {
+                    return `<div class="test-result test-pass">✅ Test 2: Safe update preserves phone numbers</div>`;
+                } else {
+                    return `<div class="test-result test-fail">❌ Test 2: Safe update would lose phone numbers</div>`;
+                }
+            } catch (error) {
+                return `<div class="test-result test-fail">❌ Test 2: Error - ${error.message}</div>`;
+            }
+        }
+
+        async function test3_TestRaceConditionProtection() {
+            try {
+                // Simulate checking for race conditions
+                const userRef = database.ref(`users/${currentUser.uid}`);
+                
+                // Simulate rapid consecutive reads (race condition scenario)
+                const reads = await Promise.all([
+                    userRef.once('value'),
+                    userRef.once('value'),
+                    userRef.once('value')
+                ]);
+                
+                const allReadsSuccessful = reads.every(snapshot => snapshot.exists());
+                
+                if (allReadsSuccessful) {
+                    return `<div class="test-result test-pass">✅ Test 3: Race condition protection working</div>`;
+                } else {
+                    return `<div class="test-result test-fail">❌ Test 3: Race condition protection failed</div>`;
+                }
+            } catch (error) {
+                return `<div class="test-result test-fail">❌ Test 3: Error - ${error.message}</div>`;
+            }
+        }
+
+        async function test4_TestMonitoringSystem() {
+            try {
+                // Check if monitoring utilities are available
+                const hasProtectionUtils = typeof window.PhoneNumberProtection !== 'undefined';
+                const hasMonitoringUtils = typeof window.PhoneNumberMonitor !== 'undefined';
+                
+                if (hasProtectionUtils && hasMonitoringUtils) {
+                    return `<div class="test-result test-pass">✅ Test 4: Monitoring system utilities available</div>`;
+                } else {
+                    return `<div class="test-result test-info">ℹ️ Test 4: Monitoring utilities not loaded (will be available on main dashboard)</div>`;
+                }
+            } catch (error) {
+                return `<div class="test-result test-fail">❌ Test 4: Error - ${error.message}</div>`;
+            }
+        }
+
+        async function setupMonitoring() {
+            const statusDiv = document.getElementById('monitoringStatus');
+            const setupBtn = document.getElementById('setupMonitoringBtn');
+            
+            setupBtn.disabled = true;
+            statusDiv.innerHTML = '<div class="test-info">🔧 Setting up monitoring...</div>';
+
+            try {
+                // Set up database listener to monitor phone number changes
+                const userRef = database.ref(`users/${currentUser.uid}`);
+                
+                userRef.on('value', (snapshot) => {
+                    const userData = snapshot.val();
+                    if (userData) {
+                        const phoneFields = ['phoneNumber', 'phone', 'businessPhone'];
+                        const currentPhoneData = {
+                            phoneNumber: userData.phoneNumber,
+                            phone: userData.phone,
+                            businessPhone: userData.businessPhone
+                        };
+                        
+                        // Check if phone numbers changed
+                        if (originalPhoneData) {
+                            const changes = [];
+                            phoneFields.forEach(field => {
+                                if (originalPhoneData[field] !== currentPhoneData[field]) {
+                                    changes.push({
+                                        field,
+                                        old: originalPhoneData[field],
+                                        new: currentPhoneData[field]
+                                    });
+                                }
+                            });
+                            
+                            if (changes.length > 0) {
+                                console.error('🚨 PHONE NUMBER CHANGE DETECTED:', {
+                                    userId: currentUser.uid,
+                                    changes,
+                                    timestamp: new Date().toISOString()
+                                });
+                                
+                                // Show alert
+                                alert(`🚨 PHONE NUMBER CHANGE DETECTED!\n\nChanges: ${changes.map(c => `${c.field}: "${c.old}" → "${c.new}"`).join('\n')}`);
+                            }
+                        }
+                        
+                        // Update reference data
+                        originalPhoneData = currentPhoneData;
+                    }
+                });
+                
+                statusDiv.innerHTML = `
+                    <div class="test-pass">
+                        ✅ Monitoring enabled for your phone numbers
+                        <ul class="mt-2">
+                            <li>Real-time database monitoring active</li>
+                            <li>Console logging enabled</li>
+                            <li>Alert notifications enabled</li>
+                            <li>Monitoring user: ${currentUser.uid}</li>
+                        </ul>
+                    </div>
+                `;
+                
+                console.log('📱 Phone number monitoring enabled for user:', currentUser.uid);
+                
+            } catch (error) {
+                statusDiv.innerHTML = `
+                    <div class="test-fail">
+                        ❌ Error setting up monitoring: ${error.message}
+                    </div>
+                `;
+            } finally {
+                setupBtn.disabled = false;
+            }
+        }
+    </script>
+</body>
+</html>

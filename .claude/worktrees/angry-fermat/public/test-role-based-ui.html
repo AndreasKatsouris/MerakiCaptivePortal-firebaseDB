@@ -1,0 +1,478 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Feature #23: Test Role-Based UI Rendering</title>
+
+  <!-- Bootstrap 5 -->
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+
+  <!-- Font Awesome -->
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+
+  <!-- SweetAlert2 -->
+  <link href="https://cdn.jsdelivr.net/npm/sweetalert2@11.10.4/dist/sweetalert2.min.css" rel="stylesheet">
+
+  <style>
+    body {
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      min-height: 100vh;
+      padding: 30px 0;
+    }
+
+    .test-container {
+      max-width: 1200px;
+      margin: 0 auto;
+    }
+
+    .test-card {
+      background: white;
+      border-radius: 12px;
+      box-shadow: 0 10px 30px rgba(0,0,0,0.2);
+      padding: 30px;
+      margin-bottom: 20px;
+    }
+
+    .role-badge {
+      display: inline-block;
+      padding: 5px 15px;
+      border-radius: 20px;
+      font-weight: bold;
+      font-size: 14px;
+      margin: 5px;
+    }
+
+    .role-restaurant_owner { background: #6f42c1; color: white; }
+    .role-general_manager { background: #0d6efd; color: white; }
+    .role-kitchen_manager { background: #fd7e14; color: white; }
+    .role-floor_manager { background: #20c997; color: white; }
+    .role-platform_admin { background: #dc3545; color: white; }
+
+    .feature-card {
+      border: 1px solid #ddd;
+      border-radius: 8px;
+      padding: 15px;
+      margin: 10px 0;
+      transition: all 0.3s;
+    }
+
+    .feature-available {
+      border-left: 4px solid #198754;
+      background: #d1e7dd;
+    }
+
+    .feature-denied {
+      border-left: 4px solid #dc3545;
+      background: #f8d7da;
+      opacity: 0.6;
+    }
+
+    .test-result {
+      margin-top: 20px;
+      padding: 15px;
+      border-radius: 8px;
+      display: none;
+    }
+
+    .test-result.success {
+      background: #d1e7dd;
+      border: 1px solid #a3cfbb;
+      color: #0f5132;
+      display: block;
+    }
+
+    .test-result.error {
+      background: #f8d7da;
+      border: 1px solid #f1aeb5;
+      color: #842029;
+      display: block;
+    }
+
+    .test-result.info {
+      background: #cfe2ff;
+      border: 1px solid #9ec5fe;
+      color: #084298;
+      display: block;
+    }
+
+    .permission-indicator {
+      display: inline-block;
+      width: 20px;
+      height: 20px;
+      border-radius: 50%;
+      margin-right: 5px;
+    }
+
+    .permission-yes { background: #198754; }
+    .permission-no { background: #dc3545; }
+  </style>
+</head>
+<body>
+  <div class="test-container">
+    <!-- Header -->
+    <div class="test-card">
+      <h1><i class="fas fa-user-shield"></i> Feature #23: Role-Based UI Rendering Test</h1>
+      <p class="lead">Verify that UI elements show/hide based on user role</p>
+      <p><strong>Test Objective:</strong> Ensure kitchen_manager sees food cost but not campaigns, floor_manager sees queue/bookings but not finance</p>
+    </div>
+
+    <!-- Current User Info -->
+    <div class="test-card">
+      <h3>Current User Information</h3>
+      <div id="userInfo">
+        <p><i class="fas fa-spinner fa-spin"></i> Loading user information...</p>
+      </div>
+    </div>
+
+    <!-- Role Management -->
+    <div class="test-card">
+      <h3>Role Management</h3>
+      <p>Change your role to test UI rendering:</p>
+      <div class="btn-group-vertical w-100" role="group">
+        <button class="btn btn-outline-primary mb-2" onclick="changeRole('restaurant_owner')">
+          <i class="fas fa-user-tie"></i> Restaurant Owner (Full Access)
+        </button>
+        <button class="btn btn-outline-primary mb-2" onclick="changeRole('general_manager')">
+          <i class="fas fa-user-check"></i> General Manager (No Billing)
+        </button>
+        <button class="btn btn-outline-warning mb-2" onclick="changeRole('kitchen_manager')">
+          <i class="fas fa-utensils"></i> Kitchen Manager (Food Cost Only)
+        </button>
+        <button class="btn btn-outline-success mb-2" onclick="changeRole('floor_manager')">
+          <i class="fas fa-users"></i> Floor Manager (Queue/Bookings Only)
+        </button>
+      </div>
+      <div id="roleChangeResult" class="test-result"></div>
+    </div>
+
+    <!-- Feature Access Display -->
+    <div class="test-card">
+      <h3>Feature Access for Current Role</h3>
+      <button class="btn btn-primary" onclick="loadFeatureAccess()">
+        <i class="fas fa-sync"></i> Refresh Feature Access
+      </button>
+      <div id="featureAccessDisplay" class="mt-3"></div>
+    </div>
+
+    <!-- Permission Checks -->
+    <div class="test-card">
+      <h3>Permission Checks</h3>
+      <div id="permissionChecks">
+        <p class="text-muted">Load feature access to see permission checks</p>
+      </div>
+    </div>
+
+    <!-- UI Element Visibility Test -->
+    <div class="test-card">
+      <h3>UI Element Visibility Test</h3>
+      <p>These elements should show/hide based on your role:</p>
+
+      <div class="row">
+        <div class="col-md-6">
+          <div id="foodCostModule" class="feature-card">
+            <h5><i class="fas fa-utensils"></i> Food Cost Analytics</h5>
+            <p>Should be visible for: kitchen_manager, general_manager, restaurant_owner</p>
+            <small class="text-muted">Hidden for: floor_manager</small>
+          </div>
+        </div>
+        <div class="col-md-6">
+          <div id="campaignsModule" class="feature-card">
+            <h5><i class="fas fa-bullhorn"></i> Campaign Management</h5>
+            <p>Should be visible for: general_manager, restaurant_owner</p>
+            <small class="text-muted">Hidden for: kitchen_manager, floor_manager</small>
+          </div>
+        </div>
+        <div class="col-md-6">
+          <div id="queueModule" class="feature-card">
+            <h5><i class="fas fa-users"></i> Queue Management</h5>
+            <p>Should be visible for: floor_manager, general_manager, restaurant_owner</p>
+            <small class="text-muted">Hidden for: kitchen_manager</small>
+          </div>
+        </div>
+        <div class="col-md-6">
+          <div id="subscriptionModule" class="feature-card">
+            <h5><i class="fas fa-credit-card"></i> Subscription & Billing</h5>
+            <p>Should be visible for: restaurant_owner only</p>
+            <small class="text-muted">Hidden for: all other roles</small>
+          </div>
+        </div>
+        <div class="col-md-6">
+          <div id="guestModule" class="feature-card">
+            <h5><i class="fas fa-address-book"></i> Guest Data</h5>
+            <p>Should be visible for: floor_manager, general_manager, restaurant_owner</p>
+            <small class="text-muted">Hidden for: kitchen_manager</small>
+          </div>
+        </div>
+        <div class="col-md-6">
+          <div id="analyticsModule" class="feature-card">
+            <h5><i class="fas fa-chart-line"></i> Analytics</h5>
+            <p>Should be visible for: all roles</p>
+            <small class="text-muted">(Content filtered by role)</small>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Test Results Summary -->
+    <div class="test-card">
+      <h3>Test Results Summary</h3>
+      <div id="testSummary">
+        <p class="text-muted">Change roles and load feature access to see test results</p>
+      </div>
+    </div>
+  </div>
+
+  <!-- Scripts -->
+  <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11.10.4/dist/sweetalert2.all.min.js"></script>
+
+  <!-- Firebase -->
+  <script type="module">
+    import { auth, rtdb, ref, get, set, update } from './js/config/firebase-config.js';
+    import { roleAccessControl } from './js/modules/access-control/services/role-access-control.js';
+
+    // Store test results
+    let testResults = [];
+
+    // Wait for auth
+    auth.onAuthStateChanged(async (user) => {
+      if (!user) {
+        document.getElementById('userInfo').innerHTML = `
+          <div class="alert alert-warning">
+            <i class="fas fa-exclamation-triangle"></i>
+            You must be logged in to test role-based UI.
+            <a href="user-login.html" class="alert-link">Login here</a>
+          </div>
+        `;
+        return;
+      }
+
+      await loadUserInfo();
+      await loadFeatureAccess();
+    });
+
+    async function loadUserInfo() {
+      const user = auth.currentUser;
+      if (!user) return;
+
+      try {
+        const role = await roleAccessControl.getUserRole();
+        const permissions = await roleAccessControl.getUserPermissions();
+
+        let roleClass = 'role-restaurant_owner';
+        let roleName = 'Restaurant Owner';
+
+        if (role) {
+          roleName = permissions?.name || role;
+          roleClass = `role-${role}`;
+        }
+
+        document.getElementById('userInfo').innerHTML = `
+          <div class="row">
+            <div class="col-md-6">
+              <p><strong>User ID:</strong> ${user.uid}</p>
+              <p><strong>Email:</strong> ${user.email}</p>
+            </div>
+            <div class="col-md-6">
+              <p><strong>Current Role:</strong> <span class="role-badge ${roleClass}">${roleName}</span></p>
+              <p><strong>Permissions:</strong> ${permissions?.permissions.length || 0} features</p>
+            </div>
+          </div>
+        `;
+      } catch (error) {
+        console.error('Error loading user info:', error);
+        document.getElementById('userInfo').innerHTML = `
+          <div class="alert alert-danger">
+            <i class="fas fa-exclamation-circle"></i> Error loading user info: ${error.message}
+          </div>
+        `;
+      }
+    }
+
+    // Change role function
+    window.changeRole = async function(roleId) {
+      const user = auth.currentUser;
+      if (!user) {
+        showResult('roleChangeResult', 'error', 'Must be logged in to change role');
+        return;
+      }
+
+      try {
+        showResult('roleChangeResult', 'info', `Changing role to ${roleId}...`);
+
+        await roleAccessControl.setUserRole(user.uid, roleId);
+
+        // Clear cache
+        roleAccessControl.clearCache();
+
+        // Reload user info
+        await loadUserInfo();
+        await loadFeatureAccess();
+
+        showResult('roleChangeResult', 'success', `Successfully changed to ${roleId} role!`);
+
+        // Add to test results
+        testResults.push({
+          action: 'Role Change',
+          role: roleId,
+          success: true,
+          timestamp: new Date().toLocaleTimeString()
+        });
+        updateTestSummary();
+
+      } catch (error) {
+        console.error('Error changing role:', error);
+        showResult('roleChangeResult', 'error', `Error changing role: ${error.message}`);
+      }
+    };
+
+    // Load feature access
+    window.loadFeatureAccess = async function() {
+      const user = auth.currentUser;
+      if (!user) {
+        document.getElementById('featureAccessDisplay').innerHTML = `
+          <div class="alert alert-warning mt-3">Must be logged in</div>
+        `;
+        return;
+      }
+
+      try {
+        const role = await roleAccessControl.getUserRole();
+        const permissions = await roleAccessControl.getUserPermissions();
+        const accessibleFeatures = await roleAccessControl.getAccessibleFeatures();
+
+        // Display features
+        let html = `<h5>Current Role: ${permissions?.name || role}</h5>`;
+        html += `<p>You have access to ${accessibleFeatures.length} features:</p>`;
+
+        if (accessibleFeatures.length === 0) {
+          html += `<div class="alert alert-info">No features available</div>`;
+        } else {
+          accessibleFeatures.forEach(feature => {
+            html += `
+              <div class="feature-card feature-available">
+                <strong><i class="${feature.icon}"></i> ${feature.name}</strong><br>
+                <small class="text-muted">Route: ${feature.route}</small>
+              </div>
+            `;
+          });
+        }
+
+        document.getElementById('featureAccessDisplay').innerHTML = html;
+
+        // Check permission flags
+        const canFinancial = await roleAccessControl.canAccessFinancial();
+        const canGuest = await roleAccessControl.canAccessGuestData();
+        const canCampaigns = await roleAccessControl.canAccessCampaigns();
+        const canSubscription = await roleAccessControl.canManageSubscription();
+
+        document.getElementById('permissionChecks').innerHTML = `
+          <div class="row">
+            <div class="col-md-6">
+              <p><span class="permission-indicator permission-${canFinancial ? 'yes' : 'no'}"></span>
+              <strong>Access Financial Data:</strong> ${canFinancial ? 'Yes' : 'No'}</p>
+              <p><span class="permission-indicator permission-${canGuest ? 'yes' : 'no'}"></span>
+              <strong>Access Guest Data:</strong> ${canGuest ? 'Yes' : 'No'}</p>
+            </div>
+            <div class="col-md-6">
+              <p><span class="permission-indicator permission-${canCampaigns ? 'yes' : 'no'}"></span>
+              <strong>Access Campaigns:</strong> ${canCampaigns ? 'Yes' : 'No'}</p>
+              <p><span class="permission-indicator permission-${canSubscription ? 'yes' : 'no'}"></span>
+              <strong>Manage Subscription:</strong> ${canSubscription ? 'Yes' : 'No'}</p>
+            </div>
+          </div>
+        `;
+
+        // Update UI elements visibility
+        await updateUIVisibility();
+
+        // Add to test results
+        testResults.push({
+          action: 'Feature Access Check',
+          role: permissions?.name || role,
+          featuresAvailable: accessibleFeatures.length,
+          timestamp: new Date().toLocaleTimeString()
+        });
+        updateTestSummary();
+
+      } catch (error) {
+        console.error('Error loading features:', error);
+        document.getElementById('featureAccessDisplay').innerHTML = `
+          <div class="alert alert-danger mt-3">Error loading features: ${error.message}</div>
+        `;
+      }
+    };
+
+    // Update UI elements visibility based on role
+    async function updateUIVisibility() {
+      const featureModules = {
+        foodCostModule: 'food_cost_analytics',
+        campaignsModule: 'campaigns',
+        queueModule: 'queue_management',
+        subscriptionModule: 'subscription',
+        guestModule: 'guest_management',
+        analyticsModule: 'analytics'
+      };
+
+      for (const [elementId, featureId] of Object.entries(featureModules)) {
+        const hasAccess = await roleAccessControl.hasFeatureAccess(featureId);
+        const element = document.getElementById(elementId);
+
+        if (element) {
+          element.classList.remove('feature-available', 'feature-denied');
+          element.classList.add(hasAccess ? 'feature-available' : 'feature-denied');
+        }
+      }
+    }
+
+    // Helper to show result messages
+    function showResult(elementId, type, message) {
+      const element = document.getElementById(elementId);
+      element.className = `test-result ${type}`;
+      element.innerHTML = message;
+    }
+
+    // Update test summary
+    function updateTestSummary() {
+      const summaryElement = document.getElementById('testSummary');
+
+      if (testResults.length === 0) {
+        summaryElement.innerHTML = '<p class="text-muted">No tests run yet</p>';
+        return;
+      }
+
+      let html = `<table class="table table-sm">
+        <thead>
+          <tr>
+            <th>Time</th>
+            <th>Action</th>
+            <th>Details</th>
+            <th>Result</th>
+          </tr>
+        </thead>
+        <tbody>`;
+
+      testResults.slice(-10).reverse().forEach(test => {
+        const resultClass = test.success ? 'text-success' : 'text-info';
+        const resultText = test.success ? '✓ Success' : `${test.featuresAvailable} features`;
+
+        html += `
+          <tr>
+            <td>${test.timestamp}</td>
+            <td>${test.action}</td>
+            <td>${test.role || '-'}</td>
+            <td class="${resultClass}"><strong>${resultText}</strong></td>
+          </tr>
+        `;
+      });
+
+      html += `</tbody></table>`;
+      summaryElement.innerHTML = html;
+    }
+
+    // Make functions globally available
+    window.roleAccessControl = roleAccessControl;
+  </script>
+</body>
+</html>

@@ -182,11 +182,12 @@ export class ForecastEngine {
         });
 
         // Calculate YoY growth rate from available data
+        // Use 52-week (364-day) offset so we always compare the same day of week
         let yoyGrowthRate = 0.05; // Default 5% growth
         const yearAgoData = [];
         data.forEach(d => {
             const oneYearEarlier = new Date(d.date);
-            oneYearEarlier.setFullYear(oneYearEarlier.getFullYear() - 1);
+            oneYearEarlier.setDate(oneYearEarlier.getDate() - 364);
             const yearAgoKey = formatDateKey(oneYearEarlier);
             if (historicByDate[yearAgoKey]) {
                 yearAgoData.push({
@@ -205,9 +206,35 @@ export class ForecastEngine {
         }
 
         // User-specified override takes precedence over auto-calculated rate
+        const autoCalculatedRate = yoyGrowthRate;
         if (growthRateOverride !== null && isFinite(growthRateOverride)) {
             yoyGrowthRate = growthRateOverride;
         }
+
+        // --- YoY Forecast Debug ---
+        console.group('[YoY Forecast] Configuration & Rules');
+        console.log('Historical records available:', data.length);
+        console.log('Forecast horizon (days):', horizon);
+        console.log('Custom start date:', startDate || '(none — starting day after last historical record)');
+        console.log('Year-ago matches found (for auto growth rate):', yearAgoData.length);
+        if (yearAgoData.length > 0) {
+            const avgCurr = yearAgoData.reduce((s, d) => s + d.current, 0) / yearAgoData.length;
+            const avgPrev = yearAgoData.reduce((s, d) => s + d.yearAgo, 0) / yearAgoData.length;
+            console.log(`  Auto-calculated YoY rate: ${(autoCalculatedRate * 100).toFixed(2)}% (avg current R${avgCurr.toFixed(0)} vs avg year-ago R${avgPrev.toFixed(0)})`);
+        } else {
+            console.log('  No year-ago matches — using default growth rate of 5%');
+        }
+        if (growthRateOverride !== null && isFinite(growthRateOverride)) {
+            console.log(`  ✅ Growth rate OVERRIDE applied: ${(growthRateOverride * 100).toFixed(2)}% (auto-calculated was ${(autoCalculatedRate * 100).toFixed(2)}%)`);
+        } else {
+            console.log(`  Growth rate used (auto): ${(yoyGrowthRate * 100).toFixed(2)}%`);
+        }
+        const DOW = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
+        console.log('Weekday averages (fallback):', Object.fromEntries(
+            Object.entries(weekdayAverages).map(([d, v]) => [DOW[d], `R${v.toFixed(0)}`])
+        ));
+        console.groupEnd();
+        // --- end configuration debug ---
 
         // Generate predictions
         const predictions = [];
@@ -221,29 +248,48 @@ export class ForecastEngine {
         const avgTransactionRatio = this.calculateAvgTransactionRatio(data);
         const historicalAvgSpend = this.calculateHistoricalAvgSpend(data);
 
+        console.group(`[YoY Forecast] Per-day predictions (${horizon} days)`);
+        const predictionLog = [];
+
         for (let i = 0; i < horizon; i++) {
             const forecastDate = new Date(lastDate);
             forecastDate.setDate(forecastDate.getDate() + i + 1);
 
-            // Look for same day last year
+            // Match same day of week, 52 weeks earlier (364-day offset)
+            // This preserves weekday alignment: Sun 1 Mar 2026 → Sun 2 Mar 2025
             const oneYearEarlier = new Date(forecastDate);
-            oneYearEarlier.setFullYear(oneYearEarlier.getFullYear() - 1);
+            oneYearEarlier.setDate(oneYearEarlier.getDate() - 364);
             const yearAgoKey = formatDateKey(oneYearEarlier);
 
             let predictedRevenue;
+            let source;
+            let baseValue;
             if (historicByDate[yearAgoKey]) {
-                // Apply growth rate to last year's value
-                predictedRevenue = historicByDate[yearAgoKey].revenue * (1 + yoyGrowthRate);
+                baseValue = historicByDate[yearAgoKey].revenue;
+                predictedRevenue = baseValue * (1 + yoyGrowthRate);
+                const matchedDow = DOW[oneYearEarlier.getDay()];
+                source = `52wk match: ${matchedDow} ${yearAgoKey}`;
             } else {
-                // Fallback to day-of-week average with growth
                 const dayOfWeek = forecastDate.getDay();
-                predictedRevenue = (weekdayAverages[dayOfWeek] || 0) * (1 + yoyGrowthRate);
+                baseValue = weekdayAverages[dayOfWeek] || 0;
+                predictedRevenue = baseValue * (1 + yoyGrowthRate);
+                source = `weekday avg (${DOW[dayOfWeek]})`;
             }
 
             const predictedTransactions = Math.round(predictedRevenue * avgTransactionRatio);
             const avgSpend = predictedTransactions > 0
                 ? predictedRevenue / predictedTransactions
                 : historicalAvgSpend;
+
+            predictionLog.push({
+                date: formatDateKey(forecastDate),
+                source,
+                baseRevenue: `R${baseValue.toFixed(0)}`,
+                growthApplied: `×${(1 + yoyGrowthRate).toFixed(4)}`,
+                predicted: `R${Math.max(0, predictedRevenue).toFixed(0)}`,
+                transactions: predictedTransactions,
+                avgSpend: `R${avgSpend.toFixed(2)}`
+            });
 
             predictions.push({
                 date: forecastDate,
@@ -252,6 +298,11 @@ export class ForecastEngine {
                 avgSpend
             });
         }
+
+        console.table(predictionLog);
+        console.log(`[YoY Forecast] Total predicted revenue: R${predictions.reduce((s, p) => s + p.predicted, 0).toFixed(0)}`);
+        console.log(`[YoY Forecast] First day: ${formatDateKey(predictions[0]?.date)}, Last day: ${formatDateKey(predictions[predictions.length - 1]?.date)}`);
+        console.groupEnd();
 
         return predictions;
     }

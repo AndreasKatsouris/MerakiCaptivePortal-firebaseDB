@@ -1,0 +1,17 @@
+{
+  "compilerOptions": {
+    "baseUrl": ".",
+    "paths": {
+      "@/*": ["PUBLIC/*"],
+      "@/components/*": ["PUBLIC/components/*"],
+      "@/js/*": ["PUBLIC/js/*"]
+    }
+  },
+  "include": [
+    "PUBLIC/**/*"
+  ],
+  "exclude": [
+    "node_modules",
+    "functions"
+  ]
+}

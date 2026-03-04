@@ -1,0 +1,442 @@
+/* shadcn/ui inspired styles for Food Cost Module
+ * These styles are designed to be added to the existing Bootstrap setup
+ * without requiring React or Tailwind dependencies
+ */
+
+:root {
+  --shadcn-background: #fff;
+  --shadcn-foreground: #020817;
+  --shadcn-card: #fff;
+  --shadcn-card-foreground: #020817;
+  --shadcn-primary: #0f172a;
+  --shadcn-primary-foreground: #fff;
+  --shadcn-secondary: #f1f5f9;
+  --shadcn-secondary-foreground: #0f172a;
+  --shadcn-destructive: #ef4444;
+  --shadcn-destructive-foreground: #fff;
+  --shadcn-muted: #f1f5f9;
+  --shadcn-muted-foreground: #64748b;
+  --shadcn-accent: #f1f5f9;
+  --shadcn-accent-foreground: #0f172a;
+  --shadcn-border: #e2e8f0;
+  --shadcn-input: #e2e8f0;
+  --shadcn-ring: #0ea5e9;
+  --shadcn-radius: 0.5rem;
+
+  --primary-color: #0f172a;
+  --primary-hover: #1e293b;
+  --secondary-color: #f1f5f9;
+  --secondary-hover: #e2e8f0;
+  --info-color: #0ea5e9;
+  --info-hover: #0284c7;
+  --success-color: #10b981;
+  --success-hover: #059669;
+  --warning-color: #f59e0b;
+  --warning-hover: #d97706;
+  --danger-color: #ef4444;
+  --danger-hover: #dc2626;
+}
+
+/* Modern Card Styling */
+.shadcn-card {
+  border-radius: var(--shadcn-radius);
+  background-color: var(--shadcn-card);
+  box-shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.1), 0 1px 2px 0 rgba(0, 0, 0, 0.06);
+  border: 1px solid var(--shadcn-border);
+}
+
+.shadcn-card-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 1.25rem 1.5rem;
+  border-bottom: 1px solid var(--shadcn-border);
+}
+
+.shadcn-card-header h6 {
+  font-weight: 600;
+  color: var(--shadcn-foreground);
+  margin: 0;
+}
+
+.shadcn-card-body {
+  padding: 1.5rem;
+}
+
+/* Modern Button Base */
+.shadcn-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: var(--shadcn-radius);
+  font-weight: 500;
+  font-size: 0.875rem;
+  line-height: 1.25rem;
+  padding: 0.5rem 1rem;
+  transition: all 150ms cubic-bezier(0.4, 0, 0.2, 1);
+  box-shadow: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
+  cursor: pointer;
+  border: 1px solid transparent;
+}
+
+.shadcn-btn:focus {
+  outline: none;
+  box-shadow: 0 0 0 2px var(--shadcn-background), 0 0 0 4px var(--shadcn-ring);
+}
+
+.shadcn-btn:disabled {
+  opacity: 0.5;
+  pointer-events: none;
+}
+
+.shadcn-btn i {
+  margin-right: 0.5rem;
+}
+
+/* Button Variants */
+.shadcn-btn-primary {
+  background-color: var(--primary-color);
+  color: white;
+}
+
+.shadcn-btn-primary:hover {
+  background-color: var(--primary-hover);
+}
+
+.shadcn-btn-secondary {
+  background-color: var(--secondary-color);
+  color: var(--shadcn-secondary-foreground);
+}
+
+.shadcn-btn-secondary:hover {
+  background-color: var(--secondary-hover);
+}
+
+.shadcn-btn-success {
+  background-color: var(--success-color);
+  color: white;
+}
+
+.shadcn-btn-success:hover {
+  background-color: var(--success-hover);
+}
+
+.shadcn-btn-info {
+  background-color: var(--info-color);
+  color: white;
+}
+
+.shadcn-btn-info:hover {
+  background-color: var(--info-hover);
+}
+
+.shadcn-btn-warning {
+  background-color: var(--warning-color);
+  color: white;
+}
+
+.shadcn-btn-warning:hover {
+  background-color: var(--warning-hover);
+}
+
+.shadcn-btn-danger {
+  background-color: var(--danger-color);
+  color: white;
+}
+
+.shadcn-btn-danger:hover {
+  background-color: var(--danger-hover);
+}
+
+/* Outline Button Variants */
+.shadcn-btn-outline {
+  background-color: transparent;
+  color: var(--shadcn-foreground);
+  border: 1px solid var(--shadcn-border);
+}
+
+.shadcn-btn-outline:hover {
+  background-color: var(--shadcn-muted);
+}
+
+.shadcn-btn-outline-primary {
+  color: var(--primary-color);
+  border-color: var(--primary-color);
+}
+
+.shadcn-btn-outline-primary:hover {
+  background-color: rgba(15, 23, 42, 0.05);
+}
+
+/* Button Sizes */
+.shadcn-btn-sm {
+  padding: 0.25rem 0.5rem;
+  font-size: 0.75rem;
+}
+
+.shadcn-btn-lg {
+  padding: 0.75rem 1.5rem;
+  font-size: 1rem;
+}
+
+/* Button Group */
+.shadcn-btn-group {
+  display: inline-flex;
+}
+
+.shadcn-btn-group .shadcn-btn {
+  border-radius: 0;
+}
+
+.shadcn-btn-group .shadcn-btn:first-child {
+  border-top-left-radius: var(--shadcn-radius);
+  border-bottom-left-radius: var(--shadcn-radius);
+}
+
+.shadcn-btn-group .shadcn-btn:last-child {
+  border-top-right-radius: var(--shadcn-radius);
+  border-bottom-right-radius: var(--shadcn-radius);
+}
+
+/* Form Controls */
+.shadcn-input {
+  display: flex;
+  height: 2.5rem;
+  width: 100%;
+  border-radius: var(--shadcn-radius);
+  border: 1px solid var(--shadcn-input);
+  background-color: var(--shadcn-background);
+  padding: 0 0.75rem;
+  font-size: 0.875rem;
+  line-height: 1.25rem;
+  transition: border-color 150ms cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.shadcn-input:focus {
+  outline: none;
+  border-color: var(--shadcn-ring);
+  box-shadow: 0 0 0 1px var(--shadcn-ring);
+}
+
+.shadcn-input-group {
+  display: flex;
+  position: relative;
+}
+
+.shadcn-input-group-text {
+  display: flex;
+  align-items: center;
+  padding: 0 0.75rem;
+  background-color: var(--shadcn-muted);
+  border: 1px solid var(--shadcn-input);
+  border-right: none;
+  border-radius: var(--shadcn-radius) 0 0 var(--shadcn-radius);
+}
+
+.shadcn-input-group .shadcn-input {
+  border-top-left-radius: 0;
+  border-bottom-left-radius: 0;
+}
+
+/* Filter Select Button */
+.shadcn-filter-btn {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  width: 100%;
+  background-color: var(--shadcn-background);
+  border: 1px solid var(--shadcn-border);
+  border-radius: var(--shadcn-radius);
+  padding: 0.5rem 1rem;
+  font-size: 0.875rem;
+  transition: border-color 150ms cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.shadcn-filter-btn:hover {
+  border-color: var(--shadcn-foreground);
+}
+
+.shadcn-filter-btn:after {
+  content: "";
+  width: 0.5rem;
+  height: 0.5rem;
+  border-right: 2px solid currentColor;
+  border-bottom: 2px solid currentColor;
+  transform: rotate(45deg);
+  margin-left: 0.5rem;
+}
+
+/* Alerts */
+.shadcn-alert {
+  border-radius: var(--shadcn-radius);
+  padding: 1rem;
+  border: 1px solid var(--shadcn-border);
+  margin-bottom: 1rem;
+}
+
+.shadcn-alert-info {
+  background-color: #f0f9ff;
+  border-color: #bae6fd;
+  color: #0369a1;
+}
+
+/* Filter Popover */
+.shadcn-popover {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background-color: rgba(0, 0, 0, 0.4);
+  z-index: 1050;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.shadcn-popover-content {
+  background-color: var(--shadcn-background);
+  border-radius: var(--shadcn-radius);
+  box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
+  padding: 1.25rem;
+  width: 90%;
+  max-width: 32rem;
+  max-height: 85vh;
+  overflow-y: auto;
+}
+
+.shadcn-popover-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 1rem;
+  padding-bottom: 0.75rem;
+  border-bottom: 1px solid var(--shadcn-border);
+}
+
+.shadcn-popover-title {
+  font-weight: 600;
+  font-size: 1rem;
+  color: var(--shadcn-foreground);
+}
+
+.shadcn-popover-close {
+  background: transparent;
+  border: none;
+  font-size: 1.25rem;
+  line-height: 1;
+  color: var(--shadcn-muted-foreground);
+  cursor: pointer;
+}
+
+.shadcn-popover-close:hover {
+  color: var(--shadcn-foreground);
+}
+
+/* Checkbox */
+.shadcn-checkbox {
+  appearance: none;
+  width: 1rem;
+  height: 1rem;
+  border: 1px solid var(--shadcn-border);
+  border-radius: 0.25rem;
+  margin-right: 0.5rem;
+  background-color: var(--shadcn-background);
+  cursor: pointer;
+  position: relative;
+}
+
+.shadcn-checkbox:checked {
+  background-color: var(--primary-color);
+  border-color: var(--primary-color);
+}
+
+.shadcn-checkbox:checked:after {
+  content: "";
+  position: absolute;
+  left: 5px;
+  top: 1px;
+  width: 5px;
+  height: 10px;
+  border: solid white;
+  border-width: 0 2px 2px 0;
+  transform: rotate(45deg);
+}
+
+.shadcn-checkbox:focus {
+  outline: none;
+  border-color: var(--shadcn-ring);
+  box-shadow: 0 0 0 2px rgba(14, 165, 233, 0.35);
+}
+
+/* Table Styling */
+.shadcn-table {
+  width: 100%;
+  border-collapse: separate;
+  border-spacing: 0;
+}
+
+.shadcn-table th {
+  font-weight: 600;
+  text-align: left;
+  padding: 0.75rem 1rem;
+  background-color: var(--shadcn-muted);
+  color: var(--shadcn-foreground);
+  font-size: 0.875rem;
+  border-bottom: 1px solid var(--shadcn-border);
+}
+
+.shadcn-table th:first-child {
+  border-top-left-radius: var(--shadcn-radius);
+}
+
+.shadcn-table th:last-child {
+  border-top-right-radius: var(--shadcn-radius);
+}
+
+.shadcn-table td {
+  padding: 0.75rem 1rem;
+  border-bottom: 1px solid var(--shadcn-border);
+  font-size: 0.875rem;
+}
+
+.shadcn-table tbody tr:last-child td:first-child {
+  border-bottom-left-radius: var(--shadcn-radius);
+}
+
+.shadcn-table tbody tr:last-child td:last-child {
+  border-bottom-right-radius: var(--shadcn-radius);
+}
+
+.shadcn-table tbody tr:hover {
+  background-color: rgba(241, 245, 249, 0.5);
+}
+
+/* Makes the table responsive */
+.shadcn-responsive-table {
+  overflow-x: auto;
+  border-radius: var(--shadcn-radius);
+  border: 1px solid var(--shadcn-border);
+}
+
+/* Dark mode support */
+@media (prefers-color-scheme: dark) {
+  :root {
+    --shadcn-background: #020817;
+    --shadcn-foreground: #ffffff;
+    --shadcn-card: #0f172a;
+    --shadcn-card-foreground: #ffffff;
+    --shadcn-primary: #0ea5e9;
+    --shadcn-primary-foreground: #ffffff;
+    --shadcn-secondary: #1e293b;
+    --shadcn-secondary-foreground: #f8fafc;
+    --shadcn-muted: #1e293b;
+    --shadcn-muted-foreground: #94a3b8;
+    --shadcn-accent: #1e293b;
+    --shadcn-accent-foreground: #f8fafc;
+    --shadcn-destructive: #ef4444;
+    --shadcn-destructive-foreground: #ffffff;
+    --shadcn-border: #1e293b;
+    --shadcn-input: #1e293b;
+  }
+}

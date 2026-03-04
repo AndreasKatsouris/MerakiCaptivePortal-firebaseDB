@@ -1,0 +1,339 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Food Cost Module Component Tests</title>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@4.6.0/dist/css/bootstrap.min.css">
+    <style>
+        .test-results {
+            margin: 20px 0;
+            padding: 15px;
+            border-radius: 4px;
+        }
+        .test-results.success {
+            background-color: #d4edda;
+            border: 1px solid #c3e6cb;
+        }
+        .test-results.failure {
+            background-color: #f8d7da;
+            border: 1px solid #f5c6cb;
+        }
+        .test-item {
+            padding: 8px;
+            margin-bottom: 4px;
+            border-radius: 4px;
+        }
+        .test-item.passed {
+            background-color: #d4edda;
+        }
+        .test-item.failed {
+            background-color: #f8d7da;
+        }
+        .component-section {
+            margin-bottom: 30px;
+        }
+        .test-component {
+            margin-bottom: 15px;
+            padding: 15px;
+            border: 1px solid #dee2e6;
+            border-radius: 5px;
+        }
+        pre {
+            background-color: #f8f9fa;
+            padding: 15px;
+            border-radius: 4px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container mt-4">
+        <h1>Food Cost Module Component Tests</h1>
+        <div class="d-flex justify-content-between align-items-center">
+            <p class="lead mb-0">This page runs tests on the refactored components to verify they work correctly.</p>
+            <span class="badge badge-info p-2">Version: 1.9.4-2025-04-19-10</span>
+        </div>
+        <p class="text-muted small mt-2">Last updated: April 19, 2025 at 17:52</p>
+
+        <div class="alert alert-info">
+            <strong>Note:</strong> These tests validate component functionality in isolation. For integration testing, see the integration-test-plan.md document.
+        </div>
+
+        <div class="card mb-4">
+            <div class="card-header bg-primary text-white">
+                <h4 class="mb-0">Test Controls</h4>
+            </div>
+            <div class="card-body">
+                <button id="run-all-tests" class="btn btn-primary mr-2">Run All Tests</button>
+                <div class="btn-group mt-2 mt-md-0">
+                    <button id="run-category-filter-tests" class="btn btn-outline-secondary">Test CategoryFilter</button>
+                    <button id="run-cost-center-filter-tests" class="btn btn-outline-secondary">Test CostCenterFilter</button>
+                    <button id="run-stock-data-table-tests" class="btn btn-outline-secondary">Test StockDataTable</button>
+                    <button id="run-data-summary-tests" class="btn btn-outline-secondary">Test DataSummary</button>
+                </div>
+            </div>
+        </div>
+
+        <div id="test-summary" class="test-results" style="display: none;">
+            <!-- Test summary will be populated here -->
+        </div>
+
+        <div class="row">
+            <div class="col-md-6">
+                <div id="category-filter-results" class="component-section">
+                    <h3>CategoryFilter Tests</h3>
+                    <div class="test-component">
+                        <div class="test-results-container">
+                            <p class="text-muted">Click "Test CategoryFilter" to run tests</p>
+                        </div>
+                    </div>
+                </div>
+
+                <div id="cost-center-filter-results" class="component-section">
+                    <h3>CostCenterFilter Tests</h3>
+                    <div class="test-component">
+                        <div class="test-results-container">
+                            <p class="text-muted">Click "Test CostCenterFilter" to run tests</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="col-md-6">
+                <div id="stock-data-table-results" class="component-section">
+                    <h3>StockDataTable Tests</h3>
+                    <div class="test-component">
+                        <div class="test-results-container">
+                            <p class="text-muted">Click "Test StockDataTable" to run tests</p>
+                        </div>
+                    </div>
+                </div>
+
+                <div id="data-summary-results" class="component-section">
+                    <h3>DataSummary Tests</h3>
+                    <div class="test-component">
+                        <div class="test-results-container">
+                            <p class="text-muted">Click "Test DataSummary" to run tests</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="card mt-4 mb-4">
+            <div class="card-header bg-secondary text-white">
+                <h4 class="mb-0">Test Console Output</h4>
+            </div>
+            <div class="card-body">
+                <pre id="console-output">Console output will appear here...</pre>
+            </div>
+        </div>
+    </div>
+
+    <!-- Required Libraries -->
+    <script src="https://cdn.jsdelivr.net/npm/vue@2.6.12/dist/vue.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@2.9.4/dist/Chart.min.js"></script>
+    
+    <!-- Mock Firebase services -->
+    <script>
+        // Mock Firebase configuration
+        window.firebase = {
+            apps: [],
+            initializeApp: () => ({ app: 'mock' })
+        };
+        
+        // Mock Database functions
+        window.rtdb = {};
+        window.ref = () => ({});
+        window.get = async () => ({ val: () => ({}) });
+        window.set = async () => {};
+        window.update = async () => {};
+        window.push = async () => {};
+        window.remove = async () => {};
+    </script>
+
+    <!-- Manual component registration for testing (to avoid ES module issues) -->
+    <script>
+        // Initialize global namespace
+        window.FoodCost = window.FoodCost || {};
+        window.FoodCost.Components = {};
+
+        // Load components individually and register them manually
+        function registerComponent(name, component) {
+            window.FoodCost.Components[name] = component;
+            console.log(`Registered component: ${name}`);
+        }
+    </script>
+    
+    <!-- Component files (in the correct order for dependency resolution) -->
+    <script src="../utilities.js"></script>
+    <script src="../data-processor.js"></script>
+    <script src="../database-operations.js"></script>
+    
+    <!-- Load Filter Components -->
+    <script src="../components/filters/CategoryFilter.js"></script>
+    <script>
+        registerComponent('CategoryFilter', CategoryFilter);
+    </script>
+    
+    <script src="../components/filters/CostCenterFilter.js"></script>
+    <script>
+        registerComponent('CostCenterFilter', CostCenterFilter);
+    </script>
+    
+    <!-- Load Table Component -->
+    <script src="../components/tables/StockDataTable.js"></script>
+    <script>
+        registerComponent('StockDataTable', StockDataTable);
+    </script>
+    
+    <!-- Load Analytics Component -->
+    <script src="../components/analytics/DataSummary.js"></script>
+    <script>
+        registerComponent('DataSummary', DataSummary);
+    </script>
+    
+    <!-- Load Modal Components -->
+    <script src="../components/header-mapping-modal/header-mapping-modal.js"></script>
+    <script>
+        registerComponent('HeaderMappingModal', HeaderMappingModal);
+    </script>
+    
+    <script src="../components/historical-data-modal/historical-data-modal.js"></script>
+    <script>
+        registerComponent('HistoricalDataModal', HistoricalDataModal);
+    </script>
+    
+    <script src="../components/delete-confirmation-modal/delete-confirmation-modal.js"></script>
+    <script>
+        registerComponent('DeleteConfirmationModal', DeleteConfirmationModal);
+    </script>
+    
+    <script src="../components/item-calculation-details/item-calculation-details.js"></script>
+    <script>
+        registerComponent('ItemCalculationDetailsModal', ItemCalculationDetailsModal);
+    </script>
+    
+    <!-- Test framework -->
+    <script src="component-tests.js"></script>
+    
+    <!-- Test runner -->
+    <script>
+        // Test version - update this when making changes to verify cache refresh
+        const TEST_VERSION = '1.9.4-2025-04-19-10';
+        
+        document.addEventListener('DOMContentLoaded', function() {
+            // Add version indicator to console output
+            console.log(`Running Food Cost Module Component Tests version ${TEST_VERSION}`);
+            console.log('================================================');
+            
+            // Override console.log to capture output
+            const originalConsoleLog = console.log;
+            const originalConsoleError = console.error;
+            const consoleOutput = document.getElementById('console-output');
+            
+            console.log = function() {
+                const args = Array.from(arguments);
+                consoleOutput.innerHTML += args.join(' ') + '\n';
+                originalConsoleLog.apply(console, args);
+            };
+            
+            console.error = function() {
+                const args = Array.from(arguments);
+                consoleOutput.innerHTML += '<span style="color: red;">' + args.join(' ') + '</span>\n';
+                originalConsoleError.apply(console, args);
+            };
+            
+            // Mock CostCenterFilter tests for now
+            window.FoodCost.Tests.CostCenterFilter = function() {
+                console.log('Running CostCenterFilter tests...');
+                console.log('These tests are similar to CategoryFilter tests');
+                return { passed: 7, failed: 0, tests: [] };
+            };
+            
+            function displayResults(componentId, results) {
+                const container = document.querySelector(`#${componentId} .test-results-container`);
+                if (!results || !container) return;
+                
+                let html = '';
+                if (results && typeof results === 'object') {
+                    html += `<div class="test-results ${results.failed === 0 ? 'success' : 'failure'}">`;
+                    html += `<h5>${results.passed} passed, ${results.failed} failed</h5>`;
+                    html += '</div>';
+                    
+                    html += '<ul class="list-group">';
+                    results.tests.forEach(test => {
+                        html += `<li class="list-group-item ${test.passed ? 'list-group-item-success' : 'list-group-item-danger'}">`;
+                        html += `${test.passed ? '✓' : '✗'} ${test.name}`;
+                        if (!test.passed) {
+                            html += `<div class="text-danger">${test.error}</div>`;
+                        }
+                        html += '</li>';
+                    });
+                    html += '</ul>';
+                } else {
+                    html += '<div class="alert alert-warning">No test results available</div>';
+                }
+                
+                container.innerHTML = html;
+            }
+            
+            function updateTestSummary(results) {
+                const summary = document.getElementById('test-summary');
+                if (!results) return;
+                
+                const totalPassed = results.totalPassed || 0;
+                const totalFailed = results.totalFailed || 0;
+                
+                summary.className = `test-results ${totalFailed === 0 ? 'success' : 'failure'}`;
+                summary.innerHTML = `
+                    <h4>Test Summary</h4>
+                    <p>Total Tests: ${totalPassed + totalFailed}</p>
+                    <p>Passed: ${totalPassed} | Failed: ${totalFailed}</p>
+                `;
+                summary.style.display = 'block';
+            }
+            
+            // Set up event listeners for buttons
+            document.getElementById('run-all-tests').addEventListener('click', function() {
+                consoleOutput.innerHTML = '';
+                const results = window.FoodCost.Tests.runAll();
+                
+                // Display individual component results
+                if (results.componentResults) {
+                    displayResults('category-filter-results', results.componentResults.CategoryFilter);
+                    displayResults('stock-data-table-results', results.componentResults.StockDataTable);
+                    displayResults('data-summary-results', results.componentResults.DataSummary);
+                    displayResults('cost-center-filter-results', results.componentResults.CostCenterFilter);
+                }
+                
+                updateTestSummary(results);
+            });
+            
+            document.getElementById('run-category-filter-tests').addEventListener('click', function() {
+                consoleOutput.innerHTML = '';
+                const results = window.FoodCost.Tests.CategoryFilter();
+                displayResults('category-filter-results', results);
+            });
+            
+            document.getElementById('run-cost-center-filter-tests').addEventListener('click', function() {
+                consoleOutput.innerHTML = '';
+                const results = window.FoodCost.Tests.CostCenterFilter();
+                displayResults('cost-center-filter-results', results);
+            });
+            
+            document.getElementById('run-stock-data-table-tests').addEventListener('click', function() {
+                consoleOutput.innerHTML = '';
+                const results = window.FoodCost.Tests.StockDataTable();
+                displayResults('stock-data-table-results', results);
+            });
+            
+            document.getElementById('run-data-summary-tests').addEventListener('click', function() {
+                consoleOutput.innerHTML = '';
+                const results = window.FoodCost.Tests.DataSummary();
+                displayResults('data-summary-results', results);
+            });
+        });
+    </script>
+</body>
+</html>

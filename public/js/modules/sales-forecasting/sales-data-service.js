@@ -462,6 +462,16 @@ export class SalesDataService {
             // Calculate summary
             const summary = this.calculateForecastSummary(forecast.predictions);
 
+            // Sanitize an object for Firebase (replace undefined with null)
+            const sanitize = (obj) => {
+                if (obj === undefined) return null;
+                if (obj === null || typeof obj !== 'object') return obj;
+                if (Array.isArray(obj)) return obj.map(sanitize);
+                return Object.fromEntries(
+                    Object.entries(obj).map(([k, v]) => [k, sanitize(v)])
+                );
+            };
+
             // Prepare the forecast record
             const forecastRecord = {
                 locationId,
@@ -470,21 +480,21 @@ export class SalesDataService {
                 createdAt: timestamp,
                 updatedAt: timestamp,
                 status: 'active',
-                salesDataId,
+                salesDataId: salesDataId ?? null,
                 historicalDataRef: salesDataId ? `salesData/${salesDataId}` : null,
-                config: forecast.config,
+                config: sanitize(forecast.config),
                 predictions: this.formatPredictions(forecast.predictions),
                 metadata: {
                     name: metadata.name || this.generateDefaultName(forecast),
                     description: metadata.description || '',
                     savedAt: timestamp,
                     savedBy: this.userId,
-                    method: forecast.config?.method,
-                    horizon: forecast.config?.horizon,
-                    confidenceLevel: forecast.config?.confidenceLevel,
-                    growthRate: forecast.config?.growthRate
+                    method: forecast.config?.method ?? null,
+                    horizon: forecast.config?.horizon ?? null,
+                    confidenceLevel: forecast.config?.confidenceLevel ?? null,
+                    growthRate: forecast.config?.growthRate ?? null
                 },
-                summary,
+                summary: sanitize(summary),
                 accuracy: null // Populated later when actuals uploaded
             };
 
@@ -939,12 +949,17 @@ export class SalesDataService {
      * Format predictions for storage
      */
     formatPredictions(predictions) {
-        console.log('[SalesDataService] formatPredictions: Formatting', predictions.length, 'predictions');
+        // Handle both array and date-keyed object formats
+        const entries = Array.isArray(predictions)
+            ? predictions
+            : Object.entries(predictions || {}).map(([date, data]) => ({ date, ...data }));
+
+        console.log('[SalesDataService] formatPredictions: Formatting', entries.length, 'predictions');
         const formatted = {};
 
-        for (const pred of predictions) {
+        for (const pred of entries) {
             const dateKey = typeof pred.date === 'string'
-                ? pred.date
+                ? pred.date.split('T')[0]
                 : pred.date.toISOString().split('T')[0];
 
             // Canonical format: predicted, transactions, avgSpend, confidence bounds

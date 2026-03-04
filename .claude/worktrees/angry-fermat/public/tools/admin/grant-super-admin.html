@@ -1,0 +1,293 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Grant Super Admin Access</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+
+    <style>
+        body {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+        }
+
+        .admin-card {
+            background: white;
+            border-radius: 20px;
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+            overflow: hidden;
+            max-width: 600px;
+            width: 100%;
+        }
+
+        .card-header-custom {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 2rem;
+            text-align: center;
+        }
+
+        .card-body-custom {
+            padding: 2rem;
+        }
+
+        .info-box {
+            background: #f8f9fa;
+            border-left: 4px solid #667eea;
+            padding: 1rem;
+            margin: 1rem 0;
+            border-radius: 4px;
+        }
+
+        .btn-grant {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            border: none;
+            padding: 12px 30px;
+            font-size: 1.1rem;
+            border-radius: 50px;
+            transition: transform 0.2s;
+        }
+
+        .btn-grant:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 5px 20px rgba(102, 126, 234, 0.4);
+        }
+
+        .status-badge {
+            display: inline-block;
+            padding: 0.5rem 1rem;
+            border-radius: 50px;
+            font-weight: 600;
+            margin-top: 1rem;
+        }
+
+        .status-success {
+            background: #d4edda;
+            color: #155724;
+        }
+
+        .status-error {
+            background: #f8d7da;
+            color: #721c24;
+        }
+
+        .status-warning {
+            background: #fff3cd;
+            color: #856404;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="admin-card">
+            <div class="card-header-custom">
+                <h2><i class="fas fa-user-shield me-2"></i>Grant Super Admin Access</h2>
+                <p class="mb-0">Project Management Feature Setup</p>
+            </div>
+            <div class="card-body-custom">
+                <div class="info-box">
+                    <h5><i class="fas fa-info-circle me-2"></i>About Super Admin</h5>
+                    <p class="mb-0">Super Admin access is required to use the Project Management feature. This grants full access to manage development projects, tasks, and milestones.</p>
+                </div>
+
+                <div id="currentUserInfo" class="mt-4">
+                    <!-- Will be populated with current user info -->
+                </div>
+
+                <div class="mt-4">
+                    <button id="grantAccessBtn" class="btn btn-primary btn-grant w-100" disabled>
+                        <i class="fas fa-shield-alt me-2"></i>Grant Super Admin Access to Current User
+                    </button>
+                </div>
+
+                <div id="statusMessage" class="text-center mt-3">
+                    <!-- Status messages will appear here -->
+                </div>
+
+                <div class="mt-4 text-center">
+                    <a href="index.html" class="btn btn-outline-secondary">
+                        <i class="fas fa-arrow-left me-2"></i>Back to Admin Tools
+                    </a>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Firebase -->
+    <script type="module">
+        import { auth, rtdb, onAuthStateChanged, ref, get, set } from '../../js/config/firebase-config.js';
+
+        let currentUser = null;
+
+        console.log('[GrantSuperAdmin] Initializing...');
+        console.log('[GrantSuperAdmin] Auth instance:', auth);
+
+        // Monitor auth state
+        onAuthStateChanged(auth, async (user) => {
+            console.log('[GrantSuperAdmin] Auth state changed:', user ? user.email : 'No user');
+            if (user) {
+                currentUser = user;
+                await displayUserInfo(user);
+                checkSuperAdminStatus(user);
+            } else {
+                displayNotLoggedIn();
+            }
+        });
+
+        async function displayUserInfo(user) {
+            const userInfo = document.getElementById('currentUserInfo');
+            userInfo.innerHTML = `
+                <div class="card bg-light">
+                    <div class="card-body">
+                        <h5 class="card-title"><i class="fas fa-user me-2"></i>Current User</h5>
+                        <p class="mb-1"><strong>Email:</strong> ${user.email}</p>
+                        <p class="mb-1"><strong>UID:</strong> <code>${user.uid}</code></p>
+                        <p class="mb-0"><strong>Display Name:</strong> ${user.displayName || 'Not set'}</p>
+                    </div>
+                </div>
+            `;
+        }
+
+        async function checkSuperAdminStatus(user) {
+            const grantBtn = document.getElementById('grantAccessBtn');
+            const statusMsg = document.getElementById('statusMessage');
+
+            try {
+                const adminRef = ref(rtdb, `admins/${user.uid}`);
+                const snapshot = await get(adminRef);
+
+                if (snapshot.exists() && snapshot.val().superAdmin === true) {
+                    statusMsg.innerHTML = `
+                        <div class="status-badge status-success">
+                            <i class="fas fa-check-circle me-2"></i>Already a Super Admin
+                        </div>
+                    `;
+                    grantBtn.disabled = true;
+                    grantBtn.innerHTML = '<i class="fas fa-check me-2"></i>Super Admin Access Already Granted';
+                } else {
+                    statusMsg.innerHTML = `
+                        <div class="status-badge status-warning">
+                            <i class="fas fa-exclamation-triangle me-2"></i>Not a Super Admin
+                        </div>
+                    `;
+                    grantBtn.disabled = false;
+                }
+            } catch (error) {
+                console.error('Error checking admin status:', error);
+                statusMsg.innerHTML = `
+                    <div class="status-badge status-error">
+                        <i class="fas fa-times-circle me-2"></i>Error checking status
+                    </div>
+                `;
+                grantBtn.disabled = false;
+            }
+        }
+
+        function displayNotLoggedIn() {
+            const userInfo = document.getElementById('currentUserInfo');
+            const grantBtn = document.getElementById('grantAccessBtn');
+            const statusMsg = document.getElementById('statusMessage');
+
+            userInfo.innerHTML = `
+                <div class="alert alert-warning">
+                    <i class="fas fa-exclamation-triangle me-2"></i>
+                    <strong>Not Logged In</strong><br>
+                    Please log in to grant Super Admin access.
+                </div>
+            `;
+
+            statusMsg.innerHTML = `
+                <a href="/admin-dashboard.html" class="btn btn-primary">
+                    <i class="fas fa-sign-in-alt me-2"></i>Go to Admin Dashboard to Login
+                </a>
+            `;
+
+            grantBtn.disabled = true;
+        }
+
+        // Grant Super Admin Access
+        document.getElementById('grantAccessBtn').addEventListener('click', async () => {
+            if (!currentUser) {
+                Swal.fire('Error', 'You must be logged in', 'error');
+                return;
+            }
+
+            const result = await Swal.fire({
+                title: 'Grant Super Admin Access?',
+                html: `
+                    <p>This will grant <strong>Super Admin</strong> access to:</p>
+                    <p><strong>${currentUser.email}</strong></p>
+                    <p class="text-muted small">Super Admins can access Project Management and other sensitive features.</p>
+                `,
+                icon: 'question',
+                showCancelButton: true,
+                confirmButtonText: 'Yes, Grant Access',
+                cancelButtonText: 'Cancel',
+                confirmButtonColor: '#667eea',
+                cancelButtonColor: '#6c757d'
+            });
+
+            if (!result.isConfirmed) {
+                return;
+            }
+
+            const grantBtn = document.getElementById('grantAccessBtn');
+            grantBtn.disabled = true;
+            grantBtn.innerHTML = '<i class="fas fa-spinner fa-spin me-2"></i>Granting Access...';
+
+            try {
+                const adminData = {
+                    superAdmin: true,
+                    email: currentUser.email,
+                    displayName: currentUser.displayName || 'Super Admin',
+                    phoneNumber: currentUser.phoneNumber || null,
+                    createdAt: Date.now(),
+                    updatedAt: Date.now()
+                };
+
+                const adminRef = ref(rtdb, `admins/${currentUser.uid}`);
+                await set(adminRef, adminData);
+
+                await Swal.fire({
+                    title: 'Success!',
+                    html: `
+                        <p><strong>Super Admin access granted successfully!</strong></p>
+                        <p>You can now access the Project Management feature.</p>
+                        <hr>
+                        <p class="text-muted small">Please refresh the admin dashboard to see the changes.</p>
+                    `,
+                    icon: 'success',
+                    confirmButtonText: 'Go to Admin Dashboard',
+                    confirmButtonColor: '#667eea'
+                });
+
+                // Redirect to admin dashboard
+                window.location.href = '/admin-dashboard.html';
+
+            } catch (error) {
+                console.error('Error granting Super Admin access:', error);
+
+                await Swal.fire({
+                    title: 'Error',
+                    html: `
+                        <p><strong>Failed to grant Super Admin access</strong></p>
+                        <p class="text-danger">${error.message}</p>
+                    `,
+                    icon: 'error',
+                    confirmButtonText: 'OK'
+                });
+
+                grantBtn.disabled = false;
+                grantBtn.innerHTML = '<i class="fas fa-shield-alt me-2"></i>Grant Super Admin Access to Current User';
+            }
+        });
+    </script>
+</body>
+</html>

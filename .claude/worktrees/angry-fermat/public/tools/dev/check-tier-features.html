@@ -1,0 +1,113 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Check Tier Features - Meraki Captive Portal</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
+</head>
+<body>
+    <div class="container my-5">
+        <h1>Tier Features Check</h1>
+        <p>This page checks what features are enabled for each tier.</p>
+        
+        <div id="loading" class="text-center my-5">
+            <div class="spinner-border" role="status">
+                <span class="visually-hidden">Loading...</span>
+            </div>
+        </div>
+        
+        <div id="results" style="display: none;">
+            <h2>Subscription Tiers</h2>
+            <div id="tiersList" class="row"></div>
+        </div>
+    </div>
+
+    <script type="module">
+        import { auth, rtdb, ref, get, onAuthStateChanged } from '../js/config/firebase-config.js';
+        import { PLATFORM_FEATURES } from '../js/modules/access-control/services/platform-features.js';
+        
+        async function loadTiers() {
+            try {
+                const tiersSnapshot = await get(ref(rtdb, 'subscriptionTiers'));
+                const tiers = tiersSnapshot.val();
+                
+                const tiersList = document.getElementById('tiersList');
+                tiersList.innerHTML = '';
+                
+                if (!tiers) {
+                    tiersList.innerHTML = '<p class="text-danger">No tiers found in database</p>';
+                    return;
+                }
+                
+                Object.entries(tiers).forEach(([tierId, tierData]) => {
+                    const tierCard = document.createElement('div');
+                    tierCard.className = 'col-md-6 mb-4';
+                    
+                    let featuresHtml = '';
+                    if (tierData.features) {
+                        const enabledFeatures = Object.entries(tierData.features)
+                            .filter(([key, value]) => value === true)
+                            .map(([key]) => {
+                                const feature = PLATFORM_FEATURES[key];
+                                return feature ? `<li>${feature.name} (${key})</li>` : `<li>${key}</li>`;
+                            })
+                            .join('');
+                        featuresHtml = enabledFeatures || '<li>No features enabled</li>';
+                    } else {
+                        featuresHtml = '<li>No features defined</li>';
+                    }
+                    
+                    tierCard.innerHTML = `
+                        <div class="card h-100">
+                            <div class="card-header">
+                                <h3>${tierData.name} (${tierId})</h3>
+                                <p class="mb-0">${tierData.price}/month</p>
+                            </div>
+                            <div class="card-body">
+                                <h5>Enabled Features:</h5>
+                                <ul>${featuresHtml}</ul>
+                            </div>
+                        </div>
+                    `;
+                    
+                    tiersList.appendChild(tierCard);
+                });
+                
+                // Also check current user's subscription
+                if (auth.currentUser) {
+                    const userSnapshot = await get(ref(rtdb, `users/${auth.currentUser.uid}`));
+                    const userData = userSnapshot.val();
+                    
+                    const userInfo = document.createElement('div');
+                    userInfo.className = 'alert alert-info mt-4';
+                    userInfo.innerHTML = `
+                        <h4>Current User Info</h4>
+                        <p><strong>Email:</strong> ${auth.currentUser.email}</p>
+                        <p><strong>Subscription Tier:</strong> ${userData?.subscription?.tier || userData?.subscription?.tierId || 'None'}</p>
+                        <p><strong>Status:</strong> ${userData?.subscription?.status || 'No subscription'}</p>
+                    `;
+                    document.getElementById('results').appendChild(userInfo);
+                }
+                
+            } catch (error) {
+                console.error('Error loading tiers:', error);
+                document.getElementById('tiersList').innerHTML = `<p class="text-danger">Error: ${error.message}</p>`;
+            } finally {
+                document.getElementById('loading').style.display = 'none';
+                document.getElementById('results').style.display = 'block';
+            }
+        }
+        
+        // Wait for auth
+        onAuthStateChanged(auth, (user) => {
+            if (user) {
+                loadTiers();
+            } else {
+                window.location.href = '/user-login.html';
+            }
+        });
+    </script>
+</body>
+</html>

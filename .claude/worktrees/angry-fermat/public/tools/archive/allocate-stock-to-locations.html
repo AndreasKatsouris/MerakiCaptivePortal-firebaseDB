@@ -1,0 +1,734 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Stock Data to Location Migration Tool</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+    <style>
+        body {
+            padding: 20px;
+            background-color: #f8f9fa;
+        }
+        .container {
+            max-width: 1400px;
+        }
+        .stock-entry {
+            cursor: pointer;
+            transition: all 0.3s;
+            margin-bottom: 10px;
+        }
+        .stock-entry:hover {
+            transform: translateX(5px);
+            box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+        }
+        .stock-entry.selected {
+            background-color: #e3f2fd;
+            border-color: #2196f3;
+        }
+        .location-card {
+            cursor: pointer;
+            transition: all 0.3s;
+            height: 100%;
+        }
+        .location-card:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 5px 15px rgba(0,0,0,0.2);
+        }
+        .location-card.selected {
+            border-color: #4caf50;
+            background-color: #e8f5e9;
+        }
+        .stats-card {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border: none;
+        }
+        .progress-section {
+            position: fixed;
+            bottom: 20px;
+            right: 20px;
+            width: 300px;
+            z-index: 1000;
+        }
+        .stock-details {
+            font-size: 0.85rem;
+            color: #666;
+        }
+        .path-info {
+            font-family: monospace;
+            font-size: 0.8rem;
+            background: #f5f5f5;
+            padding: 2px 5px;
+            border-radius: 3px;
+        }
+        .warning-section {
+            background-color: #fff3cd;
+            border: 1px solid #ffeaa7;
+            border-radius: 5px;
+            padding: 15px;
+            margin-bottom: 20px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="row mb-4">
+            <div class="col-12">
+                <h1 class="display-4">Stock Data to Location Migration Tool</h1>
+                <p class="lead">Migrate orphaned stock data to proper location structures</p>
+            </div>
+        </div>
+
+        <!-- Warning Section -->
+        <div class="warning-section">
+            <h5><i class="fas fa-exclamation-triangle"></i> Important Notes:</h5>
+            <ul>
+                <li>This tool searches for stock data that might exist outside the normal location structure</li>
+                <li>Normal stock data path: <code>locations/{locationId}/stockUsage/{timestamp}</code></li>
+                <li>Use this to migrate orphaned or legacy stock data to proper locations</li>
+                <li>Always backup your data before running migrations</li>
+            </ul>
+        </div>
+
+        <!-- Statistics -->
+        <div class="row mb-4">
+            <div class="col-md-3">
+                <div class="card stats-card">
+                    <div class="card-body text-center">
+                        <i class="fas fa-database fa-2x mb-2"></i>
+                        <h3 id="totalEntries">0</h3>
+                        <p class="mb-0">Total Stock Entries</p>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-3">
+                <div class="card stats-card">
+                    <div class="card-body text-center">
+                        <i class="fas fa-exclamation-circle fa-2x mb-2"></i>
+                        <h3 id="orphanedEntries">0</h3>
+                        <p class="mb-0">Orphaned Entries</p>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-3">
+                <div class="card stats-card">
+                    <div class="card-body text-center">
+                        <i class="fas fa-check-circle fa-2x mb-2"></i>
+                        <h3 id="properlyAllocated">0</h3>
+                        <p class="mb-0">Properly Allocated</p>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-3">
+                <div class="card stats-card">
+                    <div class="card-body text-center">
+                        <i class="fas fa-map-marker-alt fa-2x mb-2"></i>
+                        <h3 id="totalLocations">0</h3>
+                        <p class="mb-0">Available Locations</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Action Buttons -->
+        <div class="row mb-4">
+            <div class="col-12">
+                <div class="btn-group" role="group">
+                    <button class="btn btn-primary" onclick="scanForStockData()">
+                        <i class="fas fa-search"></i> Scan for Stock Data
+                    </button>
+                    <button class="btn btn-warning" onclick="checkOrphanedData()">
+                        <i class="fas fa-exclamation-triangle"></i> Find Orphaned Data
+                    </button>
+                    <button class="btn btn-success" onclick="startMigration()" id="migrateBtn" disabled>
+                        <i class="fas fa-exchange-alt"></i> Migrate Selected
+                    </button>
+                    <button class="btn btn-info" onclick="exportReport()">
+                        <i class="fas fa-download"></i> Export Report
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Main Content Area -->
+        <div class="row">
+            <!-- Stock Data Entries -->
+            <div class="col-md-7">
+                <div class="card">
+                    <div class="card-header d-flex justify-content-between align-items-center">
+                        <h5 class="mb-0">Stock Data Entries</h5>
+                        <div class="form-check">
+                            <input class="form-check-input" type="checkbox" id="showOrphanedOnly" onchange="filterEntries()">
+                            <label class="form-check-label" for="showOrphanedOnly">
+                                Show Orphaned Only
+                            </label>
+                        </div>
+                    </div>
+                    <div class="card-body" style="max-height: 600px; overflow-y: auto;">
+                        <div id="stockEntriesList">
+                            <div class="text-center p-4">
+                                <p class="text-muted">Click "Scan for Stock Data" to begin</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Locations -->
+            <div class="col-md-5">
+                <div class="card">
+                    <div class="card-header">
+                        <h5 class="mb-0">Target Locations</h5>
+                    </div>
+                    <div class="card-body" style="max-height: 600px; overflow-y: auto;">
+                        <div id="locationsList">
+                            <div class="text-center p-4">
+                                <div class="spinner-border text-primary" role="status">
+                                    <span class="visually-hidden">Loading...</span>
+                                </div>
+                                <p class="mt-2">Loading locations...</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Migration Preview Modal -->
+        <div class="modal fade" id="migrationModal" tabindex="-1">
+            <div class="modal-dialog modal-lg">
+                <div class="modal-content">
+                    <div class="modal-header">
+                        <h5 class="modal-title">Confirm Migration</h5>
+                        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                    </div>
+                    <div class="modal-body">
+                        <div class="alert alert-warning">
+                            <i class="fas fa-exclamation-triangle"></i> This will move the selected stock data to the new location structure.
+                        </div>
+                        
+                        <h6>Selected Entries: <span id="selectedCount">0</span></h6>
+                        <div id="migrationPreview" class="mb-3" style="max-height: 200px; overflow-y: auto;"></div>
+                        
+                        <h6>Target Location:</h6>
+                        <div id="targetLocationPreview"></div>
+                        
+                        <div class="form-check mt-3">
+                            <input class="form-check-input" type="checkbox" id="deleteOriginal">
+                            <label class="form-check-label" for="deleteOriginal">
+                                Delete original entries after successful migration
+                            </label>
+                        </div>
+                    </div>
+                    <div class="modal-footer">
+                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                        <button type="button" class="btn btn-danger" onclick="confirmMigration()">
+                            <i class="fas fa-exchange-alt"></i> Confirm Migration
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Progress Section -->
+    <div class="progress-section" id="progressSection" style="display: none;">
+        <div class="card">
+            <div class="card-body">
+                <h6>Migration Progress</h6>
+                <div class="progress mb-2">
+                    <div id="progressBar" class="progress-bar progress-bar-striped progress-bar-animated" 
+                         role="progressbar" style="width: 0%"></div>
+                </div>
+                <small id="progressText">0 / 0 entries processed</small>
+            </div>
+        </div>
+    </div>
+
+    <!-- Scripts -->
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    <script type="module">
+        import { auth, rtdb, ref, get, set, update, push, remove, onAuthStateChanged } from '../js/config/firebase-config.js';
+        
+        // Global variables
+        let allStockEntries = [];
+        let orphanedEntries = [];
+        let locationsData = {};
+        let selectedEntries = new Set();
+        let selectedLocation = null;
+        let migrationModal = null;
+
+        // Initialize
+        window.addEventListener('DOMContentLoaded', async () => {
+            migrationModal = new bootstrap.Modal(document.getElementById('migrationModal'));
+            
+            // Check authentication
+            onAuthStateChanged(auth, async (user) => {
+                if (user) {
+                    await loadLocations();
+                } else {
+                    alert('Please login to use this tool');
+                    window.location.href = '/admin-login.html';
+                }
+            });
+        });
+
+        // Load locations
+        async function loadLocations() {
+            try {
+                const locationsSnapshot = await get(ref(rtdb, 'locations'));
+                locationsData = locationsSnapshot.val() || {};
+                
+                document.getElementById('totalLocations').textContent = Object.keys(locationsData).length;
+                displayLocations();
+                
+            } catch (error) {
+                console.error('Error loading locations:', error);
+                alert('Error loading locations: ' + error.message);
+            }
+        }
+
+        // Scan for all stock data in the database
+        window.scanForStockData = async function() {
+            try {
+                document.getElementById('stockEntriesList').innerHTML = `
+                    <div class="text-center p-4">
+                        <div class="spinner-border text-primary" role="status"></div>
+                        <p class="mt-2">Scanning database for stock data...</p>
+                    </div>
+                `;
+                
+                allStockEntries = [];
+                orphanedEntries = [];
+                
+                // Check common paths where stock data might exist
+                const pathsToCheck = [
+                    'stockData',
+                    'stock',
+                    'stockUsage',
+                    'inventory',
+                    'items'
+                ];
+                
+                for (const path of pathsToCheck) {
+                    const snapshot = await get(ref(rtdb, path));
+                    if (snapshot.exists()) {
+                        const data = snapshot.val();
+                        console.log(`Found data at ${path}:`, data);
+                        
+                        // Process the data
+                        processStockData(data, path, '');
+                    }
+                }
+                
+                // Also check each location for properly structured data
+                for (const [locationId, location] of Object.entries(locationsData)) {
+                    const stockUsageSnapshot = await get(ref(rtdb, `locations/${locationId}/stockUsage`));
+                    if (stockUsageSnapshot.exists()) {
+                        const stockUsage = stockUsageSnapshot.val();
+                        Object.entries(stockUsage).forEach(([timestamp, data]) => {
+                            allStockEntries.push({
+                                path: `locations/${locationId}/stockUsage/${timestamp}`,
+                                locationId: locationId,
+                                timestamp: timestamp,
+                                data: data,
+                                isOrphaned: false
+                            });
+                        });
+                    }
+                }
+                
+                updateStatistics();
+                displayStockEntries();
+                
+            } catch (error) {
+                console.error('Error scanning for stock data:', error);
+                alert('Error scanning: ' + error.message);
+            }
+        }
+
+        // Process found stock data
+        function processStockData(data, basePath, subPath) {
+            const fullPath = subPath ? `${basePath}/${subPath}` : basePath;
+            
+            if (typeof data === 'object' && data !== null) {
+                // Check if this looks like stock data
+                if (isStockData(data)) {
+                    allStockEntries.push({
+                        path: fullPath,
+                        data: data,
+                        isOrphaned: !fullPath.includes('locations/'),
+                        timestamp: data.timestamp || Date.now()
+                    });
+                    
+                    if (!fullPath.includes('locations/')) {
+                        orphanedEntries.push({
+                            path: fullPath,
+                            data: data
+                        });
+                    }
+                } else {
+                    // Recursively check nested objects
+                    Object.entries(data).forEach(([key, value]) => {
+                        if (typeof value === 'object' && value !== null) {
+                            processStockData(value, basePath, subPath ? `${subPath}/${key}` : key);
+                        }
+                    });
+                }
+            }
+        }
+
+        // Check if an object looks like stock data
+        function isStockData(obj) {
+            // Look for common stock data properties
+            const stockIndicators = ['items', 'stockItems', 'category', 'usage', 'quantity', 'cost'];
+            const hasStockProperties = stockIndicators.some(prop => obj.hasOwnProperty(prop));
+            
+            // Check if it has array of items that look like stock
+            if (obj.items && Array.isArray(obj.items)) {
+                return obj.items.some(item => 
+                    item.hasOwnProperty('name') || 
+                    item.hasOwnProperty('quantity') || 
+                    item.hasOwnProperty('usage')
+                );
+            }
+            
+            return hasStockProperties;
+        }
+
+        // Check specifically for orphaned data
+        window.checkOrphanedData = async function() {
+            document.getElementById('showOrphanedOnly').checked = true;
+            await scanForStockData();
+            filterEntries();
+        }
+
+        // Update statistics
+        function updateStatistics() {
+            document.getElementById('totalEntries').textContent = allStockEntries.length;
+            document.getElementById('orphanedEntries').textContent = orphanedEntries.length;
+            document.getElementById('properlyAllocated').textContent = 
+                allStockEntries.filter(e => !e.isOrphaned).length;
+        }
+
+        // Display stock entries
+        function displayStockEntries() {
+            const container = document.getElementById('stockEntriesList');
+            const showOrphaned = document.getElementById('showOrphanedOnly').checked;
+            
+            const entriesToShow = showOrphaned ? 
+                allStockEntries.filter(e => e.isOrphaned) : 
+                allStockEntries;
+            
+            if (entriesToShow.length === 0) {
+                container.innerHTML = `
+                    <div class="alert alert-info">
+                        ${showOrphaned ? 'No orphaned stock data found' : 'No stock data found'}
+                    </div>
+                `;
+                return;
+            }
+            
+            container.innerHTML = '';
+            entriesToShow.forEach((entry, index) => {
+                const div = document.createElement('div');
+                div.className = 'card stock-entry';
+                div.dataset.index = index;
+                
+                const itemCount = entry.data.items ? entry.data.items.length : 0;
+                const timestamp = entry.data.timestamp ? 
+                    new Date(entry.data.timestamp).toLocaleString() : 'Unknown date';
+                
+                // Extract any identifying information from the data
+                let identifyingInfo = '';
+                
+                // Check for location information in the data
+                if (entry.data.locationName) {
+                    identifyingInfo += `<div><strong>Location:</strong> ${entry.data.locationName}</div>`;
+                }
+                if (entry.data.storeName) {
+                    identifyingInfo += `<div><strong>Store:</strong> ${entry.data.storeName}</div>`;
+                }
+                if (entry.data.businessName) {
+                    identifyingInfo += `<div><strong>Business:</strong> ${entry.data.businessName}</div>`;
+                }
+                
+                // Check for user information
+                if (entry.data.uploadedBy) {
+                    identifyingInfo += `<div><strong>Uploaded by:</strong> ${entry.data.uploadedBy}</div>`;
+                }
+                if (entry.data.createdBy) {
+                    identifyingInfo += `<div><strong>Created by:</strong> ${entry.data.createdBy}</div>`;
+                }
+                
+                // Show some sample items to help identify
+                let sampleItems = '';
+                if (entry.data.items && Array.isArray(entry.data.items) && entry.data.items.length > 0) {
+                    const firstItems = entry.data.items.slice(0, 3);
+                    const itemNames = firstItems.map(item => item.name || item.itemName || 'Unnamed').join(', ');
+                    sampleItems = `<div><strong>Sample items:</strong> ${itemNames}${entry.data.items.length > 3 ? '...' : ''}</div>`;
+                }
+                
+                // Show categories if available
+                if (entry.data.categories && Array.isArray(entry.data.categories) && entry.data.categories.length > 0) {
+                    identifyingInfo += `<div><strong>Categories:</strong> ${entry.data.categories.join(', ')}</div>`;
+                }
+                
+                // Extract date from path if it's in format like stockUsage/20250416_183749
+                let pathDate = '';
+                const pathMatch = entry.path.match(/(\d{8})_(\d{6})/);
+                if (pathMatch) {
+                    const dateStr = pathMatch[1];
+                    const timeStr = pathMatch[2];
+                    const year = dateStr.substring(0, 4);
+                    const month = dateStr.substring(4, 6);
+                    const day = dateStr.substring(6, 8);
+                    const hour = timeStr.substring(0, 2);
+                    const minute = timeStr.substring(2, 4);
+                    pathDate = `${year}-${month}-${day} ${hour}:${minute}`;
+                }
+                
+                div.innerHTML = `
+                    <div class="card-body">
+                        <div class="d-flex justify-content-between align-items-start">
+                            <div style="flex: 1;">
+                                <h6 class="mb-1">Stock Entry ${pathDate ? `- ${pathDate}` : ''}</h6>
+                                <div class="stock-details">
+                                    <div>Path: <span class="path-info">${entry.path}</span></div>
+                                    <div>Date: ${timestamp}</div>
+                                    <div>Items: ${itemCount}</div>
+                                    ${identifyingInfo}
+                                    ${sampleItems}
+                                </div>
+                            </div>
+                            <div>
+                                ${entry.isOrphaned ? 
+                                    '<span class="badge bg-warning">Orphaned</span>' : 
+                                    '<span class="badge bg-success">Properly Located</span>'
+                                }
+                            </div>
+                        </div>
+                    </div>
+                `;
+                
+                if (entry.isOrphaned) {
+                    div.onclick = () => selectEntry(index);
+                }
+                
+                container.appendChild(div);
+            });
+            
+            document.getElementById('migrateBtn').disabled = selectedEntries.size === 0;
+        }
+
+        // Display locations
+        function displayLocations() {
+            const container = document.getElementById('locationsList');
+            container.innerHTML = '';
+            
+            if (Object.keys(locationsData).length === 0) {
+                container.innerHTML = '<div class="alert alert-info">No locations found</div>';
+                return;
+            }
+            
+            Object.entries(locationsData).forEach(([locationId, location]) => {
+                const div = document.createElement('div');
+                div.className = 'card location-card mb-2';
+                div.dataset.locationId = locationId;
+                
+                div.innerHTML = `
+                    <div class="card-body">
+                        <h6 class="card-title">${location.name}</h6>
+                        <p class="card-text mb-2">
+                            <small class="text-muted">${location.address || 'No address'}</small>
+                        </p>
+                        <button class="btn btn-sm btn-outline-primary w-100" 
+                                onclick="selectLocation('${locationId}')">
+                            Select as Target
+                        </button>
+                    </div>
+                `;
+                
+                container.appendChild(div);
+            });
+        }
+
+        // Select entry for migration
+        window.selectEntry = function(index) {
+            const element = document.querySelector(`[data-index="${index}"]`);
+            
+            if (selectedEntries.has(index)) {
+                selectedEntries.delete(index);
+                element.classList.remove('selected');
+            } else {
+                selectedEntries.add(index);
+                element.classList.add('selected');
+            }
+            
+            document.getElementById('migrateBtn').disabled = selectedEntries.size === 0;
+        }
+
+        // Select target location
+        window.selectLocation = function(locationId) {
+            document.querySelectorAll('.location-card').forEach(card => {
+                card.classList.remove('selected');
+            });
+            
+            selectedLocation = locationId;
+            document.querySelector(`[data-location-id="${locationId}"]`).classList.add('selected');
+            
+            if (selectedEntries.size > 0 && selectedLocation) {
+                showMigrationPreview();
+            }
+        }
+
+        // Start migration process
+        window.startMigration = function() {
+            if (selectedEntries.size === 0) {
+                alert('Please select entries to migrate');
+                return;
+            }
+            if (!selectedLocation) {
+                alert('Please select a target location');
+                return;
+            }
+            showMigrationPreview();
+        }
+
+        // Show migration preview
+        function showMigrationPreview() {
+            const preview = document.getElementById('migrationPreview');
+            const locationPreview = document.getElementById('targetLocationPreview');
+            
+            document.getElementById('selectedCount').textContent = selectedEntries.size;
+            
+            // Show selected entries
+            preview.innerHTML = '';
+            selectedEntries.forEach(index => {
+                const entry = allStockEntries[index];
+                preview.innerHTML += `
+                    <div class="mb-2">
+                        <small class="text-muted">${entry.path}</small>
+                    </div>
+                `;
+            });
+            
+            // Show target location
+            const location = locationsData[selectedLocation];
+            locationPreview.innerHTML = `
+                <div class="card">
+                    <div class="card-body">
+                        <h6>${location.name}</h6>
+                        <small class="text-muted">${location.address || 'No address'}</small>
+                        <div class="mt-2">
+                            <strong>New path:</strong> 
+                            <code>locations/${selectedLocation}/stockUsage/{timestamp}</code>
+                        </div>
+                    </div>
+                </div>
+            `;
+            
+            migrationModal.show();
+        }
+
+        // Confirm and execute migration
+        window.confirmMigration = async function() {
+            const progressSection = document.getElementById('progressSection');
+            const progressBar = document.getElementById('progressBar');
+            const progressText = document.getElementById('progressText');
+            const deleteOriginal = document.getElementById('deleteOriginal').checked;
+            
+            progressSection.style.display = 'block';
+            
+            const total = selectedEntries.size;
+            let processed = 0;
+            let errors = [];
+            
+            try {
+                for (const index of selectedEntries) {
+                    const entry = allStockEntries[index];
+                    
+                    try {
+                        // Generate new timestamp if needed
+                        const timestamp = entry.timestamp || Date.now();
+                        
+                        // Create new entry at proper location
+                        const newPath = `locations/${selectedLocation}/stockUsage/${timestamp}`;
+                        const newData = {
+                            ...entry.data,
+                            migratedFrom: entry.path,
+                            migratedAt: Date.now(),
+                            migratedBy: auth.currentUser?.email || 'unknown'
+                        };
+                        
+                        await set(ref(rtdb, newPath), newData);
+                        
+                        // Delete original if requested
+                        if (deleteOriginal) {
+                            await remove(ref(rtdb, entry.path));
+                        }
+                        
+                    } catch (error) {
+                        console.error(`Error migrating ${entry.path}:`, error);
+                        errors.push({ path: entry.path, error: error.message });
+                    }
+                    
+                    processed++;
+                    const progress = (processed / total) * 100;
+                    progressBar.style.width = progress + '%';
+                    progressText.textContent = `${processed} / ${total} entries processed`;
+                }
+                
+                migrationModal.hide();
+                progressSection.style.display = 'none';
+                
+                if (errors.length > 0) {
+                    alert(`Migration completed with ${errors.length} errors. Check console for details.`);
+                    console.error('Migration errors:', errors);
+                } else {
+                    alert(`Successfully migrated ${total} entries!`);
+                }
+                
+                // Reset and refresh
+                selectedEntries.clear();
+                selectedLocation = null;
+                await scanForStockData();
+                
+            } catch (error) {
+                console.error('Error during migration:', error);
+                alert('Migration failed: ' + error.message);
+                progressSection.style.display = 'none';
+            }
+        }
+
+        // Filter entries
+        window.filterEntries = function() {
+            displayStockEntries();
+        }
+
+        // Export report
+        window.exportReport = function() {
+            let csv = 'Path,Is Orphaned,Timestamp,Item Count,Location Name\n';
+            
+            allStockEntries.forEach(entry => {
+                const itemCount = entry.data.items ? entry.data.items.length : 0;
+                const timestamp = entry.data.timestamp ? 
+                    new Date(entry.data.timestamp).toISOString() : '';
+                const locationName = entry.data.locationName || '';
+                
+                csv += `"${entry.path}",${entry.isOrphaned},"${timestamp}",${itemCount},"${locationName}"\n`;
+            });
+            
+            // Download CSV
+            const blob = new Blob([csv], { type: 'text/csv' });
+            const url = window.URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `stock-data-audit-${new Date().toISOString().split('T')[0]}.csv`;
+            a.click();
+        }
+    </script>
+</body>
+</html> 

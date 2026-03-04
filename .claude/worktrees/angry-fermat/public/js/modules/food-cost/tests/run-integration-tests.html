@@ -1,0 +1,465 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Food Cost Module - Integration Tests</title>
+    
+    <!-- Bootstrap CSS -->
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" rel="stylesheet">
+    
+    <!-- Chart.js for data visualizations -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    
+    <!-- Vue.js (development version with helpful warnings) -->
+    <script src="https://cdn.jsdelivr.net/npm/vue@2.6.14/dist/vue.js"></script>
+    
+    <!-- Custom CSS -->
+    <style>
+        body {
+            padding: 20px;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+        }
+        .app-version {
+            margin-left: 10px;
+            font-size: 0.8em;
+        }
+        .test-results {
+            margin-top: 20px;
+            padding: 15px;
+            border-radius: 4px;
+        }
+        .test-pass {
+            background-color: #d4edda;
+        }
+        .test-fail {
+            background-color: #f8d7da;
+        }
+        .test-component {
+            margin-bottom: 15px;
+            padding: 15px;
+            border: 1px solid #dee2e6;
+            border-radius: 5px;
+        }
+        pre {
+            background-color: #f8f9fa;
+            padding: 15px;
+            border-radius: 4px;
+        }
+        .component-test-area {
+            border: 1px solid #e9ecef;
+            padding: 15px;
+            margin-bottom: 20px;
+            border-radius: 4px;
+        }
+        .hidden {
+            display: none !important;
+        }
+    </style>
+</head>
+<body>
+    <div class="container mt-4">
+        <h1>Food Cost Module Integration Tests</h1>
+        <div class="d-flex justify-content-between align-items-center">
+            <p class="lead mb-0">This page runs integration tests to verify components work correctly together.</p>
+            <span class="badge bg-info p-2">Version: 1.9.4-2025-04-19-24</span>
+        </div>
+        <p class="text-muted small mt-2">Last updated: April 19, 2025 at 20:08</p>
+
+        <div class="alert alert-info">
+            <strong>Note:</strong> These tests verify how components interact with each other. For isolated component testing, see the run-tests.html document.
+        </div>
+
+        <div class="card mb-4">
+            <div class="card-header bg-primary text-white">
+                <h4 class="mb-0">Test Controls</h4>
+            </div>
+            <div class="card-body">
+                <button id="run-all-integration-tests" class="btn btn-primary mr-2">Run All Integration Tests</button>
+                <div class="btn-group mt-2 mt-md-0">
+                    <button id="run-filter-table-test" class="btn btn-outline-secondary">Test Filter Integration</button>
+                    <button id="run-summary-test" class="btn btn-outline-secondary">Test Data Summary</button>
+                </div>
+            </div>
+        </div>
+
+        <div id="integration-test-results" class="test-results" style="display: none;">
+            <!-- Test results will be populated here -->
+        </div>
+
+        <div class="row">
+            <div class="col-12">
+                <div class="card">
+                    <div class="card-header">
+                        <h4>Test Environment</h4>
+                    </div>
+                    <div class="card-body">
+                        <h5>Component Test Areas</h5>
+                        <p>These containers will be used to mount components during integration testing:</p>
+                        
+                        <div class="row">
+                            <div class="col-md-6">
+                                <div id="category_filter_container" class="component-test-area">
+                                    <h6>CategoryFilter Test Area</h6>
+                                    <div id="category_filter_mount"></div>
+                                </div>
+                            </div>
+                            <div class="col-md-6">
+                                <div id="cost_center_filter_container" class="component-test-area">
+                                    <h6>CostCenterFilter Test Area</h6>
+                                    <div id="cost_center_filter_mount"></div>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <div class="row">
+                            <div class="col-12">
+                                <div id="stock_table_container" class="component-test-area">
+                                    <h6>StockDataTable Test Area</h6>
+                                    <div id="stock_table_mount"></div>
+                                    <div id="stock_table_mount2" class="hidden"></div>
+                                    <div id="stock_table_mount3" class="hidden"></div>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <div class="row">
+                            <div class="col-md-6">
+                                <div id="data_summary_container" class="component-test-area">
+                                    <h6>DataSummary Test Area</h6>
+                                    <div id="data_summary_mount"></div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div id="test-results" class="mt-4 p-3 border hidden"></div>
+        <div id="error-log" class="mt-4 p-3 border bg-danger text-white hidden"><h4>Error Log</h4></div>
+        
+        <div class="row mt-4">
+            <div class="col-12">
+                <div class="card">
+                    <div class="card-header">
+                        <h4>Console Output</h4>
+                    </div>
+                    <div class="card-body">
+                        <pre id="console-output" class="p-2 bg-dark text-light" style="height: 300px; overflow-y: auto;"></pre>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="hidden">
+            <!-- Component loading order is important here -->
+            <script>
+                // Setup global namespace
+                window.FoodCost = window.FoodCost || {};
+                window.FoodCost.components = window.FoodCost.components || {};
+                
+                // Pre-define IntegrationTests namespace to avoid undefined errors
+                // Ensure proper namespace hierarchy
+                window.FoodCost = window.FoodCost || {};
+                
+                // Create a copy of any existing IntegrationTests object
+                const existingIntegrationTests = window.FoodCost.IntegrationTests;
+                
+                // Define the fallback implementation
+                const fallbackIntegrationTests = {
+                    results: { passed: 0, failed: 0, tests: [] },
+                    mockStockData: [],
+                    _isFallback: true, // Flag to identify fallback implementation
+                    
+                    // Fallback setup method if script fails to load
+                    setup: function() {
+                        console.log('Using fallback setup - integration-tests.js may not have loaded properly');
+                        this.mockStockData = this.createMockStockData();
+                        return this;
+                    },
+                    
+                    // Create basic mock data
+                    createMockStockData: function(count = 5) {
+                        console.log('Creating mock stock data');
+                        const items = [];
+                        for (let i = 0; i < count; i++) {
+                            items.push({
+                                id: `item_${i}`,
+                                itemCode: `SKU${1000 + i}`,
+                                description: `Test Item ${i}`,
+                                category: i % 2 === 0 ? 'Beverages' : 'Food',
+                                costCenter: i % 2 === 0 ? 'Bar' : 'Kitchen',
+                                openingQty: 10,
+                                openingValue: 100,
+                                purchaseQty: 5,
+                                purchaseValue: 50,
+                                closingQty: 5,
+                                closingValue: 50,
+                                usageQty: 10,
+                                usageValue: 100,
+                                stockPeriodDays: 7,
+                                daysToNextDelivery: 3
+                            });
+                        }
+                        return items;
+                    },
+                    
+                    // Fallback test runner method
+                    runAllTests: function(element) {
+                        console.log('Running all tests (fallback mode)');
+                        this.results = { passed: 0, failed: 0, tests: [] };
+                        
+                        this.recordResult('Fallback Test', false, 'The integration-tests.js file did not load properly. Please check the console for errors.');
+                        
+                        if (element) {
+                            this.displayResults(element);
+                        }
+                        
+                        return this.results;
+                    },
+                    
+                    // Fallback test methods
+                    testCategoryFilterToStockDataTableCommunication: function() {
+                        console.log('Running category filter test (fallback mode)');
+                        this.recordResult('CategoryFilter to StockDataTable communication', false, 'Test module not loaded properly');
+                    },
+                    
+                    testCostCenterFilterToStockDataTableCommunication: function() {
+                        console.log('Running cost center filter test (fallback mode)');
+                        this.recordResult('CostCenterFilter to StockDataTable communication', false, 'Test module not loaded properly');
+                    },
+                    
+                    testStockDataTableToDataSummaryCommunication: function() {
+                        console.log('Running data summary test (fallback mode)');
+                        this.recordResult('StockDataTable to DataSummary communication', false, 'Test module not loaded properly');
+                    },
+                    
+                    // Record test result
+                    recordResult: function(testName, passed, error) {
+                        if (passed) {
+                            this.results.passed++;
+                        } else {
+                            this.results.failed++;
+                        }
+                        
+                        this.results.tests.push({
+                            name: testName,
+                            passed: passed,
+                            error: error || null
+                        });
+                    },
+                    
+                    // Display results in element
+                    displayResults: function(element) {
+                        if (!element) return;
+                        
+                        const { passed, failed, tests } = this.results;
+                        const total = passed + failed;
+                        
+                        let html = `
+                            <div class="p-3 ${failed > 0 ? 'bg-danger text-white' : 'bg-success text-white'}">
+                                <h3>Integration Test Results (Fallback Mode):</h3>
+                                <p>Total tests: ${total}</p>
+                                <p>Passed: ${passed}</p>
+                                <p>Failed: ${failed}</p>
+                                <div class="alert alert-warning">
+                                    <strong>Warning:</strong> The integration-tests.js file did not load properly. These are fallback test results.
+                                </div>
+                            </div>
+                        `;
+                        
+                        if (failed > 0) {
+                            html += '<h4 class="mt-3">Failed tests:</h4><ul class="list-group">';
+                            tests.filter(t => !t.passed).forEach(test => {
+                                html += `<li class="list-group-item list-group-item-danger">${test.name}: ${test.error}</li>`;
+                            });
+                            html += '</ul>';
+                        }
+                        
+                        element.innerHTML = html;
+                        element.style.display = 'block';
+                    },
+                    
+                    // Helper assertion method
+                    assert: function(condition, message) {
+                        if (!condition) {
+                            throw new Error(message);
+                        }
+                        return true;
+                    }
+                };
+                
+                // Only use fallback if IntegrationTests doesn't already exist
+                window.FoodCost.IntegrationTests = existingIntegrationTests || fallbackIntegrationTests;
+                
+                // For backward compatibility - keep reference in both locations
+                window.IntegrationTests = window.FoodCost.IntegrationTests;
+                
+                // Add global error handler to trace component loading issues
+                window.addEventListener('error', function(event) {
+                    console.error('Error loading script:', event.filename, event.error);
+                    const errorLogEl = document.getElementById('error-log');
+                    if (errorLogEl) {
+                        errorLogEl.classList.remove('hidden');
+                        errorLogEl.innerHTML += `<p>Error loading: ${event.filename}<br>Message: ${event.error}</p>`;
+                    }
+                });
+            </script>
+            
+            <!-- Load component registry -->
+            <script src="../component-registry.js"></script>
+        
+        <!-- Make sure integration-tests.js loads properly -->
+        <script>
+        (function() {
+            function handleScriptError(scriptSrc) {
+                console.error(`Failed to load script: ${scriptSrc}`);
+                const errorLogEl = document.getElementById('error-log');
+                if (errorLogEl) {
+                    errorLogEl.classList.remove('hidden');
+                    errorLogEl.innerHTML += `<p>Error loading script: ${scriptSrc}<br>Using fallback implementation.</p>`;
+                }
+            }
+            
+            function loadScript(src, onLoad, onError) {
+                const script = document.createElement('script');
+                script.src = src;
+                script.onload = function() {
+                    console.log(`Successfully loaded script: ${src}`);
+                    if (typeof onLoad === 'function') {
+                        onLoad(src);
+                    }
+                };
+                script.onerror = function() {
+                    if (typeof onError === 'function') {
+                        onError(src);
+                    }
+                };
+                document.head.appendChild(script);
+                return script;
+            }
+            
+            // Try to load the scripts with error handling
+            const integrationTestsScript = loadScript('./integration-tests.js', 
+                function() {
+                    // Success handler - notify about script load but don't auto-reload
+                    if (window.FoodCost.IntegrationTests && window.FoodCost.IntegrationTests._isFallback) {
+                        console.log('Real implementation loaded after fallback - manual reload required');
+                        // Don't auto-reload as this can cause infinite loops
+                        const errorLogEl = document.getElementById('error-log');
+                        if (errorLogEl) {
+                            errorLogEl.classList.remove('hidden');
+                            errorLogEl.innerHTML = `<div class="alert alert-warning">
+                                <strong>Warning:</strong> The real implementation loaded after the fallback implementation.
+                                <button class="btn btn-sm btn-primary mt-2" onclick="window.location.reload()">Reload Page</button>
+                            </div>`;
+                        }
+                    }
+                }, 
+                handleScriptError
+            );
+        })();
+        </script>
+        
+        <!-- Load components -->
+        <script src="../components/filters/CategoryFilter.js"></script>
+        <script src="../components/filters/CostCenterFilter.js"></script>
+        <script src="../components/tables/StockDataTable.js"></script>
+        <script src="../components/analytics/DataSummary.js"></script>
+        </div>
+
+        <script>
+            // Test version - update this when making changes to verify cache refresh
+            const INTEGRATION_TEST_VERSION = '1.9.4-2025-04-19-18';
+            
+            // Capture console output
+            const originalConsoleLog = console.log;
+            const originalConsoleError = console.error;
+            const consoleOutput = document.getElementById('console-output');
+            
+            console.log = function() {
+                originalConsoleLog.apply(console, arguments);
+                const args = Array.from(arguments);
+                consoleOutput.innerHTML += args.join(' ') + '\n';
+                consoleOutput.scrollTop = consoleOutput.scrollHeight;
+            };
+            
+            console.error = function() {
+                originalConsoleError.apply(console, arguments);
+                const args = Array.from(arguments);
+                consoleOutput.innerHTML += '<span style="color: red;">' + args.join(' ') + '</span>\n';
+                consoleOutput.scrollTop = consoleOutput.scrollHeight;
+            };
+            
+            document.addEventListener('DOMContentLoaded', function() {
+            console.log(`Food Cost Module Integration Tests - Version ${INTEGRATION_TEST_VERSION}`);
+            
+            // Safely check if IntegrationTests is available and has setup method
+            if (window.FoodCost.IntegrationTests && typeof window.FoodCost.IntegrationTests.setup === 'function') {
+                // Check if we're using the fallback implementation
+                const isFallback = window.FoodCost.IntegrationTests._isFallback === true;
+                
+                // Initialize the integration tests
+                window.FoodCost.IntegrationTests.setup();
+                console.log(`Integration tests setup completed${isFallback ? ' (using fallback implementation)' : ''}`);
+                
+                // Show warning if using fallback
+                if (isFallback) {
+                    const errorLogEl = document.getElementById('error-log');
+                    if (errorLogEl) {
+                        errorLogEl.classList.remove('hidden');
+                        errorLogEl.innerHTML = `<div class="alert alert-warning">
+                            <strong>Warning:</strong> Using fallback implementation for integration tests.
+                            Either the integration-tests.js file failed to load or it loaded after the fallback was initialized.
+                            <button class="btn btn-sm btn-primary mt-2" onclick="window.location.reload()">Reload Page</button>
+                        </div>`;
+                    }
+                }
+            } else {
+                console.error('Integration tests setup failed - IntegrationTests not available');
+                
+                // Show error in the UI
+                const errorLogEl = document.getElementById('error-log');
+                if (errorLogEl) {
+                    errorLogEl.classList.remove('hidden');
+                    errorLogEl.innerHTML += `<p>Error: Integration tests framework not loaded properly. Check the console for details.</p>`;
+                }
+            }
+            
+            // Show component registration status
+            console.log('Component registration status:', {
+                CategoryFilter: window.FoodCost.components.CategoryFilter ? 'Available' : 'Missing',
+                CostCenterFilter: window.FoodCost.components.CostCenterFilter ? 'Available' : 'Missing',
+                StockDataTable: window.FoodCost.components.StockDataTable ? 'Available' : 'Missing',
+                DataSummary: window.FoodCost.components.DataSummary ? 'Available' : 'Missing'
+            });    
+                
+                // Register click handlers
+                document.getElementById('run-all-integration-tests').addEventListener('click', function() {
+                    const resultsDiv = document.getElementById('test-results');
+                    resultsDiv.classList.remove('hidden');
+                    window.FoodCost.IntegrationTests.runAllTests(resultsDiv);
+                });
+                
+                document.getElementById('run-filter-table-test').addEventListener('click', function() {
+                    const resultsDiv = document.getElementById('test-results');
+                    resultsDiv.classList.remove('hidden');
+                    document.getElementById('test-results').innerHTML = '<div class="alert alert-info">Running filter tests...</div>';
+                    window.FoodCost.IntegrationTests.testCategoryFilterToStockDataTableCommunication();
+                    window.FoodCost.IntegrationTests.testCostCenterFilterToStockDataTableCommunication();
+                    window.FoodCost.IntegrationTests.displayResults(resultsDiv);
+                });
+                
+                document.getElementById('run-summary-test').addEventListener('click', function() {
+                    const resultsDiv = document.getElementById('test-results');
+                    resultsDiv.classList.remove('hidden');
+                    document.getElementById('test-results').innerHTML = '<div class="alert alert-info">Running summary tests...</div>';
+                    window.FoodCost.IntegrationTests.testStockDataTableToDataSummaryCommunication();
+                    window.FoodCost.IntegrationTests.displayResults(resultsDiv);
+                });
+            });
+        </script>
+    </div>
+</body>
+</html>

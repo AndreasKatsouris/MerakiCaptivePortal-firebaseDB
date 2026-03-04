@@ -14,7 +14,22 @@
       "Bash(node -c:*)",
       "Bash(git push:*)",
       "Bash(firebase projects:list:*)",
-      "Bash(git clone:*)"
+      "Bash(git clone:*)",
+      "mcp__plugin_firebase_firebase__firebase_validate_security_rules",
+      "Bash(node -e:*)",
+      "Bash(python3:*)",
+      "Bash(ls:*)",
+      "Bash(node --check:*)",
+      "mcp__plugin_firebase_firebase__firebase_get_environment",
+      "Bash(dir:*)",
+      "Bash(firebase deploy:*)",
+      "Bash(du:*)",
+      "Bash(wc:*)",
+      "Bash(git ls-files:*)",
+      "Bash(git rm:*)",
+      "Bash(git restore:*)",
+      "Bash(echo:*)",
+      "Bash(cd:*)"
     ]
   },
   "enabledPlugins": {

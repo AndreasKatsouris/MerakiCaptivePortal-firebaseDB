@@ -1,0 +1,92 @@
+/**
+ * Table Header Visibility Fixes
+ * This file ensures table headers are always visible with proper contrast
+ * across all pages in the platform
+ */
+
+/* Fix for Bootstrap table headers */
+.table thead th,
+.table-light th,
+.table thead.table-light th {
+    color: #212529 !important;
+    background-color: #f8f9fa !important;
+    font-weight: 600;
+}
+
+/* Fix for thead-light class specifically */
+.thead-light th,
+.table .thead-light th {
+    color: #495057 !important;
+    background-color: #f8f9fa !important;
+    border-color: #dee2e6 !important;
+}
+
+/* Fix for dark themed tables */
+.table-dark thead th {
+    color: #fff !important;
+    background-color: #343a40 !important;
+}
+
+/* General table header fix */
+table th,
+thead th {
+    color: #495057 !important;
+}
+
+/* Ensure table body text is visible */
+.table td,
+table td {
+    color: #212529 !important;
+}
+
+/* Fix for responsive tables */
+.table-responsive .table thead th {
+    color: #495057 !important;
+    background-color: #f8f9fa !important;
+}
+
+/* Fix for sticky headers */
+.table thead.sticky-top {
+    background-color: #f8f9fa !important;
+    box-shadow: 0 2px 2px -1px rgba(0, 0, 0, 0.4);
+}
+
+/* Override any conflicting styles from food-cost-dashboard.css */
+.food-cost-dashboard .table th {
+    color: #212529 !important;
+    background-color: #f8f9fa !important;
+}
+
+/* Admin dashboard specific fixes */
+.admin-dashboard .table thead th,
+#admin-dashboard .table thead th {
+    color: #495057 !important;
+    background-color: #f8f9fa !important;
+}
+
+/* Modal specific fixes */
+.modal .table thead th,
+.modal-content .table thead th {
+    color: #495057 !important;
+    background-color: #f8f9fa !important;
+}
+
+/* Purchase order modal specific */
+.modal-overlay .table thead th,
+.modal-overlay .thead-light th {
+    color: #495057 !important;
+    background-color: #f8f9fa !important;
+}
+
+/* Hover states for better visibility */
+.table tbody tr:hover {
+    background-color: rgba(0, 0, 0, 0.03);
+}
+
+/* Ensure proper contrast for all table variants */
+.table-primary thead th { color: #004085 !important; }
+.table-secondary thead th { color: #383d41 !important; }
+.table-success thead th { color: #155724 !important; }
+.table-info thead th { color: #0c5460 !important; }
+.table-warning thead th { color: #856404 !important; }
+.table-danger thead th { color: #721c24 !important; } 

@@ -4,6 +4,7 @@
  */
 
 const functions = require('firebase-functions/v2');
+const { onValueWritten } = require('firebase-functions/v2/database');
 const admin = require('firebase-admin');
 
 // Get database reference (will be initialized when admin is ready)
@@ -187,10 +188,10 @@ exports.triggerSubscriptionStatusCheck = functions.https.onCall(
 /**
  * Database trigger: Check subscription status when trialEndDate is updated
  */
-exports.onTrialEndDateUpdate = functions.database
-  .ref('subscriptions/{userId}/trialEndDate')
-  .onWrite(async (change, context) => {
-    const { userId } = context.params;
+exports.onTrialEndDateUpdate = onValueWritten(
+  { ref: 'subscriptions/{userId}/trialEndDate' },
+  async (event) => {
+    const { userId } = event.params;
 
     try {
       // Get the full subscription
@@ -214,15 +215,16 @@ exports.onTrialEndDateUpdate = functions.database
       console.error('Error in onTrialEndDateUpdate trigger:', error);
       return null;
     }
-  });
+  }
+);
 
 /**
  * Database trigger: Check subscription status when renewalDate is updated
  */
-exports.onRenewalDateUpdate = functions.database
-  .ref('subscriptions/{userId}/renewalDate')
-  .onWrite(async (change, context) => {
-    const { userId } = context.params;
+exports.onRenewalDateUpdate = onValueWritten(
+  { ref: 'subscriptions/{userId}/renewalDate' },
+  async (event) => {
+    const { userId } = event.params;
 
     try {
       // Get the full subscription
@@ -246,7 +248,8 @@ exports.onRenewalDateUpdate = functions.database
       console.error('Error in onRenewalDateUpdate trigger:', error);
       return null;
     }
-  });
+  }
+);
 
 // Export the status check function for testing
 exports.checkAndUpdateSubscriptionStatus = checkAndUpdateSubscriptionStatus;

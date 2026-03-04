@@ -1,0 +1,288 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Generate Test Stock Data</title>
+    
+    <!-- Bootstrap CSS -->
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" rel="stylesheet">
+    
+    <!-- Font Awesome -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+    
+    <style>
+        .generate-section {
+            background-color: #f8f9fa;
+            padding: 2rem;
+            border-radius: 0.5rem;
+            margin-bottom: 2rem;
+        }
+        
+        .success-message {
+            display: none;
+        }
+    </style>
+</head>
+<body>
+    <div class="container py-5">
+        <h1 class="mb-4">Generate Test Stock Data</h1>
+        
+        <div class="alert alert-info" role="alert">
+            <h5 class="alert-heading"><i class="fas fa-info-circle me-2"></i>Test Data Generator</h5>
+            <p>This tool generates sample stock usage data for testing the Food Cost Analytics dashboard.</p>
+            <hr>
+            <p class="mb-0">The generated data will include realistic food cost percentages, inventory items, and sales data.</p>
+        </div>
+        
+        <div class="generate-section">
+            <h3>Generator Settings</h3>
+            
+            <div class="row mb-3">
+                <div class="col-md-6">
+                    <label for="locationId" class="form-label">Location ID</label>
+                    <input type="text" class="form-control" id="locationId" value="test-location-1">
+                    <small class="text-muted">This should match a location in your database</small>
+                </div>
+                
+                <div class="col-md-6">
+                    <label for="locationName" class="form-label">Location Name</label>
+                    <input type="text" class="form-control" id="locationName" value="Test Restaurant">
+                </div>
+            </div>
+            
+            <div class="row mb-3">
+                <div class="col-md-4">
+                    <label for="numDays" class="form-label">Number of Days</label>
+                    <input type="number" class="form-control" id="numDays" value="30" min="1" max="90">
+                    <small class="text-muted">Days of historical data to generate</small>
+                </div>
+                
+                <div class="col-md-4">
+                    <label for="avgRevenue" class="form-label">Average Daily Revenue</label>
+                    <div class="input-group">
+                        <span class="input-group-text">$</span>
+                        <input type="number" class="form-control" id="avgRevenue" value="5000" min="100">
+                    </div>
+                </div>
+                
+                <div class="col-md-4">
+                    <label for="targetFoodCost" class="form-label">Target Food Cost %</label>
+                    <div class="input-group">
+                        <input type="number" class="form-control" id="targetFoodCost" value="32" min="20" max="50">
+                        <span class="input-group-text">%</span>
+                    </div>
+                </div>
+            </div>
+            
+            <button class="btn btn-primary btn-lg" onclick="generateTestData()">
+                <i class="fas fa-database me-2"></i>Generate Test Data
+            </button>
+            
+            <div class="success-message alert alert-success mt-3" role="alert">
+                <i class="fas fa-check-circle me-2"></i>Test data generated successfully!
+            </div>
+        </div>
+        
+        <div id="output" class="mt-4"></div>
+    </div>
+    
+    <!-- Bootstrap Bundle JS -->
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/js/bootstrap.bundle.min.js"></script>
+    
+    <!-- Firebase Scripts -->
+    <script type="module">
+        import { initializeApp } from 'https://www.gstatic.com/firebasejs/11.2.0/firebase-app.js';
+        import { getAuth, signInAnonymously } from 'https://www.gstatic.com/firebasejs/11.2.0/firebase-auth.js';
+        import { getDatabase, ref, set, get } from 'https://www.gstatic.com/firebasejs/11.2.0/firebase-database.js';
+        
+        // Firebase configuration
+        const firebaseConfig = {
+            apiKey: "AIzaSyAagtKLQXBhEPvA3J4xFPSHxq1L8nNvvAQ",
+            authDomain: "merakicaptiveportal-firebasedb.firebaseapp.com",
+            databaseURL: "https://merakicaptiveportal-firebasedb-default-rtdb.firebaseio.com",
+            projectId: "merakicaptiveportal-firebasedb",
+            storageBucket: "merakicaptiveportal-firebasedb.appspot.com",
+            messagingSenderId: "935338193813",
+            appId: "1:935338193813:web:a0c019ad90b2171f12e8c3"
+        };
+        
+        // Initialize Firebase
+        const app = initializeApp(firebaseConfig);
+        const auth = getAuth();
+        const db = getDatabase();
+        
+        // Sign in anonymously for testing
+        signInAnonymously(auth).then(() => {
+            console.log('Signed in anonymously');
+        });
+        
+        // Sample food items with categories
+        const foodItems = [
+            { name: 'Chicken Breast', category: 'Meat', unitCost: 8.50 },
+            { name: 'Salmon Fillet', category: 'Seafood', unitCost: 15.00 },
+            { name: 'Beef Sirloin', category: 'Meat', unitCost: 12.00 },
+            { name: 'Shrimp', category: 'Seafood', unitCost: 18.00 },
+            { name: 'Lettuce', category: 'Produce', unitCost: 2.50 },
+            { name: 'Tomatoes', category: 'Produce', unitCost: 3.00 },
+            { name: 'Onions', category: 'Produce', unitCost: 1.50 },
+            { name: 'Potatoes', category: 'Produce', unitCost: 1.00 },
+            { name: 'Rice', category: 'Dry Goods', unitCost: 2.00 },
+            { name: 'Pasta', category: 'Dry Goods', unitCost: 2.50 },
+            { name: 'Olive Oil', category: 'Condiments', unitCost: 8.00 },
+            { name: 'Butter', category: 'Dairy', unitCost: 4.00 },
+            { name: 'Cream', category: 'Dairy', unitCost: 3.50 },
+            { name: 'Cheese', category: 'Dairy', unitCost: 6.00 },
+            { name: 'Wine (Cooking)', category: 'Beverages', unitCost: 10.00 },
+            { name: 'Beer', category: 'Beverages', unitCost: 3.00 },
+            { name: 'Soft Drinks', category: 'Beverages', unitCost: 1.50 },
+            { name: 'Coffee Beans', category: 'Beverages', unitCost: 12.00 },
+            { name: 'Bread', category: 'Bakery', unitCost: 2.50 },
+            { name: 'Eggs', category: 'Dairy', unitCost: 3.00 }
+        ];
+        
+        window.generateTestData = async function() {
+            const locationId = document.getElementById('locationId').value;
+            const locationName = document.getElementById('locationName').value;
+            const numDays = parseInt(document.getElementById('numDays').value);
+            const avgRevenue = parseFloat(document.getElementById('avgRevenue').value);
+            const targetFoodCost = parseFloat(document.getElementById('targetFoodCost').value) / 100;
+            
+            console.log('Generating test data with settings:', {
+                locationId, locationName, numDays, avgRevenue, targetFoodCost
+            });
+            
+            // First ensure the location exists
+            const locationRef = ref(db, `locations/${locationId}`);
+            await set(locationRef, {
+                id: locationId,
+                name: locationName,
+                displayName: locationName,
+                address: '123 Test Street',
+                createdAt: Date.now()
+            });
+            
+            // Generate stock usage data for each day
+            const endDate = new Date();
+            const startDate = new Date();
+            startDate.setDate(endDate.getDate() - numDays);
+            
+            let generatedCount = 0;
+            
+            for (let d = new Date(startDate); d <= endDate; d.setDate(d.getDate() + 1)) {
+                const currentDate = new Date(d);
+                const timestamp = currentDate.getTime();
+                
+                // Generate random variation in daily revenue (±20%)
+                const dailyRevenue = avgRevenue * (0.8 + Math.random() * 0.4);
+                const targetCost = dailyRevenue * targetFoodCost;
+                
+                // Generate stock items data
+                const stockItems = {};
+                let totalCostOfUsage = 0;
+                
+                foodItems.forEach((item, index) => {
+                    const itemCode = `ITEM${String(index + 1).padStart(3, '0')}`;
+                    
+                    // Random opening quantity (50-200 units)
+                    const openingQty = Math.floor(50 + Math.random() * 150);
+                    
+                    // Random purchase quantity (0-50 units, 30% chance of purchase)
+                    const purchaseQty = Math.random() > 0.7 ? Math.floor(Math.random() * 50) : 0;
+                    
+                    // Random usage (10-40% of available)
+                    const available = openingQty + purchaseQty;
+                    const usage = Math.floor(available * (0.1 + Math.random() * 0.3));
+                    
+                    // Closing quantity
+                    const closingQty = available - usage;
+                    
+                    // Calculate values
+                    const usageValue = usage * item.unitCost;
+                    totalCostOfUsage += usageValue;
+                    
+                    stockItems[itemCode] = {
+                        itemCode,
+                        itemName: item.name,
+                        description: item.name,
+                        category: item.category,
+                        costCenter: 'Kitchen',
+                        unitCost: item.unitCost,
+                        openingQty,
+                        purchaseQty,
+                        closingQty,
+                        usage,
+                        usagePerDay: usage,
+                        usageValue,
+                        openingValue: openingQty * item.unitCost,
+                        closingValue: closingQty * item.unitCost,
+                        unitOfMeasure: 'kg'
+                    };
+                });
+                
+                // Adjust total cost to match target
+                const adjustment = targetCost / totalCostOfUsage;
+                Object.values(stockItems).forEach(item => {
+                    item.usageValue *= adjustment;
+                });
+                totalCostOfUsage = targetCost;
+                
+                // Create the stock usage record
+                const stockUsageData = {
+                    timestamp,
+                    date: currentDate.toISOString().split('T')[0],
+                    openingStockDate: currentDate.toISOString().split('T')[0],
+                    closingStockDate: currentDate.toISOString().split('T')[0],
+                    storeName: locationName,
+                    selectedLocationId: locationId,
+                    stockItems,
+                    totals: {
+                        totalCostOfUsage,
+                        totalItems: Object.keys(stockItems).length
+                    },
+                    salesData: {
+                        total: dailyRevenue,
+                        foodSales: dailyRevenue * 0.85,
+                        beverageSales: dailyRevenue * 0.15
+                    },
+                    costPercentage: (totalCostOfUsage / dailyRevenue * 100).toFixed(2),
+                    userId: 'test-user',
+                    createdAt: timestamp
+                };
+                
+                // Save to location-specific path (new structure)
+                const locationStockRef = ref(db, `locations/${locationId}/stockUsage/${timestamp}`);
+                await set(locationStockRef, stockUsageData);
+                
+                generatedCount++;
+            }
+            
+            // Show success message
+            document.querySelector('.success-message').style.display = 'block';
+            
+            // Display summary
+            document.getElementById('output').innerHTML = `
+                <div class="card">
+                    <div class="card-body">
+                        <h5 class="card-title">Generation Summary</h5>
+                        <p><strong>Location:</strong> ${locationName} (${locationId})</p>
+                        <p><strong>Records Generated:</strong> ${generatedCount}</p>
+                        <p><strong>Date Range:</strong> ${startDate.toLocaleDateString()} to ${endDate.toLocaleDateString()}</p>
+                        <p><strong>Average Daily Revenue:</strong> $${avgRevenue.toFixed(2)}</p>
+                        <p><strong>Target Food Cost:</strong> ${(targetFoodCost * 100).toFixed(1)}%</p>
+                        <hr>
+                        <p class="mb-0">
+                            <a href="../food-cost-analytics.html" class="btn btn-success">
+                                <i class="fas fa-chart-line me-2"></i>View Analytics Dashboard
+                            </a>
+                            <a href="test-food-cost-analytics.html" class="btn btn-primary ms-2">
+                                <i class="fas fa-flask me-2"></i>View Test Analytics
+                            </a>
+                        </p>
+                    </div>
+                </div>
+            `;
+        };
+    </script>
+</body>
+</html> 

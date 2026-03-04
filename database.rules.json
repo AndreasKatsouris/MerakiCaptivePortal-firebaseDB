@@ -1,6 +1,5 @@
 {
   "rules": {
-    ".read": "auth != null",
     ".write": "auth != null && auth.token.admin === true",
     "subscriptionTiers": {
       ".read": true,
@@ -16,12 +15,14 @@
       }
     },
     "users": {
+      ".read": "auth != null",
       "$uid": {
         ".read": "auth != null",
         ".write": "auth != null && (auth.uid === $uid || auth.token.admin === true)"
       }
     },
     "subscriptions": {
+      ".read": "auth != null",
       ".indexOn": ["userId", "tier", "status", "expirationDate"],
       "$uid": {
         ".read": "auth != null && (auth.uid === $uid || auth.token.admin === true)",
@@ -38,12 +39,14 @@
       }
     },
     "userLocations": {
+      ".read": "auth != null",
       "$uid": {
         ".read": "auth != null && (auth.uid === $uid || auth.token.admin === true)",
         ".write": "auth != null && (auth.uid === $uid || auth.token.admin === true)"
       }
     },
     "onboarding-progress": {
+      ".read": "auth != null",
       "$uid": {
         ".read": "auth != null && (auth.uid === $uid || auth.token.admin === true)",
         ".write": "auth != null && (auth.uid === $uid || auth.token.admin === true)"
@@ -330,13 +333,19 @@
         }
       },
       "filings": {
-        ".indexOn": ["status", "dueDate"],
         "$year": {
           ".validate": "$year.matches(/^[0-9]{4}$/)",
           "$entityId": {
             ".validate": "$entityId.matches(/^[A-Za-z0-9_-]+$/)",
+            ".indexOn": ["status", "dueDate"],
             "$obligationId": {
-              ".validate": "newData.hasChildren(['status', 'updatedAt', 'updatedBy'])"
+              ".validate": "newData.hasChildren(['status', 'updatedAt', 'updatedBy'])",
+              "filedBy": {
+                ".validate": "newData.isString() && newData.val().length > 0 && newData.val().length <= 200"
+              },
+              "notes": {
+                ".validate": "!newData.exists() || (newData.isString() && newData.val().length <= 1000)"
+              }
             }
           }
         }

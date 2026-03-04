@@ -1,0 +1,402 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Test Feature #65 & #66 - Firebase Search & Sort</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <style>
+        body {
+            padding: 20px;
+            background-color: #f8f9fa;
+        }
+        .test-card {
+            background: white;
+            border-radius: 10px;
+            padding: 20px;
+            margin-bottom: 20px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        .status-badge {
+            padding: 5px 10px;
+            border-radius: 5px;
+            font-weight: bold;
+        }
+        .status-pending { background-color: #ffc107; color: white; }
+        .status-passed { background-color: #28a745; color: white; }
+        .status-failed { background-color: #dc3545; color: white; }
+        .log-entry {
+            font-family: 'Courier New', monospace;
+            font-size: 12px;
+            padding: 5px;
+            margin: 2px 0;
+            border-left: 3px solid #007bff;
+            background-color: #f8f9fa;
+        }
+        .log-success { border-left-color: #28a745; }
+        .log-error { border-left-color: #dc3545; }
+        .log-info { border-left-color: #17a2b8; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1 class="mb-4">
+            <i class="fas fa-search"></i> Test Features #65 & #66
+        </h1>
+        <p class="lead">Firebase RTDB Search & Sort Verification</p>
+
+        <!-- Test Results Summary -->
+        <div class="test-card">
+            <h3>Test Summary</h3>
+            <div class="row">
+                <div class="col-md-6">
+                    <h5>Feature #65: Search Filters Query Firebase</h5>
+                    <p id="feature65-status" class="status-badge status-pending">PENDING</p>
+                </div>
+                <div class="col-md-6">
+                    <h5>Feature #66: Sort Operates on Real Data</h5>
+                    <p id="feature66-status" class="status-badge status-pending">PENDING</p>
+                </div>
+            </div>
+        </div>
+
+        <!-- Feature #65 Tests -->
+        <div class="test-card">
+            <h3><i class="fas fa-search"></i> Feature #65: Search Filters</h3>
+            <p>Verify search uses Firebase orderByChild queries</p>
+
+            <button id="test-65-setup" class="btn btn-primary mb-3">
+                <i class="fas fa-plus"></i> Setup: Create Test Guests (Alpha, Beta, Gamma)
+            </button>
+
+            <button id="test-65-search-beta" class="btn btn-warning mb-3" disabled>
+                <i class="fas fa-search"></i> Test: Search for "Beta"
+            </button>
+
+            <button id="test-65-clear-search" class="btn btn-info mb-3" disabled>
+                <i class="fas fa-times"></i> Test: Clear Search
+            </button>
+
+            <button id="test-65-cleanup" class="btn btn-danger mb-3" disabled>
+                <i class="fas fa-trash"></i> Cleanup: Remove Test Guests
+            </button>
+
+            <div id="test-65-log" class="mt-3"></div>
+        </div>
+
+        <!-- Feature #66 Tests -->
+        <div class="test-card">
+            <h3><i class="fas fa-sort"></i> Feature #66: Sort Operations</h3>
+            <p>Verify sort uses Firebase orderByChild queries</p>
+
+            <button id="test-66-setup" class="btn btn-primary mb-3">
+                <i class="fas fa-plus"></i> Setup: Create Test Guests with Timestamps
+            </button>
+
+            <button id="test-66-sort-recent" class="btn btn-warning mb-3" disabled>
+                <i class="fas fa-sort-amount-down"></i> Test: Sort by Most Recent
+            </button>
+
+            <button id="test-66-sort-name" class="btn btn-info mb-3" disabled>
+                <i class="fas fa-sort-alpha-down"></i> Test: Sort by Name A-Z
+            </button>
+
+            <button id="test-66-cleanup" class="btn btn-danger mb-3" disabled>
+                <i class="fas fa-trash"></i> Cleanup: Remove Test Guests
+            </button>
+
+            <div id="test-66-log" class="mt-3"></div>
+        </div>
+
+        <!-- Console Log Output -->
+        <div class="test-card">
+            <h3><i class="fas fa-terminal"></i> Console Output</h3>
+            <div id="console-output" style="max-height: 300px; overflow-y: auto;"></div>
+        </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    <script type="module">
+        import { rtdb, auth, ref, get, set, remove, query, orderByChild, startAt, endAt } from '../../js/config/firebase-config.js';
+
+        // Intercept console.log for display
+        const originalLog = console.log;
+        const consoleOutput = document.getElementById('console-output');
+        console.log = function(...args) {
+            originalLog(...args);
+            const entry = document.createElement('div');
+            entry.className = 'log-entry log-info';
+            entry.textContent = args.map(arg =>
+                typeof arg === 'object' ? JSON.stringify(arg, null, 2) : String(arg)
+            ).join(' ');
+            consoleOutput.appendChild(entry);
+            consoleOutput.scrollTop = consoleOutput.scrollHeight;
+        };
+
+        function addLog(elementId, message, type = 'info') {
+            const logDiv = document.getElementById(elementId);
+            const entry = document.createElement('div');
+            entry.className = `log-entry log-${type}`;
+            entry.textContent = `[${new Date().toLocaleTimeString()}] ${message}`;
+            logDiv.appendChild(entry);
+            logDiv.scrollTop = logDiv.scrollHeight;
+        }
+
+        function updateStatus(featureId, status) {
+            const statusEl = document.getElementById(`${featureId}-status`);
+            statusEl.textContent = status.toUpperCase();
+            statusEl.className = `status-badge status-${status}`;
+        }
+
+        // Test phone numbers (unique identifiers)
+        const testGuests65 = [
+            { phone: '27800000001', name: 'Alpha' },
+            { phone: '27800000002', name: 'Beta' },
+            { phone: '27800000003', name: 'Gamma' }
+        ];
+
+        const testGuests66 = [
+            { phone: '27800000011', name: 'Zebra', createdAt: new Date('2024-01-01').toISOString() },
+            { phone: '27800000012', name: 'Alpha', createdAt: new Date('2024-02-01').toISOString() },
+            { phone: '27800000013', name: 'Mike', createdAt: new Date('2024-03-01').toISOString() }
+        ];
+
+        // Feature #65: Search Filters
+        document.getElementById('test-65-setup').addEventListener('click', async () => {
+            addLog('test-65-log', '📝 Creating test guests for Feature #65...', 'info');
+
+            try {
+                for (const guest of testGuests65) {
+                    const guestData = {
+                        name: guest.name,
+                        phoneNumber: guest.phone,
+                        createdAt: new Date().toISOString(),
+                        updatedAt: new Date().toISOString(),
+                        consent: false,
+                        tier: 'Bronze'
+                    };
+                    await set(ref(rtdb, `guests/${guest.phone}`), guestData);
+                    addLog('test-65-log', `✅ Created guest: ${guest.name} (${guest.phone})`, 'success');
+                }
+
+                addLog('test-65-log', '✅ All test guests created successfully', 'success');
+                document.getElementById('test-65-search-beta').disabled = false;
+                document.getElementById('test-65-clear-search').disabled = false;
+                document.getElementById('test-65-cleanup').disabled = false;
+            } catch (error) {
+                addLog('test-65-log', `❌ Error creating guests: ${error.message}`, 'error');
+            }
+        });
+
+        document.getElementById('test-65-search-beta').addEventListener('click', async () => {
+            addLog('test-65-log', '🔍 Testing search for "Beta" using Firebase query...', 'info');
+
+            try {
+                // Test Firebase query with orderByChild('name')
+                const searchTerm = 'Beta';
+                const guestsQuery = query(
+                    ref(rtdb, 'guests'),
+                    orderByChild('name'),
+                    startAt(searchTerm),
+                    endAt(searchTerm + '\uf8ff')
+                );
+
+                const snapshot = await get(guestsQuery);
+                const results = snapshot.val() || {};
+                const resultCount = Object.keys(results).length;
+
+                addLog('test-65-log', `📊 Firebase query executed: orderByChild('name').startAt('${searchTerm}').endAt('${searchTerm}\\uf8ff')`, 'info');
+                addLog('test-65-log', `📊 Results: ${resultCount} guests found`, resultCount === 1 ? 'success' : 'error');
+
+                if (resultCount === 1) {
+                    const foundGuest = Object.values(results)[0];
+                    if (foundGuest.name === 'Beta') {
+                        addLog('test-65-log', `✅ PASSED: Found only "Beta" (${foundGuest.phoneNumber})`, 'success');
+                        updateStatus('feature65', 'passed');
+                    } else {
+                        addLog('test-65-log', `❌ FAILED: Found guest with name "${foundGuest.name}" instead of "Beta"`, 'error');
+                        updateStatus('feature65', 'failed');
+                    }
+                } else if (resultCount === 0) {
+                    addLog('test-65-log', '❌ FAILED: No guests found (expected Beta)', 'error');
+                    updateStatus('feature65', 'failed');
+                } else {
+                    addLog('test-65-log', `❌ FAILED: Found ${resultCount} guests (expected 1: Beta)`, 'error');
+                    updateStatus('feature65', 'failed');
+                }
+            } catch (error) {
+                addLog('test-65-log', `❌ Error executing search: ${error.message}`, 'error');
+                updateStatus('feature65', 'failed');
+            }
+        });
+
+        document.getElementById('test-65-clear-search').addEventListener('click', async () => {
+            addLog('test-65-log', '🔄 Testing clear search (load all guests)...', 'info');
+
+            try {
+                const snapshot = await get(ref(rtdb, 'guests'));
+                const allGuests = snapshot.val() || {};
+
+                // Count test guests
+                const testGuestCount = Object.keys(allGuests).filter(phone =>
+                    testGuests65.some(tg => tg.phone === phone)
+                ).length;
+
+                addLog('test-65-log', `📊 Found ${testGuestCount} test guests after clearing search`, testGuestCount === 3 ? 'success' : 'error');
+
+                if (testGuestCount === 3) {
+                    addLog('test-65-log', '✅ PASSED: All 3 test guests reappear after clearing search', 'success');
+                } else {
+                    addLog('test-65-log', `❌ FAILED: Expected 3 guests, found ${testGuestCount}`, 'error');
+                }
+            } catch (error) {
+                addLog('test-65-log', `❌ Error clearing search: ${error.message}`, 'error');
+            }
+        });
+
+        document.getElementById('test-65-cleanup').addEventListener('click', async () => {
+            addLog('test-65-log', '🗑️ Cleaning up test guests...', 'info');
+
+            try {
+                for (const guest of testGuests65) {
+                    await remove(ref(rtdb, `guests/${guest.phone}`));
+                    addLog('test-65-log', `✅ Deleted: ${guest.name} (${guest.phone})`, 'success');
+                }
+                addLog('test-65-log', '✅ Cleanup complete', 'success');
+                document.getElementById('test-65-search-beta').disabled = true;
+                document.getElementById('test-65-clear-search').disabled = true;
+                document.getElementById('test-65-cleanup').disabled = true;
+            } catch (error) {
+                addLog('test-65-log', `❌ Error during cleanup: ${error.message}`, 'error');
+            }
+        });
+
+        // Feature #66: Sort Operations
+        document.getElementById('test-66-setup').addEventListener('click', async () => {
+            addLog('test-66-log', '📝 Creating test guests for Feature #66 with different timestamps...', 'info');
+
+            try {
+                for (const guest of testGuests66) {
+                    const guestData = {
+                        name: guest.name,
+                        phoneNumber: guest.phone,
+                        createdAt: guest.createdAt,
+                        updatedAt: guest.createdAt,
+                        consent: false,
+                        tier: 'Bronze'
+                    };
+                    await set(ref(rtdb, `guests/${guest.phone}`), guestData);
+                    addLog('test-66-log', `✅ Created: ${guest.name} (${guest.createdAt})`, 'success');
+                }
+
+                addLog('test-66-log', '✅ All test guests created with timestamps', 'success');
+                document.getElementById('test-66-sort-recent').disabled = false;
+                document.getElementById('test-66-sort-name').disabled = false;
+                document.getElementById('test-66-cleanup').disabled = false;
+            } catch (error) {
+                addLog('test-66-log', `❌ Error creating guests: ${error.message}`, 'error');
+            }
+        });
+
+        document.getElementById('test-66-sort-recent').addEventListener('click', async () => {
+            addLog('test-66-log', '📊 Testing sort by Most Recent (createdAt)...', 'info');
+
+            try {
+                const guestsQuery = query(
+                    ref(rtdb, 'guests'),
+                    orderByChild('createdAt')
+                );
+
+                const snapshot = await get(guestsQuery);
+                const results = snapshot.val() || {};
+                const sortedGuests = Object.entries(results)
+                    .filter(([phone]) => testGuests66.some(tg => tg.phone === phone))
+                    .map(([phone, data]) => ({ phone, ...data }))
+                    .sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt)); // Descending
+
+                addLog('test-66-log', `📊 Firebase query executed: orderByChild('createdAt')`, 'info');
+                addLog('test-66-log', `📊 Results: ${sortedGuests.length} test guests found`, 'info');
+
+                if (sortedGuests.length === 3) {
+                    const expectedOrder = ['Mike', 'Alpha', 'Zebra']; // Most recent first
+                    const actualOrder = sortedGuests.map(g => g.name);
+                    const orderMatches = JSON.stringify(actualOrder) === JSON.stringify(expectedOrder);
+
+                    addLog('test-66-log', `📊 Expected order: ${expectedOrder.join(', ')}`, 'info');
+                    addLog('test-66-log', `📊 Actual order: ${actualOrder.join(', ')}`, orderMatches ? 'success' : 'error');
+
+                    if (orderMatches) {
+                        addLog('test-66-log', '✅ PASSED: Guests sorted correctly by timestamp (Most Recent first)', 'success');
+                        updateStatus('feature66', 'passed');
+                    } else {
+                        addLog('test-66-log', '❌ FAILED: Sort order incorrect', 'error');
+                        updateStatus('feature66', 'failed');
+                    }
+                } else {
+                    addLog('test-66-log', `❌ FAILED: Expected 3 guests, found ${sortedGuests.length}`, 'error');
+                }
+            } catch (error) {
+                addLog('test-66-log', `❌ Error executing sort: ${error.message}`, 'error');
+                updateStatus('feature66', 'failed');
+            }
+        });
+
+        document.getElementById('test-66-sort-name').addEventListener('click', async () => {
+            addLog('test-66-log', '📊 Testing sort by Name A-Z...', 'info');
+
+            try {
+                const guestsQuery = query(
+                    ref(rtdb, 'guests'),
+                    orderByChild('name')
+                );
+
+                const snapshot = await get(guestsQuery);
+                const results = snapshot.val() || {};
+                const sortedGuests = Object.entries(results)
+                    .filter(([phone]) => testGuests66.some(tg => tg.phone === phone))
+                    .map(([phone, data]) => ({ phone, ...data }));
+
+                addLog('test-66-log', `📊 Firebase query executed: orderByChild('name')`, 'info');
+                addLog('test-66-log', `📊 Results: ${sortedGuests.length} test guests found`, 'info');
+
+                if (sortedGuests.length === 3) {
+                    const expectedOrder = ['Alpha', 'Mike', 'Zebra']; // Alphabetical
+                    const actualOrder = sortedGuests.map(g => g.name);
+                    const orderMatches = JSON.stringify(actualOrder) === JSON.stringify(expectedOrder);
+
+                    addLog('test-66-log', `📊 Expected order: ${expectedOrder.join(', ')}`, 'info');
+                    addLog('test-66-log', `📊 Actual order: ${actualOrder.join(', ')}`, orderMatches ? 'success' : 'error');
+
+                    if (orderMatches) {
+                        addLog('test-66-log', '✅ PASSED: Guests sorted correctly by name (A-Z)', 'success');
+                    } else {
+                        addLog('test-66-log', '❌ FAILED: Sort order incorrect', 'error');
+                    }
+                } else {
+                    addLog('test-66-log', `❌ FAILED: Expected 3 guests, found ${sortedGuests.length}`, 'error');
+                }
+            } catch (error) {
+                addLog('test-66-log', `❌ Error executing sort: ${error.message}`, 'error');
+            }
+        });
+
+        document.getElementById('test-66-cleanup').addEventListener('click', async () => {
+            addLog('test-66-log', '🗑️ Cleaning up test guests...', 'info');
+
+            try {
+                for (const guest of testGuests66) {
+                    await remove(ref(rtdb, `guests/${guest.phone}`));
+                    addLog('test-66-log', `✅ Deleted: ${guest.name} (${guest.phone})`, 'success');
+                }
+                addLog('test-66-log', '✅ Cleanup complete', 'success');
+                document.getElementById('test-66-sort-recent').disabled = true;
+                document.getElementById('test-66-sort-name').disabled = true;
+                document.getElementById('test-66-cleanup').disabled = true;
+            } catch (error) {
+                addLog('test-66-log', `❌ Error during cleanup: ${error.message}`, 'error');
+            }
+        });
+    </script>
+</body>
+</html>

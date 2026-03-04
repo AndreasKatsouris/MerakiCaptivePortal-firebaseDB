@@ -1,0 +1,349 @@
+{
+  "rules": {
+    ".read": "auth != null",
+    ".write": "auth != null && auth.token.admin === true",
+    "subscriptionTiers": {
+      ".read": true,
+      ".write": "auth != null && auth.token.admin === true"
+    },
+    "guests": {
+      ".read": "auth != null",
+      ".write": "auth != null && auth.token.admin === true",
+      ".indexOn": ["phoneNumber", "locationId", "createdAt", "email", "nameCollectedAt", "name"],
+      "$phoneNumber": {
+        ".read": "auth != null && (auth.token.phone_number === $phoneNumber || auth.token.admin === true)",
+        ".write": "auth != null && (auth.token.phone_number === $phoneNumber || auth.token.admin === true)"
+      }
+    },
+    "users": {
+      "$uid": {
+        ".read": "auth != null",
+        ".write": "auth != null && (auth.uid === $uid || auth.token.admin === true)"
+      }
+    },
+    "subscriptions": {
+      ".indexOn": ["userId", "tier", "status", "expirationDate"],
+      "$uid": {
+        ".read": "auth != null && (auth.uid === $uid || auth.token.admin === true)",
+        ".write": "auth != null && (auth.uid === $uid || auth.token.admin === true)"
+      }
+    },
+    "locations": {
+      ".read": "auth != null",
+      ".write": "auth != null",
+      ".indexOn": ["userId", "ownerId", "isActive", "createdAt", "name"],
+      "$locationId": {
+        ".read": "auth != null",
+        ".write": "auth != null && (auth.uid === data.child('ownerId').val() || auth.token.admin === true || !data.exists())"
+      }
+    },
+    "userLocations": {
+      "$uid": {
+        ".read": "auth != null && (auth.uid === $uid || auth.token.admin === true)",
+        ".write": "auth != null && (auth.uid === $uid || auth.token.admin === true)"
+      }
+    },
+    "onboarding-progress": {
+      "$uid": {
+        ".read": "auth != null && (auth.uid === $uid || auth.token.admin === true)",
+        ".write": "auth != null && (auth.uid === $uid || auth.token.admin === true)"
+      }
+    },
+    "admin-claims": {
+      ".read": "auth != null",
+      ".write": "auth != null"
+    },
+    "rewards": {
+      ".read": "auth != null",
+      ".write": "auth != null",
+      ".indexOn": ["status", "guestPhone", "campaignId"],
+      "$rewardId": {
+        ".write": "auth != null && (auth.token.admin === true || !data.exists() || (data.exists() && data.child('status').val() !== 'approved' && data.child('guestPhone').val() === auth.token.phone_number))",
+        ".validate": "newData.hasChildren(['metadata', 'status', 'value', 'expiresAt']) && (!data.exists() || auth.token.admin === true || (data.child('guestPhone').val() === auth.token.phone_number && data.child('status').val() !== 'approved'))"
+      }
+    },
+    "guest-rewards": {
+      "$phoneNumber": {
+        ".indexOn": ["typeId"],
+        ".read": "auth != null && (auth.token.phone_number === $phoneNumber || auth.token.admin === true)",
+        ".write": "auth != null && (auth.token.admin === true || auth.token.phone_number === $phoneNumber)"
+      }
+    },
+    "campaign-rewards": {
+      ".read": "auth != null",
+      ".write": "auth != null && auth.token.admin === true",
+      "$campaignId": {
+        "$rewardId": {
+          ".write": "auth != null && auth.token.admin === true"
+        }
+      }
+    },
+    "guest-receipts": {
+      "$phoneNumber": {
+        ".read": "auth != null && (auth.token.admin === true || auth.token.phone_number === $phoneNumber || auth.token.phone_number === '+' + $phoneNumber)",
+        ".write": "auth != null && (auth.token.admin === true || auth.token.phone_number === $phoneNumber || auth.token.phone_number === '+' + $phoneNumber)",
+        ".indexOn": ["createdAt", "processedAt"]
+      }
+    },
+    "scanningData": {
+      ".read": "auth != null",
+      ".write": "auth != null",
+      "$dataId": {
+        ".write": "auth != null"
+      }
+    },
+    "customization": {
+      ".read": true,
+      ".write": "auth != null && auth.token.admin === true"
+    },
+    "campaigns": {
+      ".indexOn": ["status", "brandName"],
+      ".read": "auth != null && (auth.token.admin === true || root.child('admin-claims').child(auth.uid).exists())",
+      ".write": "auth != null && (auth.token.admin === true || root.child('admin-claims').child(auth.uid).exists())",
+      "$campaignId": {
+        ".validate": "newData.hasChildren(['name', 'status'])"
+      }
+    },
+    "rewardTypes": {
+      ".indexOn": ["status", "category"],
+      ".read": "auth != null",
+      ".write": "auth != null && auth.token.admin === true"
+    },
+    "receipts": {
+      ".indexOn": ["phoneNumber", "guestPhoneNumber", "locationId", "status", "processedAt", "createdAt"],
+      ".read": "auth != null",
+      ".write": "auth != null"
+    },
+    "googleReviews": {
+      ".read": "auth != null",
+      ".write": "auth != null && auth.token.admin === true",
+      "$reviewId": {
+        ".validate": "newData.hasChildren(['reviewerName', 'rating', 'text', 'timestamp'])"
+      }
+    },
+    "admins": {
+      ".read": "auth != null && auth.token.admin === true",
+      ".write": "auth != null && auth.token.admin === true",
+      "$uid": {
+        ".read": "auth != null && (auth.uid === $uid || auth.token.admin === true)",
+        ".write": "auth != null && auth.token.admin === true",
+        ".validate": "newData.hasChildren(['superAdmin'])"
+      }
+    },
+    "admin": {
+      ".read": "auth != null && auth.token.admin === true",
+      ".write": false,
+      "projects": {
+        ".read": "auth != null && auth.token.admin === true",
+        ".write": "auth != null && auth.token.admin === true",
+        ".indexOn": ["status", "priority", "locationId", "createdAt"],
+        "$projectId": {
+          ".read": "auth != null && auth.token.admin === true",
+          ".write": "auth != null && auth.token.admin === true",
+          ".validate": "newData.hasChildren(['name', 'status', 'createdAt'])",
+          "status": {
+            ".validate": "newData.val().matches(/^(planning|in_progress|completed|on_hold)$/)"
+          },
+          "priority": {
+            ".validate": "newData.val().matches(/^(low|medium|high|critical)$/)"
+          },
+          "createdAt": {
+            ".validate": "newData.isNumber()"
+          },
+          "tasks": {
+            ".read": "auth != null && auth.token.admin === true",
+            ".write": "auth != null && auth.token.admin === true",
+            "$taskId": {
+              ".validate": "newData.hasChildren(['title', 'status', 'createdAt'])"
+            }
+          },
+          "milestones": {
+            ".read": "auth != null && auth.token.admin === true",
+            ".write": "auth != null && auth.token.admin === true",
+            "$milestoneId": {
+              ".validate": "newData.hasChildren(['name', 'status', 'createdAt'])"
+            }
+          }
+        }
+      }
+    },
+    "projects": {
+      ".read": "auth != null",
+      ".write": "auth != null && auth.token.admin === true",
+      ".indexOn": ["status", "createdAt"],
+      "$projectId": {
+        ".read": "auth != null",
+        ".write": "auth != null && auth.token.admin === true",
+        ".validate": "newData.hasChildren(['name', 'status', 'createdAt'])",
+        "status": {
+          ".validate": "newData.val().matches(/^(planned|in_progress|completed|blocked)$/)"
+
+        },
+        "createdAt": {
+          ".validate": "newData.isNumber()"
+        }
+      }
+    },
+    "wifiLogins": {
+      ".read": "auth != null",
+      ".write": true
+    },
+    "activeUsers": {
+      ".read": "auth != null",
+      ".write": true
+    },
+    "userPreferences": {
+      ".read": "auth != null",
+      ".write": true
+    },
+    "stockUsage": {
+      ".read": "auth != null",
+      ".indexOn": ["storeName", "timestamp"],
+      "$recordId": {
+        ".write": "auth != null && (auth.token.admin === true || (newData.child('userId').val() === auth.uid && newData.child('selectedLocationId').exists() && root.child('userLocations').child(auth.uid).child(newData.child('selectedLocationId').val()).exists()))",
+        ".read": "auth != null && (auth.token.admin === true || (data.child('userId').val() === auth.uid))",
+        ".validate": "newData.hasChildren(['timestamp', 'userId', 'selectedLocationId'])"
+      }
+    },
+    "bookings": {
+      ".read": "auth != null && (auth.token.admin === true || root.child('admin-claims').child(auth.uid).exists())",
+      ".write": "auth != null && (auth.token.admin === true || root.child('admin-claims').child(auth.uid).exists())",
+      ".indexOn": ["status", "date", "location", "createdAt"],
+      "$bookingId": {
+        ".read": "auth != null && (
+          auth.token.admin === true || 
+          root.child('admin-claims').child(auth.uid).exists() ||
+          (data.child('location').exists() && (
+            root.child('locations').child(data.child('location').val()).child('ownerId').val() === auth.uid ||
+            root.child('userLocations').child(auth.uid).child(data.child('location').val()).exists()
+          ))
+        )",
+        ".write": "auth != null && (
+          auth.token.admin === true || 
+          root.child('admin-claims').child(auth.uid).exists() ||
+          (newData.child('location').exists() && (
+            root.child('locations').child(newData.child('location').val()).child('ownerId').val() === auth.uid ||
+            root.child('userLocations').child(auth.uid).child(newData.child('location').val()).exists()
+          )) ||
+          (data.child('location').exists() && (
+            root.child('locations').child(data.child('location').val()).child('ownerId').val() === auth.uid ||
+            root.child('userLocations').child(auth.uid).child(data.child('location').val()).exists()
+          ))
+        )",
+        ".validate": "newData.hasChildren(['guestName', 'phoneNumber', 'date', 'time', 'location', 'numberOfGuests', 'status', 'createdAt'])"
+      }
+    },
+    "whatsapp-numbers": {
+      ".read": "auth != null",
+      ".write": "auth != null",
+      ".indexOn": ["userId", "status", "createdAt"],
+      "$whatsappNumberId": {
+        ".read": "auth != null && (auth.token.admin === true || data.child('userId').val() === auth.uid)",
+        ".write": "auth != null && (auth.token.admin === true || data.child('userId').val() === auth.uid || !data.exists())",
+        ".validate": "newData.hasChildren(['phoneNumber', 'displayName', 'userId', 'status', 'createdAt'])"
+      }
+    },
+    "location-whatsapp-mapping": {
+      ".read": "auth != null",
+      ".write": "auth != null",
+      ".indexOn": ["userId", "whatsappNumberId", "assignedAt"],
+      "$locationId": {
+        ".read": "auth != null && (auth.token.admin === true || data.child('userId').val() === auth.uid)",
+        ".write": "auth != null && (auth.token.admin === true || data.child('userId').val() === auth.uid || !data.exists())",
+        ".validate": "newData.hasChildren(['locationId', 'whatsappNumberId', 'phoneNumber', 'userId', 'assignedAt'])"
+      }
+    },
+    "whatsapp-tier-limits": {
+      ".read": "auth != null",
+      ".write": "auth != null && auth.token.admin === true"
+    },
+    "whatsapp-message-history": {
+      ".read": "auth != null",
+      ".write": "auth != null",
+      ".indexOn": ["locationId", "messageType", "timestamp", "phoneNumber"],
+      "$messageId": {
+        ".read": "auth != null && (auth.token.admin === true || auth.token.phone_number === data.child('phoneNumber').val())",
+        ".write": "auth != null",
+        ".validate": "newData.hasChildren(['locationId', 'messageType', 'direction', 'timestamp', 'phoneNumber'])"
+      }
+    },
+    "queue": {
+      ".read": "auth != null",
+      ".write": "auth != null",
+      ".indexOn": ["locationId", "status", "createdAt"],
+      "$locationId": {
+        ".read": "auth != null",
+        ".write": "auth != null",
+        ".indexOn": ["status", "createdAt"],
+        "entries": {
+          ".indexOn": ["status", "createdAt", "phoneNumber", "estimatedWaitTime"],
+          "$entryId": {
+            ".read": "auth != null",
+            ".write": "auth != null",
+            ".validate": "newData.hasChildren(['phoneNumber', 'status', 'createdAt'])"
+          }
+        },
+        "metadata": {
+          ".read": "auth != null",
+          ".write": "auth != null"
+        }
+      }
+    },
+    "receiptTemplates": {
+      ".read": "auth != null",
+      ".write": "auth != null && auth.token.admin === true",
+      ".indexOn": ["brandName", "status", "priority", "createdAt"],
+      "$templateId": {
+        ".read": "auth != null",
+        ".write": "auth != null && auth.token.admin === true",
+        ".validate": "newData.hasChildren(['templateName', 'brandName', 'patterns', 'status', 'priority', 'createdAt', 'createdBy'])"
+      }
+    },
+    "receiptPatternLogs": {
+      ".read": "auth != null && auth.token.admin === true",
+      ".write": true,
+      ".indexOn": ["templateId", "success", "timestamp", "brandName"],
+      "$logId": {
+        ".read": "auth != null && auth.token.admin === true",
+        ".write": true,
+        ".validate": "newData.hasChildren(['receiptId', 'success', 'timestamp'])"
+      }
+    },
+    "debug": {
+      ".read": "auth != null && auth.token.admin === true",
+      ".write": true,
+      "ocr-logs": {
+        ".indexOn": ["timestamp", "phoneNumber"],
+        "$logId": {
+          ".read": "auth != null && auth.token.admin === true",
+          ".write": true
+        }
+      }
+    },
+    "compliance": {
+      ".read": "auth != null && auth.token.admin === true",
+      ".write": "auth != null && auth.token.admin === true",
+      "entities": {
+        ".indexOn": ["status", "cipcStatus", "oversight"],
+        "$entityId": {
+          ".validate": "newData.hasChildren(['registrationNumber', 'name', 'status', 'type'])"
+        }
+      },
+      "filings": {
+        ".indexOn": ["status", "dueDate"],
+        "$year": {
+          ".validate": "$year.matches(/^[0-9]{4}$/)",
+          "$entityId": {
+            ".validate": "$entityId.matches(/^[A-Za-z0-9_-]+$/)",
+            "$obligationId": {
+              ".validate": "newData.hasChildren(['status', 'updatedAt', 'updatedBy'])"
+            }
+          }
+        }
+      },
+      "settings": {
+        ".validate": "newData.hasChild('reminders')"
+      }
+    }
+  }
+}

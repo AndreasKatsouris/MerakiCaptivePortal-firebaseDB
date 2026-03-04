@@ -1,0 +1,101 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Module - Meraki Captive Portal</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
+    <style>
+        body {
+            background-color: #f8f9fa;
+        }
+        .module-header {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 2rem 0;
+            margin-bottom: 2rem;
+        }
+        .back-link {
+            color: white;
+            text-decoration: none;
+            display: inline-flex;
+            align-items: center;
+            gap: 0.5rem;
+            margin-bottom: 1rem;
+        }
+        .back-link:hover {
+            color: #f0f0f0;
+        }
+    </style>
+</head>
+<body>
+    <div class="module-header">
+        <div class="container">
+            <a href="/user-dashboard.html" class="back-link">
+                <i class="fas fa-arrow-left"></i> Back to Dashboard
+            </a>
+            <h1 id="moduleTitle">Module</h1>
+            <p id="moduleDescription">This module is under development.</p>
+        </div>
+    </div>
+    
+    <div class="container">
+        <div class="row">
+            <div class="col-md-8 mx-auto">
+                <div class="card">
+                    <div class="card-body text-center py-5">
+                        <i id="moduleIcon" class="fas fa-cog fa-4x text-muted mb-4"></i>
+                        <h3>Coming Soon</h3>
+                        <p class="text-muted">This module is currently under development. Please check back later.</p>
+                        <a href="/user-dashboard.html" class="btn btn-primary mt-3">
+                            Return to Dashboard
+                        </a>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <script type="module">
+        import { auth, onAuthStateChanged } from './js/config/firebase-config.js';
+        
+        // Check auth
+        onAuthStateChanged(auth, (user) => {
+            if (!user) {
+                window.location.href = '/user-login.html?message=unauthorized';
+            }
+        });
+        
+        // Get module info from URL parameters
+        const params = new URLSearchParams(window.location.search);
+        const module = params.get('module') || 'Module';
+        
+        // Update page based on module
+        const moduleInfo = {
+            analytics: {
+                title: 'Analytics Dashboard',
+                description: 'View detailed analytics and insights about your business.',
+                icon: 'fa-chart-line'
+            },
+            campaign: {
+                title: 'Campaign Management',
+                description: 'Create and manage marketing campaigns.',
+                icon: 'fa-bullhorn'
+            },
+            guests: {
+                title: 'Guest Insights',
+                description: 'View and analyze customer data and behavior.',
+                icon: 'fa-users'
+            }
+        };
+        
+        if (moduleInfo[module]) {
+            document.getElementById('moduleTitle').textContent = moduleInfo[module].title;
+            document.getElementById('moduleDescription').textContent = moduleInfo[module].description;
+            document.getElementById('moduleIcon').className = `fas ${moduleInfo[module].icon} fa-4x text-muted mb-4`;
+            document.title = `${moduleInfo[module].title} - Meraki Captive Portal`;
+        }
+    </script>
+</body>
+</html>

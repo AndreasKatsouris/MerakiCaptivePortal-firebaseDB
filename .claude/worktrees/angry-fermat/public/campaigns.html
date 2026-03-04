@@ -1,0 +1,142 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Campaign Management - Meraki Captive Portal</title>
+    
+    <!-- Bootstrap CSS -->
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <!-- Font Awesome -->
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <!-- Vue.js -->
+    <script src="https://unpkg.com/vue@3/dist/vue.global.prod.js"></script>
+    <!-- SweetAlert2 -->
+    <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+    
+    <style>
+        body {
+            background-color: #f8f9fa;
+        }
+        .dashboard-header {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 2rem 0;
+            margin-bottom: 2rem;
+        }
+        .back-link {
+            color: white;
+            text-decoration: none;
+            display: inline-flex;
+            align-items: center;
+            gap: 0.5rem;
+            margin-bottom: 1rem;
+        }
+        .back-link:hover {
+            color: #f0f0f0;
+        }
+        .locked-overlay {
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(0, 0, 0, 0.8);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            color: white;
+            z-index: 10;
+        }
+    </style>
+</head>
+<body>
+    <div class="dashboard-header">
+        <div class="container">
+            <a href="/user-dashboard.html" class="back-link">
+                <i class="fas fa-arrow-left"></i> Back to Dashboard
+            </a>
+            <h1>Campaign Management</h1>
+            <p>Create and manage marketing campaigns</p>
+        </div>
+    </div>
+    
+    <div class="container">
+        <div id="app">
+            <!-- Feature access check -->
+            <div v-if="!hasAccess" class="position-relative">
+                <div class="locked-overlay">
+                    <i class="fas fa-lock fa-3x mb-3"></i>
+                    <h3>Campaigns Locked</h3>
+                    <p>Upgrade your subscription to create campaigns</p>
+                    <button @click="showUpgradePrompt" class="btn btn-primary">
+                        Upgrade Now
+                    </button>
+                </div>
+                <div style="filter: blur(5px); opacity: 0.5;">
+                    <div class="card">
+                        <div class="card-body text-center py-5">
+                            <i class="fas fa-bullhorn fa-4x text-muted mb-4"></i>
+                            <h3>Campaign Management</h3>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Campaign content when user has access -->
+            <div v-else>
+                <div class="card">
+                    <div class="card-body text-center py-5">
+                        <i class="fas fa-bullhorn fa-4x text-primary mb-4"></i>
+                        <h3>Campaign Management Module</h3>
+                        <p class="text-muted">This module is currently under development.</p>
+                        <p>You have access to create and manage campaigns!</p>
+                        <div class="mt-4">
+                            <button class="btn btn-primary" disabled>
+                                <i class="fas fa-plus"></i> Create New Campaign (Coming Soon)
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <script type="module">
+        import { auth, onAuthStateChanged } from './js/config/firebase-config.js';
+        import { featureAccessControl } from './js/modules/access-control/services/feature-access-control.js';
+        
+        const { createApp } = Vue;
+        
+        const app = createApp({
+            data() {
+                return {
+                    hasAccess: false,
+                    loading: true
+                };
+            },
+            async mounted() {
+                // Check authentication
+                onAuthStateChanged(auth, async (user) => {
+                    if (!user) {
+                        window.location.href = '/user-login.html?message=unauthorized';
+                        return;
+                    }
+                    
+                    // Check feature access
+                    this.hasAccess = await featureAccessControl.checkFeatureAccess('campaignBasic');
+                    this.loading = false;
+                });
+            },
+            methods: {
+                showUpgradePrompt() {
+                    featureAccessControl.showUpgradePrompt('campaignBasic');
+                }
+            }
+        });
+        
+        app.mount('#app');
+    </script>
+</body>
+</html>

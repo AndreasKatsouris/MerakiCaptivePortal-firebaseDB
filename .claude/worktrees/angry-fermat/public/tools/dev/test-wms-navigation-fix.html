@@ -1,0 +1,203 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>WMS Navigation Fix Test</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 20px;
+            line-height: 1.6;
+        }
+        .test-container {
+            border: 1px solid #ddd;
+            padding: 20px;
+            margin: 10px 0;
+            border-radius: 5px;
+        }
+        .success { background-color: #d4edda; border-color: #c3e6cb; }
+        .error { background-color: #f8d7da; border-color: #f5c6cb; }
+        .info { background-color: #d1ecf1; border-color: #bee5eb; }
+        button {
+            padding: 10px 15px;
+            margin: 5px;
+            border: none;
+            border-radius: 3px;
+            cursor: pointer;
+        }
+        .btn-primary { background-color: #007bff; color: white; }
+        .btn-success { background-color: #28a745; color: white; }
+        .btn-danger { background-color: #dc3545; color: white; }
+        #console { 
+            background-color: #f8f9fa; 
+            border: 1px solid #dee2e6; 
+            padding: 15px; 
+            height: 200px; 
+            overflow-y: auto; 
+            font-family: monospace;
+            font-size: 12px;
+        }
+    </style>
+</head>
+<body>
+    <h1>WMS Navigation Fix Test</h1>
+    <p>This test simulates the dynamic import caching issue that occurs when navigating away from WMS and back.</p>
+    
+    <div class="test-container info">
+        <h3>Test Controls</h3>
+        <button class="btn-primary" onclick="testDynamicImport()">Test Firebase Config Import</button>
+        <button class="btn-success" onclick="testRetryMechanism()">Test Retry Mechanism</button>
+        <button class="btn-danger" onclick="simulateNavigationFailure()">Simulate Navigation Failure</button>
+        <button onclick="clearConsole()">Clear Console</button>
+    </div>
+
+    <div class="test-container">
+        <h3>Console Output</h3>
+        <div id="console"></div>
+    </div>
+
+    <script>
+        let consoleDiv = document.getElementById('console');
+        
+        function log(message, type = 'info') {
+            const timestamp = new Date().toLocaleTimeString();
+            const color = type === 'error' ? '#dc3545' : type === 'success' ? '#28a745' : '#333';
+            consoleDiv.innerHTML += `<div style="color: ${color};">[${timestamp}] ${message}</div>`;
+            consoleDiv.scrollTop = consoleDiv.scrollHeight;
+        }
+        
+        function clearConsole() {
+            consoleDiv.innerHTML = '';
+        }
+
+        // Mock Firebase config import function with cache-busting
+        async function importFirebaseConfig(retries = 2) {
+            for (let attempt = 0; attempt <= retries; attempt++) {
+                try {
+                    // Add cache-busting parameter to prevent module caching issues on navigation
+                    const cacheBuster = Date.now() + Math.random().toString(36).substr(2, 9);
+                    const configUrl = `./js/config/firebase-config.js?v=${cacheBuster}`;
+                    
+                    log(`🔄 Importing Firebase config (attempt ${attempt + 1}/${retries + 1})...`);
+                    
+                    // Simulate import with potential failure
+                    if (Math.random() > 0.7 && attempt < retries) {
+                        throw new Error('Simulated network/caching error');
+                    }
+                    
+                    // Mock successful import
+                    const module = {
+                        rtdb: 'mock-rtdb',
+                        ref: function() { return 'mock-ref'; },
+                        get: function() { return Promise.resolve('mock-data'); },
+                        auth: { currentUser: 'mock-user' }
+                    };
+                    
+                    // Verify the module has required exports
+                    if (!module.rtdb || !module.ref || !module.get) {
+                        throw new Error('Firebase config module missing required exports');
+                    }
+                    
+                    log('✅ Firebase config imported successfully', 'success');
+                    return module;
+                    
+                } catch (error) {
+                    log(`⚠️ Firebase config import attempt ${attempt + 1} failed: ${error.message}`, 'error');
+                    
+                    if (attempt === retries) {
+                        // Final attempt - try without cache buster as fallback
+                        try {
+                            log('🔄 Final attempt: importing without cache buster...');
+                            // Mock fallback success
+                            return {
+                                rtdb: 'fallback-rtdb',
+                                ref: function() { return 'fallback-ref'; },
+                                get: function() { return Promise.resolve('fallback-data'); }
+                            };
+                        } catch (fallbackError) {
+                            log('❌ All Firebase config import attempts failed', 'error');
+                            throw new Error(`Failed to import Firebase config after ${retries + 1} attempts. Last error: ${fallbackError.message}`);
+                        }
+                    }
+                    
+                    // Wait before retry (exponential backoff)
+                    await new Promise(resolve => setTimeout(resolve, 100 * Math.pow(2, attempt)));
+                }
+            }
+        }
+
+        async function testDynamicImport() {
+            log('🧪 Testing dynamic import with cache-busting...');
+            try {
+                const config = await importFirebaseConfig();
+                log('✅ Test passed: Dynamic import successful', 'success');
+                log(`   - Config: ${JSON.stringify(Object.keys(config))}`);
+            } catch (error) {
+                log(`❌ Test failed: ${error.message}`, 'error');
+            }
+        }
+
+        async function testRetryMechanism() {
+            log('🧪 Testing retry mechanism...');
+            
+            // Mock a function that will fail initially
+            let attempts = 0;
+            async function mockFailingFunction() {
+                attempts++;
+                if (attempts < 3) {
+                    throw new Error(`Simulated failure ${attempts}`);
+                }
+                return 'Success after retries';
+            }
+
+            try {
+                // Test retry with backoff
+                for (let attempt = 0; attempt <= 2; attempt++) {
+                    try {
+                        const result = await mockFailingFunction();
+                        log(`✅ Test passed: ${result}`, 'success');
+                        return;
+                    } catch (error) {
+                        log(`⚠️ Retry attempt ${attempt + 1} failed: ${error.message}`, 'error');
+                        if (attempt < 2) {
+                            const waitTime = 100 * Math.pow(2, attempt);
+                            log(`⏱️ Waiting ${waitTime}ms before retry...`);
+                            await new Promise(resolve => setTimeout(resolve, waitTime));
+                        }
+                    }
+                }
+            } catch (error) {
+                log(`❌ All retry attempts failed: ${error.message}`, 'error');
+            }
+        }
+
+        async function simulateNavigationFailure() {
+            log('🧪 Simulating navigation failure scenario...');
+            
+            // Simulate multiple navigation attempts
+            for (let nav = 1; nav <= 3; nav++) {
+                log(`📍 Navigation ${nav}: Loading WMS section...`);
+                
+                try {
+                    // Simulate the import that would fail on subsequent navigations
+                    const config = await importFirebaseConfig();
+                    log(`✅ Navigation ${nav}: WMS loaded successfully`, 'success');
+                } catch (error) {
+                    log(`❌ Navigation ${nav}: Failed - ${error.message}`, 'error');
+                }
+                
+                // Simulate navigation away and back
+                if (nav < 3) {
+                    log(`🔄 Navigation ${nav}: Navigating away from WMS...`);
+                    await new Promise(resolve => setTimeout(resolve, 500));
+                }
+            }
+        }
+
+        // Initialize test
+        log('🚀 WMS Navigation Fix Test initialized');
+        log('📝 Click the test buttons above to verify the fix works correctly');
+    </script>
+</body>
+</html>

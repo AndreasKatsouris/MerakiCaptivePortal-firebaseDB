@@ -1,0 +1,94 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Debug Subscription</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+</head>
+<body>
+    <div class="container mt-4">
+        <h2>Subscription Debug Info</h2>
+        <div id="debug-info">
+            <div class="spinner-border" role="status">
+                <span class="visually-hidden">Loading...</span>
+            </div>
+        </div>
+    </div>
+
+    <script type="module">
+        import { auth, onAuthStateChanged, rtdb, ref, get } from './js/config/firebase-config.js';
+        import AccessControl from './js/modules/access-control/services/access-control-service.js';
+
+        onAuthStateChanged(auth, async (user) => {
+            const debugInfo = document.getElementById('debug-info');
+            
+            if (!user) {
+                debugInfo.innerHTML = '<div class="alert alert-warning">No user logged in</div>';
+                return;
+            }
+
+            try {
+                // Get raw subscription data
+                const userRef = ref(rtdb, `users/${user.uid}`);
+                const userSnapshot = await get(userRef);
+                const userData = userSnapshot.val() || {};
+
+                // Get subscription via access control
+                const subscription = await AccessControl.getCurrentSubscription();
+
+                // Check specific feature
+                const hasBookingFeature = await AccessControl.canUseFeature('bookingManagement');
+
+                // Get tier data directly
+                const tierRef = ref(rtdb, 'subscriptionTiers');
+                const tierSnapshot = await get(tierRef);
+                const tierData = tierSnapshot.val() || {};
+
+                debugInfo.innerHTML = `
+                    <div class="row">
+                        <div class="col-md-6">
+                            <div class="card">
+                                <div class="card-header">User Data</div>
+                                <div class="card-body">
+                                    <pre>${JSON.stringify(userData, null, 2)}</pre>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="card">
+                                <div class="card-header">Access Control Result</div>
+                                <div class="card-body">
+                                    <pre>${JSON.stringify(subscription, null, 2)}</pre>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="row mt-3">
+                        <div class="col-md-6">
+                            <div class="card">
+                                <div class="card-header">Feature Access</div>
+                                <div class="card-body">
+                                    <p><strong>Has bookingManagement:</strong> ${hasBookingFeature}</p>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="card">
+                                <div class="card-header">Available Tiers</div>
+                                <div class="card-body">
+                                    <pre>${JSON.stringify(Object.keys(tierData), null, 2)}</pre>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                `;
+
+            } catch (error) {
+                debugInfo.innerHTML = `<div class="alert alert-danger">Error: ${error.message}</div>`;
+                console.error('Debug error:', error);
+            }
+        });
+    </script>
+</body>
+</html>

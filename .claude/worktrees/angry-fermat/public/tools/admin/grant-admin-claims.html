@@ -1,0 +1,566 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Grant Admin Claims - Sparks Hospitality</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+
+    <style>
+        body {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 2rem 0;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+        }
+
+        .admin-card {
+            background: white;
+            border-radius: 20px;
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+            overflow: hidden;
+            max-width: 900px;
+            margin: 0 auto;
+        }
+
+        .card-header-custom {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 2rem;
+            text-align: center;
+        }
+
+        .card-body-custom {
+            padding: 2rem;
+        }
+
+        .info-box {
+            background: #f8f9fa;
+            border-left: 4px solid #667eea;
+            padding: 1rem;
+            margin: 1rem 0;
+            border-radius: 4px;
+        }
+
+        .user-card {
+            border: 1px solid #e9ecef;
+            border-radius: 8px;
+            padding: 1rem;
+            margin-bottom: 1rem;
+            transition: all 0.2s;
+        }
+
+        .user-card:hover {
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+            transform: translateY(-2px);
+        }
+
+        .admin-badge {
+            background: #28a745;
+            color: white;
+            padding: 0.25rem 0.75rem;
+            border-radius: 20px;
+            font-size: 0.8rem;
+            font-weight: 600;
+        }
+
+        .regular-badge {
+            background: #6c757d;
+            color: white;
+            padding: 0.25rem 0.75rem;
+            border-radius: 20px;
+            font-size: 0.8rem;
+            font-weight: 600;
+        }
+
+        .btn-grant-admin {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            border: none;
+            color: white;
+            transition: transform 0.2s;
+        }
+
+        .btn-grant-admin:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 5px 20px rgba(102, 126, 234, 0.4);
+        }
+
+        .btn-revoke-admin {
+            background: #dc3545;
+            border: none;
+            color: white;
+        }
+
+        .search-box {
+            background: white;
+            border: 2px solid #e9ecef;
+            border-radius: 8px;
+            padding: 0.75rem 1rem;
+            margin-bottom: 1.5rem;
+        }
+
+        .loading-spinner {
+            display: inline-block;
+            width: 1rem;
+            height: 1rem;
+            border: 2px solid rgba(255,255,255,0.3);
+            border-top-color: white;
+            border-radius: 50%;
+            animation: spin 0.8s linear infinite;
+        }
+
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="admin-card">
+            <div class="card-header-custom">
+                <h2><i class="fas fa-user-shield me-2"></i>Grant Admin Claims</h2>
+                <p class="mb-0">Platform Admin User Management</p>
+            </div>
+            <div class="card-body-custom">
+                <div class="info-box">
+                    <h5><i class="fas fa-info-circle me-2"></i>About Admin Claims</h5>
+                    <p class="mb-0">Admin claims grant users access to the admin portal with dual-level verification (Firebase Auth custom claims + RTDB admin-claims node). Only platform admins can grant or revoke admin claims.</p>
+                </div>
+
+                <div id="adminStatus" class="alert alert-info mt-3" style="display: none;">
+                    <i class="fas fa-user-check me-2"></i>
+                    <span id="adminStatusText"></span>
+                </div>
+
+                <!-- Search Box -->
+                <div class="search-box mt-4">
+                    <div class="input-group">
+                        <span class="input-group-text"><i class="fas fa-search"></i></span>
+                        <input type="email" class="form-control" id="userEmailSearch"
+                               placeholder="Enter user email address to search..."
+                               aria-label="User email">
+                        <button class="btn btn-primary" id="searchUserBtn">
+                            <i class="fas fa-search me-2"></i>Search User
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Search Result -->
+                <div id="searchResult" class="mt-4">
+                    <!-- Search results will appear here -->
+                </div>
+
+                <!-- All Users List -->
+                <div id="allUsersList" class="mt-4">
+                    <h4><i class="fas fa-users me-2"></i>All Users</h4>
+                    <p class="text-muted">Showing first 20 users. Use search to find specific users.</p>
+                    <div id="usersContainer">
+                        <div class="text-center text-muted py-5">
+                            <i class="fas fa-spinner fa-spin fa-2x mb-3"></i>
+                            <p>Loading users...</p>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="mt-4 text-center">
+                    <a href="index.html" class="btn btn-outline-secondary">
+                        <i class="fas fa-arrow-left me-2"></i>Back to Admin Tools
+                    </a>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Firebase -->
+    <script type="module">
+        import { auth, rtdb, onAuthStateChanged, ref, get, query, orderByKey, limitToFirst } from '../../js/config/firebase-config.js';
+
+        let currentUser = null;
+        let isCurrentUserAdmin = false;
+
+        const firebaseConfig = {
+            apiKey: "AIzaSyBqXVRPtq-DGbXMUAhxHH8B10MOV5OZkzI",
+            authDomain: "merakicaptiveportal-firebasedb.firebaseapp.com",
+            databaseURL: "https://merakicaptiveportal-firebasedb-default-rtdb.firebaseio.com",
+            projectId: "merakicaptiveportal-firebasedb",
+            storageBucket: "merakicaptiveportal-firebasedb.appspot.com",
+            messagingSenderId: "854311920907",
+            appId: "1:854311920907:web:dd6e51c7f0989887c6c3bc"
+        };
+
+        function getFunctionsBaseUrl() {
+            const region = 'us-central1';
+            return `https://${region}-${firebaseConfig.projectId}.cloudfunctions.net`;
+        }
+
+        console.log('[GrantAdminClaims] Initializing...');
+
+        // Monitor auth state
+        onAuthStateChanged(auth, async (user) => {
+            console.log('[GrantAdminClaims] Auth state changed:', user ? user.email : 'No user');
+            if (user) {
+                currentUser = user;
+                await checkCurrentUserAdminStatus();
+                if (isCurrentUserAdmin) {
+                    await loadAllUsers();
+                }
+            } else {
+                displayNotLoggedIn();
+            }
+        });
+
+        async function checkCurrentUserAdminStatus() {
+            const adminStatus = document.getElementById('adminStatus');
+            const adminStatusText = document.getElementById('adminStatusText');
+
+            try {
+                const idToken = await currentUser.getIdToken();
+                const response = await fetch(`${getFunctionsBaseUrl()}/verifyAdminStatus`, {
+                    headers: {
+                        'Authorization': `Bearer ${idToken}`,
+                        'Content-Type': 'application/json'
+                    }
+                });
+
+                const result = await response.json();
+                isCurrentUserAdmin = result.isAdmin === true;
+
+                if (isCurrentUserAdmin) {
+                    adminStatus.classList.remove('alert-danger');
+                    adminStatus.classList.add('alert-success');
+                    adminStatusText.textContent = `Logged in as platform admin: ${currentUser.email}`;
+                    adminStatus.style.display = 'block';
+                } else {
+                    adminStatus.classList.remove('alert-success');
+                    adminStatus.classList.add('alert-danger');
+                    adminStatusText.textContent = 'You do not have admin privileges. Only platform admins can grant admin claims.';
+                    adminStatus.style.display = 'block';
+                    document.getElementById('usersContainer').innerHTML = `
+                        <div class="alert alert-danger text-center">
+                            <i class="fas fa-exclamation-triangle me-2"></i>
+                            Access Denied: Admin privileges required
+                        </div>
+                    `;
+                }
+            } catch (error) {
+                console.error('[GrantAdminClaims] Error checking admin status:', error);
+                adminStatus.classList.add('alert-danger');
+                adminStatusText.textContent = 'Error verifying admin status';
+                adminStatus.style.display = 'block';
+            }
+        }
+
+        async function loadAllUsers() {
+            const usersContainer = document.getElementById('usersContainer');
+
+            try {
+                const usersRef = ref(rtdb, 'users');
+                const usersQuery = query(usersRef, orderByKey(), limitToFirst(20));
+                const snapshot = await get(usersQuery);
+
+                if (!snapshot.exists()) {
+                    usersContainer.innerHTML = `
+                        <div class="alert alert-info text-center">
+                            <i class="fas fa-info-circle me-2"></i>
+                            No users found in database
+                        </div>
+                    `;
+                    return;
+                }
+
+                const users = snapshot.val();
+                const userEntries = Object.entries(users);
+
+                // Check admin status for each user
+                const adminClaimsRef = ref(rtdb, 'admin-claims');
+                const adminClaimsSnapshot = await get(adminClaimsRef);
+                const adminClaims = adminClaimsSnapshot.exists() ? adminClaimsSnapshot.val() : {};
+
+                let html = '';
+                for (const [uid, userData] of userEntries) {
+                    const isAdmin = adminClaims[uid] === true;
+                    html += renderUserCard(uid, userData, isAdmin);
+                }
+
+                usersContainer.innerHTML = html;
+
+                // Attach event listeners
+                attachUserCardListeners();
+
+            } catch (error) {
+                console.error('[GrantAdminClaims] Error loading users:', error);
+                usersContainer.innerHTML = `
+                    <div class="alert alert-danger">
+                        <i class="fas fa-exclamation-triangle me-2"></i>
+                        Error loading users: ${error.message}
+                    </div>
+                `;
+            }
+        }
+
+        function renderUserCard(uid, userData, isAdmin) {
+            const email = userData.email || 'No email';
+            const displayName = userData.displayName || userData.name || 'No name';
+            const phoneNumber = userData.phoneNumber || 'No phone';
+
+            return `
+                <div class="user-card" data-uid="${uid}">
+                    <div class="d-flex justify-content-between align-items-center">
+                        <div>
+                            <h6 class="mb-1">
+                                ${displayName}
+                                ${isAdmin ? '<span class="admin-badge ms-2">ADMIN</span>' : '<span class="regular-badge ms-2">REGULAR USER</span>'}
+                            </h6>
+                            <p class="mb-0 text-muted small">
+                                <i class="fas fa-envelope me-1"></i>${email}<br>
+                                <i class="fas fa-phone me-1"></i>${phoneNumber}<br>
+                                <i class="fas fa-id-card me-1"></i><code>${uid}</code>
+                            </p>
+                        </div>
+                        <div>
+                            ${isAdmin
+                                ? `<button class="btn btn-revoke-admin btn-sm revoke-admin-btn" data-uid="${uid}" data-email="${email}">
+                                       <i class="fas fa-user-minus me-1"></i>Revoke Admin
+                                   </button>`
+                                : `<button class="btn btn-grant-admin btn-sm grant-admin-btn" data-uid="${uid}" data-email="${email}">
+                                       <i class="fas fa-user-plus me-1"></i>Grant Admin
+                                   </button>`
+                            }
+                        </div>
+                    </div>
+                </div>
+            `;
+        }
+
+        function attachUserCardListeners() {
+            // Grant admin buttons
+            document.querySelectorAll('.grant-admin-btn').forEach(btn => {
+                btn.addEventListener('click', async (e) => {
+                    const uid = e.currentTarget.dataset.uid;
+                    const email = e.currentTarget.dataset.email;
+                    await grantAdminClaims(uid, email, e.currentTarget);
+                });
+            });
+
+            // Revoke admin buttons
+            document.querySelectorAll('.revoke-admin-btn').forEach(btn => {
+                btn.addEventListener('click', async (e) => {
+                    const uid = e.currentTarget.dataset.uid;
+                    const email = e.currentTarget.dataset.email;
+                    await revokeAdminClaims(uid, email, e.currentTarget);
+                });
+            });
+        }
+
+        async function grantAdminClaims(uid, email, button) {
+            const result = await Swal.fire({
+                title: 'Grant Admin Claims?',
+                html: `
+                    <p>This will grant <strong>admin privileges</strong> to:</p>
+                    <p><strong>${email}</strong></p>
+                    <p><code>${uid}</code></p>
+                    <hr>
+                    <p class="text-muted small">This sets both Firebase Auth custom claims and RTDB admin-claims node.</p>
+                `,
+                icon: 'question',
+                showCancelButton: true,
+                confirmButtonText: 'Yes, Grant Admin',
+                cancelButtonText: 'Cancel',
+                confirmButtonColor: '#667eea',
+                cancelButtonColor: '#6c757d'
+            });
+
+            if (!result.isConfirmed) return;
+
+            button.disabled = true;
+            button.innerHTML = '<span class="loading-spinner"></span> Granting...';
+
+            try {
+                const idToken = await currentUser.getIdToken();
+                const response = await fetch(`${getFunctionsBaseUrl()}/setAdminClaim`, {
+                    method: 'POST',
+                    headers: {
+                        'Authorization': `Bearer ${idToken}`,
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({ uid, isAdmin: true })
+                });
+
+                const data = await response.json();
+
+                if (!response.ok) {
+                    throw new Error(data.error || 'Failed to grant admin claims');
+                }
+
+                await Swal.fire({
+                    title: 'Success!',
+                    html: `
+                        <p><strong>Admin claims granted successfully!</strong></p>
+                        <p>User: ${email}</p>
+                        <p class="text-success small">✓ Firebase Auth custom claims updated</p>
+                        <p class="text-success small">✓ RTDB admin-claims node created</p>
+                    `,
+                    icon: 'success',
+                    confirmButtonColor: '#667eea'
+                });
+
+                // Reload users list
+                await loadAllUsers();
+
+            } catch (error) {
+                console.error('[GrantAdminClaims] Error:', error);
+                await Swal.fire({
+                    title: 'Error',
+                    text: error.message,
+                    icon: 'error'
+                });
+                button.disabled = false;
+                button.innerHTML = '<i class="fas fa-user-plus me-1"></i>Grant Admin';
+            }
+        }
+
+        async function revokeAdminClaims(uid, email, button) {
+            const result = await Swal.fire({
+                title: 'Revoke Admin Claims?',
+                html: `
+                    <p>This will revoke <strong>admin privileges</strong> from:</p>
+                    <p><strong>${email}</strong></p>
+                    <p><code>${uid}</code></p>
+                    <hr>
+                    <p class="text-muted small">This removes both Firebase Auth custom claims and RTDB admin-claims node.</p>
+                `,
+                icon: 'warning',
+                showCancelButton: true,
+                confirmButtonText: 'Yes, Revoke Admin',
+                cancelButtonText: 'Cancel',
+                confirmButtonColor: '#dc3545',
+                cancelButtonColor: '#6c757d'
+            });
+
+            if (!result.isConfirmed) return;
+
+            button.disabled = true;
+            button.innerHTML = '<span class="loading-spinner"></span> Revoking...';
+
+            try {
+                const idToken = await currentUser.getIdToken();
+                const response = await fetch(`${getFunctionsBaseUrl()}/setAdminClaim`, {
+                    method: 'POST',
+                    headers: {
+                        'Authorization': `Bearer ${idToken}`,
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({ uid, isAdmin: false })
+                });
+
+                const data = await response.json();
+
+                if (!response.ok) {
+                    throw new Error(data.error || 'Failed to revoke admin claims');
+                }
+
+                await Swal.fire({
+                    title: 'Success!',
+                    html: `
+                        <p><strong>Admin claims revoked successfully!</strong></p>
+                        <p>User: ${email}</p>
+                        <p class="text-success small">✓ Firebase Auth custom claims removed</p>
+                        <p class="text-success small">✓ RTDB admin-claims node deleted</p>
+                    `,
+                    icon: 'success',
+                    confirmButtonColor: '#667eea'
+                });
+
+                // Reload users list
+                await loadAllUsers();
+
+            } catch (error) {
+                console.error('[GrantAdminClaims] Error:', error);
+                await Swal.fire({
+                    title: 'Error',
+                    text: error.message,
+                    icon: 'error'
+                });
+                button.disabled = false;
+                button.innerHTML = '<i class="fas fa-user-minus me-1"></i>Revoke Admin';
+            }
+        }
+
+        // Search user
+        document.getElementById('searchUserBtn').addEventListener('click', async () => {
+            const email = document.getElementById('userEmailSearch').value.trim();
+
+            if (!email) {
+                await Swal.fire('Error', 'Please enter an email address', 'error');
+                return;
+            }
+
+            if (!isCurrentUserAdmin) {
+                await Swal.fire('Access Denied', 'Only platform admins can search users', 'error');
+                return;
+            }
+
+            const searchResult = document.getElementById('searchResult');
+            searchResult.innerHTML = '<div class="text-center"><i class="fas fa-spinner fa-spin"></i> Searching...</div>';
+
+            try {
+                // Search for user by email in RTDB
+                const usersRef = ref(rtdb, 'users');
+                const snapshot = await get(usersRef);
+
+                if (!snapshot.exists()) {
+                    searchResult.innerHTML = '<div class="alert alert-warning">No users found</div>';
+                    return;
+                }
+
+                const users = snapshot.val();
+                const userEntry = Object.entries(users).find(([_, userData]) =>
+                    userData.email && userData.email.toLowerCase() === email.toLowerCase()
+                );
+
+                if (!userEntry) {
+                    searchResult.innerHTML = `<div class="alert alert-warning">User not found: ${email}</div>`;
+                    return;
+                }
+
+                const [uid, userData] = userEntry;
+
+                // Check admin status
+                const adminClaimsRef = ref(rtdb, `admin-claims/${uid}`);
+                const adminSnapshot = await get(adminClaimsRef);
+                const isAdmin = adminSnapshot.exists() && adminSnapshot.val() === true;
+
+                searchResult.innerHTML = `
+                    <h5><i class="fas fa-search-plus me-2"></i>Search Result</h5>
+                    ${renderUserCard(uid, userData, isAdmin)}
+                `;
+
+                attachUserCardListeners();
+
+            } catch (error) {
+                console.error('[GrantAdminClaims] Search error:', error);
+                searchResult.innerHTML = `<div class="alert alert-danger">Error: ${error.message}</div>`;
+            }
+        });
+
+        // Allow search on Enter key
+        document.getElementById('userEmailSearch').addEventListener('keypress', (e) => {
+            if (e.key === 'Enter') {
+                document.getElementById('searchUserBtn').click();
+            }
+        });
+
+        function displayNotLoggedIn() {
+            document.getElementById('usersContainer').innerHTML = `
+                <div class="alert alert-warning text-center">
+                    <i class="fas fa-exclamation-triangle me-2"></i>
+                    <strong>Not Logged In</strong><br>
+                    Please <a href="/admin-login.html">login as platform admin</a> to grant admin claims.
+                </div>
+            `;
+        }
+    </script>
+</body>
+</html>

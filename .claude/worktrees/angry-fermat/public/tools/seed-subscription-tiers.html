@@ -1,0 +1,171 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Seed Subscription Tiers - Sparks Hospitality</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 800px;
+            margin: 50px auto;
+            padding: 20px;
+        }
+        .result {
+            margin-top: 20px;
+            padding: 15px;
+            border-radius: 5px;
+        }
+        .success {
+            background-color: #d4edda;
+            color: #155724;
+            border: 1px solid #c3e6cb;
+        }
+        .error {
+            background-color: #f8d7da;
+            color: #721c24;
+            border: 1px solid #f5c6cb;
+        }
+        button {
+            padding: 10px 20px;
+            font-size: 16px;
+            cursor: pointer;
+            background-color: #007bff;
+            color: white;
+            border: none;
+            border-radius: 5px;
+        }
+        button:hover {
+            background-color: #0056b3;
+        }
+        button:disabled {
+            background-color: #ccc;
+            cursor: not-allowed;
+        }
+    </style>
+</head>
+<body>
+    <h1>Seed Subscription Tiers</h1>
+    <p>This tool will populate the database with default subscription tier data.</p>
+
+    <button id="seedBtn" onclick="seedTiers()">Seed Subscription Tiers</button>
+
+    <div id="result"></div>
+
+    <script type="module">
+        import { rtdb, ref, set } from '/js/config/firebase-config.js';
+
+        const subscriptionTiers = {
+            bronze: {
+                name: "Bronze",
+                monthlyPrice: 0,
+                description: "Perfect for single-location restaurants getting started",
+                features: {
+                    locations: 1,
+                    users: 2,
+                    guestProfiles: 500,
+                    campaigns: 2,
+                    analytics: false,
+                    apiAccess: false,
+                    support: "Email"
+                },
+                limits: {
+                    maxLocations: 1,
+                    maxUsers: 2,
+                    maxGuests: 500,
+                    maxCampaigns: 2,
+                    whatsappNumbers: 1,
+                    receiptsPerMonth: 100
+                }
+            },
+            silver: {
+                name: "Silver",
+                monthlyPrice: 499,
+                description: "Growing restaurants with multiple locations",
+                features: {
+                    locations: 3,
+                    users: 5,
+                    guestProfiles: 2000,
+                    campaigns: 5,
+                    analytics: true,
+                    apiAccess: false,
+                    support: "Email & Chat"
+                },
+                limits: {
+                    maxLocations: 3,
+                    maxUsers: 5,
+                    maxGuests: 2000,
+                    maxCampaigns: 5,
+                    whatsappNumbers: 3,
+                    receiptsPerMonth: 500
+                }
+            },
+            gold: {
+                name: "Gold",
+                monthlyPrice: 999,
+                description: "Multi-location operators with advanced needs",
+                features: {
+                    locations: 10,
+                    users: 15,
+                    guestProfiles: 10000,
+                    campaigns: -1,
+                    analytics: true,
+                    apiAccess: true,
+                    support: "Priority Support"
+                },
+                limits: {
+                    maxLocations: 10,
+                    maxUsers: 15,
+                    maxGuests: 10000,
+                    maxCampaigns: -1,
+                    whatsappNumbers: 10,
+                    receiptsPerMonth: 2000
+                }
+            },
+            platinum: {
+                name: "Platinum",
+                monthlyPrice: 1999,
+                description: "Enterprise franchise groups at scale",
+                features: {
+                    locations: -1,
+                    users: -1,
+                    guestProfiles: -1,
+                    campaigns: -1,
+                    analytics: true,
+                    apiAccess: true,
+                    support: "Dedicated Account Manager"
+                },
+                limits: {
+                    maxLocations: -1,
+                    maxUsers: -1,
+                    maxGuests: -1,
+                    maxCampaigns: -1,
+                    whatsappNumbers: -1,
+                    receiptsPerMonth: -1
+                }
+            }
+        };
+
+        window.seedTiers = async function() {
+            const btn = document.getElementById('seedBtn');
+            const resultDiv = document.getElementById('result');
+
+            btn.disabled = true;
+            resultDiv.innerHTML = '<p>Seeding subscription tiers...</p>';
+
+            try {
+                const tiersRef = ref(rtdb, 'subscriptionTiers');
+                await set(tiersRef, subscriptionTiers);
+
+                resultDiv.innerHTML = '<div class="result success"><strong>Success!</strong> Subscription tiers have been seeded to the database.</div>';
+                console.log('✅ Subscription tiers seeded successfully');
+            } catch (error) {
+                console.error('Error seeding tiers:', error);
+                resultDiv.innerHTML = `<div class="result error"><strong>Error!</strong> ${error.message}</div>`;
+            } finally {
+                btn.disabled = false;
+            }
+        };
+    </script>
+</body>
+</html>

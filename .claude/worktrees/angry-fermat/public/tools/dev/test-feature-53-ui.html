@@ -1,0 +1,172 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Feature #53: Duplicate Phone Detection Test</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+</head>
+<body>
+    <div class="container mt-5">
+        <div class="row">
+            <div class="col-md-8 offset-md-2">
+                <h1 class="mb-4">Feature #53: Duplicate Guest Phone Detection</h1>
+
+                <div class="card mb-4">
+                    <div class="card-body">
+                        <h5 class="card-title">Test Instructions</h5>
+                        <ol>
+                            <li>Click "Create First Guest" to create a guest with phone +27800DUP001</li>
+                            <li>Click "Try Create Duplicate" to attempt creating another guest with the same phone</li>
+                            <li>Verify that an error message appears: "Guest already exists"</li>
+                            <li>Verify that the duplicate creation is blocked</li>
+                        </ol>
+                    </div>
+                </div>
+
+                <div id="guest-management-app"></div>
+
+                <div class="card">
+                    <div class="card-body">
+                        <h5 class="card-title">Manual Test</h5>
+                        <button id="btnCreateFirst" class="btn btn-primary me-2">1. Create First Guest</button>
+                        <button id="btnCreateDuplicate" class="btn btn-warning me-2">2. Try Create Duplicate</button>
+                        <button id="btnCleanup" class="btn btn-danger">3. Cleanup Test Data</button>
+
+                        <div id="testResults" class="mt-3"></div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+    <script src="https://unpkg.com/vue@3/dist/vue.global.js"></script>
+
+    <script type="module">
+        import { auth, rtdb, ref, get, set, remove } from '/js/config/firebase-config.js';
+
+        const testPhone = '+27800DUP001';
+        const resultsDiv = document.getElementById('testResults');
+
+        function logResult(message, type = 'info') {
+            const alertClass = type === 'success' ? 'alert-success' :
+                              type === 'error' ? 'alert-danger' :
+                              type === 'warning' ? 'alert-warning' : 'alert-info';
+            resultsDiv.innerHTML += `<div class="alert ${alertClass} mt-2">${message}</div>`;
+        }
+
+        // Test Step 1: Create first guest
+        document.getElementById('btnCreateFirst').addEventListener('click', async () => {
+            resultsDiv.innerHTML = '';
+            logResult('Step 1: Creating first guest with phone ' + testPhone);
+
+            try {
+                const guestRef = ref(rtdb, `guests/${testPhone}`);
+
+                // Check if guest already exists
+                const existingSnapshot = await get(guestRef);
+                if (existingSnapshot.exists()) {
+                    logResult('⚠️ Guest already exists. Cleaning up first...', 'warning');
+                    await remove(guestRef);
+                }
+
+                const guestData = {
+                    name: 'First Guest',
+                    phoneNumber: testPhone,
+                    createdAt: new Date().toISOString(),
+                    updatedAt: new Date().toISOString(),
+                    consent: false,
+                    tier: 'Bronze'
+                };
+
+                await set(guestRef, guestData);
+                logResult('✅ First guest created successfully', 'success');
+
+                // Verify
+                const verifySnapshot = await get(guestRef);
+                if (verifySnapshot.exists()) {
+                    const data = verifySnapshot.val();
+                    logResult(`✅ Verified: Guest "${data.name}" exists with phone ${data.phoneNumber}`, 'success');
+                } else {
+                    logResult('❌ Verification failed: Guest not found', 'error');
+                }
+
+            } catch (error) {
+                logResult('❌ Error creating guest: ' + error.message, 'error');
+            }
+        });
+
+        // Test Step 2: Try to create duplicate
+        document.getElementById('btnCreateDuplicate').addEventListener('click', async () => {
+            logResult('Step 2: Attempting to create duplicate guest with phone ' + testPhone);
+
+            try {
+                const guestRef = ref(rtdb, `guests/${testPhone}`);
+
+                // DUPLICATE CHECK (this is what the fixed code does)
+                const existingSnapshot = await get(guestRef);
+
+                if (existingSnapshot.exists()) {
+                    const existingGuest = existingSnapshot.val();
+                    logResult('✅ DUPLICATE DETECTED! Guest already exists:', 'success');
+                    logResult(`   Name: ${existingGuest.name}`, 'success');
+                    logResult(`   Phone: ${existingGuest.phoneNumber}`, 'success');
+                    logResult(`   Created: ${new Date(existingGuest.createdAt).toLocaleString()}`, 'success');
+                    logResult('✅ Creation blocked (as expected)', 'success');
+
+                    // Show error dialog (simulating UI behavior)
+                    await Swal.fire({
+                        title: 'Guest Already Exists',
+                        html: `
+                            <div class="text-center">
+                                <p>A guest with this phone number already exists:</p>
+                                <div class="alert alert-info mt-3">
+                                    <strong>Name:</strong> ${existingGuest.name}<br>
+                                    <strong>Phone:</strong> ${existingGuest.phoneNumber}<br>
+                                    <strong>Created:</strong> ${new Date(existingGuest.createdAt).toLocaleDateString()}
+                                </div>
+                                <p class="mt-3">Please use a different phone number or edit the existing guest.</p>
+                            </div>
+                        `,
+                        icon: 'error',
+                        confirmButtonText: 'OK'
+                    });
+
+                    return; // Exit without creating duplicate
+                }
+
+                // If we reach here, guest doesn't exist (shouldn't happen in this test)
+                logResult('❌ No existing guest found - test failed', 'error');
+
+            } catch (error) {
+                logResult('❌ Error: ' + error.message, 'error');
+            }
+        });
+
+        // Test Step 3: Cleanup
+        document.getElementById('btnCleanup').addEventListener('click', async () => {
+            logResult('Step 3: Cleaning up test data...');
+
+            try {
+                const guestRef = ref(rtdb, `guests/${testPhone}`);
+                await remove(guestRef);
+                logResult('✅ Test data cleaned up successfully', 'success');
+
+                // Verify removal
+                const verifySnapshot = await get(guestRef);
+                if (!verifySnapshot.exists()) {
+                    logResult('✅ Verified: Guest removed from database', 'success');
+                } else {
+                    logResult('❌ Verification failed: Guest still exists', 'error');
+                }
+
+            } catch (error) {
+                logResult('❌ Error cleaning up: ' + error.message, 'error');
+            }
+        });
+    </script>
+</body>
+</html>
