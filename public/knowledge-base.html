@@ -1,0 +1,1151 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Knowledge Base - Sparks Hospitality</title>
+    <link rel="icon" type="image/svg+xml" href="favicon.svg">
+    <link rel="alternate icon" href="favicon.ico">
+
+    <!-- Bootstrap CSS -->
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <!-- Font Awesome -->
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+
+    <!-- Firebase SDK -->
+    <script src="https://www.gstatic.com/firebasejs/10.12.5/firebase-app.js" type="module"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.12.5/firebase-auth.js" type="module"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.12.5/firebase-database.js" type="module"></script>
+
+    <!-- Firebase Config & Auth Guard -->
+    <script type="module" src="js/config/firebase-config.js"></script>
+    <script type="module" src="js/auth/admin-page-guard.js"></script>
+
+    <style>
+        :root {
+            --primary: #2c3e50;
+            --secondary: #34495e;
+            --accent: #3498db;
+            --accent-light: #5dade2;
+            --success: #2ecc71;
+            --danger: #e74c3c;
+            --warning: #f39c12;
+            --text: #2c3e50;
+            --text-muted: #7f8c8d;
+            --border: #ecf0f1;
+            --bg: #f4f6f9;
+            --sidebar-width: 260px;
+        }
+
+        * {
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background-color: var(--bg);
+            color: var(--text);
+            margin: 0;
+            padding: 0;
+        }
+
+        /* ── Sidebar ── */
+        .kb-sidebar {
+            width: var(--sidebar-width);
+            background: var(--primary);
+            color: #fff;
+            position: fixed;
+            top: 0;
+            left: 0;
+            height: 100vh;
+            z-index: 1000;
+            display: flex;
+            flex-direction: column;
+            transition: transform 0.3s ease;
+        }
+
+        .kb-sidebar-header {
+            padding: 24px 20px 20px;
+            background: var(--secondary);
+            border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+        }
+
+        .kb-sidebar-header h3 {
+            margin: 0;
+            font-size: 1.15rem;
+            font-weight: 700;
+            letter-spacing: 0.3px;
+        }
+
+        .kb-sidebar-header .subtitle {
+            font-size: 0.78rem;
+            color: rgba(255, 255, 255, 0.55);
+            margin-top: 4px;
+        }
+
+        .kb-sidebar-nav {
+            flex: 1;
+            overflow-y: auto;
+            padding: 12px 0;
+        }
+
+        .kb-sidebar-nav a {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            padding: 12px 20px;
+            color: rgba(255, 255, 255, 0.75);
+            text-decoration: none;
+            font-size: 0.9rem;
+            transition: all 0.2s;
+            border-left: 3px solid transparent;
+        }
+
+        .kb-sidebar-nav a:hover,
+        .kb-sidebar-nav a.active {
+            color: #fff;
+            background: rgba(52, 152, 219, 0.2);
+            border-left-color: var(--accent);
+        }
+
+        .kb-sidebar-nav a i {
+            width: 20px;
+            text-align: center;
+            font-size: 0.95rem;
+        }
+
+        .kb-sidebar-footer {
+            padding: 16px 20px;
+            background: var(--secondary);
+            border-top: 1px solid rgba(255, 255, 255, 0.08);
+        }
+
+        .kb-sidebar-footer a {
+            color: rgba(255, 255, 255, 0.7);
+            text-decoration: none;
+            font-size: 0.85rem;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            transition: color 0.2s;
+        }
+
+        .kb-sidebar-footer a:hover {
+            color: #fff;
+        }
+
+        /* ── Main Content ── */
+        .kb-main {
+            margin-left: var(--sidebar-width);
+            min-height: 100vh;
+        }
+
+        /* ── Hero ── */
+        .kb-hero {
+            background: linear-gradient(135deg, #2c3e50 0%, #3498db 100%);
+            color: #fff;
+            padding: 56px 40px 48px;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .kb-hero::before {
+            content: '';
+            position: absolute;
+            top: -50%;
+            right: -20%;
+            width: 600px;
+            height: 600px;
+            border-radius: 50%;
+            background: rgba(255, 255, 255, 0.03);
+        }
+
+        .kb-hero::after {
+            content: '';
+            position: absolute;
+            bottom: -60%;
+            left: -10%;
+            width: 400px;
+            height: 400px;
+            border-radius: 50%;
+            background: rgba(255, 255, 255, 0.02);
+        }
+
+        .kb-hero h1 {
+            font-size: 2rem;
+            font-weight: 700;
+            margin-bottom: 6px;
+            position: relative;
+        }
+
+        .kb-hero .lead {
+            font-size: 1.05rem;
+            color: rgba(255, 255, 255, 0.8);
+            margin-bottom: 28px;
+            position: relative;
+        }
+
+        /* Search Bar */
+        .kb-search-wrapper {
+            position: relative;
+            max-width: 600px;
+        }
+
+        .kb-search-wrapper i {
+            position: absolute;
+            left: 18px;
+            top: 50%;
+            transform: translateY(-50%);
+            color: var(--text-muted);
+            font-size: 1rem;
+        }
+
+        .kb-search-input {
+            width: 100%;
+            padding: 14px 20px 14px 48px;
+            border: none;
+            border-radius: 10px;
+            font-size: 1rem;
+            background: #fff;
+            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.15);
+            color: var(--text);
+            outline: none;
+            transition: box-shadow 0.2s;
+        }
+
+        .kb-search-input::placeholder {
+            color: #adb5bd;
+        }
+
+        .kb-search-input:focus {
+            box-shadow: 0 4px 24px rgba(52, 152, 219, 0.3);
+        }
+
+        /* ── Stats Bar ── */
+        .kb-stats-bar {
+            background: #fff;
+            border-bottom: 1px solid var(--border);
+            padding: 16px 40px;
+            display: flex;
+            gap: 32px;
+            flex-wrap: wrap;
+            align-items: center;
+        }
+
+        .kb-stat {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            font-size: 0.88rem;
+            color: var(--text-muted);
+        }
+
+        .kb-stat .value {
+            font-weight: 700;
+            color: var(--accent);
+            font-size: 1.05rem;
+        }
+
+        /* ── Filter Pills ── */
+        .kb-filters {
+            padding: 20px 40px 0;
+            display: flex;
+            gap: 8px;
+            flex-wrap: wrap;
+        }
+
+        .kb-pill {
+            padding: 7px 18px;
+            border-radius: 20px;
+            border: 1px solid var(--border);
+            background: #fff;
+            color: var(--text-muted);
+            font-size: 0.85rem;
+            cursor: pointer;
+            transition: all 0.2s;
+            text-decoration: none;
+            user-select: none;
+        }
+
+        .kb-pill:hover {
+            border-color: var(--accent);
+            color: var(--accent);
+        }
+
+        .kb-pill.active {
+            background: var(--accent);
+            border-color: var(--accent);
+            color: #fff;
+        }
+
+        /* ── Cards Grid ── */
+        .kb-grid {
+            padding: 28px 40px 40px;
+        }
+
+        .kb-section-title {
+            font-size: 1.2rem;
+            font-weight: 700;
+            color: var(--text);
+            margin-bottom: 18px;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            padding-top: 12px;
+        }
+
+        .kb-section-title i {
+            color: var(--accent);
+            font-size: 1.1rem;
+        }
+
+        .kb-section-title .badge {
+            font-size: 0.72rem;
+            padding: 3px 10px;
+            border-radius: 10px;
+            font-weight: 600;
+        }
+
+        .kb-card {
+            background: #fff;
+            border: 1px solid var(--border);
+            border-radius: 10px;
+            padding: 22px;
+            height: 100%;
+            transition: all 0.25s;
+            text-decoration: none;
+            color: inherit;
+            display: flex;
+            flex-direction: column;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .kb-card::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 4px;
+            height: 100%;
+            border-radius: 10px 0 0 10px;
+            opacity: 0;
+            transition: opacity 0.25s;
+        }
+
+        .kb-card:hover {
+            transform: translateY(-3px);
+            box-shadow: 0 8px 24px rgba(0, 0, 0, 0.1);
+            border-color: transparent;
+            text-decoration: none;
+            color: inherit;
+        }
+
+        .kb-card:hover::before {
+            opacity: 1;
+        }
+
+        /* Category accent colors */
+        .kb-card[data-category="architecture"]::before { background: #9b59b6; }
+        .kb-card[data-category="api"]::before { background: #e67e22; }
+        .kb-card[data-category="features"]::before { background: var(--accent); }
+        .kb-card[data-category="deployment"]::before { background: var(--success); }
+        .kb-card[data-category="development"]::before { background: #f39c12; }
+        .kb-card[data-category="security"]::before { background: var(--danger); }
+
+        .kb-card-icon {
+            width: 42px;
+            height: 42px;
+            border-radius: 10px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 1.1rem;
+            margin-bottom: 14px;
+            flex-shrink: 0;
+        }
+
+        .kb-card-icon.architecture { background: rgba(155, 89, 182, 0.1); color: #9b59b6; }
+        .kb-card-icon.api { background: rgba(230, 126, 34, 0.1); color: #e67e22; }
+        .kb-card-icon.features { background: rgba(52, 152, 219, 0.1); color: var(--accent); }
+        .kb-card-icon.deployment { background: rgba(46, 204, 113, 0.1); color: var(--success); }
+        .kb-card-icon.development { background: rgba(243, 156, 18, 0.1); color: #f39c12; }
+        .kb-card-icon.security { background: rgba(231, 76, 60, 0.1); color: var(--danger); }
+
+        .kb-card h5 {
+            font-size: 0.95rem;
+            font-weight: 700;
+            margin-bottom: 8px;
+        }
+
+        .kb-card p {
+            font-size: 0.84rem;
+            color: var(--text-muted);
+            margin-bottom: 0;
+            flex: 1;
+            line-height: 1.5;
+        }
+
+        .kb-card-tag {
+            display: inline-block;
+            font-size: 0.7rem;
+            padding: 2px 8px;
+            border-radius: 4px;
+            margin-top: 12px;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        .kb-card-tag.architecture { background: rgba(155, 89, 182, 0.1); color: #9b59b6; }
+        .kb-card-tag.api { background: rgba(230, 126, 34, 0.1); color: #e67e22; }
+        .kb-card-tag.features { background: rgba(52, 152, 219, 0.1); color: var(--accent); }
+        .kb-card-tag.deployment { background: rgba(46, 204, 113, 0.1); color: var(--success); }
+        .kb-card-tag.development { background: rgba(243, 156, 18, 0.1); color: #f39c12; }
+        .kb-card-tag.security { background: rgba(231, 76, 60, 0.1); color: var(--danger); }
+
+        /* ── Empty State ── */
+        .kb-empty {
+            text-align: center;
+            padding: 60px 20px;
+            color: var(--text-muted);
+        }
+
+        .kb-empty i {
+            font-size: 3rem;
+            margin-bottom: 16px;
+            opacity: 0.3;
+        }
+
+        .kb-empty h5 {
+            font-weight: 600;
+            margin-bottom: 6px;
+        }
+
+        /* ── Footer ── */
+        .kb-footer {
+            padding: 24px 40px;
+            border-top: 1px solid var(--border);
+            background: #fff;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            flex-wrap: wrap;
+            gap: 12px;
+            font-size: 0.82rem;
+            color: var(--text-muted);
+        }
+
+        /* ── Mobile Toggle ── */
+        .kb-mobile-toggle {
+            display: none;
+            position: fixed;
+            top: 16px;
+            left: 16px;
+            z-index: 1100;
+            width: 40px;
+            height: 40px;
+            border-radius: 8px;
+            border: none;
+            background: var(--primary);
+            color: #fff;
+            font-size: 1.1rem;
+            cursor: pointer;
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
+            align-items: center;
+            justify-content: center;
+        }
+
+        .kb-overlay {
+            display: none;
+            position: fixed;
+            inset: 0;
+            background: rgba(0, 0, 0, 0.4);
+            z-index: 999;
+        }
+
+        /* ── Responsive ── */
+        @media (max-width: 991px) {
+            .kb-sidebar {
+                transform: translateX(-100%);
+            }
+
+            .kb-sidebar.open {
+                transform: translateX(0);
+            }
+
+            .kb-main {
+                margin-left: 0;
+            }
+
+            .kb-mobile-toggle {
+                display: flex;
+            }
+
+            .kb-overlay.show {
+                display: block;
+            }
+
+            .kb-hero {
+                padding: 40px 20px 36px;
+            }
+
+            .kb-hero h1 {
+                font-size: 1.5rem;
+            }
+
+            .kb-stats-bar {
+                padding: 14px 20px;
+                gap: 20px;
+            }
+
+            .kb-filters {
+                padding: 16px 20px 0;
+            }
+
+            .kb-grid {
+                padding: 20px;
+            }
+
+            .kb-footer {
+                padding: 20px;
+            }
+        }
+
+        @media (max-width: 576px) {
+            .kb-stats-bar {
+                flex-direction: column;
+                align-items: flex-start;
+                gap: 10px;
+            }
+        }
+
+        /* Scroll-to-top */
+        .kb-scroll-top {
+            position: fixed;
+            bottom: 24px;
+            right: 24px;
+            width: 42px;
+            height: 42px;
+            border-radius: 50%;
+            background: var(--accent);
+            color: #fff;
+            border: none;
+            font-size: 1rem;
+            cursor: pointer;
+            box-shadow: 0 3px 12px rgba(52, 152, 219, 0.4);
+            display: none;
+            align-items: center;
+            justify-content: center;
+            z-index: 900;
+            transition: opacity 0.2s;
+        }
+
+        .kb-scroll-top.visible {
+            display: flex;
+        }
+    </style>
+</head>
+
+<body style="display: none;">
+
+    <!-- Mobile sidebar toggle -->
+    <button class="kb-mobile-toggle" id="sidebarToggle" aria-label="Toggle sidebar">
+        <i class="fas fa-bars"></i>
+    </button>
+    <div class="kb-overlay" id="sidebarOverlay"></div>
+
+    <!-- Sidebar -->
+    <aside class="kb-sidebar" id="sidebar">
+        <div class="kb-sidebar-header">
+            <h3><i class="fas fa-book-open"></i> Knowledge Base</h3>
+            <div class="subtitle">Sparks Hospitality Platform</div>
+        </div>
+        <nav class="kb-sidebar-nav">
+            <a href="#" data-filter="all" class="active">
+                <i class="fas fa-th-large"></i> All Documentation
+            </a>
+            <a href="#" data-filter="architecture">
+                <i class="fas fa-sitemap"></i> Architecture
+            </a>
+            <a href="#" data-filter="api">
+                <i class="fas fa-code"></i> API Reference
+            </a>
+            <a href="#" data-filter="features">
+                <i class="fas fa-puzzle-piece"></i> Features
+            </a>
+            <a href="#" data-filter="deployment">
+                <i class="fas fa-rocket"></i> Deployment
+            </a>
+            <a href="#" data-filter="development">
+                <i class="fas fa-laptop-code"></i> Development
+            </a>
+            <a href="#" data-filter="security">
+                <i class="fas fa-shield-alt"></i> Security
+            </a>
+        </nav>
+        <div class="kb-sidebar-footer">
+            <a href="admin-dashboard.html">
+                <i class="fas fa-arrow-left"></i> Back to Dashboard
+            </a>
+        </div>
+    </aside>
+
+    <!-- Main Content -->
+    <main class="kb-main">
+        <!-- Hero Section -->
+        <section class="kb-hero">
+            <h1>Sparks Hospitality Documentation</h1>
+            <p class="lead">Architecture guides, API references, feature docs, and development standards — all in one place.</p>
+            <div class="kb-search-wrapper">
+                <i class="fas fa-search"></i>
+                <input type="text" class="kb-search-input" id="searchInput" placeholder="Search documentation..." autocomplete="off">
+            </div>
+        </section>
+
+        <!-- Stats Bar -->
+        <div class="kb-stats-bar">
+            <div class="kb-stat">
+                <i class="fas fa-cubes" style="color: var(--accent);"></i>
+                <span><span class="value">12</span> feature modules</span>
+            </div>
+            <div class="kb-stat">
+                <i class="fas fa-cloud" style="color: #9b59b6;"></i>
+                <span><span class="value">69</span> cloud functions</span>
+            </div>
+            <div class="kb-stat">
+                <i class="fas fa-layer-group" style="color: var(--success);"></i>
+                <span><span class="value">4</span> subscription tiers</span>
+            </div>
+            <div class="kb-stat">
+                <i class="fas fa-file-alt" style="color: #e67e22;"></i>
+                <span><span class="value" id="docCount">0</span> documents</span>
+            </div>
+            <div class="kb-stat ms-auto" style="font-size: 0.8rem;">
+                <i class="fas fa-clock"></i>
+                <span>Updated <span id="lastUpdated">--</span></span>
+            </div>
+        </div>
+
+        <!-- Filter Pills -->
+        <div class="kb-filters" id="filterPills">
+            <button class="kb-pill active" data-filter="all">All</button>
+            <button class="kb-pill" data-filter="architecture"><i class="fas fa-sitemap"></i> Architecture</button>
+            <button class="kb-pill" data-filter="api"><i class="fas fa-code"></i> API</button>
+            <button class="kb-pill" data-filter="features"><i class="fas fa-puzzle-piece"></i> Features</button>
+            <button class="kb-pill" data-filter="deployment"><i class="fas fa-rocket"></i> Deployment</button>
+            <button class="kb-pill" data-filter="development"><i class="fas fa-laptop-code"></i> Development</button>
+            <button class="kb-pill" data-filter="security"><i class="fas fa-shield-alt"></i> Security</button>
+        </div>
+
+        <!-- Cards Grid -->
+        <div class="kb-grid" id="cardsContainer">
+            <!-- Cards rendered by JS -->
+        </div>
+
+        <!-- Empty State -->
+        <div class="kb-empty" id="emptyState" style="display: none;">
+            <i class="fas fa-search"></i>
+            <h5>No matching documents</h5>
+            <p>Try adjusting your search or filter criteria.</p>
+        </div>
+
+        <!-- Footer -->
+        <footer class="kb-footer">
+            <div>Sparks Hospitality Knowledge Base &mdash; Internal Documentation Portal</div>
+            <div>Firebase Project: <strong>merakicaptiveportal-firebasedb</strong></div>
+        </footer>
+    </main>
+
+    <!-- Scroll to Top -->
+    <button class="kb-scroll-top" id="scrollTopBtn" aria-label="Scroll to top">
+        <i class="fas fa-chevron-up"></i>
+    </button>
+
+    <!-- Bootstrap JS -->
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    <!-- Marked.js for markdown rendering -->
+    <script src="https://cdn.jsdelivr.net/npm/marked@9.1.6/marked.min.js"></script>
+
+    <!-- Markdown Viewer Panel -->
+    <div id="mdPanel" style="display:none; position:fixed; top:0; right:0; width:min(700px,100vw); height:100vh; background:#fff; z-index:2000; box-shadow:-4px 0 24px rgba(0,0,0,0.18); display:none; flex-direction:column;">
+        <div style="display:flex; align-items:center; justify-content:space-between; padding:16px 24px; background:#2c3e50; color:#fff; flex-shrink:0;">
+            <div style="display:flex; align-items:center; gap:12px;">
+                <i class="fas fa-book-open"></i>
+                <span id="mdPanelTitle" style="font-weight:600; font-size:1rem;"></span>
+            </div>
+            <button onclick="closeMdPanel()" style="background:none; border:none; color:rgba(255,255,255,0.8); font-size:1.3rem; cursor:pointer; padding:4px 8px; line-height:1;" title="Close">&times;</button>
+        </div>
+        <div id="mdPanelBody" style="flex:1; overflow-y:auto; padding:32px 36px; font-family:'Segoe UI',sans-serif; font-size:0.95rem; line-height:1.7; color:#2c3e50;"></div>
+    </div>
+    <div id="mdOverlay" onclick="closeMdPanel()" style="display:none; position:fixed; inset:0; background:rgba(0,0,0,0.4); z-index:1999;"></div>
+
+    <style>
+        #mdPanelBody h1 { font-size:1.6rem; font-weight:700; margin-bottom:16px; color:#2c3e50; border-bottom:2px solid #ecf0f1; padding-bottom:10px; }
+        #mdPanelBody h2 { font-size:1.25rem; font-weight:600; margin-top:28px; margin-bottom:10px; color:#2c3e50; }
+        #mdPanelBody h3 { font-size:1.05rem; font-weight:600; margin-top:20px; margin-bottom:8px; color:#34495e; }
+        #mdPanelBody code { background:#f4f6f9; padding:2px 6px; border-radius:4px; font-size:0.88em; color:#c0392b; font-family:monospace; }
+        #mdPanelBody pre { background:#2c3e50; color:#ecf0f1; padding:16px; border-radius:8px; overflow-x:auto; font-size:0.85em; line-height:1.5; }
+        #mdPanelBody pre code { background:none; color:inherit; padding:0; }
+        #mdPanelBody table { width:100%; border-collapse:collapse; margin:16px 0; font-size:0.9em; }
+        #mdPanelBody th { background:#2c3e50; color:#fff; padding:10px 14px; text-align:left; font-weight:600; }
+        #mdPanelBody td { padding:9px 14px; border-bottom:1px solid #ecf0f1; }
+        #mdPanelBody tr:hover td { background:#f8f9fa; }
+        #mdPanelBody blockquote { border-left:4px solid #3498db; margin:16px 0; padding:10px 18px; background:#f4f6f9; color:#555; border-radius:0 6px 6px 0; }
+        #mdPanelBody a { color:#3498db; }
+        #mdPanelBody ul, #mdPanelBody ol { padding-left:24px; margin-bottom:12px; }
+        #mdPanelBody li { margin-bottom:4px; }
+        #mdPanelBody hr { border:none; border-top:1px solid #ecf0f1; margin:24px 0; }
+        #mdPanelBody .md-loading { text-align:center; padding:60px 0; color:#7f8c8d; }
+        #mdPanelBody .md-error { color:#e74c3c; background:#fdf2f2; padding:20px; border-radius:8px; border:1px solid #f5c6cb; }
+    </style>
+
+    <script>
+        // ── Documentation Data ──
+        const docs = [
+            // Architecture
+            {
+                title: 'System Overview',
+                description: 'High-level system architecture, component interactions, and data flow across the Sparks Hospitality platform.',
+                category: 'architecture',
+                icon: 'fas fa-project-diagram',
+                path: 'kb/architecture/SYSTEM_OVERVIEW.md'
+            },
+            {
+                title: 'Data Model',
+                description: 'Firebase Realtime Database structure: all 35+ nodes, indexing strategy, and data relationships.',
+                category: 'architecture',
+                icon: 'fas fa-database',
+                path: 'kb/architecture/DATA_MODEL.md'
+            },
+            {
+                title: 'Subscription Tiers',
+                description: 'Four-tier subscription system (Free, Starter, Professional, Enterprise) with feature gating and access control.',
+                category: 'architecture',
+                icon: 'fas fa-crown',
+                path: 'kb/architecture/SUBSCRIPTION_TIERS.md'
+            },
+            {
+                title: 'Authentication Flow',
+                description: 'Firebase Authentication, custom admin claims, dual-admin verification, and page guard patterns.',
+                category: 'architecture',
+                icon: 'fas fa-fingerprint',
+                path: 'kb/architecture/AUTHENTICATION_FLOW.md'
+            },
+
+            // API Reference
+            {
+                title: 'Cloud Functions Catalog',
+                description: 'Complete reference of all 69 deployed Cloud Functions with triggers, endpoints, inputs, and outputs.',
+                category: 'api',
+                icon: 'fas fa-server',
+                path: 'kb/api/CLOUD_FUNCTIONS_CATALOG.md'
+            },
+            {
+                title: 'Third-Party Integrations',
+                description: 'Twilio WhatsApp/SMS, SendGrid email, Google Cloud Vision OCR, and Cisco Meraki WiFi API integration guides.',
+                category: 'api',
+                icon: 'fas fa-plug',
+                path: 'kb/api/INTEGRATIONS.md'
+            },
+
+            // Features
+            {
+                title: 'Guest Management',
+                description: 'Guest capture via WiFi portal, profile management, phone normalisation, cascade deletion, and search.',
+                category: 'features',
+                icon: 'fas fa-users',
+                path: 'kb/features/GUEST_MANAGEMENT.md'
+            },
+            {
+                title: 'Queue Management System',
+                description: 'Real-time digital queue with WhatsApp self-service, wait time estimates, and tier-gated limits.',
+                category: 'features',
+                icon: 'fas fa-clock',
+                path: 'kb/features/QUEUE_MANAGEMENT.md'
+            },
+            {
+                title: 'Booking System',
+                description: 'Table reservation management with Vue 3 components, guest phone linkage, and location-scoped security.',
+                category: 'features',
+                icon: 'fas fa-calendar-check',
+                path: 'kb/features/BOOKING_SYSTEM.md'
+            },
+            {
+                title: 'Receipt Processing & OCR',
+                description: 'Google Cloud Vision OCR pipeline, template-based extraction, confidence scoring, and receipt settings.',
+                category: 'features',
+                icon: 'fas fa-receipt',
+                path: 'kb/features/RECEIPT_PROCESSING.md'
+            },
+            {
+                title: 'Food Cost Analytics',
+                description: 'Stock usage tracking, food cost percentage calculations, order calculator engines, and analytics dashboard.',
+                category: 'features',
+                icon: 'fas fa-chart-pie',
+                path: 'kb/features/FOOD_COST_ANALYTICS.md'
+            },
+            {
+                title: 'Sales Forecasting',
+                description: 'Six forecasting algorithms, SA public holidays with Easter, confidence intervals, and CSV import.',
+                category: 'features',
+                icon: 'fas fa-chart-line',
+                path: 'kb/features/SALES_FORECASTING.md'
+            },
+            {
+                title: 'Campaigns & Marketing',
+                description: 'Campaign-receipt matching, WhatsApp campaign flow, SendGrid email integration, and tier gating.',
+                category: 'features',
+                icon: 'fas fa-bullhorn',
+                path: 'kb/features/CAMPAIGNS.md'
+            },
+            {
+                title: 'Rewards & Vouchers',
+                description: 'Reward processing pipeline, voucher pool management, fraud detection, and redemption tracking.',
+                category: 'features',
+                icon: 'fas fa-gift',
+                path: 'kb/features/REWARDS_VOUCHERS.md'
+            },
+            {
+                title: 'WhatsApp Automation',
+                description: 'Twilio webhook handler, conversational bot flow, multi-location number management, and message templates.',
+                category: 'features',
+                icon: 'fab fa-whatsapp',
+                path: 'kb/features/WHATSAPP_INTEGRATION.md'
+            },
+            {
+                title: 'Access Control & Tiers',
+                description: 'Complete tier system with 28 feature IDs, FeatureGuard component, and subscription caching.',
+                category: 'features',
+                icon: 'fas fa-lock',
+                path: 'kb/features/ACCESS_CONTROL.md'
+            },
+            {
+                title: 'WiFi Login & Captive Portal',
+                description: 'Meraki captive portal flow, WifiManager class, guest data capture, and public write access patterns.',
+                category: 'features',
+                icon: 'fas fa-wifi',
+                path: 'kb/features/WIFI_LOGIN.md'
+            },
+            {
+                title: 'Project Management',
+                description: 'Super Admin project tracking, Kanban/timeline/list views, milestones, tasks, and dual project nodes.',
+                category: 'features',
+                icon: 'fas fa-tasks',
+                path: 'kb/features/PROJECT_MANAGEMENT.md'
+            },
+
+            // Deployment
+            {
+                title: 'Deployment Guide',
+                description: 'Step-by-step deployment for Firebase Hosting, Functions, database rules, and emulator setup.',
+                category: 'deployment',
+                icon: 'fas fa-rocket',
+                path: 'kb/deployment/DEPLOYMENT_GUIDE.md'
+            },
+            {
+                title: 'Environment Setup',
+                description: 'All environment variables, Firebase project config, Twilio/SendGrid/Vision API key setup.',
+                category: 'deployment',
+                icon: 'fas fa-cog',
+                path: 'kb/deployment/ENVIRONMENT_SETUP.md'
+            },
+
+            // Development
+            {
+                title: 'Getting Started',
+                description: 'Developer onboarding: prerequisites, install steps, emulator setup, and seed data creation.',
+                category: 'development',
+                icon: 'fas fa-play-circle',
+                path: 'kb/development/GETTING_STARTED.md'
+            },
+            {
+                title: 'Coding Standards',
+                description: 'JS conventions, Firebase RTDB patterns, SweetAlert2, XSS prevention, Chart.js, SA-specific standards.',
+                category: 'development',
+                icon: 'fas fa-file-code',
+                path: 'kb/development/CODING_STANDARDS.md'
+            },
+            {
+                title: 'Testing Guide',
+                description: '30 .cjs test files documented, running instructions, CRUD patterns, and how to write new tests.',
+                category: 'development',
+                icon: 'fas fa-vial',
+                path: 'kb/development/TESTING_GUIDE.md'
+            },
+
+            // Security
+            {
+                title: 'Security Overview',
+                description: 'Honest assessment: auth patterns, RTDB rule strengths, critical vulnerabilities, and priority fixes.',
+                category: 'security',
+                icon: 'fas fa-shield-alt',
+                path: 'kb/security/SECURITY_OVERVIEW.md'
+            },
+            {
+                title: 'Database Rules Guide',
+                description: 'Line-by-line breakdown of all 25+ RTDB nodes, access matrices, assessments, and extension guide.',
+                category: 'security',
+                icon: 'fas fa-database',
+                path: 'kb/security/DATABASE_RULES_GUIDE.md'
+            }
+        ];
+
+        // ── State ──
+        let activeFilter = 'all';
+        let searchQuery = '';
+
+        // ── DOM References ──
+        const searchInput = document.getElementById('searchInput');
+        const cardsContainer = document.getElementById('cardsContainer');
+        const emptyState = document.getElementById('emptyState');
+        const filterPills = document.getElementById('filterPills');
+        const docCountEl = document.getElementById('docCount');
+        const lastUpdatedEl = document.getElementById('lastUpdated');
+        const scrollTopBtn = document.getElementById('scrollTopBtn');
+        const sidebarToggle = document.getElementById('sidebarToggle');
+        const sidebarOverlay = document.getElementById('sidebarOverlay');
+        const sidebar = document.getElementById('sidebar');
+
+        // ── Init ──
+        docCountEl.textContent = docs.length;
+        lastUpdatedEl.textContent = new Date().toLocaleDateString('en-ZA', {
+            year: 'numeric', month: 'short', day: 'numeric'
+        });
+
+        // ── Render ──
+        function escapeHtml(str) {
+            const div = document.createElement('div');
+            div.textContent = str;
+            return div.innerHTML;
+        }
+
+        function renderCards() {
+            const filtered = docs.filter(function(doc) {
+                const matchesFilter = activeFilter === 'all' || doc.category === activeFilter;
+                if (!matchesFilter) return false;
+                if (!searchQuery) return true;
+                const q = searchQuery.toLowerCase();
+                return doc.title.toLowerCase().includes(q) ||
+                       doc.description.toLowerCase().includes(q) ||
+                       doc.category.toLowerCase().includes(q);
+            });
+
+            if (filtered.length === 0) {
+                cardsContainer.innerHTML = '';
+                emptyState.style.display = 'block';
+                return;
+            }
+
+            emptyState.style.display = 'none';
+
+            // Group by category
+            var grouped = {};
+            var categoryOrder = ['architecture', 'api', 'features', 'deployment', 'development', 'security'];
+            var categoryLabels = {
+                architecture: 'Architecture',
+                api: 'API Reference',
+                features: 'Features',
+                deployment: 'Deployment',
+                development: 'Development',
+                security: 'Security'
+            };
+            var categoryIcons = {
+                architecture: 'fas fa-sitemap',
+                api: 'fas fa-code',
+                features: 'fas fa-puzzle-piece',
+                deployment: 'fas fa-rocket',
+                development: 'fas fa-laptop-code',
+                security: 'fas fa-shield-alt'
+            };
+
+            filtered.forEach(function(doc) {
+                if (!grouped[doc.category]) {
+                    grouped[doc.category] = [];
+                }
+                grouped[doc.category].push(doc);
+            });
+
+            var html = '';
+            categoryOrder.forEach(function(cat) {
+                if (!grouped[cat]) return;
+                var items = grouped[cat];
+                html += '<div class="kb-section" data-section="' + escapeHtml(cat) + '">';
+                html += '<h4 class="kb-section-title">';
+                html += '<i class="' + escapeHtml(categoryIcons[cat]) + '"></i> ';
+                html += escapeHtml(categoryLabels[cat]);
+                html += ' <span class="badge bg-secondary">' + items.length + '</span>';
+                html += '</h4>';
+                html += '<div class="row g-3 mb-4">';
+                items.forEach(function(doc) {
+                    html += '<div class="col-12 col-md-6 col-lg-4">';
+                    html += '<div class="kb-card" data-category="' + escapeHtml(doc.category) + '" data-path="' + escapeHtml(doc.path) + '" data-title="' + escapeHtml(doc.title) + '" style="cursor:pointer;">';
+                    html += '<div class="kb-card-icon ' + escapeHtml(doc.category) + '"><i class="' + escapeHtml(doc.icon) + '"></i></div>';
+                    html += '<h5>' + highlightMatch(escapeHtml(doc.title)) + '</h5>';
+                    html += '<p>' + highlightMatch(escapeHtml(doc.description)) + '</p>';
+                    html += '<span class="kb-card-tag ' + escapeHtml(doc.category) + '">' + escapeHtml(doc.category) + '</span>';
+                    html += '</div>';
+                    html += '</div>';
+                });
+                html += '</div></div>';
+            });
+
+            cardsContainer.innerHTML = html;
+        }
+
+        function highlightMatch(text) {
+            if (!searchQuery) return text;
+            var q = searchQuery.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+            var regex = new RegExp('(' + q + ')', 'gi');
+            return text.replace(regex, '<mark style="background:#ffeaa7;padding:0 2px;border-radius:2px;">$1</mark>');
+        }
+
+        // ── Event Handlers ──
+
+        // Search
+        searchInput.addEventListener('input', function() {
+            searchQuery = this.value.trim();
+            renderCards();
+        });
+
+        // Filter pills
+        filterPills.addEventListener('click', function(e) {
+            var pill = e.target.closest('.kb-pill');
+            if (!pill) return;
+            var filter = pill.dataset.filter;
+            activeFilter = filter;
+
+            // Update pill styles
+            filterPills.querySelectorAll('.kb-pill').forEach(function(p) {
+                p.classList.remove('active');
+            });
+            pill.classList.add('active');
+
+            // Update sidebar active
+            sidebar.querySelectorAll('.kb-sidebar-nav a').forEach(function(a) {
+                a.classList.remove('active');
+                if (a.dataset.filter === filter) {
+                    a.classList.add('active');
+                }
+            });
+
+            renderCards();
+        });
+
+        // Sidebar nav
+        sidebar.querySelectorAll('.kb-sidebar-nav a').forEach(function(link) {
+            link.addEventListener('click', function(e) {
+                e.preventDefault();
+                var filter = this.dataset.filter;
+                activeFilter = filter;
+
+                // Update sidebar active
+                sidebar.querySelectorAll('.kb-sidebar-nav a').forEach(function(a) {
+                    a.classList.remove('active');
+                });
+                this.classList.add('active');
+
+                // Update pill active
+                filterPills.querySelectorAll('.kb-pill').forEach(function(p) {
+                    p.classList.remove('active');
+                    if (p.dataset.filter === filter) {
+                        p.classList.add('active');
+                    }
+                });
+
+                renderCards();
+                closeSidebar();
+            });
+        });
+
+        // Mobile sidebar
+        function closeSidebar() {
+            sidebar.classList.remove('open');
+            sidebarOverlay.classList.remove('show');
+        }
+
+        sidebarToggle.addEventListener('click', function() {
+            sidebar.classList.toggle('open');
+            sidebarOverlay.classList.toggle('show');
+        });
+
+        sidebarOverlay.addEventListener('click', closeSidebar);
+
+        // Scroll to top
+        window.addEventListener('scroll', function() {
+            if (window.scrollY > 400) {
+                scrollTopBtn.classList.add('visible');
+            } else {
+                scrollTopBtn.classList.remove('visible');
+            }
+        });
+
+        scrollTopBtn.addEventListener('click', function() {
+            window.scrollTo({ top: 0, behavior: 'smooth' });
+        });
+
+        // Keyboard shortcut: focus search with /
+        document.addEventListener('keydown', function(e) {
+            if (e.key === '/' && document.activeElement !== searchInput && mdPanel.style.display !== 'flex') {
+                e.preventDefault();
+                searchInput.focus();
+            }
+            if (e.key === 'Escape') {
+                if (mdPanel.style.display === 'flex') {
+                    closeMdPanel();
+                } else if (document.activeElement === searchInput) {
+                    searchInput.blur();
+                    searchInput.value = '';
+                    searchQuery = '';
+                    renderCards();
+                }
+            }
+        });
+
+        // ── Card click via event delegation (avoids onclick quoting issues) ──
+        cardsContainer.addEventListener('click', function(e) {
+            var card = e.target.closest('.kb-card[data-path]');
+            if (!card) return;
+            openDoc(card.dataset.path, card.dataset.title);
+        });
+
+        // ── Markdown Viewer ──
+        var mdPanel = document.getElementById('mdPanel');
+        var mdOverlay = document.getElementById('mdOverlay');
+        var mdPanelTitle = document.getElementById('mdPanelTitle');
+        var mdPanelBody = document.getElementById('mdPanelBody');
+
+        function openDoc(path, title) {
+            mdPanelTitle.textContent = title;
+            mdPanelBody.innerHTML = '<div class="md-loading"><i class="fas fa-spinner fa-spin fa-2x"></i><br><br>Loading...</div>';
+            mdPanel.style.display = 'flex';
+            mdOverlay.style.display = 'block';
+            document.body.style.overflow = 'hidden';
+
+            fetch(path)
+                .then(function(r) {
+                    if (!r.ok) throw new Error('HTTP ' + r.status + ' — file not found: ' + path);
+                    return r.text();
+                })
+                .then(function(md) {
+                    mdPanelBody.innerHTML = marked.parse(md);
+                    mdPanelBody.scrollTop = 0;
+                })
+                .catch(function(err) {
+                    mdPanelBody.innerHTML = '<div class="md-error"><strong>Could not load document</strong><br>' + escapeHtml(err.message) + '</div>';
+                });
+        }
+
+        function closeMdPanel() {
+            mdPanel.style.display = 'none';
+            mdOverlay.style.display = 'none';
+            document.body.style.overflow = '';
+        }
+
+        // Initial render
+        renderCards();
+    </script>
+</body>
+
+</html>

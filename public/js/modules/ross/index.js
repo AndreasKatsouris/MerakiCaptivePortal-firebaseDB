@@ -334,6 +334,88 @@ export async function initializeRoss() {
             <p class="mt-2 text-muted">Loading templates...</p>
         </div>
 
+        <!-- Template Editor Panel -->
+        <div v-else-if="templateEditor" class="card shadow-sm border-0 mb-4">
+            <div class="card-header d-flex justify-content-between align-items-center">
+                <h6 class="mb-0">
+                    <i class="fas fa-edit me-2"></i>
+                    {{ templateEditor.mode === 'create' ? 'New Template' : 'Edit Template' }}
+                </h6>
+                <button class="btn btn-sm btn-outline-secondary" @click="cancelTemplateEdit()">
+                    <i class="fas fa-times me-1"></i>Cancel
+                </button>
+            </div>
+            <div class="card-body">
+                <div class="row g-3">
+                    <div class="col-md-6">
+                        <label class="form-label fw-semibold">Name <span class="text-danger">*</span></label>
+                        <input type="text" class="form-control" v-model="templateEditor.form.name"
+                            placeholder="e.g. Monthly Fire Safety Check">
+                    </div>
+                    <div class="col-md-3">
+                        <label class="form-label fw-semibold">Category</label>
+                        <select class="form-select" v-model="templateEditor.form.category">
+                            <option v-for="(label, key) in CATEGORY_LABELS" :key="key" :value="key">
+                                {{ label }}
+                            </option>
+                        </select>
+                    </div>
+                    <div class="col-md-3">
+                        <label class="form-label fw-semibold">Recurrence</label>
+                        <select class="form-select" v-model="templateEditor.form.recurrence">
+                            <option v-for="(label, key) in RECURRENCE_LABELS" :key="key" :value="key">
+                                {{ label }}
+                            </option>
+                        </select>
+                    </div>
+                    <div class="col-12">
+                        <label class="form-label fw-semibold">Description</label>
+                        <textarea class="form-control" rows="2" v-model="templateEditor.form.description"
+                            placeholder="Brief description of this workflow template"></textarea>
+                    </div>
+                    <div class="col-md-6">
+                        <label class="form-label fw-semibold">Alert Days Before Due</label>
+                        <input type="text" class="form-control" v-model="templateEditor.form.daysBeforeAlertRaw"
+                            placeholder="e.g. 90, 30, 7">
+                        <div class="form-text">Comma-separated days (e.g. 90, 30, 7)</div>
+                    </div>
+                </div>
+
+                <!-- Subtasks -->
+                <div class="mt-4">
+                    <div class="d-flex justify-content-between align-items-center mb-2">
+                        <h6 class="mb-0">Subtasks</h6>
+                        <button class="btn btn-sm btn-outline-primary" @click="addTemplateSubtask()">
+                            <i class="fas fa-plus me-1"></i>Add Subtask
+                        </button>
+                    </div>
+                    <div v-if="templateEditor.form.subtasks.length === 0" class="text-muted small py-2">
+                        No subtasks yet. Add at least one.
+                    </div>
+                    <div v-for="(sub, idx) in templateEditor.form.subtasks" :key="idx"
+                        class="d-flex align-items-center gap-2 mb-2">
+                        <span class="text-muted small" style="min-width:20px">{{ idx + 1 }}.</span>
+                        <input type="text" class="form-control form-control-sm" v-model="sub.title"
+                            placeholder="Subtask title">
+                        <input type="number" class="form-control form-control-sm" v-model.number="sub.daysOffset"
+                            style="width:100px" title="Days offset from due date (negative = before)">
+                        <small class="text-muted text-nowrap">days offset</small>
+                        <button class="btn btn-sm btn-outline-danger" @click="removeTemplateSubtask(idx)">
+                            <i class="fas fa-times"></i>
+                        </button>
+                    </div>
+                </div>
+
+                <div class="mt-4 d-flex gap-2">
+                    <button class="btn btn-primary" @click="saveTemplate()" :disabled="templateSaving">
+                        <span v-if="templateSaving" class="spinner-border spinner-border-sm me-1"></span>
+                        {{ templateEditor.mode === 'create' ? 'Create Template' : 'Save Changes' }}
+                    </button>
+                    <button class="btn btn-outline-secondary" @click="cancelTemplateEdit()">Cancel</button>
+                </div>
+            </div>
+        </div>
+
         <!-- Content -->
         <div v-else>
 
@@ -382,11 +464,11 @@ export async function initializeRoss() {
                                 @click="activateTemplate(tmpl)">
                                 <i class="fas fa-play me-1"></i>Activate
                             </button>
-                            <button v-if="isSuperAdmin" class="btn btn-outline-secondary btn-sm"
+                            <button class="btn btn-outline-secondary btn-sm"
                                 @click="openEditTemplate(tmpl)" title="Edit template">
                                 <i class="fas fa-edit"></i>
                             </button>
-                            <button v-if="isSuperAdmin" class="btn btn-outline-danger btn-sm"
+                            <button class="btn btn-outline-danger btn-sm"
                                 @click="deleteTemplate(tmpl)" title="Delete template">
                                 <i class="fas fa-trash"></i>
                             </button>
@@ -396,7 +478,7 @@ export async function initializeRoss() {
             </div>
 
             <!-- Super Admin: add template -->
-            <div v-if="isSuperAdmin" class="mt-4">
+            <div class="mt-4">
                 <button class="btn btn-outline-primary" @click="openCreateTemplate()">
                     <i class="fas fa-plus me-1"></i>Add Template
                 </button>
@@ -452,15 +534,26 @@ export async function initializeRoss() {
                 </div>
                 <ul v-else class="list-group">
                     <li v-for="task in selectedWorkflowTasks" :key="task._taskId"
-                        class="list-group-item d-flex justify-content-between align-items-center">
-                        <div>
+                        class="list-group-item d-flex justify-content-between align-items-center gap-2">
+                        <div class="flex-grow-1">
                             <span :class="task.status === 'completed'
                                 ? 'text-decoration-line-through text-muted' : ''">
                                 {{ task.title }}
                             </span>
                             <br>
                             <small class="text-muted">Due: {{ formatDate(task.dueDate) }}</small>
+                            <small v-if="task.assignedTo" class="text-primary ms-2">
+                                <i class="fas fa-user me-1"></i>{{ staffName(task.assignedTo) }}
+                            </small>
                         </div>
+                        <select class="form-select form-select-sm w-auto"
+                            :value="task.assignedTo || ''"
+                            @change="assignTask(task, $event.target.value)">
+                            <option value="">Unassigned</option>
+                            <option v-for="m in staffMembers" :key="m.staffId" :value="m.staffId">
+                                {{ m.name }}
+                            </option>
+                        </select>
                         <button v-if="task.status !== 'completed'"
                             class="btn btn-sm btn-outline-success"
                             @click="markTaskComplete(task)">
@@ -864,6 +957,9 @@ export async function initializeRoss() {
                 templateFilter: 'all',
                 isSuperAdmin: false,
                 CATEGORY_LABELS,
+                RECURRENCE_LABELS,
+                templateEditor: null, // null = closed | { mode, templateId?, form }
+                templateSaving: false,
 
                 // View 3 — My Workflows
                 workflowFilter: { category: 'all', status: 'all' },
@@ -963,7 +1059,14 @@ export async function initializeRoss() {
 
                 try {
                     const raw = await rossService.getWorkflows(rossState.locationId);
-                    const workflowList = Array.isArray(raw) ? raw : Object.values(raw || {});
+                    const rawList = Array.isArray(raw) ? raw
+                        : Array.isArray(raw?.workflows) ? raw.workflows
+                        : Object.values(raw || {});
+                    const workflowList = rawList.map(w => ({
+                        ...w,
+                        nextDueDate: w.locationNextDueDate ?? w.nextDueDate,
+                        status: w.locationStatus ?? w.status
+                    }));
                     this.workflows = workflowList;
 
                     this.overdueAlerts = this.buildAlerts(workflowList);
@@ -1129,6 +1232,7 @@ export async function initializeRoss() {
             applyPickedLocation() {
                 if (!this.pickedLocationId) return;
                 rossState.locationId = this.pickedLocationId;
+                this.staffLocationId = this.pickedLocationId;
                 this.loadOverview();
             },
 
@@ -1180,7 +1284,7 @@ export async function initializeRoss() {
                 try {
                     await rossService.activateWorkflow({
                         templateId: template.templateId,
-                        locationId: rossState.locationId,
+                        locationIds: [rossState.locationId],
                         name: formValues.name,
                         nextDueDate: formValues.nextDueDate
                     });
@@ -1212,12 +1316,95 @@ export async function initializeRoss() {
                 }
             },
 
-            async openEditTemplate() {
-                await Swal.fire('Coming Soon', 'Template editing will be added in a future update.', 'info');
+            openEditTemplate(tmpl) {
+                this.templateEditor = {
+                    mode: 'edit',
+                    templateId: tmpl.templateId,
+                    form: {
+                        name: tmpl.name || '',
+                        category: tmpl.category || 'operations',
+                        description: tmpl.description || '',
+                        recurrence: tmpl.recurrence || 'monthly',
+                        daysBeforeAlertRaw: (tmpl.daysBeforeAlert || [30, 7]).join(', '),
+                        subtasks: (tmpl.subtasks || []).map(s => ({ ...s }))
+                    }
+                };
             },
 
-            async openCreateTemplate() {
-                await Swal.fire('Coming Soon', 'Template creation will be added in a future update.', 'info');
+            openCreateTemplate() {
+                this.templateEditor = {
+                    mode: 'create',
+                    form: {
+                        name: '',
+                        category: 'operations',
+                        description: '',
+                        recurrence: 'monthly',
+                        daysBeforeAlertRaw: '30, 7',
+                        subtasks: []
+                    }
+                };
+            },
+
+            cancelTemplateEdit() {
+                this.templateEditor = null;
+            },
+
+            addTemplateSubtask() {
+                const nextOrder = this.templateEditor.form.subtasks.length + 1;
+                this.templateEditor.form.subtasks = [
+                    ...this.templateEditor.form.subtasks,
+                    { title: '', daysOffset: 0, order: nextOrder }
+                ];
+            },
+
+            removeTemplateSubtask(idx) {
+                this.templateEditor.form.subtasks = this.templateEditor.form.subtasks
+                    .filter((_, i) => i !== idx)
+                    .map((s, i) => ({ ...s, order: i + 1 }));
+            },
+
+            async saveTemplate() {
+                const { form, mode, templateId } = this.templateEditor;
+                if (!form.name.trim()) {
+                    await Swal.fire('Required', 'Template name is required.', 'warning');
+                    return;
+                }
+                if (form.subtasks.length === 0) {
+                    await Swal.fire('Required', 'Add at least one subtask.', 'warning');
+                    return;
+                }
+                const daysBeforeAlert = form.daysBeforeAlertRaw
+                    .split(',')
+                    .map(s => parseInt(s.trim(), 10))
+                    .filter(n => !isNaN(n));
+                const payload = {
+                    name: form.name.trim(),
+                    category: form.category,
+                    description: form.description.trim(),
+                    recurrence: form.recurrence,
+                    daysBeforeAlert,
+                    subtasks: form.subtasks.map((s, i) => ({
+                        title: s.title.trim() || 'Untitled',
+                        daysOffset: s.daysOffset || 0,
+                        order: i + 1
+                    }))
+                };
+                this.templateSaving = true;
+                try {
+                    if (mode === 'create') {
+                        await rossService.createTemplate(payload);
+                    } else {
+                        await rossService.updateTemplate(templateId, payload);
+                    }
+                    this.templateEditor = null;
+                    await this.loadTemplates();
+                    await Swal.fire('Saved!', `Template "${payload.name}" saved.`, 'success');
+                } catch (err) {
+                    console.error('[ROSS] saveTemplate error:', err);
+                    await Swal.fire('Error', 'Failed to save template: ' + err.message, 'error');
+                } finally {
+                    this.templateSaving = false;
+                }
             },
 
             // ------------------------------------------------------------------
@@ -1228,11 +1415,14 @@ export async function initializeRoss() {
                 this.tabLoading = true;
                 try {
                     const raw = await rossService.getWorkflows(rossState.locationId);
-                    this.workflows = Array.isArray(raw)
-                        ? raw
-                        : Array.isArray(raw?.workflows)
-                            ? raw.workflows
-                            : Object.values(raw || {});
+                    const rawList = Array.isArray(raw) ? raw
+                        : Array.isArray(raw?.workflows) ? raw.workflows
+                        : Object.values(raw || {});
+                    this.workflows = rawList.map(w => ({
+                        ...w,
+                        nextDueDate: w.locationNextDueDate ?? w.nextDueDate,
+                        status: w.locationStatus ?? w.status
+                    }));
                 } catch (err) {
                     console.error('[ROSS] loadWorkflows error:', err);
                     await Swal.fire('Error', 'Failed to load workflows: ' + err.message, 'error');
@@ -1244,11 +1434,40 @@ export async function initializeRoss() {
             openWorkflow(workflow) {
                 this.selectedWorkflow = { ...workflow };
                 this.workflowDetailTab = 'tasks';
+                if (this.staffMembers.length === 0) this.loadStaff();
             },
 
             closeWorkflowDetail() {
                 this.selectedWorkflow = null;
                 this.loadWorkflows();
+            },
+
+            staffName(staffId) {
+                const m = this.staffMembers.find(s => s.staffId === staffId);
+                return m ? m.name : staffId;
+            },
+
+            async assignTask(task, staffId) {
+                const wf = this.selectedWorkflow;
+                try {
+                    await rossService.manageTask(
+                        rossState.locationId, wf.workflowId, 'update',
+                        task._taskId, { assignedTo: staffId || null }
+                    );
+                    this.selectedWorkflow = {
+                        ...this.selectedWorkflow,
+                        tasks: {
+                            ...this.selectedWorkflow.tasks,
+                            [task._taskId]: {
+                                ...this.selectedWorkflow.tasks[task._taskId],
+                                assignedTo: staffId || null
+                            }
+                        }
+                    };
+                } catch (err) {
+                    console.error('[ROSS] assignTask error:', err);
+                    await Swal.fire('Error', 'Failed to assign task.', 'error');
+                }
             },
 
             async markTaskComplete(task) {
@@ -1373,7 +1592,7 @@ export async function initializeRoss() {
                         name: this.builder.name,
                         category: this.builder.category,
                         recurrence: this.builder.recurrence,
-                        locationId: rossState.locationId,
+                        locationIds: [rossState.locationId],
                         nextDueDate,
                         subtasks,
                         daysBeforeAlert: this.builder.daysBeforeAlert,

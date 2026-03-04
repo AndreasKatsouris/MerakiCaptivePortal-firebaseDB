@@ -1217,10 +1217,8 @@ class AdminDashboard {
                     }
                     break;
                 case 'rossContent':
-                    if (!this.sectionInitialized.rossContent) {
-                        await initializeRoss();
-                        this.sectionInitialized.rossContent = true;
-                    }
+                    await initializeRoss();
+                    this.sectionInitialized.rossContent = true;
                     break;
                 case 'adminUsersContent':
                     if (!this.sectionInitialized.adminUsersContent) {
