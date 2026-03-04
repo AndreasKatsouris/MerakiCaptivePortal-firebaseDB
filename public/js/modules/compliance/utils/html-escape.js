@@ -23,5 +23,5 @@ export function escapeHtml(str) {
  * @returns {string}
  */
 export function escapeAttr(str) {
-  return escapeHtml(str).replace(/"/g, '&quot;');
+  return escapeHtml(str).replace(/"/g, '&quot;').replace(/'/g, '&#39;');
 }
