@@ -25,6 +25,9 @@ const MANUAL_RULES = new Set([
 
 const DATE_FORMAT_OPTIONS = { day: 'numeric', month: 'short', year: 'numeric' };
 
+/** Approximate calendar-day equivalent of 30 business days */
+const BUSINESS_DAYS_30_AS_CALENDAR = 42;
+
 // ---------------------------------------------------------------------------
 // Internal helpers
 // ---------------------------------------------------------------------------
@@ -99,6 +102,39 @@ function lastDayOfMonth(year, month) {
   return new Date(year, month + 1, 0);
 }
 
+/**
+ * Get the financial year-end date for an entity in a given calendar year.
+ * Returns null if financialYearEnd is not set or invalid.
+ * @param {Object|null} entity
+ * @param {number} year
+ * @returns {Date|null}
+ */
+function getEntityYearEnd(entity, year) {
+  const fye = entity && entity.financialYearEnd;
+  if (!fye) return null;
+  const parsed = new Date(fye);
+  if (isNaN(parsed.getTime())) return null;
+  return new Date(year, parsed.getMonth(), parsed.getDate());
+}
+
+/**
+ * Calculate a deadline N calendar days after the entity's incorporation anniversary in a given year.
+ * @param {Object|null} entity
+ * @param {number} year
+ * @param {number} calendarDaysAfter
+ * @returns {Date|null}
+ */
+function calculateAnniversaryDeadline(entity, year, calendarDaysAfter) {
+  const incDate = entity && entity.incorporationDate;
+  if (!incDate) return null;
+  const incParsed = new Date(incDate);
+  if (isNaN(incParsed.getTime())) return null;
+  const anniversary = new Date(year, incParsed.getMonth(), incParsed.getDate());
+  const dueDate = new Date(anniversary.getTime());
+  dueDate.setDate(dueDate.getDate() + calendarDaysAfter);
+  return dueDate;
+}
+
 // ---------------------------------------------------------------------------
 // Public API
 // ---------------------------------------------------------------------------
@@ -155,38 +191,14 @@ export function calculateNextDueDate(obligation, entity, year, month) {
 
     // ----- CIPC anniversary-based -----
 
-    case '30_business_days_after_anniversary': {
-      const incDate = entity && entity.incorporationDate;
-      if (!incDate) return null;
-      // Parse the incorporation date to get anniversary month/day
-      const incParsed = new Date(incDate);
-      if (isNaN(incParsed.getTime())) return null;
-      // Anniversary this year
-      const anniversary = new Date(year, incParsed.getMonth(), incParsed.getDate());
-      // 30 business days ~ 42 calendar days
-      const dueDate = new Date(anniversary.getTime());
-      dueDate.setDate(dueDate.getDate() + 42);
-      return dueDate;
-    }
-
-    case 'filed_with_cipc_annual_return': {
-      // Same logic as cipc_annual_return
-      const incDateBo = entity && entity.incorporationDate;
-      if (!incDateBo) return null;
-      const incParsedBo = new Date(incDateBo);
-      if (isNaN(incParsedBo.getTime())) return null;
-      const anniversaryBo = new Date(year, incParsedBo.getMonth(), incParsedBo.getDate());
-      const dueDateBo = new Date(anniversaryBo.getTime());
-      dueDateBo.setDate(dueDateBo.getDate() + 42);
-      return dueDateBo;
-    }
+    case '30_business_days_after_anniversary':
+    case 'filed_with_cipc_annual_return':
+      return calculateAnniversaryDeadline(entity, year, BUSINESS_DAYS_30_AS_CALENDAR);
 
     // ----- Financial year-end relative rules -----
 
     case '6_months_after_tax_year_start': {
-      const fyEnd = entity && entity.financialYearEnd;
-      if (!fyEnd) return null;
-      const yearEndDate = parseFinancialYearEnd(fyEnd, year - 1);
+      const yearEndDate = getEntityYearEnd(entity, year - 1);
       if (!yearEndDate) return null;
       // Tax year starts the day after year-end
       const taxYearStart = new Date(yearEndDate.getTime());
@@ -195,31 +207,23 @@ export function calculateNextDueDate(obligation, entity, year, month) {
     }
 
     case 'last_day_of_financial_year': {
-      const fyEnd2 = entity && entity.financialYearEnd;
-      if (!fyEnd2) return null;
-      return parseFinancialYearEnd(fyEnd2, year);
+      return getEntityYearEnd(entity, year);
     }
 
     case '6_months_after_financial_year_end': {
-      const fyEnd3 = entity && entity.financialYearEnd;
-      if (!fyEnd3) return null;
-      const yearEnd3 = parseFinancialYearEnd(fyEnd3, year);
-      if (!yearEnd3) return null;
-      return addMonths(yearEnd3, 6);
+      const yearEnd = getEntityYearEnd(entity, year);
+      if (!yearEnd) return null;
+      return addMonths(yearEnd, 6);
     }
 
     case '12_months_after_financial_year_end': {
-      const fyEnd4 = entity && entity.financialYearEnd;
-      if (!fyEnd4) return null;
-      const yearEnd4 = parseFinancialYearEnd(fyEnd4, year);
-      if (!yearEnd4) return null;
-      return addMonths(yearEnd4, 12);
+      const yearEnd = getEntityYearEnd(entity, year);
+      if (!yearEnd) return null;
+      return addMonths(yearEnd, 12);
     }
 
     case 'aligned_to_financial_year_end': {
-      const fyEnd5 = entity && entity.financialYearEnd;
-      if (!fyEnd5) return null;
-      return parseFinancialYearEnd(fyEnd5, year);
+      return getEntityYearEnd(entity, year);
     }
 
     // ----- SARS-announced windows -----
