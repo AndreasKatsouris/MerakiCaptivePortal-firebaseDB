@@ -10,10 +10,16 @@
 
 import { updateEntityCompliance } from '../services/firebase-service.js';
 import { escapeHtml, escapeAttr } from '../utils/html-escape.js';
+import { auth } from '../../../config/firebase-config.js';
 
 // ---------------------------------------------------------------------------
 // Helpers
 // ---------------------------------------------------------------------------
+
+function currentUserIdentifier() {
+  const user = auth.currentUser;
+  return user ? (user.email || user.uid) : 'unknown';
+}
 
 /**
  * Return a Bootstrap-style badge for CIPC status values.
@@ -196,91 +202,8 @@ function toggleBadgeInPlace(badgeEl, newValue) {
   }
 }
 
-// ---------------------------------------------------------------------------
-// Event delegation handler
-// ---------------------------------------------------------------------------
-
-/**
- * Handle click events on compliance badges within the active entities table.
- * Uses SweetAlert2 for confirmation, then calls updateEntityCompliance and
- * toggles the badge in-place on success.
- *
- * @param {MouseEvent} event
- * @param {Array<Object>} entities — Reference to the active entities array
- */
-// Whitelist of fields that can be toggled via badge clicks
+// Whitelist of fields that can be toggled via badge clicks (module-level constant — never changes)
 const ALLOWED_COMPLIANCE_FIELDS = new Set(['arCompliant', 'boCompliant']);
-
-// Local compliance state — avoids mutating passed-in entity objects
-const complianceState = new Map();
-
-function initComplianceState(entities) {
-  for (const entity of entities) {
-    complianceState.set(entity.registrationNumber, {
-      arCompliant: entity.arCompliant === true,
-      boCompliant: entity.boCompliant === true
-    });
-  }
-}
-
-async function handleBadgeClick(event, entities) {
-  const badge = event.target.closest('[data-entity-id][data-field]');
-  if (!badge) return;
-
-  const entityId = badge.getAttribute('data-entity-id');
-  const field = badge.getAttribute('data-field');
-
-  // Validate field against whitelist
-  if (!ALLOWED_COMPLIANCE_FIELDS.has(field)) return;
-
-  const entity = entities.find(e => e.registrationNumber === entityId);
-  if (!entity) return;
-
-  const state = complianceState.get(entityId);
-  if (!state) return;
-
-  const currentValue = state[field] === true;
-  const fieldLabel = field === 'arCompliant' ? 'Annual Return' : 'Beneficial Ownership';
-
-  try {
-    const result = await Swal.fire({
-      title: `Update ${fieldLabel} Status`,
-      text: `Mark ${entity.name} as ${currentValue ? 'Non-Compliant' : 'Compliant'}?`,
-      icon: 'question',
-      showCancelButton: true,
-      confirmButtonColor: currentValue ? '#dc3545' : '#198754',
-      confirmButtonText: currentValue ? 'Mark Non-Compliant' : 'Mark Compliant'
-    });
-
-    if (!result.isConfirmed) return;
-
-    const newValue = !currentValue;
-
-    await updateEntityCompliance(entityId, {
-      [field]: newValue,
-      updatedBy: 'director'
-    });
-
-    // Update local state immutably
-    complianceState.set(entityId, { ...state, [field]: newValue });
-
-    toggleBadgeInPlace(badge, newValue);
-
-    Swal.fire({
-      title: 'Updated',
-      text: `${entity.name} ${fieldLabel} marked as ${newValue ? 'Compliant' : 'Non-Compliant'}.`,
-      icon: 'success',
-      timer: 1500,
-      showConfirmButton: false
-    });
-  } catch (error) {
-    Swal.fire({
-      title: 'Error',
-      text: `Failed to update compliance status: ${error.message}`,
-      icon: 'error'
-    });
-  }
-}
 
 // ---------------------------------------------------------------------------
 // Public API
@@ -298,6 +221,118 @@ export async function renderEntityRegistry(containerId, activeEntities, dormantE
   if (!container) {
     throw new Error(`Entity registry mount target "#${containerId}" not found.`);
   }
+
+  // Fresh compliance state per render — prevents stale entries leaking across
+  // SPA re-renders when renderEntityRegistry is called more than once.
+  const complianceState = new Map();
+
+  // Tracks entity IDs that have an in-flight Firebase write, preventing
+  // concurrent writes from rapid badge toggle clicks.
+  const pendingBadgeUpdates = new Set();
+
+  // ---------------------------------------------------------------------------
+  // Nested helpers that close over the local complianceState
+  // ---------------------------------------------------------------------------
+
+  function initComplianceState(entities) {
+    for (const entity of entities) {
+      complianceState.set(entity.registrationNumber, {
+        arCompliant: entity.arCompliant === true,
+        boCompliant: entity.boCompliant === true
+      });
+    }
+  }
+
+  /**
+   * Handle click events on compliance badges within the active entities table.
+   * Uses SweetAlert2 for confirmation, then calls updateEntityCompliance and
+   * toggles the badge in-place on success.
+   *
+   * @param {MouseEvent}    event
+   * @param {Array<Object>} entities — Reference to the active entities array
+   */
+  async function handleBadgeClick(event, entities) {
+    const badge = event.target.closest('[data-entity-id][data-field]');
+    if (!badge) return;
+
+    const entityId = badge.getAttribute('data-entity-id');
+    const field = badge.getAttribute('data-field');
+
+    // In-flight guard — drop duplicate clicks while a write is pending
+    if (pendingBadgeUpdates.has(entityId)) return;
+    pendingBadgeUpdates.add(entityId);
+
+    // Validate field against whitelist
+    if (!ALLOWED_COMPLIANCE_FIELDS.has(field)) {
+      pendingBadgeUpdates.delete(entityId);
+      return;
+    }
+
+    const entity = entities.find(e => e.registrationNumber === entityId);
+    if (!entity) {
+      pendingBadgeUpdates.delete(entityId);
+      return;
+    }
+
+    const state = complianceState.get(entityId);
+    if (!state) {
+      pendingBadgeUpdates.delete(entityId);
+      return;
+    }
+
+    const currentValue = state[field] === true;
+    const fieldLabel = field === 'arCompliant' ? 'Annual Return' : 'Beneficial Ownership';
+
+    try {
+      const result = await Swal.fire({
+        title: `Update ${fieldLabel} Status`,
+        text: `Mark ${entity.name} as ${currentValue ? 'Non-Compliant' : 'Compliant'}?`,
+        icon: 'question',
+        showCancelButton: true,
+        confirmButtonColor: currentValue ? '#dc3545' : '#198754',
+        confirmButtonText: currentValue ? 'Mark Non-Compliant' : 'Mark Compliant'
+      });
+
+      if (!result.isConfirmed) {
+        pendingBadgeUpdates.delete(entityId);
+        return;
+      }
+
+      const newValue = !currentValue;
+
+      await updateEntityCompliance(entityId, {
+        [field]: newValue,
+        updatedBy: currentUserIdentifier()
+      });
+
+      pendingBadgeUpdates.delete(entityId);
+
+      // Update local state immutably
+      complianceState.set(entityId, { ...state, [field]: newValue });
+
+      toggleBadgeInPlace(badge, newValue);
+
+      Swal.fire({
+        title: 'Updated',
+        text: `${entity.name} ${fieldLabel} marked as ${newValue ? 'Compliant' : 'Non-Compliant'}.`,
+        icon: 'success',
+        timer: 1500,
+        showConfirmButton: false
+      });
+    } catch (error) {
+      pendingBadgeUpdates.delete(entityId);
+
+      Swal.fire({
+        title: 'Error',
+        text: `Failed to update compliance status: ${error.message}`,
+        icon: 'error'
+      });
+    }
+  }
+
+  // ---------------------------------------------------------------------------
+  // Render
+  // ---------------------------------------------------------------------------
 
   // Initialise local compliance state from entity data
   initComplianceState(activeEntities);
