@@ -1,0 +1,274 @@
+/**
+ * ROSS — Restaurant OS Service
+ * Module-specific styles scoped to #ross-app
+ * Version: 1.0.0
+ */
+
+/* ========================================
+   CSS Custom Properties
+   ======================================== */
+#ross-app {
+    --ross-overdue: #dc3545;
+    --ross-due-soon: #ffc107;
+    --ross-complete: #198754;
+    --ross-border-radius: 0.5rem;
+    --ross-transition: 0.15s ease;
+}
+
+/* ========================================
+   Tab Navigation
+   ======================================== */
+#ross-app .nav-tabs {
+    border-bottom: 2px solid #e9ecef;
+}
+
+#ross-app .nav-tabs .nav-link {
+    color: #6c757d;
+    font-size: 0.9rem;
+    border: none;
+    border-bottom: 3px solid transparent;
+    padding: 0.75rem 1.25rem;
+    font-weight: 500;
+    transition: color var(--ross-transition), border-color var(--ross-transition);
+}
+
+#ross-app .nav-tabs .nav-link:hover {
+    color: #0d6efd;
+    border-bottom-color: #0d6efd;
+    background: transparent;
+}
+
+#ross-app .nav-tabs .nav-link.active {
+    color: #0d6efd;
+    font-weight: 600;
+    border-bottom-color: #0d6efd;
+    background: transparent;
+}
+
+/* ========================================
+   Workflow Cards
+   ======================================== */
+#ross-app .workflow-card {
+    border-radius: var(--ross-border-radius);
+    transition: box-shadow var(--ross-transition);
+    border-left: 4px solid #dee2e6;
+}
+
+#ross-app .workflow-card:hover {
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+}
+
+#ross-app .workflow-card.overdue {
+    border-left-color: var(--ross-overdue);
+}
+
+#ross-app .workflow-card.due-soon {
+    border-left-color: var(--ross-due-soon);
+}
+
+#ross-app .workflow-card.normal {
+    border-left-color: #dee2e6;
+}
+
+/* ========================================
+   Alert Strips
+   ======================================== */
+#ross-app .ross-alert-overdue {
+    background-color: #f8d7da;
+    border-color: #f5c2c7;
+    color: #842029;
+    border-radius: var(--ross-border-radius);
+}
+
+#ross-app .ross-alert-due-soon {
+    background-color: #fff3cd;
+    border-color: #ffecb5;
+    color: #664d03;
+    border-radius: var(--ross-border-radius);
+}
+
+/* ========================================
+   Category Badges
+   ======================================== */
+#ross-app .ross-badge-compliance {
+    background-color: #0d6efd !important;
+    color: #fff !important;
+}
+
+#ross-app .ross-badge-operations {
+    background-color: #198754 !important;
+    color: #fff !important;
+}
+
+#ross-app .ross-badge-growth {
+    background-color: #6f42c1 !important;
+    color: #fff !important;
+}
+
+#ross-app .ross-badge-finance {
+    background-color: #ffc107 !important;
+    color: #212529 !important;
+}
+
+#ross-app .ross-badge-hr {
+    background-color: #0dcaf0 !important;
+    color: #212529 !important;
+}
+
+#ross-app .ross-badge-maintenance {
+    background-color: #fd7e14 !important;
+    color: #fff !important;
+}
+
+/* ========================================
+   Progress Bars
+   ======================================== */
+#ross-app .ross-progress-high .progress-bar {
+    background-color: #198754;
+}
+
+#ross-app .ross-progress-mid .progress-bar {
+    background-color: #ffc107;
+}
+
+#ross-app .ross-progress-low .progress-bar {
+    background-color: #dc3545;
+}
+
+/* ========================================
+   Task Checklist Rows
+   ======================================== */
+#ross-app .task-row.completed {
+    text-decoration: line-through;
+    opacity: 0.6;
+}
+
+/* ========================================
+   Builder Step Indicator
+   ======================================== */
+#ross-app .builder-steps {
+    display: flex;
+    align-items: center;
+    gap: 0;
+    margin-bottom: 1.5rem;
+}
+
+#ross-app .builder-step {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 0.25rem;
+    flex: 1;
+    font-size: 0.8rem;
+    color: #6c757d;
+}
+
+#ross-app .builder-step-circle {
+    width: 32px;
+    height: 32px;
+    border-radius: 50%;
+    background-color: #e9ecef;
+    color: #6c757d;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-weight: 600;
+    font-size: 0.85rem;
+    transition: background-color var(--ross-transition), color var(--ross-transition);
+}
+
+#ross-app .builder-step.active .builder-step-circle {
+    background-color: #0d6efd;
+    color: #fff;
+}
+
+#ross-app .builder-step.active .builder-step-label {
+    color: #0d6efd;
+    font-weight: 600;
+}
+
+#ross-app .builder-step.completed .builder-step-circle {
+    background-color: #198754;
+    color: #fff;
+}
+
+#ross-app .builder-step-connector {
+    flex: 1;
+    height: 2px;
+    background-color: #e9ecef;
+    margin-bottom: 1.25rem;
+}
+
+#ross-app .builder-step-connector.completed {
+    background-color: #198754;
+}
+
+/* ========================================
+   Staff Cards
+   ======================================== */
+#ross-app .staff-card {
+    border-radius: var(--ross-border-radius);
+    transition: box-shadow var(--ross-transition);
+}
+
+#ross-app .staff-card:hover {
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+}
+
+#ross-app .staff-avatar {
+    width: 40px;
+    height: 40px;
+    border-radius: 50%;
+    background-color: #e9ecef;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-weight: 600;
+    font-size: 0.9rem;
+    color: #495057;
+    flex-shrink: 0;
+}
+
+/* ========================================
+   Responsive Adjustments
+   ======================================== */
+@media (max-width: 768px) {
+    #ross-app .nav-tabs .nav-link {
+        font-size: 0.85rem;
+        padding: 0.5rem 0.75rem;
+    }
+
+    #ross-app .workflow-card {
+        margin-bottom: 0.75rem;
+    }
+
+    #ross-app .col-md-6,
+    #ross-app .col-md-4,
+    #ross-app .col-md-3 {
+        width: 100%;
+    }
+
+    #ross-app .builder-steps {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 0.5rem;
+    }
+
+    #ross-app .builder-step {
+        flex-direction: row;
+        gap: 0.75rem;
+        width: 100%;
+    }
+
+    #ross-app .builder-step-connector {
+        width: 2px;
+        height: 16px;
+        margin-bottom: 0;
+        margin-left: 15px;
+    }
+
+    #ross-app .staff-card {
+        width: 100%;
+        margin-bottom: 0.75rem;
+    }
+}

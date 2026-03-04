@@ -1,4 +1,5 @@
-const { LRUCache } = require('lru-cache');
+const _lruCache = require('lru-cache');
+const LRUCache = _lruCache.LRUCache || _lruCache;
 
 /**
  * Queue Performance Optimization and Caching

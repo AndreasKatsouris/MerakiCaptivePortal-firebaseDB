@@ -18,6 +18,7 @@
     <link href="css/table-fixes.css" rel="stylesheet">
     <link href="css/receipt-settings.css" rel="stylesheet">
     <link href="css/project-management.css" rel="stylesheet">
+    <link href="css/ross.css" rel="stylesheet">
 
     <!-- Vue.js - Use production version -->
     <script src="https://unpkg.com/vue@3/dist/vue.global.prod.js"></script>
@@ -387,6 +388,13 @@
                                     data-section="projectManagementContent">
                                     <i class="fas fa-tasks"></i>
                                     Project Management
+                                </a>
+                            </li>
+                            <li class="nav-item">
+                                <a href="#" id="rossMenu" class="nav-link"
+                                    data-section="rossContent">
+                                    <i class="fas fa-robot"></i>
+                                    ROSS
                                 </a>
                             </li>
                             <li class="nav-item">
@@ -1196,6 +1204,13 @@
             <!-- Project Management Section -->
             <div id="projectManagementContent" class="content-section dashboard-content d-none">
                 <div id="project-management-app">
+                    <!-- Vue will mount here -->
+                </div>
+            </div>
+
+            <!-- ROSS — Restaurant OS Service Section -->
+            <div id="rossContent" class="content-section dashboard-content d-none">
+                <div id="ross-app">
                     <!-- Vue will mount here -->
                 </div>
             </div>

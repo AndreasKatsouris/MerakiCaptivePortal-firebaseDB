@@ -189,7 +189,7 @@ exports.triggerSubscriptionStatusCheck = functions.https.onCall(
  * Database trigger: Check subscription status when trialEndDate is updated
  */
 exports.onTrialEndDateUpdate = onValueWritten(
-  { ref: 'subscriptions/{userId}/trialEndDate' },
+  'subscriptions/{userId}/trialEndDate',
   async (event) => {
     const { userId } = event.params;
 
@@ -222,7 +222,7 @@ exports.onTrialEndDateUpdate = onValueWritten(
  * Database trigger: Check subscription status when renewalDate is updated
  */
 exports.onRenewalDateUpdate = onValueWritten(
-  { ref: 'subscriptions/{userId}/renewalDate' },
+  'subscriptions/{userId}/renewalDate',
   async (event) => {
     const { userId } = event.params;
 

@@ -10,14 +10,13 @@ console.log('TWILIO_TOKEN:', authToken || 'Not set'); //'Set' : 'Not set');
 console.log('TWILIO_PHONE:', twilioPhone || 'Not set');
 
 if (!accountSid || !authToken || !twilioPhone) {
-    console.error("Twilio credentials are not set. Ensure TWILIO_SID, TWILIO_TOKEN, and TWILIO_PHONE are defined.");
-    throw new Error("Missing Twilio credentials.");
+    console.warn("Twilio credentials are not set. Twilio-dependent functions will be unavailable.");
 }
 
-const client = twilio(accountSid, authToken);
+const client = (accountSid && authToken) ? twilio(accountSid, authToken) : null;
 
 module.exports = {
     client,
-    twilioPhone,
+    twilioPhone: twilioPhone || null,
 };
 

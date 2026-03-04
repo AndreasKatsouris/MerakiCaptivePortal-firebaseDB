@@ -203,6 +203,7 @@ import { AdminUserManagement } from './admin/user-management.js';
 import { initializeUsersLocationsManagement } from './admin/users-locations-management.js';
 import { initializeDashboard } from './dashboard.js';
 import { initializeProjectManagement, cleanupProjectManagement } from './modules/project-management/index.js';
+import { initializeRoss, cleanupRoss } from './modules/ross/index.js';
 import { initializeGuestManagement, cleanupGuestManagement } from './guest-management.js';
 import { initializeQueueManagement, cleanupQueueManagement } from './queue-management.js';
 import { initializeCampaignManagement, cleanupCampaignManagement } from './campaigns/campaigns.js';
@@ -431,6 +432,14 @@ class AdminDashboard {
             contentId: 'projectManagementContent',
             init: initializeProjectManagement,
             cleanup: cleanupProjectManagement,
+            parent: 'driversSubmenu'
+        });
+
+        this.sections.set('rossContent', {
+            menuId: 'rossMenu',
+            contentId: 'rossContent',
+            init: initializeRoss,
+            cleanup: cleanupRoss,
             parent: 'driversSubmenu'
         });
 
@@ -1205,6 +1214,12 @@ class AdminDashboard {
                     if (!this.sectionInitialized.projectManagementContent) {
                         await initializeProjectManagement();
                         this.sectionInitialized.projectManagementContent = true;
+                    }
+                    break;
+                case 'rossContent':
+                    if (!this.sectionInitialized.rossContent) {
+                        await initializeRoss();
+                        this.sectionInitialized.rossContent = true;
                     }
                     break;
                 case 'adminUsersContent':
