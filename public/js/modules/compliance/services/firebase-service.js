@@ -58,7 +58,8 @@ export async function loadObligations() {
  * @returns {Promise<Object>} Nested map: entityId -> obligationId -> filing
  */
 export async function loadFilings(year) {
-  const snapshot = await get(ref(rtdb, `${BASE_PATH}/filings/${year}`));
+  const safeYear = validatePathSegment(String(year), 'year');
+  const snapshot = await get(ref(rtdb, `${BASE_PATH}/filings/${safeYear}`));
   return snapshot.val() || {};
 }
 
@@ -101,56 +102,3 @@ export async function updateEntityCompliance(entityId, flags) {
   });
 }
 
-// ---------------------------------------------------------------------------
-// Settings
-// ---------------------------------------------------------------------------
-
-/**
- * Load reminder / notification settings for the compliance module.
- * @returns {Promise<Object>}
- */
-export async function loadReminderSettings() {
-  const snapshot = await get(ref(rtdb, `${BASE_PATH}/settings`));
-  return snapshot.val() || {};
-}
-
-// ---------------------------------------------------------------------------
-// Seed / Bootstrap
-// ---------------------------------------------------------------------------
-
-/**
- * Write initial seed data (entities, obligations, settings) into RTDB.
- * Skips the write if the entities node already exists to prevent
- * accidental overwrites.
- *
- * @param {Object} entities    — Map of registrationNumber -> entity
- * @param {Object} obligations — Map of obligationId -> obligation
- * @param {Object} settings    — Default reminder/notification settings
- * @returns {Promise<{seeded: boolean, message: string}>}
- */
-export async function seedComplianceData(entities, obligations, settings) {
-  const existingSnapshot = await get(ref(rtdb, `${BASE_PATH}/entities`));
-
-  if (existingSnapshot.exists()) {
-    return {
-      seeded: false,
-      message: 'Compliance data already exists — seed skipped.'
-    };
-  }
-
-  const now = new Date().toISOString();
-
-  await set(ref(rtdb, BASE_PATH), {
-    entities,
-    obligations,
-    settings: {
-      ...settings,
-      seededAt: now
-    }
-  });
-
-  return {
-    seeded: true,
-    message: 'Compliance seed data written successfully.'
-  };
-}
