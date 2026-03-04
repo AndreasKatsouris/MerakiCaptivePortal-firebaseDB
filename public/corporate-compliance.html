@@ -7,10 +7,12 @@
     <meta http-equiv="Pragma" content="no-cache" />
     <meta http-equiv="Expires" content="0" />
     <title>Corporate Compliance — Sparks Hospitality</title>
-    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
-    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet"
+          integrity="sha384-9ndCyUaIbzAi2FUVXJi0CjmCapSmO7SnpJef0486qhLnuZ2cdeRhO02iuK6FUUVM" crossorigin="anonymous">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet"
+          integrity="sha384-gn5yKJkEGhTEnG9+YVzLrI1HwAOMSLuUlL7fBRm6J6VdNaVuQGpTcT72yiEiqzM" crossorigin="anonymous">
     <link href="css/corporate-compliance.css" rel="stylesheet">
-    <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+    <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11.14.5/dist/sweetalert2.all.min.js" crossorigin="anonymous"></script>
 </head>
 <body>
 
@@ -122,7 +124,8 @@
 </nav>
 
 <!-- Scripts -->
-<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"
+        integrity="sha384-ENjdO4Dr2bkBIFxQpeoTz1HIcje39Wm4jDKdf19U8gI4ddQ3GYNS7NTKfAdVzdl1" crossorigin="anonymous"></script>
 
 <script type="module">
     import { initializeComplianceModule } from './js/modules/compliance/index.js?v=1.0.0';
@@ -135,30 +138,29 @@
                 return;
             }
 
-            const idTokenResult = await user.getIdTokenResult();
-            if (!idTokenResult.claims.admin) {
-                document.getElementById('compliance-app').innerHTML = `
-                    <div class="alert alert-danger mt-4">
-                        <i class="fas fa-lock me-2"></i>
-                        Access restricted. This module is available to directors only.
-                    </div>`;
-                return;
-            }
-
             try {
+                const idTokenResult = await user.getIdTokenResult();
+                if (!idTokenResult.claims.admin) {
+                    document.getElementById('compliance-app').innerHTML =
+                        '<div class="alert alert-danger mt-4">' +
+                        '<i class="fas fa-lock me-2"></i>' +
+                        'Access restricted. This module is available to directors only.' +
+                        '</div>';
+                    return;
+                }
                 await initializeComplianceModule('compliance-app');
             } catch (error) {
                 const el = document.getElementById('compliance-app');
-                const alert = document.createElement('div');
-                alert.className = 'alert alert-danger mt-4';
+                const alertDiv = document.createElement('div');
+                alertDiv.className = 'alert alert-danger mt-4';
                 const h5 = document.createElement('h5');
                 h5.textContent = 'Initialisation Error';
                 const p = document.createElement('p');
                 p.textContent = error.message;
-                alert.appendChild(h5);
-                alert.appendChild(p);
+                alertDiv.appendChild(h5);
+                alertDiv.appendChild(p);
                 el.innerHTML = '';
-                el.appendChild(alert);
+                el.appendChild(alertDiv);
             }
         });
     });
