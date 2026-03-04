@@ -591,6 +591,11 @@ class AdminDashboard {
             parent: 'settingsSubmenu'
         });
 
+        this.sections.set('corporateComplianceContent', {
+            menuId: 'corporateComplianceMenu',
+            contentId: 'corporateComplianceContent'
+        });
+
         this.sections.set('adminToolsContent', {
             menuId: 'adminToolsMenu',
             contentId: 'adminToolsContent',
