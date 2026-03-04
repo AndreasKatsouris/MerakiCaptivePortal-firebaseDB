@@ -10,6 +10,20 @@
 import { updateFilingStatus, loadFilings } from '../services/firebase-service.js';
 import { calculateNextDueDate, formatDueDate, getFilingStatus } from '../utils/deadline-calculator.js';
 import { escapeHtml, escapeAttr } from '../utils/html-escape.js';
+import { auth } from '../../../config/firebase-config.js';
+
+// ---------------------------------------------------------------------------
+// Auth helper
+// ---------------------------------------------------------------------------
+
+/**
+ * Returns the current authenticated user's email, uid, or 'unknown' as fallback.
+ * @returns {string}
+ */
+function currentUserIdentifier() {
+  const user = auth.currentUser;
+  return user ? (user.email || user.uid) : 'unknown';
+}
 
 // ---------------------------------------------------------------------------
 // Constants
@@ -388,6 +402,9 @@ async function handleMarkFiled(event, obligations, activeEntities, year, filings
 
   const todayISO = new Date().toISOString().split('T')[0];
 
+  const actionBtn = document.querySelector(`tr[data-obligation-id="${CSS.escape(obligationId)}"] .action-cell button`);
+  if (actionBtn) actionBtn.disabled = true;
+
   try {
     const result = await Swal.fire({
       title: `Mark "${escapeHtml(obligation.name)}" as Filed`,
@@ -398,11 +415,11 @@ async function handleMarkFiled(event, obligations, activeEntities, year, filings
         </div>
         <div class="mb-3">
           <label class="form-label">Filed By</label>
-          <input type="text" id="swal-filed-by" class="form-control" placeholder="e.g., Lourens Kruger">
+          <input type="text" id="swal-filed-by" class="form-control" placeholder="e.g., Lourens Kruger" maxlength="200">
         </div>
         <div class="mb-3">
           <label class="form-label">Notes (optional)</label>
-          <textarea id="swal-notes" class="form-control" rows="2"></textarea>
+          <textarea id="swal-notes" class="form-control" rows="2" maxlength="1000"></textarea>
         </div>
       `,
       showCancelButton: true,
@@ -420,11 +437,20 @@ async function handleMarkFiled(event, obligations, activeEntities, year, filings
           Swal.showValidationMessage('Please enter who filed this.');
           return false;
         }
+        if (filedBy.length > 200) {
+          Swal.showValidationMessage('Filed by must be 200 characters or fewer.');
+          return false;
+        }
+        const notes = document.getElementById('swal-notes').value.trim();
+        if (notes.length > 1000) {
+          Swal.showValidationMessage('Notes must be 1000 characters or fewer.');
+          return false;
+        }
 
         return {
           filedDate,
           filedBy: filedBy.trim(),
-          notes: document.getElementById('swal-notes').value.trim()
+          notes
         };
       }
     });
@@ -433,36 +459,34 @@ async function handleMarkFiled(event, obligations, activeEntities, year, filings
 
     const formValues = result.value;
 
-    // Write to Firebase for each applicable entity
-    for (const entityId of entityIds) {
-      await updateFilingStatus(year, entityId, obligationId, {
-        status: 'filed',
-        dueDate: dueDateISO,
-        filedDate: formValues.filedDate,
-        filedBy: formValues.filedBy,
-        notes: formValues.notes,
-        updatedBy: 'director'
-      });
+    // Build the shared filing record once
+    const filingRecord = {
+      status: 'filed',
+      dueDate: dueDateISO,
+      filedDate: formValues.filedDate,
+      filedBy: formValues.filedBy,
+      notes: formValues.notes,
+      updatedBy: currentUserIdentifier()
+    };
 
-      // Build updated filings immutably
-      const filingRecord = {
-        status: 'filed',
-        dueDate: dueDateISO,
-        filedDate: formValues.filedDate,
-        filedBy: formValues.filedBy,
-        notes: formValues.notes,
-        updatedBy: 'director'
-      };
-      const updatedFilings = {
-        ...filingsRef,
-        [entityId]: {
-          ...(filingsRef[entityId] || {}),
-          [obligationId]: filingRecord
-        }
-      };
-      filingsRef = updatedFilings;
-      setFilings(updatedFilings);
-    }
+    // Write all entities in parallel
+    await Promise.all(
+      entityIds.map(entityId =>
+        updateFilingStatus(year, entityId, obligationId, filingRecord)
+      )
+    );
+
+    // Build updated state immutably in one pass
+    const updatedFilings = entityIds.reduce((acc, entityId) => ({
+      ...acc,
+      [entityId]: {
+        ...(acc[entityId] || {}),
+        [obligationId]: filingRecord
+      }
+    }), filingsRef);
+
+    setFilings(updatedFilings);
+    filingsRef = updatedFilings;
 
     // Update the row in-place
     const row = document.querySelector(`tr[data-obligation-id="${CSS.escape(obligationId)}"]`);
@@ -478,6 +502,8 @@ async function handleMarkFiled(event, obligations, activeEntities, year, filings
       }
     }
 
+    if (actionBtn) actionBtn.disabled = false;
+
     Swal.fire({
       title: 'Filed',
       text: `${obligation.name} marked as filed for ${entityIds.length} ${entityIds.length === 1 ? 'entity' : 'entities'}.`,
@@ -486,6 +512,8 @@ async function handleMarkFiled(event, obligations, activeEntities, year, filings
       showConfirmButton: false
     });
   } catch (error) {
+    if (actionBtn) actionBtn.disabled = false;
+
     Swal.fire({
       title: 'Error',
       text: `Failed to update filing status: ${error.message}`,
