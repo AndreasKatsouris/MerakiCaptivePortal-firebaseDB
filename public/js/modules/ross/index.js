@@ -1518,7 +1518,7 @@ export async function initializeRoss() {
                 });
                 if (!result.isConfirmed) return;
                 try {
-                    await rossService.deleteWorkflow(this.locationId, workflow.workflowId);
+                    await rossService.deleteWorkflow(workflow.workflowId);
                     this.workflows = this.workflows.filter(w => w.workflowId !== workflow.workflowId);
                     await Swal.fire('Deleted', 'Workflow removed.', 'success');
                 } catch (err) {
@@ -1531,7 +1531,7 @@ export async function initializeRoss() {
                 const newStatus = workflow.status === 'active' ? 'paused' : 'active';
                 try {
                     await rossService.updateWorkflow(
-                        this.locationId, workflow.workflowId, { status: newStatus }
+                        workflow.workflowId, { status: newStatus }
                     );
                     this.workflows = this.workflows.map(w =>
                         w.workflowId === workflow.workflowId ? { ...w, status: newStatus } : w
