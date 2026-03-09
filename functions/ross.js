@@ -147,6 +147,9 @@ exports.rossUpdateTemplate = onRequest(async (req, res) => {
             const data = req.body.data || req.body;
             const { templateId, updates } = data;
             if (!templateId) return res.status(400).json({ error: 'Template ID is required' });
+            if (!updates || typeof updates !== 'object') {
+                return res.status(400).json({ error: 'updates object is required' });
+            }
 
             const templateRef = db.ref(`ross/templates/${templateId}`);
             const snapshot = await templateRef.once('value');
@@ -363,6 +366,9 @@ exports.rossUpdateWorkflow = onRequest(async (req, res) => {
             const data = req.body.data || req.body;
             const { workflowId, updates } = data;
             if (!workflowId) return res.status(400).json({ error: 'Workflow ID is required' });
+            if (!updates || typeof updates !== 'object') {
+                return res.status(400).json({ error: 'updates object is required' });
+            }
 
             const workflowRef = db.ref(`ross/workflows/${uid}/${workflowId}`);
             const snap = await workflowRef.once('value');
