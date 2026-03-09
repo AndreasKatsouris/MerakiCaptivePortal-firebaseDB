@@ -1041,28 +1041,18 @@ export async function initializeRoss() {
             // ------------------------------------------------------------------
             switchTab(tab) {
                 this.currentTab = tab;
-                const version = ++this.tabVersion;
+                ++this.tabVersion;
                 if (tab === 'overview') {
-                    this.loadOverview().then(() => {
-                        if (version !== this.tabVersion) return;
-                    });
+                    this.loadOverview();
                 } else if (tab === 'templates') {
-                    this.loadTemplates().then(() => {
-                        if (version !== this.tabVersion) return;
-                    });
+                    this.loadTemplates();
                 } else if (tab === 'workflows') {
                     this.selectedWorkflow = null;
-                    this.loadWorkflows().then(() => {
-                        if (version !== this.tabVersion) return;
-                    });
+                    this.loadWorkflows();
                 } else if (tab === 'reports') {
-                    this.loadReports().then(() => {
-                        if (version !== this.tabVersion) return;
-                    });
+                    this.loadReports();
                 } else if (tab === 'staff') {
-                    this.loadStaff().then(() => {
-                        if (version !== this.tabVersion) return;
-                    });
+                    this.loadStaff();
                 }
             },
 
@@ -1219,9 +1209,11 @@ export async function initializeRoss() {
             // View 2 — Template Library
             // ------------------------------------------------------------------
             async loadTemplates() {
+                const version = this.tabVersion;
                 this.templatesLoading = true;
                 try {
                     const raw = await rossService.getTemplates();
+                    if (version !== this.tabVersion) return;
                     this.templates = Array.isArray(raw)
                         ? raw
                         : Array.isArray(raw?.templates)
@@ -1439,9 +1431,11 @@ export async function initializeRoss() {
             // ------------------------------------------------------------------
             async loadWorkflows() {
                 if (!this.locationId) return;
+                const version = this.tabVersion;
                 this.workflowsLoading = true;
                 try {
                     const raw = await rossService.getWorkflows(this.locationId);
+                    if (version !== this.tabVersion) return;
                     const rawList = Array.isArray(raw) ? raw
                         : Array.isArray(raw?.workflows) ? raw.workflows
                         : Object.values(raw || {});
@@ -1644,9 +1638,11 @@ export async function initializeRoss() {
             // ------------------------------------------------------------------
             async loadReports() {
                 if (!this.locationId) return;
+                const version = this.tabVersion;
                 this.reportsLoading = true;
                 try {
                     const raw = await rossService.getReports(this.locationId);
+                    if (version !== this.tabVersion) return;
                     this.reportData = Array.isArray(raw)
                         ? raw
                         : Array.isArray(raw?.report)
@@ -1665,9 +1661,11 @@ export async function initializeRoss() {
             // ------------------------------------------------------------------
             async loadStaff() {
                 if (!this.staffLocationId) { this.staffMembers = []; return; }
+                const version = this.tabVersion;
                 this.staffLoading = true;
                 try {
                     const raw = await rossService.getStaff(this.staffLocationId);
+                    if (version !== this.tabVersion) return;
                     this.staffMembers = Array.isArray(raw)
                         ? raw
                         : Array.isArray(raw?.staff)
