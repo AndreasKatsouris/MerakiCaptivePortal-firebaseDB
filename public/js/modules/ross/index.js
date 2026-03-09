@@ -12,7 +12,8 @@ import { rossService } from './services/ross-service.js';
 // ---------------------------------------------------------------------------
 const rossState = {
     app: null,
-    locationId: null
+    locationId: null,
+    authUnsubscribe: null
 };
 
 // ---------------------------------------------------------------------------
@@ -98,6 +99,10 @@ const RECURRENCE_LABELS = {
 // initializeRoss
 // ---------------------------------------------------------------------------
 export async function initializeRoss() {
+    if (rossState.app) {
+        cleanupRoss();
+    }
+
     const container = document.getElementById('ross-app');
     if (!container) {
         console.error('[ROSS] Container #ross-app not found');
@@ -327,7 +332,7 @@ export async function initializeRoss() {
     <div v-if="currentTab === 'templates'">
 
         <!-- Loading -->
-        <div v-if="tabLoading" class="text-center py-5">
+        <div v-if="templatesLoading" class="text-center py-5">
             <div class="spinner-border text-primary" role="status">
                 <span class="visually-hidden">Loading...</span>
             </div>
@@ -493,7 +498,7 @@ export async function initializeRoss() {
     <div v-if="currentTab === 'workflows'">
 
         <!-- Loading -->
-        <div v-if="tabLoading" class="text-center py-5">
+        <div v-if="workflowsLoading" class="text-center py-5">
             <div class="spinner-border text-primary" role="status">
                 <span class="visually-hidden">Loading...</span>
             </div>
@@ -792,7 +797,7 @@ export async function initializeRoss() {
     <div v-if="currentTab === 'reports'">
 
         <!-- Loading -->
-        <div v-if="tabLoading" class="text-center py-5">
+        <div v-if="reportsLoading" class="text-center py-5">
             <div class="spinner-border text-primary" role="status">
                 <span class="visually-hidden">Loading...</span>
             </div>
@@ -930,9 +935,16 @@ export async function initializeRoss() {
 
         data() {
             return {
+                // Module state
+                locationId: rossState.locationId,
+
                 // Navigation
                 currentTab: 'overview',
-                tabLoading: false,
+                tabVersion: 0,
+                workflowsLoading: false,
+                templatesLoading: false,
+                reportsLoading: false,
+                staffLoading: false,
 
                 // Location picker (for admins without a locationId claim)
                 availableLocations: [],
@@ -955,7 +967,6 @@ export async function initializeRoss() {
 
                 // View 2 — Template Library
                 templateFilter: 'all',
-                isSuperAdmin: false,
                 CATEGORY_LABELS,
                 RECURRENCE_LABELS,
                 templateEditor: null, // null = closed | { mode, templateId?, form }
@@ -985,14 +996,13 @@ export async function initializeRoss() {
 
                 // View 6 — Staff Management
                 staffLocationId: '',
-                staffMembers: [],
-                staffLoading: false
+                staffMembers: []
             };
         },
 
         computed: {
             showLocationPicker() {
-                return !rossState.locationId;
+                return !this.locationId;
             },
             visibleAlerts() {
                 return this.overdueAlerts
@@ -1031,6 +1041,7 @@ export async function initializeRoss() {
             // ------------------------------------------------------------------
             switchTab(tab) {
                 this.currentTab = tab;
+                ++this.tabVersion;
                 if (tab === 'overview') {
                     this.loadOverview();
                 } else if (tab === 'templates') {
@@ -1049,7 +1060,7 @@ export async function initializeRoss() {
             // View 1 — Overview
             // ------------------------------------------------------------------
             async loadOverview() {
-                if (!rossState.locationId) {
+                if (!this.locationId) {
                     this.overviewError = 'No location selected. Please select a location first.';
                     return;
                 }
@@ -1058,7 +1069,7 @@ export async function initializeRoss() {
                 this.overviewError = null;
 
                 try {
-                    const raw = await rossService.getWorkflows(rossState.locationId);
+                    const raw = await rossService.getWorkflows(this.locationId);
                     const rawList = Array.isArray(raw) ? raw
                         : Array.isArray(raw?.workflows) ? raw.workflows
                         : Object.values(raw || {});
@@ -1159,7 +1170,7 @@ export async function initializeRoss() {
             },
 
             async completeTask(task) {
-                if (!rossState.locationId) return;
+                if (!this.locationId) return;
 
                 // Immutable flag update
                 this.todayTasks = this.todayTasks.map(t =>
@@ -1168,7 +1179,7 @@ export async function initializeRoss() {
 
                 try {
                     await rossService.completeTask(
-                        rossState.locationId,
+                        this.locationId,
                         task.workflowId,
                         task.taskId
                     );
@@ -1198,9 +1209,11 @@ export async function initializeRoss() {
             // View 2 — Template Library
             // ------------------------------------------------------------------
             async loadTemplates() {
-                this.tabLoading = true;
+                const version = this.tabVersion;
+                this.templatesLoading = true;
                 try {
                     const raw = await rossService.getTemplates();
+                    if (version !== this.tabVersion) return;
                     this.templates = Array.isArray(raw)
                         ? raw
                         : Array.isArray(raw?.templates)
@@ -1210,17 +1223,30 @@ export async function initializeRoss() {
                     console.error('[ROSS] loadTemplates error:', err);
                     await Swal.fire('Error', 'Failed to load templates: ' + err.message, 'error');
                 } finally {
-                    this.tabLoading = false;
+                    this.templatesLoading = false;
                 }
             },
 
             async loadAvailableLocations() {
                 this.locationsLoading = true;
                 try {
-                    const snap = await get(ref(rtdb, 'locations'));
-                    const raw = snap.val() || {};
-                    this.availableLocations = Object.entries(raw)
-                        .map(([id, loc]) => ({ id, name: loc.name || id }))
+                    const user = auth.currentUser;
+                    if (!user) {
+                        this.availableLocations = [];
+                        return;
+                    }
+                    const userLocSnap = await get(ref(rtdb, `userLocations/${user.uid}`));
+                    const locationIds = userLocSnap.exists()
+                        ? Object.keys(userLocSnap.val())
+                        : [];
+                    const locationEntries = await Promise.all(
+                        locationIds.map(async (id) => {
+                            const locSnap = await get(ref(rtdb, `locations/${id}`));
+                            const loc = locSnap.val() || {};
+                            return { id, name: loc.name || id };
+                        })
+                    );
+                    this.availableLocations = locationEntries
                         .sort((a, b) => a.name.localeCompare(b.name));
                 } catch (err) {
                     console.error('[ROSS] loadAvailableLocations error:', err);
@@ -1231,26 +1257,19 @@ export async function initializeRoss() {
 
             applyPickedLocation() {
                 if (!this.pickedLocationId) return;
+                this.locationId = this.pickedLocationId;
                 rossState.locationId = this.pickedLocationId;
                 this.staffLocationId = this.pickedLocationId;
+                this.builder = {
+                    step: 1, name: '', category: 'operations', recurrence: 'monthly',
+                    nextDueDate: '', subtasks: [], daysBeforeAlert: [30, 7],
+                    notifyPhone: '', notifyEmail: ''
+                };
                 this.loadOverview();
             },
 
-            async checkSuperAdmin() {
-                try {
-                    const user = auth.currentUser;
-                    if (!user) return;
-                    const snap = await new Promise(resolve => {
-                        onValue(ref(rtdb, `admins/${user.uid}`), resolve, { onlyOnce: true });
-                    });
-                    this.isSuperAdmin = !!(snap.val() && snap.val().superAdmin);
-                } catch (e) {
-                    this.isSuperAdmin = false;
-                }
-            },
-
             async activateTemplate(template) {
-                if (!rossState.locationId) {
+                if (!this.locationId) {
                     await Swal.fire('No Location', 'Please select a location first.', 'warning');
                     return;
                 }
@@ -1284,7 +1303,7 @@ export async function initializeRoss() {
                 try {
                     await rossService.activateWorkflow({
                         templateId: template.templateId,
-                        locationIds: [rossState.locationId],
+                        locationIds: [this.locationId],
                         name: formValues.name,
                         nextDueDate: formValues.nextDueDate
                     });
@@ -1411,10 +1430,12 @@ export async function initializeRoss() {
             // View 3 — My Workflows
             // ------------------------------------------------------------------
             async loadWorkflows() {
-                if (!rossState.locationId) return;
-                this.tabLoading = true;
+                if (!this.locationId) return;
+                const version = this.tabVersion;
+                this.workflowsLoading = true;
                 try {
-                    const raw = await rossService.getWorkflows(rossState.locationId);
+                    const raw = await rossService.getWorkflows(this.locationId);
+                    if (version !== this.tabVersion) return;
                     const rawList = Array.isArray(raw) ? raw
                         : Array.isArray(raw?.workflows) ? raw.workflows
                         : Object.values(raw || {});
@@ -1427,7 +1448,7 @@ export async function initializeRoss() {
                     console.error('[ROSS] loadWorkflows error:', err);
                     await Swal.fire('Error', 'Failed to load workflows: ' + err.message, 'error');
                 } finally {
-                    this.tabLoading = false;
+                    this.workflowsLoading = false;
                 }
             },
 
@@ -1451,7 +1472,7 @@ export async function initializeRoss() {
                 const wf = this.selectedWorkflow;
                 try {
                     await rossService.manageTask(
-                        rossState.locationId, wf.workflowId, 'update',
+                        this.locationId, wf.workflowId, 'update',
                         task._taskId, { assignedTo: staffId || null }
                     );
                     this.selectedWorkflow = {
@@ -1481,7 +1502,7 @@ export async function initializeRoss() {
                 });
                 if (!result.isConfirmed) return;
                 try {
-                    await rossService.completeTask(rossState.locationId, wf.workflowId, task._taskId);
+                    await rossService.completeTask(this.locationId, wf.workflowId, task._taskId);
                     const updatedTasks = { ...wf.tasks };
                     updatedTasks[task._taskId] = {
                         ...updatedTasks[task._taskId],
@@ -1506,7 +1527,7 @@ export async function initializeRoss() {
                 });
                 if (!result.isConfirmed) return;
                 try {
-                    await rossService.deleteWorkflow(rossState.locationId, workflow.workflowId);
+                    await rossService.deleteWorkflow(workflow.workflowId);
                     this.workflows = this.workflows.filter(w => w.workflowId !== workflow.workflowId);
                     await Swal.fire('Deleted', 'Workflow removed.', 'success');
                 } catch (err) {
@@ -1519,7 +1540,7 @@ export async function initializeRoss() {
                 const newStatus = workflow.status === 'active' ? 'paused' : 'active';
                 try {
                     await rossService.updateWorkflow(
-                        rossState.locationId, workflow.workflowId, { status: newStatus }
+                        workflow.workflowId, { status: newStatus }
                     );
                     this.workflows = this.workflows.map(w =>
                         w.workflowId === workflow.workflowId ? { ...w, status: newStatus } : w
@@ -1569,7 +1590,7 @@ export async function initializeRoss() {
             },
 
             async builderSave() {
-                if (!rossState.locationId) {
+                if (!this.locationId) {
                     await Swal.fire('No Location', 'Please select a location first.', 'warning');
                     return;
                 }
@@ -1592,7 +1613,7 @@ export async function initializeRoss() {
                         name: this.builder.name,
                         category: this.builder.category,
                         recurrence: this.builder.recurrence,
-                        locationIds: [rossState.locationId],
+                        locationIds: [this.locationId],
                         nextDueDate,
                         subtasks,
                         daysBeforeAlert: this.builder.daysBeforeAlert,
@@ -1616,10 +1637,12 @@ export async function initializeRoss() {
             // View 5 — Reports
             // ------------------------------------------------------------------
             async loadReports() {
-                if (!rossState.locationId) return;
-                this.tabLoading = true;
+                if (!this.locationId) return;
+                const version = this.tabVersion;
+                this.reportsLoading = true;
                 try {
-                    const raw = await rossService.getReports(rossState.locationId);
+                    const raw = await rossService.getReports(this.locationId);
+                    if (version !== this.tabVersion) return;
                     this.reportData = Array.isArray(raw)
                         ? raw
                         : Array.isArray(raw?.report)
@@ -1629,7 +1652,7 @@ export async function initializeRoss() {
                     console.error('[ROSS] loadReports error:', err);
                     await Swal.fire('Error', 'Failed to load reports: ' + err.message, 'error');
                 } finally {
-                    this.tabLoading = false;
+                    this.reportsLoading = false;
                 }
             },
 
@@ -1638,9 +1661,11 @@ export async function initializeRoss() {
             // ------------------------------------------------------------------
             async loadStaff() {
                 if (!this.staffLocationId) { this.staffMembers = []; return; }
+                const version = this.tabVersion;
                 this.staffLoading = true;
                 try {
                     const raw = await rossService.getStaff(this.staffLocationId);
+                    if (version !== this.tabVersion) return;
                     this.staffMembers = Array.isArray(raw)
                         ? raw
                         : Array.isArray(raw?.staff)
@@ -1834,10 +1859,8 @@ export async function initializeRoss() {
         },
 
         mounted() {
-            this.checkSuperAdmin();
-            if (rossState.locationId) {
-                this.staffLocationId = rossState.locationId;
-                this.loadStaff();
+            if (this.locationId) {
+                this.staffLocationId = this.locationId;
                 this.loadOverview();
             } else {
                 this.loadAvailableLocations();
@@ -1846,6 +1869,13 @@ export async function initializeRoss() {
     });
 
     rossState.app.mount(container);
+
+    rossState.authUnsubscribe = auth.onAuthStateChanged((user) => {
+        if (!user && rossState.app) {
+            cleanupRoss();
+        }
+    });
+
     return rossState.app;
 }
 
@@ -1860,6 +1890,11 @@ export function cleanupRoss() {
             console.error('[ROSS] Error unmounting Vue app:', err);
         }
         rossState.app = null;
+    }
+
+    if (rossState.authUnsubscribe) {
+        rossState.authUnsubscribe();
+        rossState.authUnsubscribe = null;
     }
 
     rossState.locationId = null;

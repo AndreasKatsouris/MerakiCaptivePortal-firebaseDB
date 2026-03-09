@@ -84,7 +84,8 @@ exports.rossGetTemplates = onRequest(async (req, res) => {
             res.json({ result: { success: true, templates } });
         } catch (error) {
             console.error('[rossGetTemplates] Error:', error.message);
-            res.status(error.message.includes('Admin') ? 403 : 401).json({ error: error.message });
+            const statusCode = (error.message.includes('Admin') || error.message.includes('Super Admin')) ? 403 : 500;
+            res.status(statusCode).json({ error: error.message });
         }
     });
 });
@@ -98,7 +99,7 @@ exports.rossCreateTemplate = onRequest(async (req, res) => {
         if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' });
         try {
             const decodedToken = await verifyAuthToken(req);
-            const { uid } = await verifyAdmin(decodedToken);
+            const uid = await verifySuperAdmin(decodedToken);
 
             const data = req.body.data || req.body;
             const { name, category, description, recurrence, daysBeforeAlert, subtasks, tags } = data;
@@ -116,7 +117,9 @@ exports.rossCreateTemplate = onRequest(async (req, res) => {
                 category,
                 description: description?.trim() || '',
                 recurrence,
-                daysBeforeAlert: Array.isArray(daysBeforeAlert) ? daysBeforeAlert : [30, 7],
+                daysBeforeAlert: Array.isArray(daysBeforeAlert)
+                    ? daysBeforeAlert.filter(d => Number.isInteger(d) && d > 0)
+                    : [30, 7],
                 subtasks: Array.isArray(subtasks) ? subtasks : [],
                 notificationChannels: ['in_app'],
                 tags: Array.isArray(tags) ? tags : [],
@@ -128,7 +131,8 @@ exports.rossCreateTemplate = onRequest(async (req, res) => {
             res.json({ result: { success: true, templateId, template: templateData } });
         } catch (error) {
             console.error('[rossCreateTemplate] Error:', error.message);
-            res.status(error.message.includes('Admin') ? 403 : 401).json({ error: error.message });
+            const statusCode = (error.message.includes('Admin') || error.message.includes('Super Admin')) ? 403 : 500;
+            res.status(statusCode).json({ error: error.message });
         }
     });
 });
@@ -142,11 +146,14 @@ exports.rossUpdateTemplate = onRequest(async (req, res) => {
         if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' });
         try {
             const decodedToken = await verifyAuthToken(req);
-            const { uid } = await verifyAdmin(decodedToken);
+            const uid = await verifySuperAdmin(decodedToken);
 
             const data = req.body.data || req.body;
             const { templateId, updates } = data;
             if (!templateId) return res.status(400).json({ error: 'Template ID is required' });
+            if (!updates || typeof updates !== 'object') {
+                return res.status(400).json({ error: 'updates object is required' });
+            }
 
             const templateRef = db.ref(`ross/templates/${templateId}`);
             const snapshot = await templateRef.once('value');
@@ -169,7 +176,8 @@ exports.rossUpdateTemplate = onRequest(async (req, res) => {
             res.json({ result: { success: true, templateId } });
         } catch (error) {
             console.error('[rossUpdateTemplate] Error:', error.message);
-            res.status(error.message.includes('Admin') ? 403 : 401).json({ error: error.message });
+            const statusCode = (error.message.includes('Admin') || error.message.includes('Super Admin')) ? 403 : 500;
+            res.status(statusCode).json({ error: error.message });
         }
     });
 });
@@ -183,17 +191,20 @@ exports.rossDeleteTemplate = onRequest(async (req, res) => {
         if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' });
         try {
             const decodedToken = await verifyAuthToken(req);
-            const { uid } = await verifyAdmin(decodedToken);
+            const uid = await verifySuperAdmin(decodedToken);
 
             const data = req.body.data || req.body;
             const { templateId } = data;
             if (!templateId) return res.status(400).json({ error: 'Template ID is required' });
+            const existing = await db.ref(`ross/templates/${templateId}`).once('value');
+            if (!existing.exists()) return res.status(404).json({ error: 'Template not found' });
 
             await db.ref(`ross/templates/${templateId}`).remove();
             res.json({ result: { success: true, templateId } });
         } catch (error) {
             console.error('[rossDeleteTemplate] Error:', error.message);
-            res.status(error.message.includes('Admin') ? 403 : 401).json({ error: error.message });
+            const statusCode = (error.message.includes('Admin') || error.message.includes('Super Admin')) ? 403 : 500;
+            res.status(statusCode).json({ error: error.message });
         }
     });
 });
@@ -262,17 +273,21 @@ exports.rossActivateWorkflow = onRequest(async (req, res) => {
                 notificationChannels: ['in_app'],
                 notifyPhone: notifyPhone || null,
                 notifyEmail: notifyEmail || null,
-                daysBeforeAlert: daysBeforeAlert || template.daysBeforeAlert || [30, 7],
+                daysBeforeAlert: Array.isArray(daysBeforeAlert)
+                    ? daysBeforeAlert.filter(d => Number.isInteger(d) && d > 0)
+                    : (Array.isArray(template.daysBeforeAlert) ? template.daysBeforeAlert : [30, 7]),
                 createdAt: now,
                 updatedAt: now,
                 locations
             };
 
             await db.ref(`ross/workflows/${uid}/${workflowId}`).set(workflowData);
+            await db.ref(`ross/ownerIndex/${uid}`).set(true);
             res.json({ result: { success: true, workflowId, workflow: workflowData } });
         } catch (error) {
             console.error('[rossActivateWorkflow] Error:', error.message);
-            res.status(error.message.includes('Admin') ? 403 : 401).json({ error: error.message });
+            const statusCode = (error.message.includes('Admin') || error.message.includes('Super Admin')) ? 403 : 500;
+            res.status(statusCode).json({ error: error.message });
         }
     });
 });
@@ -334,17 +349,21 @@ exports.rossCreateWorkflow = onRequest(async (req, res) => {
                 notificationChannels: ['in_app'],
                 notifyPhone: notifyPhone || null,
                 notifyEmail: notifyEmail || null,
-                daysBeforeAlert: daysBeforeAlert || [30, 7],
+                daysBeforeAlert: Array.isArray(daysBeforeAlert)
+                    ? daysBeforeAlert.filter(d => Number.isInteger(d) && d > 0)
+                    : [30, 7],
                 createdAt: now,
                 updatedAt: now,
                 locations
             };
 
             await db.ref(`ross/workflows/${uid}/${workflowId}`).set(workflowData);
+            await db.ref(`ross/ownerIndex/${uid}`).set(true);
             res.json({ result: { success: true, workflowId, workflow: workflowData } });
         } catch (error) {
             console.error('[rossCreateWorkflow] Error:', error.message);
-            res.status(error.message.includes('Admin') ? 403 : 401).json({ error: error.message });
+            const statusCode = (error.message.includes('Admin') || error.message.includes('Super Admin')) ? 403 : 500;
+            res.status(statusCode).json({ error: error.message });
         }
     });
 });
@@ -363,22 +382,37 @@ exports.rossUpdateWorkflow = onRequest(async (req, res) => {
             const data = req.body.data || req.body;
             const { workflowId, updates } = data;
             if (!workflowId) return res.status(400).json({ error: 'Workflow ID is required' });
+            if (!updates || typeof updates !== 'object') {
+                return res.status(400).json({ error: 'updates object is required' });
+            }
 
             const workflowRef = db.ref(`ross/workflows/${uid}/${workflowId}`);
             const snap = await workflowRef.once('value');
             if (!snap.exists()) return res.status(404).json({ error: 'Workflow not found' });
 
-            const allowedFields = ['name', 'notificationChannels', 'notifyPhone', 'notifyEmail', 'daysBeforeAlert'];
+            const allowedFields = ['name', 'notificationChannels', 'notifyPhone', 'notifyEmail', 'daysBeforeAlert', 'status'];
             const sanitized = { updatedAt: Date.now() };
             allowedFields.forEach(field => {
                 if (updates[field] !== undefined) sanitized[field] = updates[field];
             });
 
+            if (sanitized.daysBeforeAlert !== undefined) {
+                if (!Array.isArray(sanitized.daysBeforeAlert)) {
+                    return res.status(400).json({ error: 'daysBeforeAlert must be an array of positive integers' });
+                }
+                sanitized.daysBeforeAlert = sanitized.daysBeforeAlert.filter(d => Number.isInteger(d) && d > 0);
+            }
+
+            if (sanitized.status !== undefined && !['active', 'paused'].includes(sanitized.status)) {
+                return res.status(400).json({ error: "Invalid status value. Use 'active' or 'paused'" });
+            }
+
             await workflowRef.update(sanitized);
             res.json({ result: { success: true, workflowId } });
         } catch (error) {
             console.error('[rossUpdateWorkflow] Error:', error.message);
-            res.status(error.message.includes('Admin') ? 403 : 401).json({ error: error.message });
+            const statusCode = (error.message.includes('Admin') || error.message.includes('Super Admin')) ? 403 : 500;
+            res.status(statusCode).json({ error: error.message });
         }
     });
 });
@@ -397,12 +431,20 @@ exports.rossDeleteWorkflow = onRequest(async (req, res) => {
             const data = req.body.data || req.body;
             const { workflowId } = data;
             if (!workflowId) return res.status(400).json({ error: 'Workflow ID is required' });
+            const existing = await db.ref(`ross/workflows/${uid}/${workflowId}`).once('value');
+            if (!existing.exists()) return res.status(404).json({ error: 'Workflow not found' });
 
             await db.ref(`ross/workflows/${uid}/${workflowId}`).remove();
+            // Clean up ownerIndex if this was the last workflow
+            const remainingSnap = await db.ref(`ross/workflows/${uid}`).once('value');
+            if (!remainingSnap.exists()) {
+                await db.ref(`ross/ownerIndex/${uid}`).remove();
+            }
             res.json({ result: { success: true, workflowId } });
         } catch (error) {
             console.error('[rossDeleteWorkflow] Error:', error.message);
-            res.status(error.message.includes('Admin') ? 403 : 401).json({ error: error.message });
+            const statusCode = (error.message.includes('Admin') || error.message.includes('Super Admin')) ? 403 : 500;
+            res.status(statusCode).json({ error: error.message });
         }
     });
 });
@@ -451,7 +493,8 @@ exports.rossGetWorkflows = onRequest(async (req, res) => {
             res.json({ result: { success: true, workflows } });
         } catch (error) {
             console.error('[rossGetWorkflows] Error:', error.message);
-            res.status(error.message.includes('Admin') ? 403 : 401).json({ error: error.message });
+            const statusCode = (error.message.includes('Admin') || error.message.includes('Super Admin')) ? 403 : 500;
+            res.status(statusCode).json({ error: error.message });
         }
     });
 });
@@ -479,13 +522,14 @@ exports.rossManageTask = onRequest(async (req, res) => {
             const snap = await locationRef.once('value');
             if (!snap.exists()) return res.status(404).json({ error: 'Workflow location not found' });
 
-            if (!taskData) return res.status(400).json({ error: 'Task data is required' });
-
             const tasksRef = locationRef.child('tasks');
             const now = Date.now();
 
             switch (action) {
                 case 'create': {
+                    if (!taskData || typeof taskData !== 'object') {
+                        return res.status(400).json({ error: 'taskData is required for create' });
+                    }
                     const newTaskId = generateId();
                     const task = {
                         title: taskData.title?.trim() || 'Untitled Task',
@@ -501,6 +545,9 @@ exports.rossManageTask = onRequest(async (req, res) => {
                 }
                 case 'update': {
                     if (!taskId) return res.status(400).json({ error: 'Task ID required for update' });
+                    if (!taskData || typeof taskData !== 'object') {
+                        return res.status(400).json({ error: 'taskData is required for update' });
+                    }
                     const allowedTaskFields = ['title', 'status', 'dueDate', 'assignedTo', 'order'];
                     const updates = {};
                     allowedTaskFields.forEach(f => { if (taskData[f] !== undefined) updates[f] = taskData[f]; });
@@ -519,7 +566,8 @@ exports.rossManageTask = onRequest(async (req, res) => {
             }
         } catch (error) {
             console.error('[rossManageTask] Error:', error.message);
-            res.status(error.message.includes('Admin') ? 403 : 401).json({ error: error.message });
+            const statusCode = (error.message.includes('Admin') || error.message.includes('Super Admin')) ? 403 : 500;
+            res.status(statusCode).json({ error: error.message });
         }
     });
 });
@@ -542,40 +590,55 @@ exports.rossCompleteTask = onRequest(async (req, res) => {
             }
 
             const now = Date.now();
-            const taskRef = db.ref(`ross/workflows/${uid}/${workflowId}/locations/${locationId}/tasks/${taskId}`);
-            const taskSnap = await taskRef.once('value');
-            if (!taskSnap.exists()) return res.status(404).json({ error: 'Task not found' });
+            const locationRef = db.ref(`ross/workflows/${uid}/${workflowId}/locations/${locationId}`);
 
-            await taskRef.update({ status: 'completed', completedAt: now });
-            await db.ref(`ross/workflows/${uid}/${workflowId}`).update({ updatedAt: now });
+            // Use a transaction to atomically update the task and check completion
+            let allTasksDone = false;
+            let totalTaskCount = 0;
+            let taskFound = false;
 
-            // Check if all tasks for this location are complete
-            const locationSnap = await db.ref(`ross/workflows/${uid}/${workflowId}/locations/${locationId}`).once('value');
-            const locationData = locationSnap.val();
-            if (locationData && locationData.tasks) {
+            await locationRef.transaction((locationData) => {
+                if (!locationData) return locationData;
+                if (!locationData.tasks || !locationData.tasks[taskId]) return locationData;
+                // Idempotency: skip if already completed
+                if (locationData.tasks[taskId].status === 'completed') return locationData;
+                taskFound = true;
+
+                locationData.tasks[taskId].status = 'completed';
+                locationData.tasks[taskId].completedAt = now;
+
                 const allTasks = Object.values(locationData.tasks);
-                const completedCount = allTasks.filter(t => t.status === 'completed').length;
-                if (completedCount === allTasks.length) {
-                    const workflowSnap = await db.ref(`ross/workflows/${uid}/${workflowId}`).once('value');
-                    const workflow = workflowSnap.val();
-                    const cycleId = `${new Date().getFullYear()}-${workflow.recurrence}`;
-                    const historyRecord = {
-                        cycleId,
-                        period: String(new Date().getFullYear()),
-                        completedAt: now,
-                        tasksTotal: allTasks.length,
-                        tasksCompleted: allTasks.length,
-                        completionRate: 100,
-                        onTime: now <= (locationData.nextDueDate || now)
-                    };
-                    await db.ref(`ross/workflows/${uid}/${workflowId}/locations/${locationId}/history/${cycleId}`).set(historyRecord);
-                }
+                totalTaskCount = allTasks.length;
+                allTasksDone = allTasks.every(t => t.status === 'completed');
+                return locationData;
+            }, undefined, false);
+
+            if (!taskFound) return res.status(404).json({ error: 'Task not found or already completed' });
+
+            if (allTasksDone && totalTaskCount > 0) {
+                const workflowSnap = await db.ref(`ross/workflows/${uid}/${workflowId}`).once('value');
+                const workflow = workflowSnap.val();
+                const cycleId = `${new Date().getFullYear()}-${workflow?.recurrence || 'unknown'}`;
+                const locSnap = await db.ref(`ross/workflows/${uid}/${workflowId}/locations/${locationId}`).once('value');
+                const locData = locSnap.val() || {};
+                const historyRecord = {
+                    cycleId,
+                    period: String(new Date().getFullYear()),
+                    completedAt: now,
+                    tasksTotal: totalTaskCount,
+                    tasksCompleted: totalTaskCount,
+                    completionRate: 100,
+                    onTime: now <= (locData.nextDueDate || now)
+                };
+                await db.ref(`ross/workflows/${uid}/${workflowId}/locations/${locationId}/history/${cycleId}`).set(historyRecord);
             }
 
+            await db.ref(`ross/workflows/${uid}/${workflowId}`).update({ updatedAt: now });
             res.json({ result: { success: true, taskId } });
         } catch (error) {
             console.error('[rossCompleteTask] Error:', error.message);
-            res.status(error.message.includes('Admin') ? 403 : 401).json({ error: error.message });
+            const statusCode = (error.message.includes('Admin') || error.message.includes('Super Admin')) ? 403 : 500;
+            res.status(statusCode).json({ error: error.message });
         }
     });
 });
@@ -627,7 +690,8 @@ exports.rossGetReports = onRequest(async (req, res) => {
             res.json({ result: { success: true, report } });
         } catch (error) {
             console.error('[rossGetReports] Error:', error.message);
-            res.status(error.message.includes('Admin') ? 403 : 401).json({ error: error.message });
+            const statusCode = (error.message.includes('Admin') || error.message.includes('Super Admin')) ? 403 : 500;
+            res.status(statusCode).json({ error: error.message });
         }
     });
 });
@@ -645,8 +709,15 @@ exports.rossScheduledReminder = onSchedule('0 5 * * *', async () => {
     const oneDayMs = 86400000;
 
     try {
-        const ownersSnap = await db.ref('ross/workflows').once('value');
-        const ownerMap = ownersSnap.val() || {};
+        const indexSnap = await db.ref('ross/ownerIndex').once('value');
+        const ownerMap = {};
+        if (indexSnap.exists()) {
+            const ownerIds = Object.keys(indexSnap.val());
+            await Promise.all(ownerIds.map(async (ownerId) => {
+                const ownerSnap = await db.ref(`ross/workflows/${ownerId}`).once('value');
+                if (ownerSnap.exists()) ownerMap[ownerId] = ownerSnap.val();
+            }));
+        }
 
         for (const [ownerId, ownerWorkflows] of Object.entries(ownerMap)) {
             for (const workflow of Object.values(ownerWorkflows)) {
@@ -743,7 +814,8 @@ exports.rossManageStaff = onRequest(async (req, res) => {
             }
         } catch (error) {
             console.error('[rossManageStaff] Error:', error.message);
-            res.status(error.message.includes('Admin') ? 403 : 401).json({ error: error.message });
+            const statusCode = (error.message.includes('Admin') || error.message.includes('Super Admin')) ? 403 : 500;
+            res.status(statusCode).json({ error: error.message });
         }
     });
 });
@@ -769,7 +841,8 @@ exports.rossGetStaff = onRequest(async (req, res) => {
             res.json({ result: { success: true, staff } });
         } catch (error) {
             console.error('[rossGetStaff] Error:', error.message);
-            res.status(error.message.includes('Admin') ? 403 : 401).json({ error: error.message });
+            const statusCode = (error.message.includes('Admin') || error.message.includes('Super Admin')) ? 403 : 500;
+            res.status(statusCode).json({ error: error.message });
         }
     });
 });

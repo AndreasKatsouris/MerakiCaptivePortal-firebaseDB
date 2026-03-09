@@ -12,7 +12,7 @@ class RossService {
     async getIdToken() {
         const user = auth.currentUser;
         if (!user) throw new Error('User not authenticated');
-        return await user.getIdToken(true);
+        return await user.getIdToken();
     }
 
     async callFunction(functionName, data = {}) {
@@ -62,12 +62,12 @@ class RossService {
         return this.callFunction('rossCreateWorkflow', data);
     }
 
-    async updateWorkflow(locationId, workflowId, updates) {
-        return this.callFunction('rossUpdateWorkflow', { locationId, workflowId, updates });
+    async updateWorkflow(workflowId, updates) {
+        return this.callFunction('rossUpdateWorkflow', { workflowId, updates });
     }
 
-    async deleteWorkflow(locationId, workflowId) {
-        return this.callFunction('rossDeleteWorkflow', { locationId, workflowId });
+    async deleteWorkflow(workflowId) {
+        return this.callFunction('rossDeleteWorkflow', { workflowId });
     }
 
     async getWorkflows(locationId, filters = {}) {
