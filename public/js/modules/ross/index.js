@@ -940,6 +940,7 @@ export async function initializeRoss() {
 
                 // Navigation
                 currentTab: 'overview',
+                tabVersion: 0,
                 workflowsLoading: false,
                 templatesLoading: false,
                 reportsLoading: false,
@@ -966,7 +967,6 @@ export async function initializeRoss() {
 
                 // View 2 — Template Library
                 templateFilter: 'all',
-                isSuperAdmin: false,
                 CATEGORY_LABELS,
                 RECURRENCE_LABELS,
                 templateEditor: null, // null = closed | { mode, templateId?, form }
@@ -1042,17 +1042,28 @@ export async function initializeRoss() {
             // ------------------------------------------------------------------
             switchTab(tab) {
                 this.currentTab = tab;
+                const version = ++this.tabVersion;
                 if (tab === 'overview') {
-                    this.loadOverview();
+                    this.loadOverview().then(() => {
+                        if (version !== this.tabVersion) return;
+                    });
                 } else if (tab === 'templates') {
-                    this.loadTemplates();
+                    this.loadTemplates().then(() => {
+                        if (version !== this.tabVersion) return;
+                    });
                 } else if (tab === 'workflows') {
                     this.selectedWorkflow = null;
-                    this.loadWorkflows();
+                    this.loadWorkflows().then(() => {
+                        if (version !== this.tabVersion) return;
+                    });
                 } else if (tab === 'reports') {
-                    this.loadReports();
+                    this.loadReports().then(() => {
+                        if (version !== this.tabVersion) return;
+                    });
                 } else if (tab === 'staff') {
-                    this.loadStaff();
+                    this.loadStaff().then(() => {
+                        if (version !== this.tabVersion) return;
+                    });
                 }
             },
 
@@ -1228,10 +1239,23 @@ export async function initializeRoss() {
             async loadAvailableLocations() {
                 this.locationsLoading = true;
                 try {
-                    const snap = await get(ref(rtdb, 'locations'));
-                    const raw = snap.val() || {};
-                    this.availableLocations = Object.entries(raw)
-                        .map(([id, loc]) => ({ id, name: loc.name || id }))
+                    const user = auth.currentUser;
+                    if (!user) {
+                        this.availableLocations = [];
+                        return;
+                    }
+                    const userLocSnap = await get(ref(rtdb, `userLocations/${user.uid}`));
+                    const locationIds = userLocSnap.exists()
+                        ? Object.keys(userLocSnap.val())
+                        : [];
+                    const locationEntries = await Promise.all(
+                        locationIds.map(async (id) => {
+                            const locSnap = await get(ref(rtdb, `locations/${id}`));
+                            const loc = locSnap.val() || {};
+                            return { id, name: loc.name || id };
+                        })
+                    );
+                    this.availableLocations = locationEntries
                         .sort((a, b) => a.name.localeCompare(b.name));
                 } catch (err) {
                     console.error('[ROSS] loadAvailableLocations error:', err);
@@ -1245,20 +1269,12 @@ export async function initializeRoss() {
                 this.locationId = this.pickedLocationId;
                 rossState.locationId = this.pickedLocationId;
                 this.staffLocationId = this.pickedLocationId;
+                this.builder = {
+                    step: 1, name: '', category: 'operations', recurrence: 'monthly',
+                    nextDueDate: '', subtasks: [], daysBeforeAlert: [30, 7],
+                    notifyPhone: '', notifyEmail: ''
+                };
                 this.loadOverview();
-            },
-
-            async checkSuperAdmin() {
-                try {
-                    const user = auth.currentUser;
-                    if (!user) return;
-                    const snap = await new Promise(resolve => {
-                        onValue(ref(rtdb, `admins/${user.uid}`), resolve, { onlyOnce: true });
-                    });
-                    this.isSuperAdmin = !!(snap.val() && snap.val().superAdmin);
-                } catch (e) {
-                    this.isSuperAdmin = false;
-                }
             },
 
             async activateTemplate(template) {
@@ -1846,10 +1862,8 @@ export async function initializeRoss() {
         },
 
         mounted() {
-            this.checkSuperAdmin();
             if (this.locationId) {
                 this.staffLocationId = this.locationId;
-                this.loadStaff();
                 this.loadOverview();
             } else {
                 this.loadAvailableLocations();
