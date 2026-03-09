@@ -98,6 +98,10 @@ const RECURRENCE_LABELS = {
 // initializeRoss
 // ---------------------------------------------------------------------------
 export async function initializeRoss() {
+    if (rossState.app) {
+        cleanupRoss();
+    }
+
     const container = document.getElementById('ross-app');
     if (!container) {
         console.error('[ROSS] Container #ross-app not found');
