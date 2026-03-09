@@ -83,6 +83,23 @@ class RossService {
         return this.callFunction('rossCompleteTask', { locationId, workflowId, taskId });
     }
 
+    // ---- Runs ----
+    async createRun(workflowId, locationId) {
+        return this.callFunction('rossCreateRun', { workflowId, locationId });
+    }
+
+    async submitResponse(workflowId, locationId, runId, taskId, value, note = null) {
+        return this.callFunction('rossSubmitResponse', { workflowId, locationId, runId, taskId, value, note });
+    }
+
+    async getRun(workflowId, locationId) {
+        return this.callFunction('rossGetRun', { workflowId, locationId });
+    }
+
+    async getRunHistory(workflowId, locationId, limit = 20) {
+        return this.callFunction('rossGetRunHistory', { workflowId, locationId, limit });
+    }
+
     // ---- Reports ----
     async getReports(locationId) {
         return this.callFunction('rossGetReports', { locationId });
