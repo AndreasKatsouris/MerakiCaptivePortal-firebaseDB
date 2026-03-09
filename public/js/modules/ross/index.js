@@ -935,6 +935,9 @@ export async function initializeRoss() {
 
         data() {
             return {
+                // Module state
+                locationId: rossState.locationId,
+
                 // Navigation
                 currentTab: 'overview',
                 workflowsLoading: false,
@@ -1000,7 +1003,7 @@ export async function initializeRoss() {
 
         computed: {
             showLocationPicker() {
-                return !rossState.locationId;
+                return !this.locationId;
             },
             visibleAlerts() {
                 return this.overdueAlerts
@@ -1057,7 +1060,7 @@ export async function initializeRoss() {
             // View 1 — Overview
             // ------------------------------------------------------------------
             async loadOverview() {
-                if (!rossState.locationId) {
+                if (!this.locationId) {
                     this.overviewError = 'No location selected. Please select a location first.';
                     return;
                 }
@@ -1066,7 +1069,7 @@ export async function initializeRoss() {
                 this.overviewError = null;
 
                 try {
-                    const raw = await rossService.getWorkflows(rossState.locationId);
+                    const raw = await rossService.getWorkflows(this.locationId);
                     const rawList = Array.isArray(raw) ? raw
                         : Array.isArray(raw?.workflows) ? raw.workflows
                         : Object.values(raw || {});
@@ -1167,7 +1170,7 @@ export async function initializeRoss() {
             },
 
             async completeTask(task) {
-                if (!rossState.locationId) return;
+                if (!this.locationId) return;
 
                 // Immutable flag update
                 this.todayTasks = this.todayTasks.map(t =>
@@ -1176,7 +1179,7 @@ export async function initializeRoss() {
 
                 try {
                     await rossService.completeTask(
-                        rossState.locationId,
+                        this.locationId,
                         task.workflowId,
                         task.taskId
                     );
@@ -1239,6 +1242,7 @@ export async function initializeRoss() {
 
             applyPickedLocation() {
                 if (!this.pickedLocationId) return;
+                this.locationId = this.pickedLocationId;
                 rossState.locationId = this.pickedLocationId;
                 this.staffLocationId = this.pickedLocationId;
                 this.loadOverview();
@@ -1258,7 +1262,7 @@ export async function initializeRoss() {
             },
 
             async activateTemplate(template) {
-                if (!rossState.locationId) {
+                if (!this.locationId) {
                     await Swal.fire('No Location', 'Please select a location first.', 'warning');
                     return;
                 }
@@ -1292,7 +1296,7 @@ export async function initializeRoss() {
                 try {
                     await rossService.activateWorkflow({
                         templateId: template.templateId,
-                        locationIds: [rossState.locationId],
+                        locationIds: [this.locationId],
                         name: formValues.name,
                         nextDueDate: formValues.nextDueDate
                     });
@@ -1419,10 +1423,10 @@ export async function initializeRoss() {
             // View 3 — My Workflows
             // ------------------------------------------------------------------
             async loadWorkflows() {
-                if (!rossState.locationId) return;
+                if (!this.locationId) return;
                 this.workflowsLoading = true;
                 try {
-                    const raw = await rossService.getWorkflows(rossState.locationId);
+                    const raw = await rossService.getWorkflows(this.locationId);
                     const rawList = Array.isArray(raw) ? raw
                         : Array.isArray(raw?.workflows) ? raw.workflows
                         : Object.values(raw || {});
@@ -1459,7 +1463,7 @@ export async function initializeRoss() {
                 const wf = this.selectedWorkflow;
                 try {
                     await rossService.manageTask(
-                        rossState.locationId, wf.workflowId, 'update',
+                        this.locationId, wf.workflowId, 'update',
                         task._taskId, { assignedTo: staffId || null }
                     );
                     this.selectedWorkflow = {
@@ -1489,7 +1493,7 @@ export async function initializeRoss() {
                 });
                 if (!result.isConfirmed) return;
                 try {
-                    await rossService.completeTask(rossState.locationId, wf.workflowId, task._taskId);
+                    await rossService.completeTask(this.locationId, wf.workflowId, task._taskId);
                     const updatedTasks = { ...wf.tasks };
                     updatedTasks[task._taskId] = {
                         ...updatedTasks[task._taskId],
@@ -1514,7 +1518,7 @@ export async function initializeRoss() {
                 });
                 if (!result.isConfirmed) return;
                 try {
-                    await rossService.deleteWorkflow(rossState.locationId, workflow.workflowId);
+                    await rossService.deleteWorkflow(this.locationId, workflow.workflowId);
                     this.workflows = this.workflows.filter(w => w.workflowId !== workflow.workflowId);
                     await Swal.fire('Deleted', 'Workflow removed.', 'success');
                 } catch (err) {
@@ -1527,7 +1531,7 @@ export async function initializeRoss() {
                 const newStatus = workflow.status === 'active' ? 'paused' : 'active';
                 try {
                     await rossService.updateWorkflow(
-                        rossState.locationId, workflow.workflowId, { status: newStatus }
+                        this.locationId, workflow.workflowId, { status: newStatus }
                     );
                     this.workflows = this.workflows.map(w =>
                         w.workflowId === workflow.workflowId ? { ...w, status: newStatus } : w
@@ -1577,7 +1581,7 @@ export async function initializeRoss() {
             },
 
             async builderSave() {
-                if (!rossState.locationId) {
+                if (!this.locationId) {
                     await Swal.fire('No Location', 'Please select a location first.', 'warning');
                     return;
                 }
@@ -1600,7 +1604,7 @@ export async function initializeRoss() {
                         name: this.builder.name,
                         category: this.builder.category,
                         recurrence: this.builder.recurrence,
-                        locationIds: [rossState.locationId],
+                        locationIds: [this.locationId],
                         nextDueDate,
                         subtasks,
                         daysBeforeAlert: this.builder.daysBeforeAlert,
@@ -1624,10 +1628,10 @@ export async function initializeRoss() {
             // View 5 — Reports
             // ------------------------------------------------------------------
             async loadReports() {
-                if (!rossState.locationId) return;
+                if (!this.locationId) return;
                 this.reportsLoading = true;
                 try {
-                    const raw = await rossService.getReports(rossState.locationId);
+                    const raw = await rossService.getReports(this.locationId);
                     this.reportData = Array.isArray(raw)
                         ? raw
                         : Array.isArray(raw?.report)
@@ -1843,8 +1847,8 @@ export async function initializeRoss() {
 
         mounted() {
             this.checkSuperAdmin();
-            if (rossState.locationId) {
-                this.staffLocationId = rossState.locationId;
+            if (this.locationId) {
+                this.staffLocationId = this.locationId;
                 this.loadStaff();
                 this.loadOverview();
             } else {
