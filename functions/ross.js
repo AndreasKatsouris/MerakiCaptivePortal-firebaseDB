@@ -773,6 +773,258 @@ exports.rossScheduledReminder = onSchedule('0 5 * * *', async () => {
 });
 
 // ============================================
+// RUN OPERATIONS
+// ============================================
+
+/**
+ * Create or return the current open run for a workflow + location.
+ * Idempotent: if an open run already exists, return it.
+ * Access: All admins
+ */
+exports.rossCreateRun = onRequest(async (req, res) => {
+    return cors(req, res, async () => {
+        if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' });
+        try {
+            const decodedToken = await verifyAuthToken(req);
+            const { uid } = await verifyAdmin(decodedToken);
+
+            const data = req.body.data || req.body;
+            const { workflowId, locationId } = data;
+            if (!workflowId || !locationId) {
+                return res.status(400).json({ error: 'workflowId and locationId are required' });
+            }
+
+            // Verify workflow + location exist and belong to this owner
+            const locSnap = await db.ref(`ross/workflows/${uid}/${workflowId}/locations/${locationId}`).once('value');
+            if (!locSnap.exists()) return res.status(404).json({ error: 'Workflow location not found' });
+
+            // Find existing open run
+            const runsRef = db.ref(`ross/runs/${uid}/${workflowId}/${locationId}`);
+            const existingSnap = await runsRef.orderByChild('completedAt').equalTo(null).limitToFirst(1).once('value');
+            if (existingSnap.exists()) {
+                const runs = existingSnap.val();
+                const runId = Object.keys(runs)[0];
+                return res.json({ result: { success: true, runId, run: runs[runId], created: false } });
+            }
+
+            // Create new run
+            const runId = generateId();
+            const now = Date.now();
+            const run = {
+                id: runId,
+                workflowId,
+                locationId,
+                startedAt: now,
+                completedAt: null,
+                completedBy: null
+            };
+            await runsRef.child(runId).set(run);
+            res.json({ result: { success: true, runId, run, created: true } });
+        } catch (error) {
+            console.error('[rossCreateRun] Error:', error.message);
+            const statusCode = (error.message.includes('Admin') || error.message.includes('Super Admin')) ? 403 : 500;
+            res.status(statusCode).json({ error: error.message });
+        }
+    });
+});
+
+/**
+ * Submit a typed response for one task within a run.
+ * Auto-flags temperature/number breaches. Enforces requiredNote.
+ * Marks run complete when all required tasks have responses.
+ * Access: All admins
+ */
+exports.rossSubmitResponse = onRequest(async (req, res) => {
+    return cors(req, res, async () => {
+        if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' });
+        try {
+            const decodedToken = await verifyAuthToken(req);
+            const { uid } = await verifyAdmin(decodedToken);
+
+            const data = req.body.data || req.body;
+            const { workflowId, locationId, runId, taskId, value, note } = data;
+            if (!workflowId || !locationId || !runId || !taskId) {
+                return res.status(400).json({ error: 'workflowId, locationId, runId, and taskId are required' });
+            }
+            if (value === undefined || value === null) {
+                return res.status(400).json({ error: 'value is required' });
+            }
+
+            // Verify run exists and is open
+            const runRef = db.ref(`ross/runs/${uid}/${workflowId}/${locationId}/${runId}`);
+            const runSnap = await runRef.once('value');
+            if (!runSnap.exists()) return res.status(404).json({ error: 'Run not found' });
+            const run = runSnap.val();
+            if (run.completedAt !== null) return res.status(409).json({ error: 'Run is already completed' });
+
+            // Get task definition from workflow
+            const locSnap = await db.ref(`ross/workflows/${uid}/${workflowId}/locations/${locationId}`).once('value');
+            if (!locSnap.exists()) return res.status(404).json({ error: 'Workflow location not found' });
+            const locData = locSnap.val();
+            const tasks = locData.tasks || {};
+            const taskDef = tasks[taskId];
+            if (!taskDef) return res.status(404).json({ error: 'Task not found in workflow' });
+
+            const inputType = taskDef.inputType || 'checkbox';
+            const inputConfig = taskDef.inputConfig || {};
+
+            // Auto-flag for temperature and number breaches
+            let flagged = false;
+            if ((inputType === 'temperature' || inputType === 'number') && typeof value === 'number') {
+                if (inputConfig.max !== undefined && value > inputConfig.max) flagged = true;
+                if (inputConfig.min !== undefined && value < inputConfig.min) flagged = true;
+            }
+
+            // Enforce requiredNote when flagged
+            if (flagged && inputConfig.requiredNote === true && (!note || String(note).trim() === '')) {
+                return res.status(422).json({
+                    error: 'A note is required when the value is out of range',
+                    flagged: true
+                });
+            }
+
+            const now = Date.now();
+            const response = {
+                taskId,
+                inputType,
+                value,
+                note: (note && String(note).trim()) ? String(note).trim() : null,
+                flagged,
+                respondedAt: now,
+                respondedBy: uid
+            };
+
+            await runRef.child(`responses/${taskId}`).set(response);
+
+            // Check if all required tasks now have responses → auto-complete run
+            const updatedRunSnap = await runRef.once('value');
+            const updatedRun = updatedRunSnap.val();
+            const responses = updatedRun.responses || {};
+
+            const requiredTaskIds = Object.entries(tasks)
+                .filter(([, t]) => t.required !== false)
+                .map(([id]) => id);
+            const allRequiredDone = requiredTaskIds.every(id => responses[id] !== undefined);
+
+            if (allRequiredDone) {
+                await runRef.update({ completedAt: now, completedBy: uid });
+                // Write history record
+                const workflowSnap = await db.ref(`ross/workflows/${uid}/${workflowId}`).once('value');
+                const workflow = workflowSnap.val() || {};
+                const cycleId = runId;
+                const flaggedCount = Object.values(responses).filter(r => r.flagged).length;
+                const historyRecord = {
+                    cycleId,
+                    runId,
+                    completedAt: now,
+                    completedBy: uid,
+                    tasksTotal: Object.keys(tasks).length,
+                    tasksRequired: requiredTaskIds.length,
+                    flaggedCount,
+                    onTime: now <= (locData.nextDueDate || now)
+                };
+                await db.ref(`ross/workflows/${uid}/${workflowId}/locations/${locationId}/history/${cycleId}`).set(historyRecord);
+                await db.ref(`ross/workflows/${uid}/${workflowId}`).update({ updatedAt: now });
+            }
+
+            res.json({ result: { success: true, taskId, flagged, runCompleted: allRequiredDone } });
+        } catch (error) {
+            console.error('[rossSubmitResponse] Error:', error.message);
+            const statusCode = (error.message.includes('Admin') || error.message.includes('Super Admin')) ? 403 : 500;
+            res.status(statusCode).json({ error: error.message });
+        }
+    });
+});
+
+/**
+ * Get the current open run for a workflow + location.
+ * Also returns the most recent completed run's responses as previousResponses.
+ * Access: All admins
+ */
+exports.rossGetRun = onRequest(async (req, res) => {
+    return cors(req, res, async () => {
+        if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' });
+        try {
+            const decodedToken = await verifyAuthToken(req);
+            const { uid } = await verifyAdmin(decodedToken);
+
+            const data = req.body.data || req.body;
+            const { workflowId, locationId } = data;
+            if (!workflowId || !locationId) {
+                return res.status(400).json({ error: 'workflowId and locationId are required' });
+            }
+
+            const runsRef = db.ref(`ross/runs/${uid}/${workflowId}/${locationId}`);
+
+            // Current open run
+            const openSnap = await runsRef.orderByChild('completedAt').equalTo(null).limitToFirst(1).once('value');
+            let currentRun = null;
+            if (openSnap.exists()) {
+                const runs = openSnap.val();
+                const runId = Object.keys(runs)[0];
+                currentRun = { ...runs[runId], runId };
+            }
+
+            // Most recent completed run (for "last time" reference)
+            const completedSnap = await runsRef.orderByChild('completedAt').limitToLast(2).once('value');
+            let previousResponses = {};
+            if (completedSnap.exists()) {
+                const allRuns = Object.values(completedSnap.val());
+                const completedRuns = allRuns
+                    .filter(r => r.completedAt !== null)
+                    .sort((a, b) => b.completedAt - a.completedAt);
+                if (completedRuns.length > 0) {
+                    previousResponses = completedRuns[0].responses || {};
+                }
+            }
+
+            res.json({ result: { success: true, currentRun, previousResponses } });
+        } catch (error) {
+            console.error('[rossGetRun] Error:', error.message);
+            const statusCode = (error.message.includes('Admin') || error.message.includes('Super Admin')) ? 403 : 500;
+            res.status(statusCode).json({ error: error.message });
+        }
+    });
+});
+
+/**
+ * Get paginated list of completed runs for a workflow + location.
+ * Powers the Reports tab run history view.
+ * Access: All admins
+ */
+exports.rossGetRunHistory = onRequest(async (req, res) => {
+    return cors(req, res, async () => {
+        if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' });
+        try {
+            const decodedToken = await verifyAuthToken(req);
+            const { uid } = await verifyAdmin(decodedToken);
+
+            const data = req.body.data || req.body;
+            const { workflowId, locationId, limit: rawLimit } = data;
+            if (!workflowId || !locationId) {
+                return res.status(400).json({ error: 'workflowId and locationId are required' });
+            }
+            const pageLimit = Math.min(Number.isInteger(rawLimit) && rawLimit > 0 ? rawLimit : 20, 100);
+
+            const runsRef = db.ref(`ross/runs/${uid}/${workflowId}/${locationId}`);
+            const snap = await runsRef.orderByChild('completedAt').limitToLast(pageLimit).once('value');
+
+            const runs = snap.exists()
+                ? Object.values(snap.val())
+                    .filter(r => r.completedAt !== null)
+                    .sort((a, b) => b.completedAt - a.completedAt)
+                : [];
+
+            res.json({ result: { success: true, runs } });
+        } catch (error) {
+            console.error('[rossGetRunHistory] Error:', error.message);
+            const statusCode = (error.message.includes('Admin') || error.message.includes('Super Admin')) ? 403 : 500;
+            res.status(statusCode).json({ error: error.message });
+        }
+    });
+});
+
+// ============================================
 // STAFF OPERATIONS (per location)
 // ============================================
 
