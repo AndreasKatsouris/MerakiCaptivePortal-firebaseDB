@@ -725,12 +725,63 @@ export async function initializeRoss() {
                 <!-- Step 3: Subtasks -->
                 <div v-if="builder.step === 3">
                     <h6 class="mb-3">Subtasks</h6>
-                    <div class="input-group mb-2">
-                        <input class="form-control" v-model="builderSubtaskInput"
-                            placeholder="Subtask title" @keyup.enter="builderAddSubtask()">
-                        <button class="btn btn-outline-primary" @click="builderAddSubtask()">
-                            <i class="fas fa-plus"></i>
-                        </button>
+                    <div class="card border-0 bg-light p-3 mb-3">
+                        <div class="row g-2">
+                            <div class="col-md-6">
+                                <input class="form-control" v-model="builderSubtaskInput"
+                                    placeholder="Subtask title" @keyup.enter="builderAddSubtask()">
+                            </div>
+                            <div class="col-md-4">
+                                <select class="form-select" v-model="builderSubtaskInputType">
+                                    <option value="checkbox">Checkbox (tick to complete)</option>
+                                    <option value="text">Text input</option>
+                                    <option value="number">Number</option>
+                                    <option value="temperature">Temperature reading</option>
+                                    <option value="yes_no">Yes / No</option>
+                                    <option value="dropdown">Dropdown list</option>
+                                    <option value="timestamp">Timestamp</option>
+                                    <option value="photo">Photo upload</option>
+                                    <option value="signature">Signature</option>
+                                    <option value="rating">Star rating</option>
+                                </select>
+                            </div>
+                            <div class="col-md-2">
+                                <button class="btn btn-outline-primary w-100" @click="builderAddSubtask()">
+                                    <i class="fas fa-plus"></i>
+                                </button>
+                            </div>
+                        </div>
+                        <div v-if="builderSubtaskInputType === 'temperature' || builderSubtaskInputType === 'number'" class="row g-2 mt-1">
+                            <div class="col-4">
+                                <input type="text" class="form-control form-control-sm" v-model="builderSubtaskConfig.unit" placeholder="Unit (e.g. °C)">
+                            </div>
+                            <div class="col-4">
+                                <input type="number" class="form-control form-control-sm" v-model.number="builderSubtaskConfig.max" placeholder="Max threshold">
+                            </div>
+                            <div class="col-4">
+                                <div class="form-check mt-2">
+                                    <input class="form-check-input" type="checkbox" v-model="builderSubtaskConfig.requiredNote" id="builderRequiredNote">
+                                    <label class="form-check-label small" for="builderRequiredNote">Require note if flagged</label>
+                                </div>
+                            </div>
+                        </div>
+                        <div v-if="builderSubtaskInputType === 'dropdown'" class="mt-2">
+                            <div class="input-group input-group-sm mb-1" v-for="(opt, i) in builderSubtaskConfig.options" :key="i">
+                                <input type="text" class="form-control" :value="opt"
+                                    @input="builderUpdateDropdownOption(i, $event.target.value)">
+                                <button class="btn btn-outline-danger" @click="builderRemoveDropdownOption(i)">
+                                    <i class="fas fa-times"></i>
+                                </button>
+                            </div>
+                            <button class="btn btn-sm btn-outline-secondary" @click="builderAddDropdownOption()">
+                                <i class="fas fa-plus me-1"></i>Add option
+                            </button>
+                        </div>
+                        <div v-if="builderSubtaskInputType === 'rating'" class="row g-2 mt-1">
+                            <div class="col-4">
+                                <input type="number" class="form-control form-control-sm" v-model.number="builderSubtaskConfig.max" placeholder="Max stars (e.g. 5)" min="2" max="10">
+                            </div>
+                        </div>
                     </div>
                     <ul class="list-group">
                         <li v-for="(st, i) in builder.subtasks" :key="i"
@@ -738,6 +789,7 @@ export async function initializeRoss() {
                             <span>
                                 <span class="badge bg-secondary me-2">{{ i + 1 }}</span>
                                 {{ st.title }}
+                                <span class="badge bg-light text-dark ms-1 small">{{ formatInputType(st.inputType || 'checkbox') }}</span>
                             </span>
                             <button class="btn btn-sm btn-outline-danger"
                                 @click="builderRemoveSubtask(i)">
@@ -990,6 +1042,8 @@ export async function initializeRoss() {
                     notifyEmail: ''
                 },
                 builderSubtaskInput: '',
+                builderSubtaskInputType: 'checkbox',
+                builderSubtaskConfig: { unit: '', max: null, requiredNote: false, options: [] },
 
                 // View 5 — Reports
                 reportData: [],
@@ -1576,17 +1630,57 @@ export async function initializeRoss() {
             builderAddSubtask() {
                 const title = this.builderSubtaskInput.trim();
                 if (!title) return;
+                const inputType = this.builderSubtaskInputType;
+                const cfg = { ...this.builderSubtaskConfig };
+                let inputConfig = {};
+                if (inputType === 'temperature' || inputType === 'number') {
+                    if (cfg.unit) inputConfig.unit = cfg.unit;
+                    if (cfg.max !== null && cfg.max !== '') inputConfig.max = Number(cfg.max);
+                    if (cfg.requiredNote) inputConfig.requiredNote = true;
+                } else if (inputType === 'dropdown') {
+                    inputConfig.options = (cfg.options || []).filter(o => String(o).trim());
+                } else if (inputType === 'rating') {
+                    inputConfig.max = Number(cfg.max) || 5;
+                }
                 const newSubtasks = [
                     ...this.builder.subtasks,
-                    { title, order: this.builder.subtasks.length + 1, dueDate: null }
+                    { title, inputType, inputConfig, required: true, order: this.builder.subtasks.length + 1 }
                 ];
                 this.builder = { ...this.builder, subtasks: newSubtasks };
                 this.builderSubtaskInput = '';
+                this.builderSubtaskInputType = 'checkbox';
+                this.builderSubtaskConfig = { unit: '', max: null, requiredNote: false, options: [] };
             },
 
             builderRemoveSubtask(index) {
                 const newSubtasks = this.builder.subtasks.filter((_, i) => i !== index);
                 this.builder = { ...this.builder, subtasks: newSubtasks };
+            },
+
+            builderAddDropdownOption() {
+                this.builderSubtaskConfig = {
+                    ...this.builderSubtaskConfig,
+                    options: [...(this.builderSubtaskConfig.options || []), '']
+                };
+            },
+            builderRemoveDropdownOption(index) {
+                this.builderSubtaskConfig = {
+                    ...this.builderSubtaskConfig,
+                    options: this.builderSubtaskConfig.options.filter((_, i) => i !== index)
+                };
+            },
+            builderUpdateDropdownOption(index, value) {
+                const options = [...this.builderSubtaskConfig.options];
+                options[index] = value;
+                this.builderSubtaskConfig = { ...this.builderSubtaskConfig, options };
+            },
+            formatInputType(type) {
+                const labels = {
+                    checkbox: 'Checkbox', text: 'Text', number: 'Number',
+                    temperature: 'Temp', yes_no: 'Yes/No', dropdown: 'Dropdown',
+                    timestamp: 'Timestamp', photo: 'Photo', signature: 'Signature', rating: 'Rating'
+                };
+                return labels[type] || type;
             },
 
             async builderSave() {
