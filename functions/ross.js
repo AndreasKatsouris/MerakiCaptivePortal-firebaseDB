@@ -558,36 +558,46 @@ exports.rossCompleteTask = onRequest(async (req, res) => {
             }
 
             const now = Date.now();
-            const taskRef = db.ref(`ross/workflows/${uid}/${workflowId}/locations/${locationId}/tasks/${taskId}`);
-            const taskSnap = await taskRef.once('value');
-            if (!taskSnap.exists()) return res.status(404).json({ error: 'Task not found' });
+            const locationRef = db.ref(`ross/workflows/${uid}/${workflowId}/locations/${locationId}`);
 
-            await taskRef.update({ status: 'completed', completedAt: now });
-            await db.ref(`ross/workflows/${uid}/${workflowId}`).update({ updatedAt: now });
+            // Use a transaction to atomically update the task and check completion
+            let allTasksDone = false;
+            let totalTaskCount = 0;
 
-            // Check if all tasks for this location are complete
-            const locationSnap = await db.ref(`ross/workflows/${uid}/${workflowId}/locations/${locationId}`).once('value');
-            const locationData = locationSnap.val();
-            if (locationData && locationData.tasks) {
+            await locationRef.transaction((locationData) => {
+                if (!locationData) return locationData;
+                if (!locationData.tasks || !locationData.tasks[taskId]) return locationData;
+                // Idempotency: skip if already completed
+                if (locationData.tasks[taskId].status === 'completed') return locationData;
+
+                locationData.tasks[taskId].status = 'completed';
+                locationData.tasks[taskId].completedAt = now;
+
                 const allTasks = Object.values(locationData.tasks);
-                const completedCount = allTasks.filter(t => t.status === 'completed').length;
-                if (completedCount === allTasks.length) {
-                    const workflowSnap = await db.ref(`ross/workflows/${uid}/${workflowId}`).once('value');
-                    const workflow = workflowSnap.val();
-                    const cycleId = `${new Date().getFullYear()}-${workflow.recurrence}`;
-                    const historyRecord = {
-                        cycleId,
-                        period: String(new Date().getFullYear()),
-                        completedAt: now,
-                        tasksTotal: allTasks.length,
-                        tasksCompleted: allTasks.length,
-                        completionRate: 100,
-                        onTime: now <= (locationData.nextDueDate || now)
-                    };
-                    await db.ref(`ross/workflows/${uid}/${workflowId}/locations/${locationId}/history/${cycleId}`).set(historyRecord);
-                }
+                totalTaskCount = allTasks.length;
+                allTasksDone = allTasks.every(t => t.status === 'completed');
+                return locationData;
+            }, undefined, false);
+
+            if (allTasksDone && totalTaskCount > 0) {
+                const workflowSnap = await db.ref(`ross/workflows/${uid}/${workflowId}`).once('value');
+                const workflow = workflowSnap.val();
+                const cycleId = `${new Date().getFullYear()}-${workflow?.recurrence || 'unknown'}`;
+                const locSnap = await db.ref(`ross/workflows/${uid}/${workflowId}/locations/${locationId}`).once('value');
+                const locData = locSnap.val() || {};
+                const historyRecord = {
+                    cycleId,
+                    period: String(new Date().getFullYear()),
+                    completedAt: now,
+                    tasksTotal: totalTaskCount,
+                    tasksCompleted: totalTaskCount,
+                    completionRate: 100,
+                    onTime: now <= (locData.locationNextDueDate || now)
+                };
+                await db.ref(`ross/workflows/${uid}/${workflowId}/locations/${locationId}/history/${cycleId}`).set(historyRecord);
             }
 
+            await db.ref(`ross/workflows/${uid}/${workflowId}`).update({ updatedAt: now });
             res.json({ result: { success: true, taskId } });
         } catch (error) {
             console.error('[rossCompleteTask] Error:', error.message);
