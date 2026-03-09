@@ -24,9 +24,10 @@ exports.seedComplianceData = functions.https.onRequest(async (req, res) => {
     return res.status(401).json({ error: 'Unauthorized — Bearer token required.' });
   }
 
+  let decoded;
   try {
     const idToken = authHeader.split('Bearer ')[1];
-    const decoded = await admin.auth().verifyIdToken(idToken);
+    decoded = await admin.auth().verifyIdToken(idToken);
     if (!decoded.admin) {
       return res.status(403).json({ error: 'Forbidden — admin access required.' });
     }
@@ -35,7 +36,7 @@ exports.seedComplianceData = functions.https.onRequest(async (req, res) => {
   }
 
   const db = admin.database();
-  const complianceRef = db.ref('compliance');
+  const complianceRef = db.ref(`compliance/${decoded.uid}`);
 
   if (req.method === 'GET') {
     const snap = await complianceRef.child('entities').once('value');

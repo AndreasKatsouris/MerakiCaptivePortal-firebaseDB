@@ -7,7 +7,7 @@
  * Receives pre-loaded data — re-fetches filings only on year change.
  */
 
-import { updateFilingStatus, loadFilings } from '../services/firebase-service.js';
+import { updateFilingStatus, loadFilings, setManualDueDate } from '../services/firebase-service.js';
 import { calculateNextDueDate, formatDueDate, getFilingStatus } from '../utils/deadline-calculator.js';
 import { escapeHtml, escapeAttr } from '../utils/html-escape.js';
 import { auth } from '../../../config/firebase-config.js';
@@ -55,6 +55,36 @@ const STATUS_CONFIG = {
 
 /** Priority order for "worst status" logic (higher index = worse). */
 const STATUS_SEVERITY = ['not_applicable', 'filed', 'in_progress', 'pending', 'overdue'];
+
+/** Obligation deadline rules that require a manually-set per-entity due date. */
+const MANUAL_RULES = new Set([
+  'manual',
+  'per_entity_licence_expiry',
+  'per_entity_inspection_anniversary'
+]);
+
+/**
+ * Return a [priority, timestamp] sort key for priority-based table ordering.
+ * Priority: overdue(0) → pending(1) → in_progress(2) → not_applicable(3) → filed(4)
+ * Within the same priority, sort by due-date timestamp ASC (soonest/most-overdue first).
+ * Items with no date sort after items with dates (MAX_SAFE_INTEGER timestamp).
+ * @param {string}   status
+ * @param {Date|null} dueDate
+ * @returns {[number, number]}
+ */
+function getPrioritySortKey(status, dueDate) {
+  const ts = dueDate instanceof Date && !isNaN(dueDate.getTime())
+    ? dueDate.getTime()
+    : Number.MAX_SAFE_INTEGER;
+  switch (status) {
+    case 'overdue':        return [0, ts];
+    case 'pending':        return [1, ts];
+    case 'in_progress':   return [2, ts];
+    case 'not_applicable': return [3, 0];
+    case 'filed':          return [4, 0];
+    default:               return [5, 0];
+  }
+}
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -162,22 +192,30 @@ function calculateEarliestDueDate(obligation, activeEntities, year) {
  * @param {Object}        obligation     — Obligation definition
  * @param {Array<Object>} activeEntities — Active entity objects
  * @param {Object}        filings        — Year filings map (entityId -> obligationId -> filing)
- * @param {Date|null}     dueDate        — Calculated due date
+ * @param {Date|null}     dueDate        — Calculated due date (earliest across entities)
+ * @param {number}        year           — Filing year (used for per-entity due date calculation)
  * @returns {string} Worst status string
  */
-function getWorstStatus(obligation, activeEntities, filings, dueDate) {
+function getWorstStatus(obligation, activeEntities, filings, dueDate, year) {
   const entityIds = getApplicableEntityIds(obligation, activeEntities);
 
   if (entityIds.length === 0) {
     return getFilingStatus(dueDate, null);
   }
 
+  const entityMap = new Map(activeEntities.map(e => [e.registrationNumber, e]));
   let worstIndex = -1;
 
   for (const entityId of entityIds) {
     const entityFilings = filings[entityId] || {};
     const filing = entityFilings[obligation.id] || null;
-    const status = getFilingStatus(dueDate, filing);
+    let entityDueDate = dueDate;
+    if (obligation.yearEndRelative
+        || obligation.deadlineRule === '30_business_days_after_anniversary'
+        || obligation.deadlineRule === 'filed_with_cipc_annual_return') {
+      entityDueDate = calculateNextDueDate(obligation, entityMap.get(entityId) || null, year);
+    }
+    const status = getFilingStatus(entityDueDate, filing);
     const severityIndex = STATUS_SEVERITY.indexOf(status);
     if (severityIndex > worstIndex) {
       worstIndex = severityIndex;
@@ -199,18 +237,52 @@ function buildStatusBadge(status) {
 
 /**
  * Build the action button HTML for an obligation row.
- * @param {string} obligationId
- * @param {string} status
- * @param {string} entityIdsJson — JSON string of applicable entity IDs
+ *
+ * @param {string}      obligationId
+ * @param {string}      status
+ * @param {string}      entityIdsJson    — JSON string of applicable entity IDs
+ * @param {Object|null} manualCtx        — { entityId, hasDate } when obligation uses a manual rule;
+ *                                         null for calculated rules
  * @returns {string} Button HTML
  */
-function buildActionButton(obligationId, status, entityIdsJson) {
+function buildActionButton(obligationId, status, entityIdsJson, manualCtx = null) {
   if (status === 'filed') {
     return '<span class="text-success"><i class="fas fa-check-circle"></i></span>';
   }
   if (status === 'not_applicable') {
     return '<span class="text-muted">&mdash;</span>';
   }
+
+  // Manual-rule obligations: require per-entity date to be set first
+  if (manualCtx) {
+    if (!manualCtx.entityId) {
+      // No entity filter active: prompt user to filter first
+      return `<span class="text-muted small" title="Select an entity to set the due date">
+        <i class="fas fa-calendar-alt me-1"></i>Select entity</span>`;
+    }
+
+    const setDateLabel = manualCtx.hasDate ? 'Update Date' : 'Set Due Date';
+    const setDateBtn = `<button
+      class="btn btn-sm btn-outline-secondary set-manual-date-btn me-1"
+      data-obligation-id="${escapeAttr(obligationId)}"
+      data-entity-id="${escapeAttr(manualCtx.entityId)}"
+      title="${setDateLabel}"
+    ><i class="fas fa-calendar-alt me-1"></i>${setDateLabel}</button>`;
+
+    if (manualCtx.hasDate) {
+      // Date is set: also show Mark Filed
+      return setDateBtn + `<button
+        class="btn btn-sm btn-outline-success mark-filed-btn"
+        data-obligation-id="${escapeAttr(obligationId)}"
+        data-entity-ids='${escapeAttr(entityIdsJson)}'
+        title="Mark as Filed"
+      ><i class="fas fa-check me-1"></i>Filed</button>`;
+    }
+
+    // No date set yet: only show Set Due Date
+    return setDateBtn;
+  }
+
   return `<button
     class="btn btn-sm btn-outline-success mark-filed-btn"
     data-obligation-id="${escapeAttr(obligationId)}"
@@ -266,7 +338,7 @@ function buildTableBody(activeEntities, obligations, filings, year) {
     for (const obligation of items) {
       rowNumber++;
       const dueDate = calculateEarliestDueDate(obligation, activeEntities, year);
-      const status = getWorstStatus(obligation, activeEntities, filings, dueDate);
+      const status = getWorstStatus(obligation, activeEntities, filings, dueDate, year);
       const entityIds = getApplicableEntityIds(obligation, activeEntities);
       const entityIdsJson = JSON.stringify(entityIds);
 
@@ -289,7 +361,7 @@ function buildTableBody(activeEntities, obligations, filings, year) {
       <tr data-obligation-id="${escapeAttr(obligation.id)}" data-row-status="${status}">
         <td class="text-muted">${rowNumber}</td>
         <td><strong>${escapeHtml(obligation.name)}</strong></td>
-        <td>${capitalise(obligation.frequency)}</td>
+        <td>${escapeHtml(capitalise(obligation.frequency))}</td>
         <td>${escapeHtml(obligation.authority || '')}</td>
         <td class="${deadlineCss}">${formatDueDate(dueDate, obligation.deadlineRule)}</td>
         <td>${buildAppliesToDisplay(obligation, activeEntities)}</td>
@@ -314,6 +386,146 @@ function buildTableBody(activeEntities, obligations, filings, year) {
 }
 
 /**
+ * Build the table body HTML sorted by filing priority.
+ * Order: overdue (date ASC) → pending (date ASC) → in_progress → not_applicable → filed
+ * The first non-overdue pending/in_progress upcoming row is highlighted as "Next Due".
+ *
+ * When entityFilterId is supplied, only obligations applicable to that entity are shown,
+ * and due dates / statuses are computed for that specific entity.
+ *
+ * @param {Array<Object>} activeEntities
+ * @param {Object}        obligations    — Map of id -> obligation
+ * @param {Object}        filings        — Year filings (entityId -> obligationId -> filing)
+ * @param {number}        year
+ * @param {string|null}   entityFilterId — registrationNumber to filter to, or null for all
+ * @returns {string} tbody inner HTML
+ */
+function buildTableBodyPrioritySorted(activeEntities, obligations, filings, year, entityFilterId) {
+  let obligationList = Object.values(obligations);
+
+  // When filtering by entity, only include applicable obligations
+  if (entityFilterId) {
+    obligationList = obligationList.filter(obl => {
+      const ids = getApplicableEntityIds(obl, activeEntities);
+      return ids.includes(entityFilterId);
+    });
+  }
+
+  const entityMap = new Map(activeEntities.map(e => [e.registrationNumber, e]));
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+
+  // Compute due date, status, and entity IDs for each obligation
+  const items = obligationList.map(obligation => {
+    let dueDate, status, entityIds;
+
+    if (entityFilterId) {
+      // Per-entity view: calculate exactly for this entity
+      const entity = entityMap.get(entityFilterId) || null;
+      const filing = (filings[entityFilterId] || {})[obligation.id] || null;
+
+      // For manual-rule obligations, use the stored manualDueDate from the filing record
+      if (MANUAL_RULES.has(obligation.deadlineRule) && filing && filing.manualDueDate) {
+        const parsed = new Date(filing.manualDueDate);
+        dueDate = isNaN(parsed.getTime()) ? null : parsed;
+      } else {
+        dueDate = calculateNextDueDate(obligation, entity, year);
+      }
+
+      status = getFilingStatus(dueDate, filing);
+      entityIds = [entityFilterId];
+    } else {
+      dueDate = calculateEarliestDueDate(obligation, activeEntities, year);
+      status = getWorstStatus(obligation, activeEntities, filings, dueDate, year);
+      entityIds = getApplicableEntityIds(obligation, activeEntities);
+    }
+
+    const isManualRule = MANUAL_RULES.has(obligation.deadlineRule);
+    // manualCtx is set for manual-rule obligations to carry context into buildActionButton
+    const manualCtx = isManualRule
+      ? {
+          entityId: entityFilterId || null,
+          hasDate: entityFilterId
+            ? !!(((filings[entityFilterId] || {})[obligation.id] || {}).manualDueDate)
+            : false
+        }
+      : null;
+
+    return { obligation, dueDate, status, entityIds, manualCtx };
+  });
+
+  // Sort by priority
+  items.sort((a, b) => {
+    const [pa, ta] = getPrioritySortKey(a.status, a.dueDate);
+    const [pb, tb] = getPrioritySortKey(b.status, b.dueDate);
+    if (pa !== pb) return pa - pb;
+    if (ta !== tb) return ta - tb;
+    return (a.obligation.name || '').localeCompare(b.obligation.name || '');
+  });
+
+  // Find the "Next Due" row: first upcoming (non-overdue) pending/in_progress with a future date
+  let nextDueIndex = -1;
+  for (let i = 0; i < items.length; i++) {
+    const { status, dueDate } = items[i];
+    if ((status === 'pending' || status === 'in_progress')
+        && dueDate instanceof Date
+        && !isNaN(dueDate.getTime())
+        && dueDate >= today) {
+      nextDueIndex = i;
+      break;
+    }
+  }
+
+  if (items.length === 0) {
+    const msg = entityFilterId ? 'No obligations apply to this entity.' : 'No obligations found.';
+    return `
+      <tr>
+        <td colspan="9" class="text-center text-muted py-4">
+          <i class="fas fa-clipboard-list fa-2x mb-2 d-block opacity-50"></i>
+          ${msg}
+        </td>
+      </tr>`;
+  }
+
+  let html = '';
+
+  for (let i = 0; i < items.length; i++) {
+    const { obligation, dueDate, status, entityIds, manualCtx } = items[i];
+    const isNextDue = i === nextDueIndex;
+    const entityIdsJson = JSON.stringify(entityIds);
+
+    // Deadline CSS class
+    let deadlineCss = '';
+    if (dueDate instanceof Date && !isNaN(dueDate.getTime()) && status !== 'filed') {
+      const daysDiff = Math.ceil((dueDate - today) / (1000 * 60 * 60 * 24));
+      if (daysDiff < 0) deadlineCss = 'deadline-overdue';
+      else if (daysDiff <= 30) deadlineCss = 'deadline-upcoming';
+      else deadlineCss = 'deadline-ok';
+    }
+
+    const rowClass = isNextDue ? ' class="next-due-row"' : '';
+    const nextDueBadge = isNextDue
+      ? ' <span class="badge bg-warning text-dark" style="font-size:0.65rem;vertical-align:middle;">NEXT DUE</span>'
+      : '';
+
+    html += `
+      <tr data-obligation-id="${escapeAttr(obligation.id)}" data-row-status="${status}"${rowClass}>
+        <td class="text-muted">${i + 1}</td>
+        <td><strong>${escapeHtml(obligation.name)}</strong>${nextDueBadge}</td>
+        <td>${escapeHtml(capitalise(obligation.frequency))}</td>
+        <td>${escapeHtml(obligation.authority || '')}</td>
+        <td class="${deadlineCss}">${formatDueDate(dueDate, obligation.deadlineRule)}</td>
+        <td>${buildAppliesToDisplay(obligation, activeEntities)}</td>
+        <td>${escapeHtml(obligation.defaultOwner || '')}</td>
+        <td class="status-cell">${buildStatusBadge(status)}</td>
+        <td class="action-cell">${buildActionButton(obligation.id, status, entityIdsJson, manualCtx)}</td>
+      </tr>`;
+  }
+
+  return html;
+}
+
+/**
  * Build the full card HTML for the compliance tracker panel.
  * @param {Array<Object>} activeEntities
  * @param {Object}        obligations
@@ -323,19 +535,29 @@ function buildTableBody(activeEntities, obligations, filings, year) {
  */
 function buildTrackerCard(activeEntities, obligations, filings, year) {
   const currentYear = new Date().getFullYear();
-  const nextYear = currentYear + 1;
+
+  const entityOptions = activeEntities
+    .map(e => `<option value="${escapeAttr(e.registrationNumber)}">${escapeHtml(e.name)}</option>`)
+    .join('');
 
   return `
     <div class="card entity-card">
-      <div class="card-header d-flex align-items-center justify-content-between">
+      <div class="card-header d-flex align-items-center justify-content-between flex-wrap gap-2">
         <span>
           <i class="fas fa-tasks text-success me-2"></i>
           <strong>Compliance Tracker</strong>
         </span>
-        <select class="form-select form-select-sm" id="compliance-year-selector" style="width: auto;">
-          <option value="${currentYear}" ${year === currentYear ? 'selected' : ''}>${currentYear}</option>
-          <option value="${nextYear}" ${year === nextYear ? 'selected' : ''}>${nextYear}</option>
-        </select>
+        <div class="d-flex gap-2">
+          <select class="form-select form-select-sm" id="compliance-entity-filter" style="width: auto; min-width: 160px;">
+            <option value="">All Entities</option>
+            ${entityOptions}
+          </select>
+          <select class="form-select form-select-sm" id="compliance-year-selector" style="width: auto;">
+            ${[currentYear - 2, currentYear - 1, currentYear, currentYear + 1]
+              .map(y => `<option value="${y}" ${year === y ? 'selected' : ''}>${y}</option>`)
+              .join('')}
+          </select>
+        </div>
       </div>
       <div class="card-body p-0">
         <div class="compliance-table-wrapper">
@@ -354,7 +576,7 @@ function buildTrackerCard(activeEntities, obligations, filings, year) {
               </tr>
             </thead>
             <tbody id="compliance-tracker-tbody">
-              ${buildTableBody(activeEntities, obligations, filings, year)}
+              ${buildTableBodyPrioritySorted(activeEntities, obligations, filings, year, null)}
             </tbody>
           </table>
         </div>
@@ -366,6 +588,96 @@ function buildTrackerCard(activeEntities, obligations, filings, year) {
 // ---------------------------------------------------------------------------
 // Event handlers
 // ---------------------------------------------------------------------------
+
+/**
+ * Handle "Set Due Date" button clicks for manual-rule obligations.
+ * Stores the date in the filing record as manualDueDate.
+ * Re-renders the affected row on success.
+ *
+ * @param {MouseEvent}    event
+ * @param {Object}        obligations    — Map of id -> obligation
+ * @param {Object}        filingsRef     — Current filings state
+ * @param {number}        year
+ * @param {Function}      setFilings     — Immutable state setter
+ */
+async function handleSetManualDueDate(event, obligations, filingsRef, year, setFilings) {
+  const btn = event.target.closest('.set-manual-date-btn');
+  if (!btn) return;
+
+  const obligationId = btn.getAttribute('data-obligation-id');
+  const entityId     = btn.getAttribute('data-entity-id');
+  const obligation   = obligations[obligationId];
+  if (!obligation || !entityId) return;
+
+  // Pre-fill with existing manualDueDate if already set
+  const existingDate = ((filingsRef[entityId] || {})[obligationId] || {}).manualDueDate || '';
+
+  const actionBtn = btn;
+  if (actionBtn) actionBtn.disabled = true;
+
+  try {
+    const result = await Swal.fire({
+      title: `Set Due Date — ${escapeHtml(obligation.name)}`,
+      html: `
+        <div class="mb-2 text-muted small">Set the expiry / due date for this entity.</div>
+        <div class="mb-3">
+          <label class="form-label">Due Date</label>
+          <input type="date" id="swal-manual-due-date" class="form-control"
+                 value="${escapeAttr(existingDate)}">
+        </div>
+      `,
+      showCancelButton: true,
+      confirmButtonColor: '#0d6efd',
+      confirmButtonText: 'Save Due Date',
+      preConfirm: () => {
+        const dateVal = document.getElementById('swal-manual-due-date').value;
+        if (!dateVal) {
+          Swal.showValidationMessage('Please select a due date');
+          return false;
+        }
+        return dateVal;
+      }
+    });
+
+    if (actionBtn) actionBtn.disabled = false;
+    if (!result.isConfirmed || !result.value) return;
+
+    const dateStr = result.value;
+
+    await setManualDueDate(year, entityId, obligationId, dateStr);
+
+    // Update local filings state immutably
+    const updatedFilings = {
+      ...filingsRef,
+      [entityId]: {
+        ...(filingsRef[entityId] || {}),
+        [obligationId]: {
+          ...((filingsRef[entityId] || {})[obligationId] || {}),
+          manualDueDate: dateStr
+        }
+      }
+    };
+    setFilings(updatedFilings);
+
+    Swal.fire({
+      toast: true,
+      icon: 'success',
+      title: 'Due date saved',
+      position: 'top-end',
+      showConfirmButton: false,
+      timer: 2000,
+      timerProgressBar: true
+    });
+
+    // Trigger tbody refresh by dispatching a synthetic change on the entity filter
+    // (the simplest way to re-render with updated filings state)
+    const entityFilterEl = document.getElementById('compliance-entity-filter');
+    if (entityFilterEl) entityFilterEl.dispatchEvent(new Event('change'));
+  } catch (error) {
+    if (actionBtn) actionBtn.disabled = false;
+    Swal.fire({ title: 'Error', text: `Failed to save due date: ${error.message}`, icon: 'error' });
+  }
+}
 
 /**
  * Handle "Mark Filed" button clicks via event delegation.
@@ -427,53 +739,67 @@ async function handleMarkFiled(event, obligations, activeEntities, year, filings
       confirmButtonText: 'Mark as Filed',
       preConfirm: () => {
         const filedDate = document.getElementById('swal-filed-date').value;
-        const filedBy = document.getElementById('swal-filed-by').value;
+        const filedBy = document.getElementById('swal-filed-by').value.trim();
+        const notes = document.getElementById('swal-notes')?.value?.trim() || '';
 
+        if (filedBy.length > 200) {
+          Swal.showValidationMessage('Filed by name must be 200 characters or fewer');
+          return false;
+        }
+        if (notes.length > 1000) {
+          Swal.showValidationMessage('Notes must be 1000 characters or fewer');
+          return false;
+        }
         if (!filedDate) {
           Swal.showValidationMessage('Please enter a filed date.');
           return false;
         }
-        if (!filedBy || !filedBy.trim()) {
-          Swal.showValidationMessage('Please enter who filed this.');
-          return false;
-        }
-        if (filedBy.length > 200) {
-          Swal.showValidationMessage('Filed by must be 200 characters or fewer.');
-          return false;
-        }
-        const notes = document.getElementById('swal-notes').value.trim();
-        if (notes.length > 1000) {
-          Swal.showValidationMessage('Notes must be 1000 characters or fewer.');
+        if (!filedBy) {
+          Swal.showValidationMessage('Please enter who filed this');
           return false;
         }
 
         return {
           filedDate,
-          filedBy: filedBy.trim(),
+          filedBy,
           notes
         };
       }
     });
 
-    if (!result.isConfirmed || !result.value) return;
+    if (!result.isConfirmed || !result.value) {
+      if (actionBtn) actionBtn.disabled = false;
+      return;
+    }
 
     const formValues = result.value;
 
-    // Build the shared filing record once
-    const filingRecord = {
-      status: 'filed',
-      dueDate: dueDateISO,
-      filedDate: formValues.filedDate,
-      filedBy: formValues.filedBy,
-      notes: formValues.notes,
-      updatedBy: currentUserIdentifier()
-    };
+    const entityMap = new Map(activeEntities.map(e => [e.registrationNumber, e]));
 
-    // Write all entities in parallel
+    // Write all entities in parallel — per-entity due date for anniversary/year-end rules
+    const filingRecords = new Map();
     await Promise.all(
-      entityIds.map(entityId =>
-        updateFilingStatus(year, entityId, obligationId, filingRecord)
-      )
+      entityIds.map(entityId => {
+        let entityDueDateISO = dueDateISO;
+        if (obligation.yearEndRelative
+            || obligation.deadlineRule === '30_business_days_after_anniversary'
+            || obligation.deadlineRule === 'filed_with_cipc_annual_return') {
+          const entityDueDate = calculateNextDueDate(obligation, entityMap.get(entityId) || null, year);
+          entityDueDateISO = entityDueDate instanceof Date && !isNaN(entityDueDate.getTime())
+            ? entityDueDate.toISOString().split('T')[0]
+            : '';
+        }
+        const record = {
+          status: 'filed',
+          dueDate: entityDueDateISO,
+          filedDate: formValues.filedDate,
+          filedBy: formValues.filedBy,
+          notes: formValues.notes,
+          updatedBy: currentUserIdentifier()
+        };
+        filingRecords.set(entityId, record);
+        return updateFilingStatus(year, entityId, obligationId, record);
+      })
     );
 
     // Build updated state immutably in one pass
@@ -481,7 +807,7 @@ async function handleMarkFiled(event, obligations, activeEntities, year, filings
       ...acc,
       [entityId]: {
         ...(acc[entityId] || {}),
-        [obligationId]: filingRecord
+        [obligationId]: filingRecords.get(entityId)
       }
     }), filingsRef);
 
@@ -543,19 +869,38 @@ export async function renderComplianceTracker(containerId, activeEntities, oblig
 
   const yearNum = parseInt(year, 10);
 
-  // Local filings state — updated immutably via setter
+  // Local state — updated immutably
   let currentFilings = { ...filings };
   let currentYear = yearNum;
+  let currentEntityFilter = null; // null = All Entities
   const setFilings = (newFilings) => { currentFilings = newFilings; };
 
   // Initial render
   container.innerHTML = buildTrackerCard(activeEntities, obligations, currentFilings, currentYear);
 
-  // --- Event delegation: Mark Filed buttons ---
+  // --- Event delegation: Mark Filed + Set Manual Due Date buttons ---
   const table = container.querySelector('.compliance-table');
   if (table) {
     table.addEventListener('click', (event) => {
+      if (event.target.closest('.set-manual-date-btn')) {
+        handleSetManualDueDate(event, obligations, currentFilings, currentYear, setFilings);
+        return;
+      }
       handleMarkFiled(event, obligations, activeEntities, currentYear, currentFilings, setFilings);
+    });
+  }
+
+  // --- Entity filter change ---
+  const entityFilter = container.querySelector('#compliance-entity-filter');
+  if (entityFilter) {
+    entityFilter.addEventListener('change', () => {
+      currentEntityFilter = entityFilter.value || null;
+      const tbody = container.querySelector('#compliance-tracker-tbody');
+      if (tbody) {
+        tbody.innerHTML = buildTableBodyPrioritySorted(
+          activeEntities, obligations, currentFilings, currentYear, currentEntityFilter
+        );
+      }
     });
   }
 
@@ -585,7 +930,9 @@ export async function renderComplianceTracker(containerId, activeEntities, oblig
 
         // Re-render tbody only (preserve card shell and event listeners)
         if (tbody) {
-          tbody.innerHTML = buildTableBody(activeEntities, obligations, currentFilings, currentYear);
+          tbody.innerHTML = buildTableBodyPrioritySorted(
+            activeEntities, obligations, currentFilings, currentYear, currentEntityFilter
+          );
         }
       } catch (error) {
         if (tbody) {

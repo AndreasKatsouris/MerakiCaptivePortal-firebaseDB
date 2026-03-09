@@ -122,6 +122,10 @@ public/
           tier-management.js
           subscription-status-manager.js
       sales-forecasting/          -- Forecast engine, charts, analytics
+      ross/                       -- Vue 3 CDN app for workflow automation
+        index.js                  -- Main Vue app (mount/unmount lifecycle)
+        services/
+          ross-service.js         -- Cloud Functions API client
       [other modules]
 ```
 
@@ -152,5 +156,6 @@ The frontend (`firebase-config.js`) auto-detects `localhost` / `127.0.0.1` and c
 | Campaigns | Email/WhatsApp marketing | Starter (basic), Professional (advanced) |
 | Rewards & Loyalty | Points, vouchers, redemption | Starter (basic), Professional (advanced) |
 | WhatsApp Integration | Twilio-powered bot, multi-location routing | Starter (basic), Professional (advanced) |
+| ROSS | Workflow automation, recurring checklists, templates, staff assignment | Admin (templates: Super Admin) |
 | Project Management | Internal project tracking (admin) | Admin only |
 | Performance Monitor | Cloud Functions metrics, cold starts | Admin only |

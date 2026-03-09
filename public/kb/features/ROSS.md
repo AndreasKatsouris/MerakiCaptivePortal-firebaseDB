@@ -94,6 +94,17 @@ ross/
       updatedAt: number
 ```
 
+### Owner Index (Fan-out)
+
+```
+ross/
+  ownerIndex/
+    {uid}: true                   ← written by rossCreateWorkflow / rossActivateWorkflow
+                                  ← removed by rossDeleteWorkflow when last workflow deleted
+```
+
+> **Hardening change:** `rossScheduledReminder` previously scanned the entire `/ross/workflows` tree (O(N) over all owners). It now reads `ross/ownerIndex` to enumerate only owners with active workflows, then iterates per-owner.
+
 ### Task Object
 
 ```json
@@ -158,21 +169,33 @@ All ROSS functions are defined in `functions/ross.js` and exported from `functio
 | Function | Auth | Description |
 |---|---|---|
 | `rossGetWorkflows` | `verifyAdmin` | List all workflows for the current user, flattened with location data |
-| `rossCreateWorkflow` | `verifyAdmin` | Create a new workflow and attach to `locationIds[]` |
-| `rossUpdateWorkflow` | `verifyAdmin` | Update workflow metadata |
-| `rossDeleteWorkflow` | `verifyAdmin` | Delete a workflow |
-| `rossManageTask` | `verifyAdmin` | Create / update / complete / uncomplete a task; supports `assignedTo` |
-| `rossActivateWorkflow` | `verifyAdmin` | Attach an existing workflow to additional locations |
+| `rossCreateWorkflow` | `verifyAdmin` | Create a new workflow, attach to `locationIds[]`, write `ownerIndex` |
+| `rossUpdateWorkflow` | `verifyAdmin` | Update workflow metadata; null guard on `updates`; `status` field validated against `['active','paused']`; `daysBeforeAlert` validated to positive integers |
+| `rossDeleteWorkflow` | `verifyAdmin` | Delete a workflow (404 if not found); clean up `ownerIndex` when last workflow removed |
+| `rossManageTask` | `verifyAdmin` | Create / update / delete a task; `taskData` guard scoped to `create` and `update` only -- delete works without `taskData` |
+| `rossCompleteTask` | `verifyAdmin` | Mark a task complete using RTDB transaction (atomic); returns 404 if task not found; writes history record when all tasks in a location are done |
+| `rossActivateWorkflow` | `verifyAdmin` | Attach an existing workflow to additional locations; write `ownerIndex` |
 | `rossGetTemplates` | `verifyAdmin` | List all templates (public + own) |
 | `rossCreateTemplate` | `verifySuperAdmin` | Create a new template |
-| `rossUpdateTemplate` | `verifySuperAdmin` | Update an existing template |
-| `rossDeleteTemplate` | `verifySuperAdmin` | Delete a template |
-| `rossCreateRun` | `verifyAdmin` | Create or return the current in-progress run for a workflow+location |
-| `rossSubmitResponse` | `verifyAdmin` | Submit a typed response for a task within a run; auto-flags out-of-range values |
+| `rossUpdateTemplate` | `verifySuperAdmin` | Update an existing template; null guard on `updates` before property access |
+| `rossDeleteTemplate` | `verifySuperAdmin` | Delete a template (404 existence check added) |
+| `rossGetReports` | `verifyAdmin` | Fetch completion reports across all workflows and locations |
+| `rossGetStaff` | `verifyAdmin` | List staff members for a location |
+| `rossScheduledReminder` | Scheduled (cron `0 5 * * *`) | Fan-out via `ross/ownerIndex` instead of full-tree scan |
+| `rossCreateRun` | `verifyAdmin` | Create or return the current in-progress run for a workflow+location (idempotent) |
+| `rossSubmitResponse` | `verifyAdmin` | Submit a typed response for a task within a run; auto-flags out-of-range values; enforces `requiredNote` |
 | `rossGetRun` | `verifyAdmin` | Get the current run and previous responses for a workflow+location |
-| `rossGetRunHistory` | `verifyAdmin` | List completed runs (newest first) for a workflow+location |
+| `rossGetRunHistory` | `verifyAdmin` | List completed runs (newest first, paginated) for a workflow+location |
 
 > **Note:** Template CRUD (`rossCreateTemplate`, `rossUpdateTemplate`, `rossDeleteTemplate`) requires `verifySuperAdmin`. The Admin SDK bypasses RTDB security rules, so Cloud Functions must enforce the same superAdmin restriction that the RTDB rules intend.
+
+> **Hardening changes (functions):**
+> - `rossCompleteTask` was rewritten to use an RTDB `transaction()` for atomic task completion (prevents race conditions between concurrent completions)
+> - `rossUpdateWorkflow` now validates `status` against `['active','paused']` and `daysBeforeAlert` entries against positive integers
+> - `rossDeleteWorkflow` and `rossDeleteTemplate` now return 404 if the target does not exist
+> - `rossManageTask` moved the `taskData` guard inside only the `create` and `update` cases, allowing `delete` to work without a `taskData` payload
+> - `rossScheduledReminder` replaced an O(N) full-tree scan of `/ross/workflows` with a fan-out read from `ross/ownerIndex`
+> - `rossCreateWorkflow`, `rossActivateWorkflow`, and `rossDeleteWorkflow` maintain the `ross/ownerIndex/{uid}` fan-out node
 
 ### Input Types
 
@@ -215,44 +238,61 @@ This is a self-contained Vue 3 CDN application. It is mounted/unmounted by `admi
 
 ```js
 const rossState = {
-  initialized: false,
-  app: null,
-  locationId: null,    // selected location for all operations
-  userId: null,
-  idToken: null
+  app: null,              // Vue 3 app instance
+  locationId: null,       // selected location (moved here for cross-function access)
+  authUnsubscribe: null   // onAuthStateChanged unsubscribe handle
 }
 ```
+
+> **Hardening change:** `locationId` is now initialised from claims/URL in `initializeRoss()` and also stored in Vue `data()` for reactivity. `userId` and `idToken` were removed from the singleton -- the service layer reads the token on demand via `getIdToken()`. `authUnsubscribe` was added so the `onAuthStateChanged` listener can be cleaned up to prevent session bleed.
 
 ### Key Component Data Properties
 
 | Property | Purpose |
 |---|---|
+| `locationId` | Selected location -- now in Vue `data()` for reactivity (was in `rossState`) |
+| `tabVersion` | Monotonic counter incremented on every tab switch; guards stale async writes |
+| `workflowsLoading` | Per-tab loading flag for Workflows tab |
+| `templatesLoading` | Per-tab loading flag for Templates tab |
+| `reportsLoading` | Per-tab loading flag for Reports tab |
+| `staffLoading` | Per-tab loading flag for Staff tab |
 | `workflows` | Array of active workflows (normalised with `status`, `nextDueDate`) |
 | `templates` | Array of reusable templates |
-| `staffMembers` | Staff for the current location (loaded lazily on workflow open) |
-| `staffLocationId` | Copy of `rossState.locationId` used by staff tab |
+| `staffMembers` | Staff for the current location (loaded lazily on staff tab activation) |
+| `staffLocationId` | Copy of `locationId` used by staff tab |
 | `pickedLocationId` | Two-step location picker value |
 | `templateEditor` | `null` = list view; `object` = editor open |
 | `templateSaving` | Boolean for save button loading state |
+
+> **Hardening change:** A single `tabLoading` boolean was replaced with per-tab flags (`workflowsLoading`, `templatesLoading`, `reportsLoading`, `staffLoading`). The `tabVersion` counter prevents stale async responses from overwriting state after the user switches tabs. `locationId` moved from `rossState` singleton into Vue `data()` so the UI reacts to location changes.
 
 ### Lifecycle
 
 ```
 initializeRoss()             ← called from admin-dashboard.js on section switch
   ↓
-rossState.app = createApp()
+if rossState.app exists → cleanupRoss() first (prevents Vue app leak on double-init)
   ↓
-mountRossApp()
+rossState.app = Vue.createApp(...)
   ↓
-loadLocations() → loadOverview() + loadWorkflows()
+mount on #ross-app
+  ↓
+onAuthStateChanged listener registered → auto-cleanup on sign-out
+  ↓
+mounted(): if locationId → loadOverview(); else → loadAvailableLocations()
+  ↓
+loadStaff() is NOT called on mount — lazy-loads only when staff tab activated
 
-cleanupRoss()                ← called when navigating away
+cleanupRoss()                ← called when navigating away or on sign-out
   ↓
 rossState.app.unmount()
-rossState.initialized = false
+rossState.authUnsubscribe() ← unsubscribes onAuthStateChanged listener
+rossState.locationId = null
 ```
 
 > **Important:** The `sectionInitialized.rossContent` guard in `admin-dashboard.js` was **removed** for ROSS. ROSS must re-initialise every time the section is activated because `cleanupRoss` fully unmounts the Vue app.
+
+> **Hardening change:** `initializeRoss()` now calls `cleanupRoss()` if `rossState.app` already exists, preventing Vue app leaks on double-init. An `onAuthStateChanged` listener is registered after mount and unsubscribed in `cleanupRoss()` to prevent session bleed. `loadStaff()` was removed from `mounted()` and is now lazy-loaded only when the staff tab is activated. `loadAvailableLocations()` reads `userLocations/${uid}` (user-scoped) instead of global `/locations`.
 
 ### Response Normalisation
 
@@ -322,7 +362,7 @@ Mount point inside content area:
 ### Staff Tab
 - Location picker → shows staff list
 - Assign staff to tasks from within an open workflow
-- Staff loaded lazily when a workflow is opened (`loadStaff()` called in `openWorkflow`)
+- Staff loaded lazily only when the staff tab is activated (removed from `mounted()`)
 
 ### Templates Tab
 - Lists all templates (public + own)
@@ -344,6 +384,17 @@ Mount point inside content area:
 | Staff "No location detected" | `applyPickedLocation` set `rossState.locationId` but not `this.staffLocationId` | Added `this.staffLocationId = this.pickedLocationId` |
 | Templates gated to superAdmin | `rossCreateTemplate` / `rossUpdateTemplate` / `rossDeleteTemplate` used `verifySuperAdmin` | Restored to `verifySuperAdmin` — Admin SDK bypasses RTDB rules; Cloud Functions must enforce the same restriction the rules intend |
 | Template editor `v-else` chain broken | Editor panel used `v-if` instead of `v-else-if`, breaking the tab loading chain | Changed to `v-else-if="templateEditor"` |
+| Vue app leak on double-init | `initializeRoss()` did not check if `rossState.app` already existed | Added guard: if `rossState.app` exists, call `cleanupRoss()` first |
+| Session bleed on sign-out | No `onAuthStateChanged` listener to clean up ROSS when user signs out | Added listener in `initializeRoss()`, unsubscribed in `cleanupRoss()` |
+| Stale async tab data | Single `tabLoading` flag allowed async responses to write into wrong tab | Replaced with per-tab flags + `tabVersion` counter to discard stale writes |
+| `loadAvailableLocations` read global `/locations` | Any admin could see all platform locations | Changed to read `userLocations/${uid}` (user-scoped) |
+| `rossCompleteTask` race condition | Non-atomic read-then-write allowed concurrent completions to conflict | Rewritten with RTDB `transaction()` for atomic completion |
+| `rossDeleteWorkflow` / `rossDeleteTemplate` no 404 | Deleting a non-existent resource returned 200 | Added existence checks returning 404 |
+| `rossManageTask` delete required `taskData` | `taskData` guard was before the switch statement | Moved guard inside `create` and `update` cases only |
+| `rossScheduledReminder` O(N) scan | Scanned entire `/ross/workflows` tree for all owners | Replaced with `ross/ownerIndex` fan-out |
+| `getIdToken(true)` forced refresh | Service layer called `getIdToken(true)` on every request | Changed to `getIdToken()` (uses cached token) |
+| `updateWorkflow` / `deleteWorkflow` unused `locationId` param | Service methods accepted `locationId` that was never used | Removed unused parameter |
+| `applyPickedLocation` stale builder state | Location change did not reset builder form | Builder form state reset on location change |
 
 ---
 

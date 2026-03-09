@@ -324,34 +324,61 @@
       }
     },
     "compliance": {
-      ".read": "auth != null && auth.token.admin === true",
-      ".write": "auth != null && auth.token.admin === true",
-      "entities": {
-        ".indexOn": ["status", "cipcStatus", "oversight"],
-        "$entityId": {
-          ".validate": "newData.hasChildren(['registrationNumber', 'name', 'status', 'type'])"
-        }
-      },
-      "filings": {
-        "$year": {
-          ".validate": "$year.matches(/^[0-9]{4}$/)",
+      "$uid": {
+        ".read": "auth != null && auth.uid === $uid",
+        ".write": "auth != null && auth.uid === $uid",
+        "entities": {
+          ".indexOn": ["status", "cipcStatus", "oversight"],
           "$entityId": {
-            ".validate": "$entityId.matches(/^[A-Za-z0-9_-]+$/)",
-            ".indexOn": ["status", "dueDate"],
-            "$obligationId": {
-              ".validate": "newData.hasChildren(['status', 'updatedAt', 'updatedBy'])",
-              "filedBy": {
-                ".validate": "newData.isString() && newData.val().length > 0 && newData.val().length <= 200"
-              },
-              "notes": {
-                ".validate": "!newData.exists() || (newData.isString() && newData.val().length <= 1000)"
+            ".validate": "newData.hasChildren(['name', 'registrationNumber', 'type', 'status'])"
+          }
+        },
+        "obligations": {
+          "$obligationId": {
+            ".validate": "newData.hasChildren(['name', 'category', 'deadlineRule'])",
+            "name": {
+              ".validate": "newData.isString() && newData.val().length >= 1 && newData.val().length <= 200"
+            },
+            "category": {
+              ".validate": "newData.val().matches(/^(monthly|biannual|annual|once_off)$/)"
+            },
+            "deadlineRule": {
+              ".validate": "newData.isString() && newData.val().length >= 1 && newData.val().length <= 60"
+            },
+            "fixedDeadline": {
+              ".validate": "!newData.exists() || (newData.isString() && newData.val().matches(/^[0-9]{2}-[0-9]{2}$/))"
+            },
+            "authority": {
+              ".validate": "!newData.exists() || (newData.isString() && newData.val().length <= 100)"
+            },
+            "defaultOwner": {
+              ".validate": "!newData.exists() || (newData.isString() && newData.val().length <= 200)"
+            }
+          }
+        },
+        "filings": {
+          "$year": {
+            ".validate": "$year.matches(/^[0-9]{4}$/)",
+            "$entityId": {
+              ".validate": "$entityId.matches(/^[A-Za-z0-9_-]+$/)",
+              ".indexOn": ["status", "dueDate"],
+              "$obligationId": {
+                ".validate": "newData.hasChildren(['status']) || newData.hasChildren(['manualDueDate'])",
+                "filedBy": {
+                  ".validate": "newData.isString() && newData.val().length <= 200"
+                },
+                "notes": {
+                  ".validate": "!newData.exists() || (newData.isString() && newData.val().length <= 1000)"
+                }
               }
             }
           }
+        },
+        "audit-log": {
+          "$entryId": {
+            ".validate": "newData.hasChildren(['action', 'actorUid', 'timestamp'])"
+          }
         }
-      },
-      "settings": {
-        ".validate": "newData.hasChild('reminders')"
       }
     },
     "ross": {

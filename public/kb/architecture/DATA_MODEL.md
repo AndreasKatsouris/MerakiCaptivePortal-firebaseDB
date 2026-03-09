@@ -405,6 +405,83 @@ Google review imports. Requires `reviewerName`, `rating`, `text`, `timestamp`.
 
 ---
 
+### ROSS (Restaurant Operations Support System) Nodes
+
+#### `ross/workflows/{uid}/{workflowId}`
+Operational workflows owned by a user, with per-location activation.
+
+```json
+{
+  "id": "wf-abc123",
+  "name": "Opening Checklist",
+  "description": "Daily opening procedure",
+  "category": "operations",
+  "recurrence": "daily",
+  "templateId": "tpl-xyz",
+  "createdAt": 1700000000000,
+  "updatedAt": 1700000000000,
+  "locations": {
+    "loc-1": {
+      "locationId": "loc-1",
+      "locationStatus": "active",
+      "locationNextDueDate": "2026-03-10T00:00:00.000Z",
+      "locationAssignedTo": "staffId",
+      "activatedAt": 1700000000000,
+      "tasks": {
+        "task-1": {
+          "title": "Check gas valve",
+          "status": "pending",
+          "dueDate": null,
+          "completedAt": null,
+          "assignedTo": null,
+          "order": 0
+        }
+      },
+      "history": {
+        "2026-daily": {
+          "cycleId": "2026-daily",
+          "period": "2026",
+          "completedAt": 1700000000000,
+          "tasksTotal": 5,
+          "tasksCompleted": 5,
+          "completionRate": 100,
+          "onTime": true
+        }
+      }
+    }
+  }
+}
+```
+
+#### `ross/templates/{templateId}`
+Reusable workflow templates. Created/edited/deleted by Super Admins only.
+
+```json
+{
+  "id": "tpl-xyz",
+  "name": "Weekly Deep Clean",
+  "description": "Weekly deep cleaning procedure",
+  "category": "operations",
+  "recurrence": "weekly",
+  "tasks": [
+    { "id": "t1", "title": "Degrease hoods", "required": true, "order": 0 }
+  ],
+  "isPublic": true,
+  "createdBy": "admin-uid",
+  "createdAt": 1700000000000,
+  "updatedAt": 1700000000000
+}
+```
+
+#### `ross/ownerIndex/{uid}`
+Fan-out index mapping user IDs to a boolean `true`. Written by `rossCreateWorkflow` and `rossActivateWorkflow`. Cleaned up by `rossDeleteWorkflow` when the last workflow for a user is removed. Used by `rossScheduledReminder` to avoid scanning the entire `/ross/workflows` tree.
+
+```json
+{ "uid-abc": true, "uid-def": true }
+```
+
+---
+
 ### Admin / Project Management Nodes
 
 #### `admin/projects/{projectId}`
@@ -487,6 +564,12 @@ guests/{phoneNumber}
   |-- queue entries (via phoneNumber)
 ```
 
+```
+ross/workflows/{uid}
+  |-- ross/ownerIndex/{uid}       (fan-out for scheduled reminder)
+  |-- ross/templates (via templateId)
+```
+
 ## Key Design Patterns
 
 1. **Phone Number as Guest Key:** Guest records are keyed by normalized phone number (E.164 format), making phone the canonical identifier across all guest-facing features.
@@ -498,3 +581,5 @@ guests/{phoneNumber}
 4. **Location-Scoped Authorization:** Security rules check `userLocations/{uid}/{locationId}` to verify a user has access to a specific location's data.
 
 5. **Atomic Multi-Path Updates:** Deletes and cross-node updates use `update(ref(rtdb), { path1: null, path2: null })` for atomicity.
+
+6. **Fan-out Index Nodes:** `ross/ownerIndex` maps user IDs to `true` so scheduled functions can enumerate active owners without scanning the entire data tree. Written on workflow create/activate, cleaned up on last workflow delete.

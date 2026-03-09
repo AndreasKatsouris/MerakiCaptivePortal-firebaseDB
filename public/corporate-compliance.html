@@ -16,81 +16,21 @@
 </head>
 <body>
 
-<!-- Sidebar Navigation -->
-<nav id="sidebar" class="sidebar">
-    <div class="sidebar-toggle" id="sidebarToggle" title="Toggle Sidebar">
-        <i class="fas fa-chevron-left"></i>
+<!-- Module Header -->
+<div class="dashboard-header">
+    <div class="container">
+        <a href="/admin-dashboard.html" class="back-link">
+            <i class="fas fa-arrow-left"></i> Back to Dashboard
+        </a>
+        <h1><i class="fas fa-building me-3"></i>Corporate Compliance</h1>
+        <p>Entity registry, compliance obligations, and deadline tracker</p>
     </div>
-    <div class="sidebar-header">
-        <h4><i class="fas fa-bolt me-2"></i><span>Sparks</span></h4>
-    </div>
-    <ul class="nav flex-column sidebar-nav">
-        <li class="nav-item">
-            <a href="user-dashboard.html" class="nav-link">
-                <i class="fas fa-home"></i><span>Dashboard</span>
-            </a>
-        </li>
-        <li class="nav-item">
-            <a href="queue-management.html" class="nav-link">
-                <i class="fas fa-clock"></i><span>Queue</span>
-            </a>
-        </li>
-        <li class="nav-item">
-            <a href="bookings.html" class="nav-link">
-                <i class="fas fa-calendar-alt"></i><span>Bookings</span>
-            </a>
-        </li>
-        <li class="nav-item">
-            <a href="guest-management.html" class="nav-link">
-                <i class="fas fa-users"></i><span>Guests</span>
-            </a>
-        </li>
-        <li class="nav-item">
-            <a href="food-cost-analytics.html" class="nav-link">
-                <i class="fas fa-chart-pie"></i><span>Food Cost</span>
-            </a>
-        </li>
-        <li class="nav-item">
-            <a href="campaigns.html" class="nav-link">
-                <i class="fas fa-bullhorn"></i><span>Campaigns</span>
-            </a>
-        </li>
-        <li class="nav-item">
-            <a href="analytics.html" class="nav-link">
-                <i class="fas fa-chart-line"></i><span>Analytics</span>
-            </a>
-        </li>
-        <li class="nav-item">
-            <a href="sales-forecasting.html" class="nav-link">
-                <i class="fas fa-chart-area"></i><span>Sales Forecasting</span>
-            </a>
-        </li>
-        <li class="nav-item">
-            <a href="corporate-compliance.html" class="nav-link active">
-                <i class="fas fa-building"></i><span>Compliance</span>
-            </a>
-        </li>
-        <li class="nav-item">
-            <a href="user-subscription.html" class="nav-link">
-                <i class="fas fa-crown"></i><span>Subscription</span>
-            </a>
-        </li>
-    </ul>
-</nav>
+</div>
 
 <!-- Main Content Area -->
 <div class="main-container">
-    <!-- Page Header -->
-    <div class="compliance-header">
-        <div class="container-fluid px-4">
-            <div class="d-flex align-items-center justify-content-between">
-                <div>
-                    <h1><i class="fas fa-building me-3"></i>Corporate Compliance</h1>
-                    <p class="mb-0 opacity-75">Entity registry, compliance obligations, and deadline tracker</p>
-                </div>
-                <div id="compliance-summary-badges"></div>
-            </div>
-        </div>
+    <div id="compliance-summary-badges-wrapper" class="container pt-3">
+        <div id="compliance-summary-badges"></div>
     </div>
 
     <!-- Module Mount Point -->
@@ -104,25 +44,6 @@
     </div>
 </div>
 
-<!-- Mobile Bottom Nav -->
-<nav class="mobile-bottom-nav">
-    <a href="user-dashboard.html" class="nav-item">
-        <i class="fas fa-home"></i><span>Home</span>
-    </a>
-    <a href="queue-management.html" class="nav-item">
-        <i class="fas fa-clock"></i><span>Queue</span>
-    </a>
-    <a href="guest-management.html" class="nav-item">
-        <i class="fas fa-users"></i><span>Guests</span>
-    </a>
-    <a href="analytics.html" class="nav-item">
-        <i class="fas fa-chart-line"></i><span>Analytics</span>
-    </a>
-    <a href="#" class="nav-item mobile-menu-btn" id="mobileMenuBtn">
-        <i class="fas fa-bars"></i><span>Menu</span>
-    </a>
-</nav>
-
 <!-- Scripts -->
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"
         integrity="sha384-ENjdO4Dr2bkBIFxQpeoTz1HIcje39Wm4jDKdf19U8gI4ddQ3GYNS7NTKfAdVzdl1" crossorigin="anonymous"></script>
@@ -130,6 +51,7 @@
 <script type="module">
     import { initializeComplianceModule } from './js/modules/compliance/index.js?v=1.0.0';
     import { auth, onAuthStateChanged } from './js/config/firebase-config.js';
+    import { featureAccessControl } from './js/modules/access-control/services/feature-access-control.js';
 
     document.addEventListener('DOMContentLoaded', async () => {
         onAuthStateChanged(auth, async (user) => {
@@ -140,14 +62,22 @@
 
             try {
                 const idTokenResult = await user.getIdTokenResult();
+
+                // Admins always get full access
                 if (!idTokenResult.claims.admin) {
-                    document.getElementById('compliance-app').innerHTML =
-                        '<div class="alert alert-danger mt-4">' +
-                        '<i class="fas fa-lock me-2"></i>' +
-                        'Access restricted. This module is available to directors only.' +
-                        '</div>';
-                    return;
+                    // Check subscription tier for non-admin users
+                    const access = await featureAccessControl.checkFeatureAccess('corporateCompliance');
+                    if (!access.hasAccess) {
+                        document.getElementById('compliance-app').innerHTML =
+                            '<div class="alert alert-warning mt-4">' +
+                            '<i class="fas fa-lock me-2"></i>' +
+                            '<strong>Professional or Enterprise subscription required.</strong> ' +
+                            'Upgrade your plan to access the Corporate Compliance Tracker.' +
+                            '</div>';
+                        return;
+                    }
                 }
+
                 await initializeComplianceModule('compliance-app');
             } catch (error) {
                 const el = document.getElementById('compliance-app');
@@ -166,33 +96,5 @@
     });
 </script>
 
-<!-- Sidebar toggle logic -->
-<script>
-    document.addEventListener('DOMContentLoaded', function() {
-        const sidebar = document.getElementById('sidebar');
-        const sidebarToggle = document.getElementById('sidebarToggle');
-
-        // Restore sidebar state
-        if (localStorage.getItem('sidebarCollapsed') === 'true') {
-            sidebar.classList.add('collapsed');
-        }
-
-        if (sidebarToggle) {
-            sidebarToggle.addEventListener('click', function() {
-                sidebar.classList.toggle('collapsed');
-                localStorage.setItem('sidebarCollapsed', sidebar.classList.contains('collapsed'));
-            });
-        }
-
-        // Mobile menu button
-        const mobileMenuBtn = document.getElementById('mobileMenuBtn');
-        if (mobileMenuBtn) {
-            mobileMenuBtn.addEventListener('click', function(e) {
-                e.preventDefault();
-                sidebar.classList.toggle('show');
-            });
-        }
-    });
-</script>
 </body>
 </html>

@@ -87,8 +87,9 @@ function parseFinancialYearEnd(financialYearEnd, year) {
  * @returns {Date}
  */
 function addMonths(date, months) {
-  const result = new Date(date.getTime());
-  result.setMonth(result.getMonth() + months);
+  const result = new Date(date.getFullYear(), date.getMonth() + months, 1);
+  const lastDay = new Date(result.getFullYear(), result.getMonth() + 1, 0).getDate();
+  result.setDate(Math.min(date.getDate(), lastDay));
   return result;
 }
 
@@ -112,9 +113,7 @@ function lastDayOfMonth(year, month) {
 function getEntityYearEnd(entity, year) {
   const fye = entity && entity.financialYearEnd;
   if (!fye) return null;
-  const parsed = new Date(fye);
-  if (isNaN(parsed.getTime())) return null;
-  return new Date(year, parsed.getMonth(), parsed.getDate());
+  return parseFinancialYearEnd(fye, year);
 }
 
 /**
@@ -166,14 +165,15 @@ export function calculateNextDueDate(obligation, entity, year, month) {
     }
 
     case 'last_business_day_of_month_following_period': {
-      // Bimonthly VAT — approximate as last day of month following current period
-      // VAT periods end at even months (Feb, Apr, Jun, Aug, Oct, Dec)
-      // The filing month is the month after the period end
-      const periodEndMonth = currentMonth % 2 === 1 ? currentMonth : currentMonth + 1;
-      const filingMonth = periodEndMonth + 1;
-      const targetYear = filingMonth > 11 ? year + 1 : year;
-      const adjustedMonth = filingMonth > 11 ? filingMonth - 12 : filingMonth;
-      return lastDayOfMonth(targetYear, adjustedMonth);
+      // Category B VAT: periods end Feb(1)/Apr(3)/Jun(5)/Aug(7)/Oct(9)/Dec(11) (0-indexed)
+      // Filing due = last day of the month following the period end.
+      // Lookup: for each currentMonth, what is the filing month (0-indexed)?
+      const VAT_FILING_MONTH = [0, 2, 2, 4, 4, 6, 6, 8, 8, 10, 10, 0];
+      // Jan→Jan, Feb→Mar, Mar→Mar, Apr→May, May→May, Jun→Jul,
+      // Jul→Jul, Aug→Sep, Sep→Sep, Oct→Nov, Nov→Nov, Dec→Jan(next year)
+      const filingMonth = VAT_FILING_MONTH[currentMonth];
+      const targetYear = filingMonth === 0 && currentMonth === 11 ? year + 1 : year;
+      return lastDayOfMonth(targetYear, filingMonth);
     }
 
     // ----- Fixed date rules -----
@@ -181,12 +181,7 @@ export function calculateNextDueDate(obligation, entity, year, month) {
     case 'fixed_date': {
       const parsed = parseFixedDeadline(obligation.fixedDeadline);
       if (!parsed) return null;
-      const candidate = new Date(year, parsed.month, parsed.day);
-      // If the date has passed in the current year, return next year
-      if (candidate < today && year === today.getFullYear()) {
-        return new Date(year + 1, parsed.month, parsed.day);
-      }
-      return candidate;
+      return new Date(year, parsed.month, parsed.day);
     }
 
     // ----- CIPC anniversary-based -----

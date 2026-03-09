@@ -204,6 +204,7 @@ import { initializeUsersLocationsManagement } from './admin/users-locations-mana
 import { initializeDashboard } from './dashboard.js';
 import { initializeProjectManagement, cleanupProjectManagement } from './modules/project-management/index.js';
 import { initializeRoss, cleanupRoss } from './modules/ross/index.js';
+import { initializeComplianceModule } from './modules/compliance/index.js';
 import { initializeGuestManagement, cleanupGuestManagement } from './guest-management.js';
 import { initializeQueueManagement, cleanupQueueManagement } from './queue-management.js';
 import { initializeCampaignManagement, cleanupCampaignManagement } from './campaigns/campaigns.js';
@@ -593,7 +594,8 @@ class AdminDashboard {
 
         this.sections.set('corporateComplianceContent', {
             menuId: 'corporateComplianceMenu',
-            contentId: 'corporateComplianceContent'
+            contentId: 'corporateComplianceContent',
+            init: () => initializeComplianceModule('compliance-module-container')
         });
 
         this.sections.set('adminToolsContent', {
@@ -1462,13 +1464,8 @@ class AdminDashboard {
                 }
 
                 case 'corporateComplianceContent':
-                    if (!this.sectionInitialized.corporateComplianceContent) {
-                        const frame = document.getElementById('corporateComplianceFrame');
-                        if (frame) {
-                            frame.src = '/corporate-compliance.html';
-                        }
-                        this.sectionInitialized.corporateComplianceContent = true;
-                    }
+                    await initializeComplianceModule('compliance-module-container');
+                    this.sectionInitialized.corporateComplianceContent = true;
                     break;
 
                 // Add other cases here...

@@ -422,6 +422,16 @@ export const PLATFORM_FEATURES = {
     dependencies: ['qmsAdvanced', 'qmsWhatsAppIntegration']
   },
 
+  // Corporate Compliance Features
+  corporateCompliance: {
+    id: 'corporateCompliance',
+    name: 'Corporate Compliance Tracker',
+    module: 'compliance',
+    description: 'Entity registry, CIPC obligations, annual return and filing deadline tracker',
+    category: 'management',
+    icon: 'fa-building'
+  },
+
   // Support Features
   supportBasic: {
     id: 'supportBasic',
@@ -476,7 +486,8 @@ export const PLATFORM_MODULES = {
   integrations: 'Integrations',
   support: 'Support',
   core: 'Core Platform',
-  locations: 'Location Management'
+  locations: 'Location Management',
+  compliance: 'Corporate Compliance'
 };
 
 // Helper functions

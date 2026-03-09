@@ -201,9 +201,26 @@
             font-size: 1rem;
         }
 
+        .kb-search-clear {
+            position: absolute;
+            right: 16px;
+            top: 50%;
+            transform: translateY(-50%);
+            background: none;
+            border: none;
+            color: var(--text-muted);
+            font-size: 1rem;
+            cursor: pointer;
+            padding: 4px;
+            display: none;
+            line-height: 1;
+        }
+        .kb-search-clear:hover { color: var(--text); }
+        .kb-search-clear.visible { display: block; }
+
         .kb-search-input {
             width: 100%;
-            padding: 14px 20px 14px 48px;
+            padding: 14px 44px 14px 48px;
             border: none;
             border-radius: 10px;
             font-size: 1rem;
@@ -601,6 +618,7 @@
             <div class="kb-search-wrapper">
                 <i class="fas fa-search"></i>
                 <input type="text" class="kb-search-input" id="searchInput" placeholder="Search documentation..." autocomplete="off">
+                <button class="kb-search-clear" id="searchClear" aria-label="Clear search">&times;</button>
             </div>
         </section>
 
@@ -608,7 +626,7 @@
         <div class="kb-stats-bar">
             <div class="kb-stat">
                 <i class="fas fa-cubes" style="color: var(--accent);"></i>
-                <span><span class="value">12</span> feature modules</span>
+                <span><span class="value">13</span> feature modules</span>
             </div>
             <div class="kb-stat">
                 <i class="fas fa-cloud" style="color: #9b59b6;"></i>
@@ -835,6 +853,20 @@
                 icon: 'fas fa-tasks',
                 path: 'kb/features/PROJECT_MANAGEMENT.md'
             },
+            {
+                title: 'ROSS — Restaurant Operations Support System',
+                description: 'Workflow automation and compliance module: create recurring checklists, track tasks per location, assign staff, and manage reusable templates.',
+                category: 'features',
+                icon: 'fas fa-robot',
+                path: 'kb/features/ROSS.md'
+            },
+            {
+                title: 'Corporate Compliance',
+                description: 'Multi-entity regulatory compliance tracker for South African restaurant groups. Tracks SARS, CIPC, DoL and franchise obligations with deadline calculation.',
+                category: 'features',
+                icon: 'fas fa-balance-scale',
+                path: 'kb/features/CORPORATE_COMPLIANCE.md'
+            },
 
             // Deployment
             {
@@ -898,6 +930,7 @@
 
         // ── DOM References ──
         const searchInput = document.getElementById('searchInput');
+        const searchClear = document.getElementById('searchClear');
         const cardsContainer = document.getElementById('cardsContainer');
         const emptyState = document.getElementById('emptyState');
         const filterPills = document.getElementById('filterPills');
@@ -1006,6 +1039,15 @@
         // Search
         searchInput.addEventListener('input', function() {
             searchQuery = this.value.trim();
+            searchClear.classList.toggle('visible', searchQuery.length > 0);
+            renderCards();
+        });
+
+        searchClear.addEventListener('click', function() {
+            searchInput.value = '';
+            searchQuery = '';
+            searchClear.classList.remove('visible');
+            searchInput.focus();
             renderCards();
         });
 
@@ -1098,6 +1140,7 @@
                     searchInput.blur();
                     searchInput.value = '';
                     searchQuery = '';
+                    searchClear.classList.remove('visible');
                     renderCards();
                 }
             }

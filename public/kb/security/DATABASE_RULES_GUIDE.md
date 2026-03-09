@@ -482,6 +482,40 @@ This is the gold standard for rules in this project.
 
 ---
 
+### `ross` (ROSS -- Restaurant Operations Support System)
+
+**Lines:** 384-402 | **Purpose:** Workflow automation, templates, and staff management
+
+```json
+"ross": {
+  "templates": {
+    ".read": "auth != null && root.child('admins').child(auth.uid).exists()",
+    ".write": "auth != null && root.child('admins').child(auth.uid).child('superAdmin').val() === true"
+  },
+  "workflows": {
+    "$ownerId": {
+      ".read": "auth != null && auth.uid === $ownerId && root.child('admins').child(auth.uid).exists()",
+      ".write": "auth != null && auth.uid === $ownerId && root.child('admins').child(auth.uid).exists()"
+    }
+  },
+  "staff": {
+    "$ownerId": {
+      ".read": "auth != null && auth.uid === $ownerId && root.child('admins').child(auth.uid).exists()",
+      ".write": "auth != null && auth.uid === $ownerId && root.child('admins').child(auth.uid).exists()"
+    }
+  }
+}
+```
+
+**Assessment:** Good. Three sub-nodes with distinct access patterns:
+- **Templates:** Read for all admins, write restricted to super admins (`admins/{uid}/superAdmin === true`). This matches the Cloud Functions enforcement where template CRUD uses `verifySuperAdmin`.
+- **Workflows:** Owner-scoped read/write. Only the workflow owner can read/write, and they must be in the `admins` node. This prevents cross-tenant data access.
+- **Staff:** Same owner-scoped pattern as workflows.
+
+**Note:** The `ross/ownerIndex` fan-out node is not covered by explicit rules because it is only written by Cloud Functions via the Admin SDK (which bypasses security rules). Direct client writes to `ownerIndex` would be rejected by the implicit deny-all rule.
+
+---
+
 ## Security Rule Patterns
 
 ### Pattern 1: Self-or-Admin

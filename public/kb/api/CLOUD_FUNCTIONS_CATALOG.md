@@ -223,6 +223,32 @@ The platform deploys **69+ Cloud Functions** from a single `functions/index.js` 
 
 ---
 
+### ROSS -- Restaurant Operations Support System
+
+| Function | Trigger | Auth | Purpose |
+|----------|---------|------|---------|
+| `rossGetWorkflows` | HTTP POST (v2) | Admin | List all workflows for the current user, flattened with location data |
+| `rossCreateWorkflow` | HTTP POST (v2) | Admin | Create workflow, attach to `locationIds[]`, write `ross/ownerIndex` |
+| `rossUpdateWorkflow` | HTTP POST (v2) | Admin | Update workflow metadata; validates `status` against `['active','paused']`; validates `daysBeforeAlert` to positive integers |
+| `rossDeleteWorkflow` | HTTP POST (v2) | Admin | Delete workflow (404 if not found); cleans up `ownerIndex` when last workflow removed |
+| `rossManageTask` | HTTP POST (v2) | Admin | Create / update / delete tasks within a workflow location |
+| `rossCompleteTask` | HTTP POST (v2) | Admin | Atomic task completion via RTDB transaction; writes history when all tasks done; 404 if task not found |
+| `rossActivateWorkflow` | HTTP POST (v2) | Admin | Attach existing workflow to additional locations; write `ownerIndex` |
+| `rossGetTemplates` | HTTP POST (v2) | Admin | List all templates (public + own) |
+| `rossCreateTemplate` | HTTP POST (v2) | Super Admin | Create a new workflow template |
+| `rossUpdateTemplate` | HTTP POST (v2) | Super Admin | Update template; null guard on `updates` |
+| `rossDeleteTemplate` | HTTP POST (v2) | Super Admin | Delete template (404 existence check) |
+| `rossGetReports` | HTTP POST (v2) | Admin | Fetch completion reports across all workflows and locations |
+| `rossGetStaff` | HTTP POST (v2) | Admin | List staff members for a location |
+| `rossScheduledReminder` | Scheduled (cron `0 5 * * *`) | N/A | Scheduled reminder using `ross/ownerIndex` fan-out (not full-tree scan) |
+
+**Authentication notes:**
+- Template CRUD requires `verifySuperAdmin` (not just `verifyAdmin`). The Admin SDK bypasses RTDB security rules, so Cloud Functions enforce the superAdmin restriction.
+- `rossCompleteTask` uses an RTDB `transaction()` for atomic completion to prevent race conditions.
+- `rossManageTask` requires `taskData` only for `create` and `update` actions -- `delete` works without it.
+
+---
+
 ### Subscription Status Management
 
 | Function | Trigger | Auth | Purpose |
@@ -252,6 +278,7 @@ The platform deploys **69+ Cloud Functions** from a single `functions/index.js` 
 | `functions/receiptProcessor.js` | Google Vision OCR processing |
 | `functions/receiptTemplateManager.js` | [TODO: verify] Template CRUD operations |
 | `functions/templateBasedExtraction.js` | Brand-specific receipt parsing |
+| `functions/ross.js` | ROSS workflow, template, task, and reminder functions |
 | `functions/projectManagement.js` | Admin project CRUD |
 | `functions/subscriptionStatusManager.js` | Subscription lifecycle management |
 | `functions/dataManagement.js` | Phone number normalization utilities |

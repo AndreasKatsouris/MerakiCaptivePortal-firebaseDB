@@ -6,6 +6,7 @@
 import { loadEntities, loadObligations, loadFilings } from './services/firebase-service.js';
 import { renderEntityRegistry } from './components/entity-registry.js';
 import { renderComplianceTracker } from './components/compliance-tracker.js';
+import { renderObligationsManager } from './components/obligations-manager.js';
 
 /**
  * @param {string} mountId - ID of the DOM element to mount into
@@ -18,6 +19,7 @@ export async function initializeComplianceModule(mountId) {
     mountEl.innerHTML = `
         <div id="panel-entity-registry" class="mb-4"></div>
         <div id="panel-compliance-tracker" class="mb-4"></div>
+        <div id="panel-obligations-manager" class="mb-4"></div>
     `;
 
     // Load all data in parallel
@@ -36,6 +38,7 @@ export async function initializeComplianceModule(mountId) {
     // Render panels
     await renderEntityRegistry('panel-entity-registry', activeEntities, dormantEntities);
     await renderComplianceTracker('panel-compliance-tracker', activeEntities, obligations, filings, year);
+    await renderObligationsManager('panel-obligations-manager', obligations, activeEntities);
 }
 
 function updateSummaryBadges(active, dormant, filings) {

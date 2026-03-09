@@ -65,5 +65,8 @@ node_modules/
 # dotenv environment variables file
 .env
 
+# Firebase service account keys — NEVER commit these
+*-adminsdk-*.json
+
 # Git worktrees
 .worktrees/

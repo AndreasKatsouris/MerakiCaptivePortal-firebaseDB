@@ -25,7 +25,8 @@ const ENTITIES = {
     oversightPhone: null,
     arCompliant: false,
     boCompliant: false,
-    financialYearEnd: null,
+    incorporationDate: null,
+    financialYearEnd: "02-28",
     notes: "Priority — required for S42 transfer.",
     createdAt: "2026-03-03T00:00:00.000Z",
     updatedAt: "2026-03-03T00:00:00.000Z"
@@ -42,7 +43,8 @@ const ENTITIES = {
     oversightPhone: null,
     arCompliant: false,
     boCompliant: false,
-    financialYearEnd: null,
+    incorporationDate: null,
+    financialYearEnd: "02-28",
     notes: "Intercompany agreements with Unocron must be documented.",
     createdAt: "2026-03-03T00:00:00.000Z",
     updatedAt: "2026-03-03T00:00:00.000Z"
@@ -59,7 +61,8 @@ const ENTITIES = {
     oversightPhone: null,
     arCompliant: false,
     boCompliant: false,
-    financialYearEnd: null,
+    incorporationDate: null,
+    financialYearEnd: "02-28",
     notes: "Trading entity for The Grove.",
     createdAt: "2026-03-03T00:00:00.000Z",
     updatedAt: "2026-03-03T00:00:00.000Z"
@@ -76,7 +79,8 @@ const ENTITIES = {
     oversightPhone: null,
     arCompliant: false,
     boCompliant: false,
-    financialYearEnd: null,
+    incorporationDate: null,
+    financialYearEnd: "02-28",
     notes: null,
     createdAt: "2026-03-03T00:00:00.000Z",
     updatedAt: "2026-03-03T00:00:00.000Z"
@@ -93,7 +97,8 @@ const ENTITIES = {
     oversightPhone: null,
     arCompliant: false,
     boCompliant: false,
-    financialYearEnd: null,
+    incorporationDate: null,
+    financialYearEnd: "02-28",
     notes: null,
     createdAt: "2026-03-03T00:00:00.000Z",
     updatedAt: "2026-03-03T00:00:00.000Z"
@@ -110,7 +115,8 @@ const ENTITIES = {
     oversightPhone: null,
     arCompliant: false,
     boCompliant: false,
-    financialYearEnd: null,
+    incorporationDate: null,
+    financialYearEnd: "02-28",
     notes: null,
     createdAt: "2026-03-03T00:00:00.000Z",
     updatedAt: "2026-03-03T00:00:00.000Z"
@@ -127,7 +133,8 @@ const ENTITIES = {
     oversightPhone: null,
     arCompliant: false,
     boCompliant: false,
-    financialYearEnd: null,
+    incorporationDate: null,
+    financialYearEnd: "02-28",
     notes: null,
     createdAt: "2026-03-03T00:00:00.000Z",
     updatedAt: "2026-03-03T00:00:00.000Z"
@@ -144,7 +151,8 @@ const ENTITIES = {
     oversightPhone: null,
     arCompliant: false,
     boCompliant: false,
-    financialYearEnd: null,
+    incorporationDate: null,
+    financialYearEnd: "02-28",
     notes: "Decision pending: activate as group management co or wind down.",
     createdAt: "2026-03-03T00:00:00.000Z",
     updatedAt: "2026-03-03T00:00:00.000Z"
@@ -163,7 +171,8 @@ const ENTITIES = {
     oversightPhone: null,
     arCompliant: false,
     boCompliant: false,
-    financialYearEnd: null,
+    incorporationDate: null,
+    financialYearEnd: "02-28",
     notes: "Voluntary deregistration application required.",
     createdAt: "2026-03-03T00:00:00.000Z",
     updatedAt: "2026-03-03T00:00:00.000Z"
@@ -199,6 +208,14 @@ const OBLIGATIONS = {
     authority: "SARS",
     defaultOwner: "Accountant",
     appliesToAll: false,
+    appliesToEntityIds: [
+      "M2009011674",
+      "M2009008158",
+      "K2022691369",
+      "K2022485535",
+      "K2022692469",
+      "K2011100483"
+    ],
     requiresVatRegistration: true,
     penaltyNote: "10% penalty on late payment; potential additional fixed penalty."
   },
