@@ -396,6 +396,13 @@ exports.rossUpdateWorkflow = onRequest(async (req, res) => {
                 if (updates[field] !== undefined) sanitized[field] = updates[field];
             });
 
+            if (sanitized.daysBeforeAlert !== undefined) {
+                if (!Array.isArray(sanitized.daysBeforeAlert)) {
+                    return res.status(400).json({ error: 'daysBeforeAlert must be an array of positive integers' });
+                }
+                sanitized.daysBeforeAlert = sanitized.daysBeforeAlert.filter(d => Number.isInteger(d) && d > 0);
+            }
+
             if (sanitized.status !== undefined && !['active', 'paused'].includes(sanitized.status)) {
                 return res.status(400).json({ error: "Invalid status value. Use 'active' or 'paused'" });
             }
@@ -428,6 +435,11 @@ exports.rossDeleteWorkflow = onRequest(async (req, res) => {
             if (!existing.exists()) return res.status(404).json({ error: 'Workflow not found' });
 
             await db.ref(`ross/workflows/${uid}/${workflowId}`).remove();
+            // Clean up ownerIndex if this was the last workflow
+            const remainingSnap = await db.ref(`ross/workflows/${uid}`).once('value');
+            if (!remainingSnap.exists()) {
+                await db.ref(`ross/ownerIndex/${uid}`).remove();
+            }
             res.json({ result: { success: true, workflowId } });
         } catch (error) {
             console.error('[rossDeleteWorkflow] Error:', error.message);
@@ -583,12 +595,14 @@ exports.rossCompleteTask = onRequest(async (req, res) => {
             // Use a transaction to atomically update the task and check completion
             let allTasksDone = false;
             let totalTaskCount = 0;
+            let taskFound = false;
 
             await locationRef.transaction((locationData) => {
                 if (!locationData) return locationData;
                 if (!locationData.tasks || !locationData.tasks[taskId]) return locationData;
                 // Idempotency: skip if already completed
                 if (locationData.tasks[taskId].status === 'completed') return locationData;
+                taskFound = true;
 
                 locationData.tasks[taskId].status = 'completed';
                 locationData.tasks[taskId].completedAt = now;
@@ -598,6 +612,8 @@ exports.rossCompleteTask = onRequest(async (req, res) => {
                 allTasksDone = allTasks.every(t => t.status === 'completed');
                 return locationData;
             }, undefined, false);
+
+            if (!taskFound) return res.status(404).json({ error: 'Task not found or already completed' });
 
             if (allTasksDone && totalTaskCount > 0) {
                 const workflowSnap = await db.ref(`ross/workflows/${uid}/${workflowId}`).once('value');
@@ -612,7 +628,7 @@ exports.rossCompleteTask = onRequest(async (req, res) => {
                     tasksTotal: totalTaskCount,
                     tasksCompleted: totalTaskCount,
                     completionRate: 100,
-                    onTime: now <= (locData.locationNextDueDate || now)
+                    onTime: now <= (locData.nextDueDate || now)
                 };
                 await db.ref(`ross/workflows/${uid}/${workflowId}/locations/${locationId}/history/${cycleId}`).set(historyRecord);
             }
