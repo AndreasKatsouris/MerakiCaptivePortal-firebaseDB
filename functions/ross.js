@@ -868,6 +868,20 @@ exports.rossSubmitResponse = onRequest(async (req, res) => {
             const inputType = taskDef.inputType || 'checkbox';
             const inputConfig = taskDef.inputConfig || {};
 
+            // Type-validate value against inputType
+            if ((inputType === 'temperature' || inputType === 'number') && typeof value !== 'number') {
+                return res.status(400).json({ error: `value must be a number for ${inputType} tasks` });
+            }
+            if (inputType === 'checkbox' && typeof value !== 'boolean') {
+                return res.status(400).json({ error: 'value must be a boolean for checkbox tasks' });
+            }
+            if (inputType === 'yes_no' && typeof value !== 'boolean') {
+                return res.status(400).json({ error: 'value must be a boolean for yes_no tasks' });
+            }
+            if (inputType === 'rating' && (typeof value !== 'number' || !Number.isInteger(value))) {
+                return res.status(400).json({ error: 'value must be an integer for rating tasks' });
+            }
+
             // Auto-flag for temperature and number breaches
             let flagged = false;
             if ((inputType === 'temperature' || inputType === 'number') && typeof value === 'number') {
