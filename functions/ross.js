@@ -272,6 +272,7 @@ exports.rossActivateWorkflow = onRequest(async (req, res) => {
             };
 
             await db.ref(`ross/workflows/${uid}/${workflowId}`).set(workflowData);
+            await db.ref(`ross/ownerIndex/${uid}`).set(true);
             res.json({ result: { success: true, workflowId, workflow: workflowData } });
         } catch (error) {
             console.error('[rossActivateWorkflow] Error:', error.message);
@@ -344,6 +345,7 @@ exports.rossCreateWorkflow = onRequest(async (req, res) => {
             };
 
             await db.ref(`ross/workflows/${uid}/${workflowId}`).set(workflowData);
+            await db.ref(`ross/ownerIndex/${uid}`).set(true);
             res.json({ result: { success: true, workflowId, workflow: workflowData } });
         } catch (error) {
             console.error('[rossCreateWorkflow] Error:', error.message);
@@ -655,8 +657,15 @@ exports.rossScheduledReminder = onSchedule('0 5 * * *', async () => {
     const oneDayMs = 86400000;
 
     try {
-        const ownersSnap = await db.ref('ross/workflows').once('value');
-        const ownerMap = ownersSnap.val() || {};
+        const indexSnap = await db.ref('ross/ownerIndex').once('value');
+        const ownerMap = {};
+        if (indexSnap.exists()) {
+            const ownerIds = Object.keys(indexSnap.val());
+            await Promise.all(ownerIds.map(async (ownerId) => {
+                const ownerSnap = await db.ref(`ross/workflows/${ownerId}`).once('value');
+                if (ownerSnap.exists()) ownerMap[ownerId] = ownerSnap.val();
+            }));
+        }
 
         for (const [ownerId, ownerWorkflows] of Object.entries(ownerMap)) {
             for (const workflow of Object.values(ownerWorkflows)) {
