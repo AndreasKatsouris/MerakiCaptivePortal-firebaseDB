@@ -98,7 +98,7 @@ exports.rossCreateTemplate = onRequest(async (req, res) => {
         if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' });
         try {
             const decodedToken = await verifyAuthToken(req);
-            const { uid } = await verifySuperAdmin(decodedToken);
+            const uid = await verifySuperAdmin(decodedToken);
 
             const data = req.body.data || req.body;
             const { name, category, description, recurrence, daysBeforeAlert, subtasks, tags } = data;
@@ -142,7 +142,7 @@ exports.rossUpdateTemplate = onRequest(async (req, res) => {
         if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' });
         try {
             const decodedToken = await verifyAuthToken(req);
-            const { uid } = await verifySuperAdmin(decodedToken);
+            const uid = await verifySuperAdmin(decodedToken);
 
             const data = req.body.data || req.body;
             const { templateId, updates } = data;
@@ -183,7 +183,7 @@ exports.rossDeleteTemplate = onRequest(async (req, res) => {
         if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' });
         try {
             const decodedToken = await verifyAuthToken(req);
-            const { uid } = await verifySuperAdmin(decodedToken);
+            const uid = await verifySuperAdmin(decodedToken);
 
             const data = req.body.data || req.body;
             const { templateId } = data;
