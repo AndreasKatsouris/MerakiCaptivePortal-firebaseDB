@@ -12,7 +12,7 @@ class RossService {
     async getIdToken() {
         const user = auth.currentUser;
         if (!user) throw new Error('User not authenticated');
-        return await user.getIdToken(true);
+        return await user.getIdToken();
     }
 
     async callFunction(functionName, data = {}) {
