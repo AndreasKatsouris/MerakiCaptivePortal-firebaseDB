@@ -103,10 +103,50 @@ ross/
   "description": "Optional detail",
   "required": true,
   "order": 0,
-  "assignedTo": "staffMemberId",   ← set via rossManageTask
-  "completedAt": null | number,
-  "completedBy": null | string
+  "inputType": "checkbox",
+  "inputConfig": {
+    "unit": "°C",
+    "max": 5,
+    "min": 0,
+    "requiredNote": false,
+    "options": []
+  },
+  "assignedTo": "staffMemberId",
+  "completedAt": null,
+  "completedBy": null
 }
+```
+
+`inputType` controls the UI control rendered when a staff member executes the workflow. `inputConfig` holds type-specific configuration (unit labels, thresholds, dropdown options, max stars). Both fields are optional — tasks without `inputType` default to `checkbox`.
+
+### Runs
+
+```
+ross/
+  runs/
+    {locationId}/
+      {workflowId}/
+        current/
+          runId: string
+          startedAt: number
+          startedBy: string (uid)
+          status: 'in_progress' | 'completed'
+          responses/
+            {taskId}/
+              value: any
+              note: string?
+              submittedAt: number
+              submittedBy: string
+              flagged: boolean
+              inputType: string
+        history/
+          {runId}/
+            runId: string
+            completedAt: number
+            completedBy: string
+            onTime: boolean
+            flaggedCount: number
+            responses: { [taskId]: ResponseObject }
 ```
 
 ---
@@ -127,8 +167,29 @@ All ROSS functions are defined in `functions/ross.js` and exported from `functio
 | `rossCreateTemplate` | `verifySuperAdmin` | Create a new template |
 | `rossUpdateTemplate` | `verifySuperAdmin` | Update an existing template |
 | `rossDeleteTemplate` | `verifySuperAdmin` | Delete a template |
+| `rossCreateRun` | `verifyAdmin` | Create or return the current in-progress run for a workflow+location |
+| `rossSubmitResponse` | `verifyAdmin` | Submit a typed response for a task within a run; auto-flags out-of-range values |
+| `rossGetRun` | `verifyAdmin` | Get the current run and previous responses for a workflow+location |
+| `rossGetRunHistory` | `verifyAdmin` | List completed runs (newest first) for a workflow+location |
 
 > **Note:** Template CRUD (`rossCreateTemplate`, `rossUpdateTemplate`, `rossDeleteTemplate`) requires `verifySuperAdmin`. The Admin SDK bypasses RTDB security rules, so Cloud Functions must enforce the same superAdmin restriction that the RTDB rules intend.
+
+### Input Types
+
+| `inputType` | UI Control | `inputConfig` fields |
+|---|---|---|
+| `checkbox` | Checkbox toggle | _(none)_ |
+| `text` | Text input | _(none)_ |
+| `number` | Number input | `unit`, `max`, `min`, `requiredNote` |
+| `temperature` | Number input with unit | `unit` (e.g. `°C`), `max`, `min`, `requiredNote` |
+| `yes_no` | Yes / No buttons | _(none)_ |
+| `dropdown` | Select list | `options: string[]` |
+| `timestamp` | Datetime-local picker | _(none)_ |
+| `photo` | Phase 2 placeholder | _(none)_ |
+| `signature` | Phase 2 placeholder | _(none)_ |
+| `rating` | Star buttons | `max` (default: 5) |
+
+Values flagged when `Number(value) > inputConfig.max` or `< inputConfig.min`. If `requiredNote: true`, a note textarea is shown when the value is out of range.
 
 ### Critical API Shape
 
