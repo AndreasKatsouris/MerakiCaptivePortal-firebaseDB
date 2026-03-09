@@ -491,13 +491,14 @@ exports.rossManageTask = onRequest(async (req, res) => {
             const snap = await locationRef.once('value');
             if (!snap.exists()) return res.status(404).json({ error: 'Workflow location not found' });
 
-            if (!taskData) return res.status(400).json({ error: 'Task data is required' });
-
             const tasksRef = locationRef.child('tasks');
             const now = Date.now();
 
             switch (action) {
                 case 'create': {
+                    if (!taskData || typeof taskData !== 'object') {
+                        return res.status(400).json({ error: 'taskData is required for create' });
+                    }
                     const newTaskId = generateId();
                     const task = {
                         title: taskData.title?.trim() || 'Untitled Task',
@@ -513,6 +514,9 @@ exports.rossManageTask = onRequest(async (req, res) => {
                 }
                 case 'update': {
                     if (!taskId) return res.status(400).json({ error: 'Task ID required for update' });
+                    if (!taskData || typeof taskData !== 'object') {
+                        return res.status(400).json({ error: 'taskData is required for update' });
+                    }
                     const allowedTaskFields = ['title', 'status', 'dueDate', 'assignedTo', 'order'];
                     const updates = {};
                     allowedTaskFields.forEach(f => { if (taskData[f] !== undefined) updates[f] = taskData[f]; });
