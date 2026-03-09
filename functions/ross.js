@@ -883,7 +883,7 @@ exports.rossSubmitResponse = onRequest(async (req, res) => {
             const runSnap = await runRef.once('value');
             if (!runSnap.exists()) return res.status(404).json({ error: 'Run not found' });
             const run = runSnap.val();
-            if (run.completedAt !== null) return res.status(409).json({ error: 'Run is already completed' });
+            if (run.completedAt) return res.status(409).json({ error: 'Run is already completed' });
 
             // Get task definition from workflow
             const locSnap = await db.ref(`ross/workflows/${uid}/${workflowId}/locations/${locationId}`).once('value');
