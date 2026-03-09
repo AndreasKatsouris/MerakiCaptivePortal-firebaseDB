@@ -19,3 +19,5 @@ _Agents append here._
 ### [SEC → COORD] — COMPLETE — C3 fixed. BACK and FRONT may proceed.
 
 ### [BACK → COORD] — COMPLETE — Tasks 2–7 done. All backend fixes applied.
+
+### [FRONT → COORD] — COMPLETE — Tasks 8–14 done. All frontend fixes applied.
