@@ -12,7 +12,8 @@ import { rossService } from './services/ross-service.js';
 // ---------------------------------------------------------------------------
 const rossState = {
     app: null,
-    locationId: null
+    locationId: null,
+    authUnsubscribe: null
 };
 
 // ---------------------------------------------------------------------------
@@ -1850,6 +1851,13 @@ export async function initializeRoss() {
     });
 
     rossState.app.mount(container);
+
+    rossState.authUnsubscribe = auth.onAuthStateChanged((user) => {
+        if (!user && rossState.app) {
+            cleanupRoss();
+        }
+    });
+
     return rossState.app;
 }
 
@@ -1864,6 +1872,11 @@ export function cleanupRoss() {
             console.error('[ROSS] Error unmounting Vue app:', err);
         }
         rossState.app = null;
+    }
+
+    if (rossState.authUnsubscribe) {
+        rossState.authUnsubscribe();
+        rossState.authUnsubscribe = null;
     }
 
     rossState.locationId = null;
