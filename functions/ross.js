@@ -84,7 +84,8 @@ exports.rossGetTemplates = onRequest(async (req, res) => {
             res.json({ result: { success: true, templates } });
         } catch (error) {
             console.error('[rossGetTemplates] Error:', error.message);
-            res.status(error.message.includes('Admin') ? 403 : 401).json({ error: error.message });
+            const statusCode = (error.message.includes('Admin') || error.message.includes('Super Admin')) ? 403 : 500;
+            res.status(statusCode).json({ error: error.message });
         }
     });
 });
@@ -116,7 +117,9 @@ exports.rossCreateTemplate = onRequest(async (req, res) => {
                 category,
                 description: description?.trim() || '',
                 recurrence,
-                daysBeforeAlert: Array.isArray(daysBeforeAlert) ? daysBeforeAlert : [30, 7],
+                daysBeforeAlert: Array.isArray(daysBeforeAlert)
+                    ? daysBeforeAlert.filter(d => Number.isInteger(d) && d > 0)
+                    : [30, 7],
                 subtasks: Array.isArray(subtasks) ? subtasks : [],
                 notificationChannels: ['in_app'],
                 tags: Array.isArray(tags) ? tags : [],
@@ -128,7 +131,8 @@ exports.rossCreateTemplate = onRequest(async (req, res) => {
             res.json({ result: { success: true, templateId, template: templateData } });
         } catch (error) {
             console.error('[rossCreateTemplate] Error:', error.message);
-            res.status(error.message.includes('Admin') ? 403 : 401).json({ error: error.message });
+            const statusCode = (error.message.includes('Admin') || error.message.includes('Super Admin')) ? 403 : 500;
+            res.status(statusCode).json({ error: error.message });
         }
     });
 });
@@ -172,7 +176,8 @@ exports.rossUpdateTemplate = onRequest(async (req, res) => {
             res.json({ result: { success: true, templateId } });
         } catch (error) {
             console.error('[rossUpdateTemplate] Error:', error.message);
-            res.status(error.message.includes('Admin') ? 403 : 401).json({ error: error.message });
+            const statusCode = (error.message.includes('Admin') || error.message.includes('Super Admin')) ? 403 : 500;
+            res.status(statusCode).json({ error: error.message });
         }
     });
 });
@@ -191,12 +196,15 @@ exports.rossDeleteTemplate = onRequest(async (req, res) => {
             const data = req.body.data || req.body;
             const { templateId } = data;
             if (!templateId) return res.status(400).json({ error: 'Template ID is required' });
+            const existing = await db.ref(`ross/templates/${templateId}`).once('value');
+            if (!existing.exists()) return res.status(404).json({ error: 'Template not found' });
 
             await db.ref(`ross/templates/${templateId}`).remove();
             res.json({ result: { success: true, templateId } });
         } catch (error) {
             console.error('[rossDeleteTemplate] Error:', error.message);
-            res.status(error.message.includes('Admin') ? 403 : 401).json({ error: error.message });
+            const statusCode = (error.message.includes('Admin') || error.message.includes('Super Admin')) ? 403 : 500;
+            res.status(statusCode).json({ error: error.message });
         }
     });
 });
@@ -265,7 +273,9 @@ exports.rossActivateWorkflow = onRequest(async (req, res) => {
                 notificationChannels: ['in_app'],
                 notifyPhone: notifyPhone || null,
                 notifyEmail: notifyEmail || null,
-                daysBeforeAlert: daysBeforeAlert || template.daysBeforeAlert || [30, 7],
+                daysBeforeAlert: Array.isArray(daysBeforeAlert)
+                    ? daysBeforeAlert.filter(d => Number.isInteger(d) && d > 0)
+                    : (Array.isArray(template.daysBeforeAlert) ? template.daysBeforeAlert : [30, 7]),
                 createdAt: now,
                 updatedAt: now,
                 locations
@@ -276,7 +286,8 @@ exports.rossActivateWorkflow = onRequest(async (req, res) => {
             res.json({ result: { success: true, workflowId, workflow: workflowData } });
         } catch (error) {
             console.error('[rossActivateWorkflow] Error:', error.message);
-            res.status(error.message.includes('Admin') ? 403 : 401).json({ error: error.message });
+            const statusCode = (error.message.includes('Admin') || error.message.includes('Super Admin')) ? 403 : 500;
+            res.status(statusCode).json({ error: error.message });
         }
     });
 });
@@ -338,7 +349,9 @@ exports.rossCreateWorkflow = onRequest(async (req, res) => {
                 notificationChannels: ['in_app'],
                 notifyPhone: notifyPhone || null,
                 notifyEmail: notifyEmail || null,
-                daysBeforeAlert: daysBeforeAlert || [30, 7],
+                daysBeforeAlert: Array.isArray(daysBeforeAlert)
+                    ? daysBeforeAlert.filter(d => Number.isInteger(d) && d > 0)
+                    : [30, 7],
                 createdAt: now,
                 updatedAt: now,
                 locations
@@ -349,7 +362,8 @@ exports.rossCreateWorkflow = onRequest(async (req, res) => {
             res.json({ result: { success: true, workflowId, workflow: workflowData } });
         } catch (error) {
             console.error('[rossCreateWorkflow] Error:', error.message);
-            res.status(error.message.includes('Admin') ? 403 : 401).json({ error: error.message });
+            const statusCode = (error.message.includes('Admin') || error.message.includes('Super Admin')) ? 403 : 500;
+            res.status(statusCode).json({ error: error.message });
         }
     });
 });
@@ -390,7 +404,8 @@ exports.rossUpdateWorkflow = onRequest(async (req, res) => {
             res.json({ result: { success: true, workflowId } });
         } catch (error) {
             console.error('[rossUpdateWorkflow] Error:', error.message);
-            res.status(error.message.includes('Admin') ? 403 : 401).json({ error: error.message });
+            const statusCode = (error.message.includes('Admin') || error.message.includes('Super Admin')) ? 403 : 500;
+            res.status(statusCode).json({ error: error.message });
         }
     });
 });
@@ -409,12 +424,15 @@ exports.rossDeleteWorkflow = onRequest(async (req, res) => {
             const data = req.body.data || req.body;
             const { workflowId } = data;
             if (!workflowId) return res.status(400).json({ error: 'Workflow ID is required' });
+            const existing = await db.ref(`ross/workflows/${uid}/${workflowId}`).once('value');
+            if (!existing.exists()) return res.status(404).json({ error: 'Workflow not found' });
 
             await db.ref(`ross/workflows/${uid}/${workflowId}`).remove();
             res.json({ result: { success: true, workflowId } });
         } catch (error) {
             console.error('[rossDeleteWorkflow] Error:', error.message);
-            res.status(error.message.includes('Admin') ? 403 : 401).json({ error: error.message });
+            const statusCode = (error.message.includes('Admin') || error.message.includes('Super Admin')) ? 403 : 500;
+            res.status(statusCode).json({ error: error.message });
         }
     });
 });
@@ -463,7 +481,8 @@ exports.rossGetWorkflows = onRequest(async (req, res) => {
             res.json({ result: { success: true, workflows } });
         } catch (error) {
             console.error('[rossGetWorkflows] Error:', error.message);
-            res.status(error.message.includes('Admin') ? 403 : 401).json({ error: error.message });
+            const statusCode = (error.message.includes('Admin') || error.message.includes('Super Admin')) ? 403 : 500;
+            res.status(statusCode).json({ error: error.message });
         }
     });
 });
@@ -535,7 +554,8 @@ exports.rossManageTask = onRequest(async (req, res) => {
             }
         } catch (error) {
             console.error('[rossManageTask] Error:', error.message);
-            res.status(error.message.includes('Admin') ? 403 : 401).json({ error: error.message });
+            const statusCode = (error.message.includes('Admin') || error.message.includes('Super Admin')) ? 403 : 500;
+            res.status(statusCode).json({ error: error.message });
         }
     });
 });
@@ -601,7 +621,8 @@ exports.rossCompleteTask = onRequest(async (req, res) => {
             res.json({ result: { success: true, taskId } });
         } catch (error) {
             console.error('[rossCompleteTask] Error:', error.message);
-            res.status(error.message.includes('Admin') ? 403 : 401).json({ error: error.message });
+            const statusCode = (error.message.includes('Admin') || error.message.includes('Super Admin')) ? 403 : 500;
+            res.status(statusCode).json({ error: error.message });
         }
     });
 });
@@ -653,7 +674,8 @@ exports.rossGetReports = onRequest(async (req, res) => {
             res.json({ result: { success: true, report } });
         } catch (error) {
             console.error('[rossGetReports] Error:', error.message);
-            res.status(error.message.includes('Admin') ? 403 : 401).json({ error: error.message });
+            const statusCode = (error.message.includes('Admin') || error.message.includes('Super Admin')) ? 403 : 500;
+            res.status(statusCode).json({ error: error.message });
         }
     });
 });
@@ -776,7 +798,8 @@ exports.rossManageStaff = onRequest(async (req, res) => {
             }
         } catch (error) {
             console.error('[rossManageStaff] Error:', error.message);
-            res.status(error.message.includes('Admin') ? 403 : 401).json({ error: error.message });
+            const statusCode = (error.message.includes('Admin') || error.message.includes('Super Admin')) ? 403 : 500;
+            res.status(statusCode).json({ error: error.message });
         }
     });
 });
@@ -802,7 +825,8 @@ exports.rossGetStaff = onRequest(async (req, res) => {
             res.json({ result: { success: true, staff } });
         } catch (error) {
             console.error('[rossGetStaff] Error:', error.message);
-            res.status(error.message.includes('Admin') ? 403 : 401).json({ error: error.message });
+            const statusCode = (error.message.includes('Admin') || error.message.includes('Super Admin')) ? 403 : 500;
+            res.status(statusCode).json({ error: error.message });
         }
     });
 });

@@ -58,8 +58,8 @@ ross/
         id: string
         name: string
         description: string
-        category: string          ← 'opening' | 'closing' | 'hygiene' | 'maintenance' | 'general'
-        recurrence: string        ← 'daily' | 'weekly' | 'monthly' | 'custom'
+        category: string          ← 'compliance' | 'operations' | 'growth' | 'finance' | 'hr' | 'maintenance'
+        recurrence: string        ← 'once' | 'daily' | 'weekly' | 'monthly' | 'quarterly' | 'annually'
         customInterval: number?
         tasks: Task[]
         templateId: string?
