@@ -388,11 +388,55 @@ export async function initializeRoss() {
 
                 <!-- Subtasks -->
                 <div class="mt-4">
-                    <div class="d-flex justify-content-between align-items-center mb-2">
-                        <h6 class="mb-0">Subtasks</h6>
-                        <button class="btn btn-sm btn-outline-primary" @click="addTemplateSubtask()">
-                            <i class="fas fa-plus me-1"></i>Add Subtask
-                        </button>
+                    <h6 class="mb-2">Subtasks</h6>
+                    <div class="card border-0 bg-light p-3 mb-3">
+                        <div class="row g-2 align-items-end">
+                            <div class="col-md-5">
+                                <label class="form-label form-label-sm mb-1">Input type for next subtask</label>
+                                <select class="form-select form-select-sm" v-model="templateEditorTaskInputType">
+                                    <option value="checkbox">Checkbox (tick to complete)</option>
+                                    <option value="text">Text input</option>
+                                    <option value="number">Number</option>
+                                    <option value="temperature">Temperature reading</option>
+                                    <option value="yes_no">Yes / No</option>
+                                    <option value="dropdown">Dropdown list</option>
+                                    <option value="timestamp">Timestamp</option>
+                                    <option value="photo">Photo upload</option>
+                                    <option value="signature">Signature</option>
+                                    <option value="rating">Star rating</option>
+                                </select>
+                            </div>
+                            <div class="col-md-5" v-if="templateEditorTaskInputType === 'temperature' || templateEditorTaskInputType === 'number'">
+                                <div class="row g-1">
+                                    <div class="col-6">
+                                        <input type="text" class="form-control form-control-sm" v-model="templateEditorTaskConfig.unit" placeholder="Unit (e.g. °C)">
+                                    </div>
+                                    <div class="col-6">
+                                        <input type="number" class="form-control form-control-sm" v-model.number="templateEditorTaskConfig.max" placeholder="Max threshold">
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="col-md-5" v-else-if="templateEditorTaskInputType === 'rating'">
+                                <input type="number" class="form-control form-control-sm" v-model.number="templateEditorTaskConfig.max" placeholder="Max stars (e.g. 5)" min="2" max="10">
+                            </div>
+                            <div class="col-md-2">
+                                <button class="btn btn-sm btn-outline-primary w-100" @click="addTemplateSubtask()">
+                                    <i class="fas fa-plus me-1"></i>Add
+                                </button>
+                            </div>
+                        </div>
+                        <div v-if="templateEditorTaskInputType === 'dropdown'" class="mt-2">
+                            <div class="input-group input-group-sm mb-1" v-for="(opt, i) in templateEditorTaskConfig.options" :key="i">
+                                <input type="text" class="form-control" :value="opt"
+                                    @input="templateEditorUpdateDropdownOption(i, $event.target.value)">
+                                <button class="btn btn-outline-danger" @click="templateEditorRemoveDropdownOption(i)">
+                                    <i class="fas fa-times"></i>
+                                </button>
+                            </div>
+                            <button class="btn btn-sm btn-outline-secondary" @click="templateEditorAddDropdownOption()">
+                                <i class="fas fa-plus me-1"></i>Add option
+                            </button>
+                        </div>
                     </div>
                     <div v-if="templateEditor.form.subtasks.length === 0" class="text-muted small py-2">
                         No subtasks yet. Add at least one.
@@ -402,6 +446,7 @@ export async function initializeRoss() {
                         <span class="text-muted small" style="min-width:20px">{{ idx + 1 }}.</span>
                         <input type="text" class="form-control form-control-sm" v-model="sub.title"
                             placeholder="Subtask title">
+                        <span class="badge bg-light text-dark border small">{{ formatInputType(sub.inputType || 'checkbox') }}</span>
                         <input type="number" class="form-control form-control-sm" v-model.number="sub.daysOffset"
                             style="width:100px" title="Days offset from due date (negative = before)">
                         <small class="text-muted text-nowrap">days offset</small>
@@ -1044,6 +1089,8 @@ export async function initializeRoss() {
                 builderSubtaskInput: '',
                 builderSubtaskInputType: 'checkbox',
                 builderSubtaskConfig: { unit: '', max: null, requiredNote: false, options: [] },
+                templateEditorTaskInputType: 'checkbox',
+                templateEditorTaskConfig: { unit: '', max: null, requiredNote: false, options: [] },
 
                 // View 5 — Reports
                 reportData: [],
@@ -1424,10 +1471,42 @@ export async function initializeRoss() {
 
             addTemplateSubtask() {
                 const nextOrder = this.templateEditor.form.subtasks.length + 1;
+                const inputType = this.templateEditorTaskInputType;
+                const cfg = { ...this.templateEditorTaskConfig };
+                let inputConfig = {};
+                if (inputType === 'temperature' || inputType === 'number') {
+                    if (cfg.unit) inputConfig.unit = cfg.unit;
+                    if (cfg.max !== null && cfg.max !== '') inputConfig.max = Number(cfg.max);
+                    if (cfg.requiredNote) inputConfig.requiredNote = true;
+                } else if (inputType === 'dropdown') {
+                    inputConfig.options = (cfg.options || []).filter(o => String(o).trim());
+                } else if (inputType === 'rating') {
+                    inputConfig.max = Number(cfg.max) || 5;
+                }
                 this.templateEditor.form.subtasks = [
                     ...this.templateEditor.form.subtasks,
-                    { title: '', daysOffset: 0, order: nextOrder }
+                    { title: '', daysOffset: 0, order: nextOrder, inputType, inputConfig }
                 ];
+                this.templateEditorTaskInputType = 'checkbox';
+                this.templateEditorTaskConfig = { unit: '', max: null, requiredNote: false, options: [] };
+            },
+
+            templateEditorAddDropdownOption() {
+                this.templateEditorTaskConfig = {
+                    ...this.templateEditorTaskConfig,
+                    options: [...(this.templateEditorTaskConfig.options || []), '']
+                };
+            },
+            templateEditorRemoveDropdownOption(index) {
+                this.templateEditorTaskConfig = {
+                    ...this.templateEditorTaskConfig,
+                    options: this.templateEditorTaskConfig.options.filter((_, i) => i !== index)
+                };
+            },
+            templateEditorUpdateDropdownOption(index, value) {
+                const options = [...this.templateEditorTaskConfig.options];
+                options[index] = value;
+                this.templateEditorTaskConfig = { ...this.templateEditorTaskConfig, options };
             },
 
             removeTemplateSubtask(idx) {
@@ -1459,7 +1538,9 @@ export async function initializeRoss() {
                     subtasks: form.subtasks.map((s, i) => ({
                         title: s.title.trim() || 'Untitled',
                         daysOffset: s.daysOffset || 0,
-                        order: i + 1
+                        order: i + 1,
+                        inputType: s.inputType || 'checkbox',
+                        inputConfig: s.inputConfig || {}
                     }))
                 };
                 this.templateSaving = true;
