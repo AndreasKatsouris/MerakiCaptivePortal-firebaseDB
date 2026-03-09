@@ -3125,6 +3125,10 @@ exports.rossGetReports = ross.rossGetReports;
 exports.rossScheduledReminder = ross.rossScheduledReminder;
 exports.rossManageStaff = ross.rossManageStaff;
 exports.rossGetStaff = ross.rossGetStaff;
+exports.rossCreateRun = ross.rossCreateRun;
+exports.rossSubmitResponse = ross.rossSubmitResponse;
+exports.rossGetRun = ross.rossGetRun;
+exports.rossGetRunHistory = ross.rossGetRunHistory;
 
 // ============================================
 // SUBSCRIPTION STATUS MANAGEMENT
