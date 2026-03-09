@@ -1044,6 +1044,7 @@ export async function initializeRoss() {
                                 <th>Tasks</th>
                                 <th>Completion</th>
                                 <th>Next Due</th>
+                                <th>Runs</th>
                             </tr>
                         </thead>
                         <tbody>
@@ -1074,10 +1075,70 @@ export async function initializeRoss() {
                                         {{ formatDate(row.nextDueDate) }}
                                     </span>
                                 </td>
+                                <td>
+                                    <button class="btn btn-sm btn-outline-secondary"
+                                        @click="loadRunHistory(row.workflowId, locationId)">
+                                        <i class="fas fa-history me-1"></i>Runs
+                                    </button>
+                                </td>
                             </tr>
                         </tbody>
                     </table>
                 </div>
+
+                <!-- Run History Panel -->
+                <div v-if="expandedReportWorkflow" class="card border-0 shadow-sm mt-4">
+                    <div class="card-header d-flex justify-content-between align-items-center">
+                        <h6 class="mb-0"><i class="fas fa-history me-2"></i>Run History</h6>
+                        <button class="btn btn-sm btn-outline-secondary"
+                            @click="expandedReportWorkflow = null; runHistory = []; expandedRun = null">
+                            <i class="fas fa-times"></i>
+                        </button>
+                    </div>
+                    <div class="card-body p-0">
+                        <div v-if="runHistoryLoading" class="text-center py-4">
+                            <div class="spinner-border spinner-border-sm text-primary"></div>
+                            <span class="ms-2 text-muted small">Loading runs...</span>
+                        </div>
+                        <div v-else-if="!runHistory.length" class="text-center py-4 text-muted small">
+                            No completed runs found.
+                        </div>
+                        <ul v-else class="list-group list-group-flush">
+                            <li v-for="run in runHistory" :key="run.runId || run.id"
+                                class="list-group-item">
+                                <div class="d-flex justify-content-between align-items-center">
+                                    <div>
+                                        <span class="fw-semibold small">{{ formatDateTime(run.completedAt) }}</span>
+                                        <span v-if="run.completedBy" class="text-muted small ms-2">
+                                            <i class="fas fa-user me-1"></i>{{ run.completedBy }}
+                                        </span>
+                                    </div>
+                                    <div class="d-flex gap-2 align-items-center">
+                                        <span v-if="run.onTime" class="badge bg-success">On Time</span>
+                                        <span v-else class="badge bg-warning text-dark">Late</span>
+                                        <span v-if="run.flaggedCount > 0" class="badge bg-danger">
+                                            <i class="fas fa-exclamation-triangle me-1"></i>{{ run.flaggedCount }} flagged
+                                        </span>
+                                        <button class="btn btn-sm btn-outline-secondary"
+                                            @click="expandedRun = expandedRun === (run.runId || run.id) ? null : (run.runId || run.id)">
+                                            <i :class="'fas ' + (expandedRun === (run.runId || run.id) ? 'fa-chevron-up' : 'fa-chevron-down')"></i>
+                                        </button>
+                                    </div>
+                                </div>
+                                <div v-if="expandedRun === (run.runId || run.id) && run.responses"
+                                    class="mt-2 ps-2 border-start">
+                                    <div v-for="(resp, taskId) in run.responses" :key="taskId"
+                                        class="small text-muted d-flex gap-2 mb-1">
+                                        <span class="fw-semibold">{{ resp.title || taskId }}:</span>
+                                        <span>{{ formatResponseValue(resp) }}</span>
+                                        <span v-if="resp.flagged" class="badge bg-warning text-dark">Flagged</span>
+                                    </div>
+                                </div>
+                            </li>
+                        </ul>
+                    </div>
+                </div>
+
                 <p class="text-muted small mt-2">
                     <i class="fas fa-info-circle me-1"></i>
                     Advanced charts and multi-location comparison coming in Phase 3.
@@ -1225,6 +1286,10 @@ export async function initializeRoss() {
 
                 // View 5 — Reports
                 reportData: [],
+                expandedReportWorkflow: null,
+                runHistory: [],
+                runHistoryLoading: false,
+                expandedRun: null,
 
                 // View 6 — Staff Management
                 staffLocationId: '',
@@ -2053,6 +2118,21 @@ export async function initializeRoss() {
                     await Swal.fire('Error', 'Failed to load reports: ' + err.message, 'error');
                 } finally {
                     this.reportsLoading = false;
+                }
+            },
+
+            async loadRunHistory(workflowId, locationId) {
+                this.expandedReportWorkflow = workflowId;
+                this.runHistory = [];
+                this.expandedRun = null;
+                this.runHistoryLoading = true;
+                try {
+                    const result = await rossService.getRunHistory(workflowId, locationId);
+                    this.runHistory = Array.isArray(result.runs) ? result.runs : [];
+                } catch (err) {
+                    await Swal.fire('Error', err.message, 'error');
+                } finally {
+                    this.runHistoryLoading = false;
                 }
             },
 
