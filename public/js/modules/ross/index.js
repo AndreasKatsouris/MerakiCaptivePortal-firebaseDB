@@ -582,38 +582,163 @@ export async function initializeRoss() {
                 <div v-if="!selectedWorkflowTasks.length" class="text-center py-4 text-muted">
                     No tasks configured.
                 </div>
-                <ul v-else class="list-group">
-                    <li v-for="task in selectedWorkflowTasks" :key="task._taskId"
-                        class="list-group-item d-flex justify-content-between align-items-center gap-2">
-                        <div class="flex-grow-1">
-                            <span :class="task.status === 'completed'
-                                ? 'text-decoration-line-through text-muted' : ''">
-                                {{ task.title }}
-                            </span>
-                            <br>
-                            <small class="text-muted">Due: {{ formatDate(task.dueDate) }}</small>
-                            <small v-if="task.assignedTo" class="text-primary ms-2">
-                                <i class="fas fa-user me-1"></i>{{ staffName(task.assignedTo) }}
-                            </small>
+                <div v-else class="list-group">
+                    <div v-for="task in selectedWorkflowTasks" :key="task._taskId"
+                        class="list-group-item p-3">
+                        <div class="d-flex justify-content-between align-items-start mb-2">
+                            <div>
+                                <span class="fw-semibold">{{ task.title }}</span>
+                                <span class="badge bg-light text-dark border ms-2 small">{{ formatInputType(task.inputType || 'checkbox') }}</span>
+                                <span v-if="currentRun && currentRun.responses && currentRun.responses[task._taskId]"
+                                    class="badge bg-success ms-2">
+                                    <i class="fas fa-check me-1"></i>Saved
+                                </span>
+                            </div>
+                            <select class="form-select form-select-sm w-auto ms-2"
+                                :value="task.assignedTo || ''"
+                                @change="assignTask(task, $event.target.value)">
+                                <option value="">Unassigned</option>
+                                <option v-for="m in staffMembers" :key="m.staffId" :value="m.staffId">
+                                    {{ m.name }}
+                                </option>
+                            </select>
                         </div>
-                        <select class="form-select form-select-sm w-auto"
-                            :value="task.assignedTo || ''"
-                            @change="assignTask(task, $event.target.value)">
-                            <option value="">Unassigned</option>
-                            <option v-for="m in staffMembers" :key="m.staffId" :value="m.staffId">
-                                {{ m.name }}
-                            </option>
-                        </select>
-                        <button v-if="task.status !== 'completed'"
-                            class="btn btn-sm btn-outline-success"
-                            @click="markTaskComplete(task)">
-                            <i class="fas fa-check me-1"></i>Complete
-                        </button>
-                        <span v-else class="badge bg-success">
-                            <i class="fas fa-check me-1"></i>Done
-                        </span>
-                    </li>
-                </ul>
+
+                        <!-- Previous response hint -->
+                        <div v-if="previousResponses[task._taskId]" class="text-muted small mb-2">
+                            <i class="fas fa-history me-1"></i>Last: {{ formatResponseValue(previousResponses[task._taskId]) }}
+                        </div>
+
+                        <!-- Photo / Signature placeholder -->
+                        <div v-if="task.inputType === 'photo' || task.inputType === 'signature'"
+                            class="alert alert-light border small py-2 mb-0">
+                            <i class="fas fa-clock me-1"></i>{{ task.inputType === 'photo' ? 'Photo upload' : 'Signature capture' }} coming in Phase 2.
+                        </div>
+
+                        <!-- Checkbox -->
+                        <div v-else-if="!task.inputType || task.inputType === 'checkbox'" class="d-flex align-items-center gap-2">
+                            <div class="form-check mb-0">
+                                <input class="form-check-input" type="checkbox"
+                                    :id="'task-cb-' + task._taskId"
+                                    v-model="runValues[task._taskId]">
+                                <label class="form-check-label" :for="'task-cb-' + task._taskId">Mark complete</label>
+                            </div>
+                            <button class="btn btn-sm btn-outline-success"
+                                :disabled="runSubmitting[task._taskId]"
+                                @click="submitTaskResponse(task)">
+                                <span v-if="runSubmitting[task._taskId]" class="spinner-border spinner-border-sm me-1"></span>
+                                Save
+                            </button>
+                        </div>
+
+                        <!-- Yes / No -->
+                        <div v-else-if="task.inputType === 'yes_no'" class="d-flex align-items-center gap-2 flex-wrap">
+                            <button class="btn btn-sm"
+                                :class="runValues[task._taskId] === true ? 'btn-success' : 'btn-outline-success'"
+                                @click="runValues = { ...runValues, [task._taskId]: true }">
+                                <i class="fas fa-check me-1"></i>Yes / Pass
+                            </button>
+                            <button class="btn btn-sm"
+                                :class="runValues[task._taskId] === false ? 'btn-danger' : 'btn-outline-danger'"
+                                @click="runValues = { ...runValues, [task._taskId]: false }">
+                                <i class="fas fa-times me-1"></i>No / Fail
+                            </button>
+                            <button class="btn btn-sm btn-outline-primary"
+                                :disabled="runSubmitting[task._taskId] || runValues[task._taskId] === undefined"
+                                @click="submitTaskResponse(task)">
+                                <span v-if="runSubmitting[task._taskId]" class="spinner-border spinner-border-sm me-1"></span>
+                                Save
+                            </button>
+                        </div>
+
+                        <!-- Text -->
+                        <div v-else-if="task.inputType === 'text'" class="d-flex gap-2">
+                            <input type="text" class="form-control form-control-sm"
+                                v-model="runValues[task._taskId]" placeholder="Enter value">
+                            <button class="btn btn-sm btn-outline-primary"
+                                :disabled="runSubmitting[task._taskId]"
+                                @click="submitTaskResponse(task)">
+                                <span v-if="runSubmitting[task._taskId]" class="spinner-border spinner-border-sm me-1"></span>
+                                Save
+                            </button>
+                        </div>
+
+                        <!-- Number / Temperature -->
+                        <div v-else-if="task.inputType === 'number' || task.inputType === 'temperature'">
+                            <div class="d-flex gap-2 align-items-center">
+                                <input type="number" class="form-control form-control-sm"
+                                    style="max-width:140px"
+                                    v-model.number="runValues[task._taskId]"
+                                    :placeholder="(task.inputConfig && task.inputConfig.unit) ? task.inputConfig.unit : 'Value'">
+                                <small v-if="task.inputConfig && task.inputConfig.unit" class="text-muted">{{ task.inputConfig.unit }}</small>
+                                <span v-if="isValueFlagged(task, runValues[task._taskId])"
+                                    class="badge bg-warning text-dark">
+                                    <i class="fas fa-exclamation-triangle me-1"></i>Flagged
+                                </span>
+                                <button class="btn btn-sm btn-outline-primary"
+                                    :disabled="runSubmitting[task._taskId]"
+                                    @click="submitTaskResponse(task)">
+                                    <span v-if="runSubmitting[task._taskId]" class="spinner-border spinner-border-sm me-1"></span>
+                                    Save
+                                </button>
+                            </div>
+                            <div v-if="task.inputConfig && task.inputConfig.requiredNote && isValueFlagged(task, runValues[task._taskId])"
+                                class="mt-2">
+                                <textarea class="form-control form-control-sm" rows="2"
+                                    v-model="runNotes[task._taskId]"
+                                    placeholder="Note required for flagged reading"></textarea>
+                            </div>
+                        </div>
+
+                        <!-- Dropdown -->
+                        <div v-else-if="task.inputType === 'dropdown'" class="d-flex gap-2">
+                            <select class="form-select form-select-sm" style="max-width:220px"
+                                v-model="runValues[task._taskId]">
+                                <option value="">Select an option</option>
+                                <option v-for="opt in (task.inputConfig && task.inputConfig.options || [])"
+                                    :key="opt" :value="opt">{{ opt }}</option>
+                            </select>
+                            <button class="btn btn-sm btn-outline-primary"
+                                :disabled="runSubmitting[task._taskId]"
+                                @click="submitTaskResponse(task)">
+                                <span v-if="runSubmitting[task._taskId]" class="spinner-border spinner-border-sm me-1"></span>
+                                Save
+                            </button>
+                        </div>
+
+                        <!-- Timestamp -->
+                        <div v-else-if="task.inputType === 'timestamp'" class="d-flex gap-2">
+                            <input type="datetime-local" class="form-control form-control-sm"
+                                style="max-width:240px"
+                                v-model="runValues[task._taskId]">
+                            <button class="btn btn-sm btn-outline-primary"
+                                :disabled="runSubmitting[task._taskId]"
+                                @click="submitTaskResponseTimestamp(task)">
+                                <span v-if="runSubmitting[task._taskId]" class="spinner-border spinner-border-sm me-1"></span>
+                                Save
+                            </button>
+                        </div>
+
+                        <!-- Rating -->
+                        <div v-else-if="task.inputType === 'rating'" class="d-flex gap-2 align-items-center flex-wrap">
+                            <div class="d-flex gap-1">
+                                <button v-for="n in (task.inputConfig && task.inputConfig.max || 5)"
+                                    :key="n"
+                                    class="btn btn-sm p-1"
+                                    :class="runValues[task._taskId] >= n ? 'btn-warning' : 'btn-outline-secondary'"
+                                    @click="runValues = { ...runValues, [task._taskId]: n }">
+                                    <i class="fas fa-star"></i>
+                                </button>
+                            </div>
+                            <button class="btn btn-sm btn-outline-primary"
+                                :disabled="runSubmitting[task._taskId] || !runValues[task._taskId]"
+                                @click="submitTaskResponse(task)">
+                                <span v-if="runSubmitting[task._taskId]" class="spinner-border spinner-border-sm me-1"></span>
+                                Save
+                            </button>
+                        </div>
+                    </div>
+                </div>
             </div>
 
             <!-- History Sub-view -->
@@ -1073,6 +1198,12 @@ export async function initializeRoss() {
                 workflowFilter: { category: 'all', status: 'all' },
                 selectedWorkflow: null,
                 workflowDetailTab: 'tasks',
+                expandedWorkflow: null,
+                currentRun: null,
+                previousResponses: {},
+                runSubmitting: {},
+                runValues: {},
+                runNotes: {},
 
                 // View 4 — Workflow Builder
                 builder: {
@@ -1587,15 +1718,109 @@ export async function initializeRoss() {
                 }
             },
 
-            openWorkflow(workflow) {
-                this.selectedWorkflow = { ...workflow };
+            async openWorkflow(wf) {
+                this.expandedWorkflow = wf;
+                this.selectedWorkflow = { ...wf };
                 this.workflowDetailTab = 'tasks';
+                this.currentRun = null;
+                this.previousResponses = {};
+                this.runValues = {};
+                this.runNotes = {};
+                this.runSubmitting = {};
                 if (this.staffMembers.length === 0) this.loadStaff();
+                try {
+                    await rossService.createRun(wf.workflowId, this.locationId);
+                    const runResult = await rossService.getRun(wf.workflowId, this.locationId);
+                    this.currentRun = runResult.currentRun || null;
+                    this.previousResponses = runResult.previousResponses || {};
+                    if (this.currentRun && this.currentRun.responses) {
+                        const preloaded = {};
+                        Object.entries(this.currentRun.responses).forEach(([taskId, resp]) => {
+                            preloaded[taskId] = resp.value;
+                        });
+                        this.runValues = preloaded;
+                    }
+                } catch (err) {
+                    await Swal.fire('Error', 'Failed to open workflow: ' + err.message, 'error');
+                }
             },
 
             closeWorkflowDetail() {
                 this.selectedWorkflow = null;
+                this.expandedWorkflow = null;
+                this.currentRun = null;
+                this.previousResponses = {};
+                this.runValues = {};
+                this.runNotes = {};
+                this.runSubmitting = {};
                 this.loadWorkflows();
+            },
+
+            async submitTaskResponse(task) {
+                if (!this.currentRun) return;
+                const taskId = task.id || task._taskId;
+                const value = this.runValues[taskId];
+                if (value === undefined || value === null || value === '') {
+                    await Swal.fire('Required', 'Please enter a value before submitting.', 'warning');
+                    return;
+                }
+                this.runSubmitting = { ...this.runSubmitting, [taskId]: true };
+                try {
+                    const runId = this.currentRun.id || this.currentRun.runId;
+                    const result = await rossService.submitResponse(
+                        this.expandedWorkflow.workflowId,
+                        this.locationId,
+                        runId,
+                        taskId,
+                        value,
+                        this.runNotes[taskId] || null
+                    );
+                    if (result.flagged) {
+                        await Swal.fire({
+                            icon: 'warning', title: 'Out of range',
+                            text: 'This reading has been flagged.',
+                            toast: true, position: 'top-end', showConfirmButton: false, timer: 3000
+                        });
+                    } else {
+                        await Swal.fire({
+                            icon: 'success', title: 'Saved',
+                            toast: true, position: 'top-end', showConfirmButton: false, timer: 1500
+                        });
+                    }
+                    const runResult = await rossService.getRun(this.expandedWorkflow.workflowId, this.locationId);
+                    this.currentRun = runResult.currentRun;
+                    if (result.runCompleted) {
+                        await Swal.fire({ icon: 'success', title: 'Workflow complete!', text: 'All required tasks have been submitted.' });
+                        await this.loadWorkflows();
+                    }
+                } catch (err) {
+                    await Swal.fire('Error', err.message, 'error');
+                } finally {
+                    this.runSubmitting = { ...this.runSubmitting, [taskId]: false };
+                }
+            },
+
+            isValueFlagged(task, value) {
+                if (value === undefined || value === null || value === '') return false;
+                const cfg = task.inputConfig || {};
+                if (cfg.max !== undefined && Number(value) > cfg.max) return true;
+                if (cfg.min !== undefined && Number(value) < cfg.min) return true;
+                return false;
+            },
+            formatResponseValue(response) {
+                if (!response) return '—';
+                const { value, inputType } = response;
+                if (inputType === 'yes_no') return value ? 'Yes / Pass' : 'No / Fail';
+                if (inputType === 'checkbox') return value ? 'Complete' : 'Incomplete';
+                if (inputType === 'timestamp') return value ? new Date(value).toLocaleString() : '—';
+                return value !== undefined && value !== null ? String(value) : '—';
+            },
+            async submitTaskResponseTimestamp(task) {
+                const taskId = task.id || task._taskId;
+                const rawValue = this.runValues[taskId];
+                if (!rawValue) return;
+                this.runValues = { ...this.runValues, [taskId]: new Date(rawValue).getTime() };
+                await this.submitTaskResponse(task);
             },
 
             staffName(staffId) {
