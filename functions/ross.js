@@ -829,6 +829,34 @@ exports.rossCreateRun = onRequest(async (req, res) => {
 });
 
 /**
+ * Validate that value matches the expected type for a given inputType.
+ * Returns an error string or null.
+ */
+function validateResponseValue(inputType, value) {
+    if (inputType === 'temperature' || inputType === 'number') {
+        if (typeof value !== 'number') return `value must be a number for ${inputType} tasks`;
+    } else if (inputType === 'checkbox') {
+        if (typeof value !== 'boolean') return 'value must be a boolean for checkbox tasks';
+    } else if (inputType === 'yes_no') {
+        if (typeof value !== 'boolean') return 'value must be a boolean for yes_no tasks';
+    } else if (inputType === 'rating') {
+        if (typeof value !== 'number' || !Number.isInteger(value)) return 'value must be an integer for rating tasks';
+    }
+    return null;
+}
+
+/**
+ * Check whether a value breaches the configured threshold.
+ */
+function isResponseFlagged(inputType, value, inputConfig) {
+    if (inputType !== 'temperature' && inputType !== 'number') return false;
+    if (typeof value !== 'number') return false;
+    if (inputConfig.max !== undefined && value > inputConfig.max) return true;
+    if (inputConfig.min !== undefined && value < inputConfig.min) return true;
+    return false;
+}
+
+/**
  * Submit a typed response for one task within a run.
  * Auto-flags temperature/number breaches. Enforces requiredNote.
  * Marks run complete when all required tasks have responses.
@@ -869,25 +897,11 @@ exports.rossSubmitResponse = onRequest(async (req, res) => {
             const inputConfig = taskDef.inputConfig || {};
 
             // Type-validate value against inputType
-            if ((inputType === 'temperature' || inputType === 'number') && typeof value !== 'number') {
-                return res.status(400).json({ error: `value must be a number for ${inputType} tasks` });
-            }
-            if (inputType === 'checkbox' && typeof value !== 'boolean') {
-                return res.status(400).json({ error: 'value must be a boolean for checkbox tasks' });
-            }
-            if (inputType === 'yes_no' && typeof value !== 'boolean') {
-                return res.status(400).json({ error: 'value must be a boolean for yes_no tasks' });
-            }
-            if (inputType === 'rating' && (typeof value !== 'number' || !Number.isInteger(value))) {
-                return res.status(400).json({ error: 'value must be an integer for rating tasks' });
-            }
+            const typeError = validateResponseValue(inputType, value);
+            if (typeError) return res.status(400).json({ error: typeError });
 
             // Auto-flag for temperature and number breaches
-            let flagged = false;
-            if ((inputType === 'temperature' || inputType === 'number') && typeof value === 'number') {
-                if (inputConfig.max !== undefined && value > inputConfig.max) flagged = true;
-                if (inputConfig.min !== undefined && value < inputConfig.min) flagged = true;
-            }
+            const flagged = isResponseFlagged(inputType, value, inputConfig);
 
             // Enforce requiredNote when flagged
             if (flagged && inputConfig.requiredNote === true && (!note || String(note).trim() === '')) {
