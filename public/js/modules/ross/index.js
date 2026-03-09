@@ -332,7 +332,7 @@ export async function initializeRoss() {
     <div v-if="currentTab === 'templates'">
 
         <!-- Loading -->
-        <div v-if="tabLoading" class="text-center py-5">
+        <div v-if="templatesLoading" class="text-center py-5">
             <div class="spinner-border text-primary" role="status">
                 <span class="visually-hidden">Loading...</span>
             </div>
@@ -498,7 +498,7 @@ export async function initializeRoss() {
     <div v-if="currentTab === 'workflows'">
 
         <!-- Loading -->
-        <div v-if="tabLoading" class="text-center py-5">
+        <div v-if="workflowsLoading" class="text-center py-5">
             <div class="spinner-border text-primary" role="status">
                 <span class="visually-hidden">Loading...</span>
             </div>
@@ -797,7 +797,7 @@ export async function initializeRoss() {
     <div v-if="currentTab === 'reports'">
 
         <!-- Loading -->
-        <div v-if="tabLoading" class="text-center py-5">
+        <div v-if="reportsLoading" class="text-center py-5">
             <div class="spinner-border text-primary" role="status">
                 <span class="visually-hidden">Loading...</span>
             </div>
@@ -937,7 +937,10 @@ export async function initializeRoss() {
             return {
                 // Navigation
                 currentTab: 'overview',
-                tabLoading: false,
+                workflowsLoading: false,
+                templatesLoading: false,
+                reportsLoading: false,
+                staffLoading: false,
 
                 // Location picker (for admins without a locationId claim)
                 availableLocations: [],
@@ -1203,7 +1206,7 @@ export async function initializeRoss() {
             // View 2 — Template Library
             // ------------------------------------------------------------------
             async loadTemplates() {
-                this.tabLoading = true;
+                this.templatesLoading = true;
                 try {
                     const raw = await rossService.getTemplates();
                     this.templates = Array.isArray(raw)
@@ -1215,7 +1218,7 @@ export async function initializeRoss() {
                     console.error('[ROSS] loadTemplates error:', err);
                     await Swal.fire('Error', 'Failed to load templates: ' + err.message, 'error');
                 } finally {
-                    this.tabLoading = false;
+                    this.templatesLoading = false;
                 }
             },
 
@@ -1417,7 +1420,7 @@ export async function initializeRoss() {
             // ------------------------------------------------------------------
             async loadWorkflows() {
                 if (!rossState.locationId) return;
-                this.tabLoading = true;
+                this.workflowsLoading = true;
                 try {
                     const raw = await rossService.getWorkflows(rossState.locationId);
                     const rawList = Array.isArray(raw) ? raw
@@ -1432,7 +1435,7 @@ export async function initializeRoss() {
                     console.error('[ROSS] loadWorkflows error:', err);
                     await Swal.fire('Error', 'Failed to load workflows: ' + err.message, 'error');
                 } finally {
-                    this.tabLoading = false;
+                    this.workflowsLoading = false;
                 }
             },
 
@@ -1622,7 +1625,7 @@ export async function initializeRoss() {
             // ------------------------------------------------------------------
             async loadReports() {
                 if (!rossState.locationId) return;
-                this.tabLoading = true;
+                this.reportsLoading = true;
                 try {
                     const raw = await rossService.getReports(rossState.locationId);
                     this.reportData = Array.isArray(raw)
@@ -1634,7 +1637,7 @@ export async function initializeRoss() {
                     console.error('[ROSS] loadReports error:', err);
                     await Swal.fire('Error', 'Failed to load reports: ' + err.message, 'error');
                 } finally {
-                    this.tabLoading = false;
+                    this.reportsLoading = false;
                 }
             },
 
