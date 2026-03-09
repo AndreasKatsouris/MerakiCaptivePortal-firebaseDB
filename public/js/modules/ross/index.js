@@ -996,8 +996,7 @@ export async function initializeRoss() {
 
                 // View 6 — Staff Management
                 staffLocationId: '',
-                staffMembers: [],
-                staffLoading: false
+                staffMembers: []
             };
         },
 
