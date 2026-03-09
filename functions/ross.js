@@ -374,11 +374,15 @@ exports.rossUpdateWorkflow = onRequest(async (req, res) => {
             const snap = await workflowRef.once('value');
             if (!snap.exists()) return res.status(404).json({ error: 'Workflow not found' });
 
-            const allowedFields = ['name', 'notificationChannels', 'notifyPhone', 'notifyEmail', 'daysBeforeAlert'];
+            const allowedFields = ['name', 'notificationChannels', 'notifyPhone', 'notifyEmail', 'daysBeforeAlert', 'status'];
             const sanitized = { updatedAt: Date.now() };
             allowedFields.forEach(field => {
                 if (updates[field] !== undefined) sanitized[field] = updates[field];
             });
+
+            if (sanitized.status !== undefined && !['active', 'paused'].includes(sanitized.status)) {
+                return res.status(400).json({ error: "Invalid status value. Use 'active' or 'paused'" });
+            }
 
             await workflowRef.update(sanitized);
             res.json({ result: { success: true, workflowId } });
