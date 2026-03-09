@@ -21,6 +21,10 @@ const db = admin.database();
 
 const VALID_CATEGORIES = ['compliance', 'operations', 'growth', 'finance', 'hr', 'maintenance'];
 const VALID_RECURRENCES = ['once', 'daily', 'weekly', 'monthly', 'quarterly', 'annually'];
+const VALID_INPUT_TYPES = [
+    'checkbox', 'text', 'number', 'temperature',
+    'yes_no', 'dropdown', 'timestamp', 'photo', 'signature', 'rating'
+];
 
 // ============================================
 // AUTH HELPERS
@@ -531,8 +535,16 @@ exports.rossManageTask = onRequest(async (req, res) => {
                         return res.status(400).json({ error: 'taskData is required for create' });
                     }
                     const newTaskId = generateId();
+                    const inputType = VALID_INPUT_TYPES.includes(taskData.inputType)
+                        ? taskData.inputType
+                        : 'checkbox';
                     const task = {
                         title: taskData.title?.trim() || 'Untitled Task',
+                        inputType,
+                        inputConfig: (taskData.inputConfig && typeof taskData.inputConfig === 'object')
+                            ? taskData.inputConfig
+                            : {},
+                        required: taskData.required !== false,
                         status: 'pending',
                         dueDate: taskData.dueDate || null,
                         completedAt: null,
@@ -548,9 +560,12 @@ exports.rossManageTask = onRequest(async (req, res) => {
                     if (!taskData || typeof taskData !== 'object') {
                         return res.status(400).json({ error: 'taskData is required for update' });
                     }
-                    const allowedTaskFields = ['title', 'status', 'dueDate', 'assignedTo', 'order'];
+                    const allowedTaskFields = ['title', 'inputType', 'inputConfig', 'required', 'status', 'dueDate', 'assignedTo', 'order'];
                     const updates = {};
                     allowedTaskFields.forEach(f => { if (taskData[f] !== undefined) updates[f] = taskData[f]; });
+                    if (updates.inputType !== undefined && !VALID_INPUT_TYPES.includes(updates.inputType)) {
+                        return res.status(400).json({ error: `Invalid inputType. Must be one of: ${VALID_INPUT_TYPES.join(', ')}` });
+                    }
                     await tasksRef.child(taskId).update(updates);
                     await db.ref(`ross/workflows/${uid}/${workflowId}`).update({ updatedAt: now });
                     return res.json({ result: { success: true, taskId } });
