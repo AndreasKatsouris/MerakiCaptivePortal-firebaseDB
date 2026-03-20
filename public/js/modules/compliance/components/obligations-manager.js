@@ -7,7 +7,13 @@
  * Receives pre-loaded data — no Firebase reads inside this component.
  */
 
-import { createObligation, updateObligation, deleteObligation } from '../services/firebase-service.js';
+import {
+  createObligation,
+  updateObligation,
+  deleteObligation
+} from '../services/firebase-service.js';
+
+const DEFAULT_WRITE_SERVICE = { create: createObligation, update: updateObligation, delete: deleteObligation };
 import { escapeHtml, escapeAttr } from '../utils/html-escape.js';
 
 // ---------------------------------------------------------------------------
@@ -579,7 +585,7 @@ function showSuccessToast(title) {
  * @param {Object}        obligations    — Map of obligationId -> obligation object
  * @param {Array<Object>} activeEntities — Pre-loaded active entity objects
  */
-export async function renderObligationsManager(containerId, obligations, activeEntities) {
+export async function renderObligationsManager(containerId, obligations, activeEntities, writeService = DEFAULT_WRITE_SERVICE) {
   const container = document.getElementById(containerId);
   if (!container) {
     throw new Error(`Obligations manager mount target "#${containerId}" not found.`);
@@ -649,7 +655,7 @@ export async function renderObligationsManager(containerId, obligations, activeE
     const { obligationId, ...data } = formData;
 
     try {
-      const record = await createObligation(obligationId, data);
+      const record = await writeService.create(obligationId, data);
       localObligations = { ...localObligations, [obligationId]: record };
       rerenderTable();
       showSuccessToast('Obligation added');
@@ -687,7 +693,7 @@ export async function renderObligationsManager(containerId, obligations, activeE
     const { obligationId: _id, ...updates } = result.value;
 
     try {
-      await updateObligation(obligationId, updates);
+      await writeService.update(obligationId, updates);
       const updatedRecord = { ...obl, ...updates, id: obligationId };
       localObligations = { ...localObligations, [obligationId]: updatedRecord };
       rerenderTable();
@@ -716,7 +722,7 @@ export async function renderObligationsManager(containerId, obligations, activeE
     if (!result.isConfirmed) return;
 
     try {
-      await deleteObligation(obligationId);
+      await writeService.delete(obligationId);
 
       const { [obligationId]: _removed, ...remaining } = localObligations;
       localObligations = remaining;
