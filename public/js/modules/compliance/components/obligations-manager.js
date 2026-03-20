@@ -372,6 +372,7 @@ function buildDialogForm(obligation, activeEntities, isEdit) {
       <div class="mb-3">
         <label class="form-label fw-semibold">Obligation ID *</label>
         <input id="swal-obl-id" class="form-control" type="text"
+               value="${escapeAttr(obl.id || '')}"
                placeholder="auto-filled from name" maxlength="60"
                style="font-family:monospace;">
         <div class="form-text">Only <code>[a-z0-9_]</code> characters. Auto-filled from name.</div>
