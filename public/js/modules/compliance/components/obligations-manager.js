@@ -132,7 +132,7 @@ function sortedObligations(obligationsMap) {
  * @param {Array<Object>} activeEntities
  * @returns {string} HTML
  */
-function buildObligationRow(obl, rowNum, activeEntities) {
+function buildObligationRow(obl, rowNum, activeEntities, showPublish = false) {
   const customBadge = obl.custom
     ? '<span class="badge bg-info ms-1" style="font-size:0.7rem;">custom</span>'
     : '';
@@ -159,6 +159,11 @@ function buildObligationRow(obl, rowNum, activeEntities) {
                 data-name="${escapeAttr(obl.name)}" title="Delete obligation">
           <i class="fas fa-trash-alt"></i>
         </button>
+        ${showPublish ? `<button class="btn btn-xs btn-outline-primary btn-publish-template ms-1"
+                data-id="${escapeAttr(obl.id)}"
+                data-name="${escapeAttr(obl.name)}" title="Publish as template">
+          <i class="fas fa-cloud-upload-alt"></i>
+        </button>` : ''}
       </td>
     </tr>
   `;
@@ -170,7 +175,7 @@ function buildObligationRow(obl, rowNum, activeEntities) {
  * @param {Array<Object>} activeEntities
  * @returns {string} HTML
  */
-function buildObligationsTable(obligations, activeEntities, entityFilterId = null) {
+function buildObligationsTable(obligations, activeEntities, entityFilterId = null, showPublish = false, panelTitle = 'Obligations Manager') {
   let sorted = sortedObligations(obligations);
 
   // Filter to obligations applicable to the selected entity
@@ -186,7 +191,7 @@ function buildObligationsTable(obligations, activeEntities, entityFilterId = nul
     : 'No obligations defined';
 
   const rows = sorted.length > 0
-    ? sorted.map((obl, i) => buildObligationRow(obl, i + 1, activeEntities)).join('')
+    ? sorted.map((obl, i) => buildObligationRow(obl, i + 1, activeEntities, showPublish)).join('')
     : `<tr><td colspan="8" class="text-center text-muted py-3">${emptyMsg}</td></tr>`;
 
   const entityOptions = activeEntities
@@ -633,7 +638,12 @@ function showSuccessToast(title) {
  * @param {Object}        obligations    — Map of obligationId -> obligation object
  * @param {Array<Object>} activeEntities — Pre-loaded active entity objects
  */
-export async function renderObligationsManager(containerId, obligations, activeEntities, writeService = DEFAULT_WRITE_SERVICE) {
+export async function renderObligationsManager(containerId, obligations, activeEntities, options = {}) {
+  const {
+    writeService = DEFAULT_WRITE_SERVICE,
+    onPublishAsTemplate = null,
+    panelTitle = 'Obligations Manager'
+  } = options;
   const container = document.getElementById(containerId);
   if (!container) {
     throw new Error(`Obligations manager mount target "#${containerId}" not found.`);
@@ -843,6 +853,26 @@ export async function renderObligationsManager(containerId, obligations, activeE
    * ever removing the listener, so cancelling a dialog leaves the UI functional.
    * @param {MouseEvent} event
    */
+  async function handlePublishAsTemplate(obligationId, name) {
+    const result = await Swal.fire({
+      title: 'Publish as Template?',
+      html: `<strong>${escapeHtml(name)}</strong> will be added to the shared template library.`,
+      icon: 'question',
+      showCancelButton: true,
+      confirmButtonColor: '#0d6efd',
+      confirmButtonText: 'Publish'
+    });
+    if (!result.isConfirmed) return;
+    try {
+      const obl = localObligations[obligationId];
+      if (!obl) return;
+      await onPublishAsTemplate({ ...obl, id: obligationId });
+      showSuccessToast('Published as template');
+    } catch (err) {
+      Swal.fire({ icon: 'error', title: 'Publish failed', text: err.message });
+    }
+  }
+
   function handleContainerClick(event) {
     if (handlerInProgress) return;
 
