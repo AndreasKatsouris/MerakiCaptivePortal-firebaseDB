@@ -205,6 +205,8 @@ import { initializeDashboard } from './dashboard.js';
 import { initializeProjectManagement, cleanupProjectManagement } from './modules/project-management/index.js';
 import { initializeRoss, cleanupRoss } from './modules/ross/index.js';
 import { initializeComplianceModule } from './modules/compliance/index.js';
+import { loadTemplates, createTemplate, updateTemplate, deleteTemplate } from './modules/compliance/services/firebase-service.js';
+import { renderObligationsManager } from './modules/compliance/components/obligations-manager.js';
 import { initializeGuestManagement, cleanupGuestManagement } from './guest-management.js';
 import { initializeQueueManagement, cleanupQueueManagement } from './queue-management.js';
 import { initializeCampaignManagement, cleanupCampaignManagement } from './campaigns/campaigns.js';
@@ -278,6 +280,7 @@ class AdminDashboard {
         // Section initialization tracking
         this.sectionInitialized = {
             foodCostContent: false,
+            obligationTemplatesContent: false,
 
             tierManagementContent: false,
             userSubscriptionManagementContent: false,
@@ -596,6 +599,25 @@ class AdminDashboard {
             menuId: 'corporateComplianceMenu',
             contentId: 'corporateComplianceContent',
             init: () => initializeComplianceModule('compliance-module-container')
+        });
+
+        this.sections.set('obligationTemplatesContent', {
+            menuId: 'obligationTemplatesMenu',
+            contentId: 'obligationTemplatesContent',
+            init: async () => {
+                const templates = await loadTemplates();
+                const templateWriteService = {
+                    create: createTemplate,
+                    update: updateTemplate,
+                    delete: deleteTemplate
+                };
+                await renderObligationsManager(
+                    'obligation-templates-container',
+                    templates,
+                    [],
+                    templateWriteService
+                );
+            }
         });
 
         this.sections.set('adminToolsContent', {
@@ -1467,6 +1489,23 @@ class AdminDashboard {
                     await initializeComplianceModule('compliance-module-container');
                     this.sectionInitialized.corporateComplianceContent = true;
                     break;
+
+                case 'obligationTemplatesContent': {
+                    const templates = await loadTemplates();
+                    const templateWriteService = {
+                        create: createTemplate,
+                        update: updateTemplate,
+                        delete: deleteTemplate
+                    };
+                    await renderObligationsManager(
+                        'obligation-templates-container',
+                        templates,
+                        [],
+                        templateWriteService
+                    );
+                    this.sectionInitialized.obligationTemplatesContent = true;
+                    break;
+                }
 
                 // Add other cases here...
             }
