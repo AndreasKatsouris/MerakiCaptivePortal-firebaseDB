@@ -379,7 +379,58 @@
             ".validate": "newData.hasChildren(['action', 'actorUid', 'timestamp'])"
           }
         }
+      },
+      "templates": {
+        ".read": "auth != null",
+        ".write": "auth != null && auth.token.admin === true",
+        "$templateId": {
+          ".validate": "newData.hasChildren(['name', 'category', 'deadlineRule'])",
+          "name": {
+            ".validate": "newData.isString() && newData.val().length >= 1 && newData.val().length <= 200"
+          },
+          "category": {
+            ".validate": "newData.val().matches(/^(monthly|biannual|annual|once_off)$/)"
+          },
+          "deadlineRule": {
+            ".validate": "newData.isString() && newData.val().length >= 1 && newData.val().length <= 60"
+          },
+          "fixedDeadline": {
+            ".validate": "!newData.exists() || (newData.isString() && newData.val().matches(/^[0-9]{2}-[0-9]{2}$/))"
+          },
+          "authority": {
+            ".validate": "!newData.exists() || (newData.isString() && newData.val().length <= 100)"
+          },
+          "defaultOwner": {
+            ".validate": "!newData.exists() || (newData.isString() && newData.val().length <= 200)"
+          }
+        }
       }
+    },
+    "salesData": {
+      ".read": "auth != null",
+      ".write": "auth != null",
+      ".indexOn": ["userId", "locationId", "uploadedAt"],
+      "$salesDataId": {
+        ".read": "auth != null && (auth.token.admin === true || data.child('userId').val() === auth.uid)",
+        ".write": "auth != null && (auth.token.admin === true || !data.exists() || data.child('userId').val() === auth.uid)"
+      }
+    },
+    "salesDataIndex": {
+      ".read": "auth != null",
+      ".write": "auth != null"
+    },
+    "forecasts": {
+      ".read": "auth != null",
+      ".write": "auth != null",
+      ".indexOn": ["userId", "locationId", "createdAt"],
+      "$forecastId": {
+        ".read": "auth != null && (auth.token.admin === true || data.child('userId').val() === auth.uid)",
+        ".write": "auth != null && (auth.token.admin === true || !data.exists() || data.child('userId').val() === auth.uid)"
+      }
+    },
+    "forecastIndex": {
+      ".read": "auth != null",
+      ".write": "auth != null"
     },
     "ross": {
       "templates": {
