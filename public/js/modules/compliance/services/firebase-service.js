@@ -416,3 +416,53 @@ export async function setManualDueDate(year, entityId, obligationId, dateStr) {
     updatedAt: new Date().toISOString()
   });
 }
+
+// ---------------------------------------------------------------------------
+// Shared template operations (compliance/templates/)
+// ---------------------------------------------------------------------------
+
+const TEMPLATES_PATH = 'compliance/templates';
+
+/**
+ * Load all shared obligation templates.
+ * Readable by any authenticated user.
+ * @returns {Promise<Object>} Map of templateId -> template object
+ */
+export async function loadTemplates() {
+  const snapshot = await get(ref(rtdb, TEMPLATES_PATH));
+  return snapshot.val() || {};
+}
+
+/**
+ * Create a new shared template. Requires admin token claim.
+ * @param {string} templateId
+ * @param {Object} data
+ * @returns {Promise<Object>} The saved template object with id attached
+ */
+export async function createTemplate(templateId, data) {
+  const safeId = validatePathSegment(templateId, 'templateId');
+  const record = { ...data, custom: true };
+  await set(ref(rtdb, `${TEMPLATES_PATH}/${safeId}`), record);
+  return { ...record, id: safeId };
+}
+
+/**
+ * Update an existing shared template. Requires admin token claim.
+ * @param {string} templateId
+ * @param {Object} updates
+ * @returns {Promise<void>}
+ */
+export async function updateTemplate(templateId, updates) {
+  const safeId = validatePathSegment(templateId, 'templateId');
+  await update(ref(rtdb, `${TEMPLATES_PATH}/${safeId}`), updates);
+}
+
+/**
+ * Delete a shared template. Requires admin token claim.
+ * @param {string} templateId
+ * @returns {Promise<void>}
+ */
+export async function deleteTemplate(templateId) {
+  const safeId = validatePathSegment(templateId, 'templateId');
+  await set(ref(rtdb, `${TEMPLATES_PATH}/${safeId}`), null);
+}
