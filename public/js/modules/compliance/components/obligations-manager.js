@@ -203,7 +203,7 @@ function buildObligationsTable(obligations, activeEntities, entityFilterId = nul
       <div class="card-header d-flex align-items-center justify-content-between flex-wrap gap-2">
         <span>
           <i class="fas fa-list-check text-primary me-2"></i>
-          <strong>Obligations Manager</strong>
+          <strong>${escapeHtml(panelTitle)}</strong>
         </span>
         <div class="d-flex gap-2 align-items-center">
           <select class="form-select form-select-sm" id="obl-entity-filter" style="width: auto; min-width: 160px;">
