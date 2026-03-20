@@ -10,7 +10,8 @@
 import {
   createObligation,
   updateObligation,
-  deleteObligation
+  deleteObligation,
+  loadTemplates
 } from '../services/firebase-service.js';
 
 const DEFAULT_WRITE_SERVICE = { create: createObligation, update: updateObligation, delete: deleteObligation };
@@ -290,6 +291,53 @@ function buildEntityCheckboxes(activeEntities, checkedIds) {
       </div>
     `;
   }).join('');
+}
+
+/**
+ * Build the SweetAlert2 HTML for the template picker step.
+ * @param {Array<Object>} templates — Array of template objects with id attached, sorted by category
+ * @returns {string} HTML
+ */
+function buildTemplatePicker(templates) {
+  const grouped = { monthly: [], biannual: [], annual: [], once_off: [] };
+  templates.forEach(t => {
+    if (grouped[t.category]) grouped[t.category].push(t);
+    else grouped.annual.push(t);
+  });
+
+  const LABELS = { monthly: 'Monthly', biannual: 'Bi-Annual', annual: 'Annual', once_off: 'Once-Off' };
+
+  let rows = '';
+  Object.entries(grouped).forEach(([cat, items]) => {
+    if (items.length === 0) return;
+    rows += `<div class="text-muted small fw-semibold mt-2 mb-1">${LABELS[cat] || cat}</div>`;
+    items.forEach(t => {
+      rows += `
+        <div class="form-check border rounded px-3 py-2 mb-1">
+          <input class="form-check-input" type="radio" name="template-picker-radio"
+                 id="tpl-${escapeAttr(t.id)}" value="${escapeAttr(t.id)}">
+          <label class="form-check-label w-100" for="tpl-${escapeAttr(t.id)}">
+            <strong>${escapeHtml(t.name)}</strong>
+            ${t.authority ? `<span class="text-muted ms-2 small">${escapeHtml(t.authority)}</span>` : ''}
+          </label>
+        </div>
+      `;
+    });
+  });
+
+  return `
+    <div style="max-height: 320px; overflow-y: auto;">
+      ${rows}
+      <div class="form-check border rounded px-3 py-2 mb-1 mt-2">
+        <input class="form-check-input" type="radio" name="template-picker-radio"
+               id="tpl-scratch" value="" checked>
+        <label class="form-check-label" for="tpl-scratch">
+          <strong>Start from scratch</strong>
+          <span class="text-muted ms-2 small">Blank form</span>
+        </label>
+      </div>
+    </div>
+  `;
 }
 
 /**
@@ -633,14 +681,55 @@ export async function renderObligationsManager(containerId, obligations, activeE
 
   /**
    * Open the Add Obligation dialog and write the new record to Firebase.
+   * If templates exist, shows a picker first then pre-fills the form.
    */
   async function handleAddObligation() {
-    const appliesToAll = true;
-    const deadlineRule = '';
+    // Step 1: load templates and show picker (skip if none exist)
+    let prefill = null;
+
+    try {
+      const templatesMap = await loadTemplates();
+      const templateList = Object.entries(templatesMap)
+        .map(([id, t]) => ({ ...t, id }))
+        .sort((a, b) => {
+          const order = { monthly: 0, biannual: 1, annual: 2, once_off: 3 };
+          const catA = order[a.category] ?? 99;
+          const catB = order[b.category] ?? 99;
+          return catA !== catB ? catA - catB : (a.name || '').localeCompare(b.name || '');
+        });
+
+      if (templateList.length > 0) {
+        const pickerResult = await Swal.fire({
+          title: 'Add Obligation',
+          html: buildTemplatePicker(templateList),
+          showCancelButton: true,
+          confirmButtonColor: '#198754',
+          confirmButtonText: 'Continue →',
+          width: '560px',
+          preConfirm: () => {
+            const selected = document.querySelector('input[name="template-picker-radio"]:checked');
+            return selected ? selected.value : '';
+          }
+        });
+
+        if (!pickerResult.isConfirmed) return;
+
+        const selectedId = pickerResult.value;
+        if (selectedId) {
+          prefill = templateList.find(t => t.id === selectedId) || null;
+        }
+      }
+    } catch {
+      // If templates fail to load, fall through to blank form
+    }
+
+    // Step 2: show add form (pre-filled from template or blank)
+    const appliesToAll = prefill ? (prefill.appliesToAll !== false) : true;
+    const deadlineRule = prefill?.deadlineRule || '';
 
     const result = await Swal.fire({
       title: 'Add Obligation',
-      html: buildDialogForm(null, localActiveEntities, false),
+      html: buildDialogForm(prefill, localActiveEntities, false),
       showCancelButton: true,
       confirmButtonColor: '#198754',
       confirmButtonText: 'Add Obligation',
