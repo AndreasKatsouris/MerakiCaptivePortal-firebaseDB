@@ -653,6 +653,7 @@ export async function renderObligationsManager(containerId, obligations, activeE
   let localObligations = { ...obligations };
   const localActiveEntities = activeEntities;
   let currentEntityFilter = null; // null = All Entities
+  const showPublish = !!onPublishAsTemplate;
 
   // ---------------------------------------------------------------------------
   // Re-render helper
@@ -665,7 +666,7 @@ export async function renderObligationsManager(containerId, obligations, activeE
   function rerenderTable() {
     // Remove click delegation before injecting new HTML so we don't stack listeners
     container.removeEventListener('click', handleContainerClick);
-    container.innerHTML = buildObligationsTable(localObligations, localActiveEntities, currentEntityFilter);
+    container.innerHTML = buildObligationsTable(localObligations, localActiveEntities, currentEntityFilter, showPublish, panelTitle);
     wireEntityFilter();
     attachDelegation();
   }
@@ -900,6 +901,17 @@ export async function renderObligationsManager(containerId, obligations, activeE
         handlerInProgress = true;
         handleDeleteObligation(id, name || id).finally(() => { handlerInProgress = false; });
       }
+      return;
+    }
+
+    const publishBtn = event.target.closest('.btn-publish-template');
+    if (publishBtn && onPublishAsTemplate) {
+      const id = publishBtn.getAttribute('data-id');
+      const name = publishBtn.getAttribute('data-name');
+      if (id) {
+        handlerInProgress = true;
+        handlePublishAsTemplate(id, name || id).finally(() => { handlerInProgress = false; });
+      }
     }
   }
 
@@ -907,7 +919,7 @@ export async function renderObligationsManager(containerId, obligations, activeE
   // Initial render
   // ---------------------------------------------------------------------------
 
-  container.innerHTML = buildObligationsTable(localObligations, localActiveEntities, currentEntityFilter);
+  container.innerHTML = buildObligationsTable(localObligations, localActiveEntities, currentEntityFilter, showPublish, panelTitle);
   wireEntityFilter();
   attachDelegation();
 }
