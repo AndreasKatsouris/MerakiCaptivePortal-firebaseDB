@@ -1,5 +1,6 @@
 import { defineConfig } from 'vite';
 import vue from '@vitejs/plugin-vue';
+import { resolve } from 'path';
 
 export default defineConfig({
   root: 'public',
@@ -7,7 +8,12 @@ export default defineConfig({
   plugins: [vue()],
   build: {
     outDir: '../dist',
-    emptyOutDir: true
+    emptyOutDir: false,
+    rollupOptions: {
+      input: {
+        'user-dashboard': resolve(__dirname, 'public/user-dashboard.html')
+      }
+    }
   },
   server: {
     port: 5173,

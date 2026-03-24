@@ -6,7 +6,8 @@
   "scripts": {
     "verify": "node scripts/verify-setup.js",
     "dev": "vite",
-    "build": "vite build",
+    "build": "node scripts/build.js",
+    "build:vite": "vite build",
     "serve": "vite preview",
     "emulators": "firebase emulators:start --import=./firebase-export --export-on-exit",
     "emulators:export": "firebase emulators:export ./firebase-export",
