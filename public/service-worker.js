@@ -12,7 +12,7 @@ const CACHE_ASSETS = [
   '/user-dashboard.html',
   '/admin-dashboard.html', 
   '/js/config/firebase-config.js',
-  '/js/user-dashboard.js',
+  '/js/modules/user-dashboard/index.js',
   '/js/modules/access-control/services/feature-access-control.js',
   '/js/modules/access-control/services/platform-features.js',
   '/js/utils/subscription-tier-fix.js',

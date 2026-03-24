@@ -36,11 +36,13 @@
     "pinia": "^2.3.1",
     "react": "^19.2.1",
     "react-dom": "^19.2.1",
-    "twilio": "^5.3.6"
+    "twilio": "^5.3.6",
+    "vue": "^3.5.30"
   },
   "devDependencies": {
     "@eslint/js": "^9.39.2",
     "@tailwindcss/forms": "^0.5.10",
+    "@vitejs/plugin-vue": "^6.0.5",
     "autoprefixer": "^10.4.21",
     "eslint": "^9.39.2",
     "eslint-config-prettier": "^10.1.8",
