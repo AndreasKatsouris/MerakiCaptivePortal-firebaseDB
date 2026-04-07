@@ -2417,17 +2417,6 @@ var FoodCostApp = {
             if (storedSalesAmount) this.salesAmount = parseFloat(storedSalesAmount);
             if (storedPercentage) this.costPercentage = parseFloat(storedPercentage);
             
-            // Load recent store context
-            try {
-                const storeContext = await getRecentStoreContext();
-                this.daysToNextDelivery = storeContext.daysToNextDelivery;
-                this.safetyStockPercentage = storeContext.safetyStockPercentage;
-                this.criticalItemBuffer = storeContext.criticalItemBuffer;
-                console.log('Loaded store context:', storeContext);
-            } catch (error) {
-                console.error('Error loading store context:', error);
-            }
-            
             // Ensure initial calculations are performed
             this.$nextTick(() => {
                 if (this.isDataLoaded && this.stockData.length > 0) {

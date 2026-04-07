@@ -267,35 +267,35 @@ export async function loadHistoricalData() {
             }
         }
         
-        // Load stock data from each accessible location
-        for (const locationId of accessibleLocationIds) {
+        // Load stock data from all accessible locations in parallel
+        const locationPromises = Array.from(accessibleLocationIds).map(async (locationId) => {
             const locationStockRef = ref(rtdb, `locations/${locationId}/stockUsage`);
             const locationSnapshot = await get(locationStockRef);
-            
-            if (locationSnapshot.exists()) {
-                const locationData = locationSnapshot.val();
-                Object.entries(locationData).forEach(([key, data]) => {
-                    allHistoricalEntries.push({
-                        key,
-                        locationId,
-                        timestamp: data.formattedTimestamp || new Date(data.timestamp).toLocaleString(),
-                        storeName: data.storeName || 'Unknown Store',
-                        selectedLocationId: locationId,
-                        openingDate: data.openingDate || '',
-                        closingDate: data.closingDate || '',
-                        totalItems: data.totalItems || (data.stockItems ? data.stockItems.length : 0),
-                        stockItems: data.stockItems,
-                        totalCostOfUsage: data.totalCostOfUsage || 0,
-                        salesAmount: data.salesAmount || 0,
-                        costPercentage: data.costPercentage || 0,
-                        totalOpeningValue: data.totalOpeningValue || 0,
-                        totalClosingValue: data.totalClosingValue || 0,
-                        stockPeriodDays: data.stockPeriodDays || 0,
-                        _rawTimestamp: data.timestamp
-                    });
-                });
-            }
-        }
+
+            if (!locationSnapshot.exists()) return [];
+
+            const locationData = locationSnapshot.val();
+            return Object.entries(locationData).map(([key, data]) => ({
+                key,
+                locationId,
+                timestamp: data.formattedTimestamp || new Date(data.timestamp).toLocaleString(),
+                storeName: data.storeName || 'Unknown Store',
+                selectedLocationId: locationId,
+                openingDate: data.openingDate || '',
+                closingDate: data.closingDate || '',
+                totalItems: data.totalItems || (data.stockItems ? data.stockItems.length : 0),
+                stockItems: data.stockItems,
+                totalCostOfUsage: data.totalCostOfUsage || 0,
+                salesAmount: data.salesAmount || 0,
+                costPercentage: data.costPercentage || 0,
+                totalOpeningValue: data.totalOpeningValue || 0,
+                totalClosingValue: data.totalClosingValue || 0,
+                stockPeriodDays: data.stockPeriodDays || 0,
+                _rawTimestamp: data.timestamp
+            }));
+        });
+        const results = await Promise.all(locationPromises);
+        allHistoricalEntries.push(...results.flat());
         
         // Sort by timestamp (most recent first)
         allHistoricalEntries.sort((a, b) => {

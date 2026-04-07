@@ -1413,52 +1413,8 @@ class AdminDashboard {
                     }
                     break;
                 case 'foodCostContent': {
-                    if (!this.foodCostInitialized) {
-                        console.log('Initializing food cost module...');
-
-                        // Clear container
-                        const container = document.getElementById('food-cost-app');
-                        if (container) {
-                            container.innerHTML = '<div class="d-flex justify-content-center align-items-center" style="min-height: 300px;">' +
-                                '<div class="text-center">' +
-                                '<div class="spinner-border text-primary mb-3" role="status">' +
-                                '<span class="visually-hidden">Loading...</span>' +
-                                '</div>' +
-                                '<p>Loading Food Cost Dashboard...</p>' +
-                                '</div>' +
-                                '</div>';
-                        }
-
-                        try {
-                            // Load module files using explicit <script> tags before mounting
-                            await this.loadRequiredScripts();
-
-                            // Access FoodCost global namespace
-                            if (typeof window.FoodCost === 'undefined' ||
-                                typeof window.FoodCost.initializeFoodCostModule !== 'function') {
-                                throw new Error('Food Cost Module not properly loaded');
-                            }
-
-                            // Initialize using the global namespace function
-                            const moduleInstance = await window.FoodCost.initializeFoodCostModule('Food-CostApp');
-
-                            this.foodCostInitialized = true;
-                            this.foodCostInstance = moduleInstance;
-
-                            console.log('Food Cost Module initialized successfully');
-                        } catch (foodCostError) {
-                            console.error('Error initializing Food Cost Module:', foodCostError);
-
-                            // Show error in container
-                            if (container) {
-                                container.innerHTML = '<div class="alert alert-danger">' +
-                                    '<h4>Module Initialization Error</h4>' +
-                                    '<p>Failed to initialize the Food Cost Module: ' + foodCostError.message + '</p>' +
-                                    '<button class="btn btn-primary mt-2" onclick="location.reload()">Refresh Page</button>' +
-                                    '</div>';
-                            }
-                        }
-                    }
+                    // Initialization handled by feature guard in showSection
+                    // via window.initializeFoodCostWithGuard()
                     break;
                 }
 

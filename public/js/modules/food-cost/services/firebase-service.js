@@ -183,11 +183,15 @@ export async function deleteHistoricalRecord(recordId) {
  */
 export async function getRecentStoreContext() {
     try {
-        // Load the most recent record (limit to 1)
-        const records = await loadHistoricalData(1);
-        
-        // If no records found, return default context
-        if (!records || records.length === 0) {
+        const stockUsageRef = ref(rtdb, STOCK_USAGE_REF);
+        const recentQuery = query(
+            stockUsageRef,
+            orderByChild('timestamp'),
+            limitToLast(1)
+        );
+        const snapshot = await get(recentQuery);
+
+        if (!snapshot.exists()) {
             console.log('No historical records found for store context, returning defaults');
             return {
                 storeName: 'Main Store',
@@ -196,10 +200,10 @@ export async function getRecentStoreContext() {
                 criticalItemBuffer: 5
             };
         }
-        
-        const mostRecent = records[0];
-        
-        // Extract store context data
+
+        const data = snapshot.val();
+        const mostRecent = Object.values(data)[0];
+
         return {
             storeName: mostRecent.storeName || 'Main Store',
             daysToNextDelivery: mostRecent.daysToNextDelivery || 3,
@@ -208,7 +212,6 @@ export async function getRecentStoreContext() {
         };
     } catch (error) {
         console.error('Error getting recent store context:', error);
-        // Return default values rather than throwing error
         return {
             storeName: 'Main Store',
             daysToNextDelivery: 3,
