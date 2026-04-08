@@ -99,3 +99,13 @@ For complex multi-module work, spawn agent teams in isolated worktrees.
 3. Use Sonnet for teammates, plan mode for approval gates
 4. COORD reviews agent output before merging
 5. Clean up worktree and team when done
+
+## Agent Feedback Loop
+
+Read at session start, update at session end.
+
+| File | When | Purpose |
+|------|------|---------|
+| `KNOWLEDGE BASE/development/SELF_OPTIMIZATION.md` | Start (read) + end (update) | Workflow patterns, promoted after 3x validation |
+| `KNOWLEDGE BASE/development/LESSONS.md` | End (if gotchas found) | Rolling log of non-obvious discoveries (max 20) |
+| `KNOWLEDGE BASE/development/SCORECARD.md` | End | Self-evaluation against fixed rubric (max 10 entries) |
