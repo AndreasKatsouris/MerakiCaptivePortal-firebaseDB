@@ -119,6 +119,7 @@ export async function saveStockData(data) {
             stockItems: data.stockItems,
         });
         
+        clearHistoricalDataCache();
         return {
             success: true,
             timestamp,
@@ -216,6 +217,18 @@ export async function checkForExistingData(data) {
     }
 }
 
+// Module-level cache for historical data — shares one in-flight promise across callers
+let _historicalDataCache = null;
+let _historicalDataCacheUid = null;
+
+/**
+ * Clear the historical data cache. Call after save/delete/update operations.
+ */
+export function clearHistoricalDataCache() {
+    _historicalDataCache = null;
+    _historicalDataCacheUid = null;
+}
+
 /**
  * Load historical stock data from Firebase
  * Filters data to only show records for locations the user has access to
@@ -225,17 +238,24 @@ export async function loadHistoricalData() {
     // Get current Firebase instances
     const rtdb = getRtdb();
     const auth = getAuth();
-    
+
     if (!rtdb) {
         throw new Error('Firebase is not initialized');
     }
-    
+
     // Check if user is authenticated
     const user = auth.currentUser;
     if (!user) {
         throw new Error('User must be authenticated to load stock data');
     }
-    
+
+    // Return cached promise if valid for current user
+    if (_historicalDataCache && _historicalDataCacheUid === user.uid) {
+        return _historicalDataCache;
+    }
+
+    _historicalDataCacheUid = user.uid;
+    _historicalDataCache = (async () => {
     try {
         // First, get user's accessible locations
         const userLocationsRef = ref(rtdb, `userLocations/${user.uid}`);
@@ -308,8 +328,12 @@ export async function loadHistoricalData() {
         return allHistoricalEntries;
     } catch (error) {
         console.error('Error loading historical data:', error);
+        _historicalDataCache = null;
         throw error;
     }
+    })();
+
+    return _historicalDataCache;
 }
 
 /**
@@ -423,7 +447,8 @@ export async function deleteHistoricalData(key, locationId) {
         
         // Remove the entry
         await remove(stockUsageRef);
-        
+
+        clearHistoricalDataCache();
         return { success: true, message: 'Historical data entry deleted successfully' };
     } catch (error) {
         console.error('Error deleting historical data:', error);

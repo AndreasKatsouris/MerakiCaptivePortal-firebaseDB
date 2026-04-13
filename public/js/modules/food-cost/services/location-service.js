@@ -5,55 +5,76 @@
 
 import { auth, rtdb, ref, get } from '../../../config/firebase-config.js';
 
+// Module-level cache: shares one in-flight promise across all callers
+let _locationsCache = null;
+let _locationsCacheUid = null;
+
 export const LocationService = {
+    /**
+     * Clear the cached locations (call on sign-out or location changes)
+     */
+    clearCache() {
+        _locationsCache = null;
+        _locationsCacheUid = null;
+    },
+
     /**
      * Get all locations for the current user
      * @returns {Promise<Array>} Array of location objects
      */
     async getUserLocations() {
-        try {
-            const user = auth.currentUser;
-            if (!user) {
-                console.error('[LocationService] No authenticated user');
-                return [];
-            }
-
-            // Get user's location IDs
-            const userLocationsRef = ref(rtdb, `userLocations/${user.uid}`);
-            const userLocationsSnapshot = await get(userLocationsRef);
-            
-            if (!userLocationsSnapshot.exists()) {
-                console.log('[LocationService] No locations found for user');
-                return [];
-            }
-
-            const locationIds = Object.keys(userLocationsSnapshot.val());
-
-            // Fetch all locations in parallel
-            const locationPromises = locationIds.map(async (locationId) => {
-                const locationRef = ref(rtdb, `locations/${locationId}`);
-                const locationSnapshot = await get(locationRef);
-
-                if (!locationSnapshot.exists()) return null;
-
-                const locationData = locationSnapshot.val();
-                return {
-                    id: locationId,
-                    ...locationData,
-                    displayName: this.formatLocationDisplay(locationData)
-                };
-            });
-
-            const results = await Promise.all(locationPromises);
-            const locations = results.filter(Boolean);
-
-            console.log('[LocationService] Found locations:', locations);
-            return locations;
-
-        } catch (error) {
-            console.error('[LocationService] Error fetching locations:', error);
+        const user = auth.currentUser;
+        if (!user) {
+            console.error('[LocationService] No authenticated user');
             return [];
         }
+
+        // Return cached promise if valid for current user
+        if (_locationsCache && _locationsCacheUid === user.uid) {
+            return _locationsCache;
+        }
+
+        _locationsCacheUid = user.uid;
+        _locationsCache = (async () => {
+            try {
+                const userLocationsRef = ref(rtdb, `userLocations/${user.uid}`);
+                const userLocationsSnapshot = await get(userLocationsRef);
+
+                if (!userLocationsSnapshot.exists()) {
+                    console.log('[LocationService] No locations found for user');
+                    return [];
+                }
+
+                const locationIds = Object.keys(userLocationsSnapshot.val());
+
+                // Fetch all locations in parallel
+                const locationPromises = locationIds.map(async (locationId) => {
+                    const locationRef = ref(rtdb, `locations/${locationId}`);
+                    const locationSnapshot = await get(locationRef);
+
+                    if (!locationSnapshot.exists()) return null;
+
+                    const locationData = locationSnapshot.val();
+                    return {
+                        id: locationId,
+                        ...locationData,
+                        displayName: this.formatLocationDisplay(locationData)
+                    };
+                });
+
+                const results = await Promise.all(locationPromises);
+                const locations = results.filter(Boolean);
+
+                console.log('[LocationService] Found locations:', locations);
+                return locations;
+            } catch (error) {
+                console.error('[LocationService] Error fetching locations:', error);
+                _locationsCache = null;
+                return [];
+            }
+        })();
+
+        return _locationsCache;
     },
 
     /**

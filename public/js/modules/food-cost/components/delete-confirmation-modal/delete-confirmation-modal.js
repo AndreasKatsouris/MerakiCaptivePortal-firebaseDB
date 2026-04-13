@@ -4,7 +4,7 @@
  * Version: 1.9.4-2025-04-19
  */
 
-import { LocationService } from '../../services/location-service.js';
+import { LocationService } from '../../services/location-service.js?v=2.2.0-20260413';
 
 export const DeleteConfirmationModal = {
     name: 'delete-confirmation-modal',
