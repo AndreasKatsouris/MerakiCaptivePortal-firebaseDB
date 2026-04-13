@@ -12,16 +12,23 @@ Max 15 patterns — unvalidated patterns older than 30 days are dropped.
 
 ## Validated Patterns
 
-_None yet — patterns below need 2 more confirmations to be promoted._
+| Pattern | Why | Confirmed |
+|---------|-----|-----------|
+| Parallelize independent Firebase reads with `Promise.all()` | Sequential reads compound latency on slow connections — 10 locations = 10 round trips vs 1 | 3x (2026-04-08 → 2026-04-13) |
 
 ## Observed Patterns
 
 | Pattern | Why | First Seen | Count |
 |---------|-----|------------|-------|
-| Parallelize independent Firebase reads with `Promise.all()` | Sequential reads compound latency on slow connections — 10 locations = 10 round trips vs 1 | 2026-04-08 | 1 |
+| ~~Parallelize independent Firebase reads with `Promise.all()`~~ | _Promoted to Validated_ | 2026-04-08 | 3 |
 | Use `limitToLast(N)` query instead of fetch-all-then-slice for RTDB | Avoids downloading entire node when only N records needed | 2026-04-08 | 1 |
 | Verify HTML container IDs exist before writing mount/init code | Stale container refs cause silent failures and error flashes | 2026-04-08 | 1 |
 | Remove stale init paths when a module has been refactored to a new entry point | Dual init causes race conditions — the old path will always fail | 2026-04-08 | 1 |
 | Spawn BACK/FRONT/QA agents in parallel for independent workstreams | 3x faster than sequential — each agent works in isolation without blocking others | 2026-04-08 | 1 |
 | Audit test directories for temp files during QA cleanup tasks | Temp files accumulate silently — thousands of lines of dead code | 2026-04-08 | 1 |
 | Use KB routing table to scope agent prompts with specific doc paths | Agents load only relevant context — saves tokens and improves focus | 2026-04-08 | 1 |
+| After fixing a pattern, grep the entire module for the same anti-pattern | Same bug often exists in multiple files — LocationService had the same sequential fetch we'd already fixed in database-operations.js | 2026-04-13 | 1 |
+| Always bump cache-busting version strings after code changes, grep for old version to find all occurrences | Without version bump, browsers serve stale cached scripts even after Firebase deploy | 2026-04-13 | 1 |
+| Guard Vue watchers with `_initializing` flag when batch-setting values | Without guard, each setter triggers its own watcher → cascading calls | 2026-04-13 | 1 |
+| Verify legacy fallback reads actually return data before keeping them | Dead legacy paths (Permission denied, no data) add seconds of latency for no benefit | 2026-04-13 | 1 |
+| Always double-check investigation findings against actual console logs | Initial analysis may blame the wrong code path — logs reveal the real bottleneck | 2026-04-13 | 1 |
