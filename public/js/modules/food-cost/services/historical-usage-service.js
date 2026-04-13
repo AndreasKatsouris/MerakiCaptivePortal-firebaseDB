@@ -54,29 +54,26 @@ const HistoricalUsageService = {
             const startTimestamp = range.startDate.getTime();
             const endTimestamp = range.endDate.getTime();
             
-            // First, get user's accessible locations
-            const userLocationsRef = ref(getRtdb(), `userLocations/${user.uid}`);
-            const userLocationsSnapshot = await get(userLocationsRef);
-            
+            // Fetch user locations and admin status in parallel
+            const [userLocationsSnapshot, adminSnapshot] = await Promise.all([
+                get(ref(getRtdb(), `userLocations/${user.uid}`)),
+                get(ref(getRtdb(), `admins/${user.uid}`))
+            ]);
+
             const accessibleLocationIds = new Set();
             if (userLocationsSnapshot.exists()) {
                 Object.keys(userLocationsSnapshot.val()).forEach(locationId => {
                     accessibleLocationIds.add(locationId);
                 });
             }
-            
-            // Check if user is admin
-            const adminRef = ref(getRtdb(), `admins/${user.uid}`);
-            const adminSnapshot = await get(adminRef);
+
             const isAdmin = adminSnapshot.exists();
-            
+
             // If admin, get all locations
             if (isAdmin) {
-                const locationsRef = ref(getRtdb(), 'locations');
-                const locationsSnapshot = await get(locationsRef);
+                const locationsSnapshot = await get(ref(getRtdb(), 'locations'));
                 if (locationsSnapshot.exists()) {
-                    const allLocationIds = Object.keys(locationsSnapshot.val());
-                    allLocationIds.forEach(id => accessibleLocationIds.add(id));
+                    Object.keys(locationsSnapshot.val()).forEach(id => accessibleLocationIds.add(id));
                 }
             }
             
@@ -155,137 +152,9 @@ const HistoricalUsageService = {
                 }
             }
             
-            // Also check the root stockUsage path for backward compatibility
-            try {
-                console.log(`[HistoricalUsage] Checking root stockUsage path for backward compatibility`); 
-                const rootStockRef = ref(getRtdb(), 'stockUsage');
-                const rootSnapshot = await get(rootStockRef);
-                
-                if (rootSnapshot.exists()) {
-                    const rootData = rootSnapshot.val() || {};
-                    console.log(`[HistoricalUsage] Found ${Object.keys(rootData).length} records in root path`);
-                    
-                    // Filter root data
-                    const rootRecords = Object.entries(rootData)
-                        .map(([key, record]) => ({
-                            id: key,
-                            ...record
-                        }))
-                        .filter(record => {
-                            // Check permissions first
-                            const hasAccess = isAdmin ||
-                                            record.userId === user.uid ||
-                                            (record.selectedLocationId && accessibleLocationIds.has(record.selectedLocationId));
-                            
-                            if (!hasAccess) {
-                                return false;
-                            }
-                            
-                            // Check store name or location ID match - be more flexible
-                            const recordStore = record.storeName || 
-                                              (record.storeContext && record.storeContext.name) ||
-                                              (record.metadata && record.metadata.storeName);
-                            
-                            const recordLocationId = record.selectedLocationId || 
-                                                   (record.storeContext && record.storeContext.locationId) ||
-                                                   (record.metadata && record.metadata.locationId);
-                            
-                            // Try multiple matching strategies for better compatibility
-                            const storeMatch = recordStore === storeIdentifier || 
-                                             recordLocationId === storeIdentifier ||
-                                             (recordStore && storeIdentifier && 
-                                              recordStore.toLowerCase() === storeIdentifier.toLowerCase()) ||
-                                             (recordStore && storeIdentifier && 
-                                              (recordStore.includes(storeIdentifier) || storeIdentifier.includes(recordStore)));
-                            
-                            // Check date range match
-                            const recordDate = record.timestamp || record.recordDate || 0;
-                            const dateMatch = recordDate >= startTimestamp && recordDate <= endTimestamp;
-                            
-                            return storeMatch && dateMatch;
-                        });
-                    
-                    // Add any root records not already in our results
-                    const existingIds = new Set(stockRecords.map(r => r.id));
-                    rootRecords.forEach(record => {
-                        if (!existingIds.has(record.id)) {
-                            stockRecords.push(record);
-                        }
-                    });
-                }
-            } catch (rootError) {
-                console.warn(`[HistoricalUsage] Error checking root stockUsage path: ${rootError.message}`);
-            }
-            
-            // ENHANCEMENT: Also check the new normalized stockData structure
-            try {
-                console.log(`[HistoricalUsage] Checking new normalized stockData structure`);
-                const stockDataRef = ref(getRtdb(), 'stockData');
-                const stockDataSnapshot = await get(stockDataRef);
-                
-                if (stockDataSnapshot.exists()) {
-                    const stockDataRecords = stockDataSnapshot.val() || {};
-                    console.log(`[HistoricalUsage] Found ${Object.keys(stockDataRecords).length} records in stockData`);
-                    
-                    // Filter stockData records
-                    const normalizedRecords = Object.entries(stockDataRecords)
-                        .map(([key, record]) => ({
-                            id: key,
-                            ...record
-                        }))
-                        .filter(record => {
-                            // Check permissions first
-                            const hasAccess = isAdmin ||
-                                            record.userId === user.uid ||
-                                            (record.locationId && accessibleLocationIds.has(record.locationId)) ||
-                                            (record.selectedLocationId && accessibleLocationIds.has(record.selectedLocationId));
-                            
-                            if (!hasAccess) {
-                                return false;
-                            }
-                            
-                            // Check location/store match with enhanced matching
-                            const recordStore = record.storeName || record.locationName || 
-                                              (record.storeContext && record.storeContext.name) ||
-                                              (record.metadata && record.metadata.storeName);
-                            
-                            const recordLocationId = record.locationId || record.selectedLocationId || 
-                                                   (record.storeContext && record.storeContext.locationId) ||
-                                                   (record.metadata && record.metadata.locationId);
-                            
-                            // Enhanced matching strategies for post-migration data
-                            const storeMatch = recordStore === storeIdentifier || 
-                                             recordLocationId === storeIdentifier ||
-                                             (recordStore && storeIdentifier && 
-                                              recordStore.toLowerCase() === storeIdentifier.toLowerCase()) ||
-                                             (recordStore && storeIdentifier && 
-                                              (recordStore.includes(storeIdentifier) || storeIdentifier.includes(recordStore))) ||
-                                             // Additional matching for location ID to name resolution
-                                             (storeIdentifier.startsWith('-') && recordLocationId === storeIdentifier) ||
-                                             (!storeIdentifier.startsWith('-') && recordStore && 
-                                              (recordStore.toLowerCase().includes(storeIdentifier.toLowerCase()) || 
-                                               storeIdentifier.toLowerCase().includes(recordStore.toLowerCase())));
-                            
-                            // Check date range match
-                            const recordDate = record.timestamp || record.recordDate || 0;
-                            const dateMatch = recordDate >= startTimestamp && recordDate <= endTimestamp;
-                            
-                            return storeMatch && dateMatch;
-                        });
-                    
-                    // Add any normalized records not already in our results
-                    const existingIds = new Set(stockRecords.map(r => r.id));
-                    normalizedRecords.forEach(record => {
-                        if (!existingIds.has(record.id)) {
-                            stockRecords.push(record);
-                        }
-                    });
-                    
-                    console.log(`[HistoricalUsage] Added ${normalizedRecords.length} records from normalized stockData structure`);
-                }
-            } catch (stockDataError) {
-                console.warn(`[HistoricalUsage] Error checking normalized stockData structure: ${stockDataError.message}`);
-            }
+            // Legacy paths removed — root stockUsage/ had no matching data,
+            // and stockData/ returns Permission denied. All stock data is now
+            // stored under locations/{id}/stockUsage.
             
             console.log(`[HistoricalUsage] Found ${stockRecords.length} total historical records for ${storeIdentifier}`);
             
@@ -485,8 +354,6 @@ const HistoricalUsageService = {
             
             // Try to resolve location name from the ID
             try {
-                const { ref, get, getRtdb } = await import('../../config/firebase-config.js');
-                
                 const locationRef = ref(getRtdb(), `locations/${storeIdentifier}`);
                 const locationSnapshot = await get(locationRef);
                 

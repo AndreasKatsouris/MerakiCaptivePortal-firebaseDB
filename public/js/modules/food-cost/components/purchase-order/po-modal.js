@@ -104,38 +104,41 @@ export const PurchaseOrderModal = {
     watch: {
         showModal(newVal) {
             if (newVal) {
-                // Initialize local values from props when modal is shown
+                // Batch all parameter changes before regenerating to prevent
+                // watcher cascade (each setter would trigger its own regeneration)
+                this._initializing = true;
                 this.localDaysToNextDelivery = this.daysToNextDelivery || 7;
                 this.localSafetyStockPercentage = this.safetyStockPercentage || 15;
                 this.localCriticalItemBuffer = this.criticalItemBuffer || 30;
                 this.localSelectedSupplier = this.selectedSupplier || 'All Suppliers';
+                this._initializing = false;
                 this.regeneratePurchaseOrder();
             }
         },
-        
+
         // Watch local parameters instead of props
         localDaysToNextDelivery() {
-            this.regeneratePurchaseOrder();
+            if (!this._initializing) this.regeneratePurchaseOrder();
         },
-        
+
         localSafetyStockPercentage() {
-            this.regeneratePurchaseOrder();
+            if (!this._initializing) this.regeneratePurchaseOrder();
         },
-        
+
         localCriticalItemBuffer() {
-            this.regeneratePurchaseOrder();
+            if (!this._initializing) this.regeneratePurchaseOrder();
         },
-        
+
         localSelectedSupplier() {
-            this.regeneratePurchaseOrder();
+            if (!this._initializing) this.regeneratePurchaseOrder();
         },
-        
+
         calculationType() {
-            this.regeneratePurchaseOrder();
+            if (!this._initializing) this.regeneratePurchaseOrder();
         },
-        
+
         lookbackDays() {
-            if (this.calculationType === 'advanced') {
+            if (!this._initializing && this.calculationType === 'advanced') {
                 this.regeneratePurchaseOrder();
             }
         }
@@ -154,12 +157,8 @@ export const PurchaseOrderModal = {
             this.isLoading = true;
             
             try {
-                // Clear historical data cache to ensure fresh data is fetched
-                // This is important when the data location paths have been updated
-                if (window.HistoricalUsageService && typeof window.HistoricalUsageService.clearCache === 'function') {
-                    window.HistoricalUsageService.clearCache();
-                    console.log('[PO Modal] Historical usage cache cleared for fresh data fetch');
-                }
+                // Historical data cache has a 30-min TTL — no need to clear on every regeneration.
+                // Cache is only cleared when the user changes location or loads new stock data.
                 
                 // Create parameters for order calculation using local values
                 const orderParams = {
