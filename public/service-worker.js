@@ -4,8 +4,8 @@
  */
 
 // Phase 3 Advanced Optimization - Performance-First Service Worker
-const CACHE_NAME = 'ob-wifi-cache-v2.2-receipt-fix';  // PHASE 3: Fixed receipt settings module loading
-const DATA_CACHE_NAME = 'ob-data-cache-v2.2-receipt-fix';  // Fixed: Receipt settings cache issue
+const CACHE_NAME = 'ob-wifi-cache-v2.4-rtdb-passthrough';  // Stop intercepting Firebase RTDB
+const DATA_CACHE_NAME = 'ob-data-cache-v2.4-rtdb-passthrough';  // Stop intercepting Firebase RTDB
 const CACHE_ASSETS = [
   '/',
   '/index.html',
@@ -24,14 +24,10 @@ const CACHE_ASSETS = [
 ];
 
 // Phase 3: API endpoints to cache for instant loading
-const CACHEABLE_API_PATTERNS = [
-  /\/getUserWhatsAppNumbers$/,
-  /\/verifyAdminStatus$/,
-  /subscriptions\//,
-  /subscriptionTiers\//,
-  /userLocations\//,
-  /locations\//
-];
+// NOTE: RTDB paths (userLocations, locations, subscriptions, etc.) removed —
+// they were matching RTDB long-polling requests and causing 4+ min delays.
+// Only non-streaming Cloud Function endpoints should be listed here.
+const CACHEABLE_API_PATTERNS = [];
 
 // Phase 3: Cache duration settings
 const CACHE_DURATIONS = {
@@ -119,17 +115,21 @@ self.addEventListener('fetch', event => {
     return;
   }
 
-  // CRITICAL FIX: Skip caching for Firebase Functions and performanceTest
-  if (url.pathname.includes('/performanceTest') || 
-      url.pathname.includes('/__/') || 
+  // CRITICAL FIX: Never intercept Firebase Functions or Firebase RTDB.
+  // RTDB uses long-polling/streaming that breaks when the SW tries to cache responses.
+  // Caching RTDB responses was causing 4+ minute delays on stock data / location loads.
+  if (url.pathname.includes('/performanceTest') ||
+      url.pathname.includes('/__/') ||
       url.hostname.includes('cloudfunctions.net') ||
-      url.hostname.includes('firebaseapp.com') && url.pathname.includes('/functions/')) {
-    // Direct network request for Firebase Functions - no caching, with error handling
+      url.hostname.includes('firebaseio.com') ||
+      url.hostname.includes('googleapis.com') ||
+      (url.hostname.includes('firebaseapp.com') && url.pathname.includes('/functions/'))) {
+    // Direct network passthrough - no SW interception
     event.respondWith(
       fetch(request).catch(error => {
-        console.error('[Service Worker] Firebase Function fetch failed:', request.url, error);
-        return new Response('Firebase Function unavailable', { 
-          status: 503, 
+        console.error('[Service Worker] Firebase passthrough failed:', request.url, error);
+        return new Response('Firebase service unavailable', {
+          status: 503,
           statusText: 'Service Unavailable',
           headers: { 'Content-Type': 'text/plain' }
         });
@@ -267,9 +267,10 @@ async function handleDashboardPageRequest(request) {
 
 // Helper functions
 function isFirebaseApiCall(url) {
-  return url.hostname.includes('cloudfunctions.net') || 
-         url.hostname.includes('firebaseio.com') ||
-         CACHEABLE_API_PATTERNS.some(pattern => pattern.test(url.pathname));
+  // Firebase hosts are handled by the early passthrough above; this function
+  // only exists for legacy matchers. Always returns false now to prevent
+  // accidental caching of Firebase traffic.
+  return false;
 }
 
 function isStaticAsset(url) {
