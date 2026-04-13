@@ -38,7 +38,7 @@ import {
     checkForExistingData
 } from './database-operations.js?v=2.2.0-20260413';
 
-import { auth, getAuth, ensureFirebaseInitialized } from './firebase-helpers.js?v=2.2.0-20260413';
+import { auth, getAuth, ensureFirebaseInitialized, getRtdb, ref, get } from './firebase-helpers.js?v=2.2.0-20260413';
 
 // Order calculator functions not available yet - commented out for now
 // import { 
@@ -1951,11 +1951,24 @@ var FoodCostApp = {
          */
         async loadHistoricalRecord(recordId) {
             this.isLoading = true;
-            
+
             try {
-                // Load all historical data and find the specific record
-                const records = await loadHistoricalData();
-                const record = records.find(r => r.key === recordId);
+                // Find the record in already-loaded historical data, or fetch directly by location
+                const cachedRecord = this.historicalData.find(r => (r.key === recordId || r.id === recordId));
+                let record;
+
+                if (cachedRecord && cachedRecord.locationId) {
+                    // Direct read from location-specific path
+                    const rtdb = getRtdb();
+                    const snapshot = await get(ref(rtdb, `locations/${cachedRecord.locationId}/stockUsage/${recordId}`));
+                    record = snapshot.exists()
+                        ? { ...snapshot.val(), key: recordId, locationId: cachedRecord.locationId }
+                        : cachedRecord;
+                } else {
+                    // Fallback: load all historical data and find the record
+                    const records = await loadHistoricalData();
+                    record = records.find(r => r.key === recordId);
+                }
                 
                 if (!record) {
                     Swal.fire({
