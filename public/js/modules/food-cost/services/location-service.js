@@ -28,22 +28,24 @@ export const LocationService = {
             }
 
             const locationIds = Object.keys(userLocationsSnapshot.val());
-            const locations = [];
 
-            // Fetch each location's details
-            for (const locationId of locationIds) {
+            // Fetch all locations in parallel
+            const locationPromises = locationIds.map(async (locationId) => {
                 const locationRef = ref(rtdb, `locations/${locationId}`);
                 const locationSnapshot = await get(locationRef);
-                
-                if (locationSnapshot.exists()) {
-                    const locationData = locationSnapshot.val();
-                    locations.push({
-                        id: locationId,
-                        ...locationData,
-                        displayName: this.formatLocationDisplay(locationData)
-                    });
-                }
-            }
+
+                if (!locationSnapshot.exists()) return null;
+
+                const locationData = locationSnapshot.val();
+                return {
+                    id: locationId,
+                    ...locationData,
+                    displayName: this.formatLocationDisplay(locationData)
+                };
+            });
+
+            const results = await Promise.all(locationPromises);
+            const locations = results.filter(Boolean);
 
             console.log('[LocationService] Found locations:', locations);
             return locations;
