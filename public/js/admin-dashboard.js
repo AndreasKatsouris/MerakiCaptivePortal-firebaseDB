@@ -1648,15 +1648,15 @@ class AdminDashboard {
         const scripts = [
             // Load the Firebase config first to ensure it's available for all modules
             { src: '/js/config/firebase-config.js', type: 'module' },
-            { src: '/js/modules/food-cost/utilities.js?v=2.1.4-20250605', type: 'module' },
-            { src: '/js/modules/food-cost/firebase-helpers.js?v=2.1.4-20250605', type: 'module' },
-            { src: '/js/modules/food-cost/database-operations.js?v=2.1.4-20250605', type: 'module' },
-            { src: '/js/modules/food-cost/data-processor.js?v=2.1.4-20250605', type: 'module' },
-            { src: '/js/modules/food-cost/chart-manager.js?v=2.1.4-20250605', type: 'module' },
-            { src: '/js/modules/food-cost/services/data-service.js?v=2.1.4-20250605', type: 'module' },
-            { src: '/js/modules/food-cost/services/location-service.js?v=2.1.4-20250605', type: 'module' },
-            { src: '/js/modules/food-cost/refactored-app-component.js?v=2.1.4-20250605', type: 'module' },
-            { src: '/js/modules/food-cost/index.js?v=2.1.4-20250605', type: 'module' }
+            { src: '/js/modules/food-cost/utilities.js?v=2.2.0-20260413', type: 'module' },
+            { src: '/js/modules/food-cost/firebase-helpers.js?v=2.2.0-20260413', type: 'module' },
+            { src: '/js/modules/food-cost/database-operations.js?v=2.2.0-20260413', type: 'module' },
+            { src: '/js/modules/food-cost/data-processor.js?v=2.2.0-20260413', type: 'module' },
+            { src: '/js/modules/food-cost/chart-manager.js?v=2.2.0-20260413', type: 'module' },
+            { src: '/js/modules/food-cost/services/data-service.js?v=2.2.0-20260413', type: 'module' },
+            { src: '/js/modules/food-cost/services/location-service.js?v=2.2.0-20260413', type: 'module' },
+            { src: '/js/modules/food-cost/refactored-app-component.js?v=2.2.0-20260413', type: 'module' },
+            { src: '/js/modules/food-cost/index.js?v=2.2.0-20260413', type: 'module' }
         ];
 
         // Load scripts sequentially to ensure proper initialization

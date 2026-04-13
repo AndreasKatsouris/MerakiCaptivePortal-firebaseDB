@@ -12,7 +12,7 @@ import {
     filterStockData, 
     getItemCalculationDetails, 
     downloadCSV 
-} from './services/data-service.js?v=2.1.5-20250606';
+} from './services/data-service.js?v=2.2.0-20260413';
 
 import { 
     processStockData,
@@ -20,14 +20,14 @@ import {
     calculateReorderPoints, 
     calculateUsagePerDay,
     calculateTotals
-} from './data-processor.js?v=2.1.5-20250606';
+} from './data-processor.js?v=2.2.0-20260413';
 
 import { 
     initCharts, 
     updateCharts, 
     destroyCharts,
     resetChartInitialization
-} from './chart-manager.js?v=2.1.5-20250606';
+} from './chart-manager.js?v=2.2.0-20260413';
 
 import {
     saveStockData,
@@ -36,9 +36,9 @@ import {
     deleteHistoricalData,
     getItemHistoricalData,
     checkForExistingData
-} from './database-operations.js?v=2.1.5-20250606';
+} from './database-operations.js?v=2.2.0-20260413';
 
-import { auth, getAuth, ensureFirebaseInitialized } from './firebase-helpers.js?v=2.1.5-20250606';
+import { auth, getAuth, ensureFirebaseInitialized } from './firebase-helpers.js?v=2.2.0-20260413';
 
 // Order calculator functions not available yet - commented out for now
 // import { 
@@ -46,34 +46,34 @@ import { auth, getAuth, ensureFirebaseInitialized } from './firebase-helpers.js?
 //     previewOrderCalculations,
 //     formatOrderCalculation,
 //     calculateOrderValues
-// } from './order-calculator.js?v=2.1.5-20250606';
+// } from './order-calculator.js?v=2.2.0-20260413';
 
 // Import location service
-import { LocationService } from './services/location-service.js?v=2.1.5-20250606';
+import { LocationService } from './services/location-service.js?v=2.2.0-20260413';
 
-import { generateTimestampKey, formatDate, formatCurrency } from './utilities.js?v=2.1.5-20250606';
+import { generateTimestampKey, formatDate, formatCurrency } from './utilities.js?v=2.2.0-20260413';
 
 // Import Firebase service for store context
-import { getRecentStoreContext } from './services/firebase-service.js?v=2.1.5-20250606';
+import { getRecentStoreContext } from './services/firebase-service.js?v=2.2.0-20260413';
 
 // Import mixins
-import { UIMixin } from './mixins/ui-mixin.js?v=2.1.5-20250606';
-import { ShadcnUIMixin } from './mixins/shadcn-ui-mixin.js?v=2.1.5-20250606';
+import { UIMixin } from './mixins/ui-mixin.js?v=2.2.0-20260413';
+import { ShadcnUIMixin } from './mixins/shadcn-ui-mixin.js?v=2.2.0-20260413';
 
 // Import modular components
 import { PurchaseOrderModal } from './components/purchase-order/po-modal.js?v=2.1.8-20250610-tooltips';
-import { HeaderMappingModal } from './components/header-mapping-modal/header-mapping-modal.js?v=2.1.5-20250606';
-import { HistoricalDataModal } from './components/historical-data-modal/historical-data-modal.js?v=2.1.5-20250606';
-import { DeleteConfirmationModal } from './components/delete-confirmation-modal/delete-confirmation-modal.js?v=2.1.5-20250606';
-import { ItemCalculationDetailsModal } from './components/item-calculation-details/item-calculation-details.js?v=2.1.5-20250606';
-import { CategoryFilter } from './components/filters/CategoryFilter.js?v=2.1.5-20250606';
-import { CostCenterFilter } from './components/filters/CostCenterFilter.js?v=2.1.5-20250606';
-import { StockDataTable } from './components/tables/StockDataTable.js?v=2.1.5-20250606';
-import { EditableStockDataTable } from './components/tables/EditableStockDataTable.js?v=2.1.5-20250606';
-import { DataSummary } from './components/analytics/DataSummary.js?v=2.1.5-20250606';
+import { HeaderMappingModal } from './components/header-mapping-modal/header-mapping-modal.js?v=2.2.0-20260413';
+import { HistoricalDataModal } from './components/historical-data-modal/historical-data-modal.js?v=2.2.0-20260413';
+import { DeleteConfirmationModal } from './components/delete-confirmation-modal/delete-confirmation-modal.js?v=2.2.0-20260413';
+import { ItemCalculationDetailsModal } from './components/item-calculation-details/item-calculation-details.js?v=2.2.0-20260413';
+import { CategoryFilter } from './components/filters/CategoryFilter.js?v=2.2.0-20260413';
+import { CostCenterFilter } from './components/filters/CostCenterFilter.js?v=2.2.0-20260413';
+import { StockDataTable } from './components/tables/StockDataTable.js?v=2.2.0-20260413';
+import { EditableStockDataTable } from './components/tables/EditableStockDataTable.js?v=2.2.0-20260413';
+import { DataSummary } from './components/analytics/DataSummary.js?v=2.2.0-20260413';
 
 // Import all database operations
-import * as DatabaseOperations from './database-operations.js?v=2.1.5-20250606';
+import * as DatabaseOperations from './database-operations.js?v=2.2.0-20260413';
 
 // Add styles for filter popups
 const filterStyles = `

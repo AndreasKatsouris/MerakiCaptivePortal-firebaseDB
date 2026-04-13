@@ -4,7 +4,7 @@
  * Version: 2.0.0-alpha-2025-04-24
  */
 
-import { getRtdb, getAuth, ref, get } from '../firebase-helpers.js?v=2.1.5-20250606';
+import { getRtdb, getAuth, ref, get } from '../firebase-helpers.js?v=2.2.0-20260413';
 import { query, orderByChild, startAt, endAt } from '../../../config/firebase-config.js';
 
 /**
