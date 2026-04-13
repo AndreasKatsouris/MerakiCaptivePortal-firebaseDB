@@ -10,13 +10,13 @@ function registerServiceWorker() {
       navigator.serviceWorker.register('/service-worker.js')
         .then(registration => {
           console.log('ServiceWorker registration successful with scope: ', registration.scope);
-          
-          // IMMEDIATE UPDATE: Force service worker update to clear cached auth.js
-          console.log('🔄 [ServiceWorker] Forcing immediate update to clear auth.js cache...');
-          registration.update().then(() => {
-            console.log('✅ [ServiceWorker] Update completed - stale cache should be cleared');
-          });
-          
+
+          // NOTE: Removed immediate registration.update() call — it was forcing
+          // a fresh SW install on every page load, saturating slow connections
+          // while Firebase was trying to connect. The browser checks for SW
+          // updates automatically (~24h cadence); manual updates happen via the
+          // periodic check below.
+
           // Check for updates periodically
           setInterval(() => {
             registration.update();

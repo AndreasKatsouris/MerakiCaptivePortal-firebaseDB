@@ -4,8 +4,8 @@
  */
 
 // Phase 3 Advanced Optimization - Performance-First Service Worker
-const CACHE_NAME = 'ob-wifi-cache-v2.4-rtdb-passthrough';  // Stop intercepting Firebase RTDB
-const DATA_CACHE_NAME = 'ob-data-cache-v2.4-rtdb-passthrough';  // Stop intercepting Firebase RTDB
+const CACHE_NAME = 'ob-wifi-cache-v2.5-lazy-install';  // Non-blocking install
+const DATA_CACHE_NAME = 'ob-data-cache-v2.5-lazy-install';  // Non-blocking install
 const CACHE_ASSETS = [
   '/',
   '/index.html',
@@ -37,70 +37,42 @@ const CACHE_DURATIONS = {
 };
 
 // Install event - cache assets with Phase 3 optimizations
+// Install event — non-blocking.
+// Do NOT pre-fetch assets here; pre-fetching 14+ files on install saturates slow
+// connections for 20+ seconds, starving in-flight Firebase requests. Assets are
+// now cached lazily via the fetch handler (cache-on-demand).
 self.addEventListener('install', event => {
-  console.log('[Service Worker] Phase 3 Performance Optimization - Installing...');
-  
+  console.log('[Service Worker] Installing (lazy install — no pre-fetch)');
   event.waitUntil(
     Promise.all([
-      // Cache static assets
-      caches.open(CACHE_NAME).then(cache => {
-        console.log('[Service Worker] Caching app shell with performance optimization...');
-        
-        // Use Promise.allSettled to continue even if some assets fail to cache
-        const cachePromises = CACHE_ASSETS.map(url => {
-          return fetch(url)
-            .then(response => {
-              if (!response.ok) {
-                throw new Error(`Failed to fetch ${url}: ${response.status} ${response.statusText}`);
-              }
-              return cache.put(url, response);
-            })
-            .catch(error => {
-              console.warn(`[Service Worker] Failed to cache: ${url}`, error);
-              // Return resolved promise to allow other assets to be cached
-              return Promise.resolve();
-            });
-        });
-        
-        return Promise.allSettled(cachePromises);
-      }),
-      // Initialize data cache for API responses
+      caches.open(CACHE_NAME),
       caches.open(DATA_CACHE_NAME)
-    ])
-    .then(() => {
-      console.log('[Service Worker] Phase 3 Cache complete - Performance optimization active!');
-      // Force activation immediately for instant performance benefits
-      return self.skipWaiting();
-    })
-    .catch(error => {
-      console.error('[Service Worker] Install failed:', error);
-      // Still complete installation even if caching failed
-      return self.skipWaiting();
+    ]).then(() => {
+      // Do NOT call skipWaiting() here. Let the old SW keep serving the current
+      // page. The new SW will activate on the next page load, avoiding mid-request
+      // takeover that breaks in-flight connections.
+      console.log('[Service Worker] Install complete — will activate on next reload');
     })
   );
 });
 
-// Activate event - clean up old caches with Phase 3 enhancements
+// Activate event — clean up old caches, but do NOT claim existing clients.
+// Claiming mid-session causes the new SW to intercept in-flight fetches that
+// were started against the old SW, leading to broken connections.
 self.addEventListener('activate', event => {
-  console.log('[Service Worker] Phase 3 Activating...');
+  console.log('[Service Worker] Activating (no client claim)');
   event.waitUntil(
-    Promise.all([
-      // Clean up old static caches
-      caches.keys().then(cacheNames => {
-        return Promise.all(
-          cacheNames.filter(cacheName => {
-            return cacheName !== CACHE_NAME && cacheName !== DATA_CACHE_NAME;
-          }).map(cacheName => {
-            console.log('[Service Worker] Clearing old cache:', cacheName);
-            return caches.delete(cacheName);
+    caches.keys().then(cacheNames => {
+      return Promise.all(
+        cacheNames
+          .filter(name => name !== CACHE_NAME && name !== DATA_CACHE_NAME)
+          .map(name => {
+            console.log('[Service Worker] Clearing old cache:', name);
+            return caches.delete(name);
           })
-        );
-      }),
-      // Take control of all pages immediately
-      self.clients.claim()
-    ])
-    .then(() => {
-      console.log('[Service Worker] Phase 3 Activation complete - Instant loading enabled!');
+      );
+    }).then(() => {
+      console.log('[Service Worker] Activation complete');
     })
   );
 });
