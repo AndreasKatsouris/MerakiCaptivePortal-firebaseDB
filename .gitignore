@@ -73,3 +73,6 @@ node_modules/
 
 # Git worktrees
 .worktrees/
+
+# Git worktrees for feature branches
+.worktrees/
