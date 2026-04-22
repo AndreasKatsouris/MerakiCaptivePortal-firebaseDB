@@ -122,10 +122,23 @@ async function trimResolvedFlags(locationId, itemKey, max) {
   await update(ref(rtdb), updates);
 }
 
-// Stubs — implemented in tasks 9-10
-export async function writeAutoFlags() {
-  throw new Error('not implemented');
+export async function writeAutoFlags(locationId, itemKey, { itemMeta, recordId, flags }) {
+  const now = Date.now();
+  const base = `${FLAGS_PATH}/${locationId}/${itemKey}`;
+  const updates = {
+    [`${base}/itemKey`]: itemKey,
+    [`${base}/itemCode`]: itemMeta?.itemCode ?? null,
+    [`${base}/description`]: itemMeta?.description ?? null,
+    [`${base}/category`]: itemMeta?.category ?? null,
+    [`${base}/costCenter`]: itemMeta?.costCenter ?? null,
+    [`${base}/lastSeenRecordId`]: recordId,
+    [`${base}/lastSeenAt`]: now,
+    [`${base}/autoFlags`]: flags
+  };
+  await update(ref(rtdb), updates);
 }
+
+// Stubs — implemented in task 10
 export async function runAutoClear() {
   throw new Error('not implemented');
 }

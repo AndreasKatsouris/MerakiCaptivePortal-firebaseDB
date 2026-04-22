@@ -215,6 +215,66 @@ describe('resolveFlag', () => {
     expect(removeCall[1]['stockItemFlags/LOC1/code:A/autoFlags/COST_SPIKE']).toBeNull();
   });
 
+});
+
+describe('writeAutoFlags', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    vi.mocked(ref).mockImplementation((_db, path) => path ?? '__root__');
+    vi.mocked(update).mockResolvedValue(undefined);
+  });
+
+  test('replaces autoFlags and updates lastSeen metadata', async () => {
+    await writeAutoFlags('LOC1', 'code:A', {
+      itemMeta: { itemCode: 'A', description: 'Apple', category: 'Produce', costCenter: 'Kitchen' },
+      recordId: 'REC1',
+      flags: {
+        COST_SPIKE: {
+          severity: 'warning',
+          score: 62,
+          detectedAt: 1000,
+          sourceRecordId: 'REC1',
+          details: { delta: 0.22 }
+        }
+      }
+    });
+    const updates = vi.mocked(update).mock.calls[0][1];
+    const base = 'stockItemFlags/LOC1/code:A';
+    expect(updates[`${base}/itemKey`]).toBe('code:A');
+    expect(updates[`${base}/itemCode`]).toBe('A');
+    expect(updates[`${base}/description`]).toBe('Apple');
+    expect(updates[`${base}/category`]).toBe('Produce');
+    expect(updates[`${base}/costCenter`]).toBe('Kitchen');
+    expect(updates[`${base}/lastSeenRecordId`]).toBe('REC1');
+    expect(typeof updates[`${base}/lastSeenAt`]).toBe('number');
+    expect(updates[`${base}/autoFlags`].COST_SPIKE.severity).toBe('warning');
+  });
+
+  test('coerces missing item meta fields to null', async () => {
+    await writeAutoFlags('LOC1', 'code:B', {
+      itemMeta: {},
+      recordId: 'REC2',
+      flags: {}
+    });
+    const updates = vi.mocked(update).mock.calls[0][1];
+    const base = 'stockItemFlags/LOC1/code:B';
+    expect(updates[`${base}/itemCode`]).toBeNull();
+    expect(updates[`${base}/description`]).toBeNull();
+    expect(updates[`${base}/category`]).toBeNull();
+    expect(updates[`${base}/costCenter`]).toBeNull();
+  });
+});
+
+describe('resolveFlag trim behavior', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    vi.mocked(ref).mockImplementation((_db, path) => path ?? '__root__');
+    vi.mocked(update).mockResolvedValue(undefined);
+    vi.mocked(set).mockResolvedValue(undefined);
+    let pushCounter = 0;
+    vi.mocked(push).mockImplementation((path) => `${path}/-NewKey${pushCounter++}`);
+  });
+
   test('trims resolvedFlags to most recent 20 (oldest dropped)', async () => {
     const fakeResolved = {};
     for (let i = 0; i < 25; i++) {
@@ -242,7 +302,6 @@ describe('resolveFlag', () => {
     const trimmedKeys = Object.keys(trimUpdates).filter((k) => k.includes('/resolvedFlags/-K'));
     expect(trimmedKeys.length).toBe(5);
     expect(trimmedKeys.every((k) => trimUpdates[k] === null)).toBe(true);
-    // oldest (K000..K004) trimmed
     expect(trimmedKeys.some((k) => k.endsWith('-K000'))).toBe(true);
     expect(trimmedKeys.some((k) => k.endsWith('-K004'))).toBe(true);
     expect(trimmedKeys.some((k) => k.endsWith('-K005'))).toBe(false);
