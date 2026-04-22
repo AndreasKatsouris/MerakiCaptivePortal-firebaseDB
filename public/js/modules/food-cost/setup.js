@@ -198,14 +198,26 @@ async function mountFlagsDashboardLazy() {
                 });
             },
             onRerun: async () => {
-                const ctx = window.FoodCost?.currentProcessingContext;
+                let ctx = null;
+                if (typeof window.FoodCost?.buildCurrentContext === 'function') {
+                    ctx = await window.FoodCost.buildCurrentContext({ recordId: null });
+                }
+                if (!ctx) ctx = window.FoodCost?.currentProcessingContext || null;
                 if (!ctx) {
                     if (typeof Swal !== 'undefined') {
-                        Swal.fire('No data loaded', 'Load a stock file first.', 'info');
+                        Swal.fire(
+                            'No data loaded',
+                            'Upload (and process) a stock file in the Stock Data tab first.',
+                            'info'
+                        );
                     }
                     return;
                 }
+                window.FoodCost.currentProcessingContext = ctx;
                 await window.FoodCost.runFlagPipeline(ctx);
+                if (window.FoodCost?.refreshFlagCountBadge) {
+                    window.FoodCost.refreshFlagCountBadge(ctx.locationId);
+                }
             },
             onOpenConfig: async () => {
                 const locId = currentLocationId();

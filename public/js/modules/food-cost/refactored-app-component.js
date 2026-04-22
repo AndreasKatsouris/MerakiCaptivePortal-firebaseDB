@@ -352,6 +352,10 @@ var FoodCostApp = {
         if (typeof window !== 'undefined') {
             window.FoodCost = window.FoodCost || {};
             window.FoodCost.vm = this;
+            // Builder used by the Flags tab Re-run button to invoke the
+            // pipeline against current in-memory data without requiring a save.
+            window.FoodCost.buildCurrentContext = (opts) =>
+                this.buildFlagPipelineContext(opts);
         }
 
         // Register a beforeunload handler to help with refresh issues
@@ -378,6 +382,35 @@ var FoodCostApp = {
     
     methods: {
         // ===== Flag system integration =====
+
+        /**
+         * Build a fresh flag-pipeline context from current in-memory state.
+         * Returns null if there's nothing to process (no data or no location).
+         * Used by both the post-save invocation and the Flags tab Re-run button.
+         */
+        async buildFlagPipelineContext({ recordId = null } = {}) {
+            if (!this.selectedLocationId) return null;
+            if (!this.stockData || this.stockData.length === 0) return null;
+            const historicalSvc = window.HistoricalUsageService;
+            let historicalData = {};
+            try {
+                if (historicalSvc?.getSummaryByItemKey) {
+                    historicalData = await historicalSvc.getSummaryByItemKey(
+                        this.selectedLocationId
+                    );
+                }
+            } catch (err) {
+                console.warn('[FoodCost] historical summary unavailable, continuing with empty:', err);
+            }
+            return {
+                locationId: this.selectedLocationId,
+                recordId,
+                processedItems: this.stockData,
+                foodCostPct: Number(this.costPercentage) || 0,
+                totalCurrentCost: this.totalCostOfUsage || 0,
+                historicalData
+            };
+        },
 
         /**
          * Reload manual/auto flags for the current location into flagsByKey
@@ -1789,26 +1822,17 @@ var FoodCostApp = {
 
                 // Run flag detection pipeline (non-blocking — must not fail the save UX)
                 try {
-                    const recordId = result?.recordId || result?.id || result?.timestamp || null;
-                    const historicalSvc = window.HistoricalUsageService;
-                    const historicalData = historicalSvc
-                        ? await historicalSvc.getSummaryByItemKey(this.selectedLocationId)
-                        : {};
-                    const totalCurrentCost = this.totalCostOfUsage || 0;
-                    const foodCostPct = Number(this.costPercentage) || 0;
                     if (window.FoodCost?.runFlagPipeline) {
-                        const ctx = {
-                            locationId: this.selectedLocationId,
-                            recordId,
-                            processedItems: this.stockData,
-                            foodCostPct,
-                            totalCurrentCost,
-                            historicalData
-                        };
-                        window.FoodCost.currentProcessingContext = ctx;
-                        await window.FoodCost.runFlagPipeline(ctx);
-                        if (window.FoodCost?.refreshFlagCountBadge) {
-                            window.FoodCost.refreshFlagCountBadge(this.selectedLocationId);
+                        const recordId =
+                            result?.recordId || result?.id || result?.timestamp || null;
+                        const ctx = await this.buildFlagPipelineContext({ recordId });
+                        if (ctx) {
+                            window.FoodCost.currentProcessingContext = ctx;
+                            await window.FoodCost.runFlagPipeline(ctx);
+                            if (window.FoodCost?.refreshFlagCountBadge) {
+                                window.FoodCost.refreshFlagCountBadge(this.selectedLocationId);
+                            }
+                            await this.reloadFlagsForLocation();
                         }
                     }
                 } catch (flagErr) {
