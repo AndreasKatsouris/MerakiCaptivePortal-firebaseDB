@@ -183,6 +183,30 @@ async function mountFlagsDashboardLazy() {
     await _flagsDashboardInstance.load();
 }
 
+async function mountAnalyticsTabLazy() {
+    if (window.__fcAnalyticsMounted) return;
+    try {
+        const mod = await import('./analytics-dashboard.js');
+        if (typeof mod.initializeFoodCostAnalytics === 'function') {
+            mod.initializeFoodCostAnalytics('food-cost-analytics-app');
+            window.__fcAnalyticsMounted = true;
+        } else {
+            console.warn('[FoodCost] initializeFoodCostAnalytics not found in analytics-dashboard.js');
+        }
+    } catch (err) {
+        console.error('[FoodCost] analytics mount failed:', err);
+    }
+}
+
+function installAnalyticsTabHandler() {
+    const btn = document.querySelector('[data-bs-target="#fcAnalyticsPane"]');
+    if (!btn || btn.dataset.analyticsHandlerInstalled === '1') return;
+    btn.dataset.analyticsHandlerInstalled = '1';
+    btn.addEventListener('shown.bs.tab', () => {
+        mountAnalyticsTabLazy();
+    });
+}
+
 function installFlagsTabHandler() {
     const btn = document.querySelector('[data-bs-target="#fcFlagsPane"]');
     if (!btn || btn.dataset.flagsHandlerInstalled === '1') return;
@@ -194,12 +218,17 @@ function installFlagsTabHandler() {
     });
 }
 
-// Install the lazy-mount handler after DOM is ready
+// Install the lazy-mount handlers after DOM is ready
+function installFoodCostTabHandlers() {
+    installFlagsTabHandler();
+    installAnalyticsTabHandler();
+}
+
 if (typeof window !== 'undefined') {
     if (document.readyState === 'loading') {
-        document.addEventListener('DOMContentLoaded', installFlagsTabHandler);
+        document.addEventListener('DOMContentLoaded', installFoodCostTabHandlers);
     } else {
-        installFlagsTabHandler();
+        installFoodCostTabHandlers();
     }
 }
 
