@@ -1790,14 +1790,16 @@ var FoodCostApp = {
                     const totalCurrentCost = this.totalCostOfUsage || 0;
                     const foodCostPct = Number(this.costPercentage) || 0;
                     if (window.FoodCost?.runFlagPipeline) {
-                        await window.FoodCost.runFlagPipeline({
+                        const ctx = {
                             locationId: this.selectedLocationId,
                             recordId,
                             processedItems: this.stockData,
                             foodCostPct,
                             totalCurrentCost,
                             historicalData
-                        });
+                        };
+                        window.FoodCost.currentProcessingContext = ctx;
+                        await window.FoodCost.runFlagPipeline(ctx);
                         if (window.FoodCost?.refreshFlagCountBadge) {
                             window.FoodCost.refreshFlagCountBadge(this.selectedLocationId);
                         }
