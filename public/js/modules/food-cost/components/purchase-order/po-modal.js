@@ -7,6 +7,10 @@
 import { generatePurchaseOrder, exportPurchaseOrderToCSV } from '../../order-calculator.js';
 import { generateAdvancedPurchaseOrder, exportAdvancedPurchaseOrderToCSV } from '../../order-calculator-advanced.js';
 import { generateCalculusPurchaseOrder, exportCalculusPurchaseOrderToCSV } from '../../order-calculator-calculus.js';
+import { getFlagsForLocation } from '../../services/flag-service.js';
+import { renderFlagBadgeCluster } from '../flags/FlagBadge.js';
+import { computeRowSeverity } from '../../flag-display-merger.js';
+import { escapeHtml } from '../../utilities.js';
 
 /**
  * Purchase Order Modal Component
@@ -391,14 +395,58 @@ export const PurchaseOrderModal = {
         },
         
         /**
+         * Pre-submit gate: warn if any draft PO items have unresolved flags.
+         * Returns true if the user confirms submission, false otherwise.
+         */
+        async warnIfFlaggedItems() {
+            if (!this.selectedLocationId || !this.purchaseOrderItems?.length) return true;
+            if (typeof Swal === 'undefined') return true;
+            let flags;
+            try {
+                flags = await getFlagsForLocation(this.selectedLocationId);
+            } catch (err) {
+                console.error('[PurchaseOrder] failed to load flags, skipping warning:', err);
+                return true;
+            }
+            if (!flags) return true;
+            const flagged = this.purchaseOrderItems.filter((i) => {
+                const entry = i.itemKey ? flags[i.itemKey] : null;
+                return entry && computeRowSeverity(entry);
+            });
+            if (!flagged.length) return true;
+            const rows = flagged
+                .map((i) => {
+                    const entry = flags[i.itemKey];
+                    return `<tr><td class="text-start">${escapeHtml(i.description || i.itemCode || i.itemKey)}</td><td>${renderFlagBadgeCluster(entry)}</td></tr>`;
+                })
+                .join('');
+            const { isConfirmed } = await Swal.fire({
+                icon: 'warning',
+                title: `${flagged.length} flagged item${flagged.length === 1 ? '' : 's'} in draft`,
+                html: `
+                    <p class="text-muted small mb-2">Review before exporting this purchase order.</p>
+                    <table class="table table-sm align-middle"><thead><tr><th class="text-start">Item</th><th>Flags</th></tr></thead><tbody>${rows}</tbody></table>
+                `,
+                showCancelButton: true,
+                confirmButtonText: 'Export anyway',
+                cancelButtonText: 'Review',
+                width: 640
+            });
+            return isConfirmed;
+        },
+
+        /**
          * Export the purchase order to CSV and download the file
          */
-        exportPurchaseOrder() {
+        async exportPurchaseOrder() {
             if (this.purchaseOrderItems.length === 0) {
                 console.warn('No purchase order items to export');
                 return;
             }
-            
+
+            const ok = await this.warnIfFlaggedItems();
+            if (!ok) return;
+
             try {
                 // Format timestamp for filename
                 const now = new Date();
