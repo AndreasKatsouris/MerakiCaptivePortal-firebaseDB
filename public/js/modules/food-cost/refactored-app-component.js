@@ -1734,6 +1734,9 @@ var FoodCostApp = {
                             totalCurrentCost,
                             historicalData
                         });
+                        if (window.FoodCost?.refreshFlagCountBadge) {
+                            window.FoodCost.refreshFlagCountBadge(this.selectedLocationId);
+                        }
                     }
                 } catch (flagErr) {
                     console.error('Flag pipeline failed (non-blocking):', flagErr);

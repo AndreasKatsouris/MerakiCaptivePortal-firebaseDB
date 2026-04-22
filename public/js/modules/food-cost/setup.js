@@ -9,6 +9,8 @@
 import { FoodCostApp } from './refactored-app-component.js';
 import { ensureFirebaseInitialized } from './firebase-helpers.js';
 import { initShadcnStyles } from './shadcn-styles.js';
+import { getFlagsForLocation } from './services/flag-service.js';
+import { computeRowSeverity } from './flag-display-merger.js';
 
 /**
  * Initialize the Food Cost module in a container
@@ -77,10 +79,48 @@ function setupFoodCostModule(containerId) {
     });
 }
 
+/**
+ * Refresh the Flags tab badge and summary pill from current RTDB flags.
+ * Non-throwing: logs on failure so the dashboard keeps working.
+ */
+async function refreshFlagCountBadge(locationId) {
+    if (!locationId) return;
+    try {
+        const flags = await getFlagsForLocation(locationId);
+        let critical = 0;
+        let warning = 0;
+        for (const entry of Object.values(flags || {})) {
+            const sev = computeRowSeverity(entry);
+            if (sev === 'critical') critical += 1;
+            else if (sev === 'warning') warning += 1;
+        }
+        const total = critical + warning;
+
+        const badge = document.getElementById('fcFlagsCountBadge');
+        if (badge) {
+            badge.style.display = total ? 'inline-block' : 'none';
+            badge.textContent = String(total);
+            badge.className = `badge ms-1 ${critical ? 'bg-danger' : 'bg-warning text-dark'}`;
+        }
+
+        const summary = document.getElementById('food-cost-flag-summary');
+        if (summary) {
+            summary.style.display = total ? 'inline-block' : 'none';
+            summary.textContent = total
+                ? `${total} flag${total === 1 ? '' : 's'} • ${critical} critical`
+                : '';
+        }
+    } catch (err) {
+        console.error('[FoodCost] refreshFlagCountBadge failed:', err);
+    }
+}
+
 // Export the setup function
-export { setupFoodCostModule };
+export { setupFoodCostModule, refreshFlagCountBadge };
 
 // IMPORTANT: Make absolutely sure it's available globally by assigning it directly to window
 window.setupFoodCostModule = setupFoodCostModule;
+window.FoodCost = window.FoodCost || {};
+window.FoodCost.refreshFlagCountBadge = refreshFlagCountBadge;
 console.log('Food Cost Module setup script loaded. setupFoodCostModule is available globally:', 
     typeof window.setupFoodCostModule === 'function' ? 'YES' : 'NO');
