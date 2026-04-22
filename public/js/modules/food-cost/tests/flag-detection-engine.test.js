@@ -2,7 +2,8 @@ import { describe, test, expect } from 'vitest';
 import {
   detectInvalidValues,
   detectCostSpike,
-  detectUsageAnomaly
+  detectUsageAnomaly,
+  detectDeadStock
 } from '../services/flag-detection-engine.js';
 
 describe('INVALID_VALUES', () => {
@@ -122,5 +123,35 @@ describe('USAGE_ANOMALY', () => {
   test('zero stdDev → no flag (avoid division by zero)', () => {
     const flatHist = { 'code:X': { usageMean: 10, usageStdDev: 0, usageSamples: 8 } };
     expect(detectUsageAnomaly({ itemKey: 'code:X', usage: 30 }, flatHist, thresholds)).toEqual({});
+  });
+});
+
+describe('DEAD_STOCK', () => {
+  const thresholds = { deadStockDaysThreshold: 28 };
+
+  test('opening qty + zero usage + days >= threshold → info flag', () => {
+    const h = { 'code:X': { daysSinceLastUsage: 30 } };
+    const r = detectDeadStock({ itemKey: 'code:X', openingQty: 10, usage: 0 }, h, thresholds);
+    expect(r.DEAD_STOCK.severity).toBe('info');
+  });
+
+  test('item with usage → no flag', () => {
+    const h = { 'code:X': { daysSinceLastUsage: 30 } };
+    expect(detectDeadStock({ itemKey: 'code:X', openingQty: 10, usage: 3 }, h, thresholds)).toEqual({});
+  });
+
+  test('zero opening → no flag', () => {
+    const h = { 'code:X': { daysSinceLastUsage: 30 } };
+    expect(detectDeadStock({ itemKey: 'code:X', openingQty: 0, usage: 0 }, h, thresholds)).toEqual({});
+  });
+
+  test('days below threshold → no flag', () => {
+    const h = { 'code:X': { daysSinceLastUsage: 10 } };
+    expect(detectDeadStock({ itemKey: 'code:X', openingQty: 5, usage: 0 }, h, thresholds)).toEqual({});
+  });
+
+  test('no history defaults past threshold → flag', () => {
+    const r = detectDeadStock({ itemKey: 'code:Y', openingQty: 5, usage: 0 }, {}, thresholds);
+    expect(r.DEAD_STOCK.severity).toBe('info');
   });
 });

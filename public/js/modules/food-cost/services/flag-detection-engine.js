@@ -68,6 +68,23 @@ export function detectUsageAnomaly(item, historicalData, thresholds) {
   };
 }
 
+export function detectDeadStock(item, historicalData, thresholds) {
+  if (Number(item.usage) > 0) return {};
+  if (Number(item.openingQty) <= 0) return {};
+  const h = historicalData?.[item.itemKey];
+  const daysSince = h?.daysSinceLastUsage ?? thresholds.deadStockDaysThreshold + 1;
+  if (daysSince < thresholds.deadStockDaysThreshold) return {};
+  return {
+    [RULE_IDS.DEAD_STOCK]: {
+      severity: SEVERITIES.INFO.id,
+      score: Math.min(100, Math.round((daysSince / thresholds.deadStockDaysThreshold) * 50)),
+      detectedAt: Date.now(),
+      sourceRecordId: item.__recordId || null,
+      details: { daysSinceLastUsage: daysSince, openingQty: Number(item.openingQty) }
+    }
+  };
+}
+
 export function runDetection() {
   // Implemented incrementally across tasks 12-17
   return {};
