@@ -1,4 +1,5 @@
-import { describe, test, expect } from 'vitest';
+import { describe, test, expect, beforeEach, vi } from 'vitest';
+import { get, ref } from '../../../config/firebase-config.js';
 import {
   DEFAULT_THRESHOLDS,
   getThresholds,
@@ -32,5 +33,46 @@ describe('flag-service exports', () => {
 
   test('DEFAULT_THRESHOLDS is frozen', () => {
     expect(Object.isFrozen(DEFAULT_THRESHOLDS)).toBe(true);
+  });
+});
+
+describe('getThresholds resolution', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  test('location overrides beat seeded defaults beat built-in DEFAULT_THRESHOLDS', async () => {
+    vi.mocked(get).mockImplementation(async (refArg) => {
+      const pathStr = String(refArg);
+      if (pathStr.includes('_defaults/thresholds')) {
+        return { exists: () => true, val: () => ({ foodCostPctWarning: 35, foodCostPctCritical: 40 }) };
+      }
+      if (pathStr.includes('LOC1/thresholds')) {
+        return { exists: () => true, val: () => ({ foodCostPctCritical: 38, unitCostSpikePct: 10 }) };
+      }
+      return { exists: () => false, val: () => null };
+    });
+    vi.mocked(ref).mockImplementation((_db, path) => path);
+
+    const t = await getThresholds('LOC1');
+    expect(t.foodCostPctWarning).toBe(35);
+    expect(t.foodCostPctCritical).toBe(38);
+    expect(t.unitCostSpikePct).toBe(10);
+    expect(t.deadStockDaysThreshold).toBe(28);
+  });
+
+  test('missing location config falls back to defaults', async () => {
+    vi.mocked(get).mockImplementation(async (refArg) => {
+      const pathStr = String(refArg);
+      if (pathStr.includes('_defaults/thresholds')) {
+        return { exists: () => true, val: () => ({}) };
+      }
+      return { exists: () => false, val: () => null };
+    });
+    vi.mocked(ref).mockImplementation((_db, path) => path);
+
+    const t = await getThresholds('LOC_UNKNOWN');
+    expect(t.foodCostPctWarning).toBe(35);
+    expect(t.deadStockDaysThreshold).toBe(28);
   });
 });
