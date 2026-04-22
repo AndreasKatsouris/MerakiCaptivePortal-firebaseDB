@@ -183,6 +183,64 @@ async function mountFlagsDashboardLazy() {
     await _flagsDashboardInstance.load();
 }
 
+/**
+ * Render the Orders tab placeholder. The existing purchase-order workflow is
+ * a modal owned by the Vue app in the Stock Data tab; this panel provides a
+ * one-click hand-off so the new tab is useful without forking the component.
+ */
+function renderOrdersTabPanel() {
+    const container = document.getElementById('food-cost-orders-app');
+    if (!container || container.dataset.rendered === '1') return;
+    container.dataset.rendered = '1';
+    container.innerHTML = `
+        <div class="card">
+            <div class="card-body">
+                <h5 class="card-title">Purchase Orders</h5>
+                <p class="text-muted mb-3">
+                    Generate a purchase order from the currently loaded stock data.
+                    The PO workflow lives alongside the stock table — use the button
+                    below to open it without leaving this tab.
+                </p>
+                <button id="fcOpenPurchaseOrderBtn" class="btn btn-primary">
+                    <i class="fas fa-file-invoice me-1"></i> Open Purchase Order
+                </button>
+                <p class="text-muted small mt-3 mb-0">
+                    If the button is disabled, first load a stock file under the
+                    <strong>Stock Data</strong> tab.
+                </p>
+            </div>
+        </div>
+    `;
+    const btn = container.querySelector('#fcOpenPurchaseOrderBtn');
+    if (btn) {
+        btn.addEventListener('click', () => {
+            try {
+                const stockTab = document.querySelector('[data-bs-target="#fcStockPane"]');
+                if (stockTab && window.bootstrap?.Tab) {
+                    window.bootstrap.Tab.getOrCreateInstance(stockTab).show();
+                }
+                const vm = window.FoodCostApp?.vm || window.FoodCostApp;
+                if (vm && typeof vm.showPurchaseOrder === 'function') {
+                    vm.showPurchaseOrder();
+                } else if (typeof Swal !== 'undefined') {
+                    Swal.fire('Stock data not loaded', 'Please load a stock file first.', 'info');
+                }
+            } catch (err) {
+                console.error('[FoodCost] open PO from Orders tab failed:', err);
+            }
+        });
+    }
+}
+
+function installOrdersTabHandler() {
+    const btn = document.querySelector('[data-bs-target="#fcOrdersPane"]');
+    if (!btn || btn.dataset.ordersHandlerInstalled === '1') return;
+    btn.dataset.ordersHandlerInstalled = '1';
+    btn.addEventListener('shown.bs.tab', () => {
+        renderOrdersTabPanel();
+    });
+}
+
 async function mountAnalyticsTabLazy() {
     if (window.__fcAnalyticsMounted) return;
     try {
@@ -222,6 +280,7 @@ function installFlagsTabHandler() {
 function installFoodCostTabHandlers() {
     installFlagsTabHandler();
     installAnalyticsTabHandler();
+    installOrdersTabHandler();
 }
 
 if (typeof window !== 'undefined') {
