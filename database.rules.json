@@ -208,6 +208,51 @@
         ".validate": "newData.hasChildren(['timestamp', 'userId', 'selectedLocationId'])"
       }
     },
+    "stockFlagAudit": {
+      "$locationId": {
+        ".read": "auth != null && (auth.token.admin === true || root.child('userLocations').child(auth.uid).child($locationId).exists() || root.child('locations').child($locationId).child('ownerId').val() === auth.uid)",
+        ".indexOn": ["timestamp"],
+        "$eventId": {
+          ".write": "auth != null && !data.exists() && (auth.token.admin === true || root.child('userLocations').child(auth.uid).child($locationId).exists() || root.child('locations').child($locationId).child('ownerId').val() === auth.uid)",
+          ".validate": "newData.hasChildren(['itemKey', 'eventType', 'actorUid', 'timestamp'])"
+        }
+      }
+    },
+    "stockFlagConfig": {
+      ".read": "auth != null",
+      "_defaults": {
+        ".write": "auth != null && auth.token.admin === true"
+      },
+      "$locationId": {
+        ".write": "auth != null && (auth.token.admin === true || root.child('locations').child($locationId).child('ownerId').val() === auth.uid)"
+      }
+    },
+    "stockItemFlags": {
+      ".read": "auth != null",
+      "$locationId": {
+        ".read": "auth != null && (auth.token.admin === true || root.child('userLocations').child(auth.uid).child($locationId).exists() || root.child('locations').child($locationId).child('ownerId').val() === auth.uid)",
+        ".write": "auth != null && (auth.token.admin === true || root.child('userLocations').child(auth.uid).child($locationId).exists() || root.child('locations').child($locationId).child('ownerId').val() === auth.uid)",
+        ".indexOn": ["lastSeenAt"],
+        "$itemKey": {
+          ".validate": "$itemKey.matches(/^(code:|hash:).+$/)",
+          "manualFlags": {
+            "$flagType": {
+              ".validate": "newData.hasChildren(['appliedBy', 'appliedAt'])",
+              "appliedBy": { ".validate": "newData.isString()" },
+              "appliedAt": { ".validate": "newData.isNumber()" },
+              "note": { ".validate": "newData.isString() || newData.val() == null" },
+              "expiresAt": { ".validate": "newData.isNumber() || newData.val() == null" },
+              "customLabel": { ".validate": "newData.isString() && newData.val().length <= 40" }
+            }
+          },
+          "autoFlags": {
+            "$ruleId": {
+              ".validate": "newData.hasChildren(['severity', 'detectedAt']) && newData.child('severity').val().matches(/^(critical|warning|info)$/)"
+            }
+          }
+        }
+      }
+    },
     "bookings": {
       ".read": "auth != null && (auth.token.admin === true || root.child('admin-claims').child(auth.uid).exists())",
       ".write": "auth != null && (auth.token.admin === true || root.child('admin-claims').child(auth.uid).exists())",
