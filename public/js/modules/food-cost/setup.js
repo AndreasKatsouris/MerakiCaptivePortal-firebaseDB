@@ -12,6 +12,7 @@ import { initShadcnStyles } from './shadcn-styles.js';
 import { getFlagsForLocation } from './services/flag-service.js';
 import { computeRowSeverity } from './flag-display-merger.js';
 import { FlagsDashboard } from './components/flags/FlagsDashboard.js';
+import { rtdb, ref, get } from '../../config/firebase-config.js';
 
 /**
  * Initialize the Food Cost module in a container
@@ -141,6 +142,29 @@ function currentUserUid() {
     }
 }
 
+/**
+ * Resolve admin + ownership for the current user against a given location,
+ * mirroring the database.rules.json check for stockFlagConfig writes.
+ */
+async function resolveFlagPermissions(locationId, uid) {
+    if (!uid) return { isAdmin: false, isLocationOwner: false };
+    try {
+        const [adminSnap, ownerSnap] = await Promise.all([
+            get(ref(rtdb, `admins/${uid}`)),
+            locationId
+                ? get(ref(rtdb, `locations/${locationId}/ownerId`))
+                : Promise.resolve({ exists: () => false, val: () => null })
+        ]);
+        return {
+            isAdmin: adminSnap.exists(),
+            isLocationOwner: ownerSnap.exists() && ownerSnap.val() === uid
+        };
+    } catch (err) {
+        console.error('[FoodCost] resolveFlagPermissions failed:', err);
+        return { isAdmin: false, isLocationOwner: false };
+    }
+}
+
 async function mountFlagsDashboardLazy() {
     const container = document.getElementById('food-cost-flags-app');
     if (!container) return;
@@ -171,12 +195,15 @@ async function mountFlagsDashboardLazy() {
                 await window.FoodCost.runFlagPipeline(ctx);
             },
             onOpenConfig: async () => {
+                const locId = currentLocationId();
+                const uid = currentUserUid();
+                const perms = await resolveFlagPermissions(locId, uid);
                 const mod = await import('./components/flags/FlagConfigPanel.js');
                 await mod.openFlagConfigPanel({
-                    locationId: currentLocationId(),
-                    userUid: currentUserUid(),
-                    isAdmin: !!window.FoodCost?.currentUserIsAdmin,
-                    isLocationOwner: !!window.FoodCost?.currentUserIsLocationOwner
+                    locationId: locId,
+                    userUid: uid,
+                    isAdmin: perms.isAdmin,
+                    isLocationOwner: perms.isLocationOwner
                 });
             }
         });
