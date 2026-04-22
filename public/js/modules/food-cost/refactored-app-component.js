@@ -70,6 +70,9 @@ import { CategoryFilter } from './components/filters/CategoryFilter.js?v=2.2.0-2
 import { CostCenterFilter } from './components/filters/CostCenterFilter.js?v=2.2.0-20260413';
 import { StockDataTable } from './components/tables/StockDataTable.js?v=2.2.0-20260413';
 import { EditableStockDataTable } from './components/tables/EditableStockDataTable.js?v=2.2.0-20260413';
+import { openFlagTagModal } from './components/flags/FlagTagModal.js?v=2.2.0-20260413';
+import { getFlagsForLocation } from './services/flag-service.js?v=2.2.0-20260413';
+import { mergeFlaggedHistoricalItems } from './flag-display-merger.js?v=2.2.0-20260413';
 import { DataSummary } from './components/analytics/DataSummary.js?v=2.2.0-20260413';
 
 // Import all database operations
@@ -171,6 +174,10 @@ var FoodCostApp = {
             // Store context
             selectedLocationId: null,
             userLocations: [],
+
+            // Flag system: map of itemKey → flag entry for the current location
+            flagsByKey: {},
+            showHistoricalFlagged: false,
             
             openingStockDate: this.getYesterdayDate(),
             closingStockDate: this.getTodayDate(),
@@ -251,8 +258,20 @@ var FoodCostApp = {
             if (!this.stockData || this.stockData.length === 0) {
                 return [];
             }
-            
+
             return this.filteredData;
+        },
+
+        /**
+         * Items rendered in the stock table — filteredData plus optional
+         * historical-placeholder rows for items that only exist in past flags.
+         */
+        displayedStockItems() {
+            const base = this.filteredData || [];
+            if (!this.showHistoricalFlagged) return base;
+            return mergeFlaggedHistoricalItems(base, this.flagsByKey, {
+                showHistorical: true
+            });
         },
         
         /**
@@ -351,6 +370,51 @@ var FoodCostApp = {
     },
     
     methods: {
+        // ===== Flag system integration =====
+
+        /**
+         * Reload manual/auto flags for the current location into flagsByKey
+         * and refresh the Flags tab badge. Non-throwing.
+         */
+        async reloadFlagsForLocation() {
+            if (!this.selectedLocationId) {
+                this.flagsByKey = {};
+                return;
+            }
+            try {
+                const flags = await getFlagsForLocation(this.selectedLocationId);
+                this.flagsByKey = flags || {};
+                if (window.FoodCost?.refreshFlagCountBadge) {
+                    window.FoodCost.refreshFlagCountBadge(this.selectedLocationId);
+                }
+            } catch (err) {
+                console.error('[FoodCost] reloadFlagsForLocation failed:', err);
+            }
+        },
+
+        /**
+         * Handle edit-flags event emitted by the stock table.
+         */
+        async onFlagEditClicked(item) {
+            if (!this.selectedLocationId) {
+                Swal.fire({
+                    icon: 'warning',
+                    title: 'No location selected',
+                    text: 'Select a location before editing flags.'
+                });
+                return;
+            }
+            const user = this.getUserData?.() || {};
+            const userUid = user.uid || user.userId || 'unknown';
+            await openFlagTagModal({
+                locationId: this.selectedLocationId,
+                item,
+                currentEntry: this.flagsByKey?.[item.itemKey] || null,
+                userUid,
+                onChange: () => this.reloadFlagsForLocation()
+            });
+        },
+
         // ===== Historical Data Deletion =====
         
         /**
@@ -1715,7 +1779,35 @@ var FoodCostApp = {
                 
                 // Save to Firebase using database-operations.js
                 const result = await saveStockData(dataToSave);
-                
+
+                // Run flag detection pipeline (non-blocking — must not fail the save UX)
+                try {
+                    const recordId = result?.recordId || result?.id || result?.timestamp || null;
+                    const historicalSvc = window.HistoricalUsageService;
+                    const historicalData = historicalSvc
+                        ? await historicalSvc.getSummaryByItemKey(this.selectedLocationId)
+                        : {};
+                    const totalCurrentCost = this.totalCostOfUsage || 0;
+                    const foodCostPct = Number(this.costPercentage) || 0;
+                    if (window.FoodCost?.runFlagPipeline) {
+                        const ctx = {
+                            locationId: this.selectedLocationId,
+                            recordId,
+                            processedItems: this.stockData,
+                            foodCostPct,
+                            totalCurrentCost,
+                            historicalData
+                        };
+                        window.FoodCost.currentProcessingContext = ctx;
+                        await window.FoodCost.runFlagPipeline(ctx);
+                        if (window.FoodCost?.refreshFlagCountBadge) {
+                            window.FoodCost.refreshFlagCountBadge(this.selectedLocationId);
+                        }
+                    }
+                } catch (flagErr) {
+                    console.error('Flag pipeline failed (non-blocking):', flagErr);
+                }
+
                 // Show success message
                 Swal.fire({
                     icon: 'success',
@@ -1723,7 +1815,7 @@ var FoodCostApp = {
                     text: 'Stock usage data has been saved. ' + result.message,
                     confirmButtonColor: '#3085d6'
                 });
-                
+
                 console.log('Stock usage data saved successfully:', result.timestamp);
             } catch (error) {
                 console.error('Error saving stock usage data:', error);
@@ -2464,6 +2556,7 @@ var FoodCostApp = {
                 console.log('Selected location:', selectedLocation);
                 // Can add additional logic here like loading location-specific data
             }
+            this.reloadFlagsForLocation();
         },
     },
     
@@ -2705,11 +2798,17 @@ var FoodCostApp = {
                         </div>
                     </div>
                     
+                    <!-- Flag system: show historical flagged items toggle -->
+                    <div class="form-check form-switch my-2">
+                        <input class="form-check-input" type="checkbox" id="fcShowHistoricalFlagged" v-model="showHistoricalFlagged">
+                        <label class="form-check-label" for="fcShowHistoricalFlagged">Show flagged historical items</label>
+                    </div>
+
                     <!-- Stock Data Table Component -->
                     <!-- Regular Stock Data Table (Non-Edit Mode) -->
                     <stock-data-table
                         v-if="!isEditMode"
-                        :items="filteredData"
+                        :items="displayedStockItems"
                         :sort-field="sortField"
                         :sort-direction="sortDirection"
                         :total-item-count="stockData.length"
@@ -2720,7 +2819,7 @@ var FoodCostApp = {
                     <!-- Editable Stock Data Table (Edit Mode) -->
                     <editable-stock-data-table
                         v-if="isEditMode"
-                        :items="filteredData"
+                        :items="displayedStockItems"
                         :show-summary="true"
                         :total-items="stockData.length"
                         :sort-field="sortField"
@@ -2730,12 +2829,14 @@ var FoodCostApp = {
                         :user-data="getUserData()"
                         :last-edit-metadata="lastEditMetadata"
                         :record-id="currentHistoricalRecord"
+                        :flags-by-key="flagsByKey"
                         @sort="sortBy"
                         @show-item-details="showItemCalculationDetails"
                         @item-changed="handleItemChange"
                         @save-changes="saveEditedStockData"
                         @reset-all-changes="cancelEditMode"
                         @validation-error="handleValidationError"
+                        @edit-flags="onFlagEditClicked"
                     ></editable-stock-data-table>
                     
                     <!-- Filters and info moved above the table -->

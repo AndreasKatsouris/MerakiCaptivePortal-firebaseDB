@@ -55,6 +55,7 @@ Primary KB: `KNOWLEDGE BASE/` (project root). Curated subset for UI: `public/kb/
 | Working on...          | Read first                                                   |
 |------------------------|--------------------------------------------------------------|
 | Food cost module       | `KNOWLEDGE BASE/FOOD_COST_MODULE_README.md`                  |
+| Food cost flag system  | `KNOWLEDGE BASE/FOOD_COST_FLAG_SYSTEM.md`                    |
 | Queue / QMS            | `KNOWLEDGE BASE/queue-system-architecture.md`                |
 | ROSS workflows         | `public/kb/features/ROSS.md`                                 |
 | WhatsApp integration   | `KNOWLEDGE BASE/WHATSAPP_BOT_SOP.md`                        |

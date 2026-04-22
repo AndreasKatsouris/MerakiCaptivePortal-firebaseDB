@@ -23,6 +23,10 @@ import * as OrderCalculator from './order-calculator.js?v=2.2.0-20260413';
 // Import Analytics Dashboard
 import { FoodCostAnalyticsDashboard, initializeFoodCostAnalytics } from './analytics-dashboard.js?v=2.2.0-20260413';
 
+// Flag system (Phase 4)
+import * as flagService from './services/flag-service.js?v=2.2.0-20260413';
+import { runFlagPipeline } from './flag-pipeline.js?v=2.2.0-20260413';
+
 // Track the current app instance
 let currentFoodCostApp = null;
 
@@ -116,6 +120,8 @@ window.FoodCost.OrderCalculator = OrderCalculator; // Expose OrderCalculator dir
 window.FoodCost.calculateCriticalityScore = OrderCalculator.calculateCriticalityScore; // Expose criticality calculation
 window.FoodCost.AnalyticsDashboard = FoodCostAnalyticsDashboard; // Expose Analytics Dashboard
 window.FoodCost.initializeFoodCostAnalytics = initializeFoodCostAnalytics; // Expose Analytics initialization
+window.FoodCost.flagService = flagService;
+window.FoodCost.runFlagPipeline = runFlagPipeline;
 
 // Export the public API
 export {
@@ -125,5 +131,7 @@ export {
     OrderCalculator,
     FoodCostAnalyticsDashboard,
     initializeFoodCostAnalytics,
+    flagService,
+    runFlagPipeline,
     MODULE_VERSION
 };

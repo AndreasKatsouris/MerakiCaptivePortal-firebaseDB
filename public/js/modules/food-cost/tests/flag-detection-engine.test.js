@@ -1,0 +1,363 @@
+import { describe, test, expect } from 'vitest';
+import {
+  detectInvalidValues,
+  detectCostSpike,
+  detectUsageAnomaly,
+  detectDeadStock,
+  detectMissingWithHistory,
+  detectHighFcPct,
+  scoreCulprit,
+  runDetection
+} from '../services/flag-detection-engine.js';
+
+describe('INVALID_VALUES', () => {
+  test('flags negative closing', () => {
+    const flags = detectInvalidValues({
+      itemKey: 'code:X',
+      closingQty: -1,
+      openingQty: 5,
+      purchaseQty: 0,
+      unitCost: 10
+    });
+    expect(flags.INVALID_VALUES.severity).toBe('critical');
+    expect(flags.INVALID_VALUES.details.reasons).toContain('negativeClosing');
+  });
+
+  test('flags closing > opening + purchases', () => {
+    const flags = detectInvalidValues({
+      itemKey: 'code:X',
+      closingQty: 100,
+      openingQty: 5,
+      purchaseQty: 10,
+      unitCost: 10
+    });
+    expect(flags.INVALID_VALUES.details.reasons).toContain('closingExceedsAvailable');
+  });
+
+  test('flags negative unit cost', () => {
+    const flags = detectInvalidValues({
+      itemKey: 'code:X',
+      closingQty: 1,
+      openingQty: 5,
+      purchaseQty: 0,
+      unitCost: -1
+    });
+    expect(flags.INVALID_VALUES.details.reasons).toContain('negativeUnitCost');
+  });
+
+  test('no flag for valid data', () => {
+    expect(
+      detectInvalidValues({
+        itemKey: 'code:X',
+        closingQty: 2,
+        openingQty: 5,
+        purchaseQty: 0,
+        unitCost: 10
+      })
+    ).toEqual({});
+  });
+
+  test('score is 100 and sourceRecordId captured', () => {
+    const flags = detectInvalidValues({
+      itemKey: 'code:X',
+      closingQty: -1,
+      openingQty: 5,
+      purchaseQty: 0,
+      unitCost: 10,
+      __recordId: 'REC1'
+    });
+    expect(flags.INVALID_VALUES.score).toBe(100);
+    expect(flags.INVALID_VALUES.sourceRecordId).toBe('REC1');
+  });
+});
+
+describe('COST_SPIKE', () => {
+  const thresholds = { unitCostSpikePct: 15, unitCostSpikeCriticalPct: 30 };
+  const hist = { 'code:X': { unitCostMean: 100, unitCostSamples: 6 } };
+
+  test('no spike below warning threshold', () => {
+    expect(detectCostSpike({ itemKey: 'code:X', unitCost: 105 }, hist, thresholds)).toEqual({});
+  });
+
+  test('warning spike (>=15% <30%)', () => {
+    const r = detectCostSpike({ itemKey: 'code:X', unitCost: 120 }, hist, thresholds);
+    expect(r.COST_SPIKE.severity).toBe('warning');
+    expect(r.COST_SPIKE.details.delta).toBeCloseTo(0.2, 5);
+  });
+
+  test('critical spike (>=30%)', () => {
+    const r = detectCostSpike({ itemKey: 'code:X', unitCost: 140 }, hist, thresholds);
+    expect(r.COST_SPIKE.severity).toBe('critical');
+  });
+
+  test('no history → no flag', () => {
+    expect(detectCostSpike({ itemKey: 'code:Y', unitCost: 1000 }, hist, thresholds)).toEqual({});
+  });
+
+  test('insufficient samples → no flag', () => {
+    const lowHist = { 'code:X': { unitCostMean: 100, unitCostSamples: 1 } };
+    expect(detectCostSpike({ itemKey: 'code:X', unitCost: 200 }, lowHist, thresholds)).toEqual({});
+  });
+});
+
+describe('USAGE_ANOMALY', () => {
+  const thresholds = { usageVarianceStdDev: 2, usageVarianceCriticalStdDev: 3 };
+  const hist = { 'code:X': { usageMean: 10, usageStdDev: 2, usageSamples: 8 } };
+
+  test('within 2σ → no flag', () => {
+    expect(detectUsageAnomaly({ itemKey: 'code:X', usage: 13 }, hist, thresholds)).toEqual({});
+  });
+
+  test('between 2σ and 3σ → warning', () => {
+    const r = detectUsageAnomaly({ itemKey: 'code:X', usage: 15 }, hist, thresholds);
+    expect(r.USAGE_ANOMALY.severity).toBe('warning');
+    expect(r.USAGE_ANOMALY.details.zScore).toBeCloseTo(2.5, 5);
+  });
+
+  test('beyond 3σ → critical', () => {
+    const r = detectUsageAnomaly({ itemKey: 'code:X', usage: 18 }, hist, thresholds);
+    expect(r.USAGE_ANOMALY.severity).toBe('critical');
+  });
+
+  test('samples < 3 → no flag (insufficient history)', () => {
+    const lowHist = { 'code:X': { usageMean: 10, usageStdDev: 2, usageSamples: 2 } };
+    expect(detectUsageAnomaly({ itemKey: 'code:X', usage: 30 }, lowHist, thresholds)).toEqual({});
+  });
+
+  test('zero stdDev → no flag (avoid division by zero)', () => {
+    const flatHist = { 'code:X': { usageMean: 10, usageStdDev: 0, usageSamples: 8 } };
+    expect(detectUsageAnomaly({ itemKey: 'code:X', usage: 30 }, flatHist, thresholds)).toEqual({});
+  });
+});
+
+describe('DEAD_STOCK', () => {
+  const thresholds = { deadStockDaysThreshold: 28 };
+
+  test('opening qty + zero usage + days >= threshold → info flag', () => {
+    const h = { 'code:X': { daysSinceLastUsage: 30 } };
+    const r = detectDeadStock({ itemKey: 'code:X', openingQty: 10, usage: 0 }, h, thresholds);
+    expect(r.DEAD_STOCK.severity).toBe('info');
+  });
+
+  test('item with usage → no flag', () => {
+    const h = { 'code:X': { daysSinceLastUsage: 30 } };
+    expect(detectDeadStock({ itemKey: 'code:X', openingQty: 10, usage: 3 }, h, thresholds)).toEqual({});
+  });
+
+  test('zero opening → no flag', () => {
+    const h = { 'code:X': { daysSinceLastUsage: 30 } };
+    expect(detectDeadStock({ itemKey: 'code:X', openingQty: 0, usage: 0 }, h, thresholds)).toEqual({});
+  });
+
+  test('days below threshold → no flag', () => {
+    const h = { 'code:X': { daysSinceLastUsage: 10 } };
+    expect(detectDeadStock({ itemKey: 'code:X', openingQty: 5, usage: 0 }, h, thresholds)).toEqual({});
+  });
+
+  test('no history defaults past threshold → flag', () => {
+    const r = detectDeadStock({ itemKey: 'code:Y', openingQty: 5, usage: 0 }, {}, thresholds);
+    expect(r.DEAD_STOCK.severity).toBe('info');
+  });
+});
+
+describe('MISSING_WITH_HISTORY', () => {
+  const thresholds = { missingItemLookbackWeeks: 4 };
+  const currentKeys = new Set(['code:A', 'code:B']);
+  const hist = {
+    'code:A': { weeksSinceLastSeen: 0 },
+    'code:B': { weeksSinceLastSeen: 0 },
+    'code:C': { weeksSinceLastSeen: 1, itemCode: 'C', description: 'Gone' },
+    'code:D': { weeksSinceLastSeen: 10 }
+  };
+
+  test('absent item within lookback → info flag', () => {
+    const result = detectMissingWithHistory(currentKeys, hist, thresholds, {});
+    expect(result['code:C'].MISSING_WITH_HISTORY.severity).toBe('info');
+  });
+
+  test('absent item outside lookback → no flag', () => {
+    const result = detectMissingWithHistory(currentKeys, hist, thresholds, {});
+    expect(result['code:D']).toBeUndefined();
+  });
+
+  test('elevates to warning when unresolved manual flag exists', () => {
+    const existing = { 'code:C': { manualFlags: { OUT_OF_STOCK: { appliedAt: 1 } } } };
+    const result = detectMissingWithHistory(currentKeys, hist, thresholds, existing);
+    expect(result['code:C'].MISSING_WITH_HISTORY.severity).toBe('warning');
+    expect(result['code:C'].MISSING_WITH_HISTORY.details.hasManualFlag).toBe(true);
+  });
+
+  test('present items get no flag', () => {
+    const result = detectMissingWithHistory(currentKeys, hist, thresholds, {});
+    expect(result['code:A']).toBeUndefined();
+    expect(result['code:B']).toBeUndefined();
+  });
+
+  test('empty history → empty result', () => {
+    expect(detectMissingWithHistory(currentKeys, {}, thresholds, {})).toEqual({});
+  });
+});
+
+describe('scoreCulprit composite', () => {
+  test('returns a 0-100 number', () => {
+    const s = scoreCulprit(
+      { itemKey: 'code:A', usageValue: 200, unitCost: 120 },
+      { 'code:A': { unitCostMean: 100, historicalCostShare: 0.1, historicalCostShareStdDev: 0.02 } },
+      { totalCurrentCost: 1000 }
+    );
+    expect(typeof s).toBe('number');
+    expect(s).toBeGreaterThanOrEqual(0);
+    expect(s).toBeLessThanOrEqual(100);
+  });
+
+  test('zero context cost yields zero contribution component', () => {
+    const s = scoreCulprit(
+      { itemKey: 'code:A', usageValue: 0, unitCost: 100 },
+      { 'code:A': { unitCostMean: 100, historicalCostShare: 0, historicalCostShareStdDev: 0.01 } },
+      { totalCurrentCost: 0 }
+    );
+    expect(s).toBe(0);
+  });
+});
+
+describe('HIGH_FC_PCT', () => {
+  const thresholds = {
+    foodCostPctWarning: 35,
+    foodCostPctCritical: 40,
+    highFcPctCulpritMinScore: 50
+  };
+
+  test('fc% below warning → no flags', () => {
+    expect(
+      detectHighFcPct({ foodCostPct: 30, processedItems: [], historicalData: {}, totalCurrentCost: 0 }, thresholds)
+    ).toEqual({});
+  });
+
+  test('fc% between warning and critical → culprits at warning severity', () => {
+    const items = [
+      { itemKey: 'code:A', usageValue: 800, unitCost: 120 },
+      { itemKey: 'code:B', usageValue: 50, unitCost: 10 }
+    ];
+    const hist = {
+      'code:A': { unitCostMean: 100, historicalCostShare: 0.1, historicalCostShareStdDev: 0.02 }
+    };
+    const r = detectHighFcPct(
+      { foodCostPct: 37, processedItems: items, historicalData: hist, totalCurrentCost: 1000 },
+      thresholds
+    );
+    expect(r['code:A'].HIGH_FC_PCT.severity).toBe('warning');
+    expect(r['code:B']).toBeUndefined();
+  });
+
+  test('fc% at critical → severity critical', () => {
+    const items = [{ itemKey: 'code:A', usageValue: 800, unitCost: 120 }];
+    const hist = { 'code:A': { unitCostMean: 100, historicalCostShare: 0.1, historicalCostShareStdDev: 0.02 } };
+    const r = detectHighFcPct(
+      { foodCostPct: 45, processedItems: items, historicalData: hist, totalCurrentCost: 1000 },
+      thresholds
+    );
+    expect(r['code:A'].HIGH_FC_PCT.severity).toBe('critical');
+  });
+});
+
+describe('runDetection orchestrator', () => {
+  const thresholds = {
+    foodCostPctWarning: 35,
+    foodCostPctCritical: 40,
+    unitCostSpikePct: 15,
+    unitCostSpikeCriticalPct: 30,
+    usageVarianceStdDev: 2,
+    usageVarianceCriticalStdDev: 3,
+    deadStockDaysThreshold: 28,
+    missingItemLookbackWeeks: 4,
+    highFcPctCulpritMinScore: 50
+  };
+
+  test('combines per-item rules under each item key', () => {
+    const items = [
+      {
+        itemKey: 'code:A',
+        unitCost: 140,
+        usage: 5,
+        closingQty: 2,
+        openingQty: 10,
+        purchaseQty: 0,
+        usageValue: 700
+      }
+    ];
+    const hist = {
+      'code:A': {
+        unitCostMean: 100,
+        unitCostSamples: 5,
+        usageMean: 5,
+        usageStdDev: 1,
+        usageSamples: 5,
+        daysSinceLastUsage: 0,
+        historicalCostShare: 0.3,
+        historicalCostShareStdDev: 0.05
+      }
+    };
+    const result = runDetection({
+      foodCostPct: 32,
+      processedItems: items,
+      historicalData: hist,
+      existingFlags: {},
+      totalCurrentCost: 700,
+      thresholds
+    });
+    expect(result['code:A'].COST_SPIKE.severity).toBe('critical');
+  });
+
+  test('includes MISSING_WITH_HISTORY for absent historical items', () => {
+    const items = [{ itemKey: 'code:A', unitCost: 100, usage: 1, closingQty: 1, openingQty: 1, purchaseQty: 1, usageValue: 100 }];
+    const hist = {
+      'code:A': { unitCostMean: 100, unitCostSamples: 5, usageMean: 1, usageStdDev: 1, usageSamples: 5, weeksSinceLastSeen: 0 },
+      'code:B': { unitCostMean: 50, unitCostSamples: 5, usageMean: 1, usageStdDev: 1, usageSamples: 5, weeksSinceLastSeen: 1 }
+    };
+    const result = runDetection({
+      foodCostPct: 20,
+      processedItems: items,
+      historicalData: hist,
+      existingFlags: {},
+      totalCurrentCost: 100,
+      thresholds
+    });
+    expect(result['code:B'].MISSING_WITH_HISTORY.severity).toBe('info');
+    expect(result['code:A']).toBeUndefined();
+  });
+
+  test('flags multiple rules on the same item', () => {
+    const items = [
+      {
+        itemKey: 'code:A',
+        unitCost: 140,
+        usage: 0,
+        closingQty: -1,
+        openingQty: 10,
+        purchaseQty: 0,
+        usageValue: 0
+      }
+    ];
+    const hist = {
+      'code:A': {
+        unitCostMean: 100,
+        unitCostSamples: 5,
+        usageMean: 5,
+        usageStdDev: 1,
+        usageSamples: 5,
+        daysSinceLastUsage: 30
+      }
+    };
+    const result = runDetection({
+      foodCostPct: 20,
+      processedItems: items,
+      historicalData: hist,
+      existingFlags: {},
+      totalCurrentCost: 0,
+      thresholds
+    });
+    expect(result['code:A'].INVALID_VALUES).toBeDefined();
+    expect(result['code:A'].COST_SPIKE).toBeDefined();
+    expect(result['code:A'].DEAD_STOCK).toBeDefined();
+  });
+});

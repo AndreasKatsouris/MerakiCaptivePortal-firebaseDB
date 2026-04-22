@@ -6,6 +6,7 @@
 
 import { getRtdb, getAuth, ref, get } from '../firebase-helpers.js?v=2.2.0-20260413';
 import { query, orderByChild, startAt, endAt } from '../../../config/firebase-config.js';
+import { summarizeRecordsByItemKey } from './historical-summary.js?v=2.2.0-20260413';
 
 /**
  * Service for retrieving and analyzing historical stock usage data
@@ -627,6 +628,17 @@ const HistoricalUsageService = {
      * @returns {Object} - Empty statistics object
      * @private
      */
+    /**
+     * Build per-itemKey summary used by the flag detection engine.
+     * @param {string} storeIdentifier - Store name or location ID
+     * @param {Object} opts - { lookbackDays }
+     * @returns {Promise<Object>} - Map of itemKey → summary stats
+     */
+    async getSummaryByItemKey(storeIdentifier, { lookbackDays = 84 } = {}) {
+        const records = await this.getHistoricalData(storeIdentifier, { lookbackDays });
+        return summarizeRecordsByItemKey(records, Date.now());
+    },
+
     _getEmptyStatistics(itemCode = '') {
         return {
             itemCode,

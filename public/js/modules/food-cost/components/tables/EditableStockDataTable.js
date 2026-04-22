@@ -1,11 +1,13 @@
 /**
  * Food Cost Module - Editable Stock Data Table Component
  * Version: 2.1.0-2025-04-29
- * 
+ *
  * This component extends the standard StockDataTable with editing capabilities.
  * It provides inline editing for stock data with validation, change tracking,
  * and role-based access control.
  */
+
+import { renderFlagBadgeCluster } from '../flags/FlagBadge.js';
 
 // Define the component
 const EditableStockDataTable = {
@@ -93,9 +95,18 @@ const EditableStockDataTable = {
         recordId: {
             type: String,
             default: ''
+        },
+
+        /**
+         * Map of itemKey → flag entry ({ manualFlags, autoFlags, ... })
+         * used to render badges and detect historical-placeholder rows.
+         */
+        flagsByKey: {
+            type: Object,
+            default: () => ({})
         }
     },
-    
+
     /**
      * Component data - defines default state
      */
@@ -192,6 +203,26 @@ const EditableStockDataTable = {
     },
     
     methods: {
+        /**
+         * Render HTML cluster of flag pills for an item entry.
+         */
+        renderFlagBadgeCluster(entry) {
+            return renderFlagBadgeCluster(entry);
+        },
+        /**
+         * Get the flag entry for a given stock item (keyed by itemKey).
+         */
+        flagEntryForItem(item) {
+            if (!item || !item.itemKey) return null;
+            return this.flagsByKey?.[item.itemKey] || null;
+        },
+        /**
+         * Emit event when user clicks the flag-edit button on a row.
+         */
+        onFlagEditClick(item) {
+            this.$emit('edit-flags', item);
+        },
+
         /**
          * Format a numeric value with 2 decimal places
          * @param {Number} value - The numeric value to format
@@ -462,13 +493,14 @@ const EditableStockDataTable = {
                                 }"></i>
                             </th>
                             <th @click="sortBy('description')" class="sortable">
-                                Description 
+                                Description
                                 <i class="fas" :class="{
                                     'fa-sort-up': sortField === 'description' && sortDirection === 'asc',
                                     'fa-sort-down': sortField === 'description' && sortDirection === 'desc',
                                     'fa-sort': sortField !== 'description'
                                 }"></i>
                             </th>
+                            <th style="min-width:160px;">Flags</th>
                             <th @click="sortBy('openingQty')" class="sortable text-right">
                                 Opening Qty 
                                 <i class="fas" :class="{
@@ -531,13 +563,25 @@ const EditableStockDataTable = {
                         </tr>
                     </thead>
                     <tbody>
-                        <tr v-for="item in editableItems" :key="item.itemCode" 
-                            :class="{ 
+                        <tr v-for="item in editableItems" :key="item.itemCode"
+                            :class="{
                                 'table-danger': item.belowReorderPoint,
-                                'table-warning': changedItems[item.itemCode]
+                                'table-warning': changedItems[item.itemCode],
+                                'table-secondary': item.__isHistoricalPlaceholder
                             }">
                             <td>{{ item.itemCode }}</td>
                             <td>{{ item.description }}</td>
+                            <td>
+                                <div class="d-flex align-items-center flex-wrap">
+                                    <span v-html="renderFlagBadgeCluster(flagEntryForItem(item))"></span>
+                                    <button type="button"
+                                        class="btn btn-sm btn-outline-secondary ms-1"
+                                        title="Edit flags"
+                                        @click.stop="onFlagEditClick(item)">
+                                        <i class="fas fa-flag"></i>
+                                    </button>
+                                </div>
+                            </td>
                             
                             <!-- Opening Qty - Editable in edit mode -->
                             <td class="text-right" :class="{ 'has-error': hasError(item, 'openingQty') }">

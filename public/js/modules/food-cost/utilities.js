@@ -252,3 +252,18 @@ export function calculateStockPeriodDays(openingDate, closingDate) {
 export function formatNumber(num) {
     return (Math.round((num + Number.EPSILON) * 100) / 100).toFixed(2);
 }
+
+/**
+ * Escape HTML special characters for safe injection into innerHTML.
+ * @param {*} value - Anything coercible to string
+ * @returns {string}
+ */
+export function escapeHtml(value) {
+    if (value === null || value === undefined) return '';
+    return String(value)
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#39;');
+}
