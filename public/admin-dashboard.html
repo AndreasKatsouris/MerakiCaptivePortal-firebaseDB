@@ -1227,7 +1227,15 @@
                     <h2>Food Cost Management</h2>
                     <p class="text-muted">Track and analyze stock usage across multiple locations</p>
                     <small class="text-muted" id="food-cost-version">Loading version...</small>
+                    <span id="food-cost-flag-summary" class="ms-2 badge bg-secondary" style="display:none;"></span>
                 </div>
+
+                <ul class="nav nav-tabs mt-3" id="foodCostTabs" role="tablist">
+                    <li class="nav-item" role="presentation"><button class="nav-link active" data-bs-toggle="tab" data-bs-target="#fcStockPane" type="button" role="tab">Stock Data</button></li>
+                    <li class="nav-item" role="presentation"><button class="nav-link" data-bs-toggle="tab" data-bs-target="#fcOrdersPane" type="button" role="tab">Orders</button></li>
+                    <li class="nav-item" role="presentation"><button class="nav-link" data-bs-toggle="tab" data-bs-target="#fcFlagsPane" type="button" role="tab">Flags <span id="fcFlagsCountBadge" class="badge bg-danger ms-1" style="display:none;">0</span></button></li>
+                    <li class="nav-item" role="presentation"><button class="nav-link" data-bs-toggle="tab" data-bs-target="#fcAnalyticsPane" type="button" role="tab">Analytics</button></li>
+                </ul>
                 <script>
                     // More robust method to get the Food Cost module version
                     (function () {
@@ -1332,8 +1340,21 @@
                     })();
                 </script>
 
-                <div id="food-cost-module-container" style="margin-top: 20px;">
-                    <!-- Food Cost Module will be loaded here with feature access control -->
+                <div class="tab-content pt-3">
+                    <div class="tab-pane fade show active" id="fcStockPane" role="tabpanel">
+                        <div id="food-cost-module-container" style="margin-top: 20px;">
+                            <!-- Food Cost Module will be loaded here with feature access control -->
+                        </div>
+                    </div>
+                    <div class="tab-pane fade" id="fcOrdersPane" role="tabpanel">
+                        <div id="food-cost-orders-app"></div>
+                    </div>
+                    <div class="tab-pane fade" id="fcFlagsPane" role="tabpanel">
+                        <div id="food-cost-flags-app"></div>
+                    </div>
+                    <div class="tab-pane fade" id="fcAnalyticsPane" role="tabpanel">
+                        <div id="food-cost-analytics-app"></div>
+                    </div>
                 </div>
                 <script type="module">
                     // Import the feature-guarded food cost module
