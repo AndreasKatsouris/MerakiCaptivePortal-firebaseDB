@@ -5,6 +5,7 @@
  */
 
 import { extractNumericValue } from './utilities.js';
+import { computeItemKey } from './services/item-identity.js';
 
 /**
  * Parse CSV text into an array of arrays
@@ -985,7 +986,7 @@ export function filterStockData(stockData, filters) {
 /**
  * Verify data consistency across stock items and harmonize property formats
  * @param {Array} stockData - Stock data array to verify
- * @param {Number} sampleSize - Number of items to include in diagnostic logs (0 for no logging) 
+ * @param {Number} sampleSize - Number of items to include in diagnostic logs (0 for no logging)
  * @returns {Object} - Issues found during verification
  */
 export function verifyDataConsistency(stockData, sampleSize = 0) {
@@ -1055,7 +1056,7 @@ export function verifyDataConsistency(stockData, sampleSize = 0) {
             const rawValue = item[`__raw_${propName}`];
 
             // No value found in any format
-            if (camelCase === undefined && upperCase === undefined && 
+            if (camelCase === undefined && upperCase === undefined &&
                 snakeCaseValue === undefined && rawValue === undefined) {
                 issues.propertyIssues++;
 
@@ -1080,7 +1081,7 @@ export function verifyDataConsistency(stockData, sampleSize = 0) {
                 if (bestValue) {
                     item.costCenter = bestValue;
                     item.cost_center = bestValue;
-                    item.COST_CENTER = bestValue; 
+                    item.COST_CENTER = bestValue;
                 }
             }
 
@@ -1094,4 +1095,26 @@ export function verifyDataConsistency(stockData, sampleSize = 0) {
 
     console.log(`Data consistency check complete. Found ${issues.propertyIssues} property issues and ${issues.dataIssues} data type issues.`);
     return issues;
+}
+
+/**
+ * Attach a stable itemKey to each stock item. Idempotent — if itemKey already
+ * set, leaves it untouched. Mutates items in place for memory efficiency, but
+ * also returns the array for chaining.
+ *
+ * Note: We mutate in place here because this helper is called by the upload
+ * pipeline right after processStockData produces fresh objects, so mutation
+ * is safe and avoids copying potentially large arrays.
+ *
+ * @param {Array} stockData - Array of stock items
+ * @returns {Promise<Array>} - The same array with itemKey attached to each item
+ */
+export async function attachItemKeys(stockData) {
+    if (!Array.isArray(stockData) || stockData.length === 0) return stockData || [];
+    await Promise.all(stockData.map(async (item) => {
+        if (!item.itemKey) {
+            item.itemKey = await computeItemKey(item);
+        }
+    }));
+    return stockData;
 }
