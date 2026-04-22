@@ -72,6 +72,7 @@ import { StockDataTable } from './components/tables/StockDataTable.js?v=2.2.0-20
 import { EditableStockDataTable } from './components/tables/EditableStockDataTable.js?v=2.2.0-20260413';
 import { openFlagTagModal } from './components/flags/FlagTagModal.js?v=2.2.0-20260413';
 import { getFlagsForLocation } from './services/flag-service.js?v=2.2.0-20260413';
+import { mergeFlaggedHistoricalItems } from './flag-display-merger.js?v=2.2.0-20260413';
 import { DataSummary } from './components/analytics/DataSummary.js?v=2.2.0-20260413';
 
 // Import all database operations
@@ -257,8 +258,20 @@ var FoodCostApp = {
             if (!this.stockData || this.stockData.length === 0) {
                 return [];
             }
-            
+
             return this.filteredData;
+        },
+
+        /**
+         * Items rendered in the stock table — filteredData plus optional
+         * historical-placeholder rows for items that only exist in past flags.
+         */
+        displayedStockItems() {
+            const base = this.filteredData || [];
+            if (!this.showHistoricalFlagged) return base;
+            return mergeFlaggedHistoricalItems(base, this.flagsByKey, {
+                showHistorical: true
+            });
         },
         
         /**
@@ -2783,11 +2796,17 @@ var FoodCostApp = {
                         </div>
                     </div>
                     
+                    <!-- Flag system: show historical flagged items toggle -->
+                    <div class="form-check form-switch my-2">
+                        <input class="form-check-input" type="checkbox" id="fcShowHistoricalFlagged" v-model="showHistoricalFlagged">
+                        <label class="form-check-label" for="fcShowHistoricalFlagged">Show flagged historical items</label>
+                    </div>
+
                     <!-- Stock Data Table Component -->
                     <!-- Regular Stock Data Table (Non-Edit Mode) -->
                     <stock-data-table
                         v-if="!isEditMode"
-                        :items="filteredData"
+                        :items="displayedStockItems"
                         :sort-field="sortField"
                         :sort-direction="sortDirection"
                         :total-item-count="stockData.length"
@@ -2798,7 +2817,7 @@ var FoodCostApp = {
                     <!-- Editable Stock Data Table (Edit Mode) -->
                     <editable-stock-data-table
                         v-if="isEditMode"
-                        :items="filteredData"
+                        :items="displayedStockItems"
                         :show-summary="true"
                         :total-items="stockData.length"
                         :sort-field="sortField"
