@@ -1,7 +1,8 @@
 import { describe, test, expect } from 'vitest';
 import {
   detectInvalidValues,
-  detectCostSpike
+  detectCostSpike,
+  detectUsageAnomaly
 } from '../services/flag-detection-engine.js';
 
 describe('INVALID_VALUES', () => {
@@ -91,5 +92,35 @@ describe('COST_SPIKE', () => {
   test('insufficient samples → no flag', () => {
     const lowHist = { 'code:X': { unitCostMean: 100, unitCostSamples: 1 } };
     expect(detectCostSpike({ itemKey: 'code:X', unitCost: 200 }, lowHist, thresholds)).toEqual({});
+  });
+});
+
+describe('USAGE_ANOMALY', () => {
+  const thresholds = { usageVarianceStdDev: 2, usageVarianceCriticalStdDev: 3 };
+  const hist = { 'code:X': { usageMean: 10, usageStdDev: 2, usageSamples: 8 } };
+
+  test('within 2σ → no flag', () => {
+    expect(detectUsageAnomaly({ itemKey: 'code:X', usage: 13 }, hist, thresholds)).toEqual({});
+  });
+
+  test('between 2σ and 3σ → warning', () => {
+    const r = detectUsageAnomaly({ itemKey: 'code:X', usage: 15 }, hist, thresholds);
+    expect(r.USAGE_ANOMALY.severity).toBe('warning');
+    expect(r.USAGE_ANOMALY.details.zScore).toBeCloseTo(2.5, 5);
+  });
+
+  test('beyond 3σ → critical', () => {
+    const r = detectUsageAnomaly({ itemKey: 'code:X', usage: 18 }, hist, thresholds);
+    expect(r.USAGE_ANOMALY.severity).toBe('critical');
+  });
+
+  test('samples < 3 → no flag (insufficient history)', () => {
+    const lowHist = { 'code:X': { usageMean: 10, usageStdDev: 2, usageSamples: 2 } };
+    expect(detectUsageAnomaly({ itemKey: 'code:X', usage: 30 }, lowHist, thresholds)).toEqual({});
+  });
+
+  test('zero stdDev → no flag (avoid division by zero)', () => {
+    const flatHist = { 'code:X': { usageMean: 10, usageStdDev: 0, usageSamples: 8 } };
+    expect(detectUsageAnomaly({ itemKey: 'code:X', usage: 30 }, flatHist, thresholds)).toEqual({});
   });
 });

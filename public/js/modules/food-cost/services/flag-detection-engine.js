@@ -44,6 +44,30 @@ export function detectCostSpike(item, historicalData, thresholds) {
   };
 }
 
+export function detectUsageAnomaly(item, historicalData, thresholds) {
+  const h = historicalData?.[item.itemKey];
+  if (!h || h.usageSamples < 3 || !h.usageStdDev) return {};
+  const z = Math.abs((Number(item.usage) - h.usageMean) / h.usageStdDev);
+  if (z < thresholds.usageVarianceStdDev) return {};
+  const severity = z >= thresholds.usageVarianceCriticalStdDev
+    ? SEVERITIES.CRITICAL.id
+    : SEVERITIES.WARNING.id;
+  return {
+    [RULE_IDS.USAGE_ANOMALY]: {
+      severity,
+      score: Math.min(100, Math.round((z / thresholds.usageVarianceCriticalStdDev) * 100)),
+      detectedAt: Date.now(),
+      sourceRecordId: item.__recordId || null,
+      details: {
+        zScore: z,
+        mean: h.usageMean,
+        stdDev: h.usageStdDev,
+        current: Number(item.usage)
+      }
+    }
+  };
+}
+
 export function runDetection() {
   // Implemented incrementally across tasks 12-17
   return {};
