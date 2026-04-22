@@ -25,6 +25,25 @@ export function detectInvalidValues(item) {
   };
 }
 
+export function detectCostSpike(item, historicalData, thresholds) {
+  const h = historicalData?.[item.itemKey];
+  if (!h || !h.unitCostMean || h.unitCostSamples < 2) return {};
+  const delta = (Number(item.unitCost) - h.unitCostMean) / h.unitCostMean;
+  if (delta < thresholds.unitCostSpikePct / 100) return {};
+  const severity = delta >= thresholds.unitCostSpikeCriticalPct / 100
+    ? SEVERITIES.CRITICAL.id
+    : SEVERITIES.WARNING.id;
+  return {
+    [RULE_IDS.COST_SPIKE]: {
+      severity,
+      score: Math.min(100, Math.round(delta * 100)),
+      detectedAt: Date.now(),
+      sourceRecordId: item.__recordId || null,
+      details: { historicalMean: h.unitCostMean, current: Number(item.unitCost), delta }
+    }
+  };
+}
+
 export function runDetection() {
   // Implemented incrementally across tasks 12-17
   return {};

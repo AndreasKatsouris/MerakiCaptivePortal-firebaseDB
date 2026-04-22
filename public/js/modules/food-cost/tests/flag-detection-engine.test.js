@@ -1,5 +1,8 @@
 import { describe, test, expect } from 'vitest';
-import { detectInvalidValues } from '../services/flag-detection-engine.js';
+import {
+  detectInvalidValues,
+  detectCostSpike
+} from '../services/flag-detection-engine.js';
 
 describe('INVALID_VALUES', () => {
   test('flags negative closing', () => {
@@ -59,5 +62,34 @@ describe('INVALID_VALUES', () => {
     });
     expect(flags.INVALID_VALUES.score).toBe(100);
     expect(flags.INVALID_VALUES.sourceRecordId).toBe('REC1');
+  });
+});
+
+describe('COST_SPIKE', () => {
+  const thresholds = { unitCostSpikePct: 15, unitCostSpikeCriticalPct: 30 };
+  const hist = { 'code:X': { unitCostMean: 100, unitCostSamples: 6 } };
+
+  test('no spike below warning threshold', () => {
+    expect(detectCostSpike({ itemKey: 'code:X', unitCost: 105 }, hist, thresholds)).toEqual({});
+  });
+
+  test('warning spike (>=15% <30%)', () => {
+    const r = detectCostSpike({ itemKey: 'code:X', unitCost: 120 }, hist, thresholds);
+    expect(r.COST_SPIKE.severity).toBe('warning');
+    expect(r.COST_SPIKE.details.delta).toBeCloseTo(0.2, 5);
+  });
+
+  test('critical spike (>=30%)', () => {
+    const r = detectCostSpike({ itemKey: 'code:X', unitCost: 140 }, hist, thresholds);
+    expect(r.COST_SPIKE.severity).toBe('critical');
+  });
+
+  test('no history → no flag', () => {
+    expect(detectCostSpike({ itemKey: 'code:Y', unitCost: 1000 }, hist, thresholds)).toEqual({});
+  });
+
+  test('insufficient samples → no flag', () => {
+    const lowHist = { 'code:X': { unitCostMean: 100, unitCostSamples: 1 } };
+    expect(detectCostSpike({ itemKey: 'code:X', unitCost: 200 }, lowHist, thresholds)).toEqual({});
   });
 });
