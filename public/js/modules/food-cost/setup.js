@@ -147,23 +147,30 @@ function currentUserUid() {
 }
 
 /**
- * Resolve admin + ownership for the current user against a given location,
- * mirroring the database.rules.json check for stockFlagConfig writes:
- *   auth.token.admin === true || locations/$loc/ownerId === auth.uid
+ * Resolve whether the current user can edit flag config for a location,
+ * mirroring the database.rules.json stockFlagConfig/{locationId}.write rule:
+ *   auth.token.admin === true ||
+ *   userLocations/{uid}/{locId} exists  (assigned access — primary model) ||
+ *   locations/{locId}/ownerId === uid    (legacy ownership field)
  */
 async function resolveFlagPermissions(locationId) {
     const user = currentUser();
     if (!user) return { isAdmin: false, isLocationOwner: false };
     try {
-        const [tokenResult, ownerSnap] = await Promise.all([
+        const [tokenResult, accessSnap, ownerSnap] = await Promise.all([
             user.getIdTokenResult(),
+            locationId
+                ? get(ref(rtdb, `userLocations/${user.uid}/${locationId}`))
+                : Promise.resolve({ exists: () => false }),
             locationId
                 ? get(ref(rtdb, `locations/${locationId}/ownerId`))
                 : Promise.resolve({ exists: () => false, val: () => null })
         ]);
-        const isAdmin = tokenResult?.claims?.admin === true;
+        const claims = tokenResult?.claims || {};
+        const isAdmin = claims.admin === true || claims.role === 'admin';
         const isLocationOwner =
-            ownerSnap.exists() && ownerSnap.val() === user.uid;
+            accessSnap.exists() ||
+            (ownerSnap.exists() && ownerSnap.val() === user.uid);
         return { isAdmin, isLocationOwner };
     } catch (err) {
         console.error('[FoodCost] resolveFlagPermissions failed:', err);
