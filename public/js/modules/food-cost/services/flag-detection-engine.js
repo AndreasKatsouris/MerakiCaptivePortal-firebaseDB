@@ -108,6 +108,47 @@ export function detectMissingWithHistory(currentItemKeys, historicalData, thresh
   return results;
 }
 
+export function scoreCulprit(item, historicalData, ctx) {
+  const h = historicalData?.[item.itemKey] || {};
+  const totalCost = Number(ctx?.totalCurrentCost) || 0;
+  const contribution = totalCost > 0 ? Number(item.usageValue) / totalCost : 0;
+  const normalizedContribution = Math.min(1, contribution / 0.3);
+
+  const currentShare = contribution;
+  const histShare = h.historicalCostShare ?? currentShare;
+  const shareStd = h.historicalCostShareStdDev ?? Math.max(0.01, histShare * 0.2);
+  const shareDeviation = Math.min(1, Math.abs(currentShare - histShare) / shareStd / 5);
+
+  const unitCostChange = h.unitCostMean > 0
+    ? Math.min(1, Math.max(0, (Number(item.unitCost) - h.unitCostMean) / h.unitCostMean))
+    : 0;
+
+  const score = 100 * (0.4 * normalizedContribution + 0.3 * shareDeviation + 0.3 * unitCostChange);
+  return Math.max(0, Math.min(100, Math.round(score)));
+}
+
+export function detectHighFcPct({ foodCostPct, processedItems, historicalData, totalCurrentCost }, thresholds) {
+  if (foodCostPct < thresholds.foodCostPctWarning) return {};
+  const isCritical = foodCostPct >= thresholds.foodCostPctCritical;
+  const severity = isCritical ? SEVERITIES.CRITICAL.id : SEVERITIES.WARNING.id;
+  const ctx = { totalCurrentCost };
+  const results = {};
+  for (const item of processedItems) {
+    const score = scoreCulprit(item, historicalData, ctx);
+    if (score < thresholds.highFcPctCulpritMinScore) continue;
+    results[item.itemKey] = {
+      [RULE_IDS.HIGH_FC_PCT]: {
+        severity,
+        score,
+        detectedAt: Date.now(),
+        sourceRecordId: item.__recordId || null,
+        details: { foodCostPct, culpritScore: score }
+      }
+    };
+  }
+  return results;
+}
+
 export function runDetection() {
   // Implemented incrementally across tasks 12-17
   return {};

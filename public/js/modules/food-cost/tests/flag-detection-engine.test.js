@@ -4,7 +4,9 @@ import {
   detectCostSpike,
   detectUsageAnomaly,
   detectDeadStock,
-  detectMissingWithHistory
+  detectMissingWithHistory,
+  detectHighFcPct,
+  scoreCulprit
 } from '../services/flag-detection-engine.js';
 
 describe('INVALID_VALUES', () => {
@@ -192,5 +194,67 @@ describe('MISSING_WITH_HISTORY', () => {
 
   test('empty history → empty result', () => {
     expect(detectMissingWithHistory(currentKeys, {}, thresholds, {})).toEqual({});
+  });
+});
+
+describe('scoreCulprit composite', () => {
+  test('returns a 0-100 number', () => {
+    const s = scoreCulprit(
+      { itemKey: 'code:A', usageValue: 200, unitCost: 120 },
+      { 'code:A': { unitCostMean: 100, historicalCostShare: 0.1, historicalCostShareStdDev: 0.02 } },
+      { totalCurrentCost: 1000 }
+    );
+    expect(typeof s).toBe('number');
+    expect(s).toBeGreaterThanOrEqual(0);
+    expect(s).toBeLessThanOrEqual(100);
+  });
+
+  test('zero context cost yields zero contribution component', () => {
+    const s = scoreCulprit(
+      { itemKey: 'code:A', usageValue: 0, unitCost: 100 },
+      { 'code:A': { unitCostMean: 100, historicalCostShare: 0, historicalCostShareStdDev: 0.01 } },
+      { totalCurrentCost: 0 }
+    );
+    expect(s).toBe(0);
+  });
+});
+
+describe('HIGH_FC_PCT', () => {
+  const thresholds = {
+    foodCostPctWarning: 35,
+    foodCostPctCritical: 40,
+    highFcPctCulpritMinScore: 50
+  };
+
+  test('fc% below warning → no flags', () => {
+    expect(
+      detectHighFcPct({ foodCostPct: 30, processedItems: [], historicalData: {}, totalCurrentCost: 0 }, thresholds)
+    ).toEqual({});
+  });
+
+  test('fc% between warning and critical → culprits at warning severity', () => {
+    const items = [
+      { itemKey: 'code:A', usageValue: 800, unitCost: 120 },
+      { itemKey: 'code:B', usageValue: 50, unitCost: 10 }
+    ];
+    const hist = {
+      'code:A': { unitCostMean: 100, historicalCostShare: 0.1, historicalCostShareStdDev: 0.02 }
+    };
+    const r = detectHighFcPct(
+      { foodCostPct: 37, processedItems: items, historicalData: hist, totalCurrentCost: 1000 },
+      thresholds
+    );
+    expect(r['code:A'].HIGH_FC_PCT.severity).toBe('warning');
+    expect(r['code:B']).toBeUndefined();
+  });
+
+  test('fc% at critical → severity critical', () => {
+    const items = [{ itemKey: 'code:A', usageValue: 800, unitCost: 120 }];
+    const hist = { 'code:A': { unitCostMean: 100, historicalCostShare: 0.1, historicalCostShareStdDev: 0.02 } };
+    const r = detectHighFcPct(
+      { foodCostPct: 45, processedItems: items, historicalData: hist, totalCurrentCost: 1000 },
+      thresholds
+    );
+    expect(r['code:A'].HIGH_FC_PCT.severity).toBe('critical');
   });
 });
