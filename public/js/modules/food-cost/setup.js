@@ -11,6 +11,7 @@ import { ensureFirebaseInitialized } from './firebase-helpers.js';
 import { initShadcnStyles } from './shadcn-styles.js';
 import { getFlagsForLocation } from './services/flag-service.js';
 import { computeRowSeverity } from './flag-display-merger.js';
+import { FlagsDashboard } from './components/flags/FlagsDashboard.js';
 
 /**
  * Initialize the Food Cost module in a container
@@ -115,8 +116,95 @@ async function refreshFlagCountBadge(locationId) {
     }
 }
 
+/**
+ * Lazily mount the FlagsDashboard into #food-cost-flags-app when the Flags tab
+ * is first shown. Subsequent shows call load() to refresh.
+ */
+let _flagsDashboardInstance = null;
+function currentLocationId() {
+    try {
+        const vm = window.FoodCostApp?.vm || window.FoodCostApp;
+        return vm?.selectedLocationId || null;
+    } catch {
+        return null;
+    }
+}
+
+function currentUserUid() {
+    try {
+        return window.firebase?.auth?.()?.currentUser?.uid || null;
+    } catch {
+        return null;
+    }
+}
+
+async function mountFlagsDashboardLazy() {
+    const container = document.getElementById('food-cost-flags-app');
+    if (!container) return;
+    const locationId = currentLocationId();
+    if (!_flagsDashboardInstance) {
+        _flagsDashboardInstance = new FlagsDashboard(container, {
+            locationId,
+            userUid: currentUserUid(),
+            onChange: () => refreshFlagCountBadge(locationId),
+            onViewDetail: async ({ itemKey, entry }) => {
+                const mod = await import('./components/flags/FlagDetailDrawer.js');
+                await mod.openFlagDetail({
+                    locationId: currentLocationId(),
+                    itemKey,
+                    entry,
+                    userUid: currentUserUid(),
+                    onChange: () => _flagsDashboardInstance.load()
+                });
+            },
+            onRerun: async () => {
+                const ctx = window.FoodCost?.currentProcessingContext;
+                if (!ctx) {
+                    if (typeof Swal !== 'undefined') {
+                        Swal.fire('No data loaded', 'Load a stock file first.', 'info');
+                    }
+                    return;
+                }
+                await window.FoodCost.runFlagPipeline(ctx);
+            },
+            onOpenConfig: async () => {
+                const mod = await import('./components/flags/FlagConfigPanel.js');
+                await mod.openFlagConfigPanel({
+                    locationId: currentLocationId(),
+                    userUid: currentUserUid(),
+                    isAdmin: !!window.FoodCost?.currentUserIsAdmin,
+                    isLocationOwner: !!window.FoodCost?.currentUserIsLocationOwner
+                });
+            }
+        });
+    } else {
+        _flagsDashboardInstance.setLocation(locationId);
+    }
+    await _flagsDashboardInstance.load();
+}
+
+function installFlagsTabHandler() {
+    const btn = document.querySelector('[data-bs-target="#fcFlagsPane"]');
+    if (!btn || btn.dataset.flagsHandlerInstalled === '1') return;
+    btn.dataset.flagsHandlerInstalled = '1';
+    btn.addEventListener('shown.bs.tab', () => {
+        mountFlagsDashboardLazy().catch((err) =>
+            console.error('[FoodCost] Flags dashboard mount failed:', err)
+        );
+    });
+}
+
+// Install the lazy-mount handler after DOM is ready
+if (typeof window !== 'undefined') {
+    if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', installFlagsTabHandler);
+    } else {
+        installFlagsTabHandler();
+    }
+}
+
 // Export the setup function
-export { setupFoodCostModule, refreshFlagCountBadge };
+export { setupFoodCostModule, refreshFlagCountBadge, mountFlagsDashboardLazy };
 
 // IMPORTANT: Make absolutely sure it's available globally by assigning it directly to window
 window.setupFoodCostModule = setupFoodCostModule;
