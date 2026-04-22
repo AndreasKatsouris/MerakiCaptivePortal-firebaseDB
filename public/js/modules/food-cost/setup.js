@@ -123,7 +123,10 @@ async function refreshFlagCountBadge(locationId) {
 let _flagsDashboardInstance = null;
 function currentLocationId() {
     try {
-        const vm = window.FoodCostApp?.vm || window.FoodCostApp;
+        const vm =
+            window.FoodCost?.vm ||
+            window.foodCostApp?.instance ||
+            null;
         return vm?.selectedLocationId || null;
     } catch {
         return null;
@@ -219,7 +222,10 @@ function renderOrdersTabPanel() {
                 if (stockTab && window.bootstrap?.Tab) {
                     window.bootstrap.Tab.getOrCreateInstance(stockTab).show();
                 }
-                const vm = window.FoodCostApp?.vm || window.FoodCostApp;
+                const vm =
+                    window.FoodCost?.vm ||
+                    window.foodCostApp?.instance ||
+                    null;
                 if (vm && typeof vm.showPurchaseOrder === 'function') {
                     vm.showPurchaseOrder();
                 } else if (typeof Swal !== 'undefined') {

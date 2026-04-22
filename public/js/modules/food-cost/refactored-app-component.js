@@ -346,7 +346,14 @@ var FoodCostApp = {
     
     mounted() {
         this.initialize();
-        
+
+        // Expose the live Vue instance so non-Vue helpers (Flags tab, etc.)
+        // can read reactive state like selectedLocationId.
+        if (typeof window !== 'undefined') {
+            window.FoodCost = window.FoodCost || {};
+            window.FoodCost.vm = this;
+        }
+
         // Register a beforeunload handler to help with refresh issues
         window.addEventListener('beforeunload', () => {
             // Store critical values in sessionStorage to preserve across refreshes
