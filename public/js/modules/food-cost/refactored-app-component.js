@@ -1715,7 +1715,30 @@ var FoodCostApp = {
                 
                 // Save to Firebase using database-operations.js
                 const result = await saveStockData(dataToSave);
-                
+
+                // Run flag detection pipeline (non-blocking — must not fail the save UX)
+                try {
+                    const recordId = result?.recordId || result?.id || result?.timestamp || null;
+                    const historicalSvc = window.HistoricalUsageService;
+                    const historicalData = historicalSvc
+                        ? await historicalSvc.getSummaryByItemKey(this.selectedLocationId)
+                        : {};
+                    const totalCurrentCost = this.totalCostOfUsage || 0;
+                    const foodCostPct = Number(this.costPercentage) || 0;
+                    if (window.FoodCost?.runFlagPipeline) {
+                        await window.FoodCost.runFlagPipeline({
+                            locationId: this.selectedLocationId,
+                            recordId,
+                            processedItems: this.stockData,
+                            foodCostPct,
+                            totalCurrentCost,
+                            historicalData
+                        });
+                    }
+                } catch (flagErr) {
+                    console.error('Flag pipeline failed (non-blocking):', flagErr);
+                }
+
                 // Show success message
                 Swal.fire({
                     icon: 'success',
@@ -1723,7 +1746,7 @@ var FoodCostApp = {
                     text: 'Stock usage data has been saved. ' + result.message,
                     confirmButtonColor: '#3085d6'
                 });
-                
+
                 console.log('Stock usage data saved successfully:', result.timestamp);
             } catch (error) {
                 console.error('Error saving stock usage data:', error);
