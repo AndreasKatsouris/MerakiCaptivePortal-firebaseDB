@@ -1,6 +1,4 @@
-import { webcrypto } from 'node:crypto';
-
-const crypto = webcrypto;
+/* global TextEncoder, crypto */
 
 async function sha1Hex(str) {
   const bytes = new TextEncoder().encode(str);
