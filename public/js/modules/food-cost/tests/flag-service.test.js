@@ -1,6 +1,6 @@
 import { describe, test, expect, beforeEach, vi } from 'vitest';
 import { get, ref, update, push, set } from '../../../config/firebase-config.js';
-import { MANUAL_FLAG_TYPES } from '../constants/flag-types.js';
+import { MANUAL_FLAG_TYPES, RULE_IDS } from '../constants/flag-types.js';
 import {
   DEFAULT_THRESHOLDS,
   getThresholds,
@@ -167,5 +167,84 @@ describe('removeManualFlag', () => {
     const event = vi.mocked(set).mock.calls[0][1];
     expect(event.eventType).toBe('manual_flag_removed');
     expect(event.payload.flagType).toBe('INVESTIGATION');
+  });
+});
+
+describe('resolveFlag', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    vi.mocked(ref).mockImplementation((_db, path) => path ?? '__root__');
+    vi.mocked(update).mockResolvedValue(undefined);
+    vi.mocked(set).mockResolvedValue(undefined);
+    vi.mocked(get).mockResolvedValue({ exists: () => false, val: () => null });
+    let pushCounter = 0;
+    vi.mocked(push).mockImplementation((path) => `${path}/-NewKey${pushCounter++}`);
+  });
+
+  test('removes manual flag, writes resolvedFlags entry, writes audit', async () => {
+    await resolveFlag('LOC1', 'code:Z', 'OUT_OF_STOCK', {
+      resolvedBy: 'uid_alice',
+      reason: 'back in stock'
+    });
+
+    const removeCall = vi.mocked(update).mock.calls.find(([, updates]) =>
+      Object.prototype.hasOwnProperty.call(updates, 'stockItemFlags/LOC1/code:Z/manualFlags/OUT_OF_STOCK')
+    );
+    expect(removeCall).toBeDefined();
+    expect(removeCall[1]['stockItemFlags/LOC1/code:Z/manualFlags/OUT_OF_STOCK']).toBeNull();
+
+    const setCalls = vi.mocked(set).mock.calls;
+    const resolvedSet = setCalls.find(([_ref, val]) => val?.flagType === 'OUT_OF_STOCK');
+    expect(resolvedSet).toBeDefined();
+    expect(resolvedSet[1].resolvedBy).toBe('uid_alice');
+    expect(resolvedSet[1].reason).toBe('back in stock');
+    expect(typeof resolvedSet[1].resolvedAt).toBe('number');
+
+    const auditSet = setCalls.find(([_ref, val]) => val?.eventType === 'flag_resolved');
+    expect(auditSet).toBeDefined();
+    expect(auditSet[1].actorUid).toBe('uid_alice');
+    expect(auditSet[1].payload.flagType).toBe('OUT_OF_STOCK');
+  });
+
+  test('removes auto flag when flagType is a RULE_ID', async () => {
+    await resolveFlag('LOC1', 'code:A', RULE_IDS.COST_SPIKE, { resolvedBy: 'u' });
+    const removeCall = vi.mocked(update).mock.calls.find(([, updates]) =>
+      Object.prototype.hasOwnProperty.call(updates, 'stockItemFlags/LOC1/code:A/autoFlags/COST_SPIKE')
+    );
+    expect(removeCall).toBeDefined();
+    expect(removeCall[1]['stockItemFlags/LOC1/code:A/autoFlags/COST_SPIKE']).toBeNull();
+  });
+
+  test('trims resolvedFlags to most recent 20 (oldest dropped)', async () => {
+    const fakeResolved = {};
+    for (let i = 0; i < 25; i++) {
+      fakeResolved[`-K${String(i).padStart(3, '0')}`] = {
+        flagType: 'INVESTIGATION',
+        resolvedAt: 1000 + i,
+        resolvedBy: 'u',
+        reason: `r${i}`
+      };
+    }
+    vi.mocked(get).mockImplementation(async (path) => {
+      if (String(path).endsWith('resolvedFlags')) {
+        return { exists: () => true, val: () => fakeResolved };
+      }
+      return { exists: () => false, val: () => null };
+    });
+
+    await resolveFlag('LOC1', 'code:R', 'INVESTIGATION', { resolvedBy: 'u', reason: 'rN' });
+
+    const trimCall = vi.mocked(update).mock.calls.find(([, updates]) =>
+      Object.keys(updates).some((k) => k.includes('/resolvedFlags/-K'))
+    );
+    expect(trimCall).toBeDefined();
+    const trimUpdates = trimCall[1];
+    const trimmedKeys = Object.keys(trimUpdates).filter((k) => k.includes('/resolvedFlags/-K'));
+    expect(trimmedKeys.length).toBe(5);
+    expect(trimmedKeys.every((k) => trimUpdates[k] === null)).toBe(true);
+    // oldest (K000..K004) trimmed
+    expect(trimmedKeys.some((k) => k.endsWith('-K000'))).toBe(true);
+    expect(trimmedKeys.some((k) => k.endsWith('-K004'))).toBe(true);
+    expect(trimmedKeys.some((k) => k.endsWith('-K005'))).toBe(false);
   });
 });
