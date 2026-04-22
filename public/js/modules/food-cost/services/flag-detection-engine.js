@@ -149,7 +149,36 @@ export function detectHighFcPct({ foodCostPct, processedItems, historicalData, t
   return results;
 }
 
-export function runDetection() {
-  // Implemented incrementally across tasks 12-17
-  return {};
+export function runDetection({
+  foodCostPct,
+  processedItems,
+  historicalData,
+  existingFlags,
+  totalCurrentCost,
+  thresholds
+}) {
+  const perItem = {};
+  const merge = (key, ruleResults) => {
+    if (!Object.keys(ruleResults).length) return;
+    perItem[key] = { ...(perItem[key] || {}), ...ruleResults };
+  };
+
+  for (const item of processedItems) {
+    merge(item.itemKey, detectInvalidValues(item));
+    merge(item.itemKey, detectCostSpike(item, historicalData, thresholds));
+    merge(item.itemKey, detectUsageAnomaly(item, historicalData, thresholds));
+    merge(item.itemKey, detectDeadStock(item, historicalData, thresholds));
+  }
+
+  const high = detectHighFcPct(
+    { foodCostPct, processedItems, historicalData, totalCurrentCost },
+    thresholds
+  );
+  for (const [k, v] of Object.entries(high)) merge(k, v);
+
+  const currentKeys = new Set(processedItems.map((i) => i.itemKey));
+  const missing = detectMissingWithHistory(currentKeys, historicalData, thresholds, existingFlags);
+  for (const [k, v] of Object.entries(missing)) merge(k, v);
+
+  return perItem;
 }

@@ -6,7 +6,8 @@ import {
   detectDeadStock,
   detectMissingWithHistory,
   detectHighFcPct,
-  scoreCulprit
+  scoreCulprit,
+  runDetection
 } from '../services/flag-detection-engine.js';
 
 describe('INVALID_VALUES', () => {
@@ -256,5 +257,107 @@ describe('HIGH_FC_PCT', () => {
       thresholds
     );
     expect(r['code:A'].HIGH_FC_PCT.severity).toBe('critical');
+  });
+});
+
+describe('runDetection orchestrator', () => {
+  const thresholds = {
+    foodCostPctWarning: 35,
+    foodCostPctCritical: 40,
+    unitCostSpikePct: 15,
+    unitCostSpikeCriticalPct: 30,
+    usageVarianceStdDev: 2,
+    usageVarianceCriticalStdDev: 3,
+    deadStockDaysThreshold: 28,
+    missingItemLookbackWeeks: 4,
+    highFcPctCulpritMinScore: 50
+  };
+
+  test('combines per-item rules under each item key', () => {
+    const items = [
+      {
+        itemKey: 'code:A',
+        unitCost: 140,
+        usage: 5,
+        closingQty: 2,
+        openingQty: 10,
+        purchaseQty: 0,
+        usageValue: 700
+      }
+    ];
+    const hist = {
+      'code:A': {
+        unitCostMean: 100,
+        unitCostSamples: 5,
+        usageMean: 5,
+        usageStdDev: 1,
+        usageSamples: 5,
+        daysSinceLastUsage: 0,
+        historicalCostShare: 0.3,
+        historicalCostShareStdDev: 0.05
+      }
+    };
+    const result = runDetection({
+      foodCostPct: 32,
+      processedItems: items,
+      historicalData: hist,
+      existingFlags: {},
+      totalCurrentCost: 700,
+      thresholds
+    });
+    expect(result['code:A'].COST_SPIKE.severity).toBe('critical');
+  });
+
+  test('includes MISSING_WITH_HISTORY for absent historical items', () => {
+    const items = [{ itemKey: 'code:A', unitCost: 100, usage: 1, closingQty: 1, openingQty: 1, purchaseQty: 1, usageValue: 100 }];
+    const hist = {
+      'code:A': { unitCostMean: 100, unitCostSamples: 5, usageMean: 1, usageStdDev: 1, usageSamples: 5, weeksSinceLastSeen: 0 },
+      'code:B': { unitCostMean: 50, unitCostSamples: 5, usageMean: 1, usageStdDev: 1, usageSamples: 5, weeksSinceLastSeen: 1 }
+    };
+    const result = runDetection({
+      foodCostPct: 20,
+      processedItems: items,
+      historicalData: hist,
+      existingFlags: {},
+      totalCurrentCost: 100,
+      thresholds
+    });
+    expect(result['code:B'].MISSING_WITH_HISTORY.severity).toBe('info');
+    expect(result['code:A']).toBeUndefined();
+  });
+
+  test('flags multiple rules on the same item', () => {
+    const items = [
+      {
+        itemKey: 'code:A',
+        unitCost: 140,
+        usage: 0,
+        closingQty: -1,
+        openingQty: 10,
+        purchaseQty: 0,
+        usageValue: 0
+      }
+    ];
+    const hist = {
+      'code:A': {
+        unitCostMean: 100,
+        unitCostSamples: 5,
+        usageMean: 5,
+        usageStdDev: 1,
+        usageSamples: 5,
+        daysSinceLastUsage: 30
+      }
+    };
+    const result = runDetection({
+      foodCostPct: 20,
+      processedItems: items,
+      historicalData: hist,
+      existingFlags: {},
+      totalCurrentCost: 0,
+      thresholds
+    });
+    expect(result['code:A'].INVALID_VALUES).toBeDefined();
+    expect(result['code:A'].COST_SPIKE).toBeDefined();
+    expect(result['code:A'].DEAD_STOCK).toBeDefined();
   });
 });
