@@ -265,6 +265,149 @@ describe('writeAutoFlags', () => {
   });
 });
 
+describe('runAutoClear', () => {
+  const EIGHT_WEEKS_MS = 8 * 7 * 24 * 3600 * 1000;
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    vi.mocked(ref).mockImplementation((_db, path) => path ?? '__root__');
+    vi.mocked(update).mockResolvedValue(undefined);
+    vi.mocked(set).mockResolvedValue(undefined);
+    let pushCounter = 0;
+    vi.mocked(push).mockImplementation((path) => `${path}/-AC${pushCounter++}`);
+  });
+
+  test('OUT_OF_STOCK clears when item reappears with usage > 0', async () => {
+    const now = Date.now();
+    vi.mocked(get).mockResolvedValue({
+      exists: () => true,
+      val: () => ({
+        'code:B': {
+          manualFlags: {
+            OUT_OF_STOCK: { appliedBy: 'u', appliedAt: now - 1000 }
+          }
+        }
+      })
+    });
+    const cleared = await runAutoClear('LOC1', [{ itemKey: 'code:B', usage: 5 }]);
+    expect(cleared).toEqual([
+      expect.objectContaining({ itemKey: 'code:B', flagType: 'OUT_OF_STOCK' })
+    ]);
+    const updates = vi.mocked(update).mock.calls[0][1];
+    expect(updates['stockItemFlags/LOC1/code:B/manualFlags/OUT_OF_STOCK']).toBeNull();
+  });
+
+  test('OUT_OF_STOCK does not clear when usage is 0', async () => {
+    vi.mocked(get).mockResolvedValue({
+      exists: () => true,
+      val: () => ({
+        'code:C': {
+          manualFlags: {
+            OUT_OF_STOCK: { appliedBy: 'u', appliedAt: Date.now() }
+          }
+        }
+      })
+    });
+    const cleared = await runAutoClear('LOC1', [{ itemKey: 'code:C', usage: 0 }]);
+    expect(cleared).toEqual([]);
+    expect(update).not.toHaveBeenCalled();
+  });
+
+  test('SEASONAL clears on expiresAt elapsed', async () => {
+    const now = Date.now();
+    vi.mocked(get).mockResolvedValue({
+      exists: () => true,
+      val: () => ({
+        'code:D': {
+          manualFlags: {
+            SEASONAL: { appliedBy: 'u', appliedAt: now - 5000, expiresAt: now - 1000 }
+          }
+        }
+      })
+    });
+    const cleared = await runAutoClear('LOC1', []);
+    expect(cleared).toEqual([
+      expect.objectContaining({ itemKey: 'code:D', flagType: 'SEASONAL' })
+    ]);
+    const updates = vi.mocked(update).mock.calls[0][1];
+    expect(updates['stockItemFlags/LOC1/code:D/manualFlags/SEASONAL']).toBeNull();
+  });
+
+  test('SEASONAL does not clear when expiresAt is future', async () => {
+    vi.mocked(get).mockResolvedValue({
+      exists: () => true,
+      val: () => ({
+        'code:D2': {
+          manualFlags: {
+            SEASONAL: { appliedBy: 'u', appliedAt: Date.now(), expiresAt: Date.now() + 60_000 }
+          }
+        }
+      })
+    });
+    const cleared = await runAutoClear('LOC1', []);
+    expect(cleared).toEqual([]);
+  });
+
+  test('RECIPE_CHANGE decays after 8 weeks', async () => {
+    const eightWeeksAgo = Date.now() - EIGHT_WEEKS_MS - 1000;
+    vi.mocked(get).mockResolvedValue({
+      exists: () => true,
+      val: () => ({
+        'code:E': {
+          manualFlags: {
+            RECIPE_CHANGE: { appliedBy: 'u', appliedAt: eightWeeksAgo }
+          }
+        }
+      })
+    });
+    const cleared = await runAutoClear('LOC1', []);
+    expect(cleared).toEqual([
+      expect.objectContaining({ itemKey: 'code:E', flagType: 'RECIPE_CHANGE' })
+    ]);
+  });
+
+  test('writes audit events for cleared flags', async () => {
+    const now = Date.now();
+    vi.mocked(get).mockResolvedValue({
+      exists: () => true,
+      val: () => ({
+        'code:B': {
+          manualFlags: { OUT_OF_STOCK: { appliedBy: 'u', appliedAt: now - 1000 } }
+        }
+      })
+    });
+    await runAutoClear('LOC1', [{ itemKey: 'code:B', usage: 3 }]);
+    const auditCall = vi.mocked(set).mock.calls.find(
+      ([, val]) => val?.eventType === 'flag_auto_cleared'
+    );
+    expect(auditCall).toBeDefined();
+    expect(auditCall[1].actorUid).toBe('system');
+    expect(auditCall[1].payload.flagType).toBe('OUT_OF_STOCK');
+  });
+
+  test('returns [] when no flags exist', async () => {
+    vi.mocked(get).mockResolvedValue({ exists: () => false, val: () => null });
+    const cleared = await runAutoClear('LOC1', [{ itemKey: 'code:X', usage: 1 }]);
+    expect(cleared).toEqual([]);
+    expect(update).not.toHaveBeenCalled();
+  });
+
+  test('non-auto-clearable manual flags are preserved', async () => {
+    vi.mocked(get).mockResolvedValue({
+      exists: () => true,
+      val: () => ({
+        'code:I': {
+          manualFlags: {
+            INVESTIGATION: { appliedBy: 'u', appliedAt: Date.now() }
+          }
+        }
+      })
+    });
+    const cleared = await runAutoClear('LOC1', [{ itemKey: 'code:I', usage: 10 }]);
+    expect(cleared).toEqual([]);
+  });
+});
+
 describe('resolveFlag trim behavior', () => {
   beforeEach(() => {
     vi.clearAllMocks();

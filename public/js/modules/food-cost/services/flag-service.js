@@ -138,7 +138,49 @@ export async function writeAutoFlags(locationId, itemKey, { itemMeta, recordId, 
   await update(ref(rtdb), updates);
 }
 
-// Stubs — implemented in task 10
-export async function runAutoClear() {
-  throw new Error('not implemented');
+const EIGHT_WEEKS_MS = 8 * 7 * 24 * 3600 * 1000;
+
+export async function runAutoClear(locationId, processedItems) {
+  const flags = await getFlagsForLocation(locationId);
+  if (!flags || typeof flags !== 'object') return [];
+
+  const byKey = Object.fromEntries((processedItems || []).map((i) => [i.itemKey, i]));
+  const now = Date.now();
+  const cleared = [];
+  const updates = {};
+
+  for (const [itemKey, itemData] of Object.entries(flags)) {
+    const manual = itemData?.manualFlags || {};
+    for (const [type, entry] of Object.entries(manual)) {
+      let clear = false;
+
+      if (type === MANUAL_FLAG_TYPES.OUT_OF_STOCK) {
+        const cur = byKey[itemKey];
+        if (cur && Number(cur.usage) > 0) clear = true;
+      } else if (type === MANUAL_FLAG_TYPES.SEASONAL) {
+        if (entry.expiresAt && entry.expiresAt < now) clear = true;
+      } else if (type === MANUAL_FLAG_TYPES.RECIPE_CHANGE) {
+        if (entry.appliedAt && (now - entry.appliedAt) > EIGHT_WEEKS_MS) clear = true;
+      }
+
+      if (clear) {
+        updates[`${FLAGS_PATH}/${locationId}/${itemKey}/manualFlags/${type}`] = null;
+        cleared.push({ itemKey, flagType: type, reason: 'auto' });
+      }
+    }
+  }
+
+  if (Object.keys(updates).length) {
+    await update(ref(rtdb), updates);
+    for (const c of cleared) {
+      await writeAudit(locationId, {
+        itemKey: c.itemKey,
+        eventType: 'flag_auto_cleared',
+        actorUid: 'system',
+        timestamp: now,
+        payload: { flagType: c.flagType, reason: c.reason }
+      });
+    }
+  }
+  return cleared;
 }
