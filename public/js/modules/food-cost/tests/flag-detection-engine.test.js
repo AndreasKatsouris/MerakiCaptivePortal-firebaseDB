@@ -3,7 +3,8 @@ import {
   detectInvalidValues,
   detectCostSpike,
   detectUsageAnomaly,
-  detectDeadStock
+  detectDeadStock,
+  detectMissingWithHistory
 } from '../services/flag-detection-engine.js';
 
 describe('INVALID_VALUES', () => {
@@ -153,5 +154,43 @@ describe('DEAD_STOCK', () => {
   test('no history defaults past threshold → flag', () => {
     const r = detectDeadStock({ itemKey: 'code:Y', openingQty: 5, usage: 0 }, {}, thresholds);
     expect(r.DEAD_STOCK.severity).toBe('info');
+  });
+});
+
+describe('MISSING_WITH_HISTORY', () => {
+  const thresholds = { missingItemLookbackWeeks: 4 };
+  const currentKeys = new Set(['code:A', 'code:B']);
+  const hist = {
+    'code:A': { weeksSinceLastSeen: 0 },
+    'code:B': { weeksSinceLastSeen: 0 },
+    'code:C': { weeksSinceLastSeen: 1, itemCode: 'C', description: 'Gone' },
+    'code:D': { weeksSinceLastSeen: 10 }
+  };
+
+  test('absent item within lookback → info flag', () => {
+    const result = detectMissingWithHistory(currentKeys, hist, thresholds, {});
+    expect(result['code:C'].MISSING_WITH_HISTORY.severity).toBe('info');
+  });
+
+  test('absent item outside lookback → no flag', () => {
+    const result = detectMissingWithHistory(currentKeys, hist, thresholds, {});
+    expect(result['code:D']).toBeUndefined();
+  });
+
+  test('elevates to warning when unresolved manual flag exists', () => {
+    const existing = { 'code:C': { manualFlags: { OUT_OF_STOCK: { appliedAt: 1 } } } };
+    const result = detectMissingWithHistory(currentKeys, hist, thresholds, existing);
+    expect(result['code:C'].MISSING_WITH_HISTORY.severity).toBe('warning');
+    expect(result['code:C'].MISSING_WITH_HISTORY.details.hasManualFlag).toBe(true);
+  });
+
+  test('present items get no flag', () => {
+    const result = detectMissingWithHistory(currentKeys, hist, thresholds, {});
+    expect(result['code:A']).toBeUndefined();
+    expect(result['code:B']).toBeUndefined();
+  });
+
+  test('empty history → empty result', () => {
+    expect(detectMissingWithHistory(currentKeys, {}, thresholds, {})).toEqual({});
   });
 });

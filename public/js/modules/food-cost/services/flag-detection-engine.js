@@ -85,6 +85,29 @@ export function detectDeadStock(item, historicalData, thresholds) {
   };
 }
 
+export function detectMissingWithHistory(currentItemKeys, historicalData, thresholds, existingFlags) {
+  const results = {};
+  for (const [itemKey, h] of Object.entries(historicalData || {})) {
+    if (currentItemKeys.has(itemKey)) continue;
+    const weeks = h?.weeksSinceLastSeen ?? Infinity;
+    if (weeks > thresholds.missingItemLookbackWeeks) continue;
+    const hasManualFlag = !!(
+      existingFlags?.[itemKey]?.manualFlags &&
+      Object.keys(existingFlags[itemKey].manualFlags).length > 0
+    );
+    results[itemKey] = {
+      [RULE_IDS.MISSING_WITH_HISTORY]: {
+        severity: hasManualFlag ? SEVERITIES.WARNING.id : SEVERITIES.INFO.id,
+        score: 40,
+        detectedAt: Date.now(),
+        sourceRecordId: null,
+        details: { weeksSinceLastSeen: weeks, hasManualFlag }
+      }
+    };
+  }
+  return results;
+}
+
 export function runDetection() {
   // Implemented incrementally across tasks 12-17
   return {};
