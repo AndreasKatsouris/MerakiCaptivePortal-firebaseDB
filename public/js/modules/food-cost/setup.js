@@ -12,7 +12,7 @@ import { initShadcnStyles } from './shadcn-styles.js';
 import { getFlagsForLocation } from './services/flag-service.js';
 import { computeRowSeverity } from './flag-display-merger.js';
 import { FlagsDashboard } from './components/flags/FlagsDashboard.js';
-import { rtdb, ref, get } from '../../config/firebase-config.js';
+import { rtdb, ref, get, auth } from '../../config/firebase-config.js';
 
 /**
  * Initialize the Food Cost module in a container
@@ -134,31 +134,37 @@ function currentLocationId() {
     }
 }
 
-function currentUserUid() {
+function currentUser() {
     try {
-        return window.firebase?.auth?.()?.currentUser?.uid || null;
+        return auth?.currentUser || null;
     } catch {
         return null;
     }
 }
 
+function currentUserUid() {
+    return currentUser()?.uid || null;
+}
+
 /**
  * Resolve admin + ownership for the current user against a given location,
- * mirroring the database.rules.json check for stockFlagConfig writes.
+ * mirroring the database.rules.json check for stockFlagConfig writes:
+ *   auth.token.admin === true || locations/$loc/ownerId === auth.uid
  */
-async function resolveFlagPermissions(locationId, uid) {
-    if (!uid) return { isAdmin: false, isLocationOwner: false };
+async function resolveFlagPermissions(locationId) {
+    const user = currentUser();
+    if (!user) return { isAdmin: false, isLocationOwner: false };
     try {
-        const [adminSnap, ownerSnap] = await Promise.all([
-            get(ref(rtdb, `admins/${uid}`)),
+        const [tokenResult, ownerSnap] = await Promise.all([
+            user.getIdTokenResult(),
             locationId
                 ? get(ref(rtdb, `locations/${locationId}/ownerId`))
                 : Promise.resolve({ exists: () => false, val: () => null })
         ]);
-        return {
-            isAdmin: adminSnap.exists(),
-            isLocationOwner: ownerSnap.exists() && ownerSnap.val() === uid
-        };
+        const isAdmin = tokenResult?.claims?.admin === true;
+        const isLocationOwner =
+            ownerSnap.exists() && ownerSnap.val() === user.uid;
+        return { isAdmin, isLocationOwner };
     } catch (err) {
         console.error('[FoodCost] resolveFlagPermissions failed:', err);
         return { isAdmin: false, isLocationOwner: false };
@@ -197,7 +203,7 @@ async function mountFlagsDashboardLazy() {
             onOpenConfig: async () => {
                 const locId = currentLocationId();
                 const uid = currentUserUid();
-                const perms = await resolveFlagPermissions(locId, uid);
+                const perms = await resolveFlagPermissions(locId);
                 const mod = await import('./components/flags/FlagConfigPanel.js');
                 await mod.openFlagConfigPanel({
                     locationId: locId,
