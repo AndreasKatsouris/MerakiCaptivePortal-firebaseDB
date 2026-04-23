@@ -23,7 +23,19 @@ export async function runFlagPipeline({
   });
 
   const autoFlagsWritten = {};
+  const detectedKeys = Object.keys(perItemFlags);
+  console.log(
+    `[FlagPipeline] runDetection produced ${detectedKeys.length} flagged itemKeys (sample:`,
+    detectedKeys.slice(0, 3),
+    ')'
+  );
   for (const [itemKey, flags] of Object.entries(perItemFlags)) {
+    if (!/^(code:|hash:).+/.test(itemKey)) {
+      console.warn(
+        `[FlagPipeline] skipping write — itemKey "${itemKey}" does not match required format`
+      );
+      continue;
+    }
     const fromUpload = processedItems.find((p) => p.itemKey === itemKey);
     const fromExisting = existingFlags?.[itemKey];
     const itemMeta = fromUpload

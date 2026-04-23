@@ -12,7 +12,21 @@ import { initShadcnStyles } from './shadcn-styles.js';
 import { getFlagsForLocation } from './services/flag-service.js';
 import { computeRowSeverity } from './flag-display-merger.js';
 import { FlagsDashboard } from './components/flags/FlagsDashboard.js';
+import { runFlagPipeline } from './flag-pipeline.js';
+import * as flagService from './services/flag-service.js';
 import { rtdb, ref, get, auth } from '../../config/firebase-config.js';
+
+// Ensure window.FoodCost has the pipeline + service handles even if
+// index.js hasn't been loaded by admin-dashboard.js's loadRequiredScripts().
+if (typeof window !== 'undefined') {
+    window.FoodCost = window.FoodCost || {};
+    if (typeof window.FoodCost.runFlagPipeline !== 'function') {
+        window.FoodCost.runFlagPipeline = runFlagPipeline;
+    }
+    if (!window.FoodCost.flagService) {
+        window.FoodCost.flagService = flagService;
+    }
+}
 
 /**
  * Initialize the Food Cost module in a container
@@ -124,14 +138,35 @@ async function refreshFlagCountBadge(locationId) {
 let _flagsDashboardInstance = null;
 function currentLocationId() {
     try {
-        const vm =
-            window.FoodCost?.vm ||
-            window.foodCostApp?.instance ||
-            null;
-        return vm?.selectedLocationId || null;
-    } catch {
+        const vm = window.FoodCost?.vm || window.foodCostApp?.instance || null;
+        const fromVm = vm?.selectedLocationId || null;
+        const fromState = window.FoodCost?.state?.selectedLocationId || null;
+        const result = fromVm || fromState || null;
+        console.log(
+            '[FoodCost] currentLocationId() — vm?',
+            !!vm,
+            'fromVm=',
+            fromVm,
+            'fromState=',
+            fromState,
+            '→',
+            result
+        );
+        return result;
+    } catch (err) {
+        console.error('[FoodCost] currentLocationId failed:', err);
         return null;
     }
+}
+
+function currentVm() {
+    return window.FoodCost?.vm || window.foodCostApp?.instance || null;
+}
+
+function hasStockDataLoaded() {
+    const vm = currentVm();
+    if (vm && Array.isArray(vm.stockData) && vm.stockData.length > 0) return true;
+    return !!window.FoodCost?.state?.hasStockData;
 }
 
 function currentUser() {
@@ -180,8 +215,17 @@ async function resolveFlagPermissions(locationId) {
 
 async function mountFlagsDashboardLazy() {
     const container = document.getElementById('food-cost-flags-app');
-    if (!container) return;
+    if (!container) {
+        console.warn('[FoodCost] Flags tab: #food-cost-flags-app missing from DOM');
+        return;
+    }
     const locationId = currentLocationId();
+    console.log(
+        '[FoodCost] Flags tab opened — locationId=',
+        locationId,
+        ' instanceExists?',
+        !!_flagsDashboardInstance
+    );
     if (!_flagsDashboardInstance) {
         _flagsDashboardInstance = new FlagsDashboard(container, {
             locationId,
@@ -270,18 +314,50 @@ function renderOrdersTabPanel() {
     if (btn) {
         btn.addEventListener('click', () => {
             try {
+                const vm = currentVm();
+                const hasData = hasStockDataLoaded();
+                console.log(
+                    '[FoodCost] Orders tab → Open PO clicked. vm?',
+                    !!vm,
+                    ' hasStockData?',
+                    hasData,
+                    ' showPurchaseOrder fn?',
+                    typeof vm?.showPurchaseOrder
+                );
+
+                if (!vm) {
+                    if (typeof Swal !== 'undefined') {
+                        Swal.fire(
+                            'Module not ready',
+                            'The Food Cost module has not finished loading. Please open the Stock Data tab first, then try again.',
+                            'info'
+                        );
+                    }
+                    return;
+                }
+                if (!hasData) {
+                    if (typeof Swal !== 'undefined') {
+                        Swal.fire(
+                            'No stock file loaded',
+                            'Please upload and process a stock file in the Stock Data tab before generating a purchase order.',
+                            'info'
+                        );
+                    }
+                    return;
+                }
+
                 const stockTab = document.querySelector('[data-bs-target="#fcStockPane"]');
                 if (stockTab && window.bootstrap?.Tab) {
                     window.bootstrap.Tab.getOrCreateInstance(stockTab).show();
                 }
-                const vm =
-                    window.FoodCost?.vm ||
-                    window.foodCostApp?.instance ||
-                    null;
-                if (vm && typeof vm.showPurchaseOrder === 'function') {
+                if (typeof vm.showPurchaseOrder === 'function') {
                     vm.showPurchaseOrder();
                 } else if (typeof Swal !== 'undefined') {
-                    Swal.fire('Stock data not loaded', 'Please load a stock file first.', 'info');
+                    Swal.fire(
+                        'Action unavailable',
+                        'showPurchaseOrder() is not exposed on the Food Cost component.',
+                        'error'
+                    );
                 }
             } catch (err) {
                 console.error('[FoodCost] open PO from Orders tab failed:', err);

@@ -14,12 +14,13 @@ import {
     downloadCSV 
 } from './services/data-service.js?v=2.2.0-20260413';
 
-import { 
+import {
     processStockData,
     calculateDerivedValues,
-    calculateReorderPoints, 
+    calculateReorderPoints,
     calculateUsagePerDay,
-    calculateTotals
+    calculateTotals,
+    attachItemKeys
 } from './data-processor.js?v=2.2.0-20260413';
 
 import { 
@@ -345,18 +346,46 @@ var FoodCostApp = {
     },
     
     mounted() {
-        this.initialize();
-
-        // Expose the live Vue instance so non-Vue helpers (Flags tab, etc.)
-        // can read reactive state like selectedLocationId.
+        // Expose the live Vue instance FIRST (before initialize) so non-Vue
+        // helpers (Flags tab, Orders tab) can read reactive state even if
+        // initialize() throws asynchronously.
         if (typeof window !== 'undefined') {
             window.FoodCost = window.FoodCost || {};
             window.FoodCost.vm = this;
+            // Plain-object snapshot for non-reactive consumers — kept in sync
+            // by the watchers below.
+            window.FoodCost.state = window.FoodCost.state || {};
+            window.FoodCost.state.selectedLocationId = this.selectedLocationId || null;
+            window.FoodCost.state.hasStockData =
+                Array.isArray(this.stockData) && this.stockData.length > 0;
             // Builder used by the Flags tab Re-run button to invoke the
             // pipeline against current in-memory data without requiring a save.
             window.FoodCost.buildCurrentContext = (opts) =>
                 this.buildFlagPipelineContext(opts);
+            console.log(
+                '[FoodCost] Vue root mounted — window.FoodCost.vm set. selectedLocationId=',
+                this.selectedLocationId,
+                ' stockData.length=',
+                Array.isArray(this.stockData) ? this.stockData.length : 0
+            );
+
+            // Keep window.FoodCost.state in sync with reactive Vue state so
+            // the Flags/Orders tabs can read a plain primitive even if the
+            // proxy access pattern fails for some reason.
+            this.$watch('selectedLocationId', (val) => {
+                window.FoodCost.state.selectedLocationId = val || null;
+                console.log('[FoodCost] selectedLocationId watcher →', val);
+            });
+            this.$watch(
+                () => (Array.isArray(this.stockData) ? this.stockData.length : 0),
+                (len) => {
+                    window.FoodCost.state.hasStockData = len > 0;
+                    console.log('[FoodCost] stockData length watcher →', len);
+                }
+            );
         }
+
+        this.initialize();
 
         // Register a beforeunload handler to help with refresh issues
         window.addEventListener('beforeunload', () => {
@@ -391,6 +420,30 @@ var FoodCostApp = {
         async buildFlagPipelineContext({ recordId = null } = {}) {
             if (!this.selectedLocationId) return null;
             if (!this.stockData || this.stockData.length === 0) return null;
+
+            // CRITICAL: ensure each item has a stable itemKey before the
+            // pipeline writes to RTDB — the stockItemFlags rule rejects keys
+            // that don't match /^(code:|hash:).+$/, which surfaces as a
+            // PERMISSION_DENIED at the multi-path update.
+            try {
+                await attachItemKeys(this.stockData);
+            } catch (err) {
+                console.error('[FoodCost] attachItemKeys failed:', err);
+                return null;
+            }
+            const missing = this.stockData.filter((i) => !i.itemKey).length;
+            if (missing > 0) {
+                console.warn(
+                    `[FoodCost] ${missing}/${this.stockData.length} items still missing itemKey after attach — flag pipeline aborted`
+                );
+                return null;
+            }
+            console.log(
+                `[FoodCost] itemKeys attached to ${this.stockData.length} items (sample:`,
+                this.stockData.slice(0, 2).map((i) => i.itemKey),
+                ')'
+            );
+
             const historicalSvc = window.HistoricalUsageService;
             let historicalData = {};
             try {

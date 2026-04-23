@@ -4,8 +4,8 @@
  */
 
 // Phase 3 Advanced Optimization - Performance-First Service Worker
-const CACHE_NAME = 'ob-wifi-cache-v2.5-lazy-install';  // Non-blocking install
-const DATA_CACHE_NAME = 'ob-data-cache-v2.5-lazy-install';  // Non-blocking install
+const CACHE_NAME = 'ob-wifi-cache-v2.8-itemkey-attach';  // Non-blocking install
+const DATA_CACHE_NAME = 'ob-data-cache-v2.8-itemkey-attach';  // Non-blocking install
 const CACHE_ASSETS = [
   '/',
   '/index.html',
