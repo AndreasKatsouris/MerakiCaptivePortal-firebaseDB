@@ -1,0 +1,58 @@
+/* Sparks Hi-Fi design tokens.
+   Mirrors the HIFI object in public/hifi/kit.jsx — source of truth for the
+   editorial hospitality OS direction. Consume via var(--hf-*). */
+
+:root {
+  /* Surfaces */
+  --hf-bg:      #f7f4ec;   /* bone */
+  --hf-bg2:     #efeadd;   /* sand */
+  --hf-paper:   #fbf9f3;   /* cream card */
+
+  /* Ink */
+  --hf-ink:     #1a1812;
+  --hf-ink-2:   #3a362d;
+  --hf-muted:   #7a7565;
+  --hf-hair:    #0a0804;
+
+  /* Lines */
+  --hf-line:    #e6dfcd;
+  --hf-line-2:  #d4ccb6;
+
+  /* Semantic */
+  --hf-accent:  #c89a3a;   /* warm amber */
+  --hf-accent-2:#a8772a;
+  --hf-good:    #5c7a4a;
+  --hf-warn:    #b0553a;   /* terracotta */
+  --hf-crit:    #8a2e1f;
+  --hf-gold:    #b4903b;
+
+  /* Typography stacks */
+  --hf-font-display: 'Instrument Serif', 'Cormorant Garamond', Georgia, serif;
+  --hf-font-body:    'Geist', 'Söhne', 'Inter', system-ui, sans-serif;
+  --hf-font-mono:    'JetBrains Mono', ui-monospace, SFMono-Regular, monospace;
+
+  /* Radii */
+  --hf-radius-sm: 3px;
+  --hf-radius:    4px;
+  --hf-radius-md: 6px;
+  --hf-radius-lg: 8px;
+
+  /* Spacing scale (match kit.jsx visual rhythm) */
+  --hf-space-1: 4px;
+  --hf-space-2: 8px;
+  --hf-space-3: 12px;
+  --hf-space-4: 16px;
+  --hf-space-5: 24px;
+  --hf-space-6: 32px;
+  --hf-space-7: 48px;
+  --hf-space-8: 64px;
+
+  /* Elevation (minimal — editorial aesthetic avoids heavy shadows) */
+  --hf-shadow-1: 0 1px 2px rgba(10, 8, 4, 0.04);
+  --hf-shadow-2: 0 2px 8px rgba(10, 8, 4, 0.06), 0 1px 2px rgba(10, 8, 4, 0.04);
+  --hf-shadow-3: 0 8px 24px rgba(10, 8, 4, 0.08), 0 2px 4px rgba(10, 8, 4, 0.04);
+
+  /* Motion */
+  --hf-ease:        cubic-bezier(0.2, 0.7, 0.3, 1);
+  --hf-transition:  150ms var(--hf-ease);
+}

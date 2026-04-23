@@ -1,0 +1,77 @@
+/* Sparks Hi-Fi base styles.
+   Extracted from public/hifi/kit.jsx `css` template — the typography and
+   helper classes every hi-fi page depends on. Scoped under .hf-scope on
+   pages that still host legacy Bootstrap so we don't leak into old UI. */
+
+.hf-scope,
+.hf-body {
+  font-family: var(--hf-font-body);
+  color: var(--hf-ink);
+  background: var(--hf-bg);
+  font-feature-settings: "ss01", "cv11";
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+.hf-scope *,
+.hf-body * {
+  box-sizing: border-box;
+}
+
+/* Typography primitives */
+.hf-display {
+  font-family: var(--hf-font-display);
+  font-weight: 400;
+  letter-spacing: -0.01em;
+}
+
+.hf-mono {
+  font-family: var(--hf-font-mono);
+  font-feature-settings: "tnum", "zero";
+}
+
+.hf-eyebrow {
+  font-family: var(--hf-font-mono);
+  font-size: 11px;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--hf-muted);
+}
+
+.hf-num {
+  font-family: var(--hf-font-display);
+  font-feature-settings: "tnum", "lnum";
+  letter-spacing: -0.02em;
+}
+
+/* Layout primitives */
+.hf-hair {
+  border-top: 1px solid var(--hf-line);
+}
+
+.hf-grain {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  opacity: 0.06;
+  mix-blend-mode: multiply;
+  background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='200' height='200'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2' stitchTiles='stitch'/></filter><rect width='100%25' height='100%25' filter='url(%23n)'/></svg>");
+}
+
+/* Scrollbars — thin, warm */
+.hf-scope ::-webkit-scrollbar,
+.hf-body ::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+
+.hf-scope ::-webkit-scrollbar-thumb,
+.hf-body ::-webkit-scrollbar-thumb {
+  background: var(--hf-line-2);
+  border-radius: 10px;
+}
+
+.hf-scope ::-webkit-scrollbar-track,
+.hf-body ::-webkit-scrollbar-track {
+  background: transparent;
+}

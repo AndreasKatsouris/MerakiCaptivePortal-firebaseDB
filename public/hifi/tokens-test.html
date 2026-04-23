@@ -1,0 +1,70 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8" />
+  <title>Sparks Hi-Fi · Tokens smoke test</title>
+  <link rel="stylesheet" href="../css/hifi-fonts.css">
+  <link rel="stylesheet" href="../css/hifi-tokens.css">
+  <link rel="stylesheet" href="../css/hifi-base.css">
+  <style>
+    html, body { margin: 0; padding: 0; }
+    body { background: var(--hf-bg2); padding: 48px; }
+    .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)); gap: 12px; max-width: 960px; }
+    .swatch { padding: 16px; border-radius: var(--hf-radius); border: 1px solid var(--hf-line); background: var(--hf-paper); }
+    .swatch .chip { width: 100%; height: 64px; border-radius: var(--hf-radius-sm); margin-bottom: 8px; border: 1px solid var(--hf-line); }
+    .swatch code { font-family: var(--hf-font-mono); font-size: 11px; color: var(--hf-muted); }
+    section { margin-bottom: 48px; }
+    h1 { font-family: var(--hf-font-display); font-size: 48px; margin: 0 0 8px; letter-spacing: -0.02em; }
+    h2 { font-family: var(--hf-font-display); font-size: 24px; margin: 0 0 16px; font-weight: 400; color: var(--hf-ink-2); }
+    .specimen { background: var(--hf-paper); border: 1px solid var(--hf-line); padding: 32px; border-radius: var(--hf-radius-md); }
+    .specimen p { font-size: 15px; line-height: 1.6; color: var(--hf-ink-2); margin: 0 0 12px; }
+    .weights > div { margin-bottom: 4px; font-size: 16px; }
+  </style>
+</head>
+<body class="hf-body">
+  <section>
+    <div class="hf-eyebrow">Hi-Fi · Tokens</div>
+    <h1>Sparks editorial OS</h1>
+    <div style="color: var(--hf-muted); font-size: 15px;">Token + typography smoke test for Phase D1.</div>
+  </section>
+
+  <section>
+    <h2>Colors</h2>
+    <div class="grid">
+      <div class="swatch"><div class="chip" style="background: var(--hf-bg)"></div><code>--hf-bg (bone)</code></div>
+      <div class="swatch"><div class="chip" style="background: var(--hf-bg2)"></div><code>--hf-bg-2 (sand)</code></div>
+      <div class="swatch"><div class="chip" style="background: var(--hf-paper)"></div><code>--hf-paper</code></div>
+      <div class="swatch"><div class="chip" style="background: var(--hf-ink)"></div><code>--hf-ink</code></div>
+      <div class="swatch"><div class="chip" style="background: var(--hf-ink-2)"></div><code>--hf-ink-2</code></div>
+      <div class="swatch"><div class="chip" style="background: var(--hf-muted)"></div><code>--hf-muted</code></div>
+      <div class="swatch"><div class="chip" style="background: var(--hf-line)"></div><code>--hf-line</code></div>
+      <div class="swatch"><div class="chip" style="background: var(--hf-line-2)"></div><code>--hf-line-2</code></div>
+      <div class="swatch"><div class="chip" style="background: var(--hf-accent)"></div><code>--hf-accent</code></div>
+      <div class="swatch"><div class="chip" style="background: var(--hf-accent-2)"></div><code>--hf-accent-2</code></div>
+      <div class="swatch"><div class="chip" style="background: var(--hf-good)"></div><code>--hf-good</code></div>
+      <div class="swatch"><div class="chip" style="background: var(--hf-warn)"></div><code>--hf-warn</code></div>
+      <div class="swatch"><div class="chip" style="background: var(--hf-crit)"></div><code>--hf-crit</code></div>
+      <div class="swatch"><div class="chip" style="background: var(--hf-gold)"></div><code>--hf-gold</code></div>
+    </div>
+  </section>
+
+  <section>
+    <h2>Typography</h2>
+    <div class="specimen">
+      <div class="hf-eyebrow" style="margin-bottom: 8px;">Eyebrow · JetBrains Mono</div>
+      <div class="hf-display" style="font-size: 56px; line-height: 1.05; margin-bottom: 16px;">The concierge that greets every user on entry.</div>
+      <div class="hf-display" style="font-style: italic; font-size: 22px; color: var(--hf-muted); margin-bottom: 24px;">Editorial italic — Instrument Serif</div>
+      <p>Body copy set in Geist, the workhorse. It reads long-form without fatigue and carries numeric data cleanly with tabular figures. Numbers like <span class="hf-num">142,380</span> feel typeset, not pasted.</p>
+      <div class="weights" style="margin-top: 24px;">
+        <div style="font-weight: 300;">Geist 300 — Light</div>
+        <div style="font-weight: 400;">Geist 400 — Regular</div>
+        <div style="font-weight: 500;">Geist 500 — Medium</div>
+        <div style="font-weight: 600;">Geist 600 — Semibold</div>
+      </div>
+      <div class="hf-mono" style="margin-top: 16px; font-size: 13px;">
+        JetBrains Mono · tabular · const x = 42;
+      </div>
+    </div>
+  </section>
+</body>
+</html>

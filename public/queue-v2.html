@@ -1,0 +1,51 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate" />
+    <title>Queue & Floor — Sparks Hospitality</title>
+    <link rel="stylesheet" href="/css/hifi-fonts.css">
+    <link rel="stylesheet" href="/css/hifi-tokens.css">
+    <link rel="stylesheet" href="/css/hifi-base.css">
+    <style>
+      html, body { margin: 0; padding: 0; height: 100%; background: var(--hf-bg); }
+      #app { min-height: 100vh; }
+      #gate { min-height: 100vh; display: grid; place-items: center; font-family: var(--hf-font-body); color: var(--hf-muted); }
+      #gate .hf-eyebrow { font-size: 11px; letter-spacing: 0.14em; text-transform: uppercase; }
+      #gate .alert { max-width: 480px; margin: 24px; background: var(--hf-paper); border: 1px solid var(--hf-line-2); padding: 20px 22px; border-radius: 6px; color: var(--hf-ink); }
+      #gate h5 { font-family: var(--hf-font-display); margin: 0 0 8px; font-size: 18px; }
+    </style>
+</head>
+<body class="hf-body">
+  <div id="gate"><div class="hf-eyebrow">Verifying access…</div></div>
+
+  <script type="module">
+    import { auth, onAuthStateChanged } from '/js/config/firebase-config.js'
+    import { featureAccessControl } from '/js/modules/access-control/services/feature-access-control.js'
+
+    document.addEventListener('DOMContentLoaded', () => {
+      onAuthStateChanged(auth, async (user) => {
+        if (!user) { window.location.href = '/user-login.html?message=unauthorized'; return }
+        try {
+          const token = await user.getIdTokenResult()
+          if (!token.claims.admin) {
+            const access = await featureAccessControl.checkFeatureAccess('queueManagement')
+            if (!access.hasAccess) {
+              document.getElementById('gate').innerHTML =
+                '<div class="alert"><h5>Queue Management requires a subscription.</h5><p style="margin:0;">Upgrade your plan to access live floor and queue features.</p></div>'
+              return
+            }
+          }
+          const host = document.getElementById('gate')
+          host.outerHTML = '<div id="app"></div>'
+          await import('/js/modules/queue-floor/v2/main.js')
+        } catch (err) {
+          document.getElementById('gate').innerHTML =
+            '<div class="alert"><h5>Initialisation error</h5><p style="margin:0;">' + ((err && err.message) || 'Unknown error') + '</p></div>'
+        }
+      })
+    })
+  </script>
+</body>
+</html>
