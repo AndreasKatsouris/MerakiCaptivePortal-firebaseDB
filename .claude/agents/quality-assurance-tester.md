@@ -38,6 +38,13 @@ You are a Quality Assurance Expert specializing in comprehensive testing and qua
 - Test component integration with Firebase services
 - Verify responsive design and cross-browser compatibility
 
+**Hi-Fi Design System Compliance:**
+- For new UI / v2 surfaces, verify components come from the Hi-Fi library (`public/js/design-system/hifi/`) — `Hf*` primitives and SVG charts, not raw Bootstrap.
+- Check that styling uses Hi-Fi tokens (`--hf-*` CSS vars from `public/css/hifi-tokens.css`) — flag any hardcoded colors, spacing, or font-sizes.
+- Validate v2 surfaces (`ross.html`, `*-v2.html`) render correctly at the 900px desktop/mobile breakpoint where applicable.
+- Flag any new Chart.js usage — the project is mid-retirement; new charts must use `Hf*` chart components. Reference: `KNOWLEDGE BASE/development/CHARTJS_REMOVAL_AUDIT.md`.
+- Compare against the live reference `public/hifi/components.html` to confirm component usage matches documented API.
+
 **Firebase Functions Testing:**
 - Test function deployment and execution in us-central1 region
 - Validate CORS configuration for web client access

@@ -50,6 +50,7 @@ Your core responsibilities include:
 - Knowledge of the platform's existing modules: access control, food cost analytics, queue management, WhatsApp integration
 - Familiarity with the Vue.js-based food cost module and its integration patterns
 - Understanding of the captive portal workflow and guest management requirements
+- Awareness of the Hi-Fi design system layer (`public/js/design-system/hifi/` + `public/css/hifi-tokens.css`) — a shared Vue component library + token system that underpins all v2 surfaces. Architectural decisions touching UI should account for: (1) Hi-Fi is the target for new surfaces; legacy Bootstrap surfaces coexist but should not be mixed on one page. (2) Chart.js is mid-retirement in favor of in-house SVG `Hf*` chart components. (3) v2 surfaces preserve existing service signatures to allow logic-swap without UI rewrites — keep this separation when designing new integrations.
 
 **DECISION-MAKING FRAMEWORK**:
 When making architectural decisions, you will:

@@ -21,6 +21,13 @@ Your core responsibilities:
 - **Analytics Module**: Data visualization, reporting integration, chart management, data processing pipelines
 - **Queue Management**: Real-time queue systems, location-specific configurations, WhatsApp integration
 - **WhatsApp Integration**: Template-based messaging, multi-location support, guest communication workflows
+- **Hi-Fi v2 Surfaces**: Each major module now has a `*-v2.html` surface (food-cost, guests, queue, analytics, campaigns, receipts) built on the Hi-Fi design system. When extending a module's UI, check the v2 surface first and prefer Hi-Fi components (`Hf*` from `public/js/design-system/hifi/`) over raw Bootstrap. Service shapes are preserved so logic can be wired without UI rewrites.
+
+**Hi-Fi Design System Integration:**
+- Component library: `public/js/design-system/hifi/` (primitives + SVG charts + Vue plugin + barrel `index.js`)
+- Tokens: `public/css/hifi-tokens.css` — use `--hf-*` CSS vars (never hardcode colors/spacing)
+- Live reference: `public/hifi/components.html`
+- Chart.js is being retired — use `HfLineChart`/`HfMultiLineChart`/`HfBarChart`/`HfPieChart`/etc. for new charts. See `KNOWLEDGE BASE/development/CHARTJS_REMOVAL_AUDIT.md` for the migration map.
 
 **Integration Requirements:**
 - Always use `ensureFirebaseInitialized()` before Firebase operations

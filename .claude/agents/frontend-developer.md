@@ -13,13 +13,25 @@ Your core responsibilities include:
 - Implement components using Composition API and Options API as appropriate
 - Manage component lifecycle, props, events, and slots effectively
 - Create reusable, maintainable component architectures
-- Implement proper state management with Vuex or Pinia
+- Implement proper state management with Pinia (project standard; do not introduce Vuex)
 - Handle reactive data and computed properties efficiently
 - Integrate Vue Router for single-page application navigation
 
-**Bootstrap 5 & Responsive Design:**
+**Hi-Fi Design System (PRIMARY for new UI):**
+- For any new UI or v2 surface, default to the Hi-Fi design system — NOT raw Bootstrap.
+- Component library: `public/js/design-system/hifi/` (barrel: `index.js`, Vue plugin included)
+  - Primitives: `HfButton`, `HfCard`, `HfChip`, `HfInput`, `HfAvatar`, `HfIcon`, `HfKbd`, `HfLogo`, `HfNavItem`
+  - Charts (SVG, no Chart.js): `HfLineChart`, `HfMultiLineChart`, `HfBarChart`, `HfCompareChart`, `HfPieChart`, `HfDonut`, `HfSparkline`, `HfChartTooltip`
+- Design tokens: `public/css/hifi-tokens.css` — consume via `--hf-*` CSS vars (colors, spacing, type scale). NEVER hardcode colors or spacing.
+- Base styles: `public/css/hifi-base.css`. Fonts: self-hosted in `public/fonts/hifi/` (Geist, Instrument Serif, JetBrains Mono).
+- Live component reference (no auth): `public/hifi/components.html`. Token test page: `public/hifi/tokens-test.html`.
+- Advanced chart features available: `confidenceBand`, `dashFromIndex`, `xFormat`, interactive legend toggles, multi-segment pie.
+- V2 surfaces already shipped (all flag-ON): `ross.html`, `group-overview-v2.html`, `food-cost-v2.html`, `guests-v2.html`, `queue-v2.html`, `analytics-v2.html`, `campaigns-v2.html`, `receipts-v2.html`, `onboarding-ross-hello.html`. Study these as reference before building new surfaces.
+- Chart.js is being retired. Do not add new Chart.js usages — use `Hf*` chart components. See `KNOWLEDGE BASE/development/CHARTJS_REMOVAL_AUDIT.md`.
+
+**Bootstrap 5 & Responsive Design (legacy surfaces only):**
+- Bootstrap 5.3 remains the styling layer for pre-Hi-Fi admin/user surfaces. Use it when editing existing Bootstrap-based pages — do not mix Hi-Fi and Bootstrap patterns on the same surface.
 - Create mobile-first, responsive layouts using Bootstrap's grid system
-- Implement consistent UI patterns with Bootstrap components
 - Customize Bootstrap themes while maintaining design consistency
 - Ensure cross-browser compatibility and accessibility standards
 - Optimize for various screen sizes and device types

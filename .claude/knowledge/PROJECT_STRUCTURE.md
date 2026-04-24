@@ -1,7 +1,16 @@
 # Project Structure Documentation
 **Meraki Captive Portal with Firebase DB**
 
-> **Purpose**: This document outlines the canonical structure of the MerakiCaptivePortal-firebaseDB project. It should be maintained throughout the project's lifecycle to help developers and AI agents understand the codebase organization without extensive exploration.
+> [!WARNING]
+> **STALE — last updated 2026-02-05.** Do not use as source of truth. This predates the Vue 3 selective migration, sales-forecasting module, Hi-Fi design system, and v2 surfaces. The tier names (Free/Pro/Enterprise) listed below are also out of date.
+>
+> **Canonical sources:**
+> - Project overview + key paths + KB index: `/CLAUDE.md` (repo root)
+> - Full knowledge base: `/KNOWLEDGE BASE/README.md`
+>
+> Kept here for historical reference only.
+
+> **Purpose (original)**: This document outlines the canonical structure of the MerakiCaptivePortal-firebaseDB project. It should be maintained throughout the project's lifecycle to help developers and AI agents understand the codebase organization without extensive exploration.
 
 > [!IMPORTANT]
 > This document should be updated whenever significant structural changes are made to the project, such as adding new modules, reorganizing directories, or deprecating features.

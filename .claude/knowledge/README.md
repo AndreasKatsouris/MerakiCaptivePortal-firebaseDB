@@ -1,6 +1,13 @@
 # Claude Code Knowledge Base
 **Meraki Captive Portal Project**
 
+> [!WARNING]
+> **This directory is stale (last updated 2026-02-05).** Do not rely on it as a source of truth. Use these instead:
+> - `/CLAUDE.md` — current project overview, key paths, KB index, tech stack
+> - `/KNOWLEDGE BASE/README.md` — full curated knowledge base (active)
+>
+> Retained for historical reference.
+
 This directory contains curated knowledge about the Meraki Captive Portal project to help Claude Code agents work efficiently without extensive codebase exploration.
 
 ## Knowledge Items

@@ -2,7 +2,6 @@
   "permissions": {
     "allow": [
       "Bash(git add:*)",
-      "Bash(git commit -m \"$\\(cat <<''EOF''\nfeat: add sales forecasting module services\n\nAdd modular service layer for sales forecasting tool:\n- SalesDataService: Historical data and forecast management\n- ForecastEngine: Forecasting algorithms and calculations\n- ForecastAnalytics: Analytics and accuracy metrics\n\nCo-Authored-By: Claude Sonnet 4.5 <noreply@anthropic.com>\nEOF\n\\)\")",
       "Bash(git merge:*)",
       "Bash(git commit:*)",
       "Bash(git checkout:*)",
@@ -29,7 +28,19 @@
       "Bash(git rm:*)",
       "Bash(git restore:*)",
       "Bash(echo:*)",
-      "Bash(cd:*)"
+      "Bash(cd:*)",
+      "Bash(npm run:*)",
+      "Bash(where gh:*)",
+      "Bash(cmd:*)",
+      "Bash(firebase functions:list:*)",
+      "Bash(awk NR>=4220 && NR<=4320:*)",
+      "Bash(awk NR>=1460 && NR<=1490:*)",
+      "Bash(grep:*)",
+      "mcp__plugin_firebase_firebase__realtimedatabase_get_data",
+      "mcp__plugin_firebase_firebase__realtimedatabase_set_data",
+      "Bash(npx firebase:*)",
+      "Bash(npx vite *)",
+      "Bash(unzip -o \"Sparks Hospitality-handoff.zip\" -d /tmp/sparks-handoff/)"
     ]
   },
   "enabledPlugins": {
