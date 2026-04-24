@@ -21,7 +21,8 @@ export default defineConfig({
         'queue-v2':                 resolve(__dirname, 'public/queue-v2.html'),
         'analytics-v2':             resolve(__dirname, 'public/analytics-v2.html'),
         'campaigns-v2':             resolve(__dirname, 'public/campaigns-v2.html'),
-        'receipts-v2':              resolve(__dirname, 'public/receipts-v2.html')
+        'receipts-v2':              resolve(__dirname, 'public/receipts-v2.html'),
+        'index-v2':                 resolve(__dirname, 'public/index-v2.html')
       }
     }
   },
