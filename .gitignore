@@ -74,5 +74,5 @@ node_modules/
 # Git worktrees
 .worktrees/
 
-# Git worktrees for feature branches
-.worktrees/
+# Playwright MCP screenshot scratch
+.playwright-mcp/
