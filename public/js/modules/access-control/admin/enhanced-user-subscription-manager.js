@@ -153,10 +153,11 @@ const EnhancedUserSubscriptionManager = {
       // For user creation
       showCreateUser: false,
       newUserData: {
+        firstName: '',
+        lastName: '',
         email: '',
-        displayName: '',
-        tier: 'free',
-        paymentStatus: 'none'
+        password: '',
+        tier: 'free'
       },
       
       // For user editing
@@ -500,7 +501,10 @@ const EnhancedUserSubscriptionManager = {
             status: 'none',
             paymentStatus: 'none'
           };
-          
+
+          // Normalize tier — database may store as tierId (standardized) or tier (legacy)
+          subscription.tier = subscription.tierId || subscription.tier || 'free';
+
           // Normalize status
           const status = subscription.paymentStatus || subscription.status || 'none';
           
@@ -733,16 +737,17 @@ const EnhancedUserSubscriptionManager = {
               updates[`${basePath}/lastUpdated`] = timestamp;
               updates[`${basePath}/history/${timestamp}`] = {
                 action: 'status_change',
-                from: user.subscription?.status,
+                from: user.subscription?.status || 'none',
                 to: actionValue,
                 timestamp,
                 adminUser: auth.currentUser?.uid || 'admin'
               };
               break;
-              
+
             case 'tier':
               const tierData = this.availableTiers[actionValue];
               updates[`${basePath}/tier`] = actionValue;
+              updates[`${basePath}/tierId`] = actionValue;
               updates[`${basePath}/lastUpdated`] = timestamp;
               if (tierData) {
                 updates[`${basePath}/features`] = tierData.features || {};
@@ -751,7 +756,7 @@ const EnhancedUserSubscriptionManager = {
               }
               updates[`${basePath}/history/${timestamp}`] = {
                 action: 'tier_change',
-                from: user.subscription?.tier,
+                from: user.subscription?.tier || 'none',
                 to: actionValue,
                 timestamp,
                 adminUser: auth.currentUser?.uid || 'admin'
@@ -846,10 +851,11 @@ const EnhancedUserSubscriptionManager = {
         
         const updates = {
           [`subscriptions/${user.id}/tier`]: newTier,
+          [`subscriptions/${user.id}/tierId`]: newTier,
           [`subscriptions/${user.id}/lastUpdated`]: timestamp,
           [`subscriptions/${user.id}/history/${timestamp}`]: {
             action: 'tier_change',
-            from: user.subscription?.tier,
+            from: user.subscription?.tier || 'none',
             to: newTier,
             timestamp,
             adminUser: auth.currentUser?.uid || 'admin'
@@ -872,96 +878,106 @@ const EnhancedUserSubscriptionManager = {
       }
     },
     
-    // User Creation
+    // User Creation — calls createUserAccount Cloud Function
+    generateTempPassword() {
+      const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZabcdefghjkmnpqrstuvwxyz23456789';
+      let password = '';
+      for (let i = 0; i < 12; i++) {
+        password += chars.charAt(Math.floor(Math.random() * chars.length));
+      }
+      this.newUserData.password = password;
+    },
+
     async createUser() {
-      if (!this.newUserData.email) {
-        showToast('Email is required', 'warning');
+      const { firstName, lastName, email, password, tier } = this.newUserData;
+
+      if (!firstName || !lastName || !email || !password) {
+        showToast('First name, last name, email, and password are required', 'warning');
         return;
       }
-      
+
+      if (password.length < 6) {
+        showToast('Password must be at least 6 characters', 'warning');
+        return;
+      }
+
       this.isLoading = true;
       try {
-        const userId = `user_${Date.now()}`;
-        const timestamp = Date.now();
-        
-        const userData = {
-          email: this.newUserData.email,
-          displayName: this.newUserData.displayName || this.newUserData.email,
-          createdAt: timestamp,
-          createdBy: 'admin'
-        };
-        
-        const subscriptionData = {
-          tier: this.newUserData.tier,
-          paymentStatus: this.newUserData.paymentStatus,
-          startDate: timestamp,
-          features: this.availableTiers[this.newUserData.tier]?.features || {},
-          limits: this.availableTiers[this.newUserData.tier]?.limits || {},
-          history: {
-            [timestamp]: {
-              action: 'admin_create',
-              timestamp,
-              adminUser: 'CURRENT_ADMIN_UID'
-            }
-          }
-        };
-        
-        // SAFETY CHECK: Ensure user doesn't already exist to prevent overwrites
-        const userRef = ref(rtdb, `users/${userId}`);
-        const subscriptionRef = ref(rtdb, `subscriptions/${userId}`);
-        
-        const existingUserSnapshot = await get(userRef);
-        if (existingUserSnapshot.exists()) {
-            console.log(`⚠️ [EnhancedUserSubscriptionManager] User ${userId} already exists, merging data instead of overwriting`);
-            const existingUserData = existingUserSnapshot.val();
-            
-            // Preserve existing data, especially phone numbers
-            const mergedUserData = {
-                ...existingUserData,
-                ...userData,
-                // Explicitly preserve phone numbers if they exist
-                phoneNumber: existingUserData.phoneNumber || userData.phoneNumber,
-                phone: existingUserData.phone || userData.phone,
-                businessPhone: existingUserData.businessPhone || userData.businessPhone,
-                updatedAt: Date.now()
-            };
-            
-            await update(userRef, mergedUserData);
-        } else {
-            await set(userRef, userData);
+        const idToken = await auth.currentUser.getIdToken();
+        const functionsUrl = 'https://us-central1-merakicaptiveportal-firebasedb.cloudfunctions.net';
+
+        const response = await fetch(`${functionsUrl}/createUserAccount`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${idToken}`
+          },
+          body: JSON.stringify({
+            email,
+            password,
+            firstName,
+            lastName,
+            tier: tier || 'free',
+            isAdmin: false,
+            locationIds: []
+          })
+        });
+
+        const result = await response.json();
+
+        if (!response.ok) {
+          throw new Error(result.error || 'Failed to create user');
         }
-        
-        // Check subscription as well
-        const existingSubscriptionSnapshot = await get(subscriptionRef);
-        if (existingSubscriptionSnapshot.exists()) {
-            console.log(`⚠️ [EnhancedUserSubscriptionManager] Subscription ${userId} already exists, merging data`);
-            const existingSubscriptionData = existingSubscriptionSnapshot.val();
-            const mergedSubscriptionData = {
-                ...existingSubscriptionData,
-                ...subscriptionData,
-                updatedAt: Date.now()
-            };
-            await update(subscriptionRef, mergedSubscriptionData);
-        } else {
-            await set(subscriptionRef, subscriptionData);
-        }
-        
-        showToast('User created successfully', 'success');
-        
+
+        showToast(
+          `User ${firstName} ${lastName} created. Welcome email sent to ${email}.`,
+          'success'
+        );
+
         // Reset form and reload data
-        this.newUserData = { email: '', displayName: '', tier: 'free', paymentStatus: 'none' };
+        this.newUserData = { firstName: '', lastName: '', email: '', password: '', tier: 'free' };
         this.showCreateUser = false;
-        await this.loadAllUsers();
+        await this.loadAllSubscriptions();
         await this.loadDashboardMetrics();
-        
+
       } catch (error) {
         console.error('Error creating user:', error);
-        showToast('Failed to create user', 'error');
+        showToast('Failed to create user: ' + error.message, 'error');
       } finally {
         this.isLoading = false;
       }
     },
     
+    async resendWelcomeEmail(user) {
+      try {
+        this.isLoading = true;
+        const idToken = await auth.currentUser.getIdToken();
+        const functionsUrl = 'https://us-central1-merakicaptiveportal-firebasedb.cloudfunctions.net';
+
+        const response = await fetch(`${functionsUrl}/resendWelcomeEmail`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${idToken}`
+          },
+          body: JSON.stringify({ userId: user.id })
+        });
+
+        const result = await response.json();
+
+        if (!response.ok) {
+          throw new Error(result.error || 'Failed to send email');
+        }
+
+        showToast(`Welcome email resent to ${user.email}`, 'success');
+      } catch (error) {
+        console.error('Error resending welcome email:', error);
+        showToast('Failed to resend email: ' + error.message, 'error');
+      } finally {
+        this.isLoading = false;
+      }
+    },
+
     // Existing methods from original component
     async loadTierDefinitions() {
       try {
@@ -1977,28 +1993,33 @@ const EnhancedUserSubscriptionManager = {
 EnhancedUserSubscriptionManager.template = `
   <div class="enhanced-user-sub-manager">
     <!-- Navigation Tabs -->
-    <ul class="nav nav-tabs mb-4">
-      <li class="nav-item">
-        <button class="nav-link" :class="{ active: currentView === 'status' }" @click="setCurrentView('status')">
-          <i class="fas fa-signal me-2"></i>Status Management
-        </button>
-      </li>
-      <li class="nav-item">
-        <button class="nav-link" :class="{ active: currentView === 'tiers' }" @click="setCurrentView('tiers')">
-          <i class="fas fa-layer-group me-2"></i>Tier Management
-        </button>
-      </li>
-      <li class="nav-item">
-        <button class="nav-link" :class="{ active: currentView === 'lifecycle' }" @click="setCurrentView('lifecycle')">
-          <i class="fas fa-sync-alt me-2"></i>Lifecycle
-        </button>
-      </li>
-      <li class="nav-item">
-        <button class="nav-link" :class="{ active: currentView === 'analytics' }" @click="setCurrentView('analytics')">
-          <i class="fas fa-chart-bar me-2"></i>Analytics
-        </button>
-      </li>
-    </ul>
+    <div class="d-flex align-items-center mb-4">
+      <ul class="nav nav-tabs flex-grow-1 mb-0">
+        <li class="nav-item">
+          <button class="nav-link" :class="{ active: currentView === 'status' }" @click="setCurrentView('status')">
+            <i class="fas fa-signal me-2"></i>Status Management
+          </button>
+        </li>
+        <li class="nav-item">
+          <button class="nav-link" :class="{ active: currentView === 'tiers' }" @click="setCurrentView('tiers')">
+            <i class="fas fa-layer-group me-2"></i>Tier Management
+          </button>
+        </li>
+        <li class="nav-item">
+          <button class="nav-link" :class="{ active: currentView === 'lifecycle' }" @click="setCurrentView('lifecycle')">
+            <i class="fas fa-sync-alt me-2"></i>Lifecycle
+          </button>
+        </li>
+        <li class="nav-item">
+          <button class="nav-link" :class="{ active: currentView === 'analytics' }" @click="setCurrentView('analytics')">
+            <i class="fas fa-chart-bar me-2"></i>Analytics
+          </button>
+        </li>
+      </ul>
+      <button class="btn btn-primary btn-sm ms-3" @click="showCreateUser = true">
+        <i class="fas fa-user-plus me-1"></i> Create User
+      </button>
+    </div>
 
     <!-- Status Management View -->
     <div v-if="currentView === 'status'" class="status-view">
@@ -2280,6 +2301,12 @@ EnhancedUserSubscriptionManager.template = `
                               <i class="fas fa-layer-group me-2"></i>{{ tier.name || tierId }}
                             </a>
                           </li>
+                          <template v-if="user.requiresPasswordChange">
+                            <li><hr class="dropdown-divider"></li>
+                            <li><a class="dropdown-item" href="#" @click.prevent="resendWelcomeEmail(user)">
+                              <i class="fas fa-envelope text-info me-2"></i>Resend Welcome Email
+                            </a></li>
+                          </template>
                         </ul>
                       </div>
                     </div>
@@ -2712,26 +2739,34 @@ EnhancedUserSubscriptionManager.template = `
           </div>
           <div class="modal-body">
             <form @submit.prevent="createUser">
+              <div class="row mb-3">
+                <div class="col-6">
+                  <label class="form-label">First Name *</label>
+                  <input type="text" class="form-control" v-model="newUserData.firstName" required>
+                </div>
+                <div class="col-6">
+                  <label class="form-label">Last Name *</label>
+                  <input type="text" class="form-control" v-model="newUserData.lastName" required>
+                </div>
+              </div>
               <div class="mb-3">
                 <label class="form-label">Email *</label>
                 <input type="email" class="form-control" v-model="newUserData.email" required>
               </div>
               <div class="mb-3">
-                <label class="form-label">Display Name</label>
-                <input type="text" class="form-control" v-model="newUserData.displayName">
+                <label class="form-label">Temporary Password *</label>
+                <div class="input-group">
+                  <input type="text" class="form-control" v-model="newUserData.password" required minlength="6">
+                  <button type="button" class="btn btn-outline-secondary" @click="generateTempPassword" title="Generate random password">
+                    <i class="fas fa-dice"></i> Generate
+                  </button>
+                </div>
+                <small class="text-muted">User will be prompted to change this on first login.</small>
               </div>
               <div class="mb-3">
-                <label class="form-label">Initial Tier</label>
+                <label class="form-label">Subscription Tier</label>
                 <select class="form-select" v-model="newUserData.tier">
                   <option v-for="(tier, tierId) in availableTiers" :key="tierId" :value="tierId">{{ tier.name || tierId }}</option>
-                </select>
-              </div>
-              <div class="mb-3">
-                <label class="form-label">Payment Status</label>
-                <select class="form-select" v-model="newUserData.paymentStatus">
-                  <option value="none">None</option>
-                  <option value="active">Active</option>
-                  <option value="trial">Trial</option>
                 </select>
               </div>
             </form>
