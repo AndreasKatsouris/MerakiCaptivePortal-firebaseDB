@@ -1,6 +1,7 @@
 // Import Firebase config
 import { auth, rtdb, ref, get, set, update, push } from './config/firebase-config.js';
 import { updatePassword } from 'https://www.gstatic.com/firebasejs/10.12.5/firebase-auth.js';
+import { escapeHtml } from './modules/compliance/utils/html-escape.js';
 
 // Wizard state
 let currentStep = 1;
@@ -137,12 +138,13 @@ async function initializeOnboarding(user) {
 
                     const card = document.createElement('div');
                     card.className = 'card mb-2 border-success';
+                    const addressLine = [address, city].filter(Boolean).join(', ') || 'No address set';
                     card.innerHTML = `
                         <div class="card-body d-flex align-items-center py-3">
                             <i class="fas fa-map-marker-alt text-success fa-lg me-3"></i>
                             <div>
-                                <h6 class="mb-0">${name}</h6>
-                                <small class="text-muted">${[address, city].filter(Boolean).join(', ') || 'No address set'}</small>
+                                <h6 class="mb-0">${escapeHtml(name)}</h6>
+                                <small class="text-muted">${escapeHtml(addressLine)}</small>
                             </div>
                             <i class="fas fa-check-circle text-success ms-auto"></i>
                         </div>`;
