@@ -14,6 +14,16 @@ const cors = require('cors')({
     credentials: true
 });
 const express = require('express');
+
+function escapeHtml(value) {
+    if (value === null || value === undefined) return '';
+    return String(value)
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#39;');
+}
 const { receiveWhatsAppMessage } = require('./receiveWhatsappMessage');
 const {
     sendWhatsAppMessage,
@@ -932,12 +942,12 @@ exports.createUserAccount = onRequest({ invoker: 'public' }, async (req, res) =>
                                     <h1 style="color: white; margin: 0;">Welcome to Sparks Hospitality</h1>
                                 </div>
                                 <div style="padding: 30px; background: #ffffff; border: 1px solid #e9ecef; border-top: none; border-radius: 0 0 8px 8px;">
-                                    <p>Hi ${firstName},</p>
+                                    <p>Hi ${escapeHtml(firstName)},</p>
                                     <p>Your account has been created by an administrator. Here are your login details:</p>
                                     <div style="background: #f8f9fa; padding: 20px; border-radius: 8px; margin: 20px 0;">
-                                        <p style="margin: 5px 0;"><strong>Email:</strong> ${email}</p>
-                                        <p style="margin: 5px 0;"><strong>Temporary Password:</strong> ${password}</p>
-                                        <p style="margin: 5px 0;"><strong>Subscription:</strong> ${tierData.name || tier}</p>
+                                        <p style="margin: 5px 0;"><strong>Email:</strong> ${escapeHtml(email)}</p>
+                                        <p style="margin: 5px 0;"><strong>Temporary Password:</strong> ${escapeHtml(password)}</p>
+                                        <p style="margin: 5px 0;"><strong>Subscription:</strong> ${escapeHtml(tierData.name || tier)}</p>
                                     </div>
                                     <p style="text-align: center; margin: 25px 0;">
                                         <a href="${loginUrl}" style="background: #0d6efd; color: white; padding: 12px 30px; text-decoration: none; border-radius: 6px; font-weight: bold;">Log In Now</a>
@@ -1076,12 +1086,12 @@ exports.resendWelcomeEmail = onRequest({ invoker: 'public' }, async (req, res) =
                                 <h1 style="color: white; margin: 0;">Welcome to Sparks Hospitality</h1>
                             </div>
                             <div style="padding: 30px; background: #ffffff; border: 1px solid #e9ecef; border-top: none; border-radius: 0 0 8px 8px;">
-                                <p>Hi ${firstName},</p>
+                                <p>Hi ${escapeHtml(firstName)},</p>
                                 <p>Your account has been created by an administrator. Here are your login details:</p>
                                 <div style="background: #f8f9fa; padding: 20px; border-radius: 8px; margin: 20px 0;">
-                                    <p style="margin: 5px 0;"><strong>Email:</strong> ${authUser.email}</p>
-                                    <p style="margin: 5px 0;"><strong>Temporary Password:</strong> ${tempPassword}</p>
-                                    <p style="margin: 5px 0;"><strong>Subscription:</strong> ${tierData.name || tierId}</p>
+                                    <p style="margin: 5px 0;"><strong>Email:</strong> ${escapeHtml(authUser.email)}</p>
+                                    <p style="margin: 5px 0;"><strong>Temporary Password:</strong> ${escapeHtml(tempPassword)}</p>
+                                    <p style="margin: 5px 0;"><strong>Subscription:</strong> ${escapeHtml(tierData.name || tierId)}</p>
                                 </div>
                                 <p style="text-align: center; margin: 25px 0;">
                                     <a href="${loginUrl}" style="background: #0d6efd; color: white; padding: 12px 30px; text-decoration: none; border-radius: 6px; font-weight: bold;">Log In Now</a>
