@@ -203,6 +203,31 @@
     </style>
 </head>
 <body>
+    <!-- Password Change Modal (shown for admin-created users) -->
+    <div id="password-change-overlay" style="display:none; position:fixed; inset:0; z-index:9999; background:rgba(0,0,0,0.6); display:none; align-items:center; justify-content:center;">
+        <div style="background:white; border-radius:20px; max-width:450px; width:90%; padding:40px; box-shadow:0 20px 60px rgba(0,0,0,0.3);">
+            <div style="text-align:center; margin-bottom:25px;">
+                <i class="fas fa-shield-alt" style="font-size:48px; color:#667eea;"></i>
+                <h3 style="margin-top:15px;">Update Your Password</h3>
+                <p class="text-muted">For security, please set a new password before continuing.</p>
+            </div>
+            <form id="password-change-form">
+                <div class="mb-3">
+                    <label for="new-password" class="form-label">New Password *</label>
+                    <input type="password" class="form-control" id="new-password" required minlength="8" placeholder="At least 8 characters">
+                </div>
+                <div class="mb-3">
+                    <label for="confirm-password" class="form-label">Confirm Password *</label>
+                    <input type="password" class="form-control" id="confirm-password" required minlength="8" placeholder="Re-enter your new password">
+                </div>
+                <div id="password-error" class="text-danger mb-3" style="display:none;"></div>
+                <button type="submit" class="btn btn-wizard-primary w-100" id="change-password-btn">
+                    <i class="fas fa-lock me-2"></i> Set New Password
+                </button>
+            </form>
+        </div>
+    </div>
+
     <div class="wizard-container">
         <div class="wizard-card">
             <div class="wizard-header">
@@ -265,30 +290,45 @@
 
                 <!-- Step 2: Location Setup -->
                 <div class="wizard-step" data-step="2">
-                    <h4 class="mb-4"><i class="fas fa-map-marker-alt me-2"></i> Add your first location</h4>
-                    <form id="location-setup-form">
-                        <div class="mb-3">
-                            <label for="location-name" class="form-label">Location Name *</label>
-                            <input type="text" class="form-control" id="location-name" required placeholder="e.g., Downtown Branch">
+                    <!-- Pre-assigned locations (shown if admin assigned locations) -->
+                    <div id="assigned-locations-view" style="display:none;">
+                        <h4 class="mb-4"><i class="fas fa-map-marker-alt me-2"></i> Your Location</h4>
+                        <p class="text-muted mb-3">Your administrator has already assigned you to the following location(s):</p>
+                        <div id="assigned-locations-list"></div>
+                        <div class="mt-3">
+                            <button type="button" class="btn btn-outline-primary btn-sm" id="show-add-location-btn">
+                                <i class="fas fa-plus me-1"></i> Add Another Location
+                            </button>
                         </div>
-                        <div class="mb-3">
-                            <label for="location-address" class="form-label">Address *</label>
-                            <textarea class="form-control" id="location-address" rows="3" required placeholder="123 Main Street, City, Province"></textarea>
-                        </div>
-                        <div class="row">
-                            <div class="col-md-6 mb-3">
-                                <label for="location-city" class="form-label">City *</label>
-                                <input type="text" class="form-control" id="location-city" required placeholder="Cape Town">
+                    </div>
+
+                    <!-- Create new location form -->
+                    <div id="new-location-view">
+                        <h4 class="mb-4"><i class="fas fa-map-marker-alt me-2"></i> Add your first location</h4>
+                        <form id="location-setup-form">
+                            <div class="mb-3">
+                                <label for="location-name" class="form-label">Location Name *</label>
+                                <input type="text" class="form-control" id="location-name" required placeholder="e.g., Downtown Branch">
                             </div>
-                            <div class="col-md-6 mb-3">
-                                <label for="location-timezone" class="form-label">Timezone *</label>
-                                <select class="form-select" id="location-timezone" required>
-                                    <option value="Africa/Johannesburg" selected>Africa/Johannesburg (SAST)</option>
-                                    <option value="Africa/Cape_Town">Africa/Cape Town (SAST)</option>
-                                </select>
+                            <div class="mb-3">
+                                <label for="location-address" class="form-label">Address *</label>
+                                <textarea class="form-control" id="location-address" rows="3" required placeholder="123 Main Street, City, Province"></textarea>
                             </div>
-                        </div>
-                    </form>
+                            <div class="row">
+                                <div class="col-md-6 mb-3">
+                                    <label for="location-city" class="form-label">City *</label>
+                                    <input type="text" class="form-control" id="location-city" required placeholder="Cape Town">
+                                </div>
+                                <div class="col-md-6 mb-3">
+                                    <label for="location-timezone" class="form-label">Timezone *</label>
+                                    <select class="form-select" id="location-timezone" required>
+                                        <option value="Africa/Johannesburg" selected>Africa/Johannesburg (SAST)</option>
+                                        <option value="Africa/Cape_Town">Africa/Cape Town (SAST)</option>
+                                    </select>
+                                </div>
+                            </div>
+                        </form>
+                    </div>
                 </div>
 
                 <!-- Step 3: Preferences -->
