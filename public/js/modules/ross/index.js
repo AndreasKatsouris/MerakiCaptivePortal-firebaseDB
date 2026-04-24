@@ -98,10 +98,11 @@ const RECURRENCE_LABELS = {
 // ---------------------------------------------------------------------------
 // initializeRoss
 // ---------------------------------------------------------------------------
-export async function initializeRoss() {
+export async function initializeRoss(options = {}) {
     if (rossState.app) {
         cleanupRoss();
     }
+    rossState.isAdmin = options.isAdmin ?? false;
 
     const container = document.getElementById('ross-app');
     if (!container) {
@@ -182,19 +183,19 @@ export async function initializeRoss() {
                     <i class="fas fa-project-diagram me-1"></i>My Workflows
                 </button>
             </li>
-            <li class="nav-item">
+            <li v-if="isAdmin || rossFeatureTier === 'advanced'" class="nav-item">
                 <button class="nav-link" :class="{ active: currentTab === 'builder' }"
                     @click="switchTab('builder')">
                     <i class="fas fa-tools me-1"></i>Workflow Builder
                 </button>
             </li>
-            <li class="nav-item">
+            <li v-if="isAdmin || rossFeatureTier === 'advanced'" class="nav-item">
                 <button class="nav-link" :class="{ active: currentTab === 'reports' }"
                     @click="switchTab('reports')">
                     <i class="fas fa-chart-bar me-1"></i>Reports
                 </button>
             </li>
-            <li class="nav-item">
+            <li v-if="isAdmin || rossFeatureTier === 'advanced'" class="nav-item">
                 <button class="nav-link" :class="{ active: currentTab === 'staff' }"
                     @click="switchTab('staff')">
                     <i class="fas fa-users me-1"></i>Staff
@@ -339,8 +340,8 @@ export async function initializeRoss() {
             <p class="mt-2 text-muted">Loading templates...</p>
         </div>
 
-        <!-- Template Editor Panel -->
-        <div v-else-if="templateEditor" class="card shadow-sm border-0 mb-4">
+        <!-- Template Editor Panel (admin only) -->
+        <div v-else-if="isAdmin && templateEditor" class="card shadow-sm border-0 mb-4">
             <div class="card-header d-flex justify-content-between align-items-center">
                 <h6 class="mb-0">
                     <i class="fas fa-edit me-2"></i>
@@ -514,11 +515,11 @@ export async function initializeRoss() {
                                 @click="activateTemplate(tmpl)">
                                 <i class="fas fa-play me-1"></i>Activate
                             </button>
-                            <button class="btn btn-outline-secondary btn-sm"
+                            <button v-if="isAdmin" class="btn btn-outline-secondary btn-sm"
                                 @click="openEditTemplate(tmpl)" title="Edit template">
                                 <i class="fas fa-edit"></i>
                             </button>
-                            <button class="btn btn-outline-danger btn-sm"
+                            <button v-if="isAdmin" class="btn btn-outline-danger btn-sm"
                                 @click="deleteTemplate(tmpl)" title="Delete template">
                                 <i class="fas fa-trash"></i>
                             </button>
@@ -528,7 +529,7 @@ export async function initializeRoss() {
             </div>
 
             <!-- Super Admin: add template -->
-            <div class="mt-4">
+            <div v-if="isAdmin" class="mt-4">
                 <button class="btn btn-outline-primary" @click="openCreateTemplate()">
                     <i class="fas fa-plus me-1"></i>Add Template
                 </button>
@@ -1220,6 +1221,8 @@ export async function initializeRoss() {
             return {
                 // Module state
                 locationId: rossState.locationId,
+                isAdmin: rossState.isAdmin || false,
+                rossFeatureTier: 'basic', // 'basic' | 'advanced'
 
                 // Navigation
                 currentTab: 'overview',
@@ -2338,7 +2341,20 @@ export async function initializeRoss() {
             }
         },
 
-        mounted() {
+        async mounted() {
+            // Detect ROSS feature tier for non-admin users
+            if (!this.isAdmin) {
+                try {
+                    const { featureAccessControl } = await import('../../modules/access-control/services/feature-access-control.js');
+                    const advResult = await featureAccessControl.checkFeatureAccess('rossAdvanced');
+                    this.rossFeatureTier = advResult.hasAccess ? 'advanced' : 'basic';
+                } catch (e) {
+                    console.warn('[ROSS] Could not check feature tier, defaulting to basic:', e.message);
+                }
+            } else {
+                this.rossFeatureTier = 'advanced';
+            }
+
             if (this.locationId) {
                 this.staffLocationId = this.locationId;
                 this.loadOverview();

@@ -4,8 +4,9 @@
  *
  * Auth pattern: onRequest + Bearer token (mirrors projectManagement.js)
  *
- * @version 1.0.0
+ * @version 1.1.0
  * @created 2026-02-25
+ * @updated 2026-03-24 — verifyUserOrAdmin for user-dashboard access
  */
 
 const { onRequest } = require('firebase-functions/v2/https');
@@ -48,6 +49,26 @@ async function verifyAdmin(decodedToken) {
     return { uid, isSuperAdmin: !!userData.superAdmin };
 }
 
+async function verifyUserOrAdmin(decodedToken) {
+    const uid = decodedToken.uid;
+
+    // Check admin first (existing path)
+    const adminSnapshot = await db.ref(`admins/${uid}`).once('value');
+    const adminData = adminSnapshot.val();
+    if (adminData) {
+        return { uid, isAdmin: true, isSuperAdmin: !!adminData.superAdmin };
+    }
+
+    // Check subscription for ROSS access
+    const subSnapshot = await db.ref(`subscriptions/${uid}/features`).once('value');
+    const features = subSnapshot.val();
+    if (features && (features.rossBasic || features.rossAdvanced)) {
+        return { uid, isAdmin: false, isSuperAdmin: false };
+    }
+
+    throw new Error('Access denied: ROSS feature not available on your subscription');
+}
+
 async function verifySuperAdmin(decodedToken) {
     const { uid, isSuperAdmin } = await verifyAdmin(decodedToken);
     if (!isSuperAdmin) throw new Error('Super Admin access required');
@@ -58,20 +79,40 @@ function generateId() {
     return db.ref().push().key;
 }
 
+/**
+ * Verify the caller has access to every requested location.
+ * Super admins bypass — they manage the entire platform.
+ * All other users must have each locationId in userLocations/{uid}.
+ *
+ * @param {string} uid - Authenticated user ID
+ * @param {string[]} locationIds - Location IDs to verify
+ * @param {boolean} isSuperAdmin - Whether the caller is a super admin
+ */
+async function verifyLocationAccess(uid, locationIds, isSuperAdmin) {
+    if (isSuperAdmin) return;
+    const snap = await db.ref(`userLocations/${uid}`).once('value');
+    const allowed = snap.val() || {};
+    for (const locId of locationIds) {
+        if (!allowed[locId]) {
+            throw new Error(`Location access denied: ${locId}`);
+        }
+    }
+}
+
 // ============================================
 // TEMPLATE OPERATIONS (Super Admin managed)
 // ============================================
 
 /**
  * Fetch all templates with optional category filter
- * Access: All admins
+ * Access: All admins and subscribed users
  */
 exports.rossGetTemplates = onRequest(async (req, res) => {
     return cors(req, res, async () => {
         if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' });
         try {
             const decodedToken = await verifyAuthToken(req);
-            await verifyAdmin(decodedToken);
+            await verifyUserOrAdmin(decodedToken);
 
             const data = req.body.data || req.body;
             const { category } = data || {};
@@ -88,7 +129,7 @@ exports.rossGetTemplates = onRequest(async (req, res) => {
             res.json({ result: { success: true, templates } });
         } catch (error) {
             console.error('[rossGetTemplates] Error:', error.message);
-            const statusCode = (error.message.includes('Admin') || error.message.includes('Super Admin')) ? 403 : 500;
+            const statusCode = (error.message.includes('Admin') || error.message.includes('Super Admin') || error.message.includes('access denied')) ? 403 : 500;
             res.status(statusCode).json({ error: error.message });
         }
     });
@@ -135,7 +176,7 @@ exports.rossCreateTemplate = onRequest(async (req, res) => {
             res.json({ result: { success: true, templateId, template: templateData } });
         } catch (error) {
             console.error('[rossCreateTemplate] Error:', error.message);
-            const statusCode = (error.message.includes('Admin') || error.message.includes('Super Admin')) ? 403 : 500;
+            const statusCode = (error.message.includes('Admin') || error.message.includes('Super Admin') || error.message.includes('access denied')) ? 403 : 500;
             res.status(statusCode).json({ error: error.message });
         }
     });
@@ -180,7 +221,7 @@ exports.rossUpdateTemplate = onRequest(async (req, res) => {
             res.json({ result: { success: true, templateId } });
         } catch (error) {
             console.error('[rossUpdateTemplate] Error:', error.message);
-            const statusCode = (error.message.includes('Admin') || error.message.includes('Super Admin')) ? 403 : 500;
+            const statusCode = (error.message.includes('Admin') || error.message.includes('Super Admin') || error.message.includes('access denied')) ? 403 : 500;
             res.status(statusCode).json({ error: error.message });
         }
     });
@@ -207,7 +248,7 @@ exports.rossDeleteTemplate = onRequest(async (req, res) => {
             res.json({ result: { success: true, templateId } });
         } catch (error) {
             console.error('[rossDeleteTemplate] Error:', error.message);
-            const statusCode = (error.message.includes('Admin') || error.message.includes('Super Admin')) ? 403 : 500;
+            const statusCode = (error.message.includes('Admin') || error.message.includes('Super Admin') || error.message.includes('access denied')) ? 403 : 500;
             res.status(statusCode).json({ error: error.message });
         }
     });
@@ -226,7 +267,7 @@ exports.rossActivateWorkflow = onRequest(async (req, res) => {
         if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' });
         try {
             const decodedToken = await verifyAuthToken(req);
-            const { uid } = await verifyAdmin(decodedToken);
+            const { uid, isSuperAdmin } = await verifyUserOrAdmin(decodedToken);
 
             const data = req.body.data || req.body;
             const { templateId, locationIds, locationNames, name, nextDueDate, daysBeforeAlert, notifyPhone, notifyEmail } = data;
@@ -234,6 +275,8 @@ exports.rossActivateWorkflow = onRequest(async (req, res) => {
             if (!templateId) return res.status(400).json({ error: 'Template ID is required' });
             if (!Array.isArray(locationIds) || locationIds.length === 0) return res.status(400).json({ error: 'At least one location ID is required' });
             if (!nextDueDate) return res.status(400).json({ error: 'Next due date is required' });
+
+            await verifyLocationAccess(uid, locationIds, isSuperAdmin);
 
             const templateSnap = await db.ref(`ross/templates/${templateId}`).once('value');
             if (!templateSnap.exists()) return res.status(404).json({ error: 'Template not found' });
@@ -290,7 +333,7 @@ exports.rossActivateWorkflow = onRequest(async (req, res) => {
             res.json({ result: { success: true, workflowId, workflow: workflowData } });
         } catch (error) {
             console.error('[rossActivateWorkflow] Error:', error.message);
-            const statusCode = (error.message.includes('Admin') || error.message.includes('Super Admin')) ? 403 : 500;
+            const statusCode = (error.message.includes('Admin') || error.message.includes('Super Admin') || error.message.includes('access denied')) ? 403 : 500;
             res.status(statusCode).json({ error: error.message });
         }
     });
@@ -305,7 +348,7 @@ exports.rossCreateWorkflow = onRequest(async (req, res) => {
         if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' });
         try {
             const decodedToken = await verifyAuthToken(req);
-            const { uid } = await verifyAdmin(decodedToken);
+            const { uid, isSuperAdmin } = await verifyUserOrAdmin(decodedToken);
 
             const data = req.body.data || req.body;
             const { name, category, recurrence, locationIds, locationNames, nextDueDate, subtasks, daysBeforeAlert, notifyPhone, notifyEmail } = data;
@@ -315,6 +358,8 @@ exports.rossCreateWorkflow = onRequest(async (req, res) => {
             if (!VALID_RECURRENCES.includes(recurrence)) return res.status(400).json({ error: 'Invalid recurrence' });
             if (!Array.isArray(locationIds) || locationIds.length === 0) return res.status(400).json({ error: 'At least one location ID is required' });
             if (!nextDueDate) return res.status(400).json({ error: 'Next due date is required' });
+
+            await verifyLocationAccess(uid, locationIds, isSuperAdmin);
 
             const workflowId = generateId();
             const now = Date.now();
@@ -366,7 +411,7 @@ exports.rossCreateWorkflow = onRequest(async (req, res) => {
             res.json({ result: { success: true, workflowId, workflow: workflowData } });
         } catch (error) {
             console.error('[rossCreateWorkflow] Error:', error.message);
-            const statusCode = (error.message.includes('Admin') || error.message.includes('Super Admin')) ? 403 : 500;
+            const statusCode = (error.message.includes('Admin') || error.message.includes('Super Admin') || error.message.includes('access denied')) ? 403 : 500;
             res.status(statusCode).json({ error: error.message });
         }
     });
@@ -381,7 +426,7 @@ exports.rossUpdateWorkflow = onRequest(async (req, res) => {
         if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' });
         try {
             const decodedToken = await verifyAuthToken(req);
-            const { uid } = await verifyAdmin(decodedToken);
+            const { uid } = await verifyUserOrAdmin(decodedToken);
 
             const data = req.body.data || req.body;
             const { workflowId, updates } = data;
@@ -415,7 +460,7 @@ exports.rossUpdateWorkflow = onRequest(async (req, res) => {
             res.json({ result: { success: true, workflowId } });
         } catch (error) {
             console.error('[rossUpdateWorkflow] Error:', error.message);
-            const statusCode = (error.message.includes('Admin') || error.message.includes('Super Admin')) ? 403 : 500;
+            const statusCode = (error.message.includes('Admin') || error.message.includes('Super Admin') || error.message.includes('access denied')) ? 403 : 500;
             res.status(statusCode).json({ error: error.message });
         }
     });
@@ -430,7 +475,7 @@ exports.rossDeleteWorkflow = onRequest(async (req, res) => {
         if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' });
         try {
             const decodedToken = await verifyAuthToken(req);
-            const { uid } = await verifyAdmin(decodedToken);
+            const { uid } = await verifyUserOrAdmin(decodedToken);
 
             const data = req.body.data || req.body;
             const { workflowId } = data;
@@ -447,7 +492,7 @@ exports.rossDeleteWorkflow = onRequest(async (req, res) => {
             res.json({ result: { success: true, workflowId } });
         } catch (error) {
             console.error('[rossDeleteWorkflow] Error:', error.message);
-            const statusCode = (error.message.includes('Admin') || error.message.includes('Super Admin')) ? 403 : 500;
+            const statusCode = (error.message.includes('Admin') || error.message.includes('Super Admin') || error.message.includes('access denied')) ? 403 : 500;
             res.status(statusCode).json({ error: error.message });
         }
     });
@@ -462,10 +507,12 @@ exports.rossGetWorkflows = onRequest(async (req, res) => {
         if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' });
         try {
             const decodedToken = await verifyAuthToken(req);
-            const { uid } = await verifyAdmin(decodedToken);
+            const { uid, isSuperAdmin } = await verifyUserOrAdmin(decodedToken);
 
             const data = req.body.data || req.body;
             const { locationId, category, status } = data || {};
+
+            if (locationId) await verifyLocationAccess(uid, [locationId], isSuperAdmin);
 
             const snapshot = await db.ref(`ross/workflows/${uid}`).once('value');
             let workflows = Object.values(snapshot.val() || {});
@@ -497,7 +544,7 @@ exports.rossGetWorkflows = onRequest(async (req, res) => {
             res.json({ result: { success: true, workflows } });
         } catch (error) {
             console.error('[rossGetWorkflows] Error:', error.message);
-            const statusCode = (error.message.includes('Admin') || error.message.includes('Super Admin')) ? 403 : 500;
+            const statusCode = (error.message.includes('Admin') || error.message.includes('Super Admin') || error.message.includes('access denied')) ? 403 : 500;
             res.status(statusCode).json({ error: error.message });
         }
     });
@@ -516,11 +563,13 @@ exports.rossManageTask = onRequest(async (req, res) => {
         if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' });
         try {
             const decodedToken = await verifyAuthToken(req);
-            const { uid } = await verifyAdmin(decodedToken);
+            const { uid, isSuperAdmin } = await verifyUserOrAdmin(decodedToken);
 
             const data = req.body.data || req.body;
             const { workflowId, locationId, action, taskId, taskData } = data;
             if (!workflowId || !locationId) return res.status(400).json({ error: 'Workflow ID and Location ID are required' });
+
+            await verifyLocationAccess(uid, [locationId], isSuperAdmin);
 
             const locationRef = db.ref(`ross/workflows/${uid}/${workflowId}/locations/${locationId}`);
             const snap = await locationRef.once('value');
@@ -581,7 +630,7 @@ exports.rossManageTask = onRequest(async (req, res) => {
             }
         } catch (error) {
             console.error('[rossManageTask] Error:', error.message);
-            const statusCode = (error.message.includes('Admin') || error.message.includes('Super Admin')) ? 403 : 500;
+            const statusCode = (error.message.includes('Admin') || error.message.includes('Super Admin') || error.message.includes('access denied')) ? 403 : 500;
             res.status(statusCode).json({ error: error.message });
         }
     });
@@ -596,13 +645,15 @@ exports.rossCompleteTask = onRequest(async (req, res) => {
         if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' });
         try {
             const decodedToken = await verifyAuthToken(req);
-            const { uid } = await verifyAdmin(decodedToken);
+            const { uid, isSuperAdmin } = await verifyUserOrAdmin(decodedToken);
 
             const data = req.body.data || req.body;
             const { workflowId, locationId, taskId } = data;
             if (!workflowId || !locationId || !taskId) {
                 return res.status(400).json({ error: 'Workflow ID, Location ID, and Task ID are required' });
             }
+
+            await verifyLocationAccess(uid, [locationId], isSuperAdmin);
 
             const now = Date.now();
             const locationRef = db.ref(`ross/workflows/${uid}/${workflowId}/locations/${locationId}`);
@@ -652,7 +703,7 @@ exports.rossCompleteTask = onRequest(async (req, res) => {
             res.json({ result: { success: true, taskId } });
         } catch (error) {
             console.error('[rossCompleteTask] Error:', error.message);
-            const statusCode = (error.message.includes('Admin') || error.message.includes('Super Admin')) ? 403 : 500;
+            const statusCode = (error.message.includes('Admin') || error.message.includes('Super Admin') || error.message.includes('access denied')) ? 403 : 500;
             res.status(statusCode).json({ error: error.message });
         }
     });
@@ -667,10 +718,12 @@ exports.rossGetReports = onRequest(async (req, res) => {
         if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' });
         try {
             const decodedToken = await verifyAuthToken(req);
-            const { uid } = await verifyAdmin(decodedToken);
+            const { uid, isSuperAdmin } = await verifyUserOrAdmin(decodedToken);
 
             const data = req.body.data || req.body;
             const { locationId } = data || {};
+
+            if (locationId) await verifyLocationAccess(uid, [locationId], isSuperAdmin);
 
             const workflowsSnap = await db.ref(`ross/workflows/${uid}`).once('value');
             const workflows = Object.values(workflowsSnap.val() || {});
@@ -705,7 +758,7 @@ exports.rossGetReports = onRequest(async (req, res) => {
             res.json({ result: { success: true, report } });
         } catch (error) {
             console.error('[rossGetReports] Error:', error.message);
-            const statusCode = (error.message.includes('Admin') || error.message.includes('Super Admin')) ? 403 : 500;
+            const statusCode = (error.message.includes('Admin') || error.message.includes('Super Admin') || error.message.includes('access denied')) ? 403 : 500;
             res.status(statusCode).json({ error: error.message });
         }
     });
@@ -786,13 +839,15 @@ exports.rossCreateRun = onRequest(async (req, res) => {
         if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' });
         try {
             const decodedToken = await verifyAuthToken(req);
-            const { uid } = await verifyAdmin(decodedToken);
+            const { uid, isSuperAdmin } = await verifyUserOrAdmin(decodedToken);
 
             const data = req.body.data || req.body;
             const { workflowId, locationId } = data;
             if (!workflowId || !locationId) {
                 return res.status(400).json({ error: 'workflowId and locationId are required' });
             }
+
+            await verifyLocationAccess(uid, [locationId], isSuperAdmin);
 
             // Verify workflow + location exist and belong to this owner
             const locSnap = await db.ref(`ross/workflows/${uid}/${workflowId}/locations/${locationId}`).once('value');
@@ -822,7 +877,7 @@ exports.rossCreateRun = onRequest(async (req, res) => {
             res.json({ result: { success: true, runId, run, created: true } });
         } catch (error) {
             console.error('[rossCreateRun] Error:', error.message);
-            const statusCode = (error.message.includes('Admin') || error.message.includes('Super Admin')) ? 403 : 500;
+            const statusCode = (error.message.includes('Admin') || error.message.includes('Super Admin') || error.message.includes('access denied')) ? 403 : 500;
             res.status(statusCode).json({ error: error.message });
         }
     });
@@ -867,13 +922,15 @@ exports.rossSubmitResponse = onRequest(async (req, res) => {
         if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' });
         try {
             const decodedToken = await verifyAuthToken(req);
-            const { uid } = await verifyAdmin(decodedToken);
+            const { uid, isSuperAdmin } = await verifyUserOrAdmin(decodedToken);
 
             const data = req.body.data || req.body;
             const { workflowId, locationId, runId, taskId, value, note } = data;
             if (!workflowId || !locationId || !runId || !taskId) {
                 return res.status(400).json({ error: 'workflowId, locationId, runId, and taskId are required' });
             }
+
+            await verifyLocationAccess(uid, [locationId], isSuperAdmin);
             if (value === undefined || value === null) {
                 return res.status(400).json({ error: 'value is required' });
             }
@@ -958,7 +1015,7 @@ exports.rossSubmitResponse = onRequest(async (req, res) => {
             res.json({ result: { success: true, taskId, flagged, runCompleted: allRequiredDone } });
         } catch (error) {
             console.error('[rossSubmitResponse] Error:', error.message);
-            const statusCode = (error.message.includes('Admin') || error.message.includes('Super Admin')) ? 403 : 500;
+            const statusCode = (error.message.includes('Admin') || error.message.includes('Super Admin') || error.message.includes('access denied')) ? 403 : 500;
             res.status(statusCode).json({ error: error.message });
         }
     });
@@ -974,13 +1031,15 @@ exports.rossGetRun = onRequest(async (req, res) => {
         if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' });
         try {
             const decodedToken = await verifyAuthToken(req);
-            const { uid } = await verifyAdmin(decodedToken);
+            const { uid, isSuperAdmin } = await verifyUserOrAdmin(decodedToken);
 
             const data = req.body.data || req.body;
             const { workflowId, locationId } = data;
             if (!workflowId || !locationId) {
                 return res.status(400).json({ error: 'workflowId and locationId are required' });
             }
+
+            await verifyLocationAccess(uid, [locationId], isSuperAdmin);
 
             const runsRef = db.ref(`ross/runs/${uid}/${workflowId}/${locationId}`);
 
@@ -1009,7 +1068,7 @@ exports.rossGetRun = onRequest(async (req, res) => {
             res.json({ result: { success: true, currentRun, previousResponses } });
         } catch (error) {
             console.error('[rossGetRun] Error:', error.message);
-            const statusCode = (error.message.includes('Admin') || error.message.includes('Super Admin')) ? 403 : 500;
+            const statusCode = (error.message.includes('Admin') || error.message.includes('Super Admin') || error.message.includes('access denied')) ? 403 : 500;
             res.status(statusCode).json({ error: error.message });
         }
     });
@@ -1025,13 +1084,15 @@ exports.rossGetRunHistory = onRequest(async (req, res) => {
         if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' });
         try {
             const decodedToken = await verifyAuthToken(req);
-            const { uid } = await verifyAdmin(decodedToken);
+            const { uid, isSuperAdmin } = await verifyUserOrAdmin(decodedToken);
 
             const data = req.body.data || req.body;
             const { workflowId, locationId, limit: rawLimit } = data;
             if (!workflowId || !locationId) {
                 return res.status(400).json({ error: 'workflowId and locationId are required' });
             }
+
+            await verifyLocationAccess(uid, [locationId], isSuperAdmin);
             const pageLimit = Math.min(Number.isInteger(rawLimit) && rawLimit > 0 ? rawLimit : 20, 100);
 
             const runsRef = db.ref(`ross/runs/${uid}/${workflowId}/${locationId}`);
@@ -1046,7 +1107,7 @@ exports.rossGetRunHistory = onRequest(async (req, res) => {
             res.json({ result: { success: true, runs } });
         } catch (error) {
             console.error('[rossGetRunHistory] Error:', error.message);
-            const statusCode = (error.message.includes('Admin') || error.message.includes('Super Admin')) ? 403 : 500;
+            const statusCode = (error.message.includes('Admin') || error.message.includes('Super Admin') || error.message.includes('access denied')) ? 403 : 500;
             res.status(statusCode).json({ error: error.message });
         }
     });
@@ -1065,11 +1126,13 @@ exports.rossManageStaff = onRequest(async (req, res) => {
         if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' });
         try {
             const decodedToken = await verifyAuthToken(req);
-            const { uid } = await verifyAdmin(decodedToken);
+            const { uid, isSuperAdmin } = await verifyUserOrAdmin(decodedToken);
 
             const data = req.body.data || req.body;
             const { locationId, action, staffId, staffData } = data;
             if (!locationId) return res.status(400).json({ error: 'Location ID is required' });
+
+            await verifyLocationAccess(uid, [locationId], isSuperAdmin);
 
             const staffRef = db.ref(`ross/staff/${uid}/${locationId}`);
             const now = Date.now();
@@ -1109,7 +1172,7 @@ exports.rossManageStaff = onRequest(async (req, res) => {
             }
         } catch (error) {
             console.error('[rossManageStaff] Error:', error.message);
-            const statusCode = (error.message.includes('Admin') || error.message.includes('Super Admin')) ? 403 : 500;
+            const statusCode = (error.message.includes('Admin') || error.message.includes('Super Admin') || error.message.includes('access denied')) ? 403 : 500;
             res.status(statusCode).json({ error: error.message });
         }
     });
@@ -1124,11 +1187,13 @@ exports.rossGetStaff = onRequest(async (req, res) => {
         if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' });
         try {
             const decodedToken = await verifyAuthToken(req);
-            const { uid } = await verifyAdmin(decodedToken);
+            const { uid, isSuperAdmin } = await verifyUserOrAdmin(decodedToken);
 
             const data = req.body.data || req.body;
             const { locationId } = data;
             if (!locationId) return res.status(400).json({ error: 'Location ID is required' });
+
+            await verifyLocationAccess(uid, [locationId], isSuperAdmin);
 
             const snap = await db.ref(`ross/staff/${uid}/${locationId}`).once('value');
             const staff = Object.values(snap.val() || {});
@@ -1136,7 +1201,7 @@ exports.rossGetStaff = onRequest(async (req, res) => {
             res.json({ result: { success: true, staff } });
         } catch (error) {
             console.error('[rossGetStaff] Error:', error.message);
-            const statusCode = (error.message.includes('Admin') || error.message.includes('Super Admin')) ? 403 : 500;
+            const statusCode = (error.message.includes('Admin') || error.message.includes('Super Admin') || error.message.includes('access denied')) ? 403 : 500;
             res.status(statusCode).json({ error: error.message });
         }
     });
