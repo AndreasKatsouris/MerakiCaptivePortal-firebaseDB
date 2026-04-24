@@ -114,6 +114,78 @@ export const HOME_FEED = [
   },
 ]
 
+// Cards rendered when the detectors can't produce a real insight (new
+// tenants, single-location operators with < 14 days of data). Honesty
+// over theatre: don't show fake numbers, show what Ross is actually
+// doing. Slotted after any real cards so the grid is always 3 wide.
+export const LEARNING_MODE_CARDS = [
+  {
+    id: 'learning-data',
+    tone: 'default',
+    eyebrow: 'Ross · still learning',
+    chip: { tone: 'default', label: 'Warming up', icon: 'sparkle' },
+    headline: "I don't have enough history yet to flag anything useful.",
+    detail:
+      "Keep uploading receipts, stock counts, and sales data — once I have a " +
+      "couple of weeks per venue I'll start surfacing cost drift, guest " +
+      "patterns, and revenue anomalies here.",
+    actions: [
+      { id: 'open-food-cost', label: 'Upload stock data', variant: 'ghost' },
+    ],
+    footnote: 'No insight yet',
+    sidecar: {
+      kind: 'kpi-spark',
+      eyebrow: 'Signals',
+      value: '—',
+      unit: '',
+      target: 'need ≥14 days',
+      trend: [0.4, 0.42, 0.44, 0.46, 0.48, 0.5, 0.52],
+      color: 'var(--hf-muted)',
+    },
+  },
+  {
+    id: 'learning-guests',
+    tone: 'default',
+    eyebrow: 'Guest intelligence · warming up',
+    chip: { tone: 'default', label: 'Watching', icon: 'users' },
+    headline: "I'll flag slipping VIPs once I can see repeat visits.",
+    detail:
+      "Connect WiFi captures or receipt OCR so I can match guests across visits. " +
+      "Once I can, you'll see lapsed-VIP cards and draft win-back campaigns here.",
+    actions: [
+      { id: 'open-guests', label: 'Open guests', variant: 'ghost' },
+    ],
+    sidecar: {
+      kind: 'donut',
+      value: 0,
+      label: '—',
+      sub: 'return rate',
+      color: 'var(--hf-muted)',
+    },
+  },
+  {
+    id: 'learning-revenue',
+    tone: 'default',
+    eyebrow: 'Revenue · warming up',
+    chip: { tone: 'default', label: 'Watching', icon: 'line' },
+    headline: "I'll spot revenue anomalies once you've got a fortnight of sales.",
+    detail:
+      "Upload historical daily sales in Analytics → Sales Data. With 12+ days " +
+      "I can compare venues and flag both wins and worries.",
+    actions: [
+      { id: 'open-analytics', label: 'Open analytics', variant: 'ghost' },
+    ],
+    sidecar: {
+      kind: 'kpi-bars',
+      eyebrow: 'Revenue',
+      value: '—',
+      delta: { label: 'no data yet', tone: 'default' },
+      bars: [6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6],
+      accentIndex: -1,
+    },
+  },
+]
+
 export const QUICK_JUMPS = [
   "Tonight's bookings",
   'Menu performance',

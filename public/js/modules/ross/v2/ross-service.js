@@ -1,30 +1,42 @@
-// LLM-ready abstraction over Ross content. Current implementation reads
-// scripted content from ./content.js; an eventual Anthropic-backed
-// implementation replaces only the bodies of these functions while keeping
-// signatures identical. Every call returns a Promise so swapping to a
-// remote LLM doesn't ripple through the UI.
+// LLM-ready abstraction over Ross content.
+//
+// getHomeFeed() now has two paths:
+//   - ROSS_HOME_REAL_DATA ON  (default): run detectors.js against RTDB and
+//     compose a feed from real signals; fall back to LEARNING_MODE_CARDS
+//     when data is too thin. Headline is templated from the user's name
+//     and whichever detectors fired.
+//   - ROSS_HOME_REAL_DATA OFF: return the original scripted wireframe feed
+//     unchanged. Used for demos and QA against a known shape.
+//
+// getHomeSidebar(), getFirstRunFindings(), askRoss() remain scripted —
+// separate slices. Signatures match what an LLM-backed service would
+// eventually yield, so the swap is a body replacement.
 
 import {
   FINDINGS_FIRST_RUN,
   HOME_FEED,
   HOME_HEADLINE,
   QUICK_JUMPS,
+  LEARNING_MODE_CARDS,
   ASK_ROSS_SAMPLE,
   LIVE_VENUES,
   ROSS_SUGGESTIONS,
   currentDateLine,
 } from './content.js'
+import { auth } from '../../../config/firebase-config.js'
+import { isEnabled } from '../../../config/feature-flags.js'
+import {
+  buildContext,
+  buildHeadline,
+  detectFoodCostDrift,
+  detectLapsedVIPs,
+  detectRevenueTrend,
+} from './detectors.js'
 
-// Simulated latency keeps loading states honest during development.
 const FAKE_LATENCY_MS = 80
 const wait = () => new Promise(r => setTimeout(r, FAKE_LATENCY_MS))
 
-/**
- * Fetch the 3-card home feed. Shape is stable; a real implementation would
- * synthesise these from RTDB aggregates + an LLM-authored headline/detail.
- */
-export async function getHomeFeed() {
-  await wait()
+function scriptedFeed() {
   return {
     headline: HOME_HEADLINE,
     dateLine: currentDateLine(),
@@ -33,9 +45,50 @@ export async function getHomeFeed() {
   }
 }
 
+function padCards(realCards) {
+  if (realCards.length >= 3) return realCards.slice(0, 3)
+  const usedIds = new Set(realCards.map((c) => c.id))
+  const fillers = LEARNING_MODE_CARDS.filter((c) => !usedIds.has(c.id))
+  return [...realCards, ...fillers].slice(0, 3)
+}
+
+/**
+ * Fetch the 3-card home feed. With the flag ON, pulls from RTDB via
+ * detectors. Caller (Pinia store) still gets the same shape.
+ */
+export async function getHomeFeed() {
+  if (!isEnabled('ROSS_HOME_REAL_DATA')) {
+    await wait()
+    return scriptedFeed()
+  }
+
+  try {
+    const ctx = await buildContext(auth)
+    if (!ctx.uid) return scriptedFeed()
+
+    const [fc, vip, rev] = await Promise.all([
+      detectFoodCostDrift(ctx).catch((e) => { console.warn('[ross] food-cost detector failed', e); return null }),
+      detectLapsedVIPs(ctx).catch((e) => { console.warn('[ross] lapsed-VIPs detector failed', e); return null }),
+      detectRevenueTrend(ctx).catch((e) => { console.warn('[ross] revenue detector failed', e); return null }),
+    ])
+
+    const realCards = [fc, vip, rev].filter(Boolean)
+    const cards = padCards(realCards)
+    return {
+      headline: buildHeadline(ctx, realCards),
+      dateLine: currentDateLine(),
+      cards,
+      quickJumps: QUICK_JUMPS,
+    }
+  } catch (e) {
+    console.error('[ross] getHomeFeed failed, falling back to scripted feed', e)
+    return scriptedFeed()
+  }
+}
+
 /**
  * Right-rail: live venue strip + Ross's "you might want to…" suggestions +
- * the Ask Ross sample prompt.
+ * the Ask Ross sample prompt. Still scripted — separate slice.
  */
 export async function getHomeSidebar() {
   await wait()
@@ -47,9 +100,7 @@ export async function getHomeSidebar() {
 }
 
 /**
- * First-run "three surprising findings". Real implementation will derive
- * these from the user's actual historical RTDB data; scripted version is
- * venue-agnostic storytelling we can ship on day one.
+ * First-run "three surprising findings". Still scripted.
  */
 export async function getFirstRunFindings() {
   await wait()
