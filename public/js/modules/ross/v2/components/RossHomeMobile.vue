@@ -44,10 +44,10 @@ const chipFor = (c) => ({
       <div class="ross-mobile__greeting">
         <div class="hf-eyebrow">{{ feed.dateLine }}</div>
         <h1>
-          Morning,<br />
-          <span class="ross-mobile__greeting-italic">Maya.</span>
+          {{ feed.headline.greeting }}<br />
+          <span class="ross-mobile__greeting-italic">{{ feed.headline.subtitle }}</span>
         </h1>
-        <div class="ross-mobile__lead">3 things worth your time.</div>
+        <div class="ross-mobile__lead">{{ feed.headline.lead }}</div>
       </div>
 
       <div class="ross-mobile__cards">

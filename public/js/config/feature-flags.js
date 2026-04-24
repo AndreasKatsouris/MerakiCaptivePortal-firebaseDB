@@ -35,15 +35,21 @@ export const FEATURE_FLAGS = {
 
   // Phase A7 — Receipts v2 is the primary Receipts surface.
   RECEIPTS_V2: true,
+
+  // Ross home: swap scripted HOME_FEED for real RTDB-derived cards.
+  // Flip to false to revert to the scripted wireframe feed for QA/demo.
+  ROSS_HOME_REAL_DATA: true,
 }
 
 export function isEnabled(flag) {
-  // Allow URL override for QA: ?flags=ROSS_IS_HOME,ROSS_ONBOARDING_HELLO
+  // Allow URL override for QA: ?flags=ROSS_IS_HOME,!ROSS_HOME_REAL_DATA
+  // Prefix with ! to force OFF (overrides the default), otherwise forces ON.
   if (typeof window !== 'undefined') {
     const override = new URLSearchParams(window.location.search).get('flags')
     if (override) {
-      const on = override.split(',').map(s => s.trim())
-      if (on.includes(flag)) return true
+      const tokens = override.split(',').map(s => s.trim()).filter(Boolean)
+      if (tokens.includes('!' + flag)) return false
+      if (tokens.includes(flag)) return true
     }
   }
   return !!FEATURE_FLAGS[flag]
