@@ -488,18 +488,18 @@
     "ross": {
       "templates": {
         ".read": "auth != null",
-        ".write": "auth != null && root.child('admins').child(auth.uid).child('superAdmin').val() === true"
+        ".write": false
       },
       "workflows": {
         "$ownerId": {
           ".read": "auth != null && auth.uid === $ownerId",
-          ".write": "auth != null && auth.uid === $ownerId"
+          ".write": false
         }
       },
       "runs": {
         "$ownerId": {
           ".read": "auth != null && auth.uid === $ownerId",
-          ".write": "auth != null && auth.uid === $ownerId",
+          ".write": false,
           "$workflowId": {
             "$locationId": {
               ".indexOn": ["completedAt"]
@@ -514,7 +514,7 @@
       "staff": {
         "$ownerId": {
           ".read": "auth != null && auth.uid === $ownerId",
-          ".write": "auth != null && auth.uid === $ownerId",
+          ".write": false,
           "$locationId": {}
         }
       }

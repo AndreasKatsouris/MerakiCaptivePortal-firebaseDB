@@ -488,31 +488,22 @@ This is the gold standard for rules in this project.
 
 ```json
 "ross": {
-  "templates": {
-    ".read": "auth != null && root.child('admins').child(auth.uid).exists()",
-    ".write": "auth != null && root.child('admins').child(auth.uid).child('superAdmin').val() === true"
-  },
-  "workflows": {
-    "$ownerId": {
-      ".read": "auth != null && auth.uid === $ownerId && root.child('admins').child(auth.uid).exists()",
-      ".write": "auth != null && auth.uid === $ownerId && root.child('admins').child(auth.uid).exists()"
-    }
-  },
-  "staff": {
-    "$ownerId": {
-      ".read": "auth != null && auth.uid === $ownerId && root.child('admins').child(auth.uid).exists()",
-      ".write": "auth != null && auth.uid === $ownerId && root.child('admins').child(auth.uid).exists()"
-    }
-  }
+  "templates":   { ".read": "auth != null",                                        ".write": false },
+  "workflows":   { "$ownerId": { ".read": "auth != null && auth.uid === $ownerId", ".write": false } },
+  "runs":        { "$ownerId": { ".read": "auth != null && auth.uid === $ownerId", ".write": false } },
+  "ownerIndex":  { ".read": "auth != null && root.child('admins').child(auth.uid).exists()", ".write": false },
+  "staff":       { "$ownerId": { ".read": "auth != null && auth.uid === $ownerId", ".write": false } }
 }
 ```
 
-**Assessment:** Good. Three sub-nodes with distinct access patterns:
-- **Templates:** Read for all admins, write restricted to super admins (`admins/{uid}/superAdmin === true`). This matches the Cloud Functions enforcement where template CRUD uses `verifySuperAdmin`.
-- **Workflows:** Owner-scoped read/write. Only the workflow owner can read/write, and they must be in the `admins` node. This prevents cross-tenant data access.
-- **Staff:** Same owner-scoped pattern as workflows.
+**Assessment:** Hardened. Reads are owner-scoped (or admin-scoped for templates / ownerIndex). **All client writes are denied** — every mutation must go through Cloud Functions, which run under the Admin SDK and bypass these rules. This forces the validation, idempotency, atomic transactions, auto-flagging, `requiredNote` 422 enforcement, and `ownerIndex` maintenance in `functions/ross.js` to be the single source of truth.
 
-**Note:** The `ross/ownerIndex` fan-out node is not covered by explicit rules because it is only written by Cloud Functions via the Admin SDK (which bypasses security rules). Direct client writes to `ownerIndex` would be rejected by the implicit deny-all rule.
+**Why writes are locked:**
+- Direct client writes would bypass `verifyLocationAccess`, `daysBeforeAlert` filtering, the `rossCompleteTask` transaction, `rossSubmitResponse` auto-flagging, and `ownerIndex` fan-out maintenance.
+- Cloud Functions enforce `verifySuperAdmin` on template CRUD; with `.write: false` on templates, the rule and the function agree (rule denies all client writes; function denies non-superAdmin server-side calls).
+- The frontend (`public/js/modules/ross/services/ross-service.js`) already routes every write through Cloud Functions HTTP endpoints — locking writes is transparent to the UI.
+
+**Note:** Seed scripts (`functions/seeds/ross-templates.js`) run with `GOOGLE_APPLICATION_CREDENTIALS` (Admin SDK), so they continue to bypass rules and work correctly. Any future tooling that uses a *user* token (not Admin SDK) to write to `/ross/*` will need to call the Cloud Function instead.
 
 ---
 
