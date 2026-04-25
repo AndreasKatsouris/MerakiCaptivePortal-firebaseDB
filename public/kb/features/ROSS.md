@@ -123,6 +123,32 @@ ross/
 
 > **Hardening change:** `rossScheduledReminder` previously scanned the entire `/ross/workflows` tree (O(N) over all owners). It now reads `ross/ownerIndex` to enumerate only owners with active workflows, then iterates per-owner.
 
+### Workflows By Location (Reverse Index)
+
+```
+ross/
+  workflowsByLocation/
+    {locationId}/
+      {workflowId}: ownerUid           ← string uid of the workflow creator
+```
+
+Maintained atomically with the workflow record:
+- **Write:** `rossCreateWorkflow` and `rossActivateWorkflow` write one entry per attached locationId in the same multi-path update as the workflow itself.
+- **Remove:** `rossDeleteWorkflow` removes every entry for the workflow's locations.
+
+**Why it exists.** Without this index, per-location ROSS functions had no way to know a workflow's owner uid given just `(workflowId, locationId)`. Pre-existing code used the *caller's* uid in the read path, which silently broke for any non-creator user with access to the same location (e.g. a second admin sharing a location, a super admin, a future staff role).
+
+**Read flow.** Every location-scoped read function now resolves the owner first:
+```js
+const ownerUid = await resolveWorkflowOwner(workflowId, locationId, callerUid);
+// then read /ross/workflows/{ownerUid}/{workflowId}/...
+```
+`resolveWorkflowOwner` returns the indexed owner when present, and falls back to the caller's own tree (transition-period safety for pre-backfill workflows). Functions affected: `rossGetWorkflows`, `rossGetReports`, `rossCompleteTask`, `rossCreateRun`, `rossSubmitResponse`, `rossGetRun`, `rossGetRunHistory`.
+
+**Owner-only operations** (`rossUpdateWorkflow`, `rossManageTask`, `rossDeleteWorkflow`) intentionally do *not* use the index — they continue to scope by `${callerUid}` so only the creator can change workflow metadata or task structure. A non-creator hitting these gets a 404, which is the intended behaviour.
+
+**Backfill.** Existing workflows pre-dating this index need an entry written. Run `node functions/seeds/ross-backfill-workflows-by-location.js` once after deploy. The script is idempotent.
+
 ### Task Object
 
 ```json

@@ -100,6 +100,48 @@ async function verifyLocationAccess(uid, locationIds, isSuperAdmin) {
 }
 
 // ============================================
+// LOCATION INDEX HELPERS
+// ============================================
+// /ross/workflowsByLocation/{locationId}/{workflowId} = ownerUid
+//
+// This index lets a caller resolve a workflow's owner uid given a
+// (workflowId, locationId) pair, so any user with location access can
+// read a workflow even if they didn't create it. Maintained on every
+// workflow create / activate / delete; consulted at the start of every
+// per-location operation. Pure mirror of the canonical workflow data.
+
+function locationIndexUpdates(workflowId, ownerUid, locationIds) {
+    const updates = {};
+    locationIds.forEach(locId => {
+        updates[`ross/workflowsByLocation/${locId}/${workflowId}`] = ownerUid;
+    });
+    return updates;
+}
+
+function locationIndexRemovals(workflowId, locationIds) {
+    const updates = {};
+    locationIds.forEach(locId => {
+        updates[`ross/workflowsByLocation/${locId}/${workflowId}`] = null;
+    });
+    return updates;
+}
+
+/**
+ * Resolve a workflow's owner uid from the location index.
+ * Falls back to the caller's own workflows tree so legacy (pre-index)
+ * workflows still work for their creator until the backfill runs.
+ * Returns the owner uid string, or null if the workflow does not exist
+ * at that location.
+ */
+async function resolveWorkflowOwner(workflowId, locationId, callerUid) {
+    const indexed = await db.ref(`ross/workflowsByLocation/${locationId}/${workflowId}`).once('value');
+    if (indexed.exists()) return indexed.val();
+    const own = await db.ref(`ross/workflows/${callerUid}/${workflowId}/locations/${locationId}`).once('value');
+    if (own.exists()) return callerUid;
+    return null;
+}
+
+// ============================================
 // TEMPLATE OPERATIONS (Super Admin managed)
 // ============================================
 
@@ -332,8 +374,12 @@ exports.rossActivateWorkflow = onRequest(async (req, res) => {
                 locations
             };
 
-            await db.ref(`ross/workflows/${uid}/${workflowId}`).set(workflowData);
-            await db.ref(`ross/ownerIndex/${uid}`).set(true);
+            const atomicWrite = {
+                [`ross/workflows/${uid}/${workflowId}`]: workflowData,
+                [`ross/ownerIndex/${uid}`]: true,
+                ...locationIndexUpdates(workflowId, uid, locationIds)
+            };
+            await db.ref().update(atomicWrite);
             res.json({ result: { success: true, workflowId, workflow: workflowData } });
         } catch (error) {
             console.error('[rossActivateWorkflow] Error:', error.message);
@@ -414,8 +460,12 @@ exports.rossCreateWorkflow = onRequest(async (req, res) => {
                 locations
             };
 
-            await db.ref(`ross/workflows/${uid}/${workflowId}`).set(workflowData);
-            await db.ref(`ross/ownerIndex/${uid}`).set(true);
+            const atomicWrite = {
+                [`ross/workflows/${uid}/${workflowId}`]: workflowData,
+                [`ross/ownerIndex/${uid}`]: true,
+                ...locationIndexUpdates(workflowId, uid, locationIds)
+            };
+            await db.ref().update(atomicWrite);
             res.json({ result: { success: true, workflowId, workflow: workflowData } });
         } catch (error) {
             console.error('[rossCreateWorkflow] Error:', error.message);
@@ -491,7 +541,14 @@ exports.rossDeleteWorkflow = onRequest(async (req, res) => {
             const existing = await db.ref(`ross/workflows/${uid}/${workflowId}`).once('value');
             if (!existing.exists()) return res.status(404).json({ error: 'Workflow not found' });
 
-            await db.ref(`ross/workflows/${uid}/${workflowId}`).remove();
+            const workflow = existing.val() || {};
+            const attachedLocationIds = Object.keys(workflow.locations || {});
+
+            const atomicDelete = {
+                [`ross/workflows/${uid}/${workflowId}`]: null,
+                ...locationIndexRemovals(workflowId, attachedLocationIds)
+            };
+            await db.ref().update(atomicDelete);
             // Clean up ownerIndex if this was the last workflow
             const remainingSnap = await db.ref(`ross/workflows/${uid}`).once('value');
             if (!remainingSnap.exists()) {
@@ -522,8 +579,45 @@ exports.rossGetWorkflows = onRequest(async (req, res) => {
 
             if (locationId) await verifyLocationAccess(uid, [locationId], isSuperAdmin);
 
-            const snapshot = await db.ref(`ross/workflows/${uid}`).once('value');
-            let workflows = Object.values(snapshot.val() || {});
+            // Determine which locations the caller can see workflows for.
+            let visibleLocationIds;
+            if (locationId) {
+                visibleLocationIds = [locationId];
+            } else if (isSuperAdmin) {
+                // Super admin: all locations across the platform
+                const allLocs = await db.ref('ross/workflowsByLocation').once('value');
+                visibleLocationIds = Object.keys(allLocs.val() || {});
+            } else {
+                const userLocsSnap = await db.ref(`userLocations/${uid}`).once('value');
+                visibleLocationIds = Object.keys(userLocsSnap.val() || {});
+            }
+
+            // Resolve (workflowId -> ownerUid) across visible locations via index.
+            const ownerByWorkflow = {};
+            await Promise.all(visibleLocationIds.map(async (locId) => {
+                const idxSnap = await db.ref(`ross/workflowsByLocation/${locId}`).once('value');
+                const idxMap = idxSnap.val() || {};
+                Object.entries(idxMap).forEach(([wfId, ownerUid]) => {
+                    ownerByWorkflow[wfId] = ownerUid;
+                });
+            }));
+
+            // Legacy fallback: include caller's own workflows even if not yet indexed
+            // (handles pre-backfill state). Indexed entries take precedence.
+            const ownSnap = await db.ref(`ross/workflows/${uid}`).once('value');
+            const ownMap = ownSnap.val() || {};
+            Object.keys(ownMap).forEach(wfId => {
+                if (!ownerByWorkflow[wfId]) ownerByWorkflow[wfId] = uid;
+            });
+
+            // Dereference each workflow.
+            const workflowEntries = await Promise.all(
+                Object.entries(ownerByWorkflow).map(async ([wfId, ownerUid]) => {
+                    const wfSnap = await db.ref(`ross/workflows/${ownerUid}/${wfId}`).once('value');
+                    return wfSnap.val();
+                })
+            );
+            let workflows = workflowEntries.filter(Boolean);
 
             if (category && VALID_CATEGORIES.includes(category)) {
                 workflows = workflows.filter(w => w.category === category);
@@ -663,8 +757,11 @@ exports.rossCompleteTask = onRequest(async (req, res) => {
 
             await verifyLocationAccess(uid, [locationId], isSuperAdmin);
 
+            const ownerUid = await resolveWorkflowOwner(workflowId, locationId, uid);
+            if (!ownerUid) return res.status(404).json({ error: 'Workflow not found at this location' });
+
             const now = Date.now();
-            const locationRef = db.ref(`ross/workflows/${uid}/${workflowId}/locations/${locationId}`);
+            const locationRef = db.ref(`ross/workflows/${ownerUid}/${workflowId}/locations/${locationId}`);
 
             // Use a transaction to atomically update the task and check completion
             let allTasksDone = false;
@@ -690,10 +787,10 @@ exports.rossCompleteTask = onRequest(async (req, res) => {
             if (!taskFound) return res.status(404).json({ error: 'Task not found or already completed' });
 
             if (allTasksDone && totalTaskCount > 0) {
-                const workflowSnap = await db.ref(`ross/workflows/${uid}/${workflowId}`).once('value');
+                const workflowSnap = await db.ref(`ross/workflows/${ownerUid}/${workflowId}`).once('value');
                 const workflow = workflowSnap.val();
                 const cycleId = `${new Date().getFullYear()}-${workflow?.recurrence || 'unknown'}`;
-                const locSnap = await db.ref(`ross/workflows/${uid}/${workflowId}/locations/${locationId}`).once('value');
+                const locSnap = await db.ref(`ross/workflows/${ownerUid}/${workflowId}/locations/${locationId}`).once('value');
                 const locData = locSnap.val() || {};
                 const historyRecord = {
                     cycleId,
@@ -704,10 +801,10 @@ exports.rossCompleteTask = onRequest(async (req, res) => {
                     completionRate: 100,
                     onTime: now <= (locData.nextDueDate || now)
                 };
-                await db.ref(`ross/workflows/${uid}/${workflowId}/locations/${locationId}/history/${cycleId}`).set(historyRecord);
+                await db.ref(`ross/workflows/${ownerUid}/${workflowId}/locations/${locationId}/history/${cycleId}`).set(historyRecord);
             }
 
-            await db.ref(`ross/workflows/${uid}/${workflowId}`).update({ updatedAt: now });
+            await db.ref(`ross/workflows/${ownerUid}/${workflowId}`).update({ updatedAt: now });
             res.json({ result: { success: true, taskId } });
         } catch (error) {
             console.error('[rossCompleteTask] Error:', error.message);
@@ -733,8 +830,41 @@ exports.rossGetReports = onRequest(async (req, res) => {
 
             if (locationId) await verifyLocationAccess(uid, [locationId], isSuperAdmin);
 
-            const workflowsSnap = await db.ref(`ross/workflows/${uid}`).once('value');
-            const workflows = Object.values(workflowsSnap.val() || {});
+            // Resolve which workflows the caller can see (location-share aware).
+            let visibleLocationIds;
+            if (locationId) {
+                visibleLocationIds = [locationId];
+            } else if (isSuperAdmin) {
+                const allLocs = await db.ref('ross/workflowsByLocation').once('value');
+                visibleLocationIds = Object.keys(allLocs.val() || {});
+            } else {
+                const userLocsSnap = await db.ref(`userLocations/${uid}`).once('value');
+                visibleLocationIds = Object.keys(userLocsSnap.val() || {});
+            }
+
+            const ownerByWorkflow = {};
+            await Promise.all(visibleLocationIds.map(async (locId) => {
+                const idxSnap = await db.ref(`ross/workflowsByLocation/${locId}`).once('value');
+                const idxMap = idxSnap.val() || {};
+                Object.entries(idxMap).forEach(([wfId, ownerUid]) => {
+                    ownerByWorkflow[wfId] = ownerUid;
+                });
+            }));
+
+            // Legacy fallback for caller's own workflows
+            const ownSnap = await db.ref(`ross/workflows/${uid}`).once('value');
+            const ownMap = ownSnap.val() || {};
+            Object.keys(ownMap).forEach(wfId => {
+                if (!ownerByWorkflow[wfId]) ownerByWorkflow[wfId] = uid;
+            });
+
+            const workflowEntries = await Promise.all(
+                Object.entries(ownerByWorkflow).map(async ([wfId, ownerUid]) => {
+                    const wfSnap = await db.ref(`ross/workflows/${ownerUid}/${wfId}`).once('value');
+                    return wfSnap.val();
+                })
+            );
+            const workflows = workflowEntries.filter(Boolean);
 
             const report = [];
             workflows.forEach(workflow => {
@@ -857,12 +987,15 @@ exports.rossCreateRun = onRequest(async (req, res) => {
 
             await verifyLocationAccess(uid, [locationId], isSuperAdmin);
 
-            // Verify workflow + location exist and belong to this owner
-            const locSnap = await db.ref(`ross/workflows/${uid}/${workflowId}/locations/${locationId}`).once('value');
+            const ownerUid = await resolveWorkflowOwner(workflowId, locationId, uid);
+            if (!ownerUid) return res.status(404).json({ error: 'Workflow location not found' });
+
+            // Verify workflow + location exist
+            const locSnap = await db.ref(`ross/workflows/${ownerUid}/${workflowId}/locations/${locationId}`).once('value');
             if (!locSnap.exists()) return res.status(404).json({ error: 'Workflow location not found' });
 
-            // Find existing open run
-            const runsRef = db.ref(`ross/runs/${uid}/${workflowId}/${locationId}`);
+            // Find existing open run (runs are scoped to workflow owner)
+            const runsRef = db.ref(`ross/runs/${ownerUid}/${workflowId}/${locationId}`);
             const existingSnap = await runsRef.orderByChild('completedAt').equalTo(null).limitToFirst(1).once('value');
             if (existingSnap.exists()) {
                 const runs = existingSnap.val();
@@ -878,6 +1011,7 @@ exports.rossCreateRun = onRequest(async (req, res) => {
                 workflowId,
                 locationId,
                 startedAt: now,
+                startedBy: uid,
                 completedAt: null,
                 completedBy: null
             };
@@ -943,15 +1077,18 @@ exports.rossSubmitResponse = onRequest(async (req, res) => {
                 return res.status(400).json({ error: 'value is required' });
             }
 
+            const ownerUid = await resolveWorkflowOwner(workflowId, locationId, uid);
+            if (!ownerUid) return res.status(404).json({ error: 'Workflow location not found' });
+
             // Verify run exists and is open
-            const runRef = db.ref(`ross/runs/${uid}/${workflowId}/${locationId}/${runId}`);
+            const runRef = db.ref(`ross/runs/${ownerUid}/${workflowId}/${locationId}/${runId}`);
             const runSnap = await runRef.once('value');
             if (!runSnap.exists()) return res.status(404).json({ error: 'Run not found' });
             const run = runSnap.val();
             if (run.completedAt) return res.status(409).json({ error: 'Run is already completed' });
 
             // Get task definition from workflow
-            const locSnap = await db.ref(`ross/workflows/${uid}/${workflowId}/locations/${locationId}`).once('value');
+            const locSnap = await db.ref(`ross/workflows/${ownerUid}/${workflowId}/locations/${locationId}`).once('value');
             if (!locSnap.exists()) return res.status(404).json({ error: 'Workflow location not found' });
             const locData = locSnap.val();
             const tasks = locData.tasks || {};
@@ -1002,7 +1139,7 @@ exports.rossSubmitResponse = onRequest(async (req, res) => {
             if (allRequiredDone) {
                 await runRef.update({ completedAt: now, completedBy: uid });
                 // Write history record
-                const workflowSnap = await db.ref(`ross/workflows/${uid}/${workflowId}`).once('value');
+                const workflowSnap = await db.ref(`ross/workflows/${ownerUid}/${workflowId}`).once('value');
                 const workflow = workflowSnap.val() || {};
                 const cycleId = runId;
                 const flaggedCount = Object.values(responses).filter(r => r.flagged).length;
@@ -1016,8 +1153,8 @@ exports.rossSubmitResponse = onRequest(async (req, res) => {
                     flaggedCount,
                     onTime: now <= (locData.nextDueDate || now)
                 };
-                await db.ref(`ross/workflows/${uid}/${workflowId}/locations/${locationId}/history/${cycleId}`).set(historyRecord);
-                await db.ref(`ross/workflows/${uid}/${workflowId}`).update({ updatedAt: now });
+                await db.ref(`ross/workflows/${ownerUid}/${workflowId}/locations/${locationId}/history/${cycleId}`).set(historyRecord);
+                await db.ref(`ross/workflows/${ownerUid}/${workflowId}`).update({ updatedAt: now });
             }
 
             res.json({ result: { success: true, taskId, flagged, runCompleted: allRequiredDone } });
@@ -1049,7 +1186,10 @@ exports.rossGetRun = onRequest(async (req, res) => {
 
             await verifyLocationAccess(uid, [locationId], isSuperAdmin);
 
-            const runsRef = db.ref(`ross/runs/${uid}/${workflowId}/${locationId}`);
+            const ownerUid = await resolveWorkflowOwner(workflowId, locationId, uid);
+            if (!ownerUid) return res.status(404).json({ error: 'Workflow location not found' });
+
+            const runsRef = db.ref(`ross/runs/${ownerUid}/${workflowId}/${locationId}`);
 
             // Current open run
             const openSnap = await runsRef.orderByChild('completedAt').equalTo(null).limitToFirst(1).once('value');
@@ -1101,9 +1241,13 @@ exports.rossGetRunHistory = onRequest(async (req, res) => {
             }
 
             await verifyLocationAccess(uid, [locationId], isSuperAdmin);
+
+            const ownerUid = await resolveWorkflowOwner(workflowId, locationId, uid);
+            if (!ownerUid) return res.status(404).json({ error: 'Workflow location not found' });
+
             const pageLimit = Math.min(Number.isInteger(rawLimit) && rawLimit > 0 ? rawLimit : 20, 100);
 
-            const runsRef = db.ref(`ross/runs/${uid}/${workflowId}/${locationId}`);
+            const runsRef = db.ref(`ross/runs/${ownerUid}/${workflowId}/${locationId}`);
             const snap = await runsRef.orderByChild('completedAt').limitToLast(pageLimit).once('value');
 
             const runs = snap.exists()
