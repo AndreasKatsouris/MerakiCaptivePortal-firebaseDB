@@ -55,26 +55,44 @@ ross/
   workflows/
     {uid}/                        ← owner user ID
       {workflowId}/
-        id: string
+        workflowId: string
+        ownerId: string           ← uid of the owning admin
+        templateId: string?       ← null for custom workflows
         name: string
-        description: string
+        description: string?
         category: string          ← 'compliance' | 'operations' | 'growth' | 'finance' | 'hr' | 'maintenance'
         recurrence: string        ← 'once' | 'daily' | 'weekly' | 'monthly' | 'quarterly' | 'annually'
-        customInterval: number?
-        tasks: Task[]
-        templateId: string?
+        customInterval: number?   ← positive integer; null otherwise
+        notificationChannels: string[]   ← currently always ['in_app'] (Phase 2: phone/email)
+        notifyPhone: string?      ← captured but not delivered (Phase 2)
+        notifyEmail: string?      ← captured but not delivered (Phase 2)
+        daysBeforeAlert: number[] ← positive integers; defaults to [30, 7]
         createdAt: number
         updatedAt: number
         locations/
           {locationId}/
-            locationId: string
-            locationStatus: string    ← 'active' | 'overdue' | 'completed'
-            locationNextDueDate: string  ← ISO date string
-            locationAssignedTo: string?
+            locationName: string
+            locationAssignedTo: string?  ← staff member id or null
+            status: string               ← 'active' | 'overdue' | 'completed'
+            nextDueDate: string          ← ISO date string
             activatedAt: number
+            tasks/
+              {taskId}/
+                title: string
+                status: string           ← 'pending' | 'completed'
+                dueDate: number
+                completedAt: number?
+                assignedTo: string?
+                order: number
+            history/                     ← written when all required tasks complete
+              {historyId}/
+                completedAt: number
+                ...
 ```
 
-> **Important:** `rossGetWorkflows` returns location data flattened as `locationStatus` and `locationNextDueDate`. Both the overview and workflow list normalise these to `status` and `nextDueDate` on the frontend.
+> **Important — tasks are per-location, not at workflow root.** Each location keeps its own `tasks/` subtree so that location-specific assignment, completion, and history can be tracked independently. The frontend (`rossGetWorkflows` consumer) flattens this into a single workflow view by reading the active location's tasks.
+
+> **Phase 2 fields.** `notifyPhone` / `notifyEmail` are stored but no Twilio/SendGrid delivery is wired yet — only `in_app` reminders fire via `rossScheduledReminder`. `customInterval` is captured and validated but the recurrence engine still uses the discrete `recurrence` string; `customInterval` is reserved for a future custom-cadence engine.
 
 ### Templates
 
@@ -135,30 +153,37 @@ ross/
 ```
 ross/
   runs/
-    {locationId}/
+    {uid}/                              ← owner user ID (matches workflows scoping)
       {workflowId}/
-        current/
-          runId: string
-          startedAt: number
-          startedBy: string (uid)
-          status: 'in_progress' | 'completed'
-          responses/
-            {taskId}/
-              value: any
-              note: string?
-              submittedAt: number
-              submittedBy: string
-              flagged: boolean
-              inputType: string
-        history/
+        {locationId}/
           {runId}/
             runId: string
-            completedAt: number
-            completedBy: string
-            onTime: boolean
-            flaggedCount: number
-            responses: { [taskId]: ResponseObject }
+            workflowId: string
+            locationId: string
+            startedAt: number
+            startedBy: string (uid)
+            status: string               ← 'in_progress' | 'completed'
+            completedAt: number?
+            completedBy: string?
+            onTime: boolean?             ← set on completion
+            flaggedCount: number?        ← set on completion
+            responses/
+              {taskId}/
+                value: any
+                note: string?
+                submittedAt: number
+                submittedBy: string
+                flagged: boolean
+                inputType: string
 ```
+
+> **No `current/history/` split.** Runs are stored flat under `runId`. In-progress and completed runs live side-by-side; consumers filter on `status`. `rossGetRun` returns the latest in-progress run plus the most recent completed run as `previousResponses`. `rossGetRunHistory` lists completed runs newest-first.
+
+### Runs lifecycle
+
+- **`rossCreateRun` is idempotent.** If a run with `status: 'in_progress'` already exists for the workflow+location, it is returned instead of creating a new one. This prevents duplicate runs when a user reloads or clicks "start" twice.
+- **`rossSubmitResponse` writes one task response at a time.** It auto-flags responses where `Number(value)` is outside `inputConfig.min`/`inputConfig.max` (applies to `number` and `temperature` input types). When a response is auto-flagged AND the task's `inputConfig.requiredNote === true`, submission is rejected with HTTP **422** until the client sends a non-empty `note`. Frontend must surface the 422 and prompt for the note.
+- **Auto-completion.** After every response submission the function checks whether all `required: true` tasks have a response. If so, the run is marked `status: 'completed'`, `completedAt` / `completedBy` are stamped, `onTime` is computed against the location's `nextDueDate`, and `flaggedCount` is summed across responses.
 
 ---
 
@@ -212,7 +237,7 @@ All ROSS functions are defined in `functions/ross.js` and exported from `functio
 | `signature` | Phase 2 placeholder | _(none)_ |
 | `rating` | Star buttons | `max` (default: 5) |
 
-Values flagged when `Number(value) > inputConfig.max` or `< inputConfig.min`. If `requiredNote: true`, a note textarea is shown when the value is out of range.
+Values are auto-flagged server-side when `Number(value) > inputConfig.max` or `< inputConfig.min` (currently only `number` and `temperature`). If `inputConfig.requiredNote === true`, the server returns **HTTP 422** until the client submits a non-empty `note` along with the flagged value — the response is not persisted until then. Frontend should render a note textarea on 422 and re-submit with the note.
 
 ### Critical API Shape
 
