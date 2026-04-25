@@ -488,13 +488,18 @@ This is the gold standard for rules in this project.
 
 ```json
 "ross": {
-  "templates":   { ".read": "auth != null",                                        ".write": false },
-  "workflows":   { "$ownerId": { ".read": "auth != null && auth.uid === $ownerId", ".write": false } },
-  "runs":        { "$ownerId": { ".read": "auth != null && auth.uid === $ownerId", ".write": false } },
-  "ownerIndex":  { ".read": "auth != null && root.child('admins').child(auth.uid).exists()", ".write": false },
-  "staff":       { "$ownerId": { ".read": "auth != null && auth.uid === $ownerId", ".write": false } }
+  "templates":           { ".read": "auth != null",                                                  ".write": false },
+  "workflows":           { "$ownerId": { ".read": "auth != null && auth.uid === $ownerId",          ".write": false } },
+  "runs":                { "$ownerId": { ".read": "auth != null && auth.uid === $ownerId",          ".write": false } },
+  "ownerIndex":          { ".read": "auth != null && root.child('admins').child(auth.uid).exists()", ".write": false },
+  "workflowsByLocation": { ".read": "auth != null && root.child('admins').child(auth.uid).exists()", ".write": false },
+  "staff":               { "$ownerId": { ".read": "auth != null && auth.uid === $ownerId",          ".write": false } }
 }
 ```
+
+> **`workflowsByLocation`** is a reverse index `(locationId, workflowId) → ownerUid` so any admin with location access can resolve a workflow's creator and read it via Cloud Functions. Admin-readable, server-write only. Maintained atomically by `rossCreateWorkflow` / `rossActivateWorkflow` / `rossDeleteWorkflow`. See `public/kb/features/ROSS.md` and `public/kb/architecture/DATA_MODEL.md` for details.
+
+> **Caveat — `ross/runs` direct reads.** Runs are stored under `runs/{ownerUid}/{workflowId}/{locationId}/{runId}` where `ownerUid` is the **workflow creator**, not the participant. Cloud Functions (Admin SDK) bypass these rules so location-share works fine via `rossGetRun` / `rossGetRunHistory` / `rossSubmitResponse`. **However**, the current `runs.$ownerId` rule restricts direct client reads to `auth.uid === $ownerId` — so if a future staff dashboard or mobile client tries to read "runs I participated in" directly from RTDB without going through a Cloud Function, a non-creator participant (User B reading a run under User A's tree) will be blocked. When that need arises, either continue routing through Cloud Functions or relax the rule using a `userLocations` cross-reference at read time.
 
 **Assessment:** Hardened. Reads are owner-scoped (or admin-scoped for templates / ownerIndex). **All client writes are denied** — every mutation must go through Cloud Functions, which run under the Admin SDK and bypass these rules. This forces the validation, idempotency, atomic transactions, auto-flagging, `requiredNote` 422 enforcement, and `ownerIndex` maintenance in `functions/ross.js` to be the single source of truth.
 

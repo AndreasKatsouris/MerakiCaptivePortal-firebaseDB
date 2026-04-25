@@ -511,6 +511,10 @@
         ".read": "auth != null && root.child('admins').child(auth.uid).exists()",
         ".write": false
       },
+      "workflowsByLocation": {
+        ".read": "auth != null && root.child('admins').child(auth.uid).exists()",
+        ".write": false
+      },
       "staff": {
         "$ownerId": {
           ".read": "auth != null && auth.uid === $ownerId",

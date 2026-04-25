@@ -513,6 +513,20 @@ Fan-out index mapping user IDs to a boolean `true`. Written by `rossCreateWorkfl
 { "uid-abc": true, "uid-def": true }
 ```
 
+#### `ross/workflowsByLocation/{locationId}/{workflowId}`
+Reverse index mapping (locationId, workflowId) → ownerUid. Lets a caller resolve the workflow owner given a location they have access to, so any user with location access can read a workflow even when they are not the creator. Written atomically alongside the workflow record by `rossCreateWorkflow` / `rossActivateWorkflow`; removed by `rossDeleteWorkflow`.
+
+```json
+{
+  "loc-1": {
+    "wf-abc123": "admin-uid",
+    "wf-def456": "other-admin-uid"
+  }
+}
+```
+
+> **Read-time use:** every per-location ROSS function (`rossGetWorkflows`, `rossGetReports`, `rossCompleteTask`, `rossCreateRun`, `rossSubmitResponse`, `rossGetRun`, `rossGetRunHistory`) starts by resolving the owner via this index, then dereferences `ross/workflows/{ownerUid}/{workflowId}/...` to get the canonical record. Structural mutations (`rossUpdateWorkflow`, `rossManageTask`, `rossDeleteWorkflow`) remain owner-only and continue to scope by the caller's uid.
+
 ---
 
 ### Admin / Project Management Nodes
