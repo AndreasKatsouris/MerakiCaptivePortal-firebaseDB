@@ -484,7 +484,7 @@ This is the gold standard for rules in this project.
 
 ### `ross` (ROSS -- Restaurant Operations Support System)
 
-**Lines:** 384-402 | **Purpose:** Workflow automation, templates, and staff management
+**Lines:** 488-521 | **Purpose:** Workflow automation, templates, runs, staff. All client writes denied; mutations go through Cloud Functions.
 
 ```json
 "ross": {

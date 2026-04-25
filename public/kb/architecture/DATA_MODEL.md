@@ -408,43 +408,46 @@ Google review imports. Requires `reviewerName`, `rating`, `text`, `timestamp`.
 ### ROSS (Restaurant Operations Support System) Nodes
 
 #### `ross/workflows/{uid}/{workflowId}`
-Operational workflows owned by a user, with per-location activation.
+Operational workflows owned by an admin user. **Hybrid shape:** workflow-level metadata is stored once at the root, while per-location state (status, due date, tasks, history, assignment) lives in a `locations/{locationId}/` subtree. One name, one recurrence, one schedule — but each attached location runs and completes independently.
 
 ```json
 {
-  "id": "wf-abc123",
+  "workflowId": "wf-abc123",
+  "ownerId": "admin-uid",
+  "templateId": "tpl-xyz",
   "name": "Opening Checklist",
   "description": "Daily opening procedure",
   "category": "operations",
   "recurrence": "daily",
-  "templateId": "tpl-xyz",
+  "customInterval": null,
+  "notificationChannels": ["in_app"],
+  "notifyPhone": null,
+  "notifyEmail": null,
+  "daysBeforeAlert": [30, 7],
   "createdAt": 1700000000000,
   "updatedAt": 1700000000000,
   "locations": {
     "loc-1": {
-      "locationId": "loc-1",
-      "locationStatus": "active",
-      "locationNextDueDate": "2026-03-10T00:00:00.000Z",
+      "locationName": "Sandton Branch",
       "locationAssignedTo": "staffId",
+      "status": "active",
+      "nextDueDate": "2026-03-10T00:00:00.000Z",
       "activatedAt": 1700000000000,
       "tasks": {
         "task-1": {
           "title": "Check gas valve",
           "status": "pending",
-          "dueDate": null,
+          "dueDate": 1700086400000,
           "completedAt": null,
           "assignedTo": null,
-          "order": 0
+          "order": 1
         }
       },
       "history": {
-        "2026-daily": {
-          "cycleId": "2026-daily",
-          "period": "2026",
+        "{historyId}": {
           "completedAt": 1700000000000,
           "tasksTotal": 5,
           "tasksCompleted": 5,
-          "completionRate": 100,
           "onTime": true
         }
       }
@@ -453,25 +456,55 @@ Operational workflows owned by a user, with per-location activation.
 }
 ```
 
+> **Phase 2 fields.** `notifyPhone` / `notifyEmail` / `customInterval` are stored but not yet acted on (no Twilio/SendGrid delivery; recurrence engine still uses the discrete `recurrence` string).
+
 #### `ross/templates/{templateId}`
-Reusable workflow templates. Created/edited/deleted by Super Admins only.
+Reusable workflow templates. Created/edited/deleted by Super Admins only via Cloud Functions (rules deny client writes).
 
 ```json
 {
-  "id": "tpl-xyz",
+  "templateId": "tpl-xyz",
   "name": "Weekly Deep Clean",
   "description": "Weekly deep cleaning procedure",
   "category": "operations",
   "recurrence": "weekly",
-  "tasks": [
-    { "id": "t1", "title": "Degrease hoods", "required": true, "order": 0 }
+  "subtasks": [
+    { "title": "Degrease hoods", "order": 1, "daysOffset": 0 }
   ],
-  "isPublic": true,
+  "daysBeforeAlert": [30, 7],
   "createdBy": "admin-uid",
   "createdAt": 1700000000000,
   "updatedAt": 1700000000000
 }
 ```
+
+> **Note:** Templates use `subtasks` (not `tasks`). When a workflow is activated from a template, each subtask is materialised into a per-location `tasks/{taskId}` entry with a generated UUID.
+
+#### `ross/runs/{uid}/{workflowId}/{locationId}/{runId}`
+Run records (in-progress and completed) for executing a workflow at a location. Flat structure — `status` distinguishes `'in_progress'` from `'completed'`.
+
+```json
+{
+  "runId": "run-abc",
+  "workflowId": "wf-abc123",
+  "locationId": "loc-1",
+  "startedAt": 1700000000000,
+  "startedBy": "admin-uid",
+  "status": "in_progress",
+  "responses": {
+    "task-1": {
+      "value": 4.2,
+      "note": "above 4°C threshold",
+      "submittedAt": 1700000100000,
+      "submittedBy": "admin-uid",
+      "flagged": true,
+      "inputType": "temperature"
+    }
+  }
+}
+```
+
+On completion, `completedAt` / `completedBy` / `onTime` / `flaggedCount` are stamped and `status` flips to `'completed'`. See `public/kb/features/ROSS.md` for the full lifecycle (idempotent create, auto-flagging, `requiredNote` 422).
 
 #### `ross/ownerIndex/{uid}`
 Fan-out index mapping user IDs to a boolean `true`. Written by `rossCreateWorkflow` and `rossActivateWorkflow`. Cleaned up by `rossDeleteWorkflow` when the last workflow for a user is removed. Used by `rossScheduledReminder` to avoid scanning the entire `/ross/workflows` tree.

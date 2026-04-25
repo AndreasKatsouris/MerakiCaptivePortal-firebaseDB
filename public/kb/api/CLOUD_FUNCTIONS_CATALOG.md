@@ -240,12 +240,18 @@ The platform deploys **69+ Cloud Functions** from a single `functions/index.js` 
 | `rossDeleteTemplate` | HTTP POST (v2) | Super Admin | Delete template (404 existence check) |
 | `rossGetReports` | HTTP POST (v2) | Admin | Fetch completion reports across all workflows and locations |
 | `rossGetStaff` | HTTP POST (v2) | Admin | List staff members for a location |
+| `rossManageStaff` | HTTP POST (v2) | Admin | Create / update / delete staff members for a location |
+| `rossCreateRun` | HTTP POST (v2) | Admin | Create or resume an in-progress run for a workflow+location (idempotent) |
+| `rossSubmitResponse` | HTTP POST (v2) | Admin | Submit a typed response for a task in a run; auto-flags out-of-range number/temperature; HTTP 422 when `requiredNote` is set and value is flagged but no note is provided; auto-completes the run when all required tasks are done |
+| `rossGetRun` | HTTP POST (v2) | Admin | Get the latest in-progress run plus the most recent completed run as `previousResponses` |
+| `rossGetRunHistory` | HTTP POST (v2) | Admin | List completed runs (newest first, paginated) for a workflow+location |
 | `rossScheduledReminder` | Scheduled (cron `0 5 * * *`) | N/A | Scheduled reminder using `ross/ownerIndex` fan-out (not full-tree scan) |
 
 **Authentication notes:**
 - Template CRUD requires `verifySuperAdmin` (not just `verifyAdmin`). The Admin SDK bypasses RTDB security rules, so Cloud Functions enforce the superAdmin restriction.
 - `rossCompleteTask` uses an RTDB `transaction()` for atomic completion to prevent race conditions.
 - `rossManageTask` requires `taskData` only for `create` and `update` actions -- `delete` works without it.
+- All client writes to `/ross/*` are denied by RTDB rules; mutations must go through these functions. See `public/kb/security/DATABASE_RULES_GUIDE.md`.
 
 ---
 
