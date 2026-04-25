@@ -292,6 +292,25 @@ export const PLATFORM_FEATURES = {
     dependencies: ['salesForecastingAdvanced']
   },
 
+  // ROSS (Restaurant Operations Support System) Features
+  rossBasic: {
+    id: 'rossBasic',
+    name: 'ROSS Workflows',
+    module: 'ross',
+    description: 'Workflow templates, task management, and operational checklists',
+    category: 'operations',
+    icon: 'fa-clipboard-list'
+  },
+  rossAdvanced: {
+    id: 'rossAdvanced',
+    name: 'ROSS Advanced',
+    module: 'ross',
+    description: 'Custom workflow builder, staff management, and compliance reports',
+    category: 'operations',
+    icon: 'fa-cogs',
+    dependencies: ['rossBasic']
+  },
+
   // Project Management Features
   projectManagementBasic: {
     id: 'projectManagementBasic',
@@ -487,7 +506,8 @@ export const PLATFORM_MODULES = {
   support: 'Support',
   core: 'Core Platform',
   locations: 'Location Management',
-  compliance: 'Corporate Compliance'
+  compliance: 'Corporate Compliance',
+  ross: 'Restaurant Operations (ROSS)'
 };
 
 // Helper functions

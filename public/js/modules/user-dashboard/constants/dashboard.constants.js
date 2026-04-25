@@ -18,7 +18,9 @@ export const FEATURES_TO_CHECK = [
   'qmsWhatsAppIntegration',
   'qmsAnalytics',
   'qmsAutomation',
-  'salesForecastingBasic'
+  'salesForecastingBasic',
+  'rossBasic',
+  'rossAdvanced'
 ]
 
 export const FEATURE_BADGES = [
@@ -35,7 +37,9 @@ export const FEATURE_BADGES = [
   { id: 'qmsAdvanced', name: 'Advanced Queue', icon: 'fa-list-ol' },
   { id: 'qmsWhatsAppIntegration', name: 'QMS WhatsApp', icon: 'fa-whatsapp' },
   { id: 'qmsAnalytics', name: 'Queue Analytics', icon: 'fa-chart-line' },
-  { id: 'qmsAutomation', name: 'Queue Automation', icon: 'fa-robot' }
+  { id: 'qmsAutomation', name: 'Queue Automation', icon: 'fa-robot' },
+  { id: 'rossBasic', name: 'ROSS Basic', icon: 'fa-clipboard-list' },
+  { id: 'rossAdvanced', name: 'ROSS Advanced', icon: 'fa-clipboard-list' }
 ]
 
 export const QUICK_ACTIONS = [
@@ -127,6 +131,15 @@ export const QUICK_ACTIONS = [
     description: 'AI-powered sales predictions & insights',
     featureId: 'salesForecastingBasic',
     href: '/sales-forecasting.html',
+    action: null
+  },
+  {
+    id: 'rossAction',
+    icon: 'fa-clipboard-list',
+    title: 'ROSS',
+    description: 'Workflows, tasks & compliance tracking',
+    featureId: 'rossBasic',
+    href: '/ross.html',
     action: null
   }
 ]

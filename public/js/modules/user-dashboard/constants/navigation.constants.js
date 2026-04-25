@@ -13,6 +13,7 @@ export const SIDEBAR_LINKS = [
   { href: 'analytics.html', icon: 'fa-chart-line', label: 'Analytics' },
   { href: 'sales-forecasting.html', icon: 'fa-chart-area', label: 'Sales Forecasting' },
   { href: 'corporate-compliance.html', icon: 'fa-building', label: 'Compliance' },
+  { href: 'ross.html', icon: 'fa-clipboard-list', label: 'ROSS' },
   { href: 'user-subscription.html', icon: 'fa-crown', label: 'Subscription' }
 ]
 
