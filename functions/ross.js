@@ -270,7 +270,7 @@ exports.rossActivateWorkflow = onRequest(async (req, res) => {
             const { uid, isSuperAdmin } = await verifyUserOrAdmin(decodedToken);
 
             const data = req.body.data || req.body;
-            const { templateId, locationIds, locationNames, name, nextDueDate, daysBeforeAlert, notifyPhone, notifyEmail } = data;
+            const { templateId, locationIds, locationNames, locationAssignedTo, name, description, nextDueDate, daysBeforeAlert, notifyPhone, notifyEmail, customInterval } = data;
 
             if (!templateId) return res.status(400).json({ error: 'Template ID is required' });
             if (!Array.isArray(locationIds) || locationIds.length === 0) return res.status(400).json({ error: 'At least one location ID is required' });
@@ -304,8 +304,10 @@ exports.rossActivateWorkflow = onRequest(async (req, res) => {
                 }
                 locations[locationId] = {
                     locationName: (locationNames && locationNames[idx]) || locationId,
+                    locationAssignedTo: (locationAssignedTo && locationAssignedTo[locationId]) || null,
                     status: 'active',
                     nextDueDate,
+                    activatedAt: now,
                     tasks
                 };
             });
@@ -315,8 +317,10 @@ exports.rossActivateWorkflow = onRequest(async (req, res) => {
                 templateId,
                 ownerId: uid,
                 name: (name || template.name).trim(),
+                description: ((description != null ? description : template.description) || '').trim() || null,
                 category: template.category,
                 recurrence: template.recurrence,
+                customInterval: (Number.isInteger(customInterval) && customInterval > 0) ? customInterval : null,
                 notificationChannels: ['in_app'],
                 notifyPhone: notifyPhone || null,
                 notifyEmail: notifyEmail || null,
@@ -351,7 +355,7 @@ exports.rossCreateWorkflow = onRequest(async (req, res) => {
             const { uid, isSuperAdmin } = await verifyUserOrAdmin(decodedToken);
 
             const data = req.body.data || req.body;
-            const { name, category, recurrence, locationIds, locationNames, nextDueDate, subtasks, daysBeforeAlert, notifyPhone, notifyEmail } = data;
+            const { name, description, category, recurrence, customInterval, locationIds, locationNames, locationAssignedTo, nextDueDate, subtasks, daysBeforeAlert, notifyPhone, notifyEmail } = data;
 
             if (!name || !name.trim()) return res.status(400).json({ error: 'Workflow name is required' });
             if (!VALID_CATEGORIES.includes(category)) return res.status(400).json({ error: 'Invalid category' });
@@ -382,8 +386,10 @@ exports.rossCreateWorkflow = onRequest(async (req, res) => {
                 }
                 locations[locationId] = {
                     locationName: (locationNames && locationNames[idx]) || locationId,
+                    locationAssignedTo: (locationAssignedTo && locationAssignedTo[locationId]) || null,
                     status: 'active',
                     nextDueDate,
+                    activatedAt: now,
                     tasks
                 };
             });
@@ -393,8 +399,10 @@ exports.rossCreateWorkflow = onRequest(async (req, res) => {
                 templateId: null,
                 ownerId: uid,
                 name: name.trim(),
+                description: (description || '').trim() || null,
                 category,
                 recurrence,
+                customInterval: (Number.isInteger(customInterval) && customInterval > 0) ? customInterval : null,
                 notificationChannels: ['in_app'],
                 notifyPhone: notifyPhone || null,
                 notifyEmail: notifyEmail || null,
