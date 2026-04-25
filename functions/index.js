@@ -71,7 +71,12 @@ const {
     getLocationByWhatsAppFunction,
     getUserWhatsAppNumbersFunction,
     getWhatsAppAnalyticsFunction,
-    removeWhatsAppNumberFunction
+    removeWhatsAppNumberFunction,
+    getWhatsAppTemplateConfigFunction,
+    updateWhatsAppTemplateConfigFunction,
+    addWhatsAppTemplateConfigFunction,
+    deleteWhatsAppTemplateConfigFunction,
+    sendWhatsAppTestMessageFunction
 } = require('./whatsappManagement');
 const { receiveWhatsAppMessageEnhanced } = require('./receiveWhatsappMessageEnhanced');
 const {
@@ -2400,6 +2405,86 @@ exports.removeWhatsAppNumber = functions.https.onRequest(async (req, res) => {
             await removeWhatsAppNumberFunction(req, res);
         } catch (error) {
             console.error('Error in removeWhatsAppNumber:', error);
+            res.status(500).json({ error: 'Internal server error' });
+        }
+    });
+});
+
+exports.getWhatsAppTemplateConfig = functions.https.onRequest(async (req, res) => {
+    cors(req, res, async () => {
+        try {
+            const authHeader = req.headers.authorization;
+            if (!authHeader) return res.status(401).json({ error: 'Authentication required' });
+            const token = authHeader.replace('Bearer ', '');
+            const decodedToken = await admin.auth().verifyIdToken(token);
+            req.user = decodedToken;
+            await getWhatsAppTemplateConfigFunction(req, res);
+        } catch (error) {
+            console.error('Error in getWhatsAppTemplateConfig:', error);
+            res.status(500).json({ error: 'Internal server error' });
+        }
+    });
+});
+
+exports.updateWhatsAppTemplateConfig = functions.https.onRequest(async (req, res) => {
+    cors(req, res, async () => {
+        try {
+            const authHeader = req.headers.authorization;
+            if (!authHeader) return res.status(401).json({ error: 'Authentication required' });
+            const token = authHeader.replace('Bearer ', '');
+            const decodedToken = await admin.auth().verifyIdToken(token);
+            req.user = decodedToken;
+            await updateWhatsAppTemplateConfigFunction(req, res);
+        } catch (error) {
+            console.error('Error in updateWhatsAppTemplateConfig:', error);
+            res.status(500).json({ error: 'Internal server error' });
+        }
+    });
+});
+
+exports.addWhatsAppTemplateConfig = functions.https.onRequest(async (req, res) => {
+    cors(req, res, async () => {
+        try {
+            const authHeader = req.headers.authorization;
+            if (!authHeader) return res.status(401).json({ error: 'Authentication required' });
+            const token = authHeader.replace('Bearer ', '');
+            const decodedToken = await admin.auth().verifyIdToken(token);
+            req.user = decodedToken;
+            await addWhatsAppTemplateConfigFunction(req, res);
+        } catch (error) {
+            console.error('Error in addWhatsAppTemplateConfig:', error);
+            res.status(500).json({ error: 'Internal server error' });
+        }
+    });
+});
+
+exports.deleteWhatsAppTemplateConfig = functions.https.onRequest(async (req, res) => {
+    cors(req, res, async () => {
+        try {
+            const authHeader = req.headers.authorization;
+            if (!authHeader) return res.status(401).json({ error: 'Authentication required' });
+            const token = authHeader.replace('Bearer ', '');
+            const decodedToken = await admin.auth().verifyIdToken(token);
+            req.user = decodedToken;
+            await deleteWhatsAppTemplateConfigFunction(req, res);
+        } catch (error) {
+            console.error('Error in deleteWhatsAppTemplateConfig:', error);
+            res.status(500).json({ error: 'Internal server error' });
+        }
+    });
+});
+
+exports.sendWhatsAppTestMessage = functions.https.onRequest(async (req, res) => {
+    cors(req, res, async () => {
+        try {
+            const authHeader = req.headers.authorization;
+            if (!authHeader) return res.status(401).json({ error: 'Authentication required' });
+            const token = authHeader.replace('Bearer ', '');
+            const decodedToken = await admin.auth().verifyIdToken(token);
+            req.user = decodedToken;
+            await sendWhatsAppTestMessageFunction(req, res);
+        } catch (error) {
+            console.error('Error in sendWhatsAppTestMessage:', error);
             res.status(500).json({ error: 'Internal server error' });
         }
     });

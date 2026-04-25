@@ -2492,10 +2492,18 @@
                                             </button>
                                         </div>
                                         <div class="col-md-3">
-                                            <a href="tools/admin/whatsapp-management.html"
-                                                class="btn btn-outline-success w-100">
+                                            <button class="btn btn-outline-success w-100"
+                                                onclick="openWAModal('')">
                                                 <i class="fas fa-external-link-alt me-2"></i>Full Management
-                                            </a>
+                                            </button>
+                                        </div>
+                                    </div>
+                                    <div class="row mt-2">
+                                        <div class="col-md-3">
+                                            <button class="btn btn-outline-primary w-100"
+                                                onclick="openWAModal('#templates')">
+                                                <i class="fas fa-file-alt me-2"></i>Manage Templates
+                                            </button>
                                         </div>
                                     </div>
                                 </div>
@@ -4475,6 +4483,42 @@
                 </div>
             </div>
         </div>
+
+        <!-- WhatsApp Management Modal -->
+        <div class="modal fade" id="whatsappManagementModal" tabindex="-1"
+             aria-labelledby="whatsappManagementModalLabel" aria-hidden="true">
+          <div class="modal-dialog modal-xl" style="max-width: 92vw;">
+            <div class="modal-content" style="height: 88vh;">
+              <div class="modal-header py-2">
+                <h5 class="modal-title" id="whatsappManagementModalLabel">
+                  <i class="fab fa-whatsapp text-success me-2"></i>WhatsApp Management
+                </h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+              </div>
+              <div class="modal-body p-0" style="height: calc(88vh - 49px); overflow: hidden;">
+                <iframe id="waManagementFrame"
+                        src=""
+                        style="width: 100%; height: 100%; border: none;"
+                        title="WhatsApp Management">
+                </iframe>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <script>
+          function openWAModal(hash) {
+            document.getElementById('waManagementFrame').src =
+              'tools/admin/whatsapp-management.html' + (hash || '');
+            bootstrap.Modal.getOrCreateInstance(
+              document.getElementById('whatsappManagementModal')
+            ).show();
+          }
+          document.getElementById('whatsappManagementModal')
+            .addEventListener('hidden.bs.modal', function () {
+              document.getElementById('waManagementFrame').src = '';
+            });
+        </script>
 
 </body>
 

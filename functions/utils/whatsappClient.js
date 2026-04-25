@@ -1,8 +1,6 @@
 const { client, twilioPhone } = require('../twilioClient');
 const {
     TEMPLATE_TYPES,
-    TWILIO_TEMPLATE_CONFIG,
-    TWILIO_TEMPLATES,
     buildBookingConfirmationParams,
     buildBookingStatusParams,
     buildBookingReminderParams,
@@ -10,8 +8,40 @@ const {
     buildWelcomeMessageParams,
     buildQueueManualAdditionParams,
     buildAdminNewBookingNotificationParams,
+    buildRewardNotificationParams,
+    buildPointsUpdateParams,
     buildFallbackMessage
 } = require('./whatsappTemplates');
+
+const { rtdb, ref, get } = require('../config/firebase-admin');
+
+// In-memory cache for template config
+let _templateConfigCache = null;
+let _templateConfigCacheTime = 0;
+const TEMPLATE_CACHE_TTL_MS = 5 * 60 * 1000; // 5 minutes
+
+async function getTemplateConfig(templateType) {
+    const now = Date.now();
+    if (!_templateConfigCache || (now - _templateConfigCacheTime) > TEMPLATE_CACHE_TTL_MS) {
+        try {
+            const configRef = ref(rtdb, 'whatsapp-template-config');
+            const snapshot = await get(configRef);
+            if (snapshot.exists()) {
+                _templateConfigCache = snapshot.val();
+                _templateConfigCacheTime = now;
+            } else {
+                console.warn('⚠️ whatsapp-template-config node not found in RTDB — templates will fall back until seeded');
+                // Don't cache the empty result — retry on next call
+                return null;
+            }
+        } catch (err) {
+            console.error('❌ Failed to load whatsapp-template-config from RTDB:', err.message);
+            // Don't update cache — retry on next call
+            return null;
+        }
+    }
+    return (_templateConfigCache && _templateConfigCache[templateType]) || null;
+}
 
 /**
  * Send WhatsApp message using Twilio
@@ -52,78 +82,57 @@ async function sendWhatsAppTemplate(to, templateType, contentVariables, options 
             throw new Error('Phone number is required');
         }
 
-        console.log(`Sending WhatsApp template ${templateType} to:`, to);
-        
-        // Get template configuration
-        const template = TWILIO_TEMPLATES[templateType];
-        if (!template) {
-            throw new Error(`Template not found: ${templateType}`);
-        }
-
-        // Ensure proper WhatsApp format
         const whatsappTo = to.startsWith('whatsapp:') ? to : `whatsapp:${to}`;
-        
-        // Try to send template if templates are enabled and ContentSid is available
-        if (TWILIO_TEMPLATE_CONFIG.USE_TEMPLATES && template.contentSid && !template.contentSid.includes('HXxxxxxxx')) {
-            try {
-                console.log(`📋 Using Twilio template with ContentSid: ${template.contentSid}`);
-                
-                const messageOptions = {
-                    contentSid: template.contentSid,
-                    contentVariables: JSON.stringify(contentVariables),
-                    from: `whatsapp:${twilioPhone}`,
-                    to: whatsappTo
-                };
 
-                // Add messaging service SID if configured
-                if (TWILIO_TEMPLATE_CONFIG.MESSAGING_SERVICE_SID) {
-                    messageOptions.messagingServiceSid = TWILIO_TEMPLATE_CONFIG.MESSAGING_SERVICE_SID;
-                }
+        // Load config from RTDB cache
+        const config = await getTemplateConfig(templateType);
 
-                const message = await client.messages.create(messageOptions);
-                
-                console.log(`✅ Twilio template sent successfully: ${templateType}`, {
-                    messageSid: message.sid,
-                    contentSid: template.contentSid
-                });
-                return message;
-                
-            } catch (templateError) {
-                console.warn(`⚠️ Template sending failed, falling back to formatted message:`, templateError.message);
-                // Fall through to fallback message
-            }
+        if (!config || !config.enabled) {
+            console.log(`📋 FALLBACK: ${templateType} ${config ? 'disabled' : 'not configured in RTDB'}`);
+            const fallbackMessage = buildFallbackMessage(templateType, Object.values(contentVariables));
+            return await client.messages.create({
+                body: fallbackMessage,
+                from: `whatsapp:${twilioPhone}`,
+                to: whatsappTo
+            });
         }
-        
-        // Fallback to formatted message using template structure
-        console.log(`📋 Using fallback formatted message for ${templateType}`);
-        const fallbackMessage = buildFallbackMessage(templateType, Object.values(contentVariables));
-        
-        const message = await client.messages.create({
-            body: fallbackMessage,
-            from: `whatsapp:${twilioPhone}`,
-            to: whatsappTo
-        });
-        
-        console.log(`✅ Fallback message sent successfully: ${templateType}`, {
-            messageSid: message.sid
-        });
-        return message;
-        
+
+        if (!config.contentSid || !/^HX[a-f0-9]{32}$/.test(config.contentSid)) {
+            console.log(`📋 FALLBACK: ${templateType} contentSid not set`);
+            const fallbackMessage = buildFallbackMessage(templateType, Object.values(contentVariables));
+            return await client.messages.create({
+                body: fallbackMessage,
+                from: `whatsapp:${twilioPhone}`,
+                to: whatsappTo
+            });
+        }
+
+        try {
+            console.log(`📋 Sending Twilio template ${templateType} (${config.contentSid}) to ${to}`);
+            const message = await client.messages.create({
+                contentSid: config.contentSid,
+                contentVariables: JSON.stringify(contentVariables),
+                from: `whatsapp:${twilioPhone}`,
+                to: whatsappTo
+            });
+            console.log(`✅ Template sent: ${templateType} sid=${message.sid}`);
+            return message;
+        } catch (templateError) {
+            console.error(`❌ FALLBACK USED: ${templateType} — Twilio error code=${templateError.code} msg="${templateError.message}"`);
+            const fallbackMessage = buildFallbackMessage(templateType, Object.values(contentVariables));
+            return await client.messages.create({
+                body: fallbackMessage,
+                from: `whatsapp:${twilioPhone}`,
+                to: whatsappTo
+            });
+        }
+
     } catch (error) {
         console.error('Error sending WhatsApp template:', error);
-        
-        // If template fails, try sending basic message
         if (options.fallbackMessage) {
-            try {
-                await sendWhatsAppMessage(to, options.fallbackMessage);
-                console.log('✅ Basic fallback message sent successfully');
-            } catch (fallbackError) {
-                console.error('❌ All fallback methods failed:', fallbackError);
-                throw fallbackError;
-            }
-        } else {
-            throw error;
+            return await sendWhatsAppMessage(to, options.fallbackMessage);
         }
+        throw error;
     }
 }
 
@@ -263,6 +272,48 @@ async function sendAdminNewBookingNotificationTemplate(phoneNumber, adminName, b
 }
 
 /**
+ * Send reward notification template
+ * @param {string} phoneNumber - Recipient phone number
+ * @param {string} guestName - Guest name
+ * @param {string} rewardName - Reward name/description
+ * @param {string} rewardValue - Reward value (e.g. "R50 off", "Free dessert")
+ * @param {number|string} totalPoints - Guest's total points after this reward
+ */
+async function sendRewardNotificationTemplate(phoneNumber, guestName, rewardName, rewardValue, totalPoints) {
+    const contentVariables = buildRewardNotificationParams(guestName, rewardName, rewardValue, totalPoints);
+
+    await sendWhatsAppTemplate(
+        phoneNumber,
+        TEMPLATE_TYPES.REWARD_NOTIFICATION,
+        contentVariables,
+        {
+            fallbackMessage: `🎁 You've Earned a Reward!\n\nHi ${guestName},\n\nCongratulations! You've earned: ${rewardName} (${rewardValue})\n\nTotal Points: ${totalPoints}\n\nReply "view rewards" to see all your rewards!`
+        }
+    );
+}
+
+/**
+ * Send points update template
+ * @param {string} phoneNumber - Recipient phone number
+ * @param {string} guestName - Guest name
+ * @param {number|string} pointsEarned - Points earned in this transaction
+ * @param {number|string} totalPoints - Guest's new total points balance
+ * @param {string} transactionType - Description of the transaction (e.g. "Receipt scan", "Bonus reward")
+ */
+async function sendPointsUpdateTemplate(phoneNumber, guestName, pointsEarned, totalPoints, transactionType) {
+    const contentVariables = buildPointsUpdateParams(guestName, pointsEarned, totalPoints, transactionType);
+
+    await sendWhatsAppTemplate(
+        phoneNumber,
+        TEMPLATE_TYPES.POINTS_UPDATE,
+        contentVariables,
+        {
+            fallbackMessage: `🎯 Points Update\n\nHi ${guestName},\n\nPoints Earned: ${pointsEarned}\nTotal Points: ${totalPoints}\nTransaction: ${transactionType}\n\nReply "check my points" to see your balance!`
+        }
+    );
+}
+
+/**
  * Get template information (for testing/debugging)
  * @param {string} templateType - Template type
  */
@@ -285,5 +336,7 @@ module.exports = {
     sendWelcomeMessageTemplate,
     sendQueueManualAdditionTemplate,
     sendAdminNewBookingNotificationTemplate,
+    sendRewardNotificationTemplate,
+    sendPointsUpdateTemplate,
     getTemplateInfo
-}; 
+};

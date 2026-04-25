@@ -58,7 +58,11 @@
     },
     "admin-claims": {
       ".read": "auth != null",
-      ".write": "auth != null"
+      ".write": "auth != null && auth.token.admin === true"
+    },
+    "whatsapp-template-config": {
+      ".read": "auth != null",
+      ".write": "auth != null && auth.token.admin === true"
     },
     "rewards": {
       ".read": "auth != null",
