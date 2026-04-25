@@ -207,7 +207,7 @@ ross/
 
 ### Runs lifecycle
 
-- **`rossCreateRun` is idempotent.** If a run with `status: 'in_progress'` already exists for the workflow+location, it is returned instead of creating a new one. This prevents duplicate runs when a user reloads or clicks "start" twice.
+- **`rossCreateRun` is idempotent.** If a run with `status: 'in_progress'` already exists for the workflow+location, it is returned instead of creating a new one. This prevents duplicate runs when a user reloads or clicks "start" twice. The new run is stamped with `startedBy: callerUid` so audits can distinguish runs initiated by the workflow creator from runs started by another admin/staff with location access.
 - **`rossSubmitResponse` writes one task response at a time.** It auto-flags responses where `Number(value)` is outside `inputConfig.min`/`inputConfig.max` (applies to `number` and `temperature` input types). When a response is auto-flagged AND the task's `inputConfig.requiredNote === true`, submission is rejected with HTTP **422** until the client sends a non-empty `note`. Frontend must surface the 422 and prompt for the note.
 - **Auto-completion.** After every response submission the function checks whether all `required: true` tasks have a response. If so, the run is marked `status: 'completed'`, `completedAt` / `completedBy` are stamped, `onTime` is computed against the location's `nextDueDate`, and `flaggedCount` is summed across responses.
 

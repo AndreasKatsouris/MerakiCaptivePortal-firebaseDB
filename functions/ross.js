@@ -584,7 +584,11 @@ exports.rossGetWorkflows = onRequest(async (req, res) => {
             if (locationId) {
                 visibleLocationIds = [locationId];
             } else if (isSuperAdmin) {
-                // Super admin: all locations across the platform
+                // Super admin without a locationId reads the entire
+                // workflowsByLocation tree, then fans out N per-location
+                // reads + M per-workflow dereferences. Acceptable at current
+                // scale; if location count grows beyond a few thousand, add
+                // a `limit` param or require locationId for super admins.
                 const allLocs = await db.ref('ross/workflowsByLocation').once('value');
                 visibleLocationIds = Object.keys(allLocs.val() || {});
             } else {

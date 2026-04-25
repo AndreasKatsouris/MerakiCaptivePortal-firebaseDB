@@ -25,6 +25,10 @@ if (!admin.apps.length) {
 const db = admin.database();
 
 async function main() {
+    // Confirm target before any read/write so an operator can abort if
+    // GOOGLE_APPLICATION_CREDENTIALS is pointing at the wrong environment.
+    console.log('Target DB:', db.app.options.databaseURL);
+
     const indexSnap = await db.ref('ross/ownerIndex').once('value');
     if (!indexSnap.exists()) {
         console.log('No owners in ross/ownerIndex — nothing to backfill.');
