@@ -18,7 +18,7 @@ const data = computed(() => store.data)
 const filteredMenu = computed(() => store.filteredMenu)
 
 const nav = [
-  { label: 'Ross',       icon: 'bolt',    href: '/ross.html' },
+  { label: 'ROSS v2',    icon: 'bolt',    href: '/ross.html' },
   { label: 'Overview',   icon: 'chart',   href: '/group-overview-v2.html' },
   { label: 'Guests',     icon: 'users',   href: '/guest-management.html' },
   { label: 'Queue',      icon: 'clock',   href: '/queue-management.html' },

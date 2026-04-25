@@ -136,8 +136,8 @@ export const QUICK_ACTIONS = [
   {
     id: 'rossAction',
     icon: 'fa-clipboard-list',
-    title: 'ROSS',
-    description: 'Workflows, tasks & compliance tracking',
+    title: 'ROSS v2',
+    description: 'Editorial concierge home (preview)',
     featureId: 'rossBasic',
     href: '/ross.html',
     action: null

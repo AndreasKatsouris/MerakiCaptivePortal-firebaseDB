@@ -17,7 +17,7 @@ onMounted(() => { if (!store.data) store.load() })
 const data = computed(() => store.data)
 
 const nav = [
-  { label: 'Ross',       icon: 'bolt',    href: '/ross.html' },
+  { label: 'ROSS v2',    icon: 'bolt',    href: '/ross.html' },
   { label: 'Overview',   icon: 'chart',   active: true },
   { label: 'Guests',     icon: 'users',   href: '/guest-management.html' },
   { label: 'Queue',      icon: 'clock',   href: '/queue-management.html' },

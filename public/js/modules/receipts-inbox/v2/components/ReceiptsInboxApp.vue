@@ -18,7 +18,7 @@ const inbox  = computed(() => store.inbox)
 const detail = computed(() => store.detail)
 
 const nav = [
-  { label: 'Ross',      icon: 'bolt',  href: '/ross.html' },
+  { label: 'ROSS v2',   icon: 'bolt',  href: '/ross.html' },
   { label: 'Overview',  icon: 'chart', href: '/group-overview-v2.html' },
   { label: 'Guests',    icon: 'users', href: '/guests-v2.html' },
   { label: 'Queue',     icon: 'clock', href: '/queue-v2.html' },
