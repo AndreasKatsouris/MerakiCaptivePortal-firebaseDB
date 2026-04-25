@@ -14,6 +14,16 @@ const cors = require('cors')({
     credentials: true
 });
 const express = require('express');
+
+function escapeHtml(value) {
+    if (value === null || value === undefined) return '';
+    return String(value)
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#39;');
+}
 const { receiveWhatsAppMessage } = require('./receiveWhatsappMessage');
 const {
     sendWhatsAppMessage,
@@ -748,7 +758,7 @@ exports.verifyAdminStatus = onRequest(async (req, res) => {
  * Create a new user account (Admin only)
  * Creates Firebase Auth account, user record, and subscription
  */
-exports.createUserAccount = onRequest(async (req, res) => {
+exports.createUserAccount = onRequest({ invoker: 'public' }, async (req, res) => {
     console.log('[createUserAccount] Received request:', {
         method: req.method,
         headers: req.headers
@@ -809,24 +819,48 @@ exports.createUserAccount = onRequest(async (req, res) => {
 
             console.log('[createUserAccount] Creating user:', { email, tier, isAdmin, locationCount: assignedLocations.length });
 
-            // Create Firebase Auth user
-            const userRecord = await admin.auth().createUser({
-                email,
-                password,
-                emailVerified: false,
-                displayName: `${firstName} ${lastName}`
-            });
+            // Create or reinstate Firebase Auth user
+            let userRecord;
+            let reinstated = false;
 
-            console.log('[createUserAccount] Firebase Auth user created:', userRecord.uid);
+            try {
+                userRecord = await admin.auth().createUser({
+                    email,
+                    password,
+                    emailVerified: false,
+                    displayName: `${firstName} ${lastName}`
+                });
+                console.log('[createUserAccount] Firebase Auth user created:', userRecord.uid);
+            } catch (createError) {
+                if (createError.code === 'auth/email-already-exists') {
+                    // User exists in Auth — reinstate by updating their account
+                    console.log('[createUserAccount] Auth account exists, reinstating user:', email);
+                    const existingUser = await admin.auth().getUserByEmail(email);
+                    await admin.auth().updateUser(existingUser.uid, {
+                        password,
+                        displayName: `${firstName} ${lastName}`,
+                        disabled: false
+                    });
+                    userRecord = await admin.auth().getUser(existingUser.uid);
+                    reinstated = true;
+                    console.log('[createUserAccount] User reinstated:', userRecord.uid);
+                } else {
+                    throw createError;
+                }
+            }
 
             // Set admin claim if requested
             if (isAdmin) {
                 await admin.auth().setCustomUserClaims(userRecord.uid, { admin: true });
                 await admin.database().ref(`admin-claims/${userRecord.uid}`).set(true);
                 console.log('[createUserAccount] Admin claims set');
+            } else if (reinstated) {
+                // Clear admin claims if reinstating as non-admin
+                await admin.auth().setCustomUserClaims(userRecord.uid, { admin: false });
+                await admin.database().ref(`admin-claims/${userRecord.uid}`).remove();
             }
 
-            // Create user record in database
+            // Create/update user record in database
             const userData = {
                 email,
                 displayName: `${firstName} ${lastName}`,
@@ -836,21 +870,31 @@ exports.createUserAccount = onRequest(async (req, res) => {
                 phoneNumber: phoneNumber || '',
                 createdAt: admin.database.ServerValue.TIMESTAMP,
                 lastLogin: admin.database.ServerValue.TIMESTAMP,
-                emailVerified: false
+                emailVerified: false,
+                requiresPasswordChange: true
             };
 
-            await admin.database().ref(`users/${userRecord.uid}`).set(userData);
-            console.log('[createUserAccount] User record created');
+            if (reinstated) {
+                // Merge with any existing data, reset onboarding so user goes through setup again
+                await admin.database().ref(`users/${userRecord.uid}`).update(userData);
+                await admin.database().ref(`onboarding-progress/${userRecord.uid}`).remove();
+                console.log('[createUserAccount] User record updated (reinstated), onboarding reset');
+            } else {
+                await admin.database().ref(`users/${userRecord.uid}`).set(userData);
+                console.log('[createUserAccount] User record created');
+            }
 
             // Create subscription with locationIds
             const subscriptionData = {
                 userId: userRecord.uid,
+                tier: tier,
                 tierId: tier,
                 status: 'active',
+                paymentStatus: 'active',
                 startDate: admin.database.ServerValue.TIMESTAMP,
                 features: tierData?.features || {},
                 limits: tierData?.limits || {},
-                locationIds: assignedLocations, // Store associated locations
+                locationIds: assignedLocations,
                 metadata: {
                     signupSource: 'admin',
                     initialTier: tier,
@@ -875,21 +919,209 @@ exports.createUserAccount = onRequest(async (req, res) => {
                 console.log('[createUserAccount] userLocations entries created');
             }
 
+            // Send welcome email with temporary password
+            let emailSent = false;
+            try {
+                const sgClient = require('./sendgridClient').client;
+                const loginUrl = 'https://merakicaptiveportal-firebasedb.web.app/user-login.html';
+
+                const emailData = {
+                    personalizations: [{
+                        to: [{ email, name: `${firstName} ${lastName}` }],
+                        subject: 'Welcome to Sparks Hospitality — Your Account is Ready'
+                    }],
+                    from: {
+                        email: process.env.SENDGRID_FROM_EMAIL || 'noreply@sparkshospitality.co.za',
+                        name: 'Sparks Hospitality'
+                    },
+                    content: [{
+                        type: 'text/html',
+                        value: `
+                            <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+                                <div style="background: linear-gradient(135deg, #0d6efd, #6610f2); padding: 30px; text-align: center; border-radius: 8px 8px 0 0;">
+                                    <h1 style="color: white; margin: 0;">Welcome to Sparks Hospitality</h1>
+                                </div>
+                                <div style="padding: 30px; background: #ffffff; border: 1px solid #e9ecef; border-top: none; border-radius: 0 0 8px 8px;">
+                                    <p>Hi ${escapeHtml(firstName)},</p>
+                                    <p>Your account has been created by an administrator. Here are your login details:</p>
+                                    <div style="background: #f8f9fa; padding: 20px; border-radius: 8px; margin: 20px 0;">
+                                        <p style="margin: 5px 0;"><strong>Email:</strong> ${escapeHtml(email)}</p>
+                                        <p style="margin: 5px 0;"><strong>Temporary Password:</strong> ${escapeHtml(password)}</p>
+                                        <p style="margin: 5px 0;"><strong>Subscription:</strong> ${escapeHtml(tierData.name || tier)}</p>
+                                    </div>
+                                    <p style="text-align: center; margin: 25px 0;">
+                                        <a href="${loginUrl}" style="background: #0d6efd; color: white; padding: 12px 30px; text-decoration: none; border-radius: 6px; font-weight: bold;">Log In Now</a>
+                                    </p>
+                                    <div style="background: #fff3cd; padding: 15px; border-radius: 8px; border-left: 4px solid #ffc107;">
+                                        <strong>Important:</strong> You will be asked to change your password when you first log in. After that, a short onboarding wizard will help you set up your business profile.
+                                    </div>
+                                    <p style="color: #6c757d; font-size: 0.9em; margin-top: 25px;">If you did not expect this email, please ignore it or contact support.</p>
+                                </div>
+                            </div>`
+                    }]
+                };
+
+                await sgClient.request({
+                    url: '/v3/mail/send',
+                    method: 'POST',
+                    body: emailData
+                });
+                emailSent = true;
+                console.log('[createUserAccount] Welcome email sent to', email);
+            } catch (emailError) {
+                console.error('[createUserAccount] Failed to send welcome email:', emailError.message);
+                // Don't fail the whole operation if email fails
+            }
+
             // Return success
             return res.status(200).json({
                 success: true,
-                message: 'User created successfully',
+                message: reinstated ? 'User reinstated successfully' : 'User created successfully',
                 userId: userRecord.uid,
                 email: email,
                 tier: tier,
                 isAdmin: isAdmin || false,
-                locationCount: assignedLocations.length
+                locationCount: assignedLocations.length,
+                emailSent,
+                reinstated
             });
 
         } catch (error) {
             console.error('[createUserAccount] Error:', error);
+
+            // Return user-friendly error messages for known cases
+            let statusCode = 500;
+            let errorMessage = 'Failed to create user';
+
+            if (error.code === 'auth/email-already-exists' || (error.errorInfo && error.errorInfo.code === 'auth/email-already-exists')) {
+                statusCode = 409;
+                errorMessage = 'A user with this email address already exists';
+            } else if (error.code === 'auth/invalid-email') {
+                statusCode = 400;
+                errorMessage = 'The email address is not valid';
+            } else if (error.code === 'auth/weak-password') {
+                statusCode = 400;
+                errorMessage = 'The password is too weak (minimum 6 characters)';
+            }
+
+            return res.status(statusCode).json({
+                error: errorMessage,
+                details: error.message
+            });
+        }
+    });
+});
+
+/**
+ * Resend welcome email to a user who hasn't logged in yet (Admin only)
+ */
+exports.resendWelcomeEmail = onRequest({ invoker: 'public' }, async (req, res) => {
+    cors(req, res, async () => {
+        try {
+            // Verify admin
+            const authHeader = req.headers.authorization;
+            if (!authHeader || !authHeader.startsWith('Bearer ')) {
+                return res.status(401).json({ error: 'Unauthorized' });
+            }
+            const idToken = authHeader.split('Bearer ')[1];
+            const decodedToken = await admin.auth().verifyIdToken(idToken);
+            const adminSnapshot = await admin.database().ref(`admin-claims/${decodedToken.uid}`).once('value');
+            if (!adminSnapshot.exists()) {
+                return res.status(403).json({ error: 'Admin access required' });
+            }
+
+            const { userId } = req.body;
+            if (!userId) {
+                return res.status(400).json({ error: 'userId is required' });
+            }
+
+            // Get user data
+            const userSnapshot = await admin.database().ref(`users/${userId}`).once('value');
+            const userData = userSnapshot.val();
+            if (!userData) {
+                return res.status(404).json({ error: 'User not found' });
+            }
+
+            if (!userData.requiresPasswordChange) {
+                return res.status(400).json({ error: 'User has already changed their password — welcome email not applicable' });
+            }
+
+            // Get subscription tier name
+            const subSnapshot = await admin.database().ref(`subscriptions/${userId}`).once('value');
+            const subData = subSnapshot.val() || {};
+            const tierId = subData.tierId || subData.tier || 'free';
+            const tierSnapshot = await admin.database().ref(`subscriptionTiers/${tierId}`).once('value');
+            const tierData = tierSnapshot.val() || {};
+
+            // Get auth user to get email
+            const authUser = await admin.auth().getUser(userId);
+
+            // Generate a temp password and update
+            const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZabcdefghjkmnpqrstuvwxyz23456789';
+            let tempPassword = '';
+            for (let i = 0; i < 12; i++) {
+                tempPassword += chars.charAt(Math.floor(Math.random() * chars.length));
+            }
+            await admin.auth().updateUser(userId, { password: tempPassword });
+
+            // Send email
+            const sgClient = require('./sendgridClient').client;
+            const loginUrl = 'https://merakicaptiveportal-firebasedb.web.app/user-login.html';
+            const firstName = userData.firstName || userData.displayName || 'there';
+
+            const emailData = {
+                personalizations: [{
+                    to: [{ email: authUser.email, name: userData.displayName || authUser.email }],
+                    subject: 'Welcome to Sparks Hospitality — Your Account is Ready'
+                }],
+                from: {
+                    email: process.env.SENDGRID_FROM_EMAIL || 'noreply@sparkshospitality.co.za',
+                    name: 'Sparks Hospitality'
+                },
+                content: [{
+                    type: 'text/html',
+                    value: `
+                        <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+                            <div style="background: linear-gradient(135deg, #0d6efd, #6610f2); padding: 30px; text-align: center; border-radius: 8px 8px 0 0;">
+                                <h1 style="color: white; margin: 0;">Welcome to Sparks Hospitality</h1>
+                            </div>
+                            <div style="padding: 30px; background: #ffffff; border: 1px solid #e9ecef; border-top: none; border-radius: 0 0 8px 8px;">
+                                <p>Hi ${escapeHtml(firstName)},</p>
+                                <p>Your account has been created by an administrator. Here are your login details:</p>
+                                <div style="background: #f8f9fa; padding: 20px; border-radius: 8px; margin: 20px 0;">
+                                    <p style="margin: 5px 0;"><strong>Email:</strong> ${escapeHtml(authUser.email)}</p>
+                                    <p style="margin: 5px 0;"><strong>Temporary Password:</strong> ${escapeHtml(tempPassword)}</p>
+                                    <p style="margin: 5px 0;"><strong>Subscription:</strong> ${escapeHtml(tierData.name || tierId)}</p>
+                                </div>
+                                <p style="text-align: center; margin: 25px 0;">
+                                    <a href="${loginUrl}" style="background: #0d6efd; color: white; padding: 12px 30px; text-decoration: none; border-radius: 6px; font-weight: bold;">Log In Now</a>
+                                </p>
+                                <div style="background: #fff3cd; padding: 15px; border-radius: 8px; border-left: 4px solid #ffc107;">
+                                    <strong>Important:</strong> You will be asked to change your password when you first log in. After that, a short onboarding wizard will help you set up your business profile.
+                                </div>
+                                <p style="color: #6c757d; font-size: 0.9em; margin-top: 25px;">If you did not expect this email, please ignore it or contact support.</p>
+                            </div>
+                        </div>`
+                }]
+            };
+
+            await sgClient.request({
+                url: '/v3/mail/send',
+                method: 'POST',
+                body: emailData
+            });
+
+            console.log('[resendWelcomeEmail] Welcome email resent to', authUser.email);
+
+            return res.status(200).json({
+                success: true,
+                message: `Welcome email resent to ${authUser.email}`
+            });
+
+        } catch (error) {
+            console.error('[resendWelcomeEmail] Error:', error);
             return res.status(500).json({
-                error: 'Failed to create user',
+                error: 'Failed to resend welcome email',
                 details: error.message
             });
         }

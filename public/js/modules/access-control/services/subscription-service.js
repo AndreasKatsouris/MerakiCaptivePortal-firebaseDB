@@ -47,7 +47,8 @@ const SUBSCRIPTION_TIERS = {
       rewardsBasic: true,
       whatsappBasic: true,
       multiLocation: true,
-      salesForecastingBasic: true
+      salesForecastingBasic: true,
+      rossBasic: true
     },
     limits: {
       guestRecords: 2000,
@@ -75,7 +76,9 @@ const SUBSCRIPTION_TIERS = {
       bookingManagement: true,
       bookingAdvanced: true,
       bookingAnalytics: true,
-      salesForecastingAdvanced: true
+      salesForecastingAdvanced: true,
+      rossBasic: true,
+      rossAdvanced: true
     },
     limits: {
       guestRecords: 10000,
@@ -95,7 +98,9 @@ const SUBSCRIPTION_TIERS = {
       campaignsCustom: true,
       rewardsCustom: true,
       advancedFoodCostCalculation: true,
-      salesForecastingAnalytics: true
+      salesForecastingAnalytics: true,
+      rossBasic: true,
+      rossAdvanced: true
     },
     limits: {
       guestRecords: Infinity,
