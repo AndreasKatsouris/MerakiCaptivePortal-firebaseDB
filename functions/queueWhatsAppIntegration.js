@@ -1,5 +1,5 @@
 const admin = require('firebase-admin');
-const { sendWhatsAppMessage } = require('./utils/whatsappClient');
+const { sendWhatsAppMessage, sendQueueManualAdditionTemplate } = require('./utils/whatsappClient');
 const { normalizePhoneNumber } = require('./dataManagement');
 const { formatQueueTime, formatToSASTDateTime } = require('./utils/timezoneUtils');
 const {
@@ -680,24 +680,24 @@ async function sendQueueNotification(phoneNumber, notificationType, queueData) {
                 break;
                 
             case 'manually_added':
-                message = `🎫 *Added to Queue!*\n\n` +
-                         `Hi ${queueData.guestName}!\n\n` +
-                         `You have been added to the queue at ${locationName}.\n\n` +
-                         `📋 *Queue Details:*\n` +
-                         `• Position: ${queueData.position}\n` +
-                         `• Party Size: ${queueData.partySize}\n` +
-                         `• Estimated Wait Time: ${queueData.estimatedWaitTime} minutes\n` +
-                         `• Special Requests: ${queueData.specialRequests || 'None'}\n\n` +
-                         `✅ *Status:* Waiting\n\n` +
-                         `We'll notify you when your table is ready!\n\n` +
-                         `💬 You can check your queue status anytime by typing "queue status".\n\n` +
-                         `🤖 This is an automated message. Reply if you have questions.`;
-                break;
-                
+                await sendQueueManualAdditionTemplate(
+                    phoneNumber,
+                    queueData.guestName,
+                    locationName,
+                    queueData.position,
+                    queueData.partySize,
+                    queueData.estimatedWaitTime,
+                    queueData.specialRequests
+                );
+                return {
+                    success: true,
+                    message: 'Notification sent successfully'
+                };
+
             default:
                 throw new Error('Invalid notification type');
         }
-        
+
         await sendWhatsAppMessage(phoneNumber, message);
         
         return {

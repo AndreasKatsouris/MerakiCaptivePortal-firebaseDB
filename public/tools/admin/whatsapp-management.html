@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>WhatsApp Multi-Location Management - Sparks Hospitality</title>
-    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
     <link href="../css/admin-dashboard.css" rel="stylesheet">
     <style>
@@ -63,6 +63,16 @@
             margin: 1rem 0;
         }
     </style>
+    <script>
+      if (window.self !== window.top) {
+        document.documentElement.classList.add('in-modal');
+      }
+    </script>
+    <style>
+      html.in-modal .sidebar { display: none !important; }
+      html.in-modal .col-md-9,
+      html.in-modal .col-lg-10 { flex: 0 0 100%; max-width: 100%; width: 100%; }
+    </style>
 </head>
 <body>
     <div class="container-fluid">
@@ -76,12 +86,107 @@
                     <ul class="nav flex-column">
                         <li class="nav-item">
                             <a class="nav-link" href="../admin-dashboard.html">
-                                <i class="fas fa-tachometer-alt"></i> Dashboard
+                                <i class="fas fa-chart-line"></i> Dashboard
+                            </a>
+                        </li>
+                        <li class="nav-item">
+                            <a class="nav-link" href="#">
+                                <i class="fas fa-bullhorn"></i> Campaigns
+                            </a>
+                        </li>
+                        <li class="nav-item">
+                            <a class="nav-link" href="#">
+                                <i class="fas fa-users"></i> Guest Management
+                            </a>
+                        </li>
+                        <li class="nav-item">
+                            <a class="nav-link" href="#">
+                                <i class="fas fa-wifi"></i> WiFi Logins
+                            </a>
+                        </li>
+                        <li class="nav-item">
+                            <a class="nav-link" href="#">
+                                <i class="fas fa-clock"></i> Queue Management
+                            </a>
+                        </li>
+                        <li class="nav-item">
+                            <a class="nav-link" href="#">
+                                <i class="fas fa-receipt"></i> Receipt Management
+                            </a>
+                        </li>
+                        <li class="nav-item">
+                            <a class="nav-link" href="#">
+                                <i class="fas fa-cogs"></i> Receipt Settings
+                            </a>
+                        </li>
+                        <li class="nav-item">
+                            <a class="nav-link" href="#">
+                                <i class="fas fa-gift"></i> Rewards Management
+                            </a>
+                        </li>
+                        <li class="nav-item">
+                            <a class="nav-link" href="#">
+                                <i class="fas fa-ticket-alt"></i> Voucher Management
+                            </a>
+                        </li>
+                        <li class="nav-item">
+                            <a class="nav-link" href="#">
+                                <i class="fas fa-tasks"></i> Project Management
+                            </a>
+                        </li>
+                        <li class="nav-item">
+                            <a class="nav-link" href="#">
+                                <i class="fas fa-utensils"></i> Food Cost
+                            </a>
+                        </li>
+                        <li class="nav-item">
+                            <a class="nav-link" href="#">
+                                <i class="fas fa-database"></i> Database Management
+                            </a>
+                        </li>
+                        <li class="nav-item">
+                            <a class="nav-link" href="#">
+                                <i class="fas fa-users-cog"></i> Admin Users
+                            </a>
+                        </li>
+                        <li class="nav-item">
+                            <a class="nav-link" href="#">
+                                <i class="fas fa-users"></i> Users &amp; Locations
+                            </a>
+                        </li>
+                        <li class="nav-item">
+                            <a class="nav-link" href="#">
+                                <i class="fas fa-chart-line"></i> Admin Activity Monitor
+                            </a>
+                        </li>
+                        <li class="nav-item">
+                            <a class="nav-link" href="#">
+                                <i class="fas fa-layer-group"></i> Tier Management
+                            </a>
+                        </li>
+                        <li class="nav-item">
+                            <a class="nav-link" href="#">
+                                <i class="fas fa-user-tag"></i> User Subscriptions
+                            </a>
+                        </li>
+                        <li class="nav-item">
+                            <a class="nav-link" href="#">
+                                <i class="fas fa-tags"></i> Reward Types
+                            </a>
+                        </li>
+                        <li class="nav-item">
+                            <a class="nav-link" href="#">
+                                <i class="fas fa-tools"></i> Admin Tools
                             </a>
                         </li>
                         <li class="nav-item">
                             <a class="nav-link active" href="#">
                                 <i class="fab fa-whatsapp"></i> WhatsApp Management
+                            </a>
+                        </li>
+                        <li class="nav-item">
+                            <a class="nav-link" href="/knowledge-base.html">
+                                <i class="fas fa-book-open"></i> Knowledge Base
                             </a>
                         </li>
                         <li class="nav-item">
@@ -97,159 +202,137 @@
             <div class="col-md-9 col-lg-10 main-content">
                 <div class="d-flex justify-content-between flex-wrap flex-md-nowrap align-items-center pt-3 pb-2 mb-3 border-bottom">
                     <h1 class="h2">
-                        <i class="fab fa-whatsapp text-success"></i> WhatsApp Multi-Location Management
+                        <i class="fab fa-whatsapp text-success"></i> WhatsApp Management
                     </h1>
                     <div class="btn-toolbar mb-2 mb-md-0">
-                        <div class="btn-group me-2">
-                            <button type="button" class="btn btn-success" onclick="showAddNumberModal()">
-                                <i class="fas fa-plus"></i> Add WhatsApp Number
-                            </button>
-                            <button type="button" class="btn btn-outline-secondary" onclick="refreshData()">
-                                <i class="fas fa-sync"></i> Refresh
-                            </button>
-                            <button type="button" class="btn btn-outline-warning" onclick="showMigrationModal()">
-                                <i class="fas fa-database"></i> Migrate Existing
-                            </button>
-                        </div>
+                        <button type="button" class="btn btn-success" onclick="showAddNumberModal()">
+                            <i class="fas fa-plus"></i> Add Number
+                        </button>
+                        <button type="button" class="btn btn-outline-secondary ms-2" onclick="refreshData()">
+                            <i class="fas fa-sync"></i>
+                        </button>
                     </div>
                 </div>
 
                 <!-- Loading Indicator -->
                 <div id="loadingIndicator" class="text-center py-5">
-                    <div class="spinner-border text-success" role="status">
-                        <span class="visually-hidden">Loading...</span>
-                    </div>
-                    <div class="mt-3">Loading WhatsApp configuration...</div>
+                    <div class="spinner-border text-success" role="status"></div>
+                    <div class="mt-3">Loading...</div>
                 </div>
 
-                <!-- User Tier Information -->
-                <div id="tierInfo" class="row mb-4" style="display: none;">
-                    <div class="col-md-12">
-                        <div class="card">
-                            <div class="card-body">
-                                <div class="row">
-                                    <div class="col-md-3">
-                                        <h6 class="card-subtitle mb-2 text-muted">Current Plan</h6>
-                                        <span id="currentTier" class="badge tier-badge">Loading...</span>
-                                    </div>
-                                    <div class="col-md-3">
-                                        <h6 class="card-subtitle mb-2 text-muted">WhatsApp Numbers</h6>
-                                        <div class="progress usage-progress">
-                                            <div id="numbersProgress" class="progress-bar bg-success" role="progressbar"></div>
-                                        </div>
-                                        <small id="numbersUsage" class="text-muted">0 of 0 used</small>
-                                    </div>
-                                    <div class="col-md-3">
-                                        <h6 class="card-subtitle mb-2 text-muted">Locations with WhatsApp</h6>
-                                        <div class="progress usage-progress">
-                                            <div id="locationsProgress" class="progress-bar bg-info" role="progressbar"></div>
-                                        </div>
-                                        <small id="locationsUsage" class="text-muted">0 locations configured</small>
-                                    </div>
-                                    <div class="col-md-3">
-                                        <h6 class="card-subtitle mb-2 text-muted">Analytics Access</h6>
-                                        <span id="analyticsAccess" class="badge bg-secondary">Checking...</span>
-                                    </div>
+                <!-- Tier Info Bar -->
+                <div id="tierInfo" class="card mb-3" style="display: none;">
+                    <div class="card-body py-2">
+                        <div class="row align-items-center">
+                            <div class="col-auto">
+                                <span id="currentTier" class="badge">Loading...</span>
+                            </div>
+                            <div class="col-md-3">
+                                <small class="text-muted d-block">WhatsApp Numbers</small>
+                                <div class="progress usage-progress">
+                                    <div id="numbersProgress" class="progress-bar bg-success" role="progressbar"></div>
                                 </div>
+                                <small id="numbersUsage" class="text-muted">0 of 0 used</small>
+                            </div>
+                            <div class="col-md-3">
+                                <small class="text-muted d-block">Locations</small>
+                                <small id="locationsUsage" class="text-muted">0 configured</small>
+                            </div>
+                            <div class="col-auto">
+                                <small class="text-muted d-block">Analytics</small>
+                                <span id="analyticsAccess" class="badge bg-secondary">Checking...</span>
                             </div>
                         </div>
                     </div>
                 </div>
 
-                <!-- WhatsApp Numbers Management -->
-                <div id="whatsappNumbers" class="row" style="display: none;">
-                    <div class="col-md-12">
-                        <h3 class="mb-3">WhatsApp Numbers</h3>
-                        <div id="numbersContainer">
-                            <!-- WhatsApp numbers will be populated here -->
-                        </div>
-                    </div>
-                </div>
+                <!-- 4-Tab Nav -->
+                <ul class="nav nav-tabs mb-3" id="whatsappTabs">
+                    <li class="nav-item">
+                        <a class="nav-link active" href="#" onclick="switchTab('numbers'); return false;">
+                            <i class="fab fa-whatsapp"></i> Numbers
+                        </a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link" href="#" onclick="switchTab('mappings'); return false;">
+                            <i class="fas fa-map-marker-alt"></i> Mappings
+                        </a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link" href="#" onclick="switchTab('templates'); return false;">
+                            <i class="fas fa-file-alt"></i> Templates
+                        </a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link" href="#" onclick="switchTab('analytics'); return false;">
+                            <i class="fas fa-chart-bar"></i> Analytics
+                        </a>
+                    </li>
+                </ul>
 
-                <!-- Location Mappings -->
-                <div id="locationMappings" class="row mt-4" style="display: none;">
-                    <div class="col-md-12">
-                        <h3 class="mb-3">Location Mappings</h3>
-                        <div id="mappingsContainer">
-                            <!-- Location mappings will be populated here -->
-                        </div>
-                    </div>
-                </div>
-
-                <!-- Analytics Section -->
-                <div id="analyticsSection" class="row mt-4" style="display: none;">
-                    <div class="col-md-12">
-                        <h3 class="mb-3">WhatsApp Analytics</h3>
-                        <div class="row">
-                            <div class="col-md-4">
-                                <div class="analytics-widget">
-                                    <h5><i class="fas fa-comments"></i> Total Messages</h5>
-                                    <h2 id="totalMessages">0</h2>
-                                    <small>This month</small>
-                                </div>
-                            </div>
-                            <div class="col-md-4">
-                                <div class="analytics-widget">
-                                    <h5><i class="fas fa-location-arrow"></i> Active Locations</h5>
-                                    <h2 id="activeLocations">0</h2>
-                                    <small>With WhatsApp enabled</small>
-                                </div>
-                            </div>
-                            <div class="col-md-4">
-                                <div class="analytics-widget">
-                                    <h5><i class="fas fa-chart-line"></i> Avg. Response Time</h5>
-                                    <h2 id="avgResponseTime">--</h2>
-                                    <small>Minutes</small>
-                                </div>
+                <!-- Numbers Tab -->
+                <div id="tab-numbers">
+                    <div id="numbersContainer"></div>
+                    <div class="mt-4">
+                        <button class="btn btn-sm btn-outline-secondary" type="button"
+                                data-bs-toggle="collapse" data-bs-target="#advancedSection">
+                            <i class="fas fa-cog"></i> Advanced
+                        </button>
+                        <div class="collapse mt-2" id="advancedSection">
+                            <div class="card card-body">
+                                <p class="text-muted mb-2">Import an existing Twilio WhatsApp number into the multi-location system.</p>
+                                <button type="button" class="btn btn-outline-warning btn-sm" onclick="showMigrationModal()">
+                                    <i class="fas fa-database"></i> Migrate Existing Number
+                                </button>
                             </div>
                         </div>
                     </div>
                 </div>
 
-                <!-- Upgrade Prompt -->
-                <div id="upgradePrompt" class="upgrade-prompt" style="display: none;">
+                <!-- Mappings Tab -->
+                <div id="tab-mappings" style="display: none;">
+                    <div id="mappingsContainer"></div>
+                </div>
+
+                <!-- Templates Tab -->
+                <div id="tab-templates" style="display: none;">
+                    <p class="text-muted mb-3">Manage Twilio ContentSids for each message template. Get ContentSids from
+                        <a href="https://console.twilio.com/us1/develop/sms/content-template-builder" target="_blank">
+                            Twilio Console &rarr; Content Template Builder
+                        </a>.
+                    </p>
+                    <div id="templatesContainer"></div>
+                </div>
+
+                <!-- Analytics Tab -->
+                <div id="tab-analytics" style="display: none;">
                     <div class="row">
-                        <div class="col-md-12">
-                            <h4><i class="fas fa-rocket"></i> Upgrade to Enable WhatsApp</h4>
-                            <p class="mb-3">WhatsApp multi-location features are not available in your current plan.</p>
-                            <div class="row">
-                                <div class="col-md-4">
-                                    <div class="card">
-                                        <div class="card-body text-center">
-                                            <h5>Starter Plan</h5>
-                                            <p>1 WhatsApp Number<br>1,000 messages/month</p>
-                                            <button class="btn btn-outline-primary" onclick="upgradeToTier('starter')">
-                                                Select Starter
-                                            </button>
-                                        </div>
-                                    </div>
-                                </div>
-                                <div class="col-md-4">
-                                    <div class="card">
-                                        <div class="card-body text-center">
-                                            <h5>Professional Plan</h5>
-                                            <p>3 WhatsApp Numbers<br>5,000 messages/month<br>Analytics included</p>
-                                            <button class="btn btn-primary" onclick="upgradeToTier('professional')">
-                                                Select Professional
-                                            </button>
-                                        </div>
-                                    </div>
-                                </div>
-                                <div class="col-md-4">
-                                    <div class="card">
-                                        <div class="card-body text-center">
-                                            <h5>Enterprise Plan</h5>
-                                            <p>20 WhatsApp Numbers<br>Unlimited messages<br>Full analytics suite</p>
-                                            <button class="btn btn-outline-success" onclick="upgradeToTier('enterprise')">
-                                                Select Enterprise
-                                            </button>
-                                        </div>
-                                    </div>
-                                </div>
+                        <div class="col-md-4">
+                            <div class="analytics-widget">
+                                <h5><i class="fas fa-comments"></i> Total Messages</h5>
+                                <h2 id="totalMessages">0</h2>
+                                <small>All time</small>
+                            </div>
+                        </div>
+                        <div class="col-md-4">
+                            <div class="analytics-widget">
+                                <h5><i class="fas fa-location-arrow"></i> Active Locations</h5>
+                                <h2 id="activeLocations">0</h2>
+                                <small>With WhatsApp enabled</small>
+                            </div>
+                        </div>
+                        <div class="col-md-4">
+                            <div class="analytics-widget">
+                                <h5><i class="fas fa-clock"></i> Avg Response Time</h5>
+                                <h2 id="avgResponseTime">&#8212;</h2>
+                                <small>Minutes</small>
                             </div>
                         </div>
                     </div>
                 </div>
+
+                <!-- Upgrade Prompt (keep existing if present) -->
+                <div id="upgradePrompt" style="display: none;"></div>
             </div>
         </div>
     </div>
@@ -268,18 +351,18 @@
                     <form id="addNumberForm">
                         <div class="mb-3">
                             <label for="phoneNumber" class="form-label">WhatsApp Phone Number</label>
-                            <input type="tel" class="form-control number-input" id="phoneNumber" 
+                            <input type="tel" class="form-control number-input" id="phoneNumber"
                                    placeholder="+27123456789" required>
                             <div class="form-text">Enter number in international format (e.g., +27123456789)</div>
                         </div>
                         <div class="mb-3">
                             <label for="displayName" class="form-label">Display Name</label>
-                            <input type="text" class="form-control" id="displayName" 
+                            <input type="text" class="form-control" id="displayName"
                                    placeholder="Restaurant Main Line" required>
                         </div>
                         <div class="mb-3">
                             <label for="description" class="form-label">Description (Optional)</label>
-                            <textarea class="form-control" id="description" rows="3" 
+                            <textarea class="form-control" id="description" rows="3"
                                       placeholder="Brief description of this WhatsApp number's purpose"></textarea>
                         </div>
                     </form>
@@ -351,14 +434,14 @@
                         <h6><i class="fas fa-info-circle"></i> Migration Process</h6>
                         <p class="mb-0">This will import your existing WhatsApp number from Twilio configuration and make it available for location assignment in the new multi-location system.</p>
                     </div>
-                    
+
                     <div id="migrationStatus" class="alert alert-warning" style="display: none;">
                         <div class="d-flex align-items-center">
                             <div class="spinner-border spinner-border-sm me-2" role="status"></div>
                             <span id="migrationStatusText">Checking existing configuration...</span>
                         </div>
                     </div>
-                    
+
                     <div id="migrationDetails" style="display: none;">
                         <h6>Existing WhatsApp Configuration Found:</h6>
                         <div class="card">
@@ -376,13 +459,13 @@
                                 <hr>
                                 <div class="form-group mt-3">
                                     <label for="migrationDisplayName" class="form-label">Display Name for Migrated Number</label>
-                                    <input type="text" class="form-control" id="migrationDisplayName" 
+                                    <input type="text" class="form-control" id="migrationDisplayName"
                                            placeholder="Main WhatsApp Line" value="Main WhatsApp Line">
                                 </div>
                             </div>
                         </div>
                     </div>
-                    
+
                     <div id="migrationError" class="alert alert-danger" style="display: none;">
                         <h6><i class="fas fa-exclamation-triangle"></i> Migration Not Available</h6>
                         <p id="migrationErrorText" class="mb-0"></p>
@@ -399,9 +482,8 @@
     </div>
 
     <!-- Scripts -->
-    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/js/bootstrap.bundle.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
-    <script type="module" src="../js/config/firebase-config.js"></script>
     <script type="module" src="whatsapp-management.js"></script>
 </body>
 </html>

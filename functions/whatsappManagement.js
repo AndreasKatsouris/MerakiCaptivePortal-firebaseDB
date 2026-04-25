@@ -18,6 +18,8 @@ const {
     remove
 } = require('./config/firebase-admin');
 
+const { client, twilioPhone } = require('./twilioClient');
+
 const {
     initializeWhatsAppSchema,
     createWhatsAppNumber,
@@ -513,11 +515,10 @@ async function removeWhatsAppNumberFunction(req, res) {
             return res.status(404).json({ error: 'WhatsApp number not found' });
         }
         
-        const whatsappNumberData = whatsappNumberSnapshot.val();
         const isAdmin = await validateAdminAccess(userId);
         
-        if (!isAdmin && whatsappNumberData.userId !== userId) {
-            return res.status(403).json({ error: 'Access denied to this WhatsApp number' });
+        if (!isAdmin) {
+            return res.status(403).json({ error: 'Only administrators can delete WhatsApp numbers' });
         }
         
         // Remove all location mappings for this number
@@ -553,6 +554,257 @@ async function removeWhatsAppNumberFunction(req, res) {
     }
 }
 
+/**
+ * Cloud Function: Get WhatsApp Template Config
+ * Admin-only. Returns all template config rows.
+ */
+async function getWhatsAppTemplateConfigFunction(req, res) {
+    try {
+        const userId = req.user?.uid;
+        if (!userId) return res.status(401).json({ error: 'Authentication required' });
+
+        const isAdmin = await validateAdminAccess(userId);
+        if (!isAdmin) return res.status(403).json({ error: 'Admin access required' });
+
+        const configRef = ref(rtdb, 'whatsapp-template-config');
+        const snapshot = await get(configRef);
+
+        res.json({
+            success: true,
+            config: snapshot.exists() ? snapshot.val() : {}
+        });
+    } catch (error) {
+        console.error('❌ Error in getWhatsAppTemplateConfigFunction:', error);
+        res.status(500).json({ error: 'Internal server error' });
+    }
+}
+
+/**
+ * Cloud Function: Update WhatsApp Template Config
+ * Admin-only. Saves contentSid + enabled for one template key.
+ */
+async function updateWhatsAppTemplateConfigFunction(req, res) {
+    try {
+        const userId = req.user?.uid;
+        if (!userId) return res.status(401).json({ error: 'Authentication required' });
+
+        const isAdmin = await validateAdminAccess(userId);
+        if (!isAdmin) return res.status(403).json({ error: 'Admin access required' });
+
+        const { templateKey, contentSid, enabled } = req.body;
+
+        if (!templateKey) {
+            return res.status(400).json({ error: 'templateKey is required' });
+        }
+
+        // Validate ContentSid format if provided
+        if (contentSid && contentSid.trim() !== '') {
+            const sid = contentSid.trim();
+            if (!/^HX[a-f0-9]{32}$/.test(sid)) {
+                return res.status(400).json({
+                    error: 'Invalid ContentSid format. Must be HX followed by 32 hex characters.'
+                });
+            }
+        }
+
+        const configRef = ref(rtdb, `whatsapp-template-config/${templateKey}`);
+        await update(configRef, {
+            contentSid: (contentSid && contentSid.trim()) ? contentSid.trim() : null,
+            enabled: Boolean(enabled)
+        });
+
+        res.json({ success: true, message: 'Template config updated' });
+    } catch (error) {
+        console.error('❌ Error in updateWhatsAppTemplateConfigFunction:', error);
+        res.status(500).json({ error: 'Internal server error' });
+    }
+}
+
+const TEST_VARIABLE_SAMPLES = {
+    booking_confirmation: { "1":"Test Guest","2":"BK-TEST001","3":"2026-02-25","4":"19:00","5":"Test Restaurant","6":"Main","7":"2","8":"None","9":"confirmed" },
+    booking_status_update: { "1":"✅","2":"Test Guest","3":"Your booking has been confirmed.","4":"BK-TEST001","5":"2026-02-25","6":"19:00","7":"Test Restaurant","8":"Main","9":"2","10":"None" },
+    booking_reminder: { "1":"Test Guest","2":"2026-02-25","3":"19:00","4":"Test Restaurant","5":"2" },
+    receipt_confirmation: { "1":"Test Guest","2":"• 50 points earned","3":"150" },
+    welcome_message: { "1":"Test Guest" },
+    queue_manual_addition: { "1":"Test Guest","2":"Test Restaurant","3":"3","4":"2","5":"15","6":"None" },
+    admin_new_booking_notification: { "1":"Admin","2":"Test Guest","3":"BK-TEST001","4":"2026-02-25","5":"19:00","6":"Test Restaurant","7":"Main","8":"2","9":"+27000000000","10":"None" }
+};
+
+/**
+ * Cloud Function: Send WhatsApp Test Message
+ * Admin-only. Fires a real template send with sample variables.
+ */
+async function sendWhatsAppTestMessageFunction(req, res) {
+    try {
+        const userId = req.user?.uid;
+        if (!userId) return res.status(401).json({ error: 'Authentication required' });
+
+        const isAdmin = await validateAdminAccess(userId);
+        if (!isAdmin) return res.status(403).json({ error: 'Admin access required' });
+
+        const { templateKey, toPhone } = req.body;
+
+        if (!templateKey || !toPhone) {
+            return res.status(400).json({ error: 'templateKey and toPhone are required' });
+        }
+
+        const configRef = ref(rtdb, `whatsapp-template-config/${templateKey}`);
+        const snapshot = await get(configRef);
+
+        if (!snapshot.exists() || !snapshot.val().contentSid) {
+            return res.status(400).json({ error: 'Template has no ContentSid configured' });
+        }
+
+        const config = snapshot.val();
+        const contentVariables = TEST_VARIABLE_SAMPLES[templateKey] || { "1": "Test" };
+
+        const whatsappTo = toPhone.startsWith('whatsapp:') ? toPhone : `whatsapp:${toPhone}`;
+
+        try {
+            const message = await client.messages.create({
+                contentSid: config.contentSid,
+                contentVariables: JSON.stringify(contentVariables),
+                from: `whatsapp:${twilioPhone}`,
+                to: whatsappTo
+            });
+
+            res.json({
+                success: true,
+                messageSid: message.sid,
+                status: message.status
+            });
+        } catch (twilioError) {
+            // Return full Twilio error — do NOT swallow
+            res.status(twilioError.status || 400).json({
+                success: false,
+                twilioError: {
+                    code: twilioError.code,
+                    message: twilioError.message,
+                    moreInfo: twilioError.moreInfo || null,
+                    status: twilioError.status || null
+                }
+            });
+        }
+
+    } catch (error) {
+        console.error('❌ Error in sendWhatsAppTestMessageFunction:', error);
+        res.status(500).json({ error: 'Internal server error' });
+    }
+}
+
+/**
+ * Cloud Function: Add WhatsApp Template Config
+ * Admin-only. Creates a new template config entry.
+ */
+async function addWhatsAppTemplateConfigFunction(req, res) {
+    try {
+        const userId = req.user?.uid;
+        if (!userId) return res.status(401).json({ error: 'Authentication required' });
+
+        const isAdmin = await validateAdminAccess(userId);
+        if (!isAdmin) return res.status(403).json({ error: 'Admin access required' });
+
+        const { templateKey, name, contentSid, enabled } = req.body;
+
+        if (!templateKey) {
+            return res.status(400).json({ error: 'templateKey is required' });
+        }
+
+        // Validate templateKey format to prevent RTDB path injection
+        if (!/^[a-z0-9_]{3,50}$/.test(templateKey)) {
+            return res.status(400).json({
+                error: 'Invalid templateKey format. Must be 3-50 characters, lowercase letters, digits, and underscores only.'
+            });
+        }
+
+        if (!name || !name.trim()) {
+            return res.status(400).json({ error: 'name is required' });
+        }
+
+        // Validate ContentSid format if provided
+        if (contentSid && contentSid.trim() !== '') {
+            const sid = contentSid.trim();
+            if (!/^HX[a-f0-9]{32}$/.test(sid)) {
+                return res.status(400).json({
+                    error: 'Invalid ContentSid format. Must be HX followed by 32 hex characters.'
+                });
+            }
+        }
+
+        // Prevent overwriting an existing template key
+        const configRef = ref(rtdb, `whatsapp-template-config/${templateKey}`);
+        const existingSnapshot = await get(configRef);
+        if (existingSnapshot.exists()) {
+            return res.status(409).json({
+                error: `Template key "${templateKey}" already exists. Use updateWhatsAppTemplateConfig to modify it.`
+            });
+        }
+
+        const now = Date.now();
+        const configEntry = {
+            name: name.trim(),
+            contentSid: (contentSid && contentSid.trim()) ? contentSid.trim() : null,
+            enabled: Boolean(enabled),
+            createdAt: now,
+            createdBy: userId,
+            updatedAt: now,
+            updatedBy: userId
+        };
+
+        await set(configRef, configEntry);
+
+        res.json({
+            success: true,
+            templateKey,
+            config: configEntry
+        });
+    } catch (error) {
+        console.error('❌ Error in addWhatsAppTemplateConfigFunction:', error);
+        res.status(500).json({ error: 'Internal server error' });
+    }
+}
+
+/**
+ * Cloud Function: Delete WhatsApp Template Config
+ * Admin-only. Removes a template config entry.
+ */
+async function deleteWhatsAppTemplateConfigFunction(req, res) {
+    try {
+        const userId = req.user?.uid;
+        if (!userId) return res.status(401).json({ error: 'Authentication required' });
+
+        const isAdmin = await validateAdminAccess(userId);
+        if (!isAdmin) return res.status(403).json({ error: 'Admin access required' });
+
+        const { templateKey } = req.body;
+
+        if (!templateKey) {
+            return res.status(400).json({ error: 'templateKey is required' });
+        }
+
+        // Validate templateKey format to prevent RTDB path injection
+        if (!/^[a-z0-9_]{3,50}$/.test(templateKey)) {
+            return res.status(400).json({
+                error: 'Invalid templateKey format.'
+            });
+        }
+
+        const configRef = ref(rtdb, `whatsapp-template-config/${templateKey}`);
+        const snapshot = await get(configRef);
+
+        if (!snapshot.exists()) {
+            return res.status(404).json({ error: `Template key "${templateKey}" not found.` });
+        }
+
+        await remove(configRef);
+
+        res.json({ success: true, templateKey });
+    } catch (error) {
+        console.error('❌ Error in deleteWhatsAppTemplateConfigFunction:', error);
+        res.status(500).json({ error: 'Internal server error' });
+    }
+}
+
 module.exports = {
     initializeWhatsAppSchemaFunction,
     createWhatsAppNumberFunction,
@@ -562,6 +814,11 @@ module.exports = {
     getUserWhatsAppNumbersFunction,
     getWhatsAppAnalyticsFunction,
     removeWhatsAppNumberFunction,
+    getWhatsAppTemplateConfigFunction,
+    updateWhatsAppTemplateConfigFunction,
+    addWhatsAppTemplateConfigFunction,
+    deleteWhatsAppTemplateConfigFunction,
+    sendWhatsAppTestMessageFunction,
     validateAdminAccess,
     getUserWhatsAppNumbers,
     getUserLocationMappings

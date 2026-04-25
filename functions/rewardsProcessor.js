@@ -1,20 +1,21 @@
-const { 
-    rtdb, 
-    ref, 
-    get, 
-    set, 
+const {
+    rtdb,
+    ref,
+    get,
+    set,
     update,
     push,
     admin
 } = require('./config/firebase-admin.js');
 
-const { 
-    assignVoucherFromPool, 
+const {
+    assignVoucherFromPool,
     checkReceiptFraud,
-    getPoolAvailability 
+    getPoolAvailability
 } = require('./voucherService.js');
 
 const { formatToSASTDateTime } = require('./utils/timezoneUtils');
+const { sendReceiptConfirmationTemplate } = require('./utils/whatsappClient');
 
 /**
  * Main function to process rewards for a validated receipt
@@ -222,7 +223,20 @@ async function processReward(guest, campaign, receiptData) {
             createdRewards.push(rewardData);
         }
 
-        // Reward processing completed - notifications will be sent by the calling function
+        // Send WhatsApp receipt confirmation notification (non-blocking)
+        if (guest.phoneNumber && createdRewards.length > 0) {
+            const rewardSummary = createdRewards
+                .map(r => r.name || r.type || r.typeId || 'reward')
+                .join(', ');
+            const totalPoints = createdRewards.reduce((sum, r) => sum + (r.points || 0), 0);
+            sendReceiptConfirmationTemplate(
+                guest.phoneNumber,
+                guest.name || guest.guestName || 'Guest',
+                rewardSummary,
+                totalPoints
+            ).catch(err => console.error('❌ WhatsApp receipt confirmation failed (non-blocking):', err.message));
+        }
+
         console.log('Reward processing completed successfully');
         return {
             success: true,
