@@ -58,6 +58,7 @@ Primary KB: `KNOWLEDGE BASE/` (project root). Curated subset for UI: `public/kb/
 
 | Working on...          | Read first                                                   |
 |------------------------|--------------------------------------------------------------|
+| **Sprint / backlog / project goals** | **`KNOWLEDGE BASE/PROJECT_BACKLOG.md`** — read every session |
 | Food cost module       | `KNOWLEDGE BASE/FOOD_COST_MODULE_README.md`                  |
 | Food cost flag system  | `KNOWLEDGE BASE/FOOD_COST_FLAG_SYSTEM.md`                    |
 | Queue / QMS            | `KNOWLEDGE BASE/queue-system-architecture.md`                |
@@ -81,6 +82,31 @@ Primary KB: `KNOWLEDGE BASE/` (project root). Curated subset for UI: `public/kb/
 | Hi-Fi design system    | `public/hifi/components.html` (live ref) + `public/js/design-system/hifi/` |
 | Chart.js retirement    | `KNOWLEDGE BASE/development/CHARTJS_REMOVAL_AUDIT.md`        |
 | Full KB index          | `KNOWLEDGE BASE/README.md`                                   |
+
+## Session Opening Protocol (REQUIRED)
+
+At the start of EVERY session, before any code is written or plan agreed:
+
+1. Read `KNOWLEDGE BASE/PROJECT_BACKLOG.md`
+2. State the Sprint Goal in your **first response**:
+   > "Current sprint goal: [X]. [N] sprint tasks remain. Is this still the plan, or are we pivoting?"
+3. Read `KNOWLEDGE BASE/development/SELF_OPTIMIZATION.md` for relevant patterns
+4. If the user's opening message is a bug report or off-topic request, apply the Bug Triage Rule below before acting
+
+Never skip this step. A session that starts without a declared goal will drift into reactive bug-fixing.
+
+## Bug Triage Rule
+
+When a bug or unplanned request surfaces mid-session:
+
+| Situation | Action |
+|-----------|--------|
+| Bug **blocks** the current sprint task | Fix it immediately, then resume sprint work |
+| Bug is real but **not sprint-blocking** | Log it in the Bug Triage Queue in `PROJECT_BACKLOG.md`, stay on sprint |
+| User **explicitly pivots** the session | Acknowledge pivot, update Sprint Goal in `PROJECT_BACKLOG.md`, proceed |
+| User asks "while you're at it…" | Ask: "Should I add this to the backlog or address it now?" — never auto-expand scope |
+
+**Default: log it, don't fix it.** The sprint goal is the contract for the session.
 
 ## Git Workflow (REQUIRED)
 
@@ -155,6 +181,9 @@ Read at session start, update at session end.
 
 | File | When | Purpose |
 |------|------|---------|
+| `KNOWLEDGE BASE/PROJECT_BACKLOG.md` | **Start (read) + end (update)** | Sprint goal, task checklist, bug triage queue |
 | `KNOWLEDGE BASE/development/SELF_OPTIMIZATION.md` | Start (read) + end (update) | Workflow patterns, promoted after 3x validation |
 | `KNOWLEDGE BASE/development/LESSONS.md` | End (if gotchas found) | Rolling log of non-obvious discoveries (max 20) |
 | `KNOWLEDGE BASE/development/SCORECARD.md` | End | Self-evaluation against fixed rubric (max 10 entries) |
+
+**Session-end backlog update:** mark completed sprint tasks `[x]`, move finished features to Recently Completed, log newly discovered bugs in Bug Triage Queue, clear the In Progress row if the branch merged.
