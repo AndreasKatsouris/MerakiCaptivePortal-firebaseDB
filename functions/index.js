@@ -1,16 +1,36 @@
 const { onRequest } = require('firebase-functions/v2/https');
 const functions = require('firebase-functions');
 const admin = require('firebase-admin');
+// CORS allowlist:
+//  - localhost ports for dev
+//  - canonical Firebase Hosting domains (live)
+//  - Firebase Hosting preview channels: <site>--<channel>-<hash>.web.app
+//    (created by `firebase hosting:channel:deploy`). Without this, every
+//    preview channel fails the verifyAdminStatus preflight and admins are
+//    locked out of the UI on previews.
+const STATIC_CORS_ORIGINS = [
+    'http://localhost:3000',
+    'http://localhost:5000',
+    'http://localhost:8000',
+    'https://merakicaptiveportal-bda0f.web.app',
+    'https://merakicaptiveportal-bda0f.firebaseapp.com',
+    'https://merakicaptiveportal-firebasedb.web.app',
+    'https://merakicaptiveportal-firebasedb.firebaseapp.com'
+];
+const PREVIEW_CHANNEL_PATTERN = /^https:\/\/merakicaptiveportal-firebasedb--[a-z0-9-]+\.web\.app$/;
+
+function isAllowedOrigin(origin) {
+    if (!origin) return true; // same-origin / curl / server-to-server
+    if (STATIC_CORS_ORIGINS.includes(origin)) return true;
+    if (PREVIEW_CHANNEL_PATTERN.test(origin)) return true;
+    return false;
+}
+
 const cors = require('cors')({
-    origin: [
-        'http://localhost:3000',
-        'http://localhost:5000',
-        'http://localhost:8000',
-        'https://merakicaptiveportal-bda0f.web.app',
-        'https://merakicaptiveportal-bda0f.firebaseapp.com',
-        'https://merakicaptiveportal-firebasedb.web.app',
-        'https://merakicaptiveportal-firebasedb.firebaseapp.com'
-    ],
+    origin: (origin, callback) => {
+        if (isAllowedOrigin(origin)) return callback(null, true);
+        return callback(new Error(`CORS: origin not allowed: ${origin}`));
+    },
     credentials: true
 });
 const express = require('express');
