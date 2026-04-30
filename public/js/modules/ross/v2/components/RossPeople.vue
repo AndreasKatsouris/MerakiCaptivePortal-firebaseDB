@@ -23,6 +23,8 @@ const selectedLocationId = computed(() => store.selectedLocationId)
 const staff = computed(() => store.staff)
 
 const editingId = ref(null)         // null = no editor open; 'new' = create form; staffId = edit row
+const confirmingDeleteId = ref(null) // staffId currently in 'confirm remove?' state
+const rowError = ref({ id: null, msg: '' })  // per-row error surfacing for delete failures
 const form = ref(blankForm())
 
 function blankForm() {
@@ -86,44 +88,33 @@ async function save() {
     }
     cancelEdit()
   } catch (_) {
-    // Error already captured into store.saveError; surface via SweetAlert
-    if (typeof window !== 'undefined' && window.Swal) {
-      await window.Swal.fire({
-        icon: 'error',
-        title: 'Save failed',
-        text: store.saveError || 'Could not save staff member.',
-      })
-    }
+    // store.saveError is already populated and rendered inline in the
+    // editor banner. No modal — keeps the surface inside the v2 visual
+    // language instead of bouncing the user to SweetAlert.
   }
 }
 
-async function confirmDelete(member) {
-  if (typeof window === 'undefined' || !window.Swal) return
-  const result = await window.Swal.fire({
-    icon: 'warning',
-    title: 'Remove staff member?',
-    html: `<strong>${escapeText(member.name)}</strong> will no longer appear in workflow assignments. Existing assignments stay attached to the staff id.`,
-    showCancelButton: true,
-    confirmButtonText: 'Remove',
-    cancelButtonText: 'Cancel',
-    reverseButtons: true,
-  })
-  if (!result.isConfirmed) return
+// Two-step inline delete: first click sets `confirmingDeleteId`, second
+// click on the same row's "Confirm remove" actually deletes. No modal,
+// no overlay — matches the inline-editor pattern already on this tab.
+function startConfirmDelete(member) {
+  confirmingDeleteId.value = member.staffId
+  rowError.value = { id: null, msg: '' }
+}
+function cancelConfirmDelete() {
+  confirmingDeleteId.value = null
+}
+async function commitDelete(member) {
+  if (confirmingDeleteId.value !== member.staffId) return
   try {
     await store.deleteStaff(member.staffId)
+    confirmingDeleteId.value = null
   } catch (_) {
-    await window.Swal.fire({
-      icon: 'error',
-      title: 'Remove failed',
-      text: store.saveError || 'Could not remove staff member.',
-    })
+    rowError.value = {
+      id: member.staffId,
+      msg: store.saveError || 'Could not remove staff member.',
+    }
   }
-}
-
-function escapeText(s) {
-  return String(s || '')
-    .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
-    .replace(/"/g, '&quot;').replace(/'/g, '&#39;')
 }
 
 function backToHome() {
@@ -132,8 +123,12 @@ function backToHome() {
   window.dispatchEvent(new PopStateEvent('popstate'))
 }
 
-// Reset editor whenever location switches.
-watch(selectedLocationId, () => { cancelEdit() })
+// Reset editor + any pending row state whenever location switches.
+watch(selectedLocationId, () => {
+  cancelEdit()
+  confirmingDeleteId.value = null
+  rowError.value = { id: null, msg: '' }
+})
 
 const channelOptions = [
   { id: 'in_app', label: 'In-app' },
@@ -265,6 +260,10 @@ const channelOptions = [
               </button>
             </div>
           </div>
+          <div v-if="store.saveError" class="people__editor-error">
+            <HfIcon name="x" :size="12" />
+            <span>{{ store.saveError }}</span>
+          </div>
           <div class="people__editor-actions">
             <HfButton variant="ghost" @click="cancelEdit" :disabled="store.saving">Cancel</HfButton>
             <HfButton
@@ -309,12 +308,31 @@ const channelOptions = [
               </div>
             </div>
             <div class="people__row-actions">
-              <HfButton variant="ghost" size="sm" @click="openEdit(m)" :disabled="store.saving">
-                Edit
-              </HfButton>
-              <HfButton variant="ghost" size="sm" @click="confirmDelete(m)" :disabled="store.saving">
-                Remove
-              </HfButton>
+              <template v-if="confirmingDeleteId === m.staffId">
+                <span class="hf-mono people__row-confirm-label">Remove?</span>
+                <HfButton
+                  variant="solid" size="sm"
+                  @click="commitDelete(m)"
+                  :disabled="store.saving"
+                >
+                  {{ store.saving ? 'Removing…' : 'Confirm' }}
+                </HfButton>
+                <HfButton variant="ghost" size="sm" @click="cancelConfirmDelete" :disabled="store.saving">
+                  Cancel
+                </HfButton>
+              </template>
+              <template v-else>
+                <HfButton variant="ghost" size="sm" @click="openEdit(m)" :disabled="store.saving">
+                  Edit
+                </HfButton>
+                <HfButton variant="ghost" size="sm" @click="startConfirmDelete(m)" :disabled="store.saving">
+                  Remove
+                </HfButton>
+              </template>
+            </div>
+            <div v-if="rowError.id === m.staffId && rowError.msg" class="people__row-error">
+              <HfIcon name="x" :size="11" />
+              <span>{{ rowError.msg }}</span>
             </div>
           </li>
         </ul>
@@ -487,11 +505,23 @@ const channelOptions = [
   padding-top: 12px;
   border-top: 1px dashed var(--hf-line);
 }
+.people__editor-error {
+  margin-top: 14px;
+  padding: 8px 12px;
+  background: rgba(212, 87, 47, 0.06);
+  border: 1px solid rgba(212, 87, 47, 0.25);
+  border-radius: var(--hf-radius);
+  color: var(--hf-warn);
+  font-family: var(--hf-font-mono);
+  font-size: 12px;
+  display: flex; align-items: center; gap: 8px;
+}
 
 /* Staff rows */
 .people__rows { list-style: none; margin: 0; padding: 0; }
 .people__row {
   display: flex; align-items: center; justify-content: space-between;
+  flex-wrap: wrap;
   gap: 16px;
   padding: 14px 0;
   border-bottom: 1px solid var(--hf-line);
@@ -514,7 +544,22 @@ const channelOptions = [
   margin-top: 6px;
 }
 .people__row-actions {
-  display: flex; gap: 8px; flex-shrink: 0;
+  display: flex; align-items: center; gap: 8px; flex-shrink: 0;
+}
+.people__row-confirm-label {
+  font-size: 11px;
+  color: var(--hf-warn);
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  margin-right: 2px;
+}
+.people__row-error {
+  flex-basis: 100%;
+  margin-top: 6px;
+  font-family: var(--hf-font-mono);
+  font-size: 11px;
+  color: var(--hf-warn);
+  display: flex; align-items: center; gap: 6px;
 }
 
 /* States */
