@@ -32,6 +32,12 @@ import {
   detectLapsedVIPs,
   detectRevenueTrend,
 } from './detectors.js'
+import {
+  detectLiveVenues,
+  detectTonightsBookings,
+  detectLapsedVIPSuggestion,
+  detectBestWeekday,
+} from './sidebar-detectors.js'
 
 const FAKE_LATENCY_MS = 80
 const wait = () => new Promise(r => setTimeout(r, FAKE_LATENCY_MS))
@@ -86,12 +92,7 @@ export async function getHomeFeed() {
   }
 }
 
-/**
- * Right-rail: live venue strip + Ross's "you might want to…" suggestions +
- * the Ask Ross sample prompt. Still scripted — separate slice.
- */
-export async function getHomeSidebar() {
-  await wait()
+function scriptedSidebar() {
   return {
     askRoss: ASK_ROSS_SAMPLE,
     venues: LIVE_VENUES,
@@ -100,10 +101,50 @@ export async function getHomeSidebar() {
 }
 
 /**
- * First-run "three surprising findings". Still scripted.
+ * Right-rail: live venue strip + Ross's "you might want to…" suggestions +
+ * the Ask Ross sample prompt.
+ *
+ * With ROSS_HOME_REAL_DATA ON: venues come from queue/{loc}/entries, and
+ * suggestions are built from real signals (tonight's bookings, lapsed
+ * VIPs). Suggestions list may be 0–2 items long (we hide rather than
+ * fake). Birthdays and shift-gap suggestions are dropped — no data source
+ * exists for them today (Phase 2 decision).
+ *
+ * askRoss.recent stays scripted until the LLM lands (Phase 6).
  */
-export async function getFirstRunFindings() {
-  await wait()
+export async function getHomeSidebar() {
+  if (!isEnabled('ROSS_HOME_REAL_DATA')) {
+    await wait()
+    return scriptedSidebar()
+  }
+
+  try {
+    const ctx = await buildContext(auth)
+    if (!ctx.uid) return scriptedSidebar()
+
+    const [venues, tonights, lapsed] = await Promise.all([
+      detectLiveVenues(ctx).catch((e) => { console.warn('[ross] live-venues detector failed', e); return [] }),
+      detectTonightsBookings(ctx).catch((e) => { console.warn('[ross] bookings detector failed', e); return null }),
+      detectLapsedVIPSuggestion(ctx).catch((e) => { console.warn('[ross] lapsed-vip suggestion failed', e); return null }),
+    ])
+
+    const realSuggestions = [tonights, lapsed].filter(Boolean)
+    const suggestions = realSuggestions.length > 0
+      ? realSuggestions
+      : ROSS_SUGGESTIONS.map((s) => ({ ...s, illustrative: true }))
+
+    return {
+      askRoss: ASK_ROSS_SAMPLE,
+      venues: venues.length ? venues : LIVE_VENUES.map((v) => ({ ...v, illustrative: true })),
+      suggestions,
+    }
+  } catch (e) {
+    console.error('[ross] getHomeSidebar failed, falling back to scripted', e)
+    return scriptedSidebar()
+  }
+}
+
+function scriptedFindings() {
   return {
     intro: {
       eyebrow: "Hi, I'm Ross.",
@@ -114,7 +155,49 @@ export async function getFirstRunFindings() {
         "service history across your four venues. Here's what I found that " +
         "surprised me.",
     },
-    findings: FINDINGS_FIRST_RUN,
+    findings: FINDINGS_FIRST_RUN.map((f) => ({ ...f, source: 'illustrative' })),
+  }
+}
+
+/**
+ * First-run "three surprising findings". Per Phase 2 decision (2 real
+ * + 1 banner), we attempt one real finding (best-day-of-week revenue
+ * lift) and slot the remaining two from FINDINGS_FIRST_RUN with an
+ * `illustrative` flag so the UI can banner them.
+ *
+ * Realistically only one detector is buildable today; "frequent
+ * unrecognised guests" needs guest schema fields that don't exist yet,
+ * and the patio/area trend needs a table-section attribute that also
+ * doesn't exist. Both stay illustrative until the data ships.
+ */
+export async function getFirstRunFindings() {
+  if (!isEnabled('ROSS_HOME_REAL_DATA')) {
+    await wait()
+    return scriptedFindings()
+  }
+
+  try {
+    const ctx = await buildContext(auth)
+    if (!ctx.uid) return scriptedFindings()
+
+    const real = await detectBestWeekday(ctx).catch((e) => {
+      console.warn('[ross] best-weekday finding failed', e); return null
+    })
+
+    const findings = []
+    if (real) findings.push(real)
+    const remaining = FINDINGS_FIRST_RUN
+      .filter((f) => !findings.some((rf) => rf.headline === f.headline))
+      .map((f) => ({ ...f, source: 'illustrative' }))
+    while (findings.length < 3 && remaining.length) findings.push(remaining.shift())
+
+    return {
+      intro: scriptedFindings().intro,
+      findings,
+    }
+  } catch (e) {
+    console.error('[ross] getFirstRunFindings failed, falling back to scripted', e)
+    return scriptedFindings()
   }
 }
 

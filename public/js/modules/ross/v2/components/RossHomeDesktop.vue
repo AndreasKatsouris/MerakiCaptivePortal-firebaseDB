@@ -203,9 +203,18 @@ const sidebar = computed(() => store.sidebar)
       <section class="ross-home__section">
         <div class="hf-eyebrow">Ross suggests</div>
         <div class="ross-home__suggestions">
-          <HfCard v-for="s in sidebar.suggestions" :key="s.id" :padded="false" class="ross-home__suggestion">
+          <HfCard
+            v-for="s in sidebar.suggestions" :key="s.id"
+            :padded="false"
+            class="ross-home__suggestion"
+            :class="{ 'is-illustrative': s.illustrative }"
+          >
             <div class="ross-home__suggestion-text">{{ s.text }}</div>
-            <a class="ross-home__suggestion-action">{{ s.action }} →</a>
+            <div class="ross-home__suggestion-foot">
+              <a v-if="s.href" :href="s.href" class="ross-home__suggestion-action">{{ s.action }} →</a>
+              <a v-else class="ross-home__suggestion-action">{{ s.action }} →</a>
+              <span v-if="s.illustrative" class="hf-mono ross-home__illustrative-tag">preview</span>
+            </div>
           </HfCard>
         </div>
       </section>
@@ -391,6 +400,23 @@ const sidebar = computed(() => store.sidebar)
 .ross-home__venue-spark { width: 54px; flex-shrink: 0; }
 
 .ross-home__suggestions { margin-top: 8px; display: flex; flex-direction: column; gap: 8px; }
+.ross-home__suggestion-foot {
+  display: flex; align-items: center; justify-content: space-between;
+  margin-top: 4px;
+}
+.ross-home__suggestion.is-illustrative {
+  border-style: dashed;
+  background: var(--hf-paper);
+}
+.ross-home__illustrative-tag {
+  font-size: 9px;
+  color: var(--hf-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.12em;
+  padding: 1px 6px;
+  border: 1px solid var(--hf-line-2);
+  border-radius: 3px;
+}
 .ross-home__suggestion { padding: 12px; background: var(--hf-bg); }
 .ross-home__suggestion-text { font-size: 12.5px; line-height: 1.4; }
 .ross-home__suggestion-action {

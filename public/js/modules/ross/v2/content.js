@@ -210,10 +210,14 @@ export const LIVE_VENUES = [
   { name: 'Rooftop 21',  status: 'closed',      primary: 'Thu 5:00 PM',  secondary: '—',          tone: 'muted',  seed: 0 },
 ]
 
+// Scripted fallback suggestions — used when real-data detectors return
+// nothing (new tenants) and as the OFF-state for ROSS_HOME_REAL_DATA.
+// `shift-gap` was removed in Phase 2: no data source for staff schedules
+// exists yet. `birthdays` needs a guest `dateOfBirth` field that isn't
+// on production guests today — kept here as illustrative until it lands.
 export const ROSS_SUGGESTIONS = [
   { id: 'birthdays', text: '87 guests celebrate birthdays this week', action: 'Draft outreach' },
   { id: 'olive-oil', text: 'Olive oil runs out in 2 days',            action: 'Reorder now' },
-  { id: 'shift-gap', text: 'Sat 6–8pm schedule gap at Ocean Club',    action: 'Fill shift' },
 ]
 
 // Tiny deterministic PRNG so the "live" sparkline seeds stay stable
