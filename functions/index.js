@@ -3466,6 +3466,7 @@ exports.rossCreateRun = ross.rossCreateRun;
 exports.rossSubmitResponse = ross.rossSubmitResponse;
 exports.rossGetRun = ross.rossGetRun;
 exports.rossGetRunHistory = ross.rossGetRunHistory;
+exports.rossV2Snooze = ross.rossV2Snooze;
 
 // ============================================
 // SUBSCRIPTION STATUS MANAGEMENT

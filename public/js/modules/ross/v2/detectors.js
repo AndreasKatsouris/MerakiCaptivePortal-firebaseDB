@@ -13,6 +13,26 @@ import {
   rtdb, ref, get, query, orderByChild, equalTo,
 } from '../../../config/firebase-config.js'
 
+/**
+ * Read this user's currently-active snoozes from ross/v2Snoozes/{uid}.
+ * Returns a Set<cardId> of snoozes whose expiresAt is still in the
+ * future. getHomeFeed uses this to filter out cards the user has hidden.
+ */
+export async function getActiveSnoozes(ctx) {
+  const { uid, now } = ctx
+  if (!uid) return new Set()
+  let snap
+  try {
+    snap = await get(ref(rtdb, `ross/v2Snoozes/${uid}`))
+  } catch (_) { return new Set() }
+  if (!snap?.exists()) return new Set()
+  const active = new Set()
+  for (const [cardId, val] of Object.entries(snap.val() || {})) {
+    if (Number(val?.expiresAt) > now) active.add(cardId)
+  }
+  return active
+}
+
 const DAY_MS = 86_400_000
 const COGS_TARGET = 30          // %
 const COGS_ALERT_DELTA = 3      // pp above target → tone: warn
@@ -142,6 +162,7 @@ export async function detectFoodCostDrift(ctx) {
       { id: 'open-food-cost', label: 'Open food-cost brief', variant: 'solid', trailing: 'arrow',
         href: `/food-cost-v2.html?loc=${encodeURIComponent(best.locId)}` },
       { id: 'ask-why', label: 'Ask Ross why', variant: 'ghost' },
+      { id: 'snooze', label: 'Snooze 24h', variant: 'ghost' },
     ],
     footnote: `${sampleCount} data points · last ${REVENUE_WINDOW_DAYS} days`,
     sidecar: {
@@ -215,7 +236,9 @@ export async function detectLapsedVIPs(ctx) {
     actions: [
       { id: 'see-guests', label: `See all ${lapsedCount} guests`, variant: 'solid',
         href: '/guests-v2.html?filter=lapsed' },
-      { id: 'draft-winback', label: 'Draft win-back', variant: 'ghost' },
+      { id: 'draft-winback', label: 'Draft win-back', variant: 'ghost',
+        href: '/campaigns-v2.html?segment=lapsed-vip' },
+      { id: 'snooze', label: 'Snooze 24h', variant: 'ghost' },
     ],
     sidecar: {
       kind: 'donut',
@@ -320,6 +343,7 @@ export async function detectRevenueTrend(ctx) {
         href: `/analytics-v2.html?loc=${encodeURIComponent(best.locId)}` },
       { id: 'forecast', label: 'Open forecast', variant: 'ghost',
         href: `/analytics-v2.html?loc=${encodeURIComponent(best.locId)}&tab=forecast` },
+      { id: 'snooze', label: 'Snooze 24h', variant: 'ghost' },
     ],
     sidecar: {
       kind: 'kpi-bars',

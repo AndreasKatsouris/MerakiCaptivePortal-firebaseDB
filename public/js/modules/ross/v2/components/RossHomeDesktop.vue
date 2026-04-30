@@ -2,16 +2,63 @@
 // Ross home — desktop 3-column editorial layout.
 // Left: venue nav. Center: greeting + 3 story cards. Right: Ask Ross +
 // live venue strip + Ross suggestions.
-import { onMounted, computed } from 'vue'
+import { onMounted, computed, ref } from 'vue'
 import { useRossStore } from '../store.js'
 import {
   HfIcon, HfChip, HfCard, HfButton, HfAvatar, HfLogo, HfNavItem, HfKbd,
   HfSparkline, HfLineChart, HfBarChart, HfDonut,
 } from '/js/design-system/hifi/index.js'
 import { seededLine } from '../content.js'
+import { snoozeCard } from '../ross-service.js'
 
 const store = useRossStore()
 onMounted(() => { if (!store.feed) store.loadHome() })
+
+// Track per-card pending state so we can disable the snooze button while
+// the round-trip is in flight. Keyed by card.id.
+const pending = ref({})
+
+/**
+ * Single dispatch for every action emitted by a feed card. Keeps the
+ * template free of imperative branching.
+ *
+ * Conventions (matches the action ids that detectors.js / content.js emit):
+ *   - 'snooze'           → call rossV2Snooze for 24h, refresh the home
+ *   - 'ask-why', 'ask-ross' → stub: route to /ross.html#ask (LLM in Phase 6)
+ *   - any action.href     → window.location navigation
+ *   - anything else       → console warn so we can see in QA which ids
+ *                            still need wiring
+ */
+async function dispatch(action, card) {
+  if (!action) return
+  if (action.id === 'snooze') {
+    if (!card?.id) {
+      console.warn('[ross] snooze action without card.id', card)
+      return
+    }
+    if (pending.value[card.id]) return
+    pending.value = { ...pending.value, [card.id]: true }
+    try {
+      await snoozeCard(card.id, 24)
+      await store.loadHome()
+    } catch (e) {
+      console.error('[ross] snooze failed', e)
+    } finally {
+      pending.value = { ...pending.value, [card.id]: false }
+    }
+    return
+  }
+  if (action.id === 'ask-why' || action.id === 'ask-ross') {
+    const seed = card?._meta?.contextLine || card?.headline || ''
+    window.location.href = '/ross.html#ask=' + encodeURIComponent(seed)
+    return
+  }
+  if (action.href) {
+    window.location.href = action.href
+    return
+  }
+  console.warn('[ross] action id has no handler yet:', action.id, card?.id)
+}
 
 const navSections = [
   { eyebrow: 'Today', items: [
@@ -117,8 +164,13 @@ const sidebar = computed(() => store.sidebar)
             <h3 class="ross-home__story-headline">{{ c.headline }}</h3>
             <p class="ross-home__story-detail" v-html="c.detail" />
             <div class="ross-home__story-actions">
-              <HfButton v-for="a in c.actions" :key="a.id" :variant="a.variant">
-                {{ a.label }}
+              <HfButton
+                v-for="a in c.actions" :key="a.id"
+                :variant="a.variant"
+                :disabled="a.id === 'snooze' && pending[c.id]"
+                @click="dispatch(a, c)"
+              >
+                {{ a.id === 'snooze' && pending[c.id] ? 'Snoozing…' : a.label }}
                 <template #trailing v-if="a.trailing">
                   <HfIcon :name="a.trailing" :size="13" />
                 </template>
