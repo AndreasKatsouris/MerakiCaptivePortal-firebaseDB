@@ -90,7 +90,8 @@
       "QA cleanup (~65 test artifact files)",
       "Sidebar dedup of v2 vs v1 entries (after v2 promotion)",
       "Project status auto-derive from PROJECT_BACKLOG.md",
-      "Factor out fetchLocationNames helper (now duplicated in activity-store, playbook-store, people-store)"
+      "Factor out fetchLocationNames helper (now duplicated in activity-store, playbook-store, people-store)",
+      "HfModal / HfConfirm design-system components — v2 needs a Hi-Fi-native modal pattern; SweetAlert2 is v1-only"
     ],
     "low": [
       "Subscription admin charts migration",
