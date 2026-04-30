@@ -296,9 +296,10 @@
             </div>
 
             <ul class="nav flex-column">
+                <li class="sidebar-section-label">Preview · v2</li>
                 <li class="nav-item">
                     <a href="/ross.html" id="rossHomeMenu" class="nav-link" title="ROSS v2 — preview home (wireframe)">
-                        <i class="fas fa-sparkles"></i>
+                        <i class="fas fa-wand-magic-sparkles"></i>
                         <span>ROSS v2</span>
                     </a>
                 </li>
@@ -344,8 +345,11 @@
                         <span>Receipts</span>
                     </a>
                 </li>
+
+                <li class="sidebar-divider" aria-hidden="true"></li>
+                <li class="sidebar-section-label">Admin</li>
                 <li class="nav-item">
-                    <a href="#" id="dashboardMenu" class="nav-link active" data-section="dashboardContent">
+                    <a href="#" id="dashboardMenu" class="nav-link" data-section="dashboardContent">
                         <i class="fas fa-chart-line"></i>
                         <span>Dashboard</span>
                     </a>
@@ -363,7 +367,7 @@
                         Engage
                         <i class="fas fa-chevron-down ms-auto"></i>
                     </a>
-                    <div class="collapse" id="engageSubmenu">
+                    <div class="collapse" id="engageSubmenu" data-bs-parent="#sidebar">
                         <ul class="nav flex-column">
                             <li class="nav-item">
                                 <a href="#" id="campaignsMenu" class="nav-link" data-section="campaignsContent">
@@ -429,7 +433,7 @@
                         Drivers
                         <i class="fas fa-chevron-down ms-auto"></i>
                     </a>
-                    <div class="collapse" id="driversSubmenu">
+                    <div class="collapse" id="driversSubmenu" data-bs-parent="#sidebar">
                         <ul class="nav flex-column">
                             <li class="nav-item">
                                 <a href="#" id="projectManagementMenu" class="nav-link"
@@ -461,7 +465,7 @@
                         Settings
                         <i class="fas fa-chevron-down ms-auto"></i>
                     </a>
-                    <div class="collapse" id="settingsSubmenu">
+                    <div class="collapse" id="settingsSubmenu" data-bs-parent="#sidebar">
                         <ul class="nav flex-column">
                             <li class="nav-item">
                                 <a href="#" class="nav-link" id="databaseManagementMenu"
@@ -533,6 +537,15 @@
                         Knowledge Base
                     </a>
                 </li>
+
+                <li class="sidebar-divider" aria-hidden="true"></li>
+                <li class="sidebar-section-label">Internal</li>
+                <li class="nav-item">
+                    <a href="/project-status.html" id="projectStatusMenu" class="nav-link" title="Sprint goal &amp; progress tracker">
+                        <i class="fas fa-bullseye"></i>
+                        <span>Project Status</span>
+                    </a>
+                </li>
             </ul>
 
             <div class="sidebar-footer">
@@ -550,7 +563,7 @@
                     <button id="sidebarCollapse" class="btn btn-light">
                         <i class="fas fa-bars"></i>
                     </button>
-                    <div class="ml-auto">
+                    <div class="ms-auto">
                         <span id="currentUserEmail"></span>
                     </div>
                 </div>
