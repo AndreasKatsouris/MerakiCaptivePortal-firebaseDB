@@ -10,66 +10,69 @@
     {
       "id": 0,
       "name": "Project Status dashboard + sidebar cleanup",
-      "status": "in_progress",
-      "summary": "Self-meta tracker built in Hi-Fi v2; sidebar bug fixes (active state, FA icons, BS5 syntax, grouping)."
+      "status": "done",
+      "summary": "Self-meta tracker built in Hi-Fi v2; sidebar bug fixes (active state, FA icons, BS5 syntax, grouping). Shipped in PR #16. CORS fix for preview channels in PR #17."
     },
     {
       "id": 1,
       "name": "ROSS v2 — gap analysis & spec",
-      "status": "todo",
-      "summary": "Read ross.jsx (handoff), v2 module, v1 cloud functions side-by-side. Map each v2 service signature to a v1 Cloud Function / RTDB path and identify the gaps."
+      "status": "in_progress",
+      "summary": "Audit v2 module + v1 cloud functions + handoff design. Map each service signature to RTDB / Cloud Function backing. Deliverable: docs/plans/2026-04-30-ross-v2-implementation.md. Surprise: home feed already wired behind ROSS_HOME_REAL_DATA flag — Phase 2 in original plan was already done."
     },
     {
       "id": 2,
-      "name": "ROSS v2 — wire home feed",
+      "name": "ROSS v2 — wire right-rail + first-run findings",
       "status": "todo",
-      "summary": "Replace getHomeFeed() / getHomeSidebar() with real rossGetWorkflows-derived data. Service signatures preserved."
+      "summary": "Replace getHomeSidebar() and getFirstRunFindings() bodies with real RTDB reads (tablesByLocation, queueIndex, guests, stockUsage, salesData aggregator). Drop shift-gap suggestion until staff-schedule data exists; banner first-run findings that lack a data source."
     },
     {
       "id": 3,
-      "name": "ROSS v2 — admin tabs (Workflows / Builder / Templates / Staff / Reports)",
+      "name": "ROSS v2 — action handlers",
       "status": "todo",
-      "summary": "Redesign the v1 multi-tab ROSS admin in Hi-Fi v2. Wire to existing Cloud Functions; flag-ON behind /ross.html tab routes."
+      "summary": "Wire button click handlers on /ross.html. Single dispatch(action) helper. Includes new rossV2Snooze Cloud Function + ross/v2Snoozes/{uid}/{cardId} RTDB node + read-side filter."
     },
     {
       "id": 4,
-      "name": "ROSS v2 — button click handlers",
+      "name": "ROSS v2 — admin redesign (single SPA)",
       "status": "todo",
-      "summary": "Hook v2 buttons (Start workflow, Mark task done, etc.) to rossCreateRun, rossSubmitResponse, rossCompleteTask."
+      "summary": "Redesign the v1 admin tabs (Workflows / Builder / Templates / Staff / Reports) as Hi-Fi v2 components inside /ross.html, routed via ?tab= URL param. No new Cloud Functions — pure UI work against the existing rossGetWorkflows / rossManageTask / etc. surface. Biggest slice of the sprint (3–5 sessions)."
     },
     {
       "id": 5,
-      "name": "ROSS v2 — first-run findings",
+      "name": "ROSS v2 — onboarding wired",
       "status": "todo",
-      "summary": "Wire getFirstRunFindings() to real signals: overdue counts, stale workflows, locations without templates."
+      "summary": "Wire /onboarding-ross-hello.html to the real getFirstRunFindings() output from Phase 2. Add 'illustrative' banner where data source missing."
     },
     {
       "id": 6,
       "name": "ROSS v2 — askRoss (LLM)",
       "status": "deferred",
-      "summary": "Anthropic-backed rossChat Cloud Function. Deferred — ship phases 0–5 first."
+      "summary": "New rossChat Cloud Function with Anthropic SDK + prompt caching. Eval harness (20-prompt golden set). Cost cap + secrets. Not part of this sprint — tracked as a separate sprint."
     }
   ],
   "tasks": [
-    { "id": "sidebar-cleanup", "label": "Sidebar bugs: active state, fa-sparkles, ml-auto, grouping, data-bs-parent", "done": false, "phase": 0 },
-    { "id": "json-data", "label": "Create public/data/project-status.json", "done": false, "phase": 0 },
-    { "id": "v2-module", "label": "Build public/project-status.html + Hi-Fi v2 module", "done": false, "phase": 0 },
-    { "id": "vite-entry", "label": "Add project-status entry to vite.config.js", "done": false, "phase": 0 },
-    { "id": "build-verify", "label": "npm run build passes; smoke test on preview channel", "done": false, "phase": 0 }
+    { "id": "sidebar-cleanup", "label": "Sidebar bugs: active state, fa-sparkles, ml-auto, grouping, data-bs-parent", "done": true, "phase": 0 },
+    { "id": "json-data", "label": "Create public/data/project-status.json", "done": true, "phase": 0 },
+    { "id": "v2-module", "label": "Build public/project-status.html + Hi-Fi v2 module", "done": true, "phase": 0 },
+    { "id": "vite-entry", "label": "Add project-status entry to vite.config.js", "done": true, "phase": 0 },
+    { "id": "build-verify", "label": "npm run build passes; smoke test on preview channel", "done": true, "phase": 0 },
+    { "id": "cors-preview-channels", "label": "Allow preview channels in Cloud Functions CORS allowlist", "done": true, "phase": 0 },
+    { "id": "ross-v2-spec", "label": "Write ROSS v2 implementation spec doc", "done": false, "phase": 1 },
+    { "id": "ross-v2-decisions", "label": "User decisions on 5 open questions (right-rail real-time, shift-gap, findings honesty, admin SPA model, snooze model)", "done": false, "phase": 1 }
   ],
   "inProgress": [
     {
-      "branch": "feature/project-status-dashboard",
-      "summary": "Project Status dashboard + sidebar cleanup",
+      "branch": "feature/ross-v2-spec",
+      "summary": "Phase 1 — ROSS v2 gap analysis & spec doc",
       "startedAt": "2026-04-30"
     }
   ],
   "recentlyCompleted": [
+    { "title": "fix(cors): allow Firebase Hosting preview channels", "pr": 17, "mergedAt": "2026-04-30" },
+    { "title": "feat(project-status): internal dashboard + sidebar cleanup", "pr": 16, "mergedAt": "2026-04-30" },
     { "title": "Session goal protocol + persistent kanban backlog", "pr": 15, "mergedAt": "2026-04-30" },
     { "title": "ROSS location index — non-creators can see shared workflows", "pr": 12, "mergedAt": "2026-04-30" },
-    { "title": "ROSS KB sweep — DATA_MODEL, CLOUD_FUNCTIONS_CATALOG", "pr": 11, "mergedAt": "2026-04-29" },
-    { "title": "ROSS write lock — clients must go through Cloud Functions", "pr": 10, "mergedAt": "2026-04-28" },
-    { "title": "ROSS persist documented workflow fields", "pr": 9, "mergedAt": "2026-04-27" }
+    { "title": "ROSS KB sweep — DATA_MODEL, CLOUD_FUNCTIONS_CATALOG", "pr": 11, "mergedAt": "2026-04-29" }
   ],
   "bugs": [],
   "backlog": {
@@ -81,15 +84,13 @@
     "medium": [
       "Hi-Fi v2 → v1 promotions (guests, queue, analytics, campaigns, receipts)",
       "WhatsApp template UI polish",
-      "QA cleanup (~65 test artifact files)"
+      "QA cleanup (~65 test artifact files)",
+      "Sidebar dedup of v2 vs v1 entries (after v2 promotion)"
     ],
     "low": [
       "Subscription admin charts migration",
       "Group overview v2 → v1 promotion",
       "Onboarding flow improvements"
     ]
-  },
-  "sidebar": {
-    "duplicateV2VsV1Entries": "Tracked: dedup once v2 is promoted (separate PR). Not in scope for current branch."
   }
 }
