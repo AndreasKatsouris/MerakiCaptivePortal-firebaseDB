@@ -14,6 +14,7 @@ import { ref, computed, onMounted, onBeforeUnmount } from 'vue'
 import RossHomeDesktop from './RossHomeDesktop.vue'
 import RossHomeMobile from './RossHomeMobile.vue'
 import RossPlaybook from './RossPlaybook.vue'
+import RossActivity from './RossActivity.vue'
 
 const isDesktop = ref(true)
 let mql = null
@@ -33,7 +34,7 @@ function syncTab() { tab.value = readTab() }
 const view = computed(() => {
   switch (tab.value) {
     case 'playbook': return 'playbook'
-    case 'activity': return 'activity-coming'  // 4b
+    case 'activity': return 'activity'
     case 'people':   return 'people-coming'    // 4c
     default:         return isDesktop.value ? 'home-desktop' : 'home-mobile'
   }
@@ -57,9 +58,10 @@ onBeforeUnmount(() => {
   <RossHomeDesktop v-if="view === 'home-desktop'" />
   <RossHomeMobile v-else-if="view === 'home-mobile'" />
   <RossPlaybook v-else-if="view === 'playbook'" />
+  <RossActivity v-else-if="view === 'activity'" />
 
-  <!-- Phase 4b/4c placeholders. Keeping the route switcher complete
-       so deep links don't 404 during the transition. -->
+  <!-- Phase 4c placeholder. Keeps the route switcher complete so deep
+       links don't 404 during the transition. -->
   <div v-else class="ross-tab-coming">
     <div class="ross-tab-coming__inner">
       <a href="/ross.html" class="ross-tab-coming__back">← Back to Ross</a>

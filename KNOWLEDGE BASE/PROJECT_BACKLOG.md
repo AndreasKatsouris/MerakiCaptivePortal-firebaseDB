@@ -21,7 +21,7 @@ Sprint: 2026-04-30 → until complete
 
 | Item | Branch | Notes |
 |------|--------|-------|
-| Phase 4a — Playbook read-view | `feature/ross-v2-playbook` | PR #21 open. Workflows + templates listing under `/ross.html?tab=playbook`. Edit/create lands in Phase 4d. |
+| Phase 4b — Activity read-view | `feature/ross-v2-activity` | Active branch. Workflow execution log under `/ross.html?tab=activity` with drill-down to per-(workflow×location) run history. |
 
 ---
 
@@ -37,14 +37,17 @@ Sprint: 2026-04-30 → until complete
 ### Phase 4 — Admin redesign (concierge-first IA) — In progress
 
 - [x] **IA reframe** — v1 = agent's playbook; concierge home stays front door; tabs collapse 6 → 3
-- [ ] **Phase 4a** — Playbook tab read-view (this PR #21)
-- [ ] **Phase 4b** — Activity tab (run history + reports)
+- [x] **Phase 4a** — Playbook tab read-view (PR #21 merged)
+- [ ] **Phase 4b** — Activity tab (run history + reports) — current
 - [ ] **Phase 4c** — People tab (staff assignments)
 - [ ] **Phase 4d** — Playbook editing/creation flows (consolidates v1 Builder)
 
 ### Phase 5 — Onboarding
 
-- [ ] Wire `/onboarding-ross-hello.html` to real `getFirstRunFindings()` output
+- [x] Audit confirms `getFirstRunFindings()` → store → component is end-to-end functional (PR #22)
+- [ ] **Onboarding journey integration** — wire `/onboarding-ross-hello.html` into the signup flow (currently unreachable; signup.js, user-dashboard.js, dashboard.store.js all skip to `/onboarding-wizard.html`). Behind a feature flag.
+- [ ] **Onboarding auth gate** — add `AdminClaims.verifyAdminStatus` gate to `main-hello.js` mirroring `/ross.html`. Today anonymous URL hits silently render scripted findings.
+- [ ] (Lower priority) Surface `store.error` in `RossOnboardingHello.vue`; lower `FINDING_MIN_LIFT` threshold; parallelise nested RTDB reads in `detectBestWeekday`; un-hardcode the 3-of-5 step counter
 
 ### Phase 6 — askRoss LLM (separate sprint)
 
@@ -92,11 +95,11 @@ Sprint: 2026-04-30 → until complete
 
 | Feature | PR | Merged |
 |---------|----|--------|
+| docs(ross-v2) — phase 5 onboarding audit | #22 | 2026-04-30 |
+| ROSS v2 — Playbook tab read-view (Phase 4a) | #21 | 2026-04-30 |
 | ROSS v2 — action handlers + snooze (Phase 3) | #20 | 2026-04-30 |
 | ROSS v2 — wire right-rail + first-run findings (Phase 2) | #19 | 2026-04-30 |
 | docs(ross-v2) — phase 1 gap analysis & spec | #18 | 2026-04-30 |
-| fix(cors) — allow Firebase Hosting preview channels | #17 | 2026-04-30 |
-| feat(project-status) — internal dashboard + sidebar cleanup | #16 | 2026-04-30 |
 
 ---
 
