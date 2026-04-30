@@ -21,7 +21,7 @@ Sprint: 2026-04-30 → until complete
 
 | Item | Branch | Notes |
 |------|--------|-------|
-| Phase 4b — Activity read-view | `feature/ross-v2-activity` | Active branch. Workflow execution log under `/ross.html?tab=activity` with drill-down to per-(workflow×location) run history. |
+| Phase 4c — People CRUD | `feature/ross-v2-people` | Active branch. Staff list / add / edit / delete under `/ross.html?tab=people`, scoped per location. SweetAlert2 confirms on destructive actions. |
 
 ---
 
@@ -37,9 +37,9 @@ Sprint: 2026-04-30 → until complete
 ### Phase 4 — Admin redesign (concierge-first IA) — In progress
 
 - [x] **IA reframe** — v1 = agent's playbook; concierge home stays front door; tabs collapse 6 → 3
-- [x] **Phase 4a** — Playbook tab read-view (PR #21 merged)
-- [ ] **Phase 4b** — Activity tab (run history + reports) — current
-- [ ] **Phase 4c** — People tab (staff assignments)
+- [x] **Phase 4a** — Playbook tab read-view (PR #21 + locationName fix #24)
+- [x] **Phase 4b** — Activity tab (PR #23)
+- [ ] **Phase 4c** — People tab (staff assignments) — current
 - [ ] **Phase 4d** — Playbook editing/creation flows (consolidates v1 Builder)
 
 ### Phase 5 — Onboarding
@@ -95,11 +95,11 @@ Sprint: 2026-04-30 → until complete
 
 | Feature | PR | Merged |
 |---------|----|--------|
+| ROSS v2 — Playbook locationName enrichment | #24 | 2026-04-30 |
+| ROSS v2 — Activity tab (Phase 4b) | #23 | 2026-04-30 |
 | docs(ross-v2) — phase 5 onboarding audit | #22 | 2026-04-30 |
 | ROSS v2 — Playbook tab read-view (Phase 4a) | #21 | 2026-04-30 |
 | ROSS v2 — action handlers + snooze (Phase 3) | #20 | 2026-04-30 |
-| ROSS v2 — wire right-rail + first-run findings (Phase 2) | #19 | 2026-04-30 |
-| docs(ross-v2) — phase 1 gap analysis & spec | #18 | 2026-04-30 |
 
 ---
 
