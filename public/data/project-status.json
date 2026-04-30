@@ -1,0 +1,95 @@
+{
+  "lastUpdated": "2026-04-30",
+  "sprint": {
+    "goal": "Effective implementation of Hi-Fi v2, starting with ROSS",
+    "started": "2026-04-30",
+    "state": "active",
+    "summary": "Turn the v2 ROSS scaffold into a real, data-wired feature. v2 stays flag-ON behind /ross.html until soaked. Scope includes the full v1 multi-tab admin redesigned in Hi-Fi v2."
+  },
+  "phases": [
+    {
+      "id": 0,
+      "name": "Project Status dashboard + sidebar cleanup",
+      "status": "in_progress",
+      "summary": "Self-meta tracker built in Hi-Fi v2; sidebar bug fixes (active state, FA icons, BS5 syntax, grouping)."
+    },
+    {
+      "id": 1,
+      "name": "ROSS v2 — gap analysis & spec",
+      "status": "todo",
+      "summary": "Read ross.jsx (handoff), v2 module, v1 cloud functions side-by-side. Map each v2 service signature to a v1 Cloud Function / RTDB path and identify the gaps."
+    },
+    {
+      "id": 2,
+      "name": "ROSS v2 — wire home feed",
+      "status": "todo",
+      "summary": "Replace getHomeFeed() / getHomeSidebar() with real rossGetWorkflows-derived data. Service signatures preserved."
+    },
+    {
+      "id": 3,
+      "name": "ROSS v2 — admin tabs (Workflows / Builder / Templates / Staff / Reports)",
+      "status": "todo",
+      "summary": "Redesign the v1 multi-tab ROSS admin in Hi-Fi v2. Wire to existing Cloud Functions; flag-ON behind /ross.html tab routes."
+    },
+    {
+      "id": 4,
+      "name": "ROSS v2 — button click handlers",
+      "status": "todo",
+      "summary": "Hook v2 buttons (Start workflow, Mark task done, etc.) to rossCreateRun, rossSubmitResponse, rossCompleteTask."
+    },
+    {
+      "id": 5,
+      "name": "ROSS v2 — first-run findings",
+      "status": "todo",
+      "summary": "Wire getFirstRunFindings() to real signals: overdue counts, stale workflows, locations without templates."
+    },
+    {
+      "id": 6,
+      "name": "ROSS v2 — askRoss (LLM)",
+      "status": "deferred",
+      "summary": "Anthropic-backed rossChat Cloud Function. Deferred — ship phases 0–5 first."
+    }
+  ],
+  "tasks": [
+    { "id": "sidebar-cleanup", "label": "Sidebar bugs: active state, fa-sparkles, ml-auto, grouping, data-bs-parent", "done": false, "phase": 0 },
+    { "id": "json-data", "label": "Create public/data/project-status.json", "done": false, "phase": 0 },
+    { "id": "v2-module", "label": "Build public/project-status.html + Hi-Fi v2 module", "done": false, "phase": 0 },
+    { "id": "vite-entry", "label": "Add project-status entry to vite.config.js", "done": false, "phase": 0 },
+    { "id": "build-verify", "label": "npm run build passes; smoke test on preview channel", "done": false, "phase": 0 }
+  ],
+  "inProgress": [
+    {
+      "branch": "feature/project-status-dashboard",
+      "summary": "Project Status dashboard + sidebar cleanup",
+      "startedAt": "2026-04-30"
+    }
+  ],
+  "recentlyCompleted": [
+    { "title": "Session goal protocol + persistent kanban backlog", "pr": 15, "mergedAt": "2026-04-30" },
+    { "title": "ROSS location index — non-creators can see shared workflows", "pr": 12, "mergedAt": "2026-04-30" },
+    { "title": "ROSS KB sweep — DATA_MODEL, CLOUD_FUNCTIONS_CATALOG", "pr": 11, "mergedAt": "2026-04-29" },
+    { "title": "ROSS write lock — clients must go through Cloud Functions", "pr": 10, "mergedAt": "2026-04-28" },
+    { "title": "ROSS persist documented workflow fields", "pr": 9, "mergedAt": "2026-04-27" }
+  ],
+  "bugs": [],
+  "backlog": {
+    "high": [
+      "Food cost open PR — review and merge",
+      "Chart.js retirement (soak ends ~2026-05-07)",
+      "ROSS obligation templates (docs/plans/2026-03-20-obligation-templates-plan.md)"
+    ],
+    "medium": [
+      "Hi-Fi v2 → v1 promotions (guests, queue, analytics, campaigns, receipts)",
+      "WhatsApp template UI polish",
+      "QA cleanup (~65 test artifact files)"
+    ],
+    "low": [
+      "Subscription admin charts migration",
+      "Group overview v2 → v1 promotion",
+      "Onboarding flow improvements"
+    ]
+  },
+  "sidebar": {
+    "duplicateV2VsV1Entries": "Tracked: dedup once v2 is promoted (separate PR). Not in scope for current branch."
+  }
+}
