@@ -31,6 +31,7 @@ import {
   detectFoodCostDrift,
   detectLapsedVIPs,
   detectRevenueTrend,
+  getActiveSnoozes,
 } from './detectors.js'
 import {
   detectLiveVenues,
@@ -41,6 +42,36 @@ import {
 
 const FAKE_LATENCY_MS = 80
 const wait = () => new Promise(r => setTimeout(r, FAKE_LATENCY_MS))
+
+const FUNCTIONS_BASE_URL = 'https://us-central1-merakicaptiveportal-firebasedb.cloudfunctions.net'
+
+/**
+ * Snooze a feed card for `hours` (default 24). Calls rossV2Snooze, which
+ * writes ross/v2Snoozes/{uid}/{cardId}. The next getHomeFeed() will
+ * filter the snoozed card out via getActiveSnoozes() in detectors.js.
+ *
+ * Returns the server's confirmation { success, cardId, expiresAt }.
+ */
+export async function snoozeCard(cardId, hours = 24) {
+  const user = auth.currentUser
+  if (!user) throw new Error('Not authenticated')
+  const idToken = await user.getIdToken()
+  const res = await fetch(`${FUNCTIONS_BASE_URL}/rossV2Snooze`, {
+    method: 'POST',
+    headers: {
+      'Authorization': `Bearer ${idToken}`,
+      'Content-Type': 'application/json',
+      'Accept': 'application/json',
+    },
+    body: JSON.stringify({ data: { cardId, hours } }),
+  })
+  if (!res.ok) {
+    const text = await res.text().catch(() => '')
+    throw new Error(`rossV2Snooze failed (${res.status}): ${text}`)
+  }
+  const json = await res.json()
+  return json.result || json
+}
 
 function scriptedFeed() {
   return {
@@ -72,13 +103,16 @@ export async function getHomeFeed() {
     const ctx = await buildContext(auth)
     if (!ctx.uid) return scriptedFeed()
 
-    const [fc, vip, rev] = await Promise.all([
+    const [fc, vip, rev, snoozes] = await Promise.all([
       detectFoodCostDrift(ctx).catch((e) => { console.warn('[ross] food-cost detector failed', e); return null }),
       detectLapsedVIPs(ctx).catch((e) => { console.warn('[ross] lapsed-VIPs detector failed', e); return null }),
       detectRevenueTrend(ctx).catch((e) => { console.warn('[ross] revenue detector failed', e); return null }),
+      getActiveSnoozes(ctx).catch((e) => { console.warn('[ross] snoozes read failed', e); return new Set() }),
     ])
 
-    const realCards = [fc, vip, rev].filter(Boolean)
+    // Filter out cards the user has snoozed; padCards re-fills the grid
+    // with LEARNING_MODE_CARDS so the layout stays 3-wide.
+    const realCards = [fc, vip, rev].filter((c) => c && !snoozes.has(c.id))
     const cards = padCards(realCards)
     return {
       headline: buildHeadline(ctx, realCards),

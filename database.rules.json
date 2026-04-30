@@ -521,6 +521,15 @@
           ".write": false,
           "$locationId": {}
         }
+      },
+      "v2Snoozes": {
+        "$uid": {
+          ".read": "auth != null && auth.uid === $uid",
+          ".write": "auth != null && auth.uid === $uid",
+          "$cardId": {
+            ".validate": "!newData.exists() || (newData.hasChildren(['expiresAt', 'snoozedAt']) && newData.child('expiresAt').isNumber() && newData.child('snoozedAt').isNumber())"
+          }
+        }
       }
     }
   }

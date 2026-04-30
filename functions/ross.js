@@ -1335,6 +1335,52 @@ exports.rossManageStaff = onRequest(async (req, res) => {
 });
 
 /**
+ * v2 Home: snooze a single insight card for the calling user.
+ * Writes ross/v2Snoozes/{uid}/{cardId} = { expiresAt, snoozedAt }.
+ * The home feed read path filters out cards whose expiresAt > now.
+ *
+ * Per-user (not per-location): snoozing is a personal UX preference.
+ * cardId is sanitised to [a-zA-Z0-9_-] to avoid path injection.
+ *
+ * Access: any authenticated admin or ROSS-subscribed user
+ */
+exports.rossV2Snooze = onRequest(async (req, res) => {
+    return cors(req, res, async () => {
+        if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' });
+        try {
+            const decodedToken = await verifyAuthToken(req);
+            const { uid } = await verifyUserOrAdmin(decodedToken);
+
+            const data = req.body.data || req.body;
+            const { cardId, hours } = data;
+
+            if (!cardId || typeof cardId !== 'string' || cardId.length > 80) {
+                return res.status(400).json({ error: 'cardId required (string, ≤80 chars)' });
+            }
+            const safeId = cardId.replace(/[^a-zA-Z0-9_-]/g, '');
+            if (!safeId) {
+                return res.status(400).json({ error: 'cardId must contain at least one safe character' });
+            }
+
+            const hrs = Number(hours);
+            if (!Number.isFinite(hrs) || hrs <= 0 || hrs > 720) {
+                return res.status(400).json({ error: 'hours must be a positive number ≤ 720 (30 days)' });
+            }
+
+            const now = Date.now();
+            const expiresAt = now + Math.round(hrs * 3600_000);
+            await db.ref(`ross/v2Snoozes/${uid}/${safeId}`).set({ expiresAt, snoozedAt: now });
+
+            res.json({ result: { success: true, cardId: safeId, expiresAt } });
+        } catch (error) {
+            console.error('[rossV2Snooze] Error:', error.message);
+            const statusCode = (error.message.includes('Admin') || error.message.includes('access denied')) ? 403 : 500;
+            res.status(statusCode).json({ error: error.message });
+        }
+    });
+});
+
+/**
  * Fetch all staff members for a location
  * Access: All admins
  */
