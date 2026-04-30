@@ -32,3 +32,5 @@ Max 15 patterns — unvalidated patterns older than 30 days are dropped.
 | Guard Vue watchers with `_initializing` flag when batch-setting values | Without guard, each setter triggers its own watcher → cascading calls | 2026-04-13 | 1 |
 | Verify legacy fallback reads actually return data before keeping them | Dead legacy paths (Permission denied, no data) add seconds of latency for no benefit | 2026-04-13 | 1 |
 | Always double-check investigation findings against actual console logs | Initial analysis may blame the wrong code path — logs reveal the real bottleneck | 2026-04-13 | 1 |
+| Launch 2 parallel Explore agents (structure + git history) before planning any CLAUDE.md or protocol change | Gives full picture without gaps — structure agent finds KB/hooks/agents, git agent reveals commit ratio and existing planning docs | 2026-04-30 | 1 |
+| Surgical CLAUDE.md edits (4 targeted inserts, nothing removed) beat rewrites | Rewrites risk breaking hook references, agent role descriptions, and KB paths that agents depend on | 2026-04-30 | 1 |

@@ -69,11 +69,11 @@ Sprint: 2026-04-30 → until complete
 
 | Feature | PR | Merged |
 |---------|----|--------|
+| Session goal protocol + kanban backlog (this file) — DX upgrade | #15 | pending merge |
 | ROSS location index — non-creators can see shared workflows | #12 | 2026-04-30 |
 | ROSS KB sweep — DATA_MODEL, CLOUD_FUNCTIONS_CATALOG, rules line range | #11 | 2026-04-29 |
 | ROSS write lock — clients must go through Cloud Functions | #10 | 2026-04-28 |
 | ROSS persist documented workflow fields, fix KB drift | #9 | 2026-04-27 |
-| ROSS restore workflow nav, relabel Hi-Fi surfaces as ROSS v2 | #8 | 2026-04-26 |
 
 ---
 
