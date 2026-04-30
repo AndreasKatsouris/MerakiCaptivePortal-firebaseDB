@@ -4,50 +4,50 @@
     "goal": "Effective implementation of Hi-Fi v2, starting with ROSS",
     "started": "2026-04-30",
     "state": "active",
-    "summary": "Turn the v2 ROSS scaffold into a real, data-wired feature. v2 stays flag-ON behind /ross.html until soaked. After the IA reframe (2026-04-30): v1 admin tabs are reframed as 'Ross's playbook' — the ruleset and procedures the future AI agent runs against. Concierge-first IA: home stays the front door; Playbook / Activity / People are deeper governance destinations."
+    "summary": "Concierge-first IA. v1 admin tabs reframed as 'Ross's playbook' — the rules and procedures the future AI agent runs against. Six v1 tabs collapse to three v2 destinations behind the concierge home: Playbook / Activity / People."
   },
   "phases": [
     {
       "id": 0,
       "name": "Project Status dashboard + sidebar cleanup",
       "status": "done",
-      "summary": "Self-meta tracker built in Hi-Fi v2; sidebar bug fixes (active state, FA icons, BS5 syntax, grouping). PR #16. CORS fix for preview channels: PR #17."
+      "summary": "PR #16 + CORS preview-channel fix PR #17."
     },
     {
       "id": 1,
       "name": "ROSS v2 — gap analysis & spec",
       "status": "done",
-      "summary": "Spec doc + IA audit (docs/plans/2026-04-30-ross-v2-implementation.md). Audit finding: home feed already wired behind ROSS_HOME_REAL_DATA flag. PR #18."
+      "summary": "PR #18. Audit found home feed already wired behind ROSS_HOME_REAL_DATA flag."
     },
     {
       "id": 2,
       "name": "ROSS v2 — wire right-rail + first-run findings",
       "status": "done",
-      "summary": "getHomeSidebar() reads queue/{loc}/entries + bookings + lapsed VIPs. getFirstRunFindings() ships 1 real (best-day-of-week) + 2 illustrative (data sources missing). PR #19."
+      "summary": "PR #19. 1 real first-run finding (best-weekday) + 2 illustrative."
     },
     {
       "id": 3,
       "name": "ROSS v2 — action handlers + snooze",
       "status": "done",
-      "summary": "dispatch(action, card) helper bound to every card button. New rossV2Snooze Cloud Function (deployed) + ross/v2Snoozes/{uid}/{cardId} RTDB node + read-side filter. Snooze action present on all 6 fallback cards + 3 detector cards. PR #20."
+      "summary": "PR #20. dispatch(action, card) + rossV2Snooze CF deployed + read-side filter."
     },
     {
       "id": 4,
       "name": "ROSS v2 — admin redesign (concierge-first IA)",
       "status": "in_progress",
-      "summary": "IA reframe: v1 admin = Ross's playbook (rules + procedures the AI agent runs against), not staff CRUD. 6 v1 tabs collapse to 3: Playbook (workflows + builder + templates), Activity (reports + run history), People (staff). Single SPA on /ross.html with ?tab= routing. Concierge home stays default; tabs are deeper destinations. v1 admin reachable at admin-dashboard.html#rossContent stays as rollback. Splitting into 4a/4b/4c branches."
+      "summary": "Phase 4a Playbook merged (PR #21). Phase 4b Activity in flight on feature/ross-v2-activity. 4c (People) and 4d (Builder) follow."
     },
     {
       "id": 5,
       "name": "ROSS v2 — onboarding wired",
-      "status": "todo",
-      "summary": "Wire /onboarding-ross-hello.html to real getFirstRunFindings() output."
+      "status": "in_progress",
+      "summary": "Phase 5 audit (PR #22) confirmed wiring is end-to-end. Two follow-ups added to backlog: integrate page into signup journey + add auth gate."
     },
     {
       "id": 6,
       "name": "ROSS v2 — askRoss (LLM)",
       "status": "deferred",
-      "summary": "Now more central, not less: ROSS-as-AI-agent IS the product. Anthropic-backed rossChat CF + eval harness + cost cap. Separate sprint."
+      "summary": "Separate sprint. Anthropic-backed rossChat CF + eval harness + cost cap."
     }
   ],
   "tasks": [
@@ -55,26 +55,27 @@
     { "id": "phase-1-shipped", "label": "Phase 1 — Gap analysis & spec doc", "done": true, "phase": 1 },
     { "id": "phase-2-shipped", "label": "Phase 2 — Sidebar + first-run findings wired", "done": true, "phase": 2 },
     { "id": "phase-3-shipped", "label": "Phase 3 — Action handlers + snooze CF deployed", "done": true, "phase": 3 },
-    { "id": "ia-reframe", "label": "IA reframe: v1 = agent's playbook, concierge-first navigation", "done": true, "phase": 4 },
-    { "id": "phase-4a-playbook", "label": "Phase 4a — Playbook tab (read-only): list workflows + templates by category", "done": false, "phase": 4 },
-    { "id": "phase-4b-activity", "label": "Phase 4b — Activity tab: run history + reports", "done": false, "phase": 4 },
-    { "id": "phase-4c-people", "label": "Phase 4c — People tab: staff assignments", "done": false, "phase": 4 },
+    { "id": "phase-4a-playbook", "label": "Phase 4a — Playbook tab read-view", "done": true, "phase": 4 },
+    { "id": "phase-4b-activity", "label": "Phase 4b — Activity tab (run history + reports)", "done": false, "phase": 4 },
+    { "id": "phase-4c-people", "label": "Phase 4c — People tab (staff assignments)", "done": false, "phase": 4 },
     { "id": "phase-4d-builder", "label": "Phase 4d — Playbook editing/creation flows (consolidates v1 Builder)", "done": false, "phase": 4 },
-    { "id": "phase-5-onboarding", "label": "Phase 5 — onboarding-ross-hello.html wired", "done": false, "phase": 5 }
+    { "id": "phase-5-audit", "label": "Phase 5 audit — confirms onboarding wiring is functional", "done": true, "phase": 5 },
+    { "id": "phase-5-journey", "label": "Onboarding journey integration — wire onboarding-ross-hello into signup flow", "done": false, "phase": 5 },
+    { "id": "phase-5-auth-gate", "label": "Onboarding auth gate — add verifyAdminStatus to main-hello.js", "done": false, "phase": 5 }
   ],
   "inProgress": [
     {
-      "branch": "feature/ross-v2-playbook",
-      "summary": "Phase 4a — Playbook tab (read-only list view)",
+      "branch": "feature/ross-v2-activity",
+      "summary": "Phase 4b — Activity tab read-view + per-(workflow×location) drill-down",
       "startedAt": "2026-04-30"
     }
   ],
   "recentlyCompleted": [
+    { "title": "docs(ross-v2): phase 5 onboarding audit", "pr": 22, "mergedAt": "2026-04-30" },
+    { "title": "ross-v2: Playbook tab read-view (phase 4a)", "pr": 21, "mergedAt": "2026-04-30" },
     { "title": "ross-v2: action handlers + snooze (phase 3)", "pr": 20, "mergedAt": "2026-04-30" },
     { "title": "ross-v2: wire right-rail + first-run findings (phase 2)", "pr": 19, "mergedAt": "2026-04-30" },
-    { "title": "docs(ross-v2): phase 1 — gap analysis & implementation spec", "pr": 18, "mergedAt": "2026-04-30" },
-    { "title": "fix(cors): allow Firebase Hosting preview channels", "pr": 17, "mergedAt": "2026-04-30" },
-    { "title": "feat(project-status): internal dashboard + sidebar cleanup", "pr": 16, "mergedAt": "2026-04-30" }
+    { "title": "docs(ross-v2): phase 1 — gap analysis & implementation spec", "pr": 18, "mergedAt": "2026-04-30" }
   ],
   "bugs": [],
   "backlog": {
@@ -88,7 +89,7 @@
       "WhatsApp template UI polish",
       "QA cleanup (~65 test artifact files)",
       "Sidebar dedup of v2 vs v1 entries (after v2 promotion)",
-      "Project status auto-derive from PROJECT_BACKLOG.md (drop manual sync)"
+      "Project status auto-derive from PROJECT_BACKLOG.md"
     ],
     "low": [
       "Subscription admin charts migration",
