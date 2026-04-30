@@ -9,7 +9,9 @@ Last updated: 2026-04-30
 
 ## 🎯 Sprint Goal
 
-**Complete the ROSS core milestone** — wire ROSS workflows into the admin dashboard, confirm end-to-end workflow execution, and reach a shippable v1 state for the ROSS module.
+**Effective implementation of Hi-Fi v2, starting with ROSS** — turn the v2 ROSS scaffold into a real, data-wired feature. v2 stays flag-ON behind `/ross.html` until soaked.
+
+**Mental model (locked 2026-04-30):** ROSS v1 isn't operator-facing compliance CRUD; it's the **policy + playbook the future AI agent runs against**. The 6 sibling v1 admin tabs collapse to 3 deeper governance destinations behind the concierge home (**Playbook / Activity / People**). LLM integration (`askRoss`) is now central, not deferred — own sprint.
 
 Sprint: 2026-04-30 → until complete
 
@@ -19,17 +21,36 @@ Sprint: 2026-04-30 → until complete
 
 | Item | Branch | Notes |
 |------|--------|-------|
-| — | — | ROSS PR #12 merged; no active branch at session start |
+| Phase 4a — Playbook read-view | `feature/ross-v2-playbook` | PR #21 open. Workflows + templates listing under `/ross.html?tab=playbook`. Edit/create lands in Phase 4d. |
 
 ---
 
 ## ✅ Sprint Tasks
 
-- [ ] Wire ROSS section into `admin-dashboard.html` section switcher (nav link + section ID)
-- [ ] Confirm ROSS workflow list loads correctly for location admins
-- [ ] End-to-end test: create workflow → assign tasks → mark complete
-- [ ] Confirm workflow sharing (non-creator can view via location index PR #12)
-- [ ] ROSS v1 smoke test pass — golden path + one error path
+### Phase 0–3 — Done
+
+- [x] **Phase 0** — Project Status dashboard + sidebar cleanup (PR #16) + CORS fix for preview channels (PR #17)
+- [x] **Phase 1** — Gap analysis & spec doc (`docs/plans/2026-04-30-ross-v2-implementation.md`, PR #18)
+- [x] **Phase 2** — Right-rail + first-run findings wired (PR #19) — 1 real finding + 2 illustrative
+- [x] **Phase 3** — Action handlers + snooze CF deployed (PR #20) — `rossV2Snooze` + `ross/v2Snoozes/{uid}` RTDB node + read-side filter
+
+### Phase 4 — Admin redesign (concierge-first IA) — In progress
+
+- [x] **IA reframe** — v1 = agent's playbook; concierge home stays front door; tabs collapse 6 → 3
+- [ ] **Phase 4a** — Playbook tab read-view (this PR #21)
+- [ ] **Phase 4b** — Activity tab (run history + reports)
+- [ ] **Phase 4c** — People tab (staff assignments)
+- [ ] **Phase 4d** — Playbook editing/creation flows (consolidates v1 Builder)
+
+### Phase 5 — Onboarding
+
+- [ ] Wire `/onboarding-ross-hello.html` to real `getFirstRunFindings()` output
+
+### Phase 6 — askRoss LLM (separate sprint)
+
+- [ ] New `rossChat` Cloud Function (Anthropic SDK + prompt caching)
+- [ ] Eval harness (20-prompt golden set)
+- [ ] Cost cap + secrets management
 
 ---
 
@@ -46,12 +67,14 @@ Sprint: 2026-04-30 → until complete
 4. **Hi-Fi v2 → v1 promotions** — flip flag and promote completed v2 surfaces (guests, queue, analytics, campaigns, receipts) once soaked
 5. **WhatsApp template UI polish** — surface improvements from `docs/plans/2026-02-19-whatsapp-template-management.md`
 6. **QA cleanup** — execute `docs/plans/qa-cleanup-plan.md` (~65 test artifact files to remove)
+7. **Sidebar dedup** — kill duplicate v2/v1 entries once v2 promoted
+8. **Project status auto-derive** — read `PROJECT_BACKLOG.md` directly in the dashboard instead of maintaining `project-status.json` separately
 
 ### Low Priority / Nice-to-Have
 
-7. Subscription admin charts migration (deferred from Chart.js audit, items #7–10)
-8. Group overview v2 → v1 promotion
-9. Onboarding flow improvements
+9. Subscription admin charts migration (deferred from Chart.js audit, items #7–10)
+10. Group overview v2 → v1 promotion
+11. Onboarding flow improvements
 
 ---
 
@@ -69,11 +92,11 @@ Sprint: 2026-04-30 → until complete
 
 | Feature | PR | Merged |
 |---------|----|--------|
-| Session goal protocol + kanban backlog (this file) — DX upgrade | #15 | pending merge |
-| ROSS location index — non-creators can see shared workflows | #12 | 2026-04-30 |
-| ROSS KB sweep — DATA_MODEL, CLOUD_FUNCTIONS_CATALOG, rules line range | #11 | 2026-04-29 |
-| ROSS write lock — clients must go through Cloud Functions | #10 | 2026-04-28 |
-| ROSS persist documented workflow fields, fix KB drift | #9 | 2026-04-27 |
+| ROSS v2 — action handlers + snooze (Phase 3) | #20 | 2026-04-30 |
+| ROSS v2 — wire right-rail + first-run findings (Phase 2) | #19 | 2026-04-30 |
+| docs(ross-v2) — phase 1 gap analysis & spec | #18 | 2026-04-30 |
+| fix(cors) — allow Firebase Hosting preview channels | #17 | 2026-04-30 |
+| feat(project-status) — internal dashboard + sidebar cleanup | #16 | 2026-04-30 |
 
 ---
 
@@ -86,3 +109,5 @@ Sprint: 2026-04-30 → until complete
 **At session end:** Claude updates this file — marks sprint tasks done `[x]`, moves completed features to Recently Completed, logs any new bugs discovered, clears the In Progress row if the branch was merged.
 
 **To change sprint focus:** Tell Claude "new sprint goal: [X]" — it will update this file and reorient.
+
+**Two sources of truth, kept in sync:** This markdown is canonical. `public/data/project-status.json` mirrors it for the in-app `Project Status` dashboard — both get updated together until the dashboard auto-derives from this file (item #8 in the backlog).
