@@ -72,6 +72,7 @@ import { CostCenterFilter } from './components/filters/CostCenterFilter.js?v=2.2
 import { StockDataTable } from './components/tables/StockDataTable.js?v=2.2.0-20260413';
 import { EditableStockDataTable } from './components/tables/EditableStockDataTable.js?v=2.2.0-20260413';
 import { openFlagTagModal } from './components/flags/FlagTagModal.js?v=2.2.0-20260413';
+import { withItemKey } from './services/item-identity.js?v=2.2.0-20260413';
 import { getFlagsForLocation } from './services/flag-service.js?v=2.2.0-20260413';
 import { mergeFlaggedHistoricalItems } from './flag-display-merger.js?v=2.2.0-20260413';
 import { DataSummary } from './components/analytics/DataSummary.js?v=2.2.0-20260413';
@@ -497,12 +498,29 @@ var FoodCostApp = {
                 });
                 return;
             }
+            // Items uploaded via CSV but not yet saved skip the flag-pipeline's
+            // attachItemKeys pass — derive the key on demand without mutating
+            // the row in the editable table.
+            let keyedItem;
+            try {
+                keyedItem = await withItemKey(item);
+            } catch (err) {
+                console.error('[FoodCost] withItemKey (modal) failed:', err);
+            }
+            if (!keyedItem?.itemKey) {
+                Swal.fire({
+                    icon: 'error',
+                    title: 'Cannot flag item',
+                    text: 'This item is missing identifying fields (item code or description).'
+                });
+                return;
+            }
             const user = this.getUserData?.() || {};
             const userUid = user.uid || user.userId || 'unknown';
             await openFlagTagModal({
                 locationId: this.selectedLocationId,
-                item,
-                currentEntry: this.flagsByKey?.[item.itemKey] || null,
+                item: keyedItem,
+                currentEntry: this.flagsByKey?.[keyedItem.itemKey] || null,
                 userUid,
                 onChange: () => this.reloadFlagsForLocation()
             });

@@ -29,4 +29,16 @@ export async function computeItemKey(item) {
   return `hash:${h}`;
 }
 
+/**
+ * Pure variant of `attachItemKeys` for a single item: returns a new object
+ * with `itemKey` set, without mutating the input. If `itemKey` is already
+ * present, returns the original reference unchanged.
+ */
+export async function withItemKey(item) {
+  if (!item) return null;
+  if (item.itemKey) return item;
+  const itemKey = await computeItemKey(item);
+  return { ...item, itemKey };
+}
+
 export const __test__ = { normalize, isRandomFallbackCode };
