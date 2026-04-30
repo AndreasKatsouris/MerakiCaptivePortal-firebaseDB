@@ -30,6 +30,43 @@ ROSS provides:
 
 ---
 
+## v2 mental model — agent governance (locked 2026-04-30)
+
+The v1 admin module is reframed in v2 as **"Ross's playbook" — the rules and procedures the future AI agent runs against**. Workflows + templates aren't operator-facing compliance CRUD; they're the policy the agent will execute (with humans approving / overriding) once the LLM lands.
+
+### Information architecture
+
+The v2 surface is **concierge-first**. The home (`/ross.html`) stays the front door — narrative, "3 things worth your attention", "Ask Ross". Everything else is a deeper governance destination, routed via `?tab=` on the same URL:
+
+| URL | Replaces (v1 tabs) | Mental model |
+|-----|---------------------|--------------|
+| `/ross.html` | (concierge home — new) | "What should I look at today?" — Ross's voice |
+| `/ross.html?tab=playbook` | Workflows + Builder + Templates | "How should Ross behave?" — author rules / templates / triggers / thresholds |
+| `/ross.html?tab=activity` | Reports + Run history | "What did Ross do?" — execution log; eventually agent-run + human-run interleaved |
+| `/ross.html?tab=people` | Staff | "Who's in the loop?" — staff + (later) approval-step routing |
+
+Six v1 tabs collapse to three v2 destinations + the concierge home. Tab routing is implemented in `public/js/modules/ross/v2/components/RossHome.vue` using `URLSearchParams` + `popstate` listener — no client-side router framework, no full page reloads.
+
+### Backwards compatibility
+
+The v1 admin remains reachable at `admin-dashboard.html#rossContent` for the entire soak period. It's the rollback net. Cloud Functions are unchanged — the v2 surfaces wrap them via thin per-tab service files (e.g. `playbook-service.js`).
+
+### Phase status (as of 2026-04-30)
+
+| Phase | Status |
+|-------|--------|
+| Home feed (`getHomeFeed`) wired to RTDB detectors | ✅ shipped (PR #19, Phase 2 confirmed) |
+| Right-rail + first-run findings | ✅ PR #19 |
+| Action handlers + snooze | ✅ PR #20 |
+| Playbook tab read-view | ✅ PR #21 (this) |
+| Activity tab | ⏳ Phase 4b |
+| People tab | ⏳ Phase 4c |
+| Playbook editing/creation flows | ⏳ Phase 4d |
+| Onboarding wired | ⏳ Phase 5 |
+| `askRoss` LLM | 🔮 separate sprint |
+
+---
+
 ## Architecture
 
 ```

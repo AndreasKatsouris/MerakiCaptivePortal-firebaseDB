@@ -59,7 +59,12 @@ function statusTone(status) {
 }
 
 function backToHome() {
-  window.location.href = '/ross.html'
+  // Align with the popstate-based tab routing in RossHome.vue: push a
+  // clean URL and dispatch popstate so the parent switcher re-reads
+  // ?tab= without a full page reload.
+  if (typeof window === 'undefined') return
+  window.history.pushState({}, '', '/ross.html')
+  window.dispatchEvent(new PopStateEvent('popstate'))
 }
 </script>
 
@@ -94,23 +99,24 @@ function backToHome() {
         </p>
       </section>
 
-      <!-- Stats -->
-      <div class="playbook__stats">
+      <!-- Stats — placeholders during load to avoid flashing 0. Hidden
+           on error so we don't render derived numbers from stale state. -->
+      <div class="playbook__stats" v-if="!error">
         <HfCard :padded="false" class="playbook__stat">
           <div class="hf-eyebrow">Active workflows</div>
-          <div class="hf-num playbook__stat-value">{{ store.activeCount }}</div>
+          <div class="hf-num playbook__stat-value">{{ loading ? '—' : store.activeCount }}</div>
           <div class="hf-mono playbook__stat-sub">across your venues</div>
         </HfCard>
         <HfCard :padded="false" class="playbook__stat">
           <div class="hf-eyebrow">Overdue</div>
-          <div class="hf-num playbook__stat-value" :class="{ 'is-warn': store.overdueCount > 0 }">
-            {{ store.overdueCount }}
+          <div class="hf-num playbook__stat-value" :class="{ 'is-warn': !loading && store.overdueCount > 0 }">
+            {{ loading ? '—' : store.overdueCount }}
           </div>
           <div class="hf-mono playbook__stat-sub">need attention</div>
         </HfCard>
         <HfCard :padded="false" class="playbook__stat">
           <div class="hf-eyebrow">Templates</div>
-          <div class="hf-num playbook__stat-value">{{ templates.length }}</div>
+          <div class="hf-num playbook__stat-value">{{ loading ? '—' : templates.length }}</div>
           <div class="hf-mono playbook__stat-sub">reusable patterns</div>
         </HfCard>
       </div>
@@ -175,8 +181,9 @@ function backToHome() {
         </div>
       </section>
 
-      <!-- Templates strip -->
-      <section v-if="templates.length" class="playbook__templates">
+      <!-- Templates strip — gated on !loading so it doesn't flash in
+           after the cards have already rendered on a slow connection. -->
+      <section v-if="!loading && !error && templates.length" class="playbook__templates">
         <header class="playbook__cat-head">
           <h2 class="playbook__cat-title">Templates</h2>
           <span class="hf-mono playbook__cat-count">

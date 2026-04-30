@@ -32,15 +32,21 @@ export const usePlaybookStore = defineStore('rossPlaybook', {
       this.loading.templates = true
       this.error = null
       try {
+        // Don't swallow individual rejections — let the outer catch set
+        // this.error so the UI's error/Retry path is reachable. If we
+        // need partial success in future, gate it on a flag rather than
+        // make failure invisible.
         const [workflows, templates] = await Promise.all([
-          getPlaybookWorkflows().catch((e) => { console.warn('[playbook] workflows failed', e); return [] }),
-          getPlaybookTemplates().catch((e) => { console.warn('[playbook] templates failed', e); return [] }),
+          getPlaybookWorkflows(),
+          getPlaybookTemplates(),
         ])
         if (token !== this._token) return
         this.workflows = workflows
         this.templates = templates
       } catch (e) {
-        this.error = e.message || String(e)
+        if (token === this._token) {
+          this.error = e.message || String(e)
+        }
       } finally {
         if (token === this._token) {
           this.loading.workflows = false
