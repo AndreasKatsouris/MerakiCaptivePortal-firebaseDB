@@ -57,6 +57,8 @@ export async function getWorkflowRunHistory({ workflowId, locationId, limit = 20
   if (!workflowId || !locationId) {
     throw new Error('workflowId and locationId are required')
   }
-  const result = await callFunction('rossGetRunHistory', { workflowId, locationId, limit })
+  // Server caps at 100; clamp client-side for defence-in-depth + intent clarity.
+  const safeLimit = Math.min(Math.max(1, Number(limit) || 20), 100)
+  const result = await callFunction('rossGetRunHistory', { workflowId, locationId, limit: safeLimit })
   return Array.isArray(result?.runs) ? result.runs : []
 }

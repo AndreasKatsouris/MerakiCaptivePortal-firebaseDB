@@ -109,7 +109,9 @@ const sidebar = computed(() => store.sidebar)
         <div class="hf-eyebrow ross-home__nav-eyebrow">{{ sec.eyebrow }}</div>
         <HfNavItem
           v-for="it in sec.items" :key="it.label"
-          :label="it.label" :icon="it.icon" :active="!!it.active"
+          :label="it.label" :icon="it.icon"
+          :href="it.href"
+          :active="!!it.active"
         />
       </template>
 
