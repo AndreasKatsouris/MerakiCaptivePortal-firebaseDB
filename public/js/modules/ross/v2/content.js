@@ -57,6 +57,7 @@ export const HOME_FEED = [
     actions: [
       { id: 'open-brief', label: 'Open food-cost brief', variant: 'solid', trailing: 'arrow' },
       { id: 'ask-why',    label: 'Ask Ross why',        variant: 'ghost' },
+      { id: 'snooze',     label: 'Snooze 24h',          variant: 'ghost' },
     ],
     footnote: '2 suggested actions',
     sidecar: {
@@ -81,6 +82,7 @@ export const HOME_FEED = [
     actions: [
       { id: 'review-draft', label: 'Review draft campaign', variant: 'solid' },
       { id: 'see-guests',   label: 'See all 42 guests',    variant: 'ghost' },
+      { id: 'snooze',       label: 'Snooze 24h',           variant: 'ghost' },
     ],
     sidecar: {
       kind: 'donut',
@@ -102,6 +104,7 @@ export const HOME_FEED = [
     actions: [
       { id: 'extend', label: 'Extend promotion', variant: 'solid' },
       { id: 'breakdown', label: 'See breakdown', variant: 'ghost' },
+      { id: 'snooze',    label: 'Snooze 24h',    variant: 'ghost' },
     ],
     sidecar: {
       kind: 'kpi-bars',
@@ -130,7 +133,8 @@ export const LEARNING_MODE_CARDS = [
       "couple of weeks per venue I'll start surfacing cost drift, guest " +
       "patterns, and revenue anomalies here.",
     actions: [
-      { id: 'open-food-cost', label: 'Upload stock data', variant: 'ghost' },
+      { id: 'open-food-cost', label: 'Upload stock data', variant: 'ghost', href: '/admin-dashboard.html#foodCostContent' },
+      { id: 'snooze',         label: 'Hide for a day',     variant: 'ghost' },
     ],
     footnote: 'No insight yet',
     sidecar: {
@@ -153,7 +157,8 @@ export const LEARNING_MODE_CARDS = [
       "Connect WiFi captures or receipt OCR so I can match guests across visits. " +
       "Once I can, you'll see lapsed-VIP cards and draft win-back campaigns here.",
     actions: [
-      { id: 'open-guests', label: 'Open guests', variant: 'ghost' },
+      { id: 'open-guests', label: 'Open guests', variant: 'ghost', href: '/guests-v2.html' },
+      { id: 'snooze',      label: 'Hide for a day', variant: 'ghost' },
     ],
     sidecar: {
       kind: 'donut',
@@ -173,7 +178,8 @@ export const LEARNING_MODE_CARDS = [
       "Upload historical daily sales in Analytics → Sales Data. With 12+ days " +
       "I can compare venues and flag both wins and worries.",
     actions: [
-      { id: 'open-analytics', label: 'Open analytics', variant: 'ghost' },
+      { id: 'open-analytics', label: 'Open analytics', variant: 'ghost', href: '/analytics-v2.html' },
+      { id: 'snooze',         label: 'Hide for a day',  variant: 'ghost' },
     ],
     sidecar: {
       kind: 'kpi-bars',
