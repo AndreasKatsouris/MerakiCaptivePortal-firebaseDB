@@ -145,6 +145,13 @@ Every non-trivial change follows these steps in order. No deviation without expl
 8. **Preview.** Deploy UI changes to a Firebase Hosting preview channel so the user can click through before merge.
 9. **User merges.** The agent never self-merges to `master`. The user (or a COORD agent) reviews and merges.
 10. **Cleanup.** After merge: `git worktree remove .worktrees/<name>` and `git branch -d feature/<name>`. Promotion of v2 → v1 (or flag flip) is a separate PR once soaked.
+11. **Reflect.** After every PR merge (or significant code change), update the three feedback files and report findings to the user:
+    - `KNOWLEDGE BASE/development/SELF_OPTIMIZATION.md` — did any new pattern emerge or get validated?
+    - `KNOWLEDGE BASE/development/LESSONS.md` — any non-obvious gotchas hit during this work?
+    - `KNOWLEDGE BASE/development/SCORECARD.md` — score this session on the rubric, summarise out loud
+    - `KNOWLEDGE BASE/PROJECT_BACKLOG.md` — mark sprint tasks done, move feature to Recently Completed, log any new bugs
+
+    Report format (always shown to user after a PR/merge): a brief bullet list covering score, top lesson, and any patterns promoted.
 
 **Trivial exception:** a typo or one-line fix can skip v2 pattern, preview, and explicit plan — but still needs a feature branch + PR. No direct master commits under any circumstance without explicit per-request authorization.
 
