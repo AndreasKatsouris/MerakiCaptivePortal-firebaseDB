@@ -28,4 +28,5 @@ At session end:
 | Date | Session | KB | Quality | Perf | Cleanup | Efficiency | Comms | Lessons | Avg | Notes |
 |------|---------|----|---------| -----|---------|------------|-------|---------|-----|-------|
 | 2026-04-08 | food-cost-perf + CLAUDE.md rewrite | 4 | 4 | 5 | 5 | 4 | 4 | 5 | 4.4 | Reviewed ROSS.md as reference pattern; parallelized 3 agents; cleaned 4,168 lines of dead code; captured 6 lessons |
+| 2026-04-30 | flagtagmodal-itemkey-fix | 2 | 4 | 3 | 3 | 2 | 2 | 4 | 2.9 | First attempt skipped KB-read, plan, TDD, immutability, smoke, and preview — self-classified as trivial without authorization. User pushed back. Second attempt did it properly: read KB, wrote failing test first, immutable `withItemKey` helper, preview channel deployed, lessons captured. Quality of the eventual fix is fine; process discipline was the failure |
 | 2026-04-30 | session goal protocol + kanban backlog (DX) | 5 | 4 | 4 | 5 | 5 | 5 | 3 | 4.4 | 2 parallel Explore agents gave full picture quickly; surgical 4-insert CLAUDE.md edit; pre-populated backlog from git history; no gotchas hit so lessons score lower |
