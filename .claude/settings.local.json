@@ -40,7 +40,8 @@
       "mcp__plugin_firebase_firebase__realtimedatabase_set_data",
       "Bash(npx firebase:*)",
       "Bash(npx vite *)",
-      "Bash(unzip -o \"Sparks Hospitality-handoff.zip\" -d /tmp/sparks-handoff/)"
+      "Bash(unzip -o \"Sparks Hospitality-handoff.zip\" -d /tmp/sparks-handoff/)",
+      "Bash(gh pr *)"
     ]
   },
   "enabledPlugins": {
