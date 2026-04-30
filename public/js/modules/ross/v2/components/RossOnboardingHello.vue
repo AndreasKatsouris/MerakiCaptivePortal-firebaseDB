@@ -48,11 +48,17 @@ function onTour() {
 
       <div class="ross-hello__findings">
         <article
-          v-for="f in data.findings" :key="f.id"
+          v-for="(f, i) in data.findings" :key="f.id || i"
           class="ross-hello__finding"
-          :class="{ 'ross-hello__finding--accent': f.accent }"
+          :class="{
+            'ross-hello__finding--accent': f.accent,
+            'ross-hello__finding--illustrative': f.source === 'illustrative',
+          }"
         >
-          <div class="hf-mono ross-hello__finding-num">{{ f.id }}</div>
+          <div class="hf-mono ross-hello__finding-num">
+            {{ String(i + 1).padStart(2, '0') }}
+            <span v-if="f.source === 'illustrative'" class="ross-hello__finding-tag">preview</span>
+          </div>
           <div class="ross-hello__finding-headline">{{ f.headline }}</div>
           <div class="ross-hello__finding-detail">{{ f.detail }}</div>
         </article>
@@ -162,6 +168,18 @@ function onTour() {
   margin-top: 8px;
 }
 .ross-hello__finding--accent .ross-hello__finding-detail { color: rgba(200, 154, 58, 0.75); }
+
+.ross-hello__finding--illustrative { opacity: 0.7; }
+.ross-hello__finding-tag {
+  margin-left: 8px;
+  padding: 1px 6px;
+  border: 1px solid currentColor;
+  border-radius: 3px;
+  font-size: 9px;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  opacity: 0.6;
+}
 
 .ross-hello__actions {
   display: flex; align-items: center; gap: 14px;
