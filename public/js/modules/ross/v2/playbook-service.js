@@ -60,3 +60,33 @@ export async function getPlaybookTemplates({ category } = {}) {
   const result = await callFunction('rossGetTemplates', args)
   return Array.isArray(result?.templates) ? result.templates : []
 }
+
+// --- Mutation wrappers (Phase 4d.1) ---------------------------------
+//
+// All return the parsed `result` object. Callers should handle errors
+// at the store layer (saving / saveError) rather than try/catch here,
+// matching the people-service convention.
+
+export function createWorkflow(payload) {
+  return callFunction('rossCreateWorkflow', payload)
+}
+
+export function updateWorkflow({ workflowId, updates }) {
+  return callFunction('rossUpdateWorkflow', { workflowId, updates })
+}
+
+export function deleteWorkflow({ workflowId }) {
+  return callFunction('rossDeleteWorkflow', { workflowId })
+}
+
+export function activateWorkflow(payload) {
+  return callFunction('rossActivateWorkflow', payload)
+}
+
+// Phase 4e — exported for the upcoming per-task editor (inputType /
+// inputConfig matrix). Not consumed yet by 4d.1; lands here so the
+// service surface stays one place. payload: { workflowId, locationId,
+// action: 'create'|'update'|'delete', taskId?, taskData? }
+export function manageTask(payload) {
+  return callFunction('rossManageTask', payload)
+}
