@@ -76,14 +76,15 @@ Sprint: 2026-04-30 → until complete
 8. **Project status auto-derive** — read `PROJECT_BACKLOG.md` directly in the dashboard instead of maintaining `project-status.json` separately
 9. **Factor out `fetchLocationNames` helper** — duplicated across `activity-store.js`, `playbook-store.js`, `people-store.js`. Extract to `public/js/modules/ross/v2/location-names.js`.
 10. **`HfModal` / `HfConfirm` design-system components** — v2 needs a Hi-Fi-native modal pattern for cases that genuinely warrant an overlay (bulk-action confirms, multi-step wizards, etc.). PR #25 dropped SweetAlert2 in favour of inline confirms / inline error banners — that works for the People tab's single-row destructive actions but won't scale. Land in `public/js/design-system/hifi/components/` with --hf-* tokens, focus trap, ESC + scrim dismiss, and a worked example in `public/hifi/components.html`. Update CLAUDE.md convention: SweetAlert2 is v1-only.
-11. **Fix KB doc field-name drift for ROSS templates** — `public/kb/features/ROSS.md` "Templates" block lists `id: string` but the actual server uses `templateId` (per seed + `rossCreateTemplate`). Same doc says template tasks are at `tasks: Task[]` but server stores `subtasks` (per `rossActivateWorkflow`, seed). Drift directly caused the PR #28 activate-from-template bug. One-line audit + edit.
+11. **Fix KB doc field-name drift for ROSS templates** — `public/kb/features/ROSS.md` "Templates" block lists `id: string` but the actual server uses `templateId` (per seed + `rossCreateTemplate`). Same doc says template tasks are at `tasks: Task[]` but server stores `subtasks` (per `rossActivateWorkflow`, seed). Drift directly caused the PR #28 activate-from-template bug. One-line audit + edit. **[Done in PR #30]**
+12. **Catalog ROSS Cloud Functions in `KNOWLEDGE BASE/api/CLOUD_FUNCTIONS_CATALOG.md`** — `functions/ross.js` is missing from the Source File Map and none of the ROSS CFs are documented there (`rossGetTemplates`, `rossCreateTemplate`, `rossUpdateTemplate`, `rossDeleteTemplate`, `rossGetWorkflows`, `rossCreateWorkflow`, `rossUpdateWorkflow`, `rossDeleteWorkflow`, `rossActivateWorkflow`, `rossManageTask`, `rossGetReports`, `rossScheduledReminder`, `rossV2Snooze`). Pre-existing drift surfaced during PR #30 review. Allowed-fields lists for each mutator are the highest-value payload — would have caught the PR #28 `t.id` bug at planning time.
 
 ### Low Priority / Nice-to-Have
 
-12. Subscription admin charts migration (deferred from Chart.js audit, items #7–10)
-13. Group overview v2 → v1 promotion
-14. Onboarding flow improvements
-15. **Edit-mode multi-location pill render** — `RossPlaybookWorkflowEditor` hydrates only the first `locationId` on edit (because `workflowById` flattens by first match in the rossGetWorkflows response). Locked caption already explains it but a future audit could surface all attached locations as read-only pills.
+13. Subscription admin charts migration (deferred from Chart.js audit, items #7–10)
+14. Group overview v2 → v1 promotion
+15. Onboarding flow improvements
+16. **Edit-mode multi-location pill render** — `RossPlaybookWorkflowEditor` hydrates only the first `locationId` on edit (because `workflowById` flattens by first match in the rossGetWorkflows response). Locked caption already explains it but a future audit could surface all attached locations as read-only pills.
 
 ---
 

@@ -22,6 +22,15 @@ import RossPlaybookSubtaskRow from './RossPlaybookSubtaskRow.vue'
 
 const store = usePlaybookStore()
 
+// Generate a stable id for in-form subtask rows. v-for keyed on array
+// index breaks when rows are reordered: focus, half-typed values, and
+// component local state stick to the wrong row after a splice. _uid is
+// stripped before the server payload is built.
+function newUid() {
+  if (typeof crypto !== 'undefined' && crypto.randomUUID) return crypto.randomUUID()
+  return `s-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`
+}
+
 const mode = computed(() => {
   if (store.editingTemplateId === 'new') return 'create'
   if (store.editingTemplateId) return 'edit'
@@ -67,6 +76,7 @@ watch(
         recurrence: t.recurrence || 'weekly',
         daysBeforeAlert: Array.isArray(t.daysBeforeAlert) ? [...t.daysBeforeAlert] : [7, 1],
         subtasks: subs.map((s, i) => ({
+          _uid: newUid(),
           title: s.title || '',
           daysOffset: Number.isFinite(Number(s.daysOffset)) ? Number(s.daysOffset) : 0,
           order: s.order || i + 1,
@@ -98,7 +108,7 @@ function addSubtask() {
     ...form.value,
     subtasks: [
       ...form.value.subtasks,
-      { title: '', daysOffset: 0, order: form.value.subtasks.length + 1 },
+      { _uid: newUid(), title: '', daysOffset: 0, order: form.value.subtasks.length + 1 },
     ],
   }
 }
@@ -157,6 +167,12 @@ const errors = computed(() => {
   if (!form.value.name.trim()) out.name = 'Required'
   if (!VALID_CATEGORIES.includes(form.value.category)) out.category = 'Invalid'
   if (!VALID_RECURRENCES.includes(form.value.recurrence)) out.recurrence = 'Invalid'
+  // An empty alert array silently disables every reminder for the
+  // template. Surface it as a form error rather than letting the user
+  // ship a no-alert policy by accident.
+  if (!form.value.daysBeforeAlert.some((d) => Number.isInteger(d) && d > 0)) {
+    out.daysBeforeAlert = 'Pick at least one alert day'
+  }
   return out
 })
 const formValid = computed(() => Object.keys(errors.value).length === 0)
@@ -170,6 +186,7 @@ function buildPayload() {
     description: form.value.description.trim() || '',
     recurrence: form.value.recurrence,
     daysBeforeAlert: form.value.daysBeforeAlert.filter((d) => Number.isInteger(d) && d > 0),
+    // _uid is form-only — strip before the round trip.
     subtasks: form.value.subtasks
       .filter((s) => s.title && s.title.trim())
       .map((s, i) => ({
@@ -273,6 +290,9 @@ const categoryOptions = [
           {{ d }}d
         </button>
       </div>
+      <span v-if="errors.daysBeforeAlert" class="tpleditor__field-err">
+        {{ errors.daysBeforeAlert }}
+      </span>
     </div>
 
     <!-- Subtasks -->
@@ -285,7 +305,7 @@ const categoryOptions = [
       <ul v-if="form.subtasks.length" class="tpleditor__subtask-list">
         <RossPlaybookSubtaskRow
           v-for="(s, i) in form.subtasks"
-          :key="i"
+          :key="s._uid"
           :subtask="s"
           :index="i"
           :total="form.subtasks.length"
