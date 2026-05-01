@@ -35,7 +35,7 @@
       "id": 4,
       "name": "ROSS v2 — admin redesign (concierge-first IA)",
       "status": "in_progress",
-      "summary": "Phase 4a Playbook merged (PR #21 + locationName enrichment PR #24). Phase 4b Activity merged (PR #23). Phase 4c People in flight on feature/ross-v2-people (PR #25). 4d (Builder edit/create) follows."
+      "summary": "Phase 4a Playbook (PR #21 + locationName fix PR #24), 4b Activity (PR #23), and 4c People CRUD (PR #25) all merged. 4d (Builder edit/create) is next — consolidates the v1 Builder behind the same inline-editor patterns established in 4c."
     },
     {
       "id": 5,
@@ -57,25 +57,19 @@
     { "id": "phase-3-shipped", "label": "Phase 3 — Action handlers + snooze CF deployed", "done": true, "phase": 3 },
     { "id": "phase-4a-playbook", "label": "Phase 4a — Playbook tab read-view + locationName fix", "done": true, "phase": 4 },
     { "id": "phase-4b-activity", "label": "Phase 4b — Activity tab (run history + reports)", "done": true, "phase": 4 },
-    { "id": "phase-4c-people", "label": "Phase 4c — People tab (staff CRUD)", "done": false, "phase": 4 },
+    { "id": "phase-4c-people", "label": "Phase 4c — People tab (staff CRUD)", "done": true, "phase": 4 },
     { "id": "phase-4d-builder", "label": "Phase 4d — Playbook editing/creation flows (consolidates v1 Builder)", "done": false, "phase": 4 },
     { "id": "phase-5-audit", "label": "Phase 5 audit — confirms onboarding wiring is functional", "done": true, "phase": 5 },
     { "id": "phase-5-journey", "label": "Onboarding journey integration — wire onboarding-ross-hello into signup flow", "done": false, "phase": 5 },
     { "id": "phase-5-auth-gate", "label": "Onboarding auth gate — add verifyAdminStatus to main-hello.js", "done": false, "phase": 5 }
   ],
-  "inProgress": [
-    {
-      "branch": "feature/ross-v2-people",
-      "summary": "Phase 4c — People tab (staff CRUD), PR #25",
-      "startedAt": "2026-04-30"
-    }
-  ],
+  "inProgress": [],
   "recentlyCompleted": [
+    { "title": "ross-v2: People tab — staff CRUD (phase 4c)", "pr": 25, "mergedAt": "2026-05-01" },
+    { "title": "docs(ross-v2): backlog + status sync after PR #23/#24", "pr": 26, "mergedAt": "2026-05-01" },
     { "title": "ross-v2: enrich locationName on Playbook tab", "pr": 24, "mergedAt": "2026-05-01" },
     { "title": "ross-v2: Activity tab — execution log read-view (phase 4b)", "pr": 23, "mergedAt": "2026-05-01" },
-    { "title": "docs(ross-v2): phase 5 onboarding audit", "pr": 22, "mergedAt": "2026-04-30" },
-    { "title": "ross-v2: Playbook tab read-view (phase 4a)", "pr": 21, "mergedAt": "2026-04-30" },
-    { "title": "ross-v2: action handlers + snooze (phase 3)", "pr": 20, "mergedAt": "2026-04-30" }
+    { "title": "docs(ross-v2): phase 5 onboarding audit", "pr": 22, "mergedAt": "2026-04-30" }
   ],
   "bugs": [],
   "backlog": {
