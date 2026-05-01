@@ -21,7 +21,7 @@ Sprint: 2026-04-30 → until complete
 
 | Item | Branch | Notes |
 |------|--------|-------|
-| — | — | No active branch. Phase 4e (per-task `inputType`/`inputConfig` editor) is next. |
+| Phase 4e.1 — per-task input-type editor | `feature/ross-v2-phase4e1` | Workflow-task editor (rossManageTask). Includes a service-side flatten fix so v2 store produces one row per (workflowId, locationId). Subtask→task propagation deferred to 4e.2. |
 
 ---
 

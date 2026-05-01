@@ -3,6 +3,7 @@ import {
   getPlaybookWorkflows, getPlaybookTemplates,
   createWorkflow, updateWorkflow, deleteWorkflow, activateWorkflow,
   createTemplate, updateTemplate, deleteTemplate,
+  manageTask,
 } from './playbook-service.js'
 import { auth, rtdb, ref, get } from '../../../config/firebase-config.js'
 import { fetchLocationNames } from './utils/location-names.js'
@@ -78,6 +79,17 @@ export const usePlaybookStore = defineStore('rossPlaybook', {
     // false; the server always enforces.
     isSuperAdmin: false,
     _superAdminLoaded: false,
+
+    // --- Task editor state (Phase 4e.1) --------------------------
+    // editingTasksFor binds to a specific (workflowId, locationId)
+    // pair — null means closed. Mutually exclusive with workflow +
+    // template editors so only one editing surface ever shows on
+    // the panel at a time.
+    editingTasksFor: null,            // { workflowId, locationId } | null
+    taskSaving: false,                // any task op in flight
+    taskSavingTaskId: null,           // which row is currently saving
+    taskSaveError: null,              // panel-level banner (e.g. add/delete fail)
+    taskRowErrors: {},                // { [taskId|_uid]: string } — per-row error
   }),
   getters: {
     workflowsByCategory(state) {
@@ -181,6 +193,9 @@ export const usePlaybookStore = defineStore('rossPlaybook', {
       this.saveError = null
       this.editingTemplateId = null
       this.templateSaveError = null
+      this.editingTasksFor = null
+      this.taskSaveError = null
+      this.taskRowErrors = {}
       this.loadLocations()
     },
     openEdit(workflowId) {
@@ -189,6 +204,9 @@ export const usePlaybookStore = defineStore('rossPlaybook', {
       this.saveError = null
       this.editingTemplateId = null
       this.templateSaveError = null
+      this.editingTasksFor = null
+      this.taskSaveError = null
+      this.taskRowErrors = {}
       this.loadLocations()
     },
     openActivateTemplate(templateId) {
@@ -197,6 +215,9 @@ export const usePlaybookStore = defineStore('rossPlaybook', {
       this.saveError = null
       this.editingTemplateId = null
       this.templateSaveError = null
+      this.editingTasksFor = null
+      this.taskSaveError = null
+      this.taskRowErrors = {}
       this.loadLocations()
     },
     closeEditor() {
@@ -301,10 +322,13 @@ export const usePlaybookStore = defineStore('rossPlaybook', {
     openCreateTemplate() {
       this.editingTemplateId = 'new'
       this.templateSaveError = null
-      // Closing the workflow editor keeps the panel single-instance.
+      // Closing the workflow + task editors keeps the panel single-instance.
       this.editingWorkflowId = null
       this.activateTemplateId = null
       this.saveError = null
+      this.editingTasksFor = null
+      this.taskSaveError = null
+      this.taskRowErrors = {}
     },
     openEditTemplate(templateId) {
       this.editingTemplateId = templateId
@@ -312,6 +336,9 @@ export const usePlaybookStore = defineStore('rossPlaybook', {
       this.editingWorkflowId = null
       this.activateTemplateId = null
       this.saveError = null
+      this.editingTasksFor = null
+      this.taskSaveError = null
+      this.taskRowErrors = {}
     },
     closeTemplateEditor() {
       this.editingTemplateId = null
@@ -378,6 +405,93 @@ export const usePlaybookStore = defineStore('rossPlaybook', {
         throw e
       } finally {
         this.saving = false
+      }
+    },
+
+    // --- Task editor lifecycle (Phase 4e.1) -----------------------
+    // Each playbook card binds to one (workflowId, locationId). The
+    // task editor is per-pair so editing tasks at venue A doesn't
+    // touch venue B's instance of the same workflow (server scopes
+    // tasksRef to ross/workflows/{uid}/{workflowId}/locations/{locId}).
+    openTasksEditor(workflowId, locationId) {
+      if (!workflowId || !locationId) return
+      this.editingTasksFor = { workflowId, locationId }
+      this.taskSaveError = null
+      this.taskRowErrors = {}
+      // Mutually exclude with workflow + template editors.
+      this.editingWorkflowId = null
+      this.activateTemplateId = null
+      this.saveError = null
+      this.editingTemplateId = null
+      this.templateSaveError = null
+    },
+    closeTasksEditor() {
+      this.editingTasksFor = null
+      this.taskSaveError = null
+      this.taskRowErrors = {}
+    },
+    setTaskRowError(rowKey, message) {
+      this.taskRowErrors = { ...this.taskRowErrors, [rowKey]: message }
+    },
+    clearTaskRowError(rowKey) {
+      if (!(rowKey in this.taskRowErrors)) return
+      const next = { ...this.taskRowErrors }
+      delete next[rowKey]
+      this.taskRowErrors = next
+    },
+
+    // --- Task mutations -------------------------------------------
+    // All wrap rossManageTask. Server validates inputType against
+    // VALID_INPUT_TYPES; inputConfig is stored verbatim. After every
+    // success we reload the workflow list so the card's tasks map
+    // reflects the new server state. Pattern matches the workflow +
+    // template mutation actions above.
+    async createTask({ workflowId, locationId, taskData }) {
+      this.taskSaving = true
+      this.taskSavingTaskId = null
+      this.taskSaveError = null
+      try {
+        await manageTask({ workflowId, locationId, action: 'create', taskData })
+        await this.load()
+      } catch (e) {
+        this.taskSaveError = e.message || String(e)
+        throw e
+      } finally {
+        this.taskSaving = false
+      }
+    },
+
+    async updateTask({ workflowId, locationId, taskId, taskData }) {
+      this.taskSaving = true
+      this.taskSavingTaskId = taskId
+      this.taskSaveError = null
+      try {
+        await manageTask({ workflowId, locationId, action: 'update', taskId, taskData })
+        await this.load()
+      } catch (e) {
+        // Per-row error so other rows aren't blocked. Caller can also
+        // surface taskSaveError if it wants a panel-level banner.
+        this.taskRowErrors = { ...this.taskRowErrors, [taskId]: e.message || String(e) }
+        throw e
+      } finally {
+        this.taskSaving = false
+        this.taskSavingTaskId = null
+      }
+    },
+
+    async deleteTask({ workflowId, locationId, taskId }) {
+      this.taskSaving = true
+      this.taskSavingTaskId = taskId
+      this.taskSaveError = null
+      try {
+        await manageTask({ workflowId, locationId, action: 'delete', taskId })
+        await this.load()
+      } catch (e) {
+        this.taskRowErrors = { ...this.taskRowErrors, [taskId]: e.message || String(e) }
+        throw e
+      } finally {
+        this.taskSaving = false
+        this.taskSavingTaskId = null
       }
     },
   },
