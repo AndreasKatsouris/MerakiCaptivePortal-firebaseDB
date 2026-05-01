@@ -34,21 +34,80 @@ async function callFunction(functionName, data = {}) {
 }
 
 /**
- * Fetch the user's workflows. v1 rossGetWorkflows returns a flat list,
- * each entry already merged with the location's status / nextDueDate.
+ * Fetch the user's workflows. v1 `rossGetWorkflows` returns one entry
+ * per workflow with all locations nested under `w.locations`, UNLESS
+ * a `locationId` arg is passed — then the server hoists status / tasks
+ * to the top level (functions/ross.js:632).
  *
- * Optional locationId filter narrows server-side.
+ * The v2 surface assumes one card per (workflowId, locationId) pair —
+ * it keys on `${w.workflowId}::${w.locationId}` and reads
+ * `w.locationName` / `w.tasks`. To keep client state consistent with
+ * that assumption, we **flatten client-side** when no locationId arg
+ * is supplied: one row per location, with `locationId`, `locationName`,
+ * `locationStatus`, `locationNextDueDate`, `tasks`, `locationAssignedTo`,
+ * `activatedAt` hoisted. This mirrors the server's `locationId` branch.
+ *
+ * Required for Phase 4e.1 — `rossManageTask` needs a real `locationId`
+ * per row. Also fixes a latent bug in the workflow editor where
+ * `editingWorkflow.locationId` was undefined.
  */
 export async function getPlaybookWorkflows({ locationId } = {}) {
   const args = locationId ? { locationId } : {}
   const result = await callFunction('rossGetWorkflows', args)
   const workflows = Array.isArray(result?.workflows) ? result.workflows : []
-  // Normalise location-prefixed fields (v1 quirk).
-  return workflows.map((w) => ({
-    ...w,
-    nextDueDate: w.locationNextDueDate ?? w.nextDueDate ?? null,
-    status: w.locationStatus ?? w.status ?? 'active',
-  }))
+
+  // Server already flattened — just normalise the legacy aliases.
+  if (locationId) {
+    return workflows.map((w) => ({
+      ...w,
+      locationId: w.locationId || locationId,
+      nextDueDate: w.locationNextDueDate ?? w.nextDueDate ?? null,
+      status: w.locationStatus ?? w.status ?? 'active',
+    }))
+  }
+
+  // No filter: server returned one entry per workflow with `locations`
+  // nested. Flatten to one row per (workflowId, locationId) pair.
+  const flat = []
+  for (const w of workflows) {
+    const locs = (w.locations && typeof w.locations === 'object') ? w.locations : {}
+    const ids = Object.keys(locs)
+    if (ids.length === 0) {
+      // Defensive: a workflow with no locations is malformed — keep it
+      // visible but mark the location fields null so the UI doesn't
+      // silently drop it.
+      flat.push({
+        ...w,
+        locationId: null,
+        locationName: null,
+        locationStatus: null,
+        locationNextDueDate: null,
+        locationAssignedTo: null,
+        activatedAt: null,
+        tasks: {},
+        nextDueDate: w.nextDueDate ?? null,
+        status: w.status ?? 'active',
+      })
+      continue
+    }
+    for (const locId of ids) {
+      const loc = locs[locId] || {}
+      flat.push({
+        ...w,
+        locationId: locId,
+        locationName: loc.locationName || locId,
+        locationStatus: loc.status ?? 'active',
+        locationNextDueDate: loc.nextDueDate ?? null,
+        locationAssignedTo: loc.locationAssignedTo ?? null,
+        activatedAt: loc.activatedAt ?? null,
+        tasks: loc.tasks || {},
+        // Hoisted aliases for legacy consumers (workflow card + editor).
+        nextDueDate: loc.nextDueDate ?? w.nextDueDate ?? null,
+        status: loc.status ?? w.status ?? 'active',
+      })
+    }
+  }
+  return flat
 }
 
 /**

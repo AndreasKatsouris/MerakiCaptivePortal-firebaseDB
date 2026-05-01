@@ -16,6 +16,7 @@ import {
 } from '/js/design-system/hifi/index.js'
 import RossPlaybookWorkflowEditor from './RossPlaybookWorkflowEditor.vue'
 import RossPlaybookTemplateEditor from './RossPlaybookTemplateEditor.vue'
+import RossPlaybookWorkflowTasksEditor from './RossPlaybookWorkflowTasksEditor.vue'
 
 const store = usePlaybookStore()
 onMounted(() => {
@@ -44,6 +45,12 @@ async function commitDeleteTemplate(templateId) {
 }
 
 const showTemplateEditor = computed(() => store.editingTemplateId !== null)
+
+// Helper: is the task editor open for this specific card pair?
+function isTasksEditorFor(w) {
+  const p = store.editingTasksFor
+  return !!p && p.workflowId === w.workflowId && p.locationId === w.locationId
+}
 
 // Per-row delete confirm: which workflowId is currently in confirm
 // state? Slide-down strip on the card replaces SweetAlert2 modal —
@@ -277,16 +284,26 @@ function backToHome() {
                    so the user's eye stays with the form, not a grid of
                    tempting alternatives. -->
               <div v-if="!showEditor" class="playbook__workflow-actions">
-                <HfButton variant="ghost" size="sm" @click="store.openEdit(w.workflowId)" :disabled="store.saving">
+                <HfButton variant="ghost" size="sm" @click="store.openEdit(w.workflowId)" :disabled="store.saving || store.taskSaving">
                   Edit
                 </HfButton>
-                <HfButton variant="ghost" size="sm" @click="togglePause(w)" :disabled="store.saving">
+                <HfButton
+                  variant="ghost" size="sm"
+                  @click="store.openTasksEditor(w.workflowId, w.locationId)"
+                  :disabled="store.saving || store.taskSaving || !w.locationId"
+                >
+                  Edit tasks
+                </HfButton>
+                <HfButton variant="ghost" size="sm" @click="togglePause(w)" :disabled="store.saving || store.taskSaving">
                   {{ w.status === 'paused' ? 'Resume' : 'Pause' }}
                 </HfButton>
-                <HfButton variant="ghost" size="sm" @click="startDelete(w.workflowId)" :disabled="store.saving || confirmingDeleteId !== null">
+                <HfButton variant="ghost" size="sm" @click="startDelete(w.workflowId)" :disabled="store.saving || store.taskSaving || confirmingDeleteId !== null">
                   Delete
                 </HfButton>
               </div>
+
+              <!-- Inline task editor for this (workflowId, locationId) pair. -->
+              <RossPlaybookWorkflowTasksEditor v-if="isTasksEditorFor(w)" />
 
               <!-- Slide-down inline confirm strip — replaces SweetAlert2.
                    Spans full card width; copy carries the gravity.
