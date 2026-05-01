@@ -3,7 +3,7 @@
 > Claude reads this file at the start of every session and updates it at the end.
 > The Sprint Goal is the contract for the session — don't deviate without explicit user confirmation.
 
-Last updated: 2026-04-30
+Last updated: 2026-05-01
 
 ---
 
@@ -21,7 +21,7 @@ Sprint: 2026-04-30 → until complete
 
 | Item | Branch | Notes |
 |------|--------|-------|
-| Phase 4b — Activity read-view | `feature/ross-v2-activity` | Active branch. Workflow execution log under `/ross.html?tab=activity` with drill-down to per-(workflow×location) run history. |
+| — | — | No active branch. Phase 4c (People tab) is next. |
 
 ---
 
@@ -38,8 +38,8 @@ Sprint: 2026-04-30 → until complete
 
 - [x] **IA reframe** — v1 = agent's playbook; concierge home stays front door; tabs collapse 6 → 3
 - [x] **Phase 4a** — Playbook tab read-view (PR #21 merged)
-- [ ] **Phase 4b** — Activity tab (run history + reports) — current
-- [ ] **Phase 4c** — People tab (staff assignments)
+- [x] **Phase 4b** — Activity tab (run history + reports) (PR #23 merged) + locationName enrichment fix (PR #24 merged)
+- [ ] **Phase 4c** — People tab (staff assignments) — next
 - [ ] **Phase 4d** — Playbook editing/creation flows (consolidates v1 Builder)
 
 ### Phase 5 — Onboarding
@@ -95,11 +95,11 @@ Sprint: 2026-04-30 → until complete
 
 | Feature | PR | Merged |
 |---------|----|--------|
+| ROSS v2 — locationName enrichment on Playbook tab | #24 | 2026-05-01 |
+| ROSS v2 — Activity tab read-view (Phase 4b) | #23 | 2026-05-01 |
 | docs(ross-v2) — phase 5 onboarding audit | #22 | 2026-04-30 |
 | ROSS v2 — Playbook tab read-view (Phase 4a) | #21 | 2026-04-30 |
 | ROSS v2 — action handlers + snooze (Phase 3) | #20 | 2026-04-30 |
-| ROSS v2 — wire right-rail + first-run findings (Phase 2) | #19 | 2026-04-30 |
-| docs(ross-v2) — phase 1 gap analysis & spec | #18 | 2026-04-30 |
 
 ---
 
