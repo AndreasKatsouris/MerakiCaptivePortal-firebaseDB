@@ -83,6 +83,25 @@ export function activateWorkflow(payload) {
   return callFunction('rossActivateWorkflow', payload)
 }
 
+// --- Template mutation wrappers (Phase 4d.2, superAdmin only) -------
+//
+// rossCreateTemplate accepts { name, category, description, recurrence,
+// daysBeforeAlert, subtasks, tags } (functions/ross.js line 192).
+// rossUpdateTemplate's allowedFields list (line 256) is the same set,
+// passed as { templateId, updates }. Server enforces verifySuperAdmin;
+// the client only gates the UI for clarity.
+export function createTemplate(payload) {
+  return callFunction('rossCreateTemplate', payload)
+}
+
+export function updateTemplate({ templateId, updates }) {
+  return callFunction('rossUpdateTemplate', { templateId, updates })
+}
+
+export function deleteTemplate({ templateId }) {
+  return callFunction('rossDeleteTemplate', { templateId })
+}
+
 // Phase 4e — exported for the upcoming per-task editor (inputType /
 // inputConfig matrix). Not consumed yet by 4d.1; lands here so the
 // service surface stays one place. payload: { workflowId, locationId,

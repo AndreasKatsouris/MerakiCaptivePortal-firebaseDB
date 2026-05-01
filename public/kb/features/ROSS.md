@@ -161,14 +161,15 @@ ross/
 ross/
   templates/
     {templateId}/
-      id: string
+      templateId: string         ← canonical id field (server seed + rossCreateTemplate)
       name: string
       description: string
-      category: string
-      recurrence: string
-      tasks: Task[]
-      isPublic: boolean
-      createdBy: string     ← uid of creator
+      category: string             ← compliance | operations | growth | finance | hr | maintenance
+      recurrence: string           ← once | daily | weekly | monthly | quarterly | annually
+      daysBeforeAlert: number[]    ← e.g. [30, 7]
+      subtasks: Subtask[]          ← canonical task list field; each { title, daysOffset?, order? }
+      tags: string[]
+      notificationChannels: string[]   ← currently always ['in_app']
       createdAt: number
       updatedAt: number
 ```
