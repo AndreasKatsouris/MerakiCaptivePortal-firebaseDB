@@ -2,6 +2,18 @@ import { defineStore } from 'pinia'
 import { auth, rtdb, ref, get } from '../../../config/firebase-config.js'
 import { getStaffForLocation, manageStaff } from './people-service.js'
 
+// Server stores `phone` raw — Twilio downstream needs E.164. Mirrors the SA
+// rule used by the v1 modules (guest/queue/booking/receipt management).
+function normalizePhone(input) {
+  if (!input) return null
+  const cleaned = String(input).replace(/[\s().-]/g, '').trim()
+  if (!cleaned) return null
+  if (cleaned.startsWith('+')) return cleaned
+  if (/^27\d{9}$/.test(cleaned)) return '+' + cleaned
+  if (/^0\d{9}$/.test(cleaned)) return '+27' + cleaned.slice(1)
+  return cleaned
+}
+
 /**
  * Read userLocations/{uid} → enrich each id with locations/{id}/name.
  * Best-effort: returns whatever was readable.
@@ -95,7 +107,8 @@ export const usePeopleStore = defineStore('rossPeople', {
       this.saving = true
       this.saveError = null
       try {
-        await manageStaff({ locationId: this.selectedLocationId, action: 'create', staffData })
+        const payload = { ...staffData, phone: normalizePhone(staffData.phone) }
+        await manageStaff({ locationId: this.selectedLocationId, action: 'create', staffData: payload })
         await this.loadStaff()
       } catch (e) {
         this.saveError = e.message || String(e)
@@ -111,7 +124,8 @@ export const usePeopleStore = defineStore('rossPeople', {
       this.saving = true
       this.saveError = null
       try {
-        await manageStaff({ locationId: this.selectedLocationId, action: 'update', staffId, staffData })
+        const payload = { ...staffData, phone: normalizePhone(staffData.phone) }
+        await manageStaff({ locationId: this.selectedLocationId, action: 'update', staffId, staffData: payload })
         await this.loadStaff()
       } catch (e) {
         this.saveError = e.message || String(e)

@@ -9,7 +9,7 @@
 import { onMounted, computed, ref, watch } from 'vue'
 import { usePeopleStore } from '../people-store.js'
 import {
-  HfIcon, HfChip, HfCard, HfButton, HfInput, HfLogo,
+  HfIcon, HfChip, HfButton, HfInput, HfLogo,
 } from '/js/design-system/hifi/index.js'
 
 const store = usePeopleStore()
