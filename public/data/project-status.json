@@ -35,7 +35,7 @@
       "id": 4,
       "name": "ROSS v2 — admin redesign (concierge-first IA)",
       "status": "in_progress",
-      "summary": "Phase 4a Playbook (PR #21 + locationName fix PR #24), 4b Activity (PR #23), 4c People CRUD (PR #25), and 4d.1 Playbook workflow editor (PR #28) all merged. 4d.2 (template CRUD, superAdmin) is next — reuses the inline-editor + slide-down-confirm patterns from 4d.1."
+      "summary": "Phase 4a Playbook (PR #21 + #24), 4b Activity (PR #23), 4c People CRUD (PR #25), 4d.1 Workflow editor (PR #28), 4d.2 Template CRUD superAdmin (PR #30), and 4e.1 Per-task input-type editor (PR #32) all merged. 4e.2 (server propagation: subtask→task at create/activate, then template-level inputType editor) is next — requires a functions deploy."
     },
     {
       "id": 5,
@@ -59,19 +59,20 @@
     { "id": "phase-4b-activity", "label": "Phase 4b — Activity tab (run history + reports)", "done": true, "phase": 4 },
     { "id": "phase-4c-people", "label": "Phase 4c — People tab (staff CRUD)", "done": true, "phase": 4 },
     { "id": "phase-4d1-workflow-editor", "label": "Phase 4d.1 — Playbook workflow create/edit/lifecycle", "done": true, "phase": 4 },
-    { "id": "phase-4d2-template-crud", "label": "Phase 4d.2 — Template CRUD (superAdmin)", "done": false, "phase": 4 },
-    { "id": "phase-4e-task-config", "label": "Phase 4e — Per-task inputType / inputConfig editor", "done": false, "phase": 4 },
+    { "id": "phase-4d2-template-crud", "label": "Phase 4d.2 — Template CRUD (superAdmin)", "done": true, "phase": 4 },
+    { "id": "phase-4e1-task-editor", "label": "Phase 4e.1 — Per-task inputType / inputConfig editor (existing workflow tasks)", "done": true, "phase": 4 },
+    { "id": "phase-4e2-propagation", "label": "Phase 4e.2 — Server propagation (subtask→task) + template-level inputType editor", "done": false, "phase": 4 },
     { "id": "phase-5-audit", "label": "Phase 5 audit — confirms onboarding wiring is functional", "done": true, "phase": 5 },
     { "id": "phase-5-journey", "label": "Onboarding journey integration — wire onboarding-ross-hello into signup flow", "done": false, "phase": 5 },
     { "id": "phase-5-auth-gate", "label": "Onboarding auth gate — add verifyAdminStatus to main-hello.js", "done": false, "phase": 5 }
   ],
   "inProgress": [],
   "recentlyCompleted": [
-    { "title": "ross-v2: Playbook workflow create/edit/lifecycle (phase 4d.1)", "pr": 28, "mergedAt": "2026-05-01" },
-    { "title": "docs(ross-v2): post-merge sync after PR #25", "pr": 27, "mergedAt": "2026-05-01" },
-    { "title": "ross-v2: People tab — staff CRUD (phase 4c)", "pr": 25, "mergedAt": "2026-05-01" },
-    { "title": "docs(ross-v2): backlog + status sync after PR #23/#24", "pr": 26, "mergedAt": "2026-05-01" },
-    { "title": "ross-v2: enrich locationName on Playbook tab", "pr": 24, "mergedAt": "2026-05-01" }
+    { "title": "docs(ross-v2): post-merge sync + reflect cycle after PR #32", "pr": 33, "mergedAt": "2026-05-01" },
+    { "title": "ross-v2: Playbook per-task input type editor (phase 4e.1)", "pr": 32, "mergedAt": "2026-05-01" },
+    { "title": "docs(ross-v2): post-merge sync + reflect cycle after PR #30", "pr": 31, "mergedAt": "2026-05-01" },
+    { "title": "ross-v2: Playbook template CRUD, superAdmin (phase 4d.2)", "pr": 30, "mergedAt": "2026-05-01" },
+    { "title": "ross-v2: Playbook workflow create/edit/lifecycle (phase 4d.1)", "pr": 28, "mergedAt": "2026-05-01" }
   ],
   "bugs": [],
   "backlog": {
@@ -86,13 +87,15 @@
       "QA cleanup (~65 test artifact files)",
       "Sidebar dedup of v2 vs v1 entries (after v2 promotion)",
       "Project status auto-derive from PROJECT_BACKLOG.md",
+      "Factor out fetchLocationNames helper across activity/playbook/people stores",
       "HfModal / HfConfirm design-system components — v2 needs a Hi-Fi-native modal pattern; SweetAlert2 is v1-only",
-      "Fix KB doc field-name drift for ROSS templates (id → templateId, tasks → subtasks in public/kb/features/ROSS.md)"
+      "Catalog ROSS Cloud Functions in CLOUD_FUNCTIONS_CATALOG.md (rossManageTask, rossActivateWorkflow, etc.)"
     ],
     "low": [
       "Subscription admin charts migration",
       "Group overview v2 → v1 promotion",
-      "Onboarding flow improvements"
+      "Onboarding flow improvements",
+      "Edit-mode multi-location pill render in workflow editor"
     ]
   }
 }
