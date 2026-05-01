@@ -430,9 +430,6 @@ export const usePlaybookStore = defineStore('rossPlaybook', {
       this.taskSaveError = null
       this.taskRowErrors = {}
     },
-    setTaskRowError(rowKey, message) {
-      this.taskRowErrors = { ...this.taskRowErrors, [rowKey]: message }
-    },
     clearTaskRowError(rowKey) {
       if (!(rowKey in this.taskRowErrors)) return
       const next = { ...this.taskRowErrors }
@@ -458,6 +455,7 @@ export const usePlaybookStore = defineStore('rossPlaybook', {
         throw e
       } finally {
         this.taskSaving = false
+        this.taskSavingTaskId = null
       }
     },
 

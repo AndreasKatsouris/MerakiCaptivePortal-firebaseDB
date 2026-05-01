@@ -62,12 +62,14 @@ function addOption() {
 }
 
 // --- rating -------------------------------------------------------
+// Pass the raw input through so validateInputConfig can surface "Scale
+// must be an integer between 2 and 10" — silently coercing back to 5
+// would hide the rejection. The HTML step="1" min/max attributes are
+// the first line of defence; validation catches anything that slips
+// through (e.g. paste).
 const scaleVal = computed({
   get() { return props.config.scale ?? 5 },
-  set(v) {
-    const n = Number(v)
-    patch('scale', Number.isInteger(n) ? n : 5)
-  },
+  set(v) { patch('scale', v === '' ? null : v) },
 })
 
 // --- text ---------------------------------------------------------
@@ -153,7 +155,11 @@ const maxLengthVal = computed({
     <div v-else-if="inputType === 'rating'" class="cfg__grid">
       <label class="cfg__field">
         <span class="hf-eyebrow">Scale (max value)</span>
-        <HfInput v-model="scaleVal" type="number" :disabled="disabled" placeholder="5" />
+        <HfInput
+          v-model="scaleVal" type="number"
+          step="1" min="2" max="10"
+          :disabled="disabled" placeholder="5"
+        />
       </label>
       <label class="cfg__field cfg__field--span2 cfg__check">
         <input

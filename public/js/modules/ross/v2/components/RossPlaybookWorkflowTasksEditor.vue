@@ -159,7 +159,7 @@ async function deleteExisting(taskId) {
     </p>
 
     <div v-if="midRunWarning" class="tedit__warn hf-mono">
-      <HfIcon name="x" :size="12" />
+      <HfIcon name="alert" :size="12" />
       This workflow has an open run. Editing task type or thresholds may
       invalidate responses already submitted.
     </div>

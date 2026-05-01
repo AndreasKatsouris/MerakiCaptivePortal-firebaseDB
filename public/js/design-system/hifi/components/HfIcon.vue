@@ -44,6 +44,7 @@ const paths = {
   dot:      '<circle cx="12" cy="12" r="3"/>',
   ellipsis: '<circle cx="5" cy="12" r="1.3"/><circle cx="12" cy="12" r="1.3"/><circle cx="19" cy="12" r="1.3"/>',
   leaf:     '<path d="M20 4c-2 10-8 14-14 14 0-6 4-12 14-14Z"/><path d="M5 19l8-8"/>',
+  alert:    '<path d="M12 3 2 20h20L12 3Z"/><path d="M12 10v5"/><path d="M12 18v.5"/>',
 }
 
 const inner = computed(() => paths[props.name] || paths.dot)
