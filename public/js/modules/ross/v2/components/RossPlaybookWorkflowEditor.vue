@@ -29,6 +29,14 @@ import RossPlaybookSubtaskRow from './RossPlaybookSubtaskRow.vue'
 
 const store = usePlaybookStore()
 
+// Stable id for in-form subtask rows. Index keys lose row identity
+// across reorders — local state (focus, half-typed input) can stick
+// to the wrong row after a splice. Stripped before the server payload.
+function newUid() {
+  if (typeof crypto !== 'undefined' && crypto.randomUUID) return crypto.randomUUID()
+  return `s-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`
+}
+
 const mode = computed(() => {
   if (store.activateTemplateId) return 'activate'
   if (store.editingWorkflowId === 'new') return 'create'
@@ -161,7 +169,7 @@ function addSubtask() {
     ...form.value,
     subtasks: [
       ...form.value.subtasks,
-      { title: '', daysOffset: 0, order: form.value.subtasks.length + 1 },
+      { _uid: newUid(), title: '', daysOffset: 0, order: form.value.subtasks.length + 1 },
     ],
   }
 }
@@ -210,6 +218,11 @@ const errors = computed(() => {
   const phone = form.value.notifyPhone.trim()
   if (phone && !E164_LIKE.test(phone)) {
     out.notifyPhone = 'Use international format: +27 …'
+  }
+  // Empty alert array silently disables every reminder. Surface as a
+  // form error rather than letting a no-alert workflow ship.
+  if (!form.value.daysBeforeAlert.some((d) => Number.isInteger(d) && d > 0)) {
+    out.daysBeforeAlert = 'Pick at least one alert day'
   }
   return out
 })
@@ -438,6 +451,9 @@ const categoryOptions = [
             {{ d }}d
           </button>
         </div>
+        <span v-if="errors.daysBeforeAlert" class="wfeditor__field-err">
+          {{ errors.daysBeforeAlert }}
+        </span>
       </div>
     </div>
 
@@ -451,7 +467,7 @@ const categoryOptions = [
       <ul v-if="form.subtasks.length" class="wfeditor__subtask-list">
         <RossPlaybookSubtaskRow
           v-for="(s, i) in form.subtasks"
-          :key="i"
+          :key="s._uid || i"
           :subtask="s"
           :index="i"
           :total="form.subtasks.length"

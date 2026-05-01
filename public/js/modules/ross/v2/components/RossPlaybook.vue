@@ -15,9 +15,35 @@ import {
   HfIcon, HfChip, HfCard, HfButton, HfLogo,
 } from '/js/design-system/hifi/index.js'
 import RossPlaybookWorkflowEditor from './RossPlaybookWorkflowEditor.vue'
+import RossPlaybookTemplateEditor from './RossPlaybookTemplateEditor.vue'
 
 const store = usePlaybookStore()
-onMounted(() => { if (!store.workflows.length) store.load() })
+onMounted(() => {
+  if (!store.workflows.length) store.load()
+  // Probe superAdmin status independently — the template CRUD UI is
+  // gated on it. Server still enforces verifySuperAdmin on every CF.
+  store.loadSuperAdminStatus()
+})
+
+// Template delete confirm: which templateId is currently in confirm
+// state? Mirrors the slide-down strip pattern used for workflows.
+const confirmingDeleteTemplateId = ref(null)
+function startDeleteTemplate(templateId) {
+  confirmingDeleteTemplateId.value = templateId
+}
+function cancelDeleteTemplate() {
+  confirmingDeleteTemplateId.value = null
+}
+async function commitDeleteTemplate(templateId) {
+  try {
+    await store.deleteTemplate(templateId)
+    confirmingDeleteTemplateId.value = null
+  } catch (_) {
+    // store.templateSaveError populated; surfaced inline on the card.
+  }
+}
+
+const showTemplateEditor = computed(() => store.editingTemplateId !== null)
 
 // Per-row delete confirm: which workflowId is currently in confirm
 // state? Slide-down strip on the card replaces SweetAlert2 modal —
@@ -286,15 +312,41 @@ function backToHome() {
       </section>
 
       <!-- Templates strip — gated on !loading so it doesn't flash in
-           after the cards have already rendered on a slow connection. -->
-      <section v-if="!loading && !error && templates.length" class="playbook__templates">
+           after the cards have already rendered on a slow connection.
+           SuperAdmins see the editor + CRUD actions; everyone else
+           sees the read-only Activate flow. -->
+      <section v-if="!loading && !error && (templates.length || store.isSuperAdmin)" class="playbook__templates">
         <header class="playbook__cat-head">
-          <h2 class="playbook__cat-title">Templates</h2>
-          <span class="hf-mono playbook__cat-count">
-            reusable patterns Ross can instantiate
-          </span>
+          <div class="playbook__cat-head-left">
+            <h2 class="playbook__cat-title">Templates</h2>
+            <span class="hf-mono playbook__cat-count">
+              reusable patterns Ross can instantiate
+            </span>
+          </div>
+          <HfButton
+            v-if="store.isSuperAdmin && !showTemplateEditor && !showEditor"
+            variant="solid" size="sm"
+            @click="store.openCreateTemplate()"
+            :disabled="store.templateSaving"
+          >
+            <template #leading><HfIcon name="plus" :size="13" /></template>
+            New template
+          </HfButton>
         </header>
-        <div class="playbook__template-grid">
+
+        <!-- Template editor — superAdmin-only. Mounts above the grid
+             so the card list shrinks below it (matches workflow pattern). -->
+        <RossPlaybookTemplateEditor v-if="showTemplateEditor" />
+
+        <!-- Global template save error: surfaces delete failures when
+             the editor isn't open (delete is triggered from the card,
+             not the editor). -->
+        <div v-if="store.templateSaveError && !showTemplateEditor" class="playbook__save-error">
+          <HfIcon name="x" :size="12" />
+          <span>{{ store.templateSaveError }}</span>
+        </div>
+
+        <div v-if="templates.length" class="playbook__template-grid">
           <HfCard
             v-for="t in templates" :key="t.templateId || t.id"
             :padded="false"
@@ -319,12 +371,68 @@ function backToHome() {
                 +{{ templateSubtaskCount(t) - 2 }} more
               </li>
             </ul>
-            <div v-if="!showEditor" class="playbook__template-actions">
-              <HfButton variant="ghost" size="sm" @click="store.openActivateTemplate(t.templateId || t.id)" :disabled="store.saving">
+
+            <div v-if="!showEditor && !showTemplateEditor" class="playbook__template-actions">
+              <HfButton
+                variant="ghost" size="sm"
+                @click="store.openActivateTemplate(t.templateId || t.id)"
+                :disabled="store.saving || store.templateSaving"
+              >
                 Activate
               </HfButton>
+              <HfButton
+                v-if="store.isSuperAdmin"
+                variant="ghost" size="sm"
+                @click="store.openEditTemplate(t.templateId || t.id)"
+                :disabled="store.saving || store.templateSaving"
+              >
+                Edit
+              </HfButton>
+              <HfButton
+                v-if="store.isSuperAdmin"
+                variant="ghost" size="sm"
+                @click="startDeleteTemplate(t.templateId || t.id)"
+                :disabled="store.saving || store.templateSaving || confirmingDeleteTemplateId !== null"
+              >
+                Delete
+              </HfButton>
+            </div>
+
+            <!-- Slide-down delete confirm strip. Same pattern as the
+                 workflow card. Copy reflects the higher stakes —
+                 deleting a template doesn't touch live workflows but
+                 makes the policy unrecoverable. -->
+            <div
+              v-if="confirmingDeleteTemplateId === (t.templateId || t.id)"
+              class="playbook__confirm-strip"
+            >
+              <div class="playbook__confirm-copy hf-mono">
+                Delete "{{ t.name }}"? Workflows already activated from this template keep running unaffected, but the template itself is gone — you'll need to rebuild it from scratch to reuse the policy.
+              </div>
+              <div class="playbook__confirm-actions">
+                <HfButton
+                  variant="solid" size="sm"
+                  @click="commitDeleteTemplate(t.templateId || t.id)"
+                  :disabled="store.templateSaving"
+                >
+                  {{ store.templateSaving ? 'Deleting…' : 'Confirm delete' }}
+                </HfButton>
+                <HfButton
+                  variant="ghost" size="sm"
+                  @click="cancelDeleteTemplate"
+                  :disabled="store.templateSaving"
+                >
+                  Cancel
+                </HfButton>
+              </div>
             </div>
           </HfCard>
+        </div>
+
+        <!-- Empty-state for superAdmins when there are no templates yet. -->
+        <div v-else class="playbook__template-empty hf-mono">
+          No templates yet. Create one to give Ross a reusable policy
+          your team can instantiate at any venue.
         </div>
       </section>
 
@@ -590,7 +698,23 @@ function backToHome() {
 
 .playbook__template-actions {
   margin-top: 10px;
-  display: flex; gap: 6px;
+  display: flex; flex-wrap: wrap; gap: 6px;
+}
+
+/* Templates section header has a CTA. Wrap title+count so the
+   space-between in cat-head still pushes them to opposite ends. */
+.playbook__cat-head-left {
+  display: flex; align-items: baseline; gap: 12px; flex-wrap: wrap;
+}
+
+.playbook__template-empty {
+  border: 1px dashed var(--hf-line);
+  border-radius: var(--hf-radius);
+  padding: 20px;
+  text-align: center;
+  font-size: 12px;
+  color: var(--hf-muted);
+  margin-top: 12px;
 }
 
 .playbook__footer {

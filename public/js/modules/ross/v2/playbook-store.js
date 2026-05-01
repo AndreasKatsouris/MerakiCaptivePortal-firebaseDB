@@ -2,6 +2,7 @@ import { defineStore } from 'pinia'
 import {
   getPlaybookWorkflows, getPlaybookTemplates,
   createWorkflow, updateWorkflow, deleteWorkflow, activateWorkflow,
+  createTemplate, updateTemplate, deleteTemplate,
 } from './playbook-service.js'
 import { auth, rtdb, ref, get } from '../../../config/firebase-config.js'
 import { fetchLocationNames } from './utils/location-names.js'
@@ -63,6 +64,20 @@ export const usePlaybookStore = defineStore('rossPlaybook', {
     locationsLoading: false,
     locationsError: null,
     _locationsLoaded: false,
+
+    // --- Template editor state (Phase 4d.2, superAdmin only) ------
+    // editingTemplateId === 'new' means create form; any other id means
+    // edit. Mutually exclusive with the workflow editor — opening one
+    // closes the other so the panel never shows two editors.
+    editingTemplateId: null,
+    templateSaving: false,
+    templateSaveError: null,
+
+    // superAdmin status for the current user. Lazily loaded once per
+    // session via loadSuperAdminStatus(). UI hides template CRUD when
+    // false; the server always enforces.
+    isSuperAdmin: false,
+    _superAdminLoaded: false,
   }),
   getters: {
     workflowsByCategory(state) {
@@ -164,18 +179,24 @@ export const usePlaybookStore = defineStore('rossPlaybook', {
       this.editingWorkflowId = 'new'
       this.activateTemplateId = null
       this.saveError = null
+      this.editingTemplateId = null
+      this.templateSaveError = null
       this.loadLocations()
     },
     openEdit(workflowId) {
       this.editingWorkflowId = workflowId
       this.activateTemplateId = null
       this.saveError = null
+      this.editingTemplateId = null
+      this.templateSaveError = null
       this.loadLocations()
     },
     openActivateTemplate(templateId) {
       this.editingWorkflowId = 'new'
       this.activateTemplateId = templateId
       this.saveError = null
+      this.editingTemplateId = null
+      this.templateSaveError = null
       this.loadLocations()
     },
     closeEditor() {
@@ -248,6 +269,97 @@ export const usePlaybookStore = defineStore('rossPlaybook', {
         throw e
       } finally {
         this.saving = false
+      }
+    },
+
+    // --- SuperAdmin gate ------------------------------------------
+    // Reads admins/{uid}.superAdmin once. Server is the source of truth
+    // (verifySuperAdmin in functions/ross.js); this read only decides
+    // whether to render the template CRUD UI. A non-superAdmin who
+    // somehow triggers a CF call still gets a 403 from the server.
+    async loadSuperAdminStatus() {
+      if (this._superAdminLoaded) return
+      const user = auth.currentUser
+      if (!user) return
+      try {
+        const snap = await get(ref(rtdb, `admins/${user.uid}`))
+        const v = snap.val()
+        // admins/{uid} can be `true` (legacy boolean admin) or
+        // `{ superAdmin: true, ... }`. Only the object shape carries
+        // superAdmin status.
+        this.isSuperAdmin = !!(v && typeof v === 'object' && v.superAdmin)
+        this._superAdminLoaded = true
+      } catch (_) {
+        // Permission denied for non-admins is expected; treat as
+        // not-superAdmin.
+        this.isSuperAdmin = false
+        this._superAdminLoaded = true
+      }
+    },
+
+    // --- Template editor lifecycle --------------------------------
+    openCreateTemplate() {
+      this.editingTemplateId = 'new'
+      this.templateSaveError = null
+      // Closing the workflow editor keeps the panel single-instance.
+      this.editingWorkflowId = null
+      this.activateTemplateId = null
+      this.saveError = null
+    },
+    openEditTemplate(templateId) {
+      this.editingTemplateId = templateId
+      this.templateSaveError = null
+      this.editingWorkflowId = null
+      this.activateTemplateId = null
+      this.saveError = null
+    },
+    closeTemplateEditor() {
+      this.editingTemplateId = null
+      this.templateSaveError = null
+    },
+
+    // --- Template mutations ---------------------------------------
+    async createTemplate(payload) {
+      this.templateSaving = true
+      this.templateSaveError = null
+      try {
+        await createTemplate(payload)
+        await this.load()
+        this.closeTemplateEditor()
+      } catch (e) {
+        this.templateSaveError = e.message || String(e)
+        throw e
+      } finally {
+        this.templateSaving = false
+      }
+    },
+
+    async updateTemplate(templateId, updates) {
+      this.templateSaving = true
+      this.templateSaveError = null
+      try {
+        await updateTemplate({ templateId, updates })
+        await this.load()
+        this.closeTemplateEditor()
+      } catch (e) {
+        this.templateSaveError = e.message || String(e)
+        throw e
+      } finally {
+        this.templateSaving = false
+      }
+    },
+
+    async deleteTemplate(templateId) {
+      this.templateSaving = true
+      this.templateSaveError = null
+      try {
+        await deleteTemplate({ templateId })
+        await this.load()
+      } catch (e) {
+        this.templateSaveError = e.message || String(e)
+        throw e
+      } finally {
+        this.templateSaving = false
       }
     },
 
