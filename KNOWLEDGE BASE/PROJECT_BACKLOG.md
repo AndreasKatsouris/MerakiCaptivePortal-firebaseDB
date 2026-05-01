@@ -3,7 +3,7 @@
 > Claude reads this file at the start of every session and updates it at the end.
 > The Sprint Goal is the contract for the session — don't deviate without explicit user confirmation.
 
-Last updated: 2026-05-01 (post PR #30)
+Last updated: 2026-05-01 (post PR #32)
 
 ---
 
@@ -21,7 +21,7 @@ Sprint: 2026-04-30 → until complete
 
 | Item | Branch | Notes |
 |------|--------|-------|
-| Phase 4e.1 — per-task input-type editor | `feature/ross-v2-phase4e1` | Workflow-task editor (rossManageTask). Includes a service-side flatten fix so v2 store produces one row per (workflowId, locationId). Subtask→task propagation deferred to 4e.2. |
+| — | — | No active branch. Phase 4e.2 (server propagation: subtasks→tasks at create/activate, then template-level inputType editor) is next. |
 
 ---
 
@@ -42,7 +42,8 @@ Sprint: 2026-04-30 → until complete
 - [x] **Phase 4c** — People tab — staff CRUD (PR #25). First edit-capable v2 surface; established inline-editor + two-step inline delete + inline error banner patterns + client-side phone normalization.
 - [x] **Phase 4d.1** — Playbook tab — workflow create / edit / pause / delete + activate-from-template (PR #28). First edit-capable v2 surface for the workflow data path. Slide-down inline delete confirm. Server's allowedFields limit on `rossUpdateWorkflow` surfaced via locked-field UX.
 - [x] **Phase 4d.2** — Template CRUD (superAdmin) (PR #30). Inline `RossPlaybookTemplateEditor` mirrors workflow editor; slide-down delete confirm on cards; `admins/{uid}.superAdmin` probe gates UI (server still enforces `verifySuperAdmin`). Same PR fixed KB doc drift (`templateId`/`subtasks`) and follow-up commit added stable subtask `_uid` keys + empty-`daysBeforeAlert` validator in both editors.
-- [ ] **Phase 4e** — Per-task `inputType` / `inputConfig` editor (deferred from 4d) — next
+- [x] **Phase 4e.1** — Per-task `inputType` / `inputConfig` editor on existing workflow tasks (PR #32). New `RossPlaybookWorkflowTasksEditor` + `RossPlaybookTaskRow` + `RossPlaybookTaskConfigFields` reachable from each card's "Edit tasks" button. All 10 server input types supported via `constants/input-types.js`. Same PR fixed a latent v2 bug: `playbook-service.getPlaybookWorkflows()` now flattens client-side to one row per (workflowId, locationId), matching what the v2 surface always assumed. Follow-up commit addressed 4 of 5 review findings (alert icon, dead code, `taskSavingTaskId` symmetry, raw-rating-input through validator).
+- [ ] **Phase 4e.2** — Server propagation: extend `rossCreateWorkflow` + `rossActivateWorkflow` to carry `inputType` / `inputConfig` from subtasks → workflow tasks. Then template-level inputType editor (depends on this CF change). Requires `functions/` deploy.
 
 ### Phase 5 — Onboarding
 
@@ -102,11 +103,11 @@ Sprint: 2026-04-30 → until complete
 
 | Feature | PR | Merged |
 |---------|----|--------|
+| ROSS v2 — Playbook per-task input type editor (Phase 4e.1) | #32 | 2026-05-01 |
+| docs(ross-v2) — post-merge sync after PR #30 | #31 | 2026-05-01 |
 | ROSS v2 — Playbook template CRUD, superAdmin (Phase 4d.2) | #30 | 2026-05-01 |
 | ROSS v2 — Playbook workflow create/edit/lifecycle (Phase 4d.1) | #28 | 2026-05-01 |
-| docs(ross-v2) — post-merge sync after PR #25 | #27 | 2026-05-01 |
 | ROSS v2 — People tab staff CRUD (Phase 4c) | #25 | 2026-05-01 |
-| docs(ross-v2) — backlog + status sync after PR #23/#24 | #26 | 2026-05-01 |
 
 ---
 
