@@ -3,7 +3,7 @@
 > Claude reads this file at the start of every session and updates it at the end.
 > The Sprint Goal is the contract for the session — don't deviate without explicit user confirmation.
 
-Last updated: 2026-05-01
+Last updated: 2026-05-01 (post PR #30)
 
 ---
 
@@ -21,7 +21,7 @@ Sprint: 2026-04-30 → until complete
 
 | Item | Branch | Notes |
 |------|--------|-------|
-| — | — | No active branch. Phase 4d.2 (template CRUD, superAdmin) is next. |
+| — | — | No active branch. Phase 4e (per-task `inputType`/`inputConfig` editor) is next. |
 
 ---
 
@@ -41,8 +41,8 @@ Sprint: 2026-04-30 → until complete
 - [x] **Phase 4b** — Activity tab (run history + reports) (PR #23)
 - [x] **Phase 4c** — People tab — staff CRUD (PR #25). First edit-capable v2 surface; established inline-editor + two-step inline delete + inline error banner patterns + client-side phone normalization.
 - [x] **Phase 4d.1** — Playbook tab — workflow create / edit / pause / delete + activate-from-template (PR #28). First edit-capable v2 surface for the workflow data path. Slide-down inline delete confirm. Server's allowedFields limit on `rossUpdateWorkflow` surfaced via locked-field UX.
-- [ ] **Phase 4d.2** — Template CRUD (superAdmin) — next
-- [ ] **Phase 4e** — Per-task `inputType` / `inputConfig` editor (deferred from 4d)
+- [x] **Phase 4d.2** — Template CRUD (superAdmin) (PR #30). Inline `RossPlaybookTemplateEditor` mirrors workflow editor; slide-down delete confirm on cards; `admins/{uid}.superAdmin` probe gates UI (server still enforces `verifySuperAdmin`). Same PR fixed KB doc drift (`templateId`/`subtasks`) and follow-up commit added stable subtask `_uid` keys + empty-`daysBeforeAlert` validator in both editors.
+- [ ] **Phase 4e** — Per-task `inputType` / `inputConfig` editor (deferred from 4d) — next
 
 ### Phase 5 — Onboarding
 
@@ -102,11 +102,11 @@ Sprint: 2026-04-30 → until complete
 
 | Feature | PR | Merged |
 |---------|----|--------|
+| ROSS v2 — Playbook template CRUD, superAdmin (Phase 4d.2) | #30 | 2026-05-01 |
 | ROSS v2 — Playbook workflow create/edit/lifecycle (Phase 4d.1) | #28 | 2026-05-01 |
 | docs(ross-v2) — post-merge sync after PR #25 | #27 | 2026-05-01 |
 | ROSS v2 — People tab staff CRUD (Phase 4c) | #25 | 2026-05-01 |
 | docs(ross-v2) — backlog + status sync after PR #23/#24 | #26 | 2026-05-01 |
-| ROSS v2 — locationName enrichment on Playbook tab | #24 | 2026-05-01 |
 
 ---
 
