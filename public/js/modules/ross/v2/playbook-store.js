@@ -1,28 +1,42 @@
 import { defineStore } from 'pinia'
-import { getPlaybookWorkflows, getPlaybookTemplates } from './playbook-service.js'
-import { rtdb, ref, get } from '../../../config/firebase-config.js'
+import {
+  getPlaybookWorkflows, getPlaybookTemplates,
+  createWorkflow, updateWorkflow, deleteWorkflow, activateWorkflow,
+} from './playbook-service.js'
+import { auth, rtdb, ref, get } from '../../../config/firebase-config.js'
+import { fetchLocationNames } from './utils/location-names.js'
+
+// VALID_CATEGORIES / VALID_RECURRENCES mirror functions/ross.js so the
+// editor can validate before the round trip. Keep in sync if the server
+// list changes.
+export const VALID_CATEGORIES = ['compliance', 'operations', 'growth', 'finance', 'hr', 'maintenance']
+export const VALID_RECURRENCES = ['once', 'daily', 'weekly', 'monthly', 'quarterly', 'annually']
+
+// rossUpdateWorkflow allowedFields (functions/ross.js). Only these
+// fields can be edited on an existing workflow — category, recurrence,
+// description, locations, and subtasks are NOT editable. Surfaced as a
+// passive caption in the editor so the user knows what they can change.
+export const UPDATABLE_FIELDS = ['name', 'notificationChannels', 'notifyPhone', 'notifyEmail', 'daysBeforeAlert', 'status']
 
 /**
- * Best-effort location-name enrichment. Older workflows were created
- * with locationName === locationId (functions/ross.js:348 fallback when
- * the create call didn't pass locationNames). Read locations/{id}/name
- * directly to recover the human-readable name. Returns a Map keyed by
- * locationId. Always resolves — failures yield an empty entry.
- *
- * Mirrors the same helper in activity-store.js. Kept duplicated for now
- * (two call-sites). Factor out into a shared util once a third lands.
+ * Read userLocations/{uid} → enrich each id with locations/{id}/name.
+ * Mirrors people-store.fetchUserLocations. Best-effort: returns whatever
+ * was readable.
  */
-async function fetchLocationNames(locationIds) {
-  const out = new Map()
-  await Promise.all(locationIds.map(async (locId) => {
+async function fetchUserLocations() {
+  const user = auth.currentUser
+  if (!user) return []
+  const snap = await get(ref(rtdb, `userLocations/${user.uid}`))
+  if (!snap.exists()) return []
+  const ids = Object.keys(snap.val() || {})
+  return Promise.all(ids.map(async (id) => {
+    let name = id
     try {
-      const snap = await get(ref(rtdb, `locations/${locId}/name`))
-      if (snap.exists() && typeof snap.val() === 'string') {
-        out.set(locId, snap.val())
-      }
-    } catch (_) { /* leave empty */ }
+      const ns = await get(ref(rtdb, `locations/${id}/name`))
+      if (ns.exists() && typeof ns.val() === 'string') name = ns.val()
+    } catch (_) { /* keep id as fallback */ }
+    return { id, name }
   }))
-  return out
 }
 
 export const usePlaybookStore = defineStore('rossPlaybook', {
@@ -32,6 +46,23 @@ export const usePlaybookStore = defineStore('rossPlaybook', {
     loading: { workflows: false, templates: false },
     error: null,
     _token: 0,
+
+    // Editor state — single-instance: at most one open at a time.
+    // editingWorkflowId === 'new' means create form; any other id
+    // means edit. activateTemplateId means the editor is populated
+    // for an activate-from-template flow (subtasks come from the
+    // template; only locations/dates/notifications are user inputs).
+    editingWorkflowId: null,
+    activateTemplateId: null,
+
+    saving: false,
+    saveError: null,
+
+    // Location picker — lazily loaded when the editor opens.
+    locations: [],
+    locationsLoading: false,
+    locationsError: null,
+    _locationsLoaded: false,
   }),
   getters: {
     workflowsByCategory(state) {
@@ -47,6 +78,16 @@ export const usePlaybookStore = defineStore('rossPlaybook', {
     },
     overdueCount(state) {
       return state.workflows.filter((w) => w.status === 'overdue').length
+    },
+    // The flat list returned by rossGetWorkflows has one entry per
+    // (workflowId, locationId). De-duplicate by workflowId for editor
+    // lookups.
+    workflowById(state) {
+      const map = new Map()
+      for (const w of state.workflows) {
+        if (!map.has(w.workflowId)) map.set(w.workflowId, w)
+      }
+      return map
     },
   },
   actions: {
@@ -94,6 +135,132 @@ export const usePlaybookStore = defineStore('rossPlaybook', {
           this.loading.workflows = false
           this.loading.templates = false
         }
+      }
+    },
+
+    async loadLocations() {
+      if (this._locationsLoaded || this.locationsLoading) return
+      this.locationsLoading = true
+      this.locationsError = null
+      try {
+        const locs = await fetchUserLocations()
+        locs.sort((a, b) => (a.name || a.id).localeCompare(b.name || b.id))
+        this.locations = locs
+        this._locationsLoaded = true
+      } catch (e) {
+        this.locationsError = e.message || String(e)
+      } finally {
+        this.locationsLoading = false
+      }
+    },
+
+    // --- Editor lifecycle -----------------------------------------
+    openCreate() {
+      this.editingWorkflowId = 'new'
+      this.activateTemplateId = null
+      this.saveError = null
+      this.loadLocations()
+    },
+    openEdit(workflowId) {
+      this.editingWorkflowId = workflowId
+      this.activateTemplateId = null
+      this.saveError = null
+      this.loadLocations()
+    },
+    openActivateTemplate(templateId) {
+      this.editingWorkflowId = 'new'
+      this.activateTemplateId = templateId
+      this.saveError = null
+      this.loadLocations()
+    },
+    closeEditor() {
+      this.editingWorkflowId = null
+      this.activateTemplateId = null
+      this.saveError = null
+    },
+
+    // --- Mutations ------------------------------------------------
+    // All four mutation actions follow the same pattern: set saving,
+    // call CF, reload list on success, surface server error in
+    // saveError. Editor + inline confirm strip read saveError to
+    // render banners; closing the editor on success means the user
+    // sees the refreshed list.
+    async createWorkflow(payload) {
+      this.saving = true
+      this.saveError = null
+      try {
+        await createWorkflow(payload)
+        await this.load()
+        this.closeEditor()
+      } catch (e) {
+        this.saveError = e.message || String(e)
+        throw e
+      } finally {
+        this.saving = false
+      }
+    },
+
+    async updateWorkflow(workflowId, updates) {
+      this.saving = true
+      this.saveError = null
+      try {
+        await updateWorkflow({ workflowId, updates })
+        await this.load()
+        this.closeEditor()
+      } catch (e) {
+        this.saveError = e.message || String(e)
+        throw e
+      } finally {
+        this.saving = false
+      }
+    },
+
+    async deleteWorkflow(workflowId) {
+      this.saving = true
+      this.saveError = null
+      try {
+        await deleteWorkflow({ workflowId })
+        await this.load()
+      } catch (e) {
+        this.saveError = e.message || String(e)
+        throw e
+      } finally {
+        this.saving = false
+      }
+    },
+
+    async setStatus(workflowId, status) {
+      if (!['active', 'paused'].includes(status)) {
+        throw new Error('status must be active or paused')
+      }
+      this.saving = true
+      this.saveError = null
+      try {
+        await updateWorkflow({ workflowId, updates: { status } })
+        await this.load()
+      } catch (e) {
+        this.saveError = e.message || String(e)
+        throw e
+      } finally {
+        this.saving = false
+      }
+    },
+
+    async activateTemplate(payload) {
+      // payload: { templateId, locationIds, locationNames, name?, description?,
+      //            nextDueDate, daysBeforeAlert?, notifyPhone?, notifyEmail?,
+      //            customInterval? }
+      this.saving = true
+      this.saveError = null
+      try {
+        await activateWorkflow(payload)
+        await this.load()
+        this.closeEditor()
+      } catch (e) {
+        this.saveError = e.message || String(e)
+        throw e
+      } finally {
+        this.saving = false
       }
     },
   },

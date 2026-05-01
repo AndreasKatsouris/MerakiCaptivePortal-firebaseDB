@@ -61,7 +61,9 @@ The v1 admin remains reachable at `admin-dashboard.html#rossContent` for the ent
 | Playbook tab read-view | ✅ PR #21 |
 | Activity tab | ✅ PR #23 (locationName enrichment fix in PR #24) |
 | People tab | ✅ PR #25 — first **edit-capable** v2 surface |
-| Playbook editing/creation flows | ⏳ Phase 4d |
+| Playbook editing — workflow create / edit / pause / delete | ✅ Phase 4d.1 — first edit-capable v2 surface for the workflow data path |
+| Playbook editing — template CRUD | ⏳ Phase 4d.2 (superAdmin) |
+| Per-task `inputType` / `inputConfig` editor | ⏳ Phase 4e (deferred from 4d) |
 | Onboarding wired | ⏳ Phase 5 |
 | `askRoss` LLM | 🔮 separate sprint |
 
@@ -74,6 +76,18 @@ The v1 admin remains reachable at `admin-dashboard.html#rossContent` for the ent
 - **Two-step inline delete** — `Remove` → row's actions become `Confirm` / `Cancel` in place. No SweetAlert2 modal; matches the inline-editor visual language. (CLAUDE.md's "SweetAlert2 for all notifications" convention was written for v1 surfaces; v2 is establishing its own. An `HfModal`/`HfConfirm` pair may land in the design system later for cases that genuinely need a modal.)
 - **Inline error banners** — save errors render in the editor panel; delete errors render scoped under the affected row. Server messages surface verbatim.
 - **Phone normalization is client-side.** `rossManageStaff` stores `staffData.phone` raw, so the People store normalizes to E.164 (`+27…` for SA inputs) before calling. SMS routing downstream depends on this — never push a typed `082 555 1234` to the server.
+
+### Playbook tab — patterns established (PR 4d.1)
+
+`?tab=playbook` extends the People-tab inline patterns to a heavier surface (multi-section editor + per-card lifecycle actions). Phase 4d.2 (template CRUD) and 4e (per-task config) inherit these decisions.
+
+- **Single-instance inline editor** — `RossPlaybookWorkflowEditor.vue` mounts above the workflow list, replacing the previous read-only header strip while open. Three modes share one component: `create` (custom workflow), `edit` (existing workflow), `activate` (template instantiation). Mode is derived from store state (`editingWorkflowId`, `activateTemplateId`).
+- **Slide-down delete confirm strip** — replaces SweetAlert2 for cases where People's row-inline `Confirm / Cancel` doesn't fit. Renders full-width below the workflow card, warn-tone bordered, with copy that carries the gravity ("Delete X? This removes it from every location and clears its task history."). 30 lines of CSS, no design-system component. `HfModal` is deferred until something needs a true overlay.
+- **Field-level locking** — the editor visually disables fields the server won't accept on update. `rossUpdateWorkflow`'s `allowedFields` are limited to `name`, `notificationChannels`, `notifyPhone`, `notifyEmail`, `daysBeforeAlert`, `status`. **Description, category, recurrence, locations, and subtasks are not editable** — to change them the user must delete and recreate. The form shows a `locked` mono-tag next to each disabled field and a passive caption at the top of the editor explaining the limit.
+- **Reorder via explicit up/down buttons, not drag-and-drop** — `RossPlaybookSubtaskRow.vue` exposes `↑ / ↓ / ✕`. Keyboard-reachable, mobile-friendly, matches Hi-Fi v2's pointer-and-keyboard minimalism. Drag-and-drop is *not* a goal in v2.
+- **Per-task `inputType` / `inputConfig` editor is deferred to Phase 4e.** 4d.1 ships subtasks with `title + daysOffset + order` only; server defaults `inputType: 'checkbox'` (functions/ross.js) which covers the goldenpath. The 11-input-type matrix × per-type config UI is its own design surface.
+- **`fetchLocationNames` factor-out** — extracted to `public/js/modules/ross/v2/utils/location-names.js` after this PR's editor became the fourth call-site. Activity / playbook stores swapped to the import; people store will swap on next touch.
+- **Server contract mirrors** — `VALID_CATEGORIES` and `VALID_RECURRENCES` are exported from `playbook-store.js` so the editor validates before the round trip. Keep in sync with `functions/ross.js` if the server list changes.
 
 ---
 

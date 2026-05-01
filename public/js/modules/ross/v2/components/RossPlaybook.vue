@@ -9,14 +9,46 @@
 // Reframing note: "workflows" / "templates" in the data model are the
 // AI agent's behavioural ruleset. The copy reflects that. The CFs and
 // shapes are unchanged from v1.
-import { onMounted, computed } from 'vue'
+import { onMounted, computed, ref } from 'vue'
 import { usePlaybookStore } from '../playbook-store.js'
 import {
   HfIcon, HfChip, HfCard, HfButton, HfLogo,
 } from '/js/design-system/hifi/index.js'
+import RossPlaybookWorkflowEditor from './RossPlaybookWorkflowEditor.vue'
 
 const store = usePlaybookStore()
 onMounted(() => { if (!store.workflows.length) store.load() })
+
+// Per-row delete confirm: which workflowId is currently in confirm
+// state? Slide-down strip on the card replaces SweetAlert2 modal —
+// matches the inline pattern from RossPeople.vue. Only one row can be
+// in confirm at a time.
+const confirmingDeleteId = ref(null)
+function startDelete(workflowId) {
+  confirmingDeleteId.value = workflowId
+}
+function cancelDelete() {
+  confirmingDeleteId.value = null
+}
+async function commitDelete(workflowId) {
+  try {
+    await store.deleteWorkflow(workflowId)
+    confirmingDeleteId.value = null
+  } catch (_) {
+    // store.saveError populated; surfaced inline on the row below.
+  }
+}
+
+async function togglePause(w) {
+  const next = w.status === 'paused' ? 'active' : 'paused'
+  try {
+    await store.setStatus(w.workflowId, next)
+  } catch (_) {
+    // saveError populated, rendered as a global banner under the head
+  }
+}
+
+const showEditor = computed(() => store.editingWorkflowId !== null)
 
 const loading = computed(() => store.loading.workflows || store.loading.templates)
 const error = computed(() => store.error)
@@ -121,6 +153,26 @@ function backToHome() {
         </HfCard>
       </div>
 
+      <!-- Primary action: new workflow. Sits above the list / editor so
+           the next gesture is always reachable without scrolling. -->
+      <div v-if="!loading && !error" class="playbook__primary-actions">
+        <HfButton variant="solid" @click="store.openCreate()" :disabled="showEditor">
+          <template #leading><HfIcon name="plus" :size="13" /></template>
+          New workflow
+        </HfButton>
+      </div>
+
+      <!-- Global save error: surfaces pause/resume failures when the
+           editor isn't open. Editor and inline-confirm strip already
+           render saveError inline in their own contexts. -->
+      <div v-if="store.saveError && !showEditor" class="playbook__save-error">
+        <HfIcon name="x" :size="12" />
+        <span>{{ store.saveError }}</span>
+      </div>
+
+      <!-- Inline editor — slot above the list (matches People's anchor). -->
+      <RossPlaybookWorkflowEditor v-if="showEditor" />
+
       <!-- Workflows by category -->
       <section v-if="loading" class="playbook__loading">
         <div class="hf-eyebrow">Loading playbook…</div>
@@ -138,6 +190,10 @@ function backToHome() {
           You haven't published any workflows for me to follow. Pick a template below
           and instantiate it at a venue, or build a new one from scratch.
         </p>
+        <HfButton v-if="!showEditor" variant="solid" @click="store.openCreate()">
+          <template #leading><HfIcon name="plus" :size="13" /></template>
+          New workflow
+        </HfButton>
       </section>
 
       <section v-else class="playbook__categories">
@@ -154,7 +210,7 @@ function backToHome() {
           </header>
           <ul class="playbook__workflow-list">
             <li
-              v-for="w in byCategory[catKey]" :key="w.workflowId"
+              v-for="w in byCategory[catKey]" :key="`${w.workflowId}::${w.locationId}`"
               class="playbook__workflow"
               :data-status="w.status"
             >
@@ -174,6 +230,37 @@ function backToHome() {
                     {{ recurrenceLabel[w.recurrence] || w.recurrence }}
                   </span>
                   <span v-if="w.locationName" class="hf-mono playbook__workflow-loc">{{ w.locationName }}</span>
+                </div>
+              </div>
+
+              <!-- Per-row action strip. Hidden while the editor is open
+                   so the user's eye stays with the form, not a grid of
+                   tempting alternatives. -->
+              <div v-if="!showEditor" class="playbook__workflow-actions">
+                <HfButton variant="ghost" size="sm" @click="store.openEdit(w.workflowId)" :disabled="store.saving">
+                  Edit
+                </HfButton>
+                <HfButton variant="ghost" size="sm" @click="togglePause(w)" :disabled="store.saving">
+                  {{ w.status === 'paused' ? 'Resume' : 'Pause' }}
+                </HfButton>
+                <HfButton variant="ghost" size="sm" @click="startDelete(w.workflowId)" :disabled="store.saving || confirmingDeleteId !== null">
+                  Delete
+                </HfButton>
+              </div>
+
+              <!-- Slide-down inline confirm strip — replaces SweetAlert2.
+                   Spans full card width; copy carries the gravity. -->
+              <div v-if="confirmingDeleteId === w.workflowId" class="playbook__confirm-strip">
+                <div class="playbook__confirm-copy hf-mono">
+                  Delete "{{ w.name }}"? This removes it from every location and clears its task history.
+                </div>
+                <div class="playbook__confirm-actions">
+                  <HfButton variant="solid" size="sm" @click="commitDelete(w.workflowId)" :disabled="store.saving">
+                    {{ store.saving ? 'Deleting…' : 'Confirm delete' }}
+                  </HfButton>
+                  <HfButton variant="ghost" size="sm" @click="cancelDelete" :disabled="store.saving">
+                    Cancel
+                  </HfButton>
                 </div>
               </div>
             </li>
@@ -204,6 +291,11 @@ function backToHome() {
               {{ Array.isArray(t.tasks) ? t.tasks.length : 0 }}
               task{{ (t.tasks?.length || 0) === 1 ? '' : 's' }}
             </div>
+            <div v-if="!showEditor" class="playbook__template-actions">
+              <HfButton variant="ghost" size="sm" @click="store.openActivateTemplate(t.id)" :disabled="store.saving">
+                Activate
+              </HfButton>
+            </div>
           </HfCard>
         </div>
       </section>
@@ -211,7 +303,8 @@ function backToHome() {
       <footer class="playbook__footer">
         <p class="hf-mono">
           Workflows + templates are the procedures Ross will run against once the agent
-          is online. Edit / create flows ship in the next phase.
+          is online. Today they're walked by your team — you author the rules, Ross
+          runs them with you.
         </p>
       </footer>
     </main>
@@ -401,6 +494,58 @@ function backToHome() {
   font-size: 13px;
 }
 .playbook__error-msg { color: var(--hf-warn); font-family: var(--hf-font-mono); }
+
+/* Primary action row + global save-error banner */
+.playbook__primary-actions {
+  margin-top: 28px;
+  display: flex; gap: 8px;
+}
+
+.playbook__save-error {
+  margin-top: 14px;
+  padding: 8px 12px;
+  background: rgba(212, 87, 47, 0.06);
+  border: 1px solid rgba(212, 87, 47, 0.25);
+  border-radius: var(--hf-radius);
+  color: var(--hf-warn);
+  font-family: var(--hf-font-mono);
+  font-size: 12px;
+  display: flex; align-items: center; gap: 8px;
+}
+
+/* Per-workflow row actions + slide-down delete confirm */
+.playbook__workflow-actions {
+  display: flex; gap: 6px; flex-wrap: wrap;
+  margin-top: 8px;
+}
+
+.playbook__confirm-strip {
+  margin-top: 10px;
+  padding: 10px 12px;
+  border: 1px solid var(--hf-warn);
+  border-radius: var(--hf-radius);
+  background: rgba(212, 87, 47, 0.04);
+  display: flex; flex-direction: column; gap: 8px;
+  animation: playbook-confirm-in 140ms ease-out;
+}
+@keyframes playbook-confirm-in {
+  from { opacity: 0; transform: translateY(-4px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+.playbook__confirm-copy {
+  font-size: 11px;
+  color: var(--hf-warn);
+  letter-spacing: 0.04em;
+}
+.playbook__confirm-actions {
+  display: flex; gap: 6px;
+}
+
+/* Template card actions */
+.playbook__template-actions {
+  margin-top: 10px;
+  display: flex; gap: 6px;
+}
 
 .playbook__footer {
   margin-top: 48px;

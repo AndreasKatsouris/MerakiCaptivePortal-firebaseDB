@@ -1,28 +1,6 @@
 import { defineStore } from 'pinia'
 import { getActivityReport, getWorkflowRunHistory } from './activity-service.js'
-import { rtdb, ref, get } from '../../../config/firebase-config.js'
-
-/**
- * Best-effort location-name enrichment. Older workflows were created
- * with locationName === locationId (functions/ross.js:348 fallback when
- * the create call didn't pass locationNames). Read locations/{id}/name
- * directly to recover the human-readable name. Returns a Map keyed by
- * locationId. Always resolves — failures yield an empty entry, never
- * throw, so the store load doesn't fail just because some locations
- * aren't readable.
- */
-async function fetchLocationNames(locationIds) {
-  const out = new Map()
-  await Promise.all(locationIds.map(async (locId) => {
-    try {
-      const snap = await get(ref(rtdb, `locations/${locId}/name`))
-      if (snap.exists() && typeof snap.val() === 'string') {
-        out.set(locId, snap.val())
-      }
-    } catch (_) { /* leave empty */ }
-  }))
-  return out
-}
+import { fetchLocationNames } from './utils/location-names.js'
 
 export const useActivityStore = defineStore('rossActivity', {
   state: () => ({
