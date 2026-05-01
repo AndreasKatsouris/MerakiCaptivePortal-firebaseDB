@@ -21,7 +21,7 @@ Sprint: 2026-04-30 → until complete
 
 | Item | Branch | Notes |
 |------|--------|-------|
-| — | — | No active branch. Phase 4d (Playbook editing/creation) is next. |
+| — | — | No active branch. Phase 4d.2 (template CRUD, superAdmin) is next. |
 
 ---
 
@@ -40,7 +40,9 @@ Sprint: 2026-04-30 → until complete
 - [x] **Phase 4a** — Playbook tab read-view (PR #21) + locationName enrichment fix (PR #24)
 - [x] **Phase 4b** — Activity tab (run history + reports) (PR #23)
 - [x] **Phase 4c** — People tab — staff CRUD (PR #25). First edit-capable v2 surface; established inline-editor + two-step inline delete + inline error banner patterns + client-side phone normalization.
-- [ ] **Phase 4d** — Playbook editing/creation flows (consolidates v1 Builder) — next
+- [x] **Phase 4d.1** — Playbook tab — workflow create / edit / pause / delete + activate-from-template (PR #28). First edit-capable v2 surface for the workflow data path. Slide-down inline delete confirm. Server's allowedFields limit on `rossUpdateWorkflow` surfaced via locked-field UX.
+- [ ] **Phase 4d.2** — Template CRUD (superAdmin) — next
+- [ ] **Phase 4e** — Per-task `inputType` / `inputConfig` editor (deferred from 4d)
 
 ### Phase 5 — Onboarding
 
@@ -74,12 +76,14 @@ Sprint: 2026-04-30 → until complete
 8. **Project status auto-derive** — read `PROJECT_BACKLOG.md` directly in the dashboard instead of maintaining `project-status.json` separately
 9. **Factor out `fetchLocationNames` helper** — duplicated across `activity-store.js`, `playbook-store.js`, `people-store.js`. Extract to `public/js/modules/ross/v2/location-names.js`.
 10. **`HfModal` / `HfConfirm` design-system components** — v2 needs a Hi-Fi-native modal pattern for cases that genuinely warrant an overlay (bulk-action confirms, multi-step wizards, etc.). PR #25 dropped SweetAlert2 in favour of inline confirms / inline error banners — that works for the People tab's single-row destructive actions but won't scale. Land in `public/js/design-system/hifi/components/` with --hf-* tokens, focus trap, ESC + scrim dismiss, and a worked example in `public/hifi/components.html`. Update CLAUDE.md convention: SweetAlert2 is v1-only.
+11. **Fix KB doc field-name drift for ROSS templates** — `public/kb/features/ROSS.md` "Templates" block lists `id: string` but the actual server uses `templateId` (per seed + `rossCreateTemplate`). Same doc says template tasks are at `tasks: Task[]` but server stores `subtasks` (per `rossActivateWorkflow`, seed). Drift directly caused the PR #28 activate-from-template bug. One-line audit + edit.
 
 ### Low Priority / Nice-to-Have
 
-11. Subscription admin charts migration (deferred from Chart.js audit, items #7–10)
-12. Group overview v2 → v1 promotion
-13. Onboarding flow improvements
+12. Subscription admin charts migration (deferred from Chart.js audit, items #7–10)
+13. Group overview v2 → v1 promotion
+14. Onboarding flow improvements
+15. **Edit-mode multi-location pill render** — `RossPlaybookWorkflowEditor` hydrates only the first `locationId` on edit (because `workflowById` flattens by first match in the rossGetWorkflows response). Locked caption already explains it but a future audit could surface all attached locations as read-only pills.
 
 ---
 
@@ -97,11 +101,11 @@ Sprint: 2026-04-30 → until complete
 
 | Feature | PR | Merged |
 |---------|----|--------|
+| ROSS v2 — Playbook workflow create/edit/lifecycle (Phase 4d.1) | #28 | 2026-05-01 |
+| docs(ross-v2) — post-merge sync after PR #25 | #27 | 2026-05-01 |
 | ROSS v2 — People tab staff CRUD (Phase 4c) | #25 | 2026-05-01 |
 | docs(ross-v2) — backlog + status sync after PR #23/#24 | #26 | 2026-05-01 |
 | ROSS v2 — locationName enrichment on Playbook tab | #24 | 2026-05-01 |
-| ROSS v2 — Activity tab read-view (Phase 4b) | #23 | 2026-05-01 |
-| docs(ross-v2) — phase 5 onboarding audit | #22 | 2026-04-30 |
 
 ---
 

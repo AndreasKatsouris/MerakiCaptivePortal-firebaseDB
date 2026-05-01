@@ -35,7 +35,7 @@
       "id": 4,
       "name": "ROSS v2 — admin redesign (concierge-first IA)",
       "status": "in_progress",
-      "summary": "Phase 4a Playbook (PR #21 + locationName fix PR #24), 4b Activity (PR #23), and 4c People CRUD (PR #25) all merged. 4d (Builder edit/create) is next — consolidates the v1 Builder behind the same inline-editor patterns established in 4c."
+      "summary": "Phase 4a Playbook (PR #21 + locationName fix PR #24), 4b Activity (PR #23), 4c People CRUD (PR #25), and 4d.1 Playbook workflow editor (PR #28) all merged. 4d.2 (template CRUD, superAdmin) is next — reuses the inline-editor + slide-down-confirm patterns from 4d.1."
     },
     {
       "id": 5,
@@ -58,18 +58,20 @@
     { "id": "phase-4a-playbook", "label": "Phase 4a — Playbook tab read-view + locationName fix", "done": true, "phase": 4 },
     { "id": "phase-4b-activity", "label": "Phase 4b — Activity tab (run history + reports)", "done": true, "phase": 4 },
     { "id": "phase-4c-people", "label": "Phase 4c — People tab (staff CRUD)", "done": true, "phase": 4 },
-    { "id": "phase-4d-builder", "label": "Phase 4d — Playbook editing/creation flows (consolidates v1 Builder)", "done": false, "phase": 4 },
+    { "id": "phase-4d1-workflow-editor", "label": "Phase 4d.1 — Playbook workflow create/edit/lifecycle", "done": true, "phase": 4 },
+    { "id": "phase-4d2-template-crud", "label": "Phase 4d.2 — Template CRUD (superAdmin)", "done": false, "phase": 4 },
+    { "id": "phase-4e-task-config", "label": "Phase 4e — Per-task inputType / inputConfig editor", "done": false, "phase": 4 },
     { "id": "phase-5-audit", "label": "Phase 5 audit — confirms onboarding wiring is functional", "done": true, "phase": 5 },
     { "id": "phase-5-journey", "label": "Onboarding journey integration — wire onboarding-ross-hello into signup flow", "done": false, "phase": 5 },
     { "id": "phase-5-auth-gate", "label": "Onboarding auth gate — add verifyAdminStatus to main-hello.js", "done": false, "phase": 5 }
   ],
   "inProgress": [],
   "recentlyCompleted": [
+    { "title": "ross-v2: Playbook workflow create/edit/lifecycle (phase 4d.1)", "pr": 28, "mergedAt": "2026-05-01" },
+    { "title": "docs(ross-v2): post-merge sync after PR #25", "pr": 27, "mergedAt": "2026-05-01" },
     { "title": "ross-v2: People tab — staff CRUD (phase 4c)", "pr": 25, "mergedAt": "2026-05-01" },
     { "title": "docs(ross-v2): backlog + status sync after PR #23/#24", "pr": 26, "mergedAt": "2026-05-01" },
-    { "title": "ross-v2: enrich locationName on Playbook tab", "pr": 24, "mergedAt": "2026-05-01" },
-    { "title": "ross-v2: Activity tab — execution log read-view (phase 4b)", "pr": 23, "mergedAt": "2026-05-01" },
-    { "title": "docs(ross-v2): phase 5 onboarding audit", "pr": 22, "mergedAt": "2026-04-30" }
+    { "title": "ross-v2: enrich locationName on Playbook tab", "pr": 24, "mergedAt": "2026-05-01" }
   ],
   "bugs": [],
   "backlog": {
@@ -84,8 +86,8 @@
       "QA cleanup (~65 test artifact files)",
       "Sidebar dedup of v2 vs v1 entries (after v2 promotion)",
       "Project status auto-derive from PROJECT_BACKLOG.md",
-      "Factor out fetchLocationNames helper (now duplicated in activity-store, playbook-store, people-store)",
-      "HfModal / HfConfirm design-system components — v2 needs a Hi-Fi-native modal pattern; SweetAlert2 is v1-only"
+      "HfModal / HfConfirm design-system components — v2 needs a Hi-Fi-native modal pattern; SweetAlert2 is v1-only",
+      "Fix KB doc field-name drift for ROSS templates (id → templateId, tasks → subtasks in public/kb/features/ROSS.md)"
     ],
     "low": [
       "Subscription admin charts migration",
