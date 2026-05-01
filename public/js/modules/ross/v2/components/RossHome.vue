@@ -15,6 +15,7 @@ import RossHomeDesktop from './RossHomeDesktop.vue'
 import RossHomeMobile from './RossHomeMobile.vue'
 import RossPlaybook from './RossPlaybook.vue'
 import RossActivity from './RossActivity.vue'
+import RossPeople from './RossPeople.vue'
 
 const isDesktop = ref(true)
 let mql = null
@@ -35,7 +36,7 @@ const view = computed(() => {
   switch (tab.value) {
     case 'playbook': return 'playbook'
     case 'activity': return 'activity'
-    case 'people':   return 'people-coming'    // 4c
+    case 'people':   return 'people'
     default:         return isDesktop.value ? 'home-desktop' : 'home-mobile'
   }
 })
@@ -59,49 +60,6 @@ onBeforeUnmount(() => {
   <RossHomeMobile v-else-if="view === 'home-mobile'" />
   <RossPlaybook v-else-if="view === 'playbook'" />
   <RossActivity v-else-if="view === 'activity'" />
-
-  <!-- Phase 4c placeholder. Keeps the route switcher complete so deep
-       links don't 404 during the transition. -->
-  <div v-else class="ross-tab-coming">
-    <div class="ross-tab-coming__inner">
-      <a href="/ross.html" class="ross-tab-coming__back">← Back to Ross</a>
-      <h1 class="ross-tab-coming__title">Coming next</h1>
-      <p class="ross-tab-coming__lead">
-        This tab is part of the Phase 4 admin redesign and ships in a
-        follow-up PR. Workflows + templates have already moved to
-        <a href="/ross.html?tab=playbook">Playbook</a>.
-      </p>
-    </div>
-  </div>
+  <RossPeople v-else-if="view === 'people'" />
 </template>
 
-<style scoped>
-.ross-tab-coming {
-  min-height: 100vh;
-  background: var(--hf-bg);
-  display: grid; place-items: center;
-}
-.ross-tab-coming__inner {
-  max-width: 520px;
-  padding: 32px;
-  text-align: center;
-}
-.ross-tab-coming__back {
-  color: var(--hf-ink-2);
-  font-family: var(--hf-font-body);
-  font-size: 12px;
-  text-decoration: none;
-}
-.ross-tab-coming__back:hover { color: var(--hf-ink); }
-.ross-tab-coming__title {
-  font-family: var(--hf-font-display);
-  font-size: 36px; font-weight: 400;
-  letter-spacing: -0.015em;
-  margin: 16px 0 8px;
-}
-.ross-tab-coming__lead {
-  color: var(--hf-ink-2);
-  font-size: 15px; line-height: 1.6;
-}
-.ross-tab-coming__lead a { color: var(--hf-accent); }
-</style>

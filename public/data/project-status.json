@@ -35,7 +35,7 @@
       "id": 4,
       "name": "ROSS v2 — admin redesign (concierge-first IA)",
       "status": "in_progress",
-      "summary": "Phase 4a Playbook (PR #21) and Phase 4b Activity (PR #23 + #24 fix) merged. 4c (People) is next, 4d (Builder) follows."
+      "summary": "Phase 4a Playbook merged (PR #21 + locationName enrichment PR #24). Phase 4b Activity merged (PR #23). Phase 4c People in flight on feature/ross-v2-people (PR #25). 4d (Builder edit/create) follows."
     },
     {
       "id": 5,
@@ -55,15 +55,21 @@
     { "id": "phase-1-shipped", "label": "Phase 1 — Gap analysis & spec doc", "done": true, "phase": 1 },
     { "id": "phase-2-shipped", "label": "Phase 2 — Sidebar + first-run findings wired", "done": true, "phase": 2 },
     { "id": "phase-3-shipped", "label": "Phase 3 — Action handlers + snooze CF deployed", "done": true, "phase": 3 },
-    { "id": "phase-4a-playbook", "label": "Phase 4a — Playbook tab read-view", "done": true, "phase": 4 },
+    { "id": "phase-4a-playbook", "label": "Phase 4a — Playbook tab read-view + locationName fix", "done": true, "phase": 4 },
     { "id": "phase-4b-activity", "label": "Phase 4b — Activity tab (run history + reports)", "done": true, "phase": 4 },
-    { "id": "phase-4c-people", "label": "Phase 4c — People tab (staff assignments)", "done": false, "phase": 4 },
+    { "id": "phase-4c-people", "label": "Phase 4c — People tab (staff CRUD)", "done": false, "phase": 4 },
     { "id": "phase-4d-builder", "label": "Phase 4d — Playbook editing/creation flows (consolidates v1 Builder)", "done": false, "phase": 4 },
     { "id": "phase-5-audit", "label": "Phase 5 audit — confirms onboarding wiring is functional", "done": true, "phase": 5 },
     { "id": "phase-5-journey", "label": "Onboarding journey integration — wire onboarding-ross-hello into signup flow", "done": false, "phase": 5 },
     { "id": "phase-5-auth-gate", "label": "Onboarding auth gate — add verifyAdminStatus to main-hello.js", "done": false, "phase": 5 }
   ],
-  "inProgress": [],
+  "inProgress": [
+    {
+      "branch": "feature/ross-v2-people",
+      "summary": "Phase 4c — People tab (staff CRUD), PR #25",
+      "startedAt": "2026-04-30"
+    }
+  ],
   "recentlyCompleted": [
     { "title": "ross-v2: enrich locationName on Playbook tab", "pr": 24, "mergedAt": "2026-05-01" },
     { "title": "ross-v2: Activity tab — execution log read-view (phase 4b)", "pr": 23, "mergedAt": "2026-05-01" },
@@ -83,7 +89,9 @@
       "WhatsApp template UI polish",
       "QA cleanup (~65 test artifact files)",
       "Sidebar dedup of v2 vs v1 entries (after v2 promotion)",
-      "Project status auto-derive from PROJECT_BACKLOG.md"
+      "Project status auto-derive from PROJECT_BACKLOG.md",
+      "Factor out fetchLocationNames helper (now duplicated in activity-store, playbook-store, people-store)",
+      "HfModal / HfConfirm design-system components — v2 needs a Hi-Fi-native modal pattern; SweetAlert2 is v1-only"
     ],
     "low": [
       "Subscription admin charts migration",

@@ -51,19 +51,29 @@ Six v1 tabs collapse to three v2 destinations + the concierge home. Tab routing 
 
 The v1 admin remains reachable at `admin-dashboard.html#rossContent` for the entire soak period. It's the rollback net. Cloud Functions are unchanged — the v2 surfaces wrap them via thin per-tab service files (e.g. `playbook-service.js`).
 
-### Phase status (as of 2026-04-30)
+### Phase status (as of 2026-05-01)
 
 | Phase | Status |
 |-------|--------|
 | Home feed (`getHomeFeed`) wired to RTDB detectors | ✅ shipped (PR #19, Phase 2 confirmed) |
 | Right-rail + first-run findings | ✅ PR #19 |
 | Action handlers + snooze | ✅ PR #20 |
-| Playbook tab read-view | ✅ PR #21 (this) |
-| Activity tab | ⏳ Phase 4b |
-| People tab | ⏳ Phase 4c |
+| Playbook tab read-view | ✅ PR #21 |
+| Activity tab | ✅ PR #23 (locationName enrichment fix in PR #24) |
+| People tab | ✅ PR #25 — first **edit-capable** v2 surface |
 | Playbook editing/creation flows | ⏳ Phase 4d |
 | Onboarding wired | ⏳ Phase 5 |
 | `askRoss` LLM | 🔮 separate sprint |
+
+### People tab — patterns established (PR #25)
+
+`?tab=people` is the first v2 surface that mutates RTDB. The patterns landed here become the template for Phase 4d (Builder edit/create):
+
+- **Location picker pills** at the top, auto-hidden when the user has only one location.
+- **Inline editor panel** for create + edit (no modals). Opens above the staff list, closes on save/cancel.
+- **Two-step inline delete** — `Remove` → row's actions become `Confirm` / `Cancel` in place. No SweetAlert2 modal; matches the inline-editor visual language. (CLAUDE.md's "SweetAlert2 for all notifications" convention was written for v1 surfaces; v2 is establishing its own. An `HfModal`/`HfConfirm` pair may land in the design system later for cases that genuinely need a modal.)
+- **Inline error banners** — save errors render in the editor panel; delete errors render scoped under the affected row. Server messages surface verbatim.
+- **Phone normalization is client-side.** `rossManageStaff` stores `staffData.phone` raw, so the People store normalizes to E.164 (`+27…` for SA inputs) before calling. SMS routing downstream depends on this — never push a typed `082 555 1234` to the server.
 
 ---
 

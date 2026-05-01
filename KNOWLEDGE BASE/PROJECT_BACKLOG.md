@@ -21,7 +21,7 @@ Sprint: 2026-04-30 → until complete
 
 | Item | Branch | Notes |
 |------|--------|-------|
-| — | — | No active branch. Phase 4c (People tab) is next. |
+| Phase 4c — People CRUD | `feature/ross-v2-people` | Active branch (PR #25). Staff list / add / edit / delete under `/ross.html?tab=people`, scoped per location. Hi-Fi inline two-step delete + inline error banners (no SweetAlert2 in v2). Client-side phone normalization. |
 
 ---
 
@@ -37,9 +37,9 @@ Sprint: 2026-04-30 → until complete
 ### Phase 4 — Admin redesign (concierge-first IA) — In progress
 
 - [x] **IA reframe** — v1 = agent's playbook; concierge home stays front door; tabs collapse 6 → 3
-- [x] **Phase 4a** — Playbook tab read-view (PR #21 merged)
-- [x] **Phase 4b** — Activity tab (run history + reports) (PR #23 merged) + locationName enrichment fix (PR #24 merged)
-- [ ] **Phase 4c** — People tab (staff assignments) — next
+- [x] **Phase 4a** — Playbook tab read-view (PR #21) + locationName enrichment fix (PR #24)
+- [x] **Phase 4b** — Activity tab (run history + reports) (PR #23)
+- [ ] **Phase 4c** — People tab (staff assignments) — current
 - [ ] **Phase 4d** — Playbook editing/creation flows (consolidates v1 Builder)
 
 ### Phase 5 — Onboarding
@@ -72,6 +72,8 @@ Sprint: 2026-04-30 → until complete
 6. **QA cleanup** — execute `docs/plans/qa-cleanup-plan.md` (~65 test artifact files to remove)
 7. **Sidebar dedup** — kill duplicate v2/v1 entries once v2 promoted
 8. **Project status auto-derive** — read `PROJECT_BACKLOG.md` directly in the dashboard instead of maintaining `project-status.json` separately
+9. **Factor out `fetchLocationNames` helper** — duplicated across `activity-store.js`, `playbook-store.js`, `people-store.js`. Extract to `public/js/modules/ross/v2/location-names.js`.
+10. **`HfModal` / `HfConfirm` design-system components** — v2 needs a Hi-Fi-native modal pattern for cases that genuinely warrant an overlay (bulk-action confirms, multi-step wizards, etc.). PR #25 dropped SweetAlert2 in favour of inline confirms / inline error banners — that works for the People tab's single-row destructive actions but won't scale. Land in `public/js/design-system/hifi/components/` with --hf-* tokens, focus trap, ESC + scrim dismiss, and a worked example in `public/hifi/components.html`. Update CLAUDE.md convention: SweetAlert2 is v1-only.
 
 ### Low Priority / Nice-to-Have
 
