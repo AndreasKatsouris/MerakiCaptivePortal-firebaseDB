@@ -21,7 +21,7 @@ Sprint: 2026-04-30 → until complete
 
 | Item | Branch | Notes |
 |------|--------|-------|
-| Phase 4c — People CRUD | `feature/ross-v2-people` | Active branch (PR #25). Staff list / add / edit / delete under `/ross.html?tab=people`, scoped per location. Hi-Fi inline two-step delete + inline error banners (no SweetAlert2 in v2). Client-side phone normalization. |
+| — | — | No active branch. Phase 4d (Playbook editing/creation) is next. |
 
 ---
 
@@ -39,8 +39,8 @@ Sprint: 2026-04-30 → until complete
 - [x] **IA reframe** — v1 = agent's playbook; concierge home stays front door; tabs collapse 6 → 3
 - [x] **Phase 4a** — Playbook tab read-view (PR #21) + locationName enrichment fix (PR #24)
 - [x] **Phase 4b** — Activity tab (run history + reports) (PR #23)
-- [ ] **Phase 4c** — People tab (staff assignments) — current
-- [ ] **Phase 4d** — Playbook editing/creation flows (consolidates v1 Builder)
+- [x] **Phase 4c** — People tab — staff CRUD (PR #25). First edit-capable v2 surface; established inline-editor + two-step inline delete + inline error banner patterns + client-side phone normalization.
+- [ ] **Phase 4d** — Playbook editing/creation flows (consolidates v1 Builder) — next
 
 ### Phase 5 — Onboarding
 
@@ -77,9 +77,9 @@ Sprint: 2026-04-30 → until complete
 
 ### Low Priority / Nice-to-Have
 
-9. Subscription admin charts migration (deferred from Chart.js audit, items #7–10)
-10. Group overview v2 → v1 promotion
-11. Onboarding flow improvements
+11. Subscription admin charts migration (deferred from Chart.js audit, items #7–10)
+12. Group overview v2 → v1 promotion
+13. Onboarding flow improvements
 
 ---
 
@@ -97,11 +97,11 @@ Sprint: 2026-04-30 → until complete
 
 | Feature | PR | Merged |
 |---------|----|--------|
+| ROSS v2 — People tab staff CRUD (Phase 4c) | #25 | 2026-05-01 |
+| docs(ross-v2) — backlog + status sync after PR #23/#24 | #26 | 2026-05-01 |
 | ROSS v2 — locationName enrichment on Playbook tab | #24 | 2026-05-01 |
 | ROSS v2 — Activity tab read-view (Phase 4b) | #23 | 2026-05-01 |
 | docs(ross-v2) — phase 5 onboarding audit | #22 | 2026-04-30 |
-| ROSS v2 — Playbook tab read-view (Phase 4a) | #21 | 2026-04-30 |
-| ROSS v2 — action handlers + snooze (Phase 3) | #20 | 2026-04-30 |
 
 ---
 
