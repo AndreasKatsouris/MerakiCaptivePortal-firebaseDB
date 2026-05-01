@@ -1,5 +1,5 @@
 {
-  "lastUpdated": "2026-04-30",
+  "lastUpdated": "2026-05-01",
   "sprint": {
     "goal": "Effective implementation of Hi-Fi v2, starting with ROSS",
     "started": "2026-04-30",
@@ -35,7 +35,7 @@
       "id": 4,
       "name": "ROSS v2 — admin redesign (concierge-first IA)",
       "status": "in_progress",
-      "summary": "Phase 4a Playbook merged (PR #21 + locationName fix PR #24). Phase 4b Activity merged (PR #23). Phase 4c People in flight on feature/ross-v2-people. 4d (Builder edit/create) follows."
+      "summary": "Phase 4a Playbook merged (PR #21 + locationName enrichment PR #24). Phase 4b Activity merged (PR #23). Phase 4c People in flight on feature/ross-v2-people (PR #25). 4d (Builder edit/create) follows."
     },
     {
       "id": 5,
@@ -66,13 +66,13 @@
   "inProgress": [
     {
       "branch": "feature/ross-v2-people",
-      "summary": "Phase 4c — People tab (staff CRUD)",
+      "summary": "Phase 4c — People tab (staff CRUD), PR #25",
       "startedAt": "2026-04-30"
     }
   ],
   "recentlyCompleted": [
-    { "title": "ross-v2: Playbook locationName enrichment", "pr": 24, "mergedAt": "2026-04-30" },
-    { "title": "ross-v2: activity tab (phase 4b)", "pr": 23, "mergedAt": "2026-04-30" },
+    { "title": "ross-v2: enrich locationName on Playbook tab", "pr": 24, "mergedAt": "2026-05-01" },
+    { "title": "ross-v2: Activity tab — execution log read-view (phase 4b)", "pr": 23, "mergedAt": "2026-05-01" },
     { "title": "docs(ross-v2): phase 5 onboarding audit", "pr": 22, "mergedAt": "2026-04-30" },
     { "title": "ross-v2: Playbook tab read-view (phase 4a)", "pr": 21, "mergedAt": "2026-04-30" },
     { "title": "ross-v2: action handlers + snooze (phase 3)", "pr": 20, "mergedAt": "2026-04-30" }

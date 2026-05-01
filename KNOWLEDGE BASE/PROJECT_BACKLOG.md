@@ -3,7 +3,7 @@
 > Claude reads this file at the start of every session and updates it at the end.
 > The Sprint Goal is the contract for the session — don't deviate without explicit user confirmation.
 
-Last updated: 2026-04-30
+Last updated: 2026-05-01
 
 ---
 
@@ -21,7 +21,7 @@ Sprint: 2026-04-30 → until complete
 
 | Item | Branch | Notes |
 |------|--------|-------|
-| Phase 4c — People CRUD | `feature/ross-v2-people` | Active branch. Staff list / add / edit / delete under `/ross.html?tab=people`, scoped per location. SweetAlert2 confirms on destructive actions. |
+| Phase 4c — People CRUD | `feature/ross-v2-people` | Active branch (PR #25). Staff list / add / edit / delete under `/ross.html?tab=people`, scoped per location. Hi-Fi inline two-step delete + inline error banners (no SweetAlert2 in v2). Client-side phone normalization. |
 
 ---
 
@@ -37,8 +37,8 @@ Sprint: 2026-04-30 → until complete
 ### Phase 4 — Admin redesign (concierge-first IA) — In progress
 
 - [x] **IA reframe** — v1 = agent's playbook; concierge home stays front door; tabs collapse 6 → 3
-- [x] **Phase 4a** — Playbook tab read-view (PR #21 + locationName fix #24)
-- [x] **Phase 4b** — Activity tab (PR #23)
+- [x] **Phase 4a** — Playbook tab read-view (PR #21) + locationName enrichment fix (PR #24)
+- [x] **Phase 4b** — Activity tab (run history + reports) (PR #23)
 - [ ] **Phase 4c** — People tab (staff assignments) — current
 - [ ] **Phase 4d** — Playbook editing/creation flows (consolidates v1 Builder)
 
@@ -97,8 +97,8 @@ Sprint: 2026-04-30 → until complete
 
 | Feature | PR | Merged |
 |---------|----|--------|
-| ROSS v2 — Playbook locationName enrichment | #24 | 2026-04-30 |
-| ROSS v2 — Activity tab (Phase 4b) | #23 | 2026-04-30 |
+| ROSS v2 — locationName enrichment on Playbook tab | #24 | 2026-05-01 |
+| ROSS v2 — Activity tab read-view (Phase 4b) | #23 | 2026-05-01 |
 | docs(ross-v2) — phase 5 onboarding audit | #22 | 2026-04-30 |
 | ROSS v2 — Playbook tab read-view (Phase 4a) | #21 | 2026-04-30 |
 | ROSS v2 — action handlers + snooze (Phase 3) | #20 | 2026-04-30 |
