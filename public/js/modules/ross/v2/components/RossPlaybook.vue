@@ -90,6 +90,20 @@ function statusTone(status) {
   return 'default'
 }
 
+// Templates carry their tasks under `subtasks` (server seed +
+// rossCreateTemplate + rossActivateWorkflow all use that field). The
+// `tasks` fallback here is purely defensive — should never trigger
+// against current server data, but guards against a stale-cache edge
+// during rollouts.
+function templateSubtasks(t) {
+  if (Array.isArray(t?.subtasks)) return t.subtasks
+  if (Array.isArray(t?.tasks)) return t.tasks
+  return []
+}
+function templateSubtaskCount(t) {
+  return templateSubtasks(t).length
+}
+
 function backToHome() {
   // Align with the popstate-based tab routing in RossHome.vue: push a
   // clean URL and dispatch popstate so the parent switcher re-reads
@@ -249,10 +263,13 @@ function backToHome() {
               </div>
 
               <!-- Slide-down inline confirm strip — replaces SweetAlert2.
-                   Spans full card width; copy carries the gravity. -->
+                   Spans full card width; copy carries the gravity.
+                   Note: rossDeleteWorkflow removes the workflow definition
+                   atomically (including all per-location pending tasks)
+                   but does NOT touch run-history records under ross/runs/. -->
               <div v-if="confirmingDeleteId === w.workflowId" class="playbook__confirm-strip">
                 <div class="playbook__confirm-copy hf-mono">
-                  Delete "{{ w.name }}"? This removes it from every location and clears its task history.
+                  Delete "{{ w.name }}"? This removes the workflow from every location it's attached to. Completed-run history in Activity is preserved.
                 </div>
                 <div class="playbook__confirm-actions">
                   <HfButton variant="solid" size="sm" @click="commitDelete(w.workflowId)" :disabled="store.saving">
@@ -279,7 +296,7 @@ function backToHome() {
         </header>
         <div class="playbook__template-grid">
           <HfCard
-            v-for="t in templates" :key="t.id"
+            v-for="t in templates" :key="t.templateId || t.id"
             :padded="false"
             class="playbook__template"
           >
@@ -288,11 +305,22 @@ function backToHome() {
             <p v-if="t.description" class="playbook__template-desc">{{ t.description }}</p>
             <div class="hf-mono playbook__template-meta">
               {{ recurrenceLabel[t.recurrence] || t.recurrence }} ·
-              {{ Array.isArray(t.tasks) ? t.tasks.length : 0 }}
-              task{{ (t.tasks?.length || 0) === 1 ? '' : 's' }}
+              {{ templateSubtaskCount(t) }}
+              task{{ templateSubtaskCount(t) === 1 ? '' : 's' }}
             </div>
+            <!-- At-a-glance preview: first 2 subtask titles, with +N more
+                 indicator. Helps the user pick the right template without
+                 opening the activate editor. -->
+            <ul v-if="templateSubtaskCount(t) > 0" class="playbook__template-preview hf-mono">
+              <li v-for="(s, i) in templateSubtasks(t).slice(0, 2)" :key="i">
+                · {{ s.title }}
+              </li>
+              <li v-if="templateSubtaskCount(t) > 2" class="playbook__template-preview-more">
+                +{{ templateSubtaskCount(t) - 2 }} more
+              </li>
+            </ul>
             <div v-if="!showEditor" class="playbook__template-actions">
-              <HfButton variant="ghost" size="sm" @click="store.openActivateTemplate(t.id)" :disabled="store.saving">
+              <HfButton variant="ghost" size="sm" @click="store.openActivateTemplate(t.templateId || t.id)" :disabled="store.saving">
                 Activate
               </HfButton>
             </div>
@@ -541,7 +569,25 @@ function backToHome() {
   display: flex; gap: 6px;
 }
 
-/* Template card actions */
+/* Template card actions + at-a-glance preview list */
+.playbook__template-preview {
+  list-style: none;
+  margin: 8px 0 0; padding: 0;
+  font-size: 11px;
+  color: var(--hf-ink-2);
+  letter-spacing: 0.02em;
+}
+.playbook__template-preview li {
+  padding: 1px 0;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.playbook__template-preview-more {
+  color: var(--hf-muted);
+  font-style: italic;
+}
+
 .playbook__template-actions {
   margin-top: 10px;
   display: flex; gap: 6px;

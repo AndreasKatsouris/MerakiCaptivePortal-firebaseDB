@@ -139,6 +139,11 @@ export const usePlaybookStore = defineStore('rossPlaybook', {
     },
 
     async loadLocations() {
+      // Once-per-session cache. If a location is added in another tab
+      // the picker won't reflect it until the user reloads — acceptable
+      // tradeoff vs re-reading userLocations every time the editor
+      // opens. Bump this if the v2 surface grows a "locations changed"
+      // signal.
       if (this._locationsLoaded || this.locationsLoading) return
       this.locationsLoading = true
       this.locationsError = null

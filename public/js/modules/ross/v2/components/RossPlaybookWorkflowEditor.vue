@@ -42,11 +42,25 @@ const editingWorkflow = computed(() =>
     : null,
 )
 
-const activateTemplate = computed(() =>
-  mode.value === 'activate'
-    ? store.templates.find((t) => t.id === store.activateTemplateId) || null
-    : null,
-)
+const activateTemplate = computed(() => {
+  if (mode.value !== 'activate') return null
+  // Match either `templateId` (canonical) or legacy `id`. rossGetTemplates
+  // returns Object.values(...) so the document carries `templateId`; older
+  // shapes sometimes had `id`.
+  return store.templates.find((t) =>
+    (t.templateId || t.id) === store.activateTemplateId,
+  ) || null
+})
+
+// Tasks live under `subtasks` (server seed + rossCreateTemplate +
+// rossActivateWorkflow). Same defensive `tasks` fallback as the parent.
+const activateSubtasks = computed(() => {
+  const t = activateTemplate.value
+  if (!t) return []
+  if (Array.isArray(t.subtasks)) return t.subtasks
+  if (Array.isArray(t.tasks)) return t.tasks
+  return []
+})
 
 // Form draft. Field meanings match the rossCreateWorkflow contract.
 function blankForm() {
@@ -177,6 +191,11 @@ function moveSubtask({ from, to }) {
 }
 
 // --- Validation + submit ------------------------------------------
+// Loose E.164 check: + followed by 7-15 digits. Twilio/SendGrid handle
+// the strict country-code validation; this just catches obvious typos
+// before the round trip.
+const E164_LIKE = /^\+\d{7,15}$/
+
 const errors = computed(() => {
   const out = {}
   if (!form.value.name.trim()) out.name = 'Required'
@@ -187,6 +206,10 @@ const errors = computed(() => {
   }
   if (!isEditMode.value && !form.value.nextDueDate) {
     out.nextDueDate = 'Required'
+  }
+  const phone = form.value.notifyPhone.trim()
+  if (phone && !E164_LIKE.test(phone)) {
+    out.notifyPhone = 'Use international format: +27 …'
   }
   return out
 })
@@ -285,9 +308,33 @@ const categoryOptions = [
       schedule, locations, or tasks, delete this workflow and recreate it.
     </p>
     <p v-else-if="mode === 'activate'" class="wfeditor__caption hf-mono">
-      Tasks come from the template ({{ Array.isArray(activateTemplate?.tasks) ? activateTemplate.tasks.length : 0 }}).
+      Tasks come from the template ({{ activateSubtasks.length }}).
       Pick locations and a start date — Ross handles the rest.
     </p>
+
+    <!-- Activate-mode preview: read-only list of the template's subtasks
+         so the user can verify the policy before committing. Day offset
+         is shown to make the schedule explicit. -->
+    <div v-if="mode === 'activate' && activateSubtasks.length" class="wfeditor__preview">
+      <h4 class="wfeditor__section-title">Template tasks</h4>
+      <ol class="wfeditor__preview-list">
+        <li
+          v-for="(s, i) in activateSubtasks" :key="i"
+          class="wfeditor__preview-item"
+        >
+          <span class="wfeditor__preview-num hf-mono">{{ i + 1 }}.</span>
+          <span class="wfeditor__preview-title">{{ s.title || 'Untitled task' }}</span>
+          <span v-if="Number(s.daysOffset) !== 0" class="hf-mono wfeditor__preview-offset">
+            {{ Number(s.daysOffset) > 0 ? '+' : '' }}{{ s.daysOffset }}d
+          </span>
+        </li>
+      </ol>
+    </div>
+    <div v-else-if="mode === 'activate' && !activateSubtasks.length" class="wfeditor__preview wfeditor__preview--warn hf-mono">
+      This template has no tasks defined. Activating it will create an empty
+      workflow at the selected location(s). Pick a different template, or
+      cancel and edit this template (Phase 4d.2) before activating.
+    </div>
 
     <!-- Identity -->
     <div class="wfeditor__grid">
@@ -427,6 +474,7 @@ const categoryOptions = [
       <label class="wfeditor__field">
         <span class="hf-eyebrow">Notify phone</span>
         <HfInput v-model="form.notifyPhone" placeholder="+27 …" />
+        <span v-if="errors.notifyPhone" class="wfeditor__field-err">{{ errors.notifyPhone }}</span>
       </label>
       <label class="wfeditor__field">
         <span class="hf-eyebrow">Notify email</span>
@@ -493,6 +541,47 @@ const categoryOptions = [
   background: var(--hf-paper);
   border-left: 2px solid var(--hf-line-2);
   border-radius: 0 var(--hf-radius) var(--hf-radius) 0;
+}
+
+/* Activate-mode template preview */
+.wfeditor__preview {
+  margin: 0 0 14px;
+  padding: 10px 12px;
+  border: 1px solid var(--hf-line-2);
+  border-radius: var(--hf-radius);
+  background: var(--hf-paper);
+}
+.wfeditor__preview .wfeditor__section-title {
+  margin-top: 0;
+}
+.wfeditor__preview-list {
+  list-style: none;
+  margin: 6px 0 0; padding: 0;
+}
+.wfeditor__preview-item {
+  display: flex; align-items: baseline; gap: 8px;
+  padding: 4px 0;
+  font-size: 13px;
+  color: var(--hf-ink);
+  border-bottom: 1px dashed var(--hf-line);
+}
+.wfeditor__preview-item:last-child { border-bottom: none; }
+.wfeditor__preview-num {
+  font-size: 11px;
+  color: var(--hf-muted);
+  min-width: 22px;
+}
+.wfeditor__preview-title { flex: 1; min-width: 0; }
+.wfeditor__preview-offset {
+  font-size: 11px;
+  color: var(--hf-muted);
+  letter-spacing: 0.04em;
+}
+.wfeditor__preview--warn {
+  font-size: 11px;
+  color: var(--hf-warn);
+  background: rgba(212, 87, 47, 0.04);
+  border-color: rgba(212, 87, 47, 0.25);
 }
 
 .wfeditor__grid {

@@ -83,7 +83,10 @@ export function activateWorkflow(payload) {
   return callFunction('rossActivateWorkflow', payload)
 }
 
+// Phase 4e — exported for the upcoming per-task editor (inputType /
+// inputConfig matrix). Not consumed yet by 4d.1; lands here so the
+// service surface stays one place. payload: { workflowId, locationId,
+// action: 'create'|'update'|'delete', taskId?, taskData? }
 export function manageTask(payload) {
-  // payload: { workflowId, locationId, action: 'create'|'update'|'delete', taskId?, taskData? }
   return callFunction('rossManageTask', payload)
 }
