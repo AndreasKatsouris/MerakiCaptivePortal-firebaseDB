@@ -76,3 +76,4 @@ node_modules/
 
 # Playwright MCP screenshot scratch
 .playwright-mcp/
+.claude/worktrees/
