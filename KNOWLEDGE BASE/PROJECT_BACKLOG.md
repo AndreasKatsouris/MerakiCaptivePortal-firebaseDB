@@ -21,7 +21,7 @@ Sprint: 2026-04-30 → until complete
 
 | Item | Branch | Notes |
 |------|--------|-------|
-| — | — | No active branch. Phase 4e.2 (server propagation: subtasks→tasks at create/activate, then template-level inputType editor) is next. |
+| Phase 4e.2 — server propagation + template-level inputType editor | `feature/ross-v2-phase4e2` | Single `buildTaskFromSubtask` helper shared by `rossCreateWorkflow` + `rossActivateWorkflow`; inputType enum validated at all 4 write paths (createWorkflow, createTemplate, updateTemplate, manageTask). Subtask row UI gains type select + config sub-form (reused from 4e.1). Requires `firebase deploy --only functions` for the 4 affected CFs. |
 
 ---
 

@@ -195,6 +195,12 @@ exports.rossCreateTemplate = onRequest(async (req, res) => {
             if (!VALID_CATEGORIES.includes(category)) return res.status(400).json({ error: 'Invalid category' });
             if (!VALID_RECURRENCES.includes(recurrence)) return res.status(400).json({ error: 'Invalid recurrence' });
 
+            // Phase 4e.2: enforce inputType enum on each subtask so the
+            // type can't sneak through the template path and silently
+            // fall back at activation time.
+            const subtaskTypeError = validateSubtasksInputTypes(subtasks);
+            if (subtaskTypeError) return res.status(400).json({ error: subtaskTypeError });
+
             const templateId = generateId();
             const now = Date.now();
 
@@ -252,6 +258,10 @@ exports.rossUpdateTemplate = onRequest(async (req, res) => {
             if (updates.recurrence !== undefined && !VALID_RECURRENCES.includes(updates.recurrence)) {
                 return res.status(400).json({ error: 'Invalid recurrence' });
             }
+            if (updates.subtasks !== undefined) {
+                const subtaskTypeError = validateSubtasksInputTypes(updates.subtasks);
+                if (subtaskTypeError) return res.status(400).json({ error: subtaskTypeError });
+            }
 
             const allowedFields = ['name', 'category', 'description', 'recurrence', 'daysBeforeAlert', 'subtasks', 'tags'];
             const sanitized = { updatedAt: Date.now() };
@@ -297,6 +307,57 @@ exports.rossDeleteTemplate = onRequest(async (req, res) => {
 });
 
 // ============================================
+// SUBTASK → TASK PROPAGATION (Phase 4e.2)
+// ============================================
+//
+// Single source of truth for building a per-location task object from
+// a template subtask or workflow create-mode subtask. Centralised so
+// rossActivateWorkflow + rossCreateWorkflow stay in lockstep — drift
+// between create-from-scratch and activate-from-template is the
+// highest-leverage risk on this code path.
+//
+// inputType is enum-validated upstream by validateSubtasksInputTypes
+// at write time (rossCreateWorkflow / rossCreateTemplate /
+// rossUpdateTemplate). rossActivateWorkflow stays defensive — invalid
+// historical values fall back to 'checkbox' rather than rejecting the
+// activation. inputConfig is stored verbatim (matches rossManageTask).
+function buildTaskFromSubtask(subtask, nextDueDate) {
+    const rawType = subtask.inputType;
+    const inputType = VALID_INPUT_TYPES.includes(rawType) ? rawType : 'checkbox';
+    const inputConfig = (subtask.inputConfig && typeof subtask.inputConfig === 'object')
+        ? subtask.inputConfig
+        : {};
+    return {
+        title: (subtask.title || '').trim() || 'Untitled Task',
+        status: 'pending',
+        dueDate: nextDueDate + ((subtask.daysOffset || 0) * 86400000),
+        completedAt: null,
+        assignedTo: null,
+        order: subtask.order || 1,
+        inputType,
+        inputConfig,
+    };
+}
+
+// Validate inputType enum on every subtask in an array. Returns an
+// error string or null. Used at every write path that accepts
+// subtasks (rossCreateWorkflow, rossCreateTemplate, rossUpdateTemplate)
+// so the enum is enforceable end-to-end. Without this, a hand-crafted
+// client could write subtasks with `inputType: 'frobnicate'` to a
+// template; rossActivateWorkflow would silently default to 'checkbox'
+// and corrupt the policy.
+function validateSubtasksInputTypes(subtasks) {
+    if (!Array.isArray(subtasks)) return null;
+    for (const s of subtasks) {
+        if (s && s.inputType !== undefined && s.inputType !== null
+            && !VALID_INPUT_TYPES.includes(s.inputType)) {
+            return `Invalid inputType: ${s.inputType}. Must be one of: ${VALID_INPUT_TYPES.join(', ')}`;
+        }
+    }
+    return null;
+}
+
+// ============================================
 // WORKFLOW OPERATIONS
 // ============================================
 
@@ -327,21 +388,17 @@ exports.rossActivateWorkflow = onRequest(async (req, res) => {
             const workflowId = generateId();
             const now = Date.now();
 
-            // Build per-location records with tasks from template subtasks
+            // Build per-location records with tasks from template subtasks.
+            // Phase 4e.2: inputType + inputConfig now propagate through
+            // buildTaskFromSubtask (defensive fallback to 'checkbox' for
+            // legacy templates with no inputType set).
             const locations = {};
             locationIds.forEach((locationId, idx) => {
                 const tasks = {};
                 if (Array.isArray(template.subtasks)) {
                     template.subtasks.forEach(subtask => {
                         const taskId = generateId();
-                        tasks[taskId] = {
-                            title: subtask.title,
-                            status: 'pending',
-                            dueDate: nextDueDate + ((subtask.daysOffset || 0) * 86400000),
-                            completedAt: null,
-                            assignedTo: null,
-                            order: subtask.order || 1
-                        };
+                        tasks[taskId] = buildTaskFromSubtask(subtask, nextDueDate);
                     });
                 }
                 locations[locationId] = {
@@ -409,6 +466,10 @@ exports.rossCreateWorkflow = onRequest(async (req, res) => {
             if (!Array.isArray(locationIds) || locationIds.length === 0) return res.status(400).json({ error: 'At least one location ID is required' });
             if (!nextDueDate) return res.status(400).json({ error: 'Next due date is required' });
 
+            // Phase 4e.2: enforce inputType enum on incoming subtasks.
+            const subtaskTypeError = validateSubtasksInputTypes(subtasks);
+            if (subtaskTypeError) return res.status(400).json({ error: subtaskTypeError });
+
             await verifyLocationAccess(uid, locationIds, isSuperAdmin);
 
             const workflowId = generateId();
@@ -420,14 +481,7 @@ exports.rossCreateWorkflow = onRequest(async (req, res) => {
                 if (Array.isArray(subtasks)) {
                     subtasks.forEach(subtask => {
                         const taskId = generateId();
-                        tasks[taskId] = {
-                            title: subtask.title?.trim() || 'Untitled Task',
-                            status: 'pending',
-                            dueDate: nextDueDate + ((subtask.daysOffset || 0) * 86400000),
-                            completedAt: null,
-                            assignedTo: null,
-                            order: subtask.order || 1
-                        };
+                        tasks[taskId] = buildTaskFromSubtask(subtask, nextDueDate);
                     });
                 }
                 locations[locationId] = {

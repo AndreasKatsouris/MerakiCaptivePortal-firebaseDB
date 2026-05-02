@@ -167,16 +167,16 @@ ross/
       category: string             ← compliance | operations | growth | finance | hr | maintenance
       recurrence: string           ← once | daily | weekly | monthly | quarterly | annually
       daysBeforeAlert: number[]    ← e.g. [30, 7]
-      subtasks: Subtask[]          ← canonical task list field; each { title, daysOffset?, order? }
+      subtasks: Subtask[]          ← canonical task list; each { title, daysOffset?, order?, inputType?, inputConfig? } — inputType/inputConfig propagate to per-location tasks at activation time (Phase 4e.2)
       tags: string[]
       notificationChannels: string[]   ← currently always ['in_app']
       createdAt: number
       updatedAt: number
 ```
 
-> **Task input types (Phase 4e.1).** Workflow tasks (under `ross/workflows/{uid}/{workflowId}/locations/{locationId}/tasks/{taskId}`) carry `inputType` and `inputConfig` fields. `VALID_INPUT_TYPES = ['checkbox', 'text', 'number', 'temperature', 'yes_no', 'dropdown', 'timestamp', 'photo', 'signature', 'rating']` (functions/ross.js:25-28). Server enum-validates `inputType`; `inputConfig` is stored verbatim. Runtime semantics live in `validateResponseValue` / `isResponseFlagged` (functions/ross.js:1036-1058). `inputConfig` shapes that have proven server semantics: `{ min, max, requiredNote, unit }` for `number`/`temperature` (auto-flag breaches, enforce note); `{ options: string[] }` for `dropdown`; `{ scale }` for `rating`. Other types accept advisory keys the runner may use later.
+> **Task input types.** Workflow tasks (under `ross/workflows/{uid}/{workflowId}/locations/{locationId}/tasks/{taskId}`) and template subtasks both carry `inputType` and `inputConfig` fields. `VALID_INPUT_TYPES = ['checkbox', 'text', 'number', 'temperature', 'yes_no', 'dropdown', 'timestamp', 'photo', 'signature', 'rating']` (functions/ross.js:25-28). Server enum-validates `inputType` at every write path (`rossCreateWorkflow`, `rossCreateTemplate`, `rossUpdateTemplate`, `rossManageTask`); `inputConfig` is stored verbatim. Runtime semantics live in `validateResponseValue` / `isResponseFlagged` (functions/ross.js:1036-1058). `inputConfig` shapes with proven server semantics: `{ min, max, requiredNote, unit }` for `number`/`temperature` (auto-flag breaches, enforce note); `{ options: string[] }` for `dropdown`; `{ scale, requiredNote }` for `rating`. Other types accept advisory keys the runner may use later.
 >
-> **Server propagation gap (Phase 4e.2 follow-up).** `rossCreateWorkflow` (line 421) and `rossActivateWorkflow` (line 334) build workflow tasks from incoming subtasks but **strip** `inputType`/`inputConfig` — only `title`/`order`/`dueDate` survive. As of 4e.1 the only path that persists these fields is `rossManageTask` (per-task CRUD on an existing workflow). Setting input types in the workflow editor's create flow or on a template silently drops them. Phase 4e.2 will extend the create/activate CFs to carry the fields through.
+> **Subtask → task propagation (Phase 4e.2).** `rossCreateWorkflow` and `rossActivateWorkflow` route every subtask through the shared `buildTaskFromSubtask(subtask, nextDueDate)` helper (functions/ross.js, defined just above WORKFLOW OPERATIONS). The helper carries `inputType` (defensively defaults to `'checkbox'` for legacy subtasks with no value) and `inputConfig` (stored verbatim) into the per-location task object. Centralised so create-from-scratch and activate-from-template never drift apart. Existing in-flight workflow tasks created before 4e.2 simply lack the field; all UI reads use `task.inputType || 'checkbox'`.
 
 ### Owner Index (Fan-out)
 

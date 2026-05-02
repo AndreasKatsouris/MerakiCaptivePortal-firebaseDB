@@ -24,6 +24,9 @@ import { computed, ref, watch } from 'vue'
 import {
   usePlaybookStore, VALID_CATEGORIES, VALID_RECURRENCES,
 } from '../playbook-store.js'
+import {
+  defaultInputConfig, sanitiseInputConfig, validateInputConfig,
+} from '../constants/input-types.js'
 import { HfIcon, HfButton, HfInput } from '/js/design-system/hifi/index.js'
 import RossPlaybookSubtaskRow from './RossPlaybookSubtaskRow.vue'
 
@@ -164,12 +167,22 @@ function toggleAlert(d) {
 }
 
 // --- Subtasks (create mode only) ----------------------------------
+// Phase 4e.2: new rows default to inputType 'checkbox' (server falls
+// back here too, but we set it explicitly so the row UI binding has a
+// concrete value to work with).
 function addSubtask() {
   form.value = {
     ...form.value,
     subtasks: [
       ...form.value.subtasks,
-      { _uid: newUid(), title: '', daysOffset: 0, order: form.value.subtasks.length + 1 },
+      {
+        _uid: newUid(),
+        title: '',
+        daysOffset: 0,
+        order: form.value.subtasks.length + 1,
+        inputType: 'checkbox',
+        inputConfig: defaultInputConfig('checkbox'),
+      },
     ],
   }
 }
@@ -224,6 +237,16 @@ const errors = computed(() => {
   if (!form.value.daysBeforeAlert.some((d) => Number.isInteger(d) && d > 0)) {
     out.daysBeforeAlert = 'Pick at least one alert day'
   }
+  // Phase 4e.2: validate per-subtask inputConfig before payload build.
+  // First failing subtask sets the form-level error; the per-row UI
+  // already constrains most fields so this is a belt-and-braces gate.
+  if (mode.value === 'create') {
+    for (const s of form.value.subtasks) {
+      if (!s.title || !s.title.trim()) continue
+      const err = validateInputConfig(s.inputType || 'checkbox', s.inputConfig || {})
+      if (err) { out.subtasks = `Task "${s.title.trim()}": ${err}`; break }
+    }
+  }
   return out
 })
 const formValid = computed(() => Object.keys(errors.value).length === 0)
@@ -276,11 +299,19 @@ async function save() {
     nextDueDate: fromDateInput(form.value.nextDueDate),
     subtasks: form.value.subtasks
       .filter((s) => s.title && s.title.trim())
-      .map((s, i) => ({
-        title: s.title.trim(),
-        daysOffset: Number.isFinite(Number(s.daysOffset)) ? Number(s.daysOffset) : 0,
-        order: i + 1,
-      })),
+      .map((s, i) => {
+        const inputType = s.inputType || 'checkbox'
+        return {
+          title: s.title.trim(),
+          daysOffset: Number.isFinite(Number(s.daysOffset)) ? Number(s.daysOffset) : 0,
+          order: i + 1,
+          // Phase 4e.2: propagate to per-location task at create time.
+          // Server validates inputType against VALID_INPUT_TYPES;
+          // sanitiseInputConfig strips empties + dedupes options.
+          inputType,
+          inputConfig: sanitiseInputConfig(inputType, s.inputConfig || {}),
+        }
+      }),
     daysBeforeAlert: form.value.daysBeforeAlert,
     notifyPhone: form.value.notifyPhone.trim() || null,
     notifyEmail: form.value.notifyEmail.trim() || null,
@@ -483,6 +514,7 @@ const categoryOptions = [
           Add task
         </HfButton>
       </div>
+      <p v-if="errors.subtasks" class="wfeditor__field-err">{{ errors.subtasks }}</p>
     </div>
 
     <!-- Notifications -->
