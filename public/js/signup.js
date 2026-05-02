@@ -410,13 +410,21 @@ class SignupManager {
 
             showToast('Account created successfully! Redirecting…', 'success');
 
-            // Hold the toast for 2s while the router resolves in parallel,
-            // then navigate. Promise.all means navigation happens at
-            // max(toast, router) — never before the toast renders.
+            // Hold the toast for a minimum of 2s, run the router resolve
+            // concurrently, then navigate exactly once at max(toast, router).
+            // We pass a deferred navigator that captures the destination
+            // instead of letting routePostLogin call window.location.href
+            // directly — otherwise the assignment would begin browser
+            // navigation as soon as the RTDB read settles (~200ms), and
+            // the toast would only be visible for a fraction of a second.
+            // routePostLogin still applies its error fallback by calling
+            // the captured navigator with the legacy URL on resolver error.
+            let dest = '/user-dashboard.html';
             await Promise.all([
-                new Promise(r => setTimeout(r, 2000)),
-                routePostLogin(freshUser)
+                routePostLogin(freshUser, (d) => { dest = d; }),
+                new Promise(r => setTimeout(r, 2000))
             ]);
+            window.location.href = dest;
 
         } catch (error) {
             console.error('Signup error:', error);
