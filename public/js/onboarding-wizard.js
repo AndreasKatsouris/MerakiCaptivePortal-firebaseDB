@@ -377,8 +377,13 @@ async function completeOnboarding() {
             });
         }
 
-        // Save onboarding progress
-        await set(ref(rtdb, `onboarding-progress/${user.uid}`), {
+        // Save onboarding progress.
+        // Use update(), not set() — set() would overwrite the entire node
+        // and wipe `helloSeen` written by RossOnboardingHello before the
+        // wizard ran. The router relies on helloSeen to decide whether
+        // to re-show the hello on next login. See
+        // public/js/auth/post-login-router.js field contract.
+        await update(ref(rtdb, `onboarding-progress/${user.uid}`), {
             completed: true,
             completedAt: Date.now(),
             completedSteps: ['business-info', 'location-setup', 'preferences'],

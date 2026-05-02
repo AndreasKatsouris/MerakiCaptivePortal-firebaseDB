@@ -3,9 +3,10 @@
  * Handles user registration for the Laki Sparks platform
  */
 
-import { auth, rtdb, ref, get, set, push, functions, httpsCallable, onAuthStateChanged } from './config/firebase-config.js';
+import { auth, rtdb, ref, get, set, update, push, functions, httpsCallable, onAuthStateChanged } from './config/firebase-config.js';
 import { createUserWithEmailAndPassword, updateProfile } from 'https://www.gstatic.com/firebasejs/10.12.5/firebase-auth.js';
 import { showToast } from './utils/toast.js';
+import { routePostLogin } from './auth/post-login-router.js';
 
 class SignupManager {
     constructor() {
@@ -390,17 +391,32 @@ class SignupManager {
                     const newLocationRef = push(ref(rtdb, 'locations'));
                     await set(newLocationRef, locationData);
                     await set(ref(rtdb, `userLocations/${freshUser.uid}/${newLocationRef.key}`), true);
+
+                    // Initialise onboarding-progress so the post-login router
+                    // has clean state to read. helloSeen=false routes new
+                    // accounts through the Ross hello before the wizard.
+                    // Only writes for genuinely new users (the merge branch
+                    // above handles re-entry of existing accounts and must
+                    // not stomp completed=true).
+                    await set(ref(rtdb, `onboarding-progress/${freshUser.uid}`), {
+                        completed: false,
+                        helloSeen: false,
+                        createdAt: Date.now()
+                    });
                 }
             } catch (userCreationError) {
                 throw userCreationError;
             }
 
-            showToast('Account created successfully! Redirecting to setup wizard...', 'success');
+            showToast('Account created successfully! Redirecting…', 'success');
 
-            // Redirect to onboarding wizard after 2 seconds
-            setTimeout(() => {
-                window.location.href = '/onboarding-wizard.html';
-            }, 2000);
+            // Hold the toast for 2s while the router resolves in parallel,
+            // then navigate. Promise.all means navigation happens at
+            // max(toast, router) — never before the toast renders.
+            await Promise.all([
+                new Promise(r => setTimeout(r, 2000)),
+                routePostLogin(freshUser)
+            ]);
 
         } catch (error) {
             console.error('Signup error:', error);

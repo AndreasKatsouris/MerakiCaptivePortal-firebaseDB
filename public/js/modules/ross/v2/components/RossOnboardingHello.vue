@@ -1,10 +1,12 @@
 <script setup>
 // Ross's first-run hello: three surprising findings on an inked stage.
-// On "Show me everything" → continues to the existing business-data
-// wizard at /onboarding-wizard.html (preserving the wizard as-is).
+// On "Show me everything" → marks helloSeen on onboarding-progress (so
+// the post-login router doesn't re-route the user back here on next
+// login) → continues to the business-data wizard.
 import { onMounted, computed } from 'vue'
 import { useRossStore } from '../store.js'
 import { HfIcon, HfButton, HfLogo } from '/js/design-system/hifi/index.js'
+import { auth, rtdb, ref, update } from '../../../../config/firebase-config.js'
 
 const store = useRossStore()
 onMounted(() => { if (!store.findings) store.loadFindings() })
@@ -14,11 +16,29 @@ const data = computed(() => store.findings)
 const stepTotal = 5
 const stepCurrent = 3
 
-function onContinue() {
+// FIELD CONTRACT: onboarding-progress/{uid}.helloSeen — see
+// public/js/auth/post-login-router.js for the full router matrix.
+// Public mount (main-hello-public.js, future) has no auth.currentUser
+// and so this no-ops safely.
+async function markHelloSeen() {
+  const uid = auth.currentUser?.uid
+  if (!uid) return
+  try {
+    await update(ref(rtdb, `onboarding-progress/${uid}`), { helloSeen: true })
+  } catch (err) {
+    // Don't block the user — write failure means the router will re-show
+    // the hello on next login (mild UX regression, no data loss).
+    console.error('[RossOnboardingHello] failed to persist helloSeen:', err)
+  }
+}
+
+async function onContinue() {
+  await markHelloSeen()
   window.location.href = '/onboarding-wizard.html'
 }
-function onTour() {
+async function onTour() {
   // Tour is not yet built — keep the button until the tour flow ships.
+  await markHelloSeen()
   window.location.href = '/onboarding-wizard.html?tour=1'
 }
 </script>
