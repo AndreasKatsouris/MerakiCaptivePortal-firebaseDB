@@ -1,6 +1,6 @@
 {
   "lastUpdated": "2026-05-02",
-  "lastUpdatedNote": "Phase 5 spec merged (post PR #37)",
+  "lastUpdatedNote": "Phase 5 PR 1 of 5 merged (post PR #39)",
   "sprint": {
     "goal": "Effective implementation of Hi-Fi v2, with ROSS as the central post-login surface for every subscribed user",
     "started": "2026-04-30",
@@ -71,22 +71,22 @@
     { "id": "phase-4e2-propagation", "label": "Phase 4e.2 — Server propagation (subtask→task) + template-level inputType editor", "done": true, "phase": 4 },
     { "id": "phase-5-audit", "label": "Phase 5 audit — confirms onboarding wiring is functional", "done": true, "phase": 5 },
     { "id": "phase-5-spec", "label": "Phase 5 spec — central-funnel cleanup design doc (PR #37)", "done": true, "phase": 5 },
-    { "id": "phase-5-pr1-router", "label": "PR 1 (≈#39) — post-login-router + hello auth gate + helloSeen field", "done": false, "phase": 5 },
-    { "id": "phase-5-pr2-signup", "label": "PR 2 (≈#40) — signup v2 Hi-Fi + Free/All-in tier collapse", "done": false, "phase": 5 },
-    { "id": "phase-5-pr3-homepage", "label": "PR 3 (≈#41) — homepage v2 Hi-Fi + synthetic public hello", "done": false, "phase": 5 },
-    { "id": "phase-5-pr4-rollout", "label": "PR 4 (≈#42) — router rollout — ROSS becomes home", "done": false, "phase": 5 },
-    { "id": "phase-5-pr5-sidebar", "label": "PR 5 (≈#43) — ROSS sidebar cleanup (Today + Ross's brain)", "done": false, "phase": 5 },
+    { "id": "phase-5-pr1-router", "label": "PR 1 (PR #39) — post-login-router + hello auth gate + helloSeen field", "done": true, "phase": 5 },
+    { "id": "phase-5-pr2-signup", "label": "PR 2 (≈#41) — signup v2 Hi-Fi + Free/All-in tier collapse", "done": false, "phase": 5 },
+    { "id": "phase-5-pr3-homepage", "label": "PR 3 (≈#42) — homepage v2 Hi-Fi + synthetic public hello", "done": false, "phase": 5 },
+    { "id": "phase-5-pr4-rollout", "label": "PR 4 (≈#43) — router rollout — ROSS becomes home", "done": false, "phase": 5 },
+    { "id": "phase-5-pr5-sidebar", "label": "PR 5 (≈#44) — ROSS sidebar cleanup (Today + Ross's brain)", "done": false, "phase": 5 },
     { "id": "phase-6-templates", "label": "Phase 6 — Workflow runner + step types + starter template library", "done": false, "phase": 6 }
   ],
   "inProgress": [
-    { "label": "Post-merge sync after PR #37 — once merged, next is PR ≈#39 = feat/post-login-router", "branch": "docs/post-merge-sync-pr37" }
+    { "label": "Post-merge sync after PR #39 — once merged, next is PR ≈#41 = feat/signup-v2-hifi (Phase 5 PR 2)", "branch": "docs/post-merge-sync-pr39" }
   ],
   "recentlyCompleted": [
+    { "title": "ross-v2: post-login router foundation + hello auth gate (phase 5 PR 1)", "pr": 39, "mergedAt": "2026-05-02" },
+    { "title": "docs(ross-v2): post-merge sync + reflect cycle after PR #37", "pr": 38, "mergedAt": "2026-05-02" },
     { "title": "docs(ross-v2): phase 5 spec — ROSS as central funnel + cleanup plan", "pr": 37, "mergedAt": "2026-05-02" },
     { "title": "docs(ross-v2): post-merge sync + reflect cycle after PR #35", "pr": 36, "mergedAt": "2026-05-02" },
-    { "title": "ross-v2: subtask→task inputType propagation + template-level editor (phase 4e.2)", "pr": 35, "mergedAt": "2026-05-01" },
-    { "title": "docs: sync project-status.json to backlog state after PR #33", "pr": 34, "mergedAt": "2026-05-01" },
-    { "title": "docs(ross-v2): post-merge sync + reflect cycle after PR #32", "pr": 33, "mergedAt": "2026-05-01" }
+    { "title": "ross-v2: subtask→task inputType propagation + template-level editor (phase 4e.2)", "pr": 35, "mergedAt": "2026-05-01" }
   ],
   "bugs": [],
   "backlog": {
