@@ -17,6 +17,9 @@ import { computed, ref, watch } from 'vue'
 import {
   usePlaybookStore, VALID_CATEGORIES, VALID_RECURRENCES,
 } from '../playbook-store.js'
+import {
+  defaultInputConfig, sanitiseInputConfig, validateInputConfig,
+} from '../constants/input-types.js'
 import { HfIcon, HfButton, HfInput } from '/js/design-system/hifi/index.js'
 import RossPlaybookSubtaskRow from './RossPlaybookSubtaskRow.vue'
 
@@ -75,12 +78,22 @@ watch(
         category: t.category || 'operations',
         recurrence: t.recurrence || 'weekly',
         daysBeforeAlert: Array.isArray(t.daysBeforeAlert) ? [...t.daysBeforeAlert] : [7, 1],
-        subtasks: subs.map((s, i) => ({
-          _uid: newUid(),
-          title: s.title || '',
-          daysOffset: Number.isFinite(Number(s.daysOffset)) ? Number(s.daysOffset) : 0,
-          order: s.order || i + 1,
-        })),
+        // Phase 4e.2: hydrate inputType + inputConfig if present.
+        // Legacy templates with no inputType land as 'checkbox' which
+        // is the same default the server uses on activation.
+        subtasks: subs.map((s, i) => {
+          const inputType = s.inputType || 'checkbox'
+          return {
+            _uid: newUid(),
+            title: s.title || '',
+            daysOffset: Number.isFinite(Number(s.daysOffset)) ? Number(s.daysOffset) : 0,
+            order: s.order || i + 1,
+            inputType,
+            inputConfig: (s.inputConfig && typeof s.inputConfig === 'object')
+              ? { ...s.inputConfig }
+              : defaultInputConfig(inputType),
+          }
+        }),
         tags: Array.isArray(t.tags) ? [...t.tags] : [],
       }
     } else {
@@ -103,12 +116,21 @@ function toggleAlert(d) {
 }
 
 // --- Subtasks -----------------------------------------------------
+// Phase 4e.2: new rows default to inputType 'checkbox'. Server stores
+// the explicit value verbatim; the row UI uses it for the type select.
 function addSubtask() {
   form.value = {
     ...form.value,
     subtasks: [
       ...form.value.subtasks,
-      { _uid: newUid(), title: '', daysOffset: 0, order: form.value.subtasks.length + 1 },
+      {
+        _uid: newUid(),
+        title: '',
+        daysOffset: 0,
+        order: form.value.subtasks.length + 1,
+        inputType: 'checkbox',
+        inputConfig: defaultInputConfig('checkbox'),
+      },
     ],
   }
 }
@@ -173,6 +195,12 @@ const errors = computed(() => {
   if (!form.value.daysBeforeAlert.some((d) => Number.isInteger(d) && d > 0)) {
     out.daysBeforeAlert = 'Pick at least one alert day'
   }
+  // Phase 4e.2: validate per-subtask inputConfig before payload build.
+  for (const s of form.value.subtasks) {
+    if (!s.title || !s.title.trim()) continue
+    const err = validateInputConfig(s.inputType || 'checkbox', s.inputConfig || {})
+    if (err) { out.subtasks = `Task "${s.title.trim()}": ${err}`; break }
+  }
   return out
 })
 const formValid = computed(() => Object.keys(errors.value).length === 0)
@@ -186,14 +214,22 @@ function buildPayload() {
     description: form.value.description.trim() || '',
     recurrence: form.value.recurrence,
     daysBeforeAlert: form.value.daysBeforeAlert.filter((d) => Number.isInteger(d) && d > 0),
-    // _uid is form-only — strip before the round trip.
+    // _uid is form-only — strip before the round trip. Phase 4e.2:
+    // inputType + inputConfig now persist on template subtasks so they
+    // propagate to per-location tasks at activation time (via the
+    // server's buildTaskFromSubtask helper).
     subtasks: form.value.subtasks
       .filter((s) => s.title && s.title.trim())
-      .map((s, i) => ({
-        title: s.title.trim(),
-        daysOffset: Number.isFinite(Number(s.daysOffset)) ? Number(s.daysOffset) : 0,
-        order: i + 1,
-      })),
+      .map((s, i) => {
+        const inputType = s.inputType || 'checkbox'
+        return {
+          title: s.title.trim(),
+          daysOffset: Number.isFinite(Number(s.daysOffset)) ? Number(s.daysOffset) : 0,
+          order: i + 1,
+          inputType,
+          inputConfig: sanitiseInputConfig(inputType, s.inputConfig || {}),
+        }
+      }),
     tags: form.value.tags,
   }
 }
@@ -321,6 +357,7 @@ const categoryOptions = [
           Add task
         </HfButton>
       </div>
+      <p v-if="errors.subtasks" class="tpleditor__field-err">{{ errors.subtasks }}</p>
     </div>
 
     <!-- Tags -->
