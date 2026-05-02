@@ -1,5 +1,6 @@
 {
   "lastUpdated": "2026-05-01",
+  "lastUpdatedNote": "post PR #35",
   "sprint": {
     "goal": "Effective implementation of Hi-Fi v2, starting with ROSS",
     "started": "2026-04-30",
@@ -34,8 +35,8 @@
     {
       "id": 4,
       "name": "ROSS v2 — admin redesign (concierge-first IA)",
-      "status": "in_progress",
-      "summary": "Phase 4a Playbook (PR #21 + #24), 4b Activity (PR #23), 4c People CRUD (PR #25), 4d.1 Workflow editor (PR #28), 4d.2 Template CRUD superAdmin (PR #30), and 4e.1 Per-task input-type editor (PR #32) all merged. 4e.2 (server propagation: subtask→task at create/activate, then template-level inputType editor) is next — requires a functions deploy."
+      "status": "done",
+      "summary": "All Phase 4 tasks merged: 4a Playbook (PRs #21/#24), 4b Activity (#23), 4c People CRUD (#25), 4d.1 Workflow editor (#28), 4d.2 Template CRUD superAdmin (#30), 4e.1 Per-task input-type editor (#32), 4e.2 Subtask→task propagation + template-level inputType editor (#35). All v2 admin tabs are flag-ON behind /ross.html and edit-capable end-to-end."
     },
     {
       "id": 5,
@@ -61,18 +62,18 @@
     { "id": "phase-4d1-workflow-editor", "label": "Phase 4d.1 — Playbook workflow create/edit/lifecycle", "done": true, "phase": 4 },
     { "id": "phase-4d2-template-crud", "label": "Phase 4d.2 — Template CRUD (superAdmin)", "done": true, "phase": 4 },
     { "id": "phase-4e1-task-editor", "label": "Phase 4e.1 — Per-task inputType / inputConfig editor (existing workflow tasks)", "done": true, "phase": 4 },
-    { "id": "phase-4e2-propagation", "label": "Phase 4e.2 — Server propagation (subtask→task) + template-level inputType editor", "done": false, "phase": 4 },
+    { "id": "phase-4e2-propagation", "label": "Phase 4e.2 — Server propagation (subtask→task) + template-level inputType editor", "done": true, "phase": 4 },
     { "id": "phase-5-audit", "label": "Phase 5 audit — confirms onboarding wiring is functional", "done": true, "phase": 5 },
     { "id": "phase-5-journey", "label": "Onboarding journey integration — wire onboarding-ross-hello into signup flow", "done": false, "phase": 5 },
     { "id": "phase-5-auth-gate", "label": "Onboarding auth gate — add verifyAdminStatus to main-hello.js", "done": false, "phase": 5 }
   ],
   "inProgress": [],
   "recentlyCompleted": [
+    { "title": "ross-v2: subtask→task inputType propagation + template-level editor (phase 4e.2)", "pr": 35, "mergedAt": "2026-05-01" },
+    { "title": "docs: sync project-status.json to backlog state after PR #33", "pr": 34, "mergedAt": "2026-05-01" },
     { "title": "docs(ross-v2): post-merge sync + reflect cycle after PR #32", "pr": 33, "mergedAt": "2026-05-01" },
     { "title": "ross-v2: Playbook per-task input type editor (phase 4e.1)", "pr": 32, "mergedAt": "2026-05-01" },
-    { "title": "docs(ross-v2): post-merge sync + reflect cycle after PR #30", "pr": 31, "mergedAt": "2026-05-01" },
-    { "title": "ross-v2: Playbook template CRUD, superAdmin (phase 4d.2)", "pr": 30, "mergedAt": "2026-05-01" },
-    { "title": "ross-v2: Playbook workflow create/edit/lifecycle (phase 4d.1)", "pr": 28, "mergedAt": "2026-05-01" }
+    { "title": "ross-v2: Playbook template CRUD, superAdmin (phase 4d.2)", "pr": 30, "mergedAt": "2026-05-01" }
   ],
   "bugs": [],
   "backlog": {
