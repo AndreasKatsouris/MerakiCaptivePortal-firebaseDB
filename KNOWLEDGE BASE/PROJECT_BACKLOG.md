@@ -3,15 +3,15 @@
 > Claude reads this file at the start of every session and updates it at the end.
 > The Sprint Goal is the contract for the session — don't deviate without explicit user confirmation.
 
-Last updated: 2026-05-01 (post PR #35)
+Last updated: 2026-05-02 (post PR #36 — Phase 5 spec locked)
 
 ---
 
 ## 🎯 Sprint Goal
 
-**Effective implementation of Hi-Fi v2, starting with ROSS** — turn the v2 ROSS scaffold into a real, data-wired feature. v2 stays flag-ON behind `/ross.html` until soaked.
+**Effective implementation of Hi-Fi v2, with ROSS as the central post-login surface for every subscribed user.** Workflows are the product; v1 modules become workflow step types over time.
 
-**Mental model (locked 2026-04-30):** ROSS v1 isn't operator-facing compliance CRUD; it's the **policy + playbook the future AI agent runs against**. The 6 sibling v1 admin tabs collapse to 3 deeper governance destinations behind the concierge home (**Playbook / Activity / People**). LLM integration (`askRoss`) is now central, not deferred — own sprint.
+**Mental model (locked 2026-04-30, refined 2026-05-02):** ROSS v1 isn't operator-facing compliance CRUD; it's the **policy + playbook the future AI agent runs against**. The 6 sibling v1 admin tabs collapse to 3 deeper governance destinations behind the concierge home (**Playbook / Activity / People**). The **playbook is the product** — workflows direct every operation; modules become step types inside workflows, not destinations. **Two tiers only**: Free (full ROSS UI + 5 starter templates) and All-in (full template library). No POS integrations yet — manual entry / file uploads only. LLM integration (`askRoss`) is now central, not deferred — own sprint.
 
 Sprint: 2026-04-30 → until complete
 
@@ -21,7 +21,7 @@ Sprint: 2026-04-30 → until complete
 
 | Item | Branch | Notes |
 |------|--------|-------|
-| — | — | No active branch. Phase 4 (ROSS v2 admin redesign) complete. Next candidate: Phase 5 (onboarding journey integration + auth gate) or one of the High Priority backlog items (food cost merge, Chart.js retirement, ROSS obligation templates). |
+| Phase 5 cleanup spec | (none — planning only) | Spec locked at `docs/superpowers/specs/2026-05-02-ross-central-funnel-cleanup-design.md`. Next: PR #37 = `feat/post-login-router` (PR 1 of 5 in the cleanup plan). |
 
 ---
 
@@ -45,18 +45,36 @@ Sprint: 2026-04-30 → until complete
 - [x] **Phase 4e.1** — Per-task `inputType` / `inputConfig` editor on existing workflow tasks (PR #32). New `RossPlaybookWorkflowTasksEditor` + `RossPlaybookTaskRow` + `RossPlaybookTaskConfigFields` reachable from each card's "Edit tasks" button. All 10 server input types supported via `constants/input-types.js`. Same PR fixed a latent v2 bug: `playbook-service.getPlaybookWorkflows()` now flattens client-side to one row per (workflowId, locationId), matching what the v2 surface always assumed. Follow-up commit addressed 4 of 5 review findings (alert icon, dead code, `taskSavingTaskId` symmetry, raw-rating-input through validator).
 - [x] **Phase 4e.2** — Server propagation + template-level inputType editor (PR #35). Single `buildTaskFromSubtask(subtask, nextDueDate)` helper shared by `rossCreateWorkflow` + `rossActivateWorkflow` keeps create-from-scratch and activate-from-template byte-identical. `validateSubtasksInputTypes` rejects invalid `inputType` enum values upstream at all 4 write paths (`rossCreateWorkflow`, `rossCreateTemplate`, `rossUpdateTemplate`, `rossManageTask`) — closing the validation hole I caught during plan-review (planner had only proposed it for `rossCreateWorkflow`). Subtask row UI gains always-visible type select + collapsed config sub-form, reusing `RossPlaybookTaskConfigFields` from 4e.1. Functions deployed pre-merge to avoid client/server protocol gap.
 
-### Phase 5 — Onboarding
+### Phase 5 — ROSS-as-central-funnel cleanup (LOCKED SPEC 2026-05-02)
+
+Spec: `docs/superpowers/specs/2026-05-02-ross-central-funnel-cleanup-design.md`. Five PRs, sequenced as below. Replaces the original "Phase 5 = onboarding wiring" framing — that was too narrow. The actual work is making ROSS the post-login destination for the first time (`ROSS_IS_HOME` flag has been unread since shipped) and Hi-Fi-rewriting the three v1 surfaces (homepage, signup, wizard) that sit between a visitor and ROSS.
 
 - [x] Audit confirms `getFirstRunFindings()` → store → component is end-to-end functional (PR #22)
-- [ ] **Onboarding journey integration** — wire `/onboarding-ross-hello.html` into the signup flow (currently unreachable; signup.js, user-dashboard.js, dashboard.store.js all skip to `/onboarding-wizard.html`). Behind a feature flag.
-- [ ] **Onboarding auth gate** — add `AdminClaims.verifyAdminStatus` gate to `main-hello.js` mirroring `/ross.html`. Today anonymous URL hits silently render scripted findings.
-- [ ] (Lower priority) Surface `store.error` in `RossOnboardingHello.vue`; lower `FINDING_MIN_LIFT` threshold; parallelise nested RTDB reads in `detectBestWeekday`; un-hardcode the 3-of-5 step counter
+- [ ] **PR 1 (≈#37)** — `feat/post-login-router`: new `post-login-router.js` with pure decision function + unit tests; auth gate on `/onboarding-ross-hello.html` mirroring `/ross.html`; `helloSeen` field on `onboarding-progress/{uid}`; signup wired to router (other call sites stay hardcoded for now).
+- [ ] **PR 2 (≈#38)** — `feat/signup-v2-hifi`: Hi-Fi rewrite of `/signup.html`; tier collapse to Free/All-in; write `tier` to `subscriptions/{uid}` at signup. Depends on PR 1.
+- [ ] **PR 3 (≈#39)** — `feat/homepage-v2-hifi`: Hi-Fi rewrite of `/index.html` with workflow-centric copy; embed synthetic public hello via reused `RossOnboardingHello.vue` component (different data feed). Independent of PRs 1/2.
+- [ ] **PR 4 (≈#40)** — `feat/post-login-router-rollout`: wire remaining 5 redirect call sites to `routePostLogin`; `user-dashboard.html` gets a deprecation banner. **This is the moment ROSS becomes home.** Depends on PRs 1+2.
+- [ ] **PR 5 (≈#41)** — `feat/ross-sidebar-cleanup`: redesign `RossHomeDesktop.vue` sidebar — Today / Workflows / Ross's brain (3 sections, no Operations / Guests). v1 module deep-links removed from ROSS sidebar; admin reaches them via `/admin-dashboard.html`. Depends on PR 4.
 
-### Phase 6 — askRoss LLM (separate sprint)
+Lower-priority Phase 5 items (deferred to dedicated polish PR after the 5-PR sequence): surface `store.error` in `RossOnboardingHello.vue`; lower `FINDING_MIN_LIFT` threshold; parallelise nested RTDB reads in `detectBestWeekday`; un-hardcode the 3-of-5 step counter.
+
+### Phase 6 — Playbook UX enrichment + template library curation (next sprint after Phase 5 cleanup)
+
+> **Vocabulary anchor (per `public/kb/features/ROSS.md`):** Templates → activated → Workflows (per location) → composed of Tasks → executed via Runs. The Runs server surface (`rossCreateRun`, `rossSubmitResponse`, auto-flag, 422-on-required-note) is already shipped — Phase 6 is the operator-facing UX layer on top, plus content (template curation + tier gating).
+
+- [ ] **Curate starter library** — decide which 5 existing templates ship Free; what extends to All-in (existing seed has Opening Checklist, Closing Checklist, Weekly Deep Clean, Monthly Stock Audit per KB; need at least 1 more for free + N for all-in)
+- [ ] **Tier-gated template list** — filter the existing Templates list inside the Playbook tab on `users/{uid}/tier` or `subscriptions/{uid}/tier`; gate `rossActivateWorkflow` server-side too (defence in depth)
+- [ ] **Day-zero auto-activation** — at account creation (post-onboarding completion), programmatically call `rossActivateWorkflow` for one starter template against the user's default location, so a new operator lands in ROSS with one runnable workflow already attached. May need a new CF (e.g. `rossSeedFirstWorkflow`) or a hook in `signup.js` / wizard completion
+- [ ] **Operator-facing Run execution UI** — richer run-execution surface honouring all 10 `inputType`s (existing UI in v1 admin handles checkbox; v2 needs the full matrix — number/temperature with auto-flag handling + 422 note enforcement, dropdown, rating, photo/signature placeholders, etc.). Extends `?tab=playbook` workflow card → "Start run" → run UI
+- [ ] **Concierge home active-run surfacing** — replace the current scripted/illustrative cards on `/ross.html` with real-data cards driven by my activated workflows: today's pending tasks, overdue runs, recent completions. Uses existing `rossGetWorkflows` + `rossGetRun` per active workflow
+- [ ] (Stretch) **Compliance Sweep** as the first end-to-end curated template if not already in seed (recommended starter — small `inputType` footprint, strongest SA-locale moat per LESSONS / spec rationale)
+
+### Phase 7 — askRoss LLM (separate sprint)
 
 - [ ] New `rossChat` Cloud Function (Anthropic SDK + prompt caching)
 - [ ] Eval harness (20-prompt golden set)
 - [ ] Cost cap + secrets management
+- [ ] Web-sourced day-zero findings (weather, local events, public holidays, suburb demographics) — surfaced once LLM is live
 
 ---
 
@@ -70,10 +88,10 @@ Sprint: 2026-04-30 → until complete
 
 ### Medium Priority
 
-4. **Hi-Fi v2 → v1 promotions** — flip flag and promote completed v2 surfaces (guests, queue, analytics, campaigns, receipts) once soaked
+4. **Hi-Fi v2 → v1 promotions** — partially superseded by Phase 5 PR 5 (sidebar cleanup removes v2 module deep-links from ROSS nav entirely). v1 modules stay reachable via `admin-dashboard.html` for the operator. Flag-flip to make v2 the canonical surface for guests/queue/analytics/campaigns/receipts can happen any time post-soak — it just doesn't change ROSS nav anymore.
 5. **WhatsApp template UI polish** — surface improvements from `docs/plans/2026-02-19-whatsapp-template-management.md`
 6. **QA cleanup** — execute `docs/plans/qa-cleanup-plan.md` (~65 test artifact files to remove)
-7. **Sidebar dedup** — kill duplicate v2/v1 entries once v2 promoted
+7. **Sidebar dedup** — folded into Phase 5 PR 5
 8. **Project status auto-derive** — read `PROJECT_BACKLOG.md` directly in the dashboard instead of maintaining `project-status.json` separately
 9. **Factor out `fetchLocationNames` helper** — duplicated across `activity-store.js`, `playbook-store.js`, `people-store.js`. Extract to `public/js/modules/ross/v2/location-names.js`.
 10. **`HfModal` / `HfConfirm` design-system components** — v2 needs a Hi-Fi-native modal pattern for cases that genuinely warrant an overlay (bulk-action confirms, multi-step wizards, etc.). PR #25 dropped SweetAlert2 in favour of inline confirms / inline error banners — that works for the People tab's single-row destructive actions but won't scale. Land in `public/js/design-system/hifi/components/` with --hf-* tokens, focus trap, ESC + scrim dismiss, and a worked example in `public/hifi/components.html`. Update CLAUDE.md convention: SweetAlert2 is v1-only.
@@ -103,11 +121,11 @@ Sprint: 2026-04-30 → until complete
 
 | Feature | PR | Merged |
 |---------|----|--------|
+| docs(ross-v2) — post-merge sync + reflect cycle after PR #35 | #36 | 2026-05-02 |
 | ROSS v2 — Subtask→task inputType propagation + template-level editor (Phase 4e.2) | #35 | 2026-05-01 |
 | docs: sync project-status.json to backlog state after PR #33 | #34 | 2026-05-01 |
 | docs(ross-v2) — post-merge sync + reflect cycle after PR #32 | #33 | 2026-05-01 |
 | ROSS v2 — Playbook per-task input type editor (Phase 4e.1) | #32 | 2026-05-01 |
-| ROSS v2 — Playbook template CRUD, superAdmin (Phase 4d.2) | #30 | 2026-05-01 |
 
 ---
 

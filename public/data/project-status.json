@@ -1,11 +1,11 @@
 {
-  "lastUpdated": "2026-05-01",
-  "lastUpdatedNote": "post PR #35",
+  "lastUpdated": "2026-05-02",
+  "lastUpdatedNote": "Phase 5 spec locked (post PR #36)",
   "sprint": {
-    "goal": "Effective implementation of Hi-Fi v2, starting with ROSS",
+    "goal": "Effective implementation of Hi-Fi v2, with ROSS as the central post-login surface for every subscribed user",
     "started": "2026-04-30",
     "state": "active",
-    "summary": "Concierge-first IA. v1 admin tabs reframed as 'Ross's playbook' — the rules and procedures the future AI agent runs against. Six v1 tabs collapse to three v2 destinations behind the concierge home: Playbook / Activity / People."
+    "summary": "Concierge-first IA. v1 admin tabs reframed as 'Ross's playbook' — the rules and procedures the future AI agent runs against. Six v1 tabs collapse to three v2 destinations behind the concierge home: Playbook / Activity / People. Phase 5 reframed 2026-05-02 — the actual scope is making ROSS the post-login destination for the first time + Hi-Fi-rewriting the public→ROSS funnel (homepage, signup, wizard) and stripping the module-launcher pattern from ROSS sidebar. Workflows are the product; v1 modules become workflow step types over time. Two tiers only: Free (full UI + 5 starter templates), All-in (full library)."
   },
   "phases": [
     {
@@ -40,15 +40,21 @@
     },
     {
       "id": 5,
-      "name": "ROSS v2 — onboarding wired",
+      "name": "ROSS v2 — central-funnel cleanup",
       "status": "in_progress",
-      "summary": "Phase 5 audit (PR #22) confirmed wiring is end-to-end. Two follow-ups added to backlog: integrate page into signup journey + add auth gate."
+      "summary": "Spec locked 2026-05-02 at docs/superpowers/specs/2026-05-02-ross-central-funnel-cleanup-design.md. Five PRs sequenced: post-login router (#37), signup v2 Hi-Fi + tier collapse (#38), homepage v2 Hi-Fi (#39), router rollout — ROSS becomes home (#40), ROSS sidebar cleanup (#41). Q1–Q5 product questions resolved: Free = full UI + 5 starter templates, day-zero = pre-populated demo workflow, v1 access = admin-only via admin-dashboard, hello = same component two data feeds, ROSS_IS_HOME flag wired for rollback safety."
     },
     {
       "id": 6,
+      "name": "ROSS v2 — playbook UX enrichment + template library curation",
+      "status": "planned",
+      "summary": "Next sprint after Phase 5 cleanup. The Runs server surface (rossCreateRun/rossSubmitResponse + auto-flag + 422-on-required-note) is already shipped — Phase 6 is the operator-facing UX layer on top: tier-gated template list (Free=5/All-in=full from existing seed), day-zero auto-activation of one starter template, richer run execution UI honouring all 10 inputTypes, and concierge home cards driven by real activated workflows instead of scripted findings. Vocabulary per public/kb/features/ROSS.md: Templates → Workflows → Tasks → Runs. Compliance Sweep recommended as first curated template."
+    },
+    {
+      "id": 7,
       "name": "ROSS v2 — askRoss (LLM)",
       "status": "deferred",
-      "summary": "Separate sprint. Anthropic-backed rossChat CF + eval harness + cost cap."
+      "summary": "Separate sprint. Anthropic-backed rossChat CF + eval harness + cost cap + web-sourced day-zero findings (weather, local events, holidays, suburb demographics)."
     }
   ],
   "tasks": [
@@ -64,29 +70,35 @@
     { "id": "phase-4e1-task-editor", "label": "Phase 4e.1 — Per-task inputType / inputConfig editor (existing workflow tasks)", "done": true, "phase": 4 },
     { "id": "phase-4e2-propagation", "label": "Phase 4e.2 — Server propagation (subtask→task) + template-level inputType editor", "done": true, "phase": 4 },
     { "id": "phase-5-audit", "label": "Phase 5 audit — confirms onboarding wiring is functional", "done": true, "phase": 5 },
-    { "id": "phase-5-journey", "label": "Onboarding journey integration — wire onboarding-ross-hello into signup flow", "done": false, "phase": 5 },
-    { "id": "phase-5-auth-gate", "label": "Onboarding auth gate — add verifyAdminStatus to main-hello.js", "done": false, "phase": 5 }
+    { "id": "phase-5-spec", "label": "Phase 5 spec locked — central-funnel cleanup design doc", "done": true, "phase": 5 },
+    { "id": "phase-5-pr1-router", "label": "PR 1 (≈#37) — post-login-router + hello auth gate + helloSeen field", "done": false, "phase": 5 },
+    { "id": "phase-5-pr2-signup", "label": "PR 2 (≈#38) — signup v2 Hi-Fi + Free/All-in tier collapse", "done": false, "phase": 5 },
+    { "id": "phase-5-pr3-homepage", "label": "PR 3 (≈#39) — homepage v2 Hi-Fi + synthetic public hello", "done": false, "phase": 5 },
+    { "id": "phase-5-pr4-rollout", "label": "PR 4 (≈#40) — router rollout — ROSS becomes home", "done": false, "phase": 5 },
+    { "id": "phase-5-pr5-sidebar", "label": "PR 5 (≈#41) — ROSS sidebar cleanup (Today / Workflows / Ross's brain)", "done": false, "phase": 5 },
+    { "id": "phase-6-templates", "label": "Phase 6 — Workflow runner + step types + starter template library", "done": false, "phase": 6 }
   ],
-  "inProgress": [],
+  "inProgress": [
+    { "label": "Phase 5 cleanup spec — locked, ready for PR 1 planning", "branch": "(none yet)" }
+  ],
   "recentlyCompleted": [
+    { "title": "docs(ross-v2): post-merge sync + reflect cycle after PR #35", "pr": 36, "mergedAt": "2026-05-02" },
     { "title": "ross-v2: subtask→task inputType propagation + template-level editor (phase 4e.2)", "pr": 35, "mergedAt": "2026-05-01" },
     { "title": "docs: sync project-status.json to backlog state after PR #33", "pr": 34, "mergedAt": "2026-05-01" },
     { "title": "docs(ross-v2): post-merge sync + reflect cycle after PR #32", "pr": 33, "mergedAt": "2026-05-01" },
-    { "title": "ross-v2: Playbook per-task input type editor (phase 4e.1)", "pr": 32, "mergedAt": "2026-05-01" },
-    { "title": "ross-v2: Playbook template CRUD, superAdmin (phase 4d.2)", "pr": 30, "mergedAt": "2026-05-01" }
+    { "title": "ross-v2: Playbook per-task input type editor (phase 4e.1)", "pr": 32, "mergedAt": "2026-05-01" }
   ],
   "bugs": [],
   "backlog": {
     "high": [
       "Food cost open PR — review and merge",
       "Chart.js retirement (soak ends ~2026-05-07)",
-      "ROSS obligation templates (docs/plans/2026-03-20-obligation-templates-plan.md)"
+      "Phase 6 — workflow templates (after Phase 5 cleanup ships; spec to be drafted)"
     ],
     "medium": [
-      "Hi-Fi v2 → v1 promotions (guests, queue, analytics, campaigns, receipts)",
+      "Hi-Fi v2 → v1 promotions (guests, queue, analytics, campaigns, receipts) — partially superseded by Phase 5 PR 5 sidebar cleanup which removes them from ROSS nav",
       "WhatsApp template UI polish",
       "QA cleanup (~65 test artifact files)",
-      "Sidebar dedup of v2 vs v1 entries (after v2 promotion)",
       "Project status auto-derive from PROJECT_BACKLOG.md",
       "Factor out fetchLocationNames helper across activity/playbook/people stores",
       "HfModal / HfConfirm design-system components — v2 needs a Hi-Fi-native modal pattern; SweetAlert2 is v1-only",
@@ -94,8 +106,8 @@
     ],
     "low": [
       "Subscription admin charts migration",
-      "Group overview v2 → v1 promotion",
-      "Onboarding flow improvements",
+      "Group overview v2 → v1 promotion (likely dropped — see Phase 5 PR 5)",
+      "Onboarding flow improvements (lower-priority items in spec — surface store.error, lower FINDING_MIN_LIFT, parallelise detectBestWeekday reads, un-hardcode 3-of-5 step counter)",
       "Edit-mode multi-location pill render in workflow editor"
     ]
   }
