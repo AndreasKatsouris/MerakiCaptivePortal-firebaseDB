@@ -3,7 +3,7 @@
 > Claude reads this file at the start of every session and updates it at the end.
 > The Sprint Goal is the contract for the session — don't deviate without explicit user confirmation.
 
-Last updated: 2026-05-02 (post PR #36 — Phase 5 spec locked)
+Last updated: 2026-05-02 (post PR #37 — Phase 5 spec merged)
 
 ---
 
@@ -21,7 +21,7 @@ Sprint: 2026-04-30 → until complete
 
 | Item | Branch | Notes |
 |------|--------|-------|
-| Phase 5 cleanup spec | (none — planning only) | Spec locked at `docs/superpowers/specs/2026-05-02-ross-central-funnel-cleanup-design.md`. Next: PR #37 = `feat/post-login-router` (PR 1 of 5 in the cleanup plan). |
+| Post-merge sync after PR #37 | `docs/post-merge-sync-pr37` | Reflect cycle for the spec PR. Once merged, next is PR ≈#39 = `feat/post-login-router` (Phase 5 PR 1). |
 
 ---
 
@@ -50,11 +50,12 @@ Sprint: 2026-04-30 → until complete
 Spec: `docs/superpowers/specs/2026-05-02-ross-central-funnel-cleanup-design.md`. Five PRs, sequenced as below. Replaces the original "Phase 5 = onboarding wiring" framing — that was too narrow. The actual work is making ROSS the post-login destination for the first time (`ROSS_IS_HOME` flag has been unread since shipped) and Hi-Fi-rewriting the three v1 surfaces (homepage, signup, wizard) that sit between a visitor and ROSS.
 
 - [x] Audit confirms `getFirstRunFindings()` → store → component is end-to-end functional (PR #22)
-- [ ] **PR 1 (≈#37)** — `feat/post-login-router`: new `post-login-router.js` with pure decision function + unit tests; auth gate on `/onboarding-ross-hello.html` mirroring `/ross.html`; `helloSeen` field on `onboarding-progress/{uid}`; signup wired to router (other call sites stay hardcoded for now).
-- [ ] **PR 2 (≈#38)** — `feat/signup-v2-hifi`: Hi-Fi rewrite of `/signup.html`; tier collapse to Free/All-in; write `tier` to `subscriptions/{uid}` at signup. Depends on PR 1.
-- [ ] **PR 3 (≈#39)** — `feat/homepage-v2-hifi`: Hi-Fi rewrite of `/index.html` with workflow-centric copy; embed synthetic public hello via reused `RossOnboardingHello.vue` component (different data feed). Independent of PRs 1/2.
-- [ ] **PR 4 (≈#40)** — `feat/post-login-router-rollout`: wire remaining 5 redirect call sites to `routePostLogin`; `user-dashboard.html` gets a deprecation banner. **This is the moment ROSS becomes home.** Depends on PRs 1+2.
-- [ ] **PR 5 (≈#41)** — `feat/ross-sidebar-cleanup`: redesign `RossHomeDesktop.vue` sidebar — Today / Workflows / Ross's brain (3 sections, no Operations / Guests). v1 module deep-links removed from ROSS sidebar; admin reaches them via `/admin-dashboard.html`. Depends on PR 4.
+- [x] Spec locked + merged (PR #37, 2026-05-02)
+- [ ] **PR 1 (≈#39)** — `feat/post-login-router`: new `post-login-router.js` with pure decision function + unit tests; auth gate on `/onboarding-ross-hello.html` mirroring `/ross.html`; `helloSeen` field on `onboarding-progress/{uid}`; signup wired to router (other call sites stay hardcoded for now).
+- [ ] **PR 2 (≈#40)** — `feat/signup-v2-hifi`: Hi-Fi rewrite of `/signup.html`; tier collapse to Free/All-in; write `tier` to `subscriptions/{uid}` at signup. Depends on PR 1.
+- [ ] **PR 3 (≈#41)** — `feat/homepage-v2-hifi`: Hi-Fi rewrite of `/index.html` with workflow-centric copy; embed synthetic public hello via reused `RossOnboardingHello.vue` component (different data feed). Independent of PRs 1/2.
+- [ ] **PR 4 (≈#42)** — `feat/post-login-router-rollout`: wire remaining 5 redirect call sites to `routePostLogin`; `user-dashboard.html` gets a deprecation banner. **This is the moment ROSS becomes home.** Depends on PRs 1+2.
+- [ ] **PR 5 (≈#43)** — `feat/ross-sidebar-cleanup`: collapse sidebar to just Today + Ross's brain (3 sections). v1 module deep-links removed from ROSS sidebar; operator reaches them via `/admin-dashboard.html`. Depends on PR 4.
 
 Lower-priority Phase 5 items (deferred to dedicated polish PR after the 5-PR sequence): surface `store.error` in `RossOnboardingHello.vue`; lower `FINDING_MIN_LIFT` threshold; parallelise nested RTDB reads in `detectBestWeekday`; un-hardcode the 3-of-5 step counter.
 
@@ -121,11 +122,11 @@ Lower-priority Phase 5 items (deferred to dedicated polish PR after the 5-PR seq
 
 | Feature | PR | Merged |
 |---------|----|--------|
+| docs(ross-v2) — phase 5 spec: ROSS as central funnel + cleanup plan | #37 | 2026-05-02 |
 | docs(ross-v2) — post-merge sync + reflect cycle after PR #35 | #36 | 2026-05-02 |
 | ROSS v2 — Subtask→task inputType propagation + template-level editor (Phase 4e.2) | #35 | 2026-05-01 |
 | docs: sync project-status.json to backlog state after PR #33 | #34 | 2026-05-01 |
 | docs(ross-v2) — post-merge sync + reflect cycle after PR #32 | #33 | 2026-05-01 |
-| ROSS v2 — Playbook per-task input type editor (Phase 4e.1) | #32 | 2026-05-01 |
 
 ---
 
