@@ -9,11 +9,39 @@
   <link rel="stylesheet" href="/css/hifi-base.css">
   <style>
     html, body { margin: 0; padding: 0; height: 100%; background: var(--hf-ink); }
-    #app { min-height: 100vh; }
+    #app, #gate { min-height: 100vh; }
+    /* Auth gate — shown only until Vue app replaces it. Inked background
+       to match the hello stage so the transition is near-invisible. */
+    #gate { display: grid; place-items: center; font-family: var(--hf-font-body); color: var(--hf-muted); }
+    #gate .hf-eyebrow { font-size: 11px; letter-spacing: 0.14em; text-transform: uppercase; }
   </style>
 </head>
 <body class="hf-body">
-  <div id="app"></div>
-  <script type="module" src="/js/modules/ross/v2/main-hello.js"></script>
+
+<div id="gate">
+  <div class="hf-eyebrow">Verifying access…</div>
+</div>
+
+<script type="module">
+  import { auth, onAuthStateChanged } from '/js/config/firebase-config.js'
+
+  // Auth-only gate: onboarding hello is pre-tier-relevant. Anyone with a
+  // Firebase auth user can see it. Anonymous URL hits bounce to login so
+  // future real-data findings (Phase 6+) can't be probed unauthenticated.
+  document.addEventListener('DOMContentLoaded', () => {
+    onAuthStateChanged(auth, async (user) => {
+      if (!user) {
+        window.location.href = '/user-login.html?message=unauthorized'
+        return
+      }
+      // Gate cleared — swap placeholder for the app mount and dynamic-import
+      // the Vue entry so unauthorised visitors never load the hello bundle.
+      const host = document.getElementById('gate')
+      host.outerHTML = '<div id="app"></div>'
+      await import('/js/modules/ross/v2/main-hello.js')
+    })
+  })
+</script>
+
 </body>
 </html>

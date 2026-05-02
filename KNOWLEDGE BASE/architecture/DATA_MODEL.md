@@ -117,7 +117,28 @@ Admin profile data. Requires `superAdmin` field.
 ```
 
 #### `onboarding-progress/{uid}`
-Tracks user onboarding completion.
+Tracks user onboarding completion. Read by `post-login-router.js` to decide post-login destination.
+
+```json
+{
+  "completed": true,
+  "completedAt": 1700000000000,
+  "completedSteps": ["business-info", "location-setup", "preferences"],
+  "currentStep": "completed",
+  "selectedFeatures": ["wifi", "queue", "campaigns"],
+  "toursSeen": [],
+  "helloSeen": true,
+  "createdAt": 1700000000000
+}
+```
+
+| Field | Owner | Purpose |
+|-------|-------|---------|
+| `completed`, `completedAt`, `completedSteps`, `currentStep`, `selectedFeatures`, `toursSeen` | `onboarding-wizard.js` | Wizard progress state |
+| `helloSeen` | `RossOnboardingHello.vue` (write) + `post-login-router.js` (read) | Whether the user has acknowledged the Ross v2 first-run hello. Missing on existing pre-PR-#37 accounts → router treats as `true` (don't show retroactively) |
+| `createdAt` | `signup.js` | Initial creation timestamp |
+
+> **Important — wizard writes via `update()`, not `set()`.** The wizard completion path uses `update()` to preserve `helloSeen` written by the Ross hello before the wizard ran. Replacing with `set()` would silently wipe the field.
 
 ---
 

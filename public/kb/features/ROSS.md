@@ -51,7 +51,7 @@ Six v1 tabs collapse to three v2 destinations + the concierge home. Tab routing 
 
 The v1 admin remains reachable at `admin-dashboard.html#rossContent` for the entire soak period. It's the rollback net. Cloud Functions are unchanged — the v2 surfaces wrap them via thin per-tab service files (e.g. `playbook-service.js`).
 
-### Phase status (as of 2026-05-01)
+### Phase status (as of 2026-05-02)
 
 | Phase | Status |
 |-------|--------|
@@ -61,11 +61,23 @@ The v1 admin remains reachable at `admin-dashboard.html#rossContent` for the ent
 | Playbook tab read-view | ✅ PR #21 |
 | Activity tab | ✅ PR #23 (locationName enrichment fix in PR #24) |
 | People tab | ✅ PR #25 — first **edit-capable** v2 surface |
-| Playbook editing — workflow create / edit / pause / delete | ✅ Phase 4d.1 — first edit-capable v2 surface for the workflow data path |
-| Playbook editing — template CRUD | ⏳ Phase 4d.2 (superAdmin) |
-| Per-task `inputType` / `inputConfig` editor | ⏳ Phase 4e (deferred from 4d) |
-| Onboarding wired | ⏳ Phase 5 |
-| `askRoss` LLM | 🔮 separate sprint |
+| Playbook editing — workflow create / edit / pause / delete | ✅ Phase 4d.1 |
+| Playbook editing — template CRUD | ✅ Phase 4d.2 (PR #30, superAdmin) |
+| Per-task `inputType` / `inputConfig` editor | ✅ Phase 4e.1 (PR #32) + 4e.2 (PR #35) |
+| Phase 5 spec — central-funnel cleanup | ✅ PR #37 |
+| Onboarding wired (router + auth gate + helloSeen) | ⏳ Phase 5 PR 1 of 5 |
+| `askRoss` LLM | 🔮 separate sprint (Phase 7) |
+
+### Onboarding handoff — `helloSeen` field (Phase 5 PR 1)
+
+The Ross v2 first-run hello (`/onboarding-ross-hello.html`) sits between signup and the business-data wizard. To prevent re-showing it on every login, `RossOnboardingHello.vue.onContinue` writes `helloSeen: true` to `onboarding-progress/{uid}` before redirecting to the wizard. The post-login router (`public/js/auth/post-login-router.js`) reads this field to decide between hello / wizard / ross / legacy-dashboard destinations.
+
+**Field contract:**
+- Path: `onboarding-progress/{uid}.helloSeen` (boolean)
+- Writer: `RossOnboardingHello.vue` (component) + `signup.js` (initialisation to `false`)
+- Reader: `post-login-router.js` (only consumer)
+- Backwards-compat: missing field on a `completed: true` node ⇒ router treats as `true` (existing accounts never get shown the hello retroactively)
+- Wizard's completion path uses `update()` not `set()` to preserve this field — see `onboarding-wizard.js:381` and the warning in `KNOWLEDGE BASE/architecture/DATA_MODEL.md`
 
 ### People tab — patterns established (PR #25)
 

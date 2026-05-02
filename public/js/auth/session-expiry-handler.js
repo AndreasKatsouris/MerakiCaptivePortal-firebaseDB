@@ -22,7 +22,8 @@ const PROTECTED_PAGES = [
     'receipt-management.html',
     'reward-management.html',
     'admin-dashboard.html',
-    'onboarding-wizard.html'
+    'onboarding-wizard.html',
+    'onboarding-ross-hello.html'
 ];
 
 /**

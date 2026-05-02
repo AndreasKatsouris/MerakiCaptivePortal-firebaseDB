@@ -3,9 +3,10 @@
  * Handles user registration for the Laki Sparks platform
  */
 
-import { auth, rtdb, ref, get, set, push, functions, httpsCallable, onAuthStateChanged } from './config/firebase-config.js';
+import { auth, rtdb, ref, get, set, update, push, functions, httpsCallable, onAuthStateChanged } from './config/firebase-config.js';
 import { createUserWithEmailAndPassword, updateProfile } from 'https://www.gstatic.com/firebasejs/10.12.5/firebase-auth.js';
 import { showToast } from './utils/toast.js';
+import { routePostLogin } from './auth/post-login-router.js';
 
 class SignupManager {
     constructor() {
@@ -390,17 +391,40 @@ class SignupManager {
                     const newLocationRef = push(ref(rtdb, 'locations'));
                     await set(newLocationRef, locationData);
                     await set(ref(rtdb, `userLocations/${freshUser.uid}/${newLocationRef.key}`), true);
+
+                    // Initialise onboarding-progress so the post-login router
+                    // has clean state to read. helloSeen=false routes new
+                    // accounts through the Ross hello before the wizard.
+                    // Only writes for genuinely new users (the merge branch
+                    // above handles re-entry of existing accounts and must
+                    // not stomp completed=true).
+                    await set(ref(rtdb, `onboarding-progress/${freshUser.uid}`), {
+                        completed: false,
+                        helloSeen: false,
+                        createdAt: Date.now()
+                    });
                 }
             } catch (userCreationError) {
                 throw userCreationError;
             }
 
-            showToast('Account created successfully! Redirecting to setup wizard...', 'success');
+            showToast('Account created successfully! Redirecting…', 'success');
 
-            // Redirect to onboarding wizard after 2 seconds
-            setTimeout(() => {
-                window.location.href = '/onboarding-wizard.html';
-            }, 2000);
+            // Hold the toast for a minimum of 2s, run the router resolve
+            // concurrently, then navigate exactly once at max(toast, router).
+            // We pass a deferred navigator that captures the destination
+            // instead of letting routePostLogin call window.location.href
+            // directly — otherwise the assignment would begin browser
+            // navigation as soon as the RTDB read settles (~200ms), and
+            // the toast would only be visible for a fraction of a second.
+            // routePostLogin still applies its error fallback by calling
+            // the captured navigator with the legacy URL on resolver error.
+            let dest = '/user-dashboard.html';
+            await Promise.all([
+                routePostLogin(freshUser, (d) => { dest = d; }),
+                new Promise(r => setTimeout(r, 2000))
+            ]);
+            window.location.href = dest;
 
         } catch (error) {
             console.error('Signup error:', error);
