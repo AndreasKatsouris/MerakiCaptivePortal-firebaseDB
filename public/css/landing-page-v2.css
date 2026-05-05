@@ -103,6 +103,135 @@
   .lp-container { padding: 0 var(--hf-space-4); }
 }
 
+/* PR #44 additions — pricing, hello embed, two-card grid, founder solo,
+   typographic hero panel (replaces the v1 hero photo). */
+
+.lp-hero__panel {
+  background: var(--hf-paper);
+  border: 1px solid var(--hf-line);
+  border-radius: var(--hf-radius-lg);
+  padding: var(--hf-space-5) var(--hf-space-5) var(--hf-space-4);
+  box-shadow: var(--hf-shadow-2);
+  font-family: var(--hf-font-body);
+  color: var(--hf-ink);
+  position: relative;
+}
+.lp-hero__panel-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--hf-space-3);
+  margin-bottom: var(--hf-space-3);
+}
+.lp-hero__panel-eyebrow {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-family: var(--hf-font-mono);
+  font-size: 11px;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--hf-muted);
+}
+.lp-hero__panel-time {
+  font-family: var(--hf-font-mono);
+  font-size: 11px;
+  letter-spacing: 0.14em;
+  color: var(--hf-muted);
+}
+.lp-hero__panel-title {
+  font-family: var(--hf-font-display);
+  font-size: 28px;
+  letter-spacing: -0.015em;
+  line-height: 1.05;
+  margin-bottom: var(--hf-space-4);
+}
+.lp-hero__panel-tasks {
+  list-style: none;
+  padding: 0;
+  margin: 0 0 var(--hf-space-4);
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+  border-top: 1px solid var(--hf-line);
+}
+.lp-hero__panel-task {
+  display: flex;
+  align-items: center;
+  gap: var(--hf-space-3);
+  padding: var(--hf-space-3) 0;
+  border-bottom: 1px solid var(--hf-line);
+  font-size: 14px;
+  line-height: 1.3;
+}
+.lp-hero__panel-check {
+  flex: 0 0 auto;
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  border: 1.5px solid var(--hf-line-2);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--hf-paper);
+  background: var(--hf-paper);
+}
+.lp-hero__panel-task--done .lp-hero__panel-check {
+  background: var(--hf-ink);
+  border-color: var(--hf-ink);
+}
+.lp-hero__panel-task--done .lp-hero__panel-label {
+  color: var(--hf-ink);
+}
+.lp-hero__panel-task--active .lp-hero__panel-check {
+  border-color: var(--hf-accent);
+  border-style: dashed;
+  animation: lp-hero-pulse 1.6s ease-in-out infinite;
+}
+.lp-hero__panel-task--active .lp-hero__panel-label {
+  color: var(--hf-ink);
+}
+.lp-hero__panel-task--active .lp-hero__panel-meta {
+  color: var(--hf-accent);
+}
+.lp-hero__panel-label {
+  flex: 1;
+  min-width: 0;
+  color: var(--hf-ink-2);
+}
+.lp-hero__panel-meta {
+  font-family: var(--hf-font-mono);
+  font-size: 12px;
+  color: var(--hf-muted);
+  letter-spacing: 0.04em;
+}
+.lp-hero__panel-foot {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-family: var(--hf-font-mono);
+  font-size: 11px;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--hf-muted);
+}
+.lp-hero__panel-status-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--hf-good);
+  box-shadow: 0 0 0 3px rgba(92, 122, 74, 0.18);
+}
+
+@keyframes lp-hero-pulse {
+  0%, 100% { opacity: 1; }
+  50%      { opacity: 0.45; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .lp-hero__panel-task--active .lp-hero__panel-check { animation: none; }
+}
+
 /* PR #44 additions — pricing, hello embed, two-card grid, founder solo. */
 
 .lp-container--narrow { max-width: 720px; }

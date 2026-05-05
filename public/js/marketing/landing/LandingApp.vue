@@ -127,8 +127,57 @@ function smoothScroll(e, selector) {
               </hf-button>
             </div>
           </div>
-          <div class="lp-hero__media">
-            <img src="/img/ob-bg.jpg" alt="A small restaurant team setting up before service." loading="eager" />
+          <!-- Typographic hero panel: a stylised representation of one
+               workflow run. The product, in miniature. Aria-hidden
+               because everything visible is decorative — the hero copy
+               carries the actual narrative for screen readers. -->
+          <div class="lp-hero__panel" aria-hidden="true">
+            <header class="lp-hero__panel-head">
+              <span class="lp-hero__panel-eyebrow">
+                <hf-icon name="sparkle" :size="11" />
+                Daily Opening Checklist
+              </span>
+              <span class="lp-hero__panel-time">06:30</span>
+            </header>
+            <div class="lp-hero__panel-title">Tannie&rsquo;s Kitchen</div>
+            <ul class="lp-hero__panel-tasks">
+              <li class="lp-hero__panel-task lp-hero__panel-task--done">
+                <span class="lp-hero__panel-check" aria-hidden="true">
+                  <svg viewBox="0 0 16 16" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+                    <path d="M3 8.5 L6.5 12 L13 5" />
+                  </svg>
+                </span>
+                <span class="lp-hero__panel-label">Walk-in fridge temp</span>
+                <span class="lp-hero__panel-meta">3&deg;C</span>
+              </li>
+              <li class="lp-hero__panel-task lp-hero__panel-task--done">
+                <span class="lp-hero__panel-check" aria-hidden="true">
+                  <svg viewBox="0 0 16 16" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+                    <path d="M3 8.5 L6.5 12 L13 5" />
+                  </svg>
+                </span>
+                <span class="lp-hero__panel-label">Front-of-house signage on</span>
+                <span class="lp-hero__panel-meta">OK</span>
+              </li>
+              <li class="lp-hero__panel-task lp-hero__panel-task--done">
+                <span class="lp-hero__panel-check" aria-hidden="true">
+                  <svg viewBox="0 0 16 16" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+                    <path d="M3 8.5 L6.5 12 L13 5" />
+                  </svg>
+                </span>
+                <span class="lp-hero__panel-label">Cash float counted</span>
+                <span class="lp-hero__panel-meta">R2,500</span>
+              </li>
+              <li class="lp-hero__panel-task lp-hero__panel-task--active">
+                <span class="lp-hero__panel-check" aria-hidden="true"></span>
+                <span class="lp-hero__panel-label">Music queued</span>
+                <span class="lp-hero__panel-meta">…</span>
+              </li>
+            </ul>
+            <footer class="lp-hero__panel-foot">
+              <span class="lp-hero__panel-status-dot" aria-hidden="true"></span>
+              <span>3 of 4 done &middot; Ross is watching</span>
+            </footer>
           </div>
         </div>
       </div>
