@@ -1,6 +1,6 @@
 {
-  "lastUpdated": "2026-05-02",
-  "lastUpdatedNote": "Phase 5 PR 1 of 5 merged (post PR #39)",
+  "lastUpdated": "2026-05-05",
+  "lastUpdatedNote": "Reflect cycle complete (post PR #40); ready to start Phase 5 PR 2 = feat/signup-v2-hifi",
   "sprint": {
     "goal": "Effective implementation of Hi-Fi v2, with ROSS as the central post-login surface for every subscribed user",
     "started": "2026-04-30",
@@ -42,7 +42,7 @@
       "id": 5,
       "name": "ROSS v2 — central-funnel cleanup",
       "status": "in_progress",
-      "summary": "Spec locked 2026-05-02 at docs/superpowers/specs/2026-05-02-ross-central-funnel-cleanup-design.md. Five PRs sequenced: post-login router (#37), signup v2 Hi-Fi + tier collapse (#38), homepage v2 Hi-Fi (#39), router rollout — ROSS becomes home (#40), ROSS sidebar cleanup (#41). Q1–Q5 product questions resolved: Free = full UI + 5 starter templates, day-zero = pre-populated demo workflow, v1 access = admin-only via admin-dashboard, hello = same component two data feeds, ROSS_IS_HOME flag wired for rollback safety."
+      "summary": "Spec locked 2026-05-02 at docs/superpowers/specs/2026-05-02-ross-central-funnel-cleanup-design.md. Five PRs sequenced: post-login router (#39, merged), signup v2 Hi-Fi + tier collapse (≈#42), homepage v2 Hi-Fi (≈#43), router rollout — ROSS becomes home (≈#44), ROSS sidebar cleanup (≈#45). Q1–Q5 product questions resolved: Free = full UI + 5 starter templates, day-zero = pre-populated demo workflow, v1 access = admin-only via admin-dashboard, hello = same component two data feeds, ROSS_IS_HOME flag wired for rollback safety."
     },
     {
       "id": 6,
@@ -72,21 +72,19 @@
     { "id": "phase-5-audit", "label": "Phase 5 audit — confirms onboarding wiring is functional", "done": true, "phase": 5 },
     { "id": "phase-5-spec", "label": "Phase 5 spec — central-funnel cleanup design doc (PR #37)", "done": true, "phase": 5 },
     { "id": "phase-5-pr1-router", "label": "PR 1 (PR #39) — post-login-router + hello auth gate + helloSeen field", "done": true, "phase": 5 },
-    { "id": "phase-5-pr2-signup", "label": "PR 2 (≈#41) — signup v2 Hi-Fi + Free/All-in tier collapse", "done": false, "phase": 5 },
-    { "id": "phase-5-pr3-homepage", "label": "PR 3 (≈#42) — homepage v2 Hi-Fi + synthetic public hello", "done": false, "phase": 5 },
-    { "id": "phase-5-pr4-rollout", "label": "PR 4 (≈#43) — router rollout — ROSS becomes home", "done": false, "phase": 5 },
-    { "id": "phase-5-pr5-sidebar", "label": "PR 5 (≈#44) — ROSS sidebar cleanup (Today + Ross's brain)", "done": false, "phase": 5 },
+    { "id": "phase-5-pr2-signup", "label": "PR 2 (≈#42) — signup v2 Hi-Fi + Free/All-in tier collapse", "done": false, "phase": 5 },
+    { "id": "phase-5-pr3-homepage", "label": "PR 3 (≈#43) — homepage v2 Hi-Fi + synthetic public hello", "done": false, "phase": 5 },
+    { "id": "phase-5-pr4-rollout", "label": "PR 4 (≈#44) — router rollout — ROSS becomes home", "done": false, "phase": 5 },
+    { "id": "phase-5-pr5-sidebar", "label": "PR 5 (≈#45) — ROSS sidebar cleanup (Today + Ross's brain)", "done": false, "phase": 5 },
     { "id": "phase-6-templates", "label": "Phase 6 — Workflow runner + step types + starter template library", "done": false, "phase": 6 }
   ],
-  "inProgress": [
-    { "label": "Post-merge sync after PR #39 — once merged, next is PR ≈#41 = feat/signup-v2-hifi (Phase 5 PR 2)", "branch": "docs/post-merge-sync-pr39" }
-  ],
+  "inProgress": [],
   "recentlyCompleted": [
+    { "title": "docs(ross-v2): post-merge sync + reflect cycle after PR #39", "pr": 40, "mergedAt": "2026-05-02" },
     { "title": "ross-v2: post-login router foundation + hello auth gate (phase 5 PR 1)", "pr": 39, "mergedAt": "2026-05-02" },
     { "title": "docs(ross-v2): post-merge sync + reflect cycle after PR #37", "pr": 38, "mergedAt": "2026-05-02" },
     { "title": "docs(ross-v2): phase 5 spec — ROSS as central funnel + cleanup plan", "pr": 37, "mergedAt": "2026-05-02" },
-    { "title": "docs(ross-v2): post-merge sync + reflect cycle after PR #35", "pr": 36, "mergedAt": "2026-05-02" },
-    { "title": "ross-v2: subtask→task inputType propagation + template-level editor (phase 4e.2)", "pr": 35, "mergedAt": "2026-05-01" }
+    { "title": "docs(ross-v2): post-merge sync + reflect cycle after PR #35", "pr": 36, "mergedAt": "2026-05-02" }
   ],
   "bugs": [],
   "backlog": {

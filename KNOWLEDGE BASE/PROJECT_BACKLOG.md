@@ -3,7 +3,7 @@
 > Claude reads this file at the start of every session and updates it at the end.
 > The Sprint Goal is the contract for the session — don't deviate without explicit user confirmation.
 
-Last updated: 2026-05-02 (post PR #39 — Phase 5 PR 1 of 5 merged)
+Last updated: 2026-05-05 (post PR #40 — reflect cycle complete; ready to start Phase 5 PR 2 = `feat/signup-v2-hifi`)
 
 ---
 
@@ -21,7 +21,7 @@ Sprint: 2026-04-30 → until complete
 
 | Item | Branch | Notes |
 |------|--------|-------|
-| Post-merge sync after PR #39 | `docs/post-merge-sync-pr39` | Reflect cycle for Phase 5 PR 1. Once merged, next is PR ≈#41 = `feat/signup-v2-hifi` (Phase 5 PR 2). Note: PR ≈#40 will likely be this docs sync. |
+| — | — | Idle. Next sprint task: Phase 5 PR 2 = `feat/signup-v2-hifi` (≈ PR #42, since this sync ate PR #41). |
 
 ---
 
@@ -52,10 +52,10 @@ Spec: `docs/superpowers/specs/2026-05-02-ross-central-funnel-cleanup-design.md`.
 - [x] Audit confirms `getFirstRunFindings()` → store → component is end-to-end functional (PR #22)
 - [x] Spec locked + merged (PR #37, 2026-05-02)
 - [x] **PR 1 (PR #39)** — `feat/post-login-router`: pure router + 19 tests at 100% coverage; hello auth gate; `helloSeen` field shipped end-to-end (signup init + hello CTA write + wizard `set→update` fix to preserve it + KB doc + matrix backwards-compat). Toast-timing fix landed via deferred-navigator pattern after review caught the `Promise.all` side-effect race.
-- [ ] **PR 2 (≈#41)** — `feat/signup-v2-hifi`: Hi-Fi rewrite of `/signup.html`; tier collapse to Free/All-in; write `tier` to `subscriptions/{uid}` at signup. Depends on PR 1.
-- [ ] **PR 3 (≈#42)** — `feat/homepage-v2-hifi`: Hi-Fi rewrite of `/index.html` with workflow-centric copy; embed synthetic public hello via reused `RossOnboardingHello.vue` component (different data feed). Independent of PRs 1/2.
-- [ ] **PR 4 (≈#43)** — `feat/post-login-router-rollout`: wire remaining 5 redirect call sites to `routePostLogin`; `user-dashboard.html` gets a deprecation banner. **This is the moment ROSS becomes home.** Depends on PRs 1+2.
-- [ ] **PR 5 (≈#44)** — `feat/ross-sidebar-cleanup`: collapse sidebar to just Today + Ross's brain (3 sections). v1 module deep-links removed from ROSS sidebar; operator reaches them via `/admin-dashboard.html`. Depends on PR 4.
+- [ ] **PR 2 (≈#42)** — `feat/signup-v2-hifi`: Hi-Fi rewrite of `/signup.html`; tier collapse to Free/All-in; write `tier` to `subscriptions/{uid}` at signup. Depends on PR 1.
+- [ ] **PR 3 (≈#43)** — `feat/homepage-v2-hifi`: Hi-Fi rewrite of `/index.html` with workflow-centric copy; embed synthetic public hello via reused `RossOnboardingHello.vue` component (different data feed). Independent of PRs 1/2.
+- [ ] **PR 4 (≈#44)** — `feat/post-login-router-rollout`: wire remaining 5 redirect call sites to `routePostLogin`; `user-dashboard.html` gets a deprecation banner. **This is the moment ROSS becomes home.** Depends on PRs 1+2.
+- [ ] **PR 5 (≈#45)** — `feat/ross-sidebar-cleanup`: collapse sidebar to just Today + Ross's brain (3 sections). v1 module deep-links removed from ROSS sidebar; operator reaches them via `/admin-dashboard.html`. Depends on PR 4.
 
 Lower-priority Phase 5 items (deferred to dedicated polish PR after the 5-PR sequence): surface `store.error` in `RossOnboardingHello.vue`; lower `FINDING_MIN_LIFT` threshold; parallelise nested RTDB reads in `detectBestWeekday`; un-hardcode the 3-of-5 step counter.
 
@@ -122,11 +122,11 @@ Lower-priority Phase 5 items (deferred to dedicated polish PR after the 5-PR seq
 
 | Feature | PR | Merged |
 |---------|----|--------|
+| docs(ross-v2) — post-merge sync + reflect cycle after PR #39 | #40 | 2026-05-02 |
 | ROSS v2 — post-login router foundation + hello auth gate (Phase 5 PR 1) | #39 | 2026-05-02 |
 | docs(ross-v2) — post-merge sync + reflect cycle after PR #37 | #38 | 2026-05-02 |
 | docs(ross-v2) — phase 5 spec: ROSS as central funnel + cleanup plan | #37 | 2026-05-02 |
 | docs(ross-v2) — post-merge sync + reflect cycle after PR #35 | #36 | 2026-05-02 |
-| ROSS v2 — Subtask→task inputType propagation + template-level editor (Phase 4e.2) | #35 | 2026-05-01 |
 
 ---
 
