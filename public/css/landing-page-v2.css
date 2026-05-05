@@ -1,9 +1,17 @@
-/* Sparks Hi-Fi landing page (index-v2.html) — page-level layout only.
+/* Sparks Hi-Fi landing page (/index.html) — page-level layout only.
    Visual primitives (button, card, chip, icon) come from the Vue components
    in /js/design-system/hifi/. Values resolve to --hf-* tokens. */
 
 /* Shell + container */
-.lp-shell { min-height: 100vh; background: var(--hf-bg); color: var(--hf-ink); }
+.lp-shell {
+  min-height: 100vh;
+  background: var(--hf-bg);
+  color: var(--hf-ink);
+  /* Sticky-nav offset, used by anchor-aliases and any other fragment
+     that needs to land below the nav. Single source of truth — bump
+     this if .lp-nav padding/font-size changes. (PR #44 review.) */
+  --lp-nav-height: 80px;
+}
 .lp-container { max-width: 1180px; margin: 0 auto; padding: 0 var(--hf-space-5); }
 .lp-section { padding: var(--hf-space-8) 0; }
 .lp-section + .lp-section { border-top: 1px solid var(--hf-line); }
@@ -101,4 +109,217 @@
   .lp-grid  { grid-template-columns: 1fr; }
   .lp-hero__ctas { flex-direction: column; align-items: stretch; }
   .lp-container { padding: 0 var(--hf-space-4); }
+}
+
+/* PR #44 additions — pricing, hello embed, two-card grid, founder solo,
+   typographic hero panel (replaces the v1 hero photo). */
+
+.lp-hero__panel {
+  background: var(--hf-paper);
+  border: 1px solid var(--hf-line);
+  border-radius: var(--hf-radius-lg);
+  padding: var(--hf-space-5) var(--hf-space-5) var(--hf-space-4);
+  box-shadow: var(--hf-shadow-2);
+  font-family: var(--hf-font-body);
+  color: var(--hf-ink);
+  position: relative;
+}
+.lp-hero__panel-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--hf-space-3);
+  margin-bottom: var(--hf-space-3);
+}
+.lp-hero__panel-eyebrow {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-family: var(--hf-font-mono);
+  font-size: 11px;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--hf-muted);
+}
+.lp-hero__panel-time {
+  font-family: var(--hf-font-mono);
+  font-size: 11px;
+  letter-spacing: 0.14em;
+  color: var(--hf-muted);
+}
+.lp-hero__panel-title {
+  font-family: var(--hf-font-display);
+  font-size: 28px;
+  letter-spacing: -0.015em;
+  line-height: 1.05;
+  margin-bottom: var(--hf-space-4);
+}
+.lp-hero__panel-tasks {
+  list-style: none;
+  padding: 0;
+  margin: 0 0 var(--hf-space-4);
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+  border-top: 1px solid var(--hf-line);
+}
+.lp-hero__panel-task {
+  display: flex;
+  align-items: center;
+  gap: var(--hf-space-3);
+  padding: var(--hf-space-3) 0;
+  border-bottom: 1px solid var(--hf-line);
+  font-size: 14px;
+  line-height: 1.3;
+}
+.lp-hero__panel-check {
+  flex: 0 0 auto;
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  border: 1.5px solid var(--hf-line-2);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--hf-paper);
+  background: var(--hf-paper);
+}
+.lp-hero__panel-task--done .lp-hero__panel-check {
+  background: var(--hf-ink);
+  border-color: var(--hf-ink);
+}
+.lp-hero__panel-task--done .lp-hero__panel-label {
+  color: var(--hf-ink);
+}
+.lp-hero__panel-task--active .lp-hero__panel-check {
+  border-color: var(--hf-accent);
+  border-style: dashed;
+  animation: lp-hero-pulse 1.6s ease-in-out infinite;
+}
+.lp-hero__panel-task--active .lp-hero__panel-label {
+  color: var(--hf-ink);
+}
+.lp-hero__panel-task--active .lp-hero__panel-meta {
+  color: var(--hf-accent);
+}
+.lp-hero__panel-label {
+  flex: 1;
+  min-width: 0;
+  color: var(--hf-ink-2);
+}
+.lp-hero__panel-meta {
+  font-family: var(--hf-font-mono);
+  font-size: 12px;
+  color: var(--hf-muted);
+  letter-spacing: 0.04em;
+}
+.lp-hero__panel-foot {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-family: var(--hf-font-mono);
+  font-size: 11px;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--hf-muted);
+}
+.lp-hero__panel-status-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--hf-good);
+  box-shadow: 0 0 0 3px rgba(92, 122, 74, 0.18);
+}
+
+@keyframes lp-hero-pulse {
+  0%, 100% { opacity: 1; }
+  50%      { opacity: 0.45; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .lp-hero__panel-task--active .lp-hero__panel-check { animation: none; }
+}
+
+/* PR #44 additions — pricing, hello embed, two-card grid, founder solo. */
+
+.lp-container--narrow { max-width: 720px; }
+
+.lp-grid--two {
+  grid-template-columns: repeat(2, 1fr);
+  gap: var(--hf-space-5);
+  max-width: 880px;
+  margin: 0 auto;
+}
+
+.lp-section--bleed {
+  padding-bottom: 0;
+}
+
+/* The embedded RossOnboardingHello renders a full-bleed inked stage.
+   The component's own min-height: 100vh creates the visual break. */
+.lp-hello-embed {
+  margin-top: var(--hf-space-6);
+}
+
+.lp-pricing__status {
+  text-align: center;
+  color: var(--hf-muted);
+  padding: var(--hf-space-6) 0;
+}
+.lp-pricing__desc {
+  margin: var(--hf-space-1) 0 0;
+  color: var(--hf-muted);
+  font-size: 13px;
+  line-height: 1.4;
+}
+.lp-pricing__price {
+  display: flex;
+  align-items: baseline;
+  gap: 4px;
+  margin: var(--hf-space-3) 0 var(--hf-space-4);
+}
+.lp-pricing__price-amount {
+  font-family: var(--hf-font-display);
+  font-size: 36px;
+  letter-spacing: -0.02em;
+  color: var(--hf-ink);
+}
+.lp-pricing__price-period {
+  font-size: 13px;
+  color: var(--hf-muted);
+}
+.lp-pricing__hint {
+  text-align: center;
+  margin: var(--hf-space-4) auto 0;
+  font-size: 12px;
+  color: var(--hf-muted);
+  font-style: italic;
+}
+.lp-pricing__price-subtext {
+  margin: calc(var(--hf-space-2) * -1) 0 var(--hf-space-3);
+  font-size: 11px;
+  color: var(--hf-muted);
+  font-style: italic;
+  letter-spacing: 0.02em;
+}
+
+/* Single-card founder quote (the v1 grid had 3 cards; we keep one). */
+.lp-quote--solo {
+  max-width: 680px;
+  margin: 0 auto;
+}
+
+/* Invisible anchor target preserving SEO compat for old #testimonials links.
+   Sits inside #about so old "Case Studies" anchors still scroll to a real
+   section without rendering any UI. */
+.lp-anchor-alias {
+  display: block;
+  height: 0;
+  position: relative;
+  top: calc(var(--lp-nav-height) * -1);
+  visibility: hidden;
+}
+
+@media (max-width: 720px) {
+  .lp-grid--two { grid-template-columns: 1fr; }
 }
