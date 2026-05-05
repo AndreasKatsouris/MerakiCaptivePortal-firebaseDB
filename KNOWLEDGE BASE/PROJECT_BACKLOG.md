@@ -3,7 +3,7 @@
 > Claude reads this file at the start of every session and updates it at the end.
 > The Sprint Goal is the contract for the session — don't deviate without explicit user confirmation.
 
-Last updated: 2026-05-05 (post PR #42 — reflect cycle complete; ready to start Phase 5 PR 3 = `feat/homepage-v2-hifi`. Note: this sync is PR ~#43, so the originally-numbered PR 4/5 slip by one.)
+Last updated: 2026-05-05 (post PR #44 — reflect cycle complete; ready to start Phase 5 PR 4 = `feat/post-login-router-rollout` (≈ PR #46, since this sync is ≈#45). New Phase 5 PR 6 added at the bottom of the cleanup list — drop the wizard for new accounts (decided 2026-05-05).)
 
 ---
 
@@ -21,7 +21,7 @@ Sprint: 2026-04-30 → until complete
 
 | Item | Branch | Notes |
 |------|--------|-------|
-| — | — | Idle. Next sprint task: Phase 5 PR 3 = `feat/homepage-v2-hifi` (≈ PR #44, since this sync ate PR #43). PR 3 is independent of PR 1/2 so it can start immediately. |
+| — | — | Idle. Next sprint task: Phase 5 PR 4 = `feat/post-login-router-rollout` (≈ PR #46, since this sync ate PR #45). PR 4 is the moment ROSS becomes home — wires the remaining 5 redirect call sites to `routePostLogin`. Depends on PRs 1+2 (both merged). |
 
 ---
 
@@ -53,9 +53,10 @@ Spec: `docs/superpowers/specs/2026-05-02-ross-central-funnel-cleanup-design.md`.
 - [x] Spec locked + merged (PR #37, 2026-05-02)
 - [x] **PR 1 (PR #39)** — `feat/post-login-router`: pure router + 19 tests at 100% coverage; hello auth gate; `helloSeen` field shipped end-to-end (signup init + hello CTA write + wizard `set→update` fix to preserve it + KB doc + matrix backwards-compat). Toast-timing fix landed via deferred-navigator pattern after review caught the `Promise.all` side-effect race.
 - [x] **PR 2 (PR #42)** — `feat/signup-v2-hifi`: Hi-Fi Vue 3 rewrite of `/signup.html` (no Pinia, ephemeral form state). Dynamic-tier reframe (operator pivot — admin curates Free/All-in via existing admin-dashboard Tier Management UI rather than hardcoding in code constants). Service layer extracted to `signup-service.js`. `tier` written to `users/{uid}/tier`, `subscriptions/{uid}/tier` (canonical) AND `subscriptions/{uid}/tierId` (legacy compat). `registerUser` CF gap closed: server-side `subscriptionTiers/{tierId}` validation, length-bounds on free-text fields, atomic multi-path `update()` for users + subscriptions + onboarding-progress, idempotent onboarding-progress init. New `.validate` rule on `subscriptions/$uid` rejects unknown tier IDs (defense in depth). Two new Hi-Fi components shipped: `HfSelect` (rebuilt as true custom combobox after operator flagged native dropdown panel ignored design tokens — full WAI-ARIA + keyboard) and `HfCheckbox`. v2 surface uses inline error/success banners (not SweetAlert2 — that util silently no-ops on the Hi-Fi mount shell). Doc housekeeping: 3 plan stragglers relocated `docs/superpowers/plans/` → `docs/plans/` after operator clarified the canonical location; LESSON corrected.
-- [ ] **PR 3 (≈#44)** — `feat/homepage-v2-hifi`: Hi-Fi rewrite of `/index.html` with workflow-centric copy; embed synthetic public hello via reused `RossOnboardingHello.vue` component (different data feed). Independent of PRs 1/2.
-- [ ] **PR 4 (≈#45)** — `feat/post-login-router-rollout`: wire remaining 5 redirect call sites to `routePostLogin`; `user-dashboard.html` gets a deprecation banner. **This is the moment ROSS becomes home.** Depends on PRs 1+2.
-- [ ] **PR 5 (≈#46)** — `feat/ross-sidebar-cleanup`: collapse sidebar to just Today + Ross's brain (3 sections). v1 module deep-links removed from ROSS sidebar; operator reaches them via `/admin-dashboard.html`. Depends on PR 4.
+- [x] **PR 3 (PR #44)** — `feat/homepage-v2-hifi`: `/index.html` itself promoted to Hi-Fi mount shell (legacy v1 + index-v2.html chrome stepping-stone + landing-page.css all deleted). Workflow-centric narrative replaces fabricated stats/testimonials/success stories — three concrete workflow cards (Daily Opening Checklist / Weekly Compliance Sweep / Monthly Marketing Push), single primary CTA "Start free", honest tone throughout. Synthetic public hello preview embeds the actual `RossOnboardingHello.vue` (Q4 lock — same component, two data feeds) with a Tannie's-Kitchen Cape Town narrative; CTAs route to `/signup.html`. RossOnboardingHello refactored with three optional props (`findings` / `continueHref` / `tourHref`) — defaults preserve post-signup behavior byte-for-byte. Pricing section reads `subscriptionTiers` via new shared `services/subscription-tiers.js` (extracted from PR 2's signup-service); static Free/All-in fallback if RTDB empty. Founder Lakis Katsouris quote preserved in single-card layout. Hero photo (`/img/ob-bg.jpg`) replaced with typographic workflow-card panel demonstrating the product in miniature. Module rename `landing-v2/` → `marketing/landing/`. SEO preserved (`<title>`, meta description, `#features`/`#about`/`#testimonials` alias). Three review fixes landed in same PR: logo `smoothScroll` always preventDefault, All-in fallback gets "Pricing announced soon" subtext, magic `top:-80px` promoted to `--lp-nav-height` custom property.
+- [ ] **PR 4 (≈#46)** — `feat/post-login-router-rollout`: wire remaining 5 redirect call sites to `routePostLogin`; `user-dashboard.html` gets a deprecation banner. **This is the moment ROSS becomes home.** Depends on PRs 1+2.
+- [ ] **PR 5 (≈#47)** — `feat/ross-sidebar-cleanup`: collapse sidebar to just Today + Ross's brain (3 sections). v1 module deep-links removed from ROSS sidebar; operator reaches them via `/admin-dashboard.html`. Depends on PR 4.
+- [ ] **PR 6 (≈#48)** — `feat/drop-wizard-new-accounts`: skip `/onboarding-wizard.html` for new accounts entirely. Signup already collects business name/type/phone/franchise + initial location post-PR #42; the wizard re-asks all of it (`business-name`, `business-type`, `contact-phone`, `location-name`, `location-address`) plus a weird `change-password` step right after the user just chose one. Update `routePostLogin` to drop the wizard branch for fresh signups (`completed: false && helloSeen: false`); wizard remains reachable as opt-in "advanced setup" for existing users (don't delete the file). Decision (2026-05-05): option (b) "drop for new accounts" chosen over (a) "slim the wizard" — operator preference for committing to the ROSS-first stance rather than half-measure. Depends on PR 4.
 
 Lower-priority Phase 5 items (deferred to dedicated polish PR after the 5-PR sequence): surface `store.error` in `RossOnboardingHello.vue`; lower `FINDING_MIN_LIFT` threshold; parallelise nested RTDB reads in `detectBestWeekday`; un-hardcode the 3-of-5 step counter.
 
@@ -122,11 +123,11 @@ Lower-priority Phase 5 items (deferred to dedicated polish PR after the 5-PR seq
 
 | Feature | PR | Merged |
 |---------|----|--------|
+| homepage v2 — Hi-Fi promotion + workflow-centric copy + dynamic pricing + reused public hello + typographic hero panel (Phase 5 PR 3) | #44 | 2026-05-05 |
+| docs(ross-v2) — post-merge sync + reflect cycle after PR #42 | #43 | 2026-05-05 |
 | signup v2 — Hi-Fi Vue 3 rewrite + tier writes + registerUser update + .validate rule (Phase 5 PR 2) | #42 | 2026-05-05 |
 | docs(ross-v2) — close out PR #40, advance PR numbers | #41 | 2026-05-02 |
 | docs(ross-v2) — post-merge sync + reflect cycle after PR #39 | #40 | 2026-05-02 |
-| ROSS v2 — post-login router foundation + hello auth gate (Phase 5 PR 1) | #39 | 2026-05-02 |
-| docs(ross-v2) — post-merge sync + reflect cycle after PR #37 | #38 | 2026-05-02 |
 
 ---
 
