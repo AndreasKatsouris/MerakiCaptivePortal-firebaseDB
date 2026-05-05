@@ -511,7 +511,30 @@ exports.registerUser = functions.https.onCall(async (data, context) => {
         // PR 2: prefer the explicit `tier` field; fall back to legacy
         // `selectedTier` for compat with any older callers still in flight.
         const tierId = tier || selectedTier || null;
-        const tierDataSafe = tierData || {};
+
+        // PR 2 review (Major #1): validate tierId against the canonical
+        // subscriptionTiers node — never trust the caller. Mirrors the
+        // pattern already used by createUserAccount (line 858). Use the
+        // server-fetched tier data for features/limits so a client can't
+        // inflate its own subscription by stuffing tierData on the way in.
+        if (!tierId) {
+            throw new functions.https.HttpsError('invalid-argument', 'Tier is required.');
+        }
+        const canonicalTierSnap = await admin.database().ref(`subscriptionTiers/${tierId}`).once('value');
+        if (!canonicalTierSnap.exists()) {
+            console.error('[registerUser] Invalid tier:', tierId);
+            throw new functions.https.HttpsError('invalid-argument', `Unknown tier: ${tierId}`);
+        }
+        const canonicalTierData = canonicalTierSnap.val() || {};
+
+        // PR 2 review (Major #1): bound free-text user-supplied strings
+        // before persisting to RTDB. Keeps a misconfigured or malicious
+        // client from writing arbitrarily large blobs into shared nodes.
+        const MAX_NAME = 200;
+        const tooLong = (s) => typeof s === 'string' && s.length > MAX_NAME;
+        if (tooLong(franchiseName)) throw new functions.https.HttpsError('invalid-argument', 'franchiseName too long.');
+        if (tooLong(brandName))     throw new functions.https.HttpsError('invalid-argument', 'brandName too long.');
+        if (tooLong(businessName))  throw new functions.https.HttpsError('invalid-argument', 'businessName too long.');
 
         // Create user data
         const userData = {
@@ -546,54 +569,72 @@ exports.registerUser = functions.https.onCall(async (data, context) => {
             status: 'trial', // Start with trial
             startDate: admin.database.ServerValue.TIMESTAMP,
             trialEndDate: Date.now() + (14 * 24 * 60 * 60 * 1000), // 14-day trial
-            features: tierDataSafe.features || {},
-            limits: tierDataSafe.limits || {},
+            features: canonicalTierData.features || {},
+            limits: canonicalTierData.limits || {},
             metadata: {
                 signupSource: 'web',
                 initialTier: tierId
             }
         };
 
-        // Save user data to database with protection against overwrites
-        const userRef = admin.database().ref(`users/${userId}`);
+        // PR 2 review (Minor #4): atomic multi-path write. Read existing
+        // state to honour the merge-vs-overwrite guards, then commit
+        // users/subs/onboarding-progress in a single `update()` call so a
+        // mid-sequence failure can't leave the account half-initialised
+        // (the post-login router reads onboarding-progress first thing
+        // post-signup — a missing node mis-routes silently).
+        // The locations + userLocations writes stay separate because they
+        // need a `push()` key.
+        const userRef         = admin.database().ref(`users/${userId}`);
         const subscriptionRef = admin.database().ref(`subscriptions/${userId}`);
+        const onboardingRef   = admin.database().ref(`onboarding-progress/${userId}`);
 
-        // Check if user already exists to prevent overwrites
-        const existingUserSnapshot = await userRef.once('value');
-        if (existingUserSnapshot.exists()) {
+        const [existingUserSnap, existingSubSnap, existingOnboardingSnap] = await Promise.all([
+            userRef.once('value'),
+            subscriptionRef.once('value'),
+            onboardingRef.once('value'),
+        ]);
+
+        let userPayload = userData;
+        if (existingUserSnap.exists()) {
             console.log(`⚠️ [CloudFunction] User ${userId} already exists, merging data instead of overwriting`);
-            const existingUserData = existingUserSnapshot.val();
-
-            // Preserve existing data, especially phone numbers
-            const mergedUserData = {
+            const existingUserData = existingUserSnap.val();
+            userPayload = {
                 ...existingUserData,
                 ...userData,
-                // Explicitly preserve phone numbers if they exist
-                phoneNumber: existingUserData.phoneNumber || userData.phoneNumber,
-                phone: existingUserData.phone || userData.phone,
+                // Preserve existing phone numbers if they exist
+                phoneNumber:   existingUserData.phoneNumber   || userData.phoneNumber,
+                phone:         existingUserData.phone         || userData.phone,
                 businessPhone: existingUserData.businessPhone || userData.businessPhone,
                 updatedAt: admin.database.ServerValue.TIMESTAMP
             };
-
-            await userRef.update(mergedUserData);
-        } else {
-            await userRef.set(userData);
         }
 
-        // Check if subscription already exists
-        const existingSubscriptionSnapshot = await subscriptionRef.once('value');
-        if (existingSubscriptionSnapshot.exists()) {
+        let subPayload = subscriptionData;
+        if (existingSubSnap.exists()) {
             console.log(`⚠️ [CloudFunction] Subscription ${userId} already exists, merging data instead of overwriting`);
-            const existingSubscriptionData = existingSubscriptionSnapshot.val();
-            const mergedSubscriptionData = {
-                ...existingSubscriptionData,
+            subPayload = {
+                ...existingSubSnap.val(),
                 ...subscriptionData,
                 updatedAt: admin.database.ServerValue.TIMESTAMP
             };
-            await subscriptionRef.update(mergedSubscriptionData);
-        } else {
-            await subscriptionRef.set(subscriptionData);
         }
+
+        const multiWrite = {
+            [`users/${userId}`]:         userPayload,
+            [`subscriptions/${userId}`]: subPayload,
+        };
+        // PR 2 + PR 1 contract: initialise onboarding-progress only when
+        // absent so we can't stomp a wizard that has already advanced
+        // past helloSeen on a re-entry of an existing account.
+        if (!existingOnboardingSnap.exists()) {
+            multiWrite[`onboarding-progress/${userId}`] = {
+                completed: false,
+                helloSeen: false,
+                createdAt: admin.database.ServerValue.TIMESTAMP
+            };
+        }
+        await admin.database().ref().update(multiWrite);
 
         // Create initial location for the user
         const locationData = {
@@ -614,22 +655,11 @@ exports.registerUser = functions.https.onCall(async (data, context) => {
             }
         };
 
-        // Create a location and link it to the user
+        // Create a location and link it to the user (separate from the
+        // multi-path write above because the location node needs a push() key)
         const locationRef = await admin.database().ref('locations').push();
         await locationRef.set(locationData);
         await admin.database().ref(`userLocations/${userId}/${locationRef.key}`).set(true);
-
-        // PR 2 + PR 1 contract: initialise onboarding-progress so the
-        // post-login router has clean state to read. Idempotent via
-        // transaction — only writes when the node is absent, so we can't
-        // stomp a wizard that has already advanced past helloSeen.
-        await admin.database().ref(`onboarding-progress/${userId}`).transaction(cur => (
-            cur || {
-                completed: false,
-                helloSeen: false,
-                createdAt: admin.database.ServerValue.TIMESTAMP
-            }
-        ));
 
         return { success: true, userId: userId };
 

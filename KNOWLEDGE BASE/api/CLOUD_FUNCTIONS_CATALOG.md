@@ -30,10 +30,17 @@ The platform deploys **69+ Cloud Functions** from a single `functions/index.js` 
 | `setupInitialAdmin` | HTTP POST (v2) | Setup Secret | One-time bootstrap for first admin user |
 
 **`registerUser` Details:**
-- Input: `{ firstName, lastName, businessName, businessAddress, businessPhone, businessType, selectedTier, tierData }`
-- Creates: `users/{uid}`, `subscriptions/{uid}`, `locations/{pushId}`, `userLocations/{uid}/{locationId}`
+- Input: `{ firstName, lastName, businessName, businessAddress, businessPhone, businessType, isFranchise, franchiseName, brandName, tier, selectedTier?, tierData? }`
+  - `tier` is the canonical tier ID; `selectedTier` is accepted as a legacy alias when `tier` is absent
+  - `tierData` is accepted but ignored — the CF re-fetches tier features/limits from `subscriptionTiers/{tierId}` so a client cannot inflate its own subscription
+- Validation: rejects with `invalid-argument` when `tier` is missing, when `tier` does not exist in `subscriptionTiers/{tierId}`, or when `businessName` / `franchiseName` / `brandName` exceed 200 chars
+- Creates / updates atomically (single multi-path `update`):
+  - `users/{uid}` — includes `tier`, `isFranchise`, `franchiseName`, `brandName`
+  - `subscriptions/{uid}` — `tier` (canonical) AND `tierId` (legacy compat); `features` / `limits` populated from server-fetched tier data
+  - `onboarding-progress/{uid}` — initialised with `{ completed: false, helloSeen: false }` only when absent (idempotent re-entry)
+- Creates separately (needs push key): `locations/{pushId}`, `userLocations/{uid}/{locationId}`
 - Trial: 14-day trial period
-- Protection: Merges instead of overwriting existing data
+- Protection: Merges instead of overwriting existing data on `users` / `subscriptions` (preserves phone numbers; preserves wizard progress)
 
 **`createUserAccount` Details:**
 - Input: `{ email, password, firstName, lastName, businessName, phoneNumber, tier, isAdmin, locationIds }`

@@ -35,12 +35,21 @@ export function validatePassword(password) {
   return { ok: Object.values(requirements).every(Boolean), requirements }
 }
 
+// Loads the dynamic `subscriptionTiers` RTDB node. Throws a friendly
+// Error on RTDB failure so any caller (not just SignupApp) gets a
+// useful message instead of the raw Firebase error.
+// @throws {Error} when the RTDB read fails (auth/network/quota etc).
 export async function loadTiers() {
-  const snap = await get(ref(rtdb, 'subscriptionTiers'))
-  const raw = snap.val() || {}
-  return Object.entries(raw)
-    .map(([id, tier]) => ({ id, ...tier }))
-    .sort((a, b) => (a.monthlyPrice || 0) - (b.monthlyPrice || 0))
+  try {
+    const snap = await get(ref(rtdb, 'subscriptionTiers'))
+    const raw = snap.val() || {}
+    return Object.entries(raw)
+      .map(([id, tier]) => ({ id, ...tier }))
+      .sort((a, b) => (a.monthlyPrice || 0) - (b.monthlyPrice || 0))
+  } catch (err) {
+    console.error('[Signup] loadTiers failed:', err)
+    throw new Error('Could not load subscription plans. Please try again later.')
+  }
 }
 
 // Creates the auth user, runs the dual-path RTDB write, and returns the
@@ -157,17 +166,25 @@ export async function createAccount({ formData, tier, tierData = {} }) {
     status:        'active',
   }
 
+  // PR 2 review (Minor #4): atomic multi-path write. Read existing
+  // state to preserve the merge-vs-overwrite race-condition guards from
+  // the original signup.js, then commit users/subs/onboarding-progress
+  // in a single root `update()` so a mid-sequence failure can't leave
+  // the account half-initialised. The locations + userLocations writes
+  // stay separate because they need a `push()` key.
   const userRef         = ref(rtdb, `users/${freshUser.uid}`)
   const subscriptionRef = ref(rtdb, `subscriptions/${freshUser.uid}`)
+  const onboardingRef   = ref(rtdb, `onboarding-progress/${freshUser.uid}`)
 
-  // Race-condition guard from original signup.js: another writer (e.g.
-  // a re-entry of an existing account) may have created the node
-  // between auth-create and now. Merge instead of stomping.
-  const existingUserSnapshot = await get(userRef)
-  if (existingUserSnapshot.exists()) {
+  const [existingUserSnap, existingSubSnap, existingOnboardingSnap] = await Promise.all([
+    get(userRef), get(subscriptionRef), get(onboardingRef),
+  ])
+
+  let userPayload = userData
+  if (existingUserSnap.exists()) {
     console.log(`⚠️ [Signup] User ${freshUser.uid} already exists, merging data instead of overwriting`)
-    const existingUserData = existingUserSnapshot.val()
-    const mergedUserData = {
+    const existingUserData = existingUserSnap.val()
+    userPayload = {
       ...existingUserData,
       ...userData,
       phoneNumber:   existingUserData.phoneNumber   || userData.phoneNumber,
@@ -175,38 +192,40 @@ export async function createAccount({ formData, tier, tierData = {} }) {
       businessPhone: existingUserData.businessPhone || userData.businessPhone,
       updatedAt:     Date.now(),
     }
-    await update(userRef, mergedUserData)
-  } else {
-    await set(userRef, userData)
   }
 
-  const existingSubscriptionSnapshot = await get(subscriptionRef)
-  if (existingSubscriptionSnapshot.exists()) {
+  let subPayload = subscriptionData
+  if (existingSubSnap.exists()) {
     console.log(`⚠️ [Signup] Subscription ${freshUser.uid} already exists, merging data`)
-    const existingSubscriptionData = existingSubscriptionSnapshot.val()
-    const mergedSubscriptionData = {
-      ...existingSubscriptionData,
+    subPayload = {
+      ...existingSubSnap.val(),
       ...subscriptionData,
       updatedAt: Date.now(),
     }
-    await update(subscriptionRef, mergedSubscriptionData)
-  } else {
-    await set(subscriptionRef, subscriptionData)
   }
 
+  const multiWrite = {
+    [`users/${freshUser.uid}`]:         userPayload,
+    [`subscriptions/${freshUser.uid}`]: subPayload,
+  }
+  // Initialise onboarding-progress only when absent so we don't stomp a
+  // wizard that has already advanced past helloSeen on a re-entry.
+  if (!existingOnboardingSnap.exists()) {
+    multiWrite[`onboarding-progress/${freshUser.uid}`] = {
+      completed: false,
+      helloSeen: false,
+      createdAt: Date.now(),
+    }
+  }
+  await update(ref(rtdb), multiWrite)
+
+  // Locations needs its own push() key, so it lives outside the atomic
+  // write above. Ordering: location node first, then the userLocations
+  // pointer — never the other way (a dangling pointer is worse than a
+  // detached location).
   const newLocationRef = push(ref(rtdb, 'locations'))
   await set(newLocationRef, locationData)
   await set(ref(rtdb, `userLocations/${freshUser.uid}/${newLocationRef.key}`), true)
-
-  // Initialise onboarding-progress so the post-login router has clean
-  // state (helloSeen=false routes new accounts through the Ross hello
-  // before the wizard). Set, not update, because this branch only runs
-  // for genuinely new accounts; the merge branches above handle re-entry.
-  await set(ref(rtdb, `onboarding-progress/${freshUser.uid}`), {
-    completed: false,
-    helloSeen: false,
-    createdAt: Date.now(),
-  })
 
   return { user: freshUser }
 }
