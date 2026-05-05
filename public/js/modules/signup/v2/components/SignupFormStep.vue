@@ -1,11 +1,14 @@
 <script setup>
-import { reactive, computed } from 'vue'
+import { reactive, ref, computed } from 'vue'
 import HfButton   from '/js/design-system/hifi/components/HfButton.vue'
 import HfInput    from '/js/design-system/hifi/components/HfInput.vue'
 import HfSelect   from '/js/design-system/hifi/components/HfSelect.vue'
 import HfCheckbox from '/js/design-system/hifi/components/HfCheckbox.vue'
 import { validatePassword } from '../signup-service.js'
-import { showToast } from '/js/utils/toast.js'
+
+// v2 surfaces use inline error banners — not SweetAlert2 toast (LESSONS
+// 2026-04-30). Validation errors stay local to this component since the
+// offending fields are right here.
 
 const props = defineProps({
   tier:       { type: Object, default: () => ({}) },
@@ -42,16 +45,22 @@ const passwordsMatch = computed(() =>
   form.password.length > 0 && form.password === form.confirmPassword
 )
 
+const validationError = ref(null)
+
 function onSubmit() {
   if (props.submitting) return
+  validationError.value = null
   if (form.password !== form.confirmPassword) {
-    showToast('Passwords do not match', 'error'); return
+    validationError.value = 'Passwords do not match.'
+    return
   }
   if (!passwordCheck.value.ok) {
-    showToast('Password does not meet requirements', 'error'); return
+    validationError.value = 'Password does not meet all the requirements above.'
+    return
   }
   if (!form.agreeTerms) {
-    showToast('Please agree to the terms and conditions', 'error'); return
+    validationError.value = 'Please agree to the Terms of Service and Privacy Policy.'
+    return
   }
   emit('submit', { ...form })
 }
@@ -78,6 +87,21 @@ const reqLabel = {
 
     <form class="form-step__form" @submit.prevent="onSubmit" novalidate>
       <h2 class="form-step__heading">Create your account</h2>
+
+      <div
+        v-if="validationError"
+        class="form-step__banner"
+        role="alert"
+      >
+        <strong>Almost there.</strong>
+        <span>{{ validationError }}</span>
+        <button
+          type="button"
+          class="form-step__banner-dismiss"
+          @click="validationError = null"
+          aria-label="Dismiss"
+        >×</button>
+      </div>
 
       <fieldset class="form-step__group">
         <legend>Business information</legend>
@@ -232,6 +256,32 @@ const reqLabel = {
   letter-spacing: -0.01em;
   margin: 0;
 }
+.form-step__banner {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 14px;
+  border-radius: var(--hf-radius-md);
+  background: var(--hf-bg);
+  border: 1px solid var(--hf-warn);
+  color: var(--hf-warn);
+  font-size: 13px;
+  line-height: 1.4;
+}
+.form-step__banner strong { font-weight: 600; }
+.form-step__banner span   { flex: 1; min-width: 0; }
+.form-step__banner-dismiss {
+  background: none;
+  border: none;
+  color: inherit;
+  font-size: 18px;
+  line-height: 1;
+  padding: 0 4px;
+  cursor: pointer;
+  opacity: 0.7;
+}
+.form-step__banner-dismiss:hover { opacity: 1; }
+
 .form-step__group {
   border: none;
   padding: 0;

@@ -5,14 +5,20 @@ import SignupFormStep from './SignupFormStep.vue'
 import HfLogo from '/js/design-system/hifi/components/HfLogo.vue'
 import { loadTiers, createAccount } from '../signup-service.js'
 import { routePostLogin } from '/js/auth/post-login-router.js'
-import { showToast } from '/js/utils/toast.js'
 
-const step          = ref('tier')
-const selectedTier  = ref(null)
-const tiers         = ref([])
-const tiersLoading  = ref(true)
-const tiersError    = ref(null)
-const submitting    = ref(false)
+// v2 surfaces use inline error banners — not SweetAlert2 toast (LESSONS
+// 2026-04-30: SweetAlert2 is v1-only). The shared toast.js util depends
+// on the SweetAlert2 CDN which we don't load in the Hi-Fi mount shell,
+// so any showToast() call here would silently no-op.
+
+const step           = ref('tier')
+const selectedTier   = ref(null)
+const tiers          = ref([])
+const tiersLoading   = ref(true)
+const tiersError     = ref(null)
+const submitting     = ref(false)
+const submitError    = ref(null)
+const submitSuccess  = ref(false)
 
 onMounted(async () => {
   try {
@@ -39,21 +45,41 @@ function onBack() {
   step.value = 'tier'
 }
 
+function friendlyAuthMessage(error) {
+  if (!error) return 'Error creating account. Please try again.'
+  switch (error.code) {
+    case 'auth/email-already-in-use':
+      return 'This email is already registered. Try logging in instead.'
+    case 'auth/weak-password':
+      return 'Password is too weak. Please use a stronger password.'
+    case 'auth/invalid-email':
+      return 'That email address looks invalid. Please double-check it.'
+    case 'functions/unauthenticated':
+    case 'unauthenticated':
+      return 'Your session expired before we could finish. Please try again.'
+    case 'functions/invalid-argument':
+    case 'invalid-argument':
+      return error.message || 'One of the fields was rejected. Please review and try again.'
+    default:
+      return 'Error creating account. Please try again.'
+  }
+}
+
 async function onSubmit(formData) {
   if (submitting.value) return
-  submitting.value = true
+  submitting.value  = true
+  submitError.value = null
   const tierId   = selectedTier.value
   const tierData = tiers.value.find(t => t.id === tierId) || {}
 
   try {
     const { user } = await createAccount({ formData, tier: tierId, tierData })
 
-    showToast('Account created successfully! Redirecting…', 'success')
-
-    // Hold the toast for ~2s while the router resolves the destination.
-    // We pass a deferred navigator so the side effect (window.location)
-    // fires AFTER both the timer and the resolver settle. Pattern from
-    // PR #39 — see LESSONS.md "Promise.all timing bug".
+    // Surface success inline so the user sees confirmation while the
+    // router resolves and the redirect timer counts down. Hold for ~2s
+    // via the deferred-navigator pattern (PR #39 / LESSONS Promise.all
+    // timing) so the message is actually visible before navigation.
+    submitSuccess.value = true
     let dest = '/user-dashboard.html'
     await Promise.all([
       routePostLogin(user, (d) => { dest = d }),
@@ -62,15 +88,7 @@ async function onSubmit(formData) {
     window.location.href = dest
   } catch (error) {
     console.error('Signup error:', error)
-    if (error.code === 'auth/email-already-in-use') {
-      showToast('This email is already registered. Please log in instead.', 'error')
-    } else if (error.code === 'auth/weak-password') {
-      showToast('Password is too weak. Please use a stronger password.', 'error')
-    } else if (error.code === 'auth/invalid-email') {
-      showToast('Invalid email address format.', 'error')
-    } else {
-      showToast('Error creating account. Please try again.', 'error')
-    }
+    submitError.value = friendlyAuthMessage(error)
   } finally {
     submitting.value = false
   }
@@ -95,6 +113,29 @@ async function onSubmit(formData) {
         {{ tiersError }}
       </div>
       <template v-else>
+        <div
+          v-if="submitError"
+          class="signup-page__banner signup-page__banner--error"
+          role="alert"
+        >
+          <strong>We couldn't create your account.</strong>
+          <span>{{ submitError }}</span>
+          <button
+            type="button"
+            class="signup-page__banner-dismiss"
+            @click="submitError = null"
+            aria-label="Dismiss"
+          >×</button>
+        </div>
+        <div
+          v-if="submitSuccess"
+          class="signup-page__banner signup-page__banner--success"
+          role="status"
+        >
+          <strong>Account created.</strong>
+          <span>Redirecting you now…</span>
+        </div>
+
         <TierSelectStep
           v-if="step === 'tier'"
           :tiers="tiers"
@@ -160,6 +201,41 @@ async function onSubmit(formData) {
   padding: 64px 0;
 }
 .signup-page__status--error { color: var(--hf-warn); }
+
+.signup-page__banner {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 12px 16px;
+  margin: 0 auto 20px;
+  max-width: 880px;
+  border-radius: var(--hf-radius-md);
+  font-size: 13px;
+  line-height: 1.4;
+}
+.signup-page__banner strong { font-weight: 600; }
+.signup-page__banner span   { flex: 1; min-width: 0; }
+.signup-page__banner--error {
+  background: var(--hf-paper);
+  border: 1px solid var(--hf-warn);
+  color: var(--hf-warn);
+}
+.signup-page__banner--success {
+  background: var(--hf-paper);
+  border: 1px solid var(--hf-good);
+  color: var(--hf-good);
+}
+.signup-page__banner-dismiss {
+  background: none;
+  border: none;
+  color: inherit;
+  font-size: 18px;
+  line-height: 1;
+  padding: 0 4px;
+  cursor: pointer;
+  opacity: 0.7;
+}
+.signup-page__banner-dismiss:hover { opacity: 1; }
 
 .signup-page__footer {
   text-align: center;
