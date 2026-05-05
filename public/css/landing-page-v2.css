@@ -3,7 +3,15 @@
    in /js/design-system/hifi/. Values resolve to --hf-* tokens. */
 
 /* Shell + container */
-.lp-shell { min-height: 100vh; background: var(--hf-bg); color: var(--hf-ink); }
+.lp-shell {
+  min-height: 100vh;
+  background: var(--hf-bg);
+  color: var(--hf-ink);
+  /* Sticky-nav offset, used by anchor-aliases and any other fragment
+     that needs to land below the nav. Single source of truth — bump
+     this if .lp-nav padding/font-size changes. (PR #44 review.) */
+  --lp-nav-height: 80px;
+}
 .lp-container { max-width: 1180px; margin: 0 auto; padding: 0 var(--hf-space-5); }
 .lp-section { padding: var(--hf-space-8) 0; }
 .lp-section + .lp-section { border-top: 1px solid var(--hf-line); }
@@ -287,6 +295,13 @@
   color: var(--hf-muted);
   font-style: italic;
 }
+.lp-pricing__price-subtext {
+  margin: calc(var(--hf-space-2) * -1) 0 var(--hf-space-3);
+  font-size: 11px;
+  color: var(--hf-muted);
+  font-style: italic;
+  letter-spacing: 0.02em;
+}
 
 /* Single-card founder quote (the v1 grid had 3 cards; we keep one). */
 .lp-quote--solo {
@@ -301,7 +316,7 @@
   display: block;
   height: 0;
   position: relative;
-  top: -80px;
+  top: calc(var(--lp-nav-height) * -1);
   visibility: hidden;
 }
 

@@ -35,10 +35,12 @@ const workflows = [
 
 // Fallback for the pricing section when subscriptionTiers can't be
 // loaded (empty node, network error, RTDB rule reject etc). Honest
-// shape, no fabricated numbers.
+// shape, no fabricated numbers — the All-in price is genuinely TBD per
+// the Phase 5 spec, so the card surfaces 'Pricing announced soon' as
+// subtext rather than a bare em-dash. (PR #44 review.)
 const FALLBACK_TIERS = [
-  { id: 'free',   name: 'Free',   description: 'Start with the playbook. Bring your own data.', monthlyPrice: 0,  features: {} },
-  { id: 'all-in', name: 'All-in', description: 'Everything in Free, plus the full template library.', monthlyPrice: null, features: {} },
+  { id: 'free',   name: 'Free',   description: 'Start with the playbook. Bring your own data.',         monthlyPrice: 0,    features: {} },
+  { id: 'all-in', name: 'All-in', description: 'Everything in Free, plus the full template library.',   monthlyPrice: null, features: {}, priceSubtext: 'Pricing announced soon' },
 ]
 
 const tiers       = ref([])
@@ -66,12 +68,15 @@ function priceLabel(tier) {
 }
 
 function smoothScroll(e, selector) {
-  if (selector === '#') return
-  const target = document.querySelector(selector)
-  if (target) {
-    e.preventDefault()
-    target.scrollIntoView({ behavior: 'smooth', block: 'start' })
+  // Always preventDefault — even the bare '#' branch should not append a
+  // hash to the URL or push a history entry on logo click. (PR #44 review.)
+  e.preventDefault()
+  if (selector === '#') {
+    window.scrollTo({ top: 0, behavior: 'smooth' })
+    return
   }
+  const target = document.querySelector(selector)
+  if (target) target.scrollIntoView({ behavior: 'smooth', block: 'start' })
 }
 </script>
 
@@ -252,6 +257,7 @@ function smoothScroll(e, selector) {
               <span class="lp-pricing__price-amount">{{ priceLabel(t) }}</span>
               <span v-if="t.monthlyPrice && Number(t.monthlyPrice) !== 0" class="lp-pricing__price-period">/month</span>
             </div>
+            <p v-if="t.priceSubtext" class="lp-pricing__price-subtext">{{ t.priceSubtext }}</p>
             <hf-button as="a" variant="accent" href="/signup.html">
               Get started
               <template #trailing><hf-icon name="arrow" :size="14" /></template>
