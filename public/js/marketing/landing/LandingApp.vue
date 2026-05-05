@@ -1,48 +1,69 @@
 <script setup>
-// Sparks Hi-Fi marketing landing — page content.
-// Layout classes (.lp-*) live in /css/landing-page-v2.css. Visual primitives
-// (button, card, chip, icon) come from the Hi-Fi Vue component library so we
-// inherit any future design-system updates instead of forking the styles.
+// Sparks Hi-Fi marketing landing — workflow-centric narrative.
 //
-// Marketing copy mirrors public/index.html. Copy changes belong in a
-// separate content PR, not this refactor.
+// PR 3 of Phase 5 (Phase 5 spec §3.3). Replaces the v1-derived "Smart
+// Guest WiFi / Real-Time Analytics" feature framing with the
+// playbook-as-product story the moonshot mandates. Fake stats + fake
+// testimonials + fake success stories deleted; founder quote kept.
+//
+// Layout classes (.lp-*) live in /css/landing-page-v2.css. Visual
+// primitives come from the Hi-Fi Vue component library.
+import { ref, onMounted } from 'vue'
+import RossOnboardingHello from '/js/modules/ross/v2/components/RossOnboardingHello.vue'
+import { PUBLIC_HELLO_FINDINGS } from '../public-hello-content.js'
+import { loadTiers } from '/js/services/subscription-tiers.js'
 
-const features = [
-  { icon: 'sparkle', title: 'Smart Guest WiFi',     body: 'Transform your WiFi into a powerful engagement tool. Capture guest data, build relationships, and drive repeat visits automatically.' },
-  { icon: 'line',    title: 'Real-Time Analytics',  body: 'Make data-driven decisions with instant insights into guest behavior, peak hours, and revenue trends.' },
-  { icon: 'cart',    title: 'Food Cost Control',    body: 'Optimize inventory, reduce waste, and maximize profits with AI-powered cost management and predictive ordering.' },
-  { icon: 'send',    title: 'Marketing Automation', body: 'Engage guests with personalized campaigns, loyalty programs, and targeted offers based on their preferences.' },
-  { icon: 'users',   title: 'Team Management',      body: 'Streamline scheduling, track performance, and empower your staff with the tools they need to excel.' },
-  { icon: 'chart',   title: 'Mobile Dashboard',     body: 'Monitor and manage your restaurant from anywhere with our intuitive mobile-first design.' },
-]
-
-const stats = [
-  { num: '10x', label: 'Efficiency increase' },
-  { num: '83%', label: 'Reduction in waste' },
-  { num: '4.8', label: 'Customer rating' },
-  { num: '52%', label: 'Increase in revenue' },
-]
-
-const quotes = [
+// Three concrete workflow examples — chosen to read as "things Ross
+// runs for the operator", not "modules in a feature grid".
+const workflows = [
   {
-    body: 'My father, Lakis Katsouris, served people all his life from a young age. As an entrepreneur, he understood that hospitality is about creating moments that matter. Sparks Hospitality carries forward his belief that technology should amplify human connection, not replace it.',
-    initials: 'LK', name: 'Founder’s Story', role: 'The Katsouris Legacy',
+    icon:    'sparkle',
+    title:   'Daily Opening Checklist',
+    body:    'Temperatures, prep counts, signage, music, deposit float. Ross runs the same playbook every morning and flags anything that drifts before service starts.',
   },
   {
-    body: 'Sparks transformed how we operate. The WiFi engagement alone increased our repeat visits by 40%. It’s like having a dedicated team working around the clock.',
-    initials: 'MR', name: 'Maria Rodriguez', role: 'Owner, Bella Vista',
+    icon:    'shield',
+    title:   'Weekly Compliance Sweep',
+    body:    'Cold-chain logs, allergen audits, expiring stock, supplier docs. One run. One paper trail. Ready when the inspector knocks.',
   },
   {
-    body: 'The food cost system is a game-changer. We’ve reduced waste by 30% and our margins have never been better. The predictive ordering is incredibly accurate.',
-    initials: 'JC', name: 'James Chen', role: 'Executive Chef',
+    icon:    'send',
+    title:   'Monthly Marketing Push',
+    body:    'Pull last month\'s top guests, draft the campaign, schedule the send, follow up on no-replies. The work that always gets postponed — done in twenty minutes.',
   },
 ]
 
-const successStories = [
-  { eyebrow: 'Multi-site',  title: 'Ocean Basket Group', body: '15 locations saw a 25% increase in retention and a 35% boost in campaign effectiveness within 3 months.' },
-  { eyebrow: 'Independent', title: 'The Garden Bistro',  body: 'Menu optimization based on guest insights led to a 28% revenue increase in just 90 days.' },
-  { eyebrow: 'Community',   title: 'Mama’s Kitchen', body: 'Built a community of 5,000+ loyal guests with automated engagement and personalized rewards.' },
+// Fallback for the pricing section when subscriptionTiers can't be
+// loaded (empty node, network error, RTDB rule reject etc). Honest
+// shape, no fabricated numbers.
+const FALLBACK_TIERS = [
+  { id: 'free',   name: 'Free',   description: 'Start with the playbook. Bring your own data.', monthlyPrice: 0,  features: {} },
+  { id: 'all-in', name: 'All-in', description: 'Everything in Free, plus the full template library.', monthlyPrice: null, features: {} },
 ]
+
+const tiers       = ref([])
+const tiersError  = ref(null)
+const tiersLoading = ref(true)
+
+onMounted(async () => {
+  try {
+    const list = await loadTiers()
+    tiers.value = list.length > 0 ? list : FALLBACK_TIERS
+  } catch (err) {
+    console.warn('[landing] tier load failed; using fallback:', err)
+    tiers.value = FALLBACK_TIERS
+    tiersError.value = err.message
+  } finally {
+    tiersLoading.value = false
+  }
+})
+
+function priceLabel(tier) {
+  const v = tier.monthlyPrice
+  if (v == null || v === '') return '—'
+  if (Number(v) === 0) return 'Free'
+  return `R${v}`
+}
 
 function smoothScroll(e, selector) {
   if (selector === '#') return
@@ -66,12 +87,12 @@ function smoothScroll(e, selector) {
           <span class="lp-logo__text">Sparks</span>
         </a>
         <ul class="lp-nav__menu">
-          <li><a href="#features"     class="lp-nav__link" @click="smoothScroll($event, '#features')">Platform</a></li>
-          <li><a href="#about"        class="lp-nav__link" @click="smoothScroll($event, '#about')">Our Story</a></li>
-          <li><a href="#testimonials" class="lp-nav__link" @click="smoothScroll($event, '#testimonials')">Case Studies</a></li>
+          <li><a href="#features" class="lp-nav__link" @click="smoothScroll($event, '#features')">Workflows</a></li>
+          <li><a href="#about"    class="lp-nav__link" @click="smoothScroll($event, '#about')">Story</a></li>
+          <li><a href="#pricing"  class="lp-nav__link" @click="smoothScroll($event, '#pricing')">Pricing</a></li>
           <li><a href="/user-login.html" class="lp-nav__link">Login</a></li>
           <li>
-            <hf-button as="a" variant="accent" href="/signup.html">Get Started</hf-button>
+            <hf-button as="a" variant="accent" href="/signup.html">Start free</hf-button>
           </li>
         </ul>
       </div>
@@ -83,111 +104,141 @@ function smoothScroll(e, selector) {
         <div class="lp-hero__inner">
           <div>
             <div class="lp-hero__eyebrow">
-              <hf-chip tone="accent">Inspired by service</hf-chip>
+              <hf-chip tone="accent">Your restaurant's playbook, run by Ross</hf-chip>
             </div>
             <h1 class="lp-hero__title">
-              Restaurant management,
-              <span class="lp-hero__title-accent">infinite scale.</span>
+              Workflows are the work.
+              <span class="lp-hero__title-accent">Ross runs them.</span>
             </h1>
             <p class="lp-hero__lede">
-              Sparks Hospitality amplifies what your team can do by effortlessly scaling
-              your restaurant operations. So you can focus on what matters most &mdash;
-              creating exceptional guest experiences.
+              Opening checklists. Compliance sweeps. Marketing pushes. The hundred small things
+              that keep a restaurant honest &mdash; written down once, run by Ross every day,
+              flagged when something drifts.
             </p>
             <div class="lp-hero__ctas">
-              <hf-button as="a" href="/signup.html">
-                Get Started
+              <hf-button as="a" variant="accent" href="/signup.html">
+                Start free
                 <template #trailing>
                   <hf-icon name="arrow" :size="14" />
                 </template>
               </hf-button>
-              <hf-button as="a" variant="ghost" href="#demo" @click="smoothScroll($event, '#demo')">
-                Watch Demo
+              <hf-button as="a" variant="ghost" href="#hello-preview" @click="smoothScroll($event, '#hello-preview')">
+                See a sample first
               </hf-button>
             </div>
           </div>
           <div class="lp-hero__media">
-            <img src="/img/ob-bg.jpg" alt="Restaurant Management Dashboard" loading="eager" />
+            <img src="/img/ob-bg.jpg" alt="A small restaurant team setting up before service." loading="eager" />
           </div>
         </div>
       </div>
     </section>
 
-    <!-- Stats -->
-    <section class="lp-section lp-section--paper">
+    <!-- Workflows (the product is the playbook) -->
+    <section class="lp-section lp-section--paper" id="features">
       <div class="lp-container">
         <header class="lp-section__head">
-          <span class="lp-section__eyebrow hf-eyebrow">Scaling your operations</span>
-          <h2 class="lp-section__title">Extra capacity at superhuman scale</h2>
-          <p class="lp-section__lede">Our platform enables your team to go further, faster.</p>
-        </header>
-        <div class="lp-stats">
-          <div v-for="s in stats" :key="s.label" class="lp-stat">
-            <div class="lp-stat__num">{{ s.num }}</div>
-            <div class="lp-stat__label">{{ s.label }}</div>
-          </div>
-        </div>
-      </div>
-    </section>
-
-    <!-- Features -->
-    <section class="lp-section" id="features">
-      <div class="lp-container">
-        <header class="lp-section__head">
-          <span class="lp-section__eyebrow hf-eyebrow">The Sparks stack</span>
-          <h2 class="lp-section__title">Sits at the heart of your operations</h2>
-          <p class="lp-section__lede">Unprecedented management power at unlimited scale.</p>
+          <span class="lp-section__eyebrow hf-eyebrow">The product is the playbook</span>
+          <h2 class="lp-section__title">Start with three workflows. Ross runs them daily.</h2>
+          <p class="lp-section__lede">
+            Modules are not destinations &mdash; they're step types inside a workflow. The
+            workflow is what Ross runs. Here are three that almost every restaurant needs.
+          </p>
         </header>
         <div class="lp-grid">
-          <hf-card v-for="f in features" :key="f.title">
+          <hf-card v-for="w in workflows" :key="w.title">
             <template #header>
               <div class="lp-feature__icon" aria-hidden="true">
-                <hf-icon :name="f.icon" :size="20" />
+                <hf-icon :name="w.icon" :size="20" />
               </div>
-              <h3 class="lp-card-title">{{ f.title }}</h3>
+              <h3 class="lp-card-title">{{ w.title }}</h3>
             </template>
-            <p class="lp-card-body">{{ f.body }}</p>
+            <p class="lp-card-body">{{ w.body }}</p>
           </hf-card>
         </div>
       </div>
     </section>
 
-    <!-- About / Inspiration -->
+    <!-- Synthetic hello preview -->
+    <section class="lp-section lp-section--bleed" id="hello-preview">
+      <div class="lp-container lp-container--narrow">
+        <header class="lp-section__head">
+          <span class="lp-section__eyebrow hf-eyebrow">A sample first look</span>
+          <h2 class="lp-section__title">What Ross might tell you on day one.</h2>
+          <p class="lp-section__lede">
+            Three things worth attending to on a Tuesday morning at a small Cape Town café.
+            <strong>None of this is real customer data</strong> &mdash; the cards are tagged
+            <em>preview</em> to make that clear. It's a flavour of how the agent thinks.
+          </p>
+        </header>
+      </div>
+      <div class="lp-hello-embed">
+        <RossOnboardingHello
+          :findings="PUBLIC_HELLO_FINDINGS"
+          continue-href="/signup.html"
+          tour-href="/signup.html"
+        />
+      </div>
+    </section>
+
+    <!-- Pricing -->
+    <section class="lp-section" id="pricing">
+      <div class="lp-container">
+        <header class="lp-section__head">
+          <span class="lp-section__eyebrow hf-eyebrow">Two ways to start</span>
+          <h2 class="lp-section__title">Free to start. Upgrade when you outgrow it.</h2>
+          <p class="lp-section__lede">
+            The full ROSS workflow UI ships on every plan. Upgrading widens the template
+            library you can pull from.
+          </p>
+        </header>
+        <div v-if="tiersLoading" class="lp-pricing__status hf-eyebrow">Loading plans…</div>
+        <div v-else class="lp-grid lp-grid--two">
+          <hf-card v-for="t in tiers" :key="t.id">
+            <template #header>
+              <h3 class="lp-card-title">{{ t.name || 'Plan' }}</h3>
+              <p v-if="t.description" class="lp-pricing__desc">{{ t.description }}</p>
+            </template>
+            <div class="lp-pricing__price">
+              <span class="lp-pricing__price-amount">{{ priceLabel(t) }}</span>
+              <span v-if="t.monthlyPrice && Number(t.monthlyPrice) !== 0" class="lp-pricing__price-period">/month</span>
+            </div>
+            <hf-button as="a" variant="accent" href="/signup.html">
+              Get started
+              <template #trailing><hf-icon name="arrow" :size="14" /></template>
+            </hf-button>
+          </hf-card>
+        </div>
+        <p v-if="tiersError" class="lp-pricing__hint">
+          Showing default plans. Live pricing will be back shortly.
+        </p>
+      </div>
+    </section>
+
+    <!-- Founder story (also #testimonials alias for SEO compat) -->
     <section class="lp-section lp-section--sand" id="about">
+      <a id="testimonials" class="lp-anchor-alias" aria-hidden="true"></a>
       <div class="lp-container">
         <header class="lp-section__head">
           <span class="lp-section__eyebrow hf-eyebrow">Inspired by service</span>
           <h2 class="lp-section__title">A legacy that guides everything we do</h2>
         </header>
-        <div class="lp-quotes">
-          <article v-for="q in quotes" :key="q.initials" class="lp-quote">
-            <div class="lp-quote__mark" aria-hidden="true">&ldquo;</div>
-            <p class="lp-quote__body">{{ q.body }}</p>
-            <div class="lp-quote__author">
-              <div class="lp-quote__avatar">{{ q.initials }}</div>
-              <div>
-                <p class="lp-quote__name">{{ q.name }}</p>
-                <p class="lp-quote__role">{{ q.role }}</p>
-              </div>
+        <article class="lp-quote lp-quote--solo">
+          <div class="lp-quote__mark" aria-hidden="true">&ldquo;</div>
+          <p class="lp-quote__body">
+            My father, Lakis Katsouris, served people all his life from a young age. As an
+            entrepreneur, he understood that hospitality is about creating moments that matter.
+            Sparks Hospitality carries forward his belief that technology should amplify human
+            connection, not replace it.
+          </p>
+          <div class="lp-quote__author">
+            <div class="lp-quote__avatar">LK</div>
+            <div>
+              <p class="lp-quote__name">Founder's Story</p>
+              <p class="lp-quote__role">The Katsouris Legacy</p>
             </div>
-          </article>
-        </div>
-      </div>
-    </section>
-
-    <!-- Success at scale -->
-    <section class="lp-section" id="testimonials">
-      <div class="lp-container">
-        <header class="lp-section__head">
-          <span class="lp-section__eyebrow hf-eyebrow">Success at scale</span>
-          <h2 class="lp-section__title">Real results from real operators</h2>
-          <p class="lp-section__lede">Restaurants transforming their operations with Sparks.</p>
-        </header>
-        <div class="lp-grid">
-          <hf-card v-for="s in successStories" :key="s.title" :eyebrow="s.eyebrow" :title="s.title">
-            <p class="lp-card-body">{{ s.body }}</p>
-          </hf-card>
-        </div>
+          </div>
+        </article>
       </div>
     </section>
 
@@ -195,10 +246,10 @@ function smoothScroll(e, selector) {
     <section class="lp-section lp-section--ink">
       <div class="lp-container">
         <div class="lp-cta">
-          <h2 class="lp-cta__title">Give your team superhuman powers</h2>
-          <p class="lp-cta__lede">Join the hospitality revolution with a 30-day free trial.</p>
+          <h2 class="lp-cta__title">Ready when you are.</h2>
+          <p class="lp-cta__lede">Free to start. Upgrade when you outgrow it. No card up front.</p>
           <hf-button as="a" variant="accent" href="/signup.html">
-            Get Started Free
+            Start free
             <template #trailing>
               <hf-icon name="arrow" :size="14" />
             </template>
@@ -211,36 +262,12 @@ function smoothScroll(e, selector) {
     <footer class="lp-footer">
       <div class="lp-footer__inner">
         <div class="lp-footer__links">
-          <a href="#features"     @click="smoothScroll($event, '#features')">Platform</a>
-          <a href="#about"        @click="smoothScroll($event, '#about')">Our Story</a>
-          <a href="#testimonials" @click="smoothScroll($event, '#testimonials')">Case Studies</a>
+          <a href="#features" @click="smoothScroll($event, '#features')">Workflows</a>
+          <a href="#about"    @click="smoothScroll($event, '#about')">Story</a>
+          <a href="#pricing"  @click="smoothScroll($event, '#pricing')">Pricing</a>
           <a href="/terms.html">Terms</a>
           <a href="/privacy">Privacy</a>
           <a href="/admin-login.html">Admin</a>
-        </div>
-        <div class="lp-footer__social">
-          <a href="#" aria-label="Facebook">
-            <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
-              <path d="M13 22v-9h3l1-4h-4V6.5c0-1.2.4-2 2-2h2V1.2C16.6 1.1 15.4 1 14.1 1 11.4 1 9.5 2.7 9.5 5.7V9h-3v4h3v9h3.5Z" />
-            </svg>
-          </a>
-          <a href="#" aria-label="Twitter">
-            <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
-              <path d="M18.9 6.3a7.6 7.6 0 0 1-2.2.6 3.8 3.8 0 0 0 1.7-2.1 7.6 7.6 0 0 1-2.4.9 3.8 3.8 0 0 0-6.5 3.5A10.7 10.7 0 0 1 1.7 5.3a3.8 3.8 0 0 0 1.2 5.1 3.7 3.7 0 0 1-1.7-.5v.1a3.8 3.8 0 0 0 3 3.7 3.8 3.8 0 0 1-1.7.1 3.8 3.8 0 0 0 3.5 2.7A7.6 7.6 0 0 1 1 18a10.7 10.7 0 0 0 5.8 1.7c7 0 10.8-5.8 10.8-10.8v-.5a7.7 7.7 0 0 0 1.9-2Z" />
-            </svg>
-          </a>
-          <a href="#" aria-label="LinkedIn">
-            <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
-              <path d="M5.4 3.5a2 2 0 1 1 0 4 2 2 0 0 1 0-4Zm-1.7 5.6h3.4V21H3.7V9.1ZM10 9.1h3.3V11h.1c.5-.9 1.7-1.9 3.5-1.9 3.7 0 4.4 2.4 4.4 5.6V21h-3.4v-5.6c0-1.4 0-3.2-2-3.2s-2.3 1.5-2.3 3.1V21H10V9.1Z" />
-            </svg>
-          </a>
-          <a href="#" aria-label="Instagram">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-              <rect x="3" y="3" width="18" height="18" rx="5" />
-              <circle cx="12" cy="12" r="4" />
-              <circle cx="17.5" cy="6.5" r="0.6" fill="currentColor" />
-            </svg>
-          </a>
         </div>
         <p class="lp-footer__legal">&copy; 2026 Sparks Hospitality &middot; In honour of Lakis Katsouris</p>
       </div>

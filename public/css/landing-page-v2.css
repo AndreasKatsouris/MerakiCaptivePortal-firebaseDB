@@ -1,4 +1,4 @@
-/* Sparks Hi-Fi landing page (index-v2.html) — page-level layout only.
+/* Sparks Hi-Fi landing page (/index.html) — page-level layout only.
    Visual primitives (button, card, chip, icon) come from the Vue components
    in /js/design-system/hifi/. Values resolve to --hf-* tokens. */
 
@@ -101,4 +101,81 @@
   .lp-grid  { grid-template-columns: 1fr; }
   .lp-hero__ctas { flex-direction: column; align-items: stretch; }
   .lp-container { padding: 0 var(--hf-space-4); }
+}
+
+/* PR #44 additions — pricing, hello embed, two-card grid, founder solo. */
+
+.lp-container--narrow { max-width: 720px; }
+
+.lp-grid--two {
+  grid-template-columns: repeat(2, 1fr);
+  gap: var(--hf-space-5);
+  max-width: 880px;
+  margin: 0 auto;
+}
+
+.lp-section--bleed {
+  padding-bottom: 0;
+}
+
+/* The embedded RossOnboardingHello renders a full-bleed inked stage.
+   The component's own min-height: 100vh creates the visual break. */
+.lp-hello-embed {
+  margin-top: var(--hf-space-6);
+}
+
+.lp-pricing__status {
+  text-align: center;
+  color: var(--hf-muted);
+  padding: var(--hf-space-6) 0;
+}
+.lp-pricing__desc {
+  margin: var(--hf-space-1) 0 0;
+  color: var(--hf-muted);
+  font-size: 13px;
+  line-height: 1.4;
+}
+.lp-pricing__price {
+  display: flex;
+  align-items: baseline;
+  gap: 4px;
+  margin: var(--hf-space-3) 0 var(--hf-space-4);
+}
+.lp-pricing__price-amount {
+  font-family: var(--hf-font-display);
+  font-size: 36px;
+  letter-spacing: -0.02em;
+  color: var(--hf-ink);
+}
+.lp-pricing__price-period {
+  font-size: 13px;
+  color: var(--hf-muted);
+}
+.lp-pricing__hint {
+  text-align: center;
+  margin: var(--hf-space-4) auto 0;
+  font-size: 12px;
+  color: var(--hf-muted);
+  font-style: italic;
+}
+
+/* Single-card founder quote (the v1 grid had 3 cards; we keep one). */
+.lp-quote--solo {
+  max-width: 680px;
+  margin: 0 auto;
+}
+
+/* Invisible anchor target preserving SEO compat for old #testimonials links.
+   Sits inside #about so old "Case Studies" anchors still scroll to a real
+   section without rendering any UI. */
+.lp-anchor-alias {
+  display: block;
+  height: 0;
+  position: relative;
+  top: -80px;
+  visibility: hidden;
+}
+
+@media (max-width: 720px) {
+  .lp-grid--two { grid-template-columns: 1fr; }
 }
