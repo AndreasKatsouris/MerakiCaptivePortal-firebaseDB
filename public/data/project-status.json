@@ -1,6 +1,6 @@
 {
   "lastUpdated": "2026-05-05",
-  "lastUpdatedNote": "Reflect cycle complete (post PR #40); ready to start Phase 5 PR 2 = feat/signup-v2-hifi",
+  "lastUpdatedNote": "Reflect cycle complete (post PR #42); ready to start Phase 5 PR 3 = feat/homepage-v2-hifi (≈ PR #44)",
   "sprint": {
     "goal": "Effective implementation of Hi-Fi v2, with ROSS as the central post-login surface for every subscribed user",
     "started": "2026-04-30",
@@ -42,7 +42,7 @@
       "id": 5,
       "name": "ROSS v2 — central-funnel cleanup",
       "status": "in_progress",
-      "summary": "Spec locked 2026-05-02 at docs/superpowers/specs/2026-05-02-ross-central-funnel-cleanup-design.md. Five PRs sequenced: post-login router (#39, merged), signup v2 Hi-Fi + tier collapse (≈#42), homepage v2 Hi-Fi (≈#43), router rollout — ROSS becomes home (≈#44), ROSS sidebar cleanup (≈#45). Q1–Q5 product questions resolved: Free = full UI + 5 starter templates, day-zero = pre-populated demo workflow, v1 access = admin-only via admin-dashboard, hello = same component two data feeds, ROSS_IS_HOME flag wired for rollback safety."
+      "summary": "Spec locked 2026-05-02 at docs/superpowers/specs/2026-05-02-ross-central-funnel-cleanup-design.md. Five PRs sequenced: post-login router (#39, merged), signup v2 Hi-Fi + dynamic tier writes (#42, merged — operator reframed hardcoded tier collapse to dynamic RTDB-driven), homepage v2 Hi-Fi (≈#44), router rollout — ROSS becomes home (≈#45), ROSS sidebar cleanup (≈#46). Q1–Q5 product questions resolved: Free = full UI + 5 starter templates, day-zero = pre-populated demo workflow, v1 access = admin-only via admin-dashboard, hello = same component two data feeds, ROSS_IS_HOME flag wired for rollback safety."
     },
     {
       "id": 6,
@@ -72,7 +72,7 @@
     { "id": "phase-5-audit", "label": "Phase 5 audit — confirms onboarding wiring is functional", "done": true, "phase": 5 },
     { "id": "phase-5-spec", "label": "Phase 5 spec — central-funnel cleanup design doc (PR #37)", "done": true, "phase": 5 },
     { "id": "phase-5-pr1-router", "label": "PR 1 (PR #39) — post-login-router + hello auth gate + helloSeen field", "done": true, "phase": 5 },
-    { "id": "phase-5-pr2-signup", "label": "PR 2 (≈#42) — signup v2 Hi-Fi + Free/All-in tier collapse", "done": false, "phase": 5 },
+    { "id": "phase-5-pr2-signup", "label": "PR 2 (PR #42) — signup v2 Hi-Fi Vue 3 rewrite + dynamic tier writes + registerUser CF closure + .validate rule + HfSelect/HfCheckbox", "done": true, "phase": 5 },
     { "id": "phase-5-pr3-homepage", "label": "PR 3 (≈#43) — homepage v2 Hi-Fi + synthetic public hello", "done": false, "phase": 5 },
     { "id": "phase-5-pr4-rollout", "label": "PR 4 (≈#44) — router rollout — ROSS becomes home", "done": false, "phase": 5 },
     { "id": "phase-5-pr5-sidebar", "label": "PR 5 (≈#45) — ROSS sidebar cleanup (Today + Ross's brain)", "done": false, "phase": 5 },
