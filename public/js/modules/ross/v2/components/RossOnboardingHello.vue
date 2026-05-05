@@ -1,25 +1,43 @@
 <script setup>
 // Ross's first-run hello: three surprising findings on an inked stage.
-// On "Show me everything" → marks helloSeen on onboarding-progress (so
-// the post-login router doesn't re-route the user back here on next
-// login) → continues to the business-data wizard.
+//
+// Two mount modes (Q4 lock — see Phase 5 spec §3.4):
+//   1) Default (post-signup): no props passed → loads findings from the
+//      Pinia store, navigates CTAs to /onboarding-wizard.html, persists
+//      helloSeen=true on the user's onboarding-progress so the router
+//      doesn't re-route the user back here on next login.
+//   2) Public homepage: parent passes `findings` (synthetic), plus
+//      `continueHref` / `tourHref` overrides → CTAs send the visitor
+//      into /signup.html instead. markHelloSeen() already no-ops when
+//      auth.currentUser is null (line 27), so the public mount is safe.
 import { onMounted, computed } from 'vue'
 import { useRossStore } from '../store.js'
 import { HfIcon, HfButton, HfLogo } from '/js/design-system/hifi/index.js'
 import { auth, rtdb, ref, update } from '../../../../config/firebase-config.js'
 
-const store = useRossStore()
-onMounted(() => { if (!store.findings) store.loadFindings() })
+const props = defineProps({
+  // When provided, takes precedence over store.findings. Skip the store
+  // load entirely so the public mount doesn't trigger a real-data fetch.
+  findings:     { type: Object, default: null },
+  // CTA destinations. Defaults preserve the post-signup wizard flow.
+  continueHref: { type: String, default: '/onboarding-wizard.html' },
+  tourHref:     { type: String, default: '/onboarding-wizard.html?tour=1' },
+})
 
-const data = computed(() => store.findings)
+const store = useRossStore()
+onMounted(() => {
+  if (props.findings) return
+  if (!store.findings) store.loadFindings()
+})
+
+const data = computed(() => props.findings || store.findings)
 
 const stepTotal = 5
 const stepCurrent = 3
 
 // FIELD CONTRACT: onboarding-progress/{uid}.helloSeen — see
 // public/js/auth/post-login-router.js for the full router matrix.
-// Public mount (main-hello-public.js, future) has no auth.currentUser
-// and so this no-ops safely.
+// Safe to call on the public mount: no auth.currentUser → early return.
 async function markHelloSeen() {
   const uid = auth.currentUser?.uid
   if (!uid) return
@@ -34,12 +52,12 @@ async function markHelloSeen() {
 
 async function onContinue() {
   await markHelloSeen()
-  window.location.href = '/onboarding-wizard.html'
+  window.location.href = props.continueHref
 }
 async function onTour() {
   // Tour is not yet built — keep the button until the tour flow ships.
   await markHelloSeen()
-  window.location.href = '/onboarding-wizard.html?tour=1'
+  window.location.href = props.tourHref
 }
 </script>
 
