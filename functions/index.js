@@ -500,9 +500,18 @@ exports.registerUser = functions.https.onCall(async (data, context) => {
             businessAddress,
             businessPhone,
             businessType,
+            isFranchise,
+            franchiseName,
+            brandName,
             selectedTier,
+            tier,
             tierData
         } = data;
+
+        // PR 2: prefer the explicit `tier` field; fall back to legacy
+        // `selectedTier` for compat with any older callers still in flight.
+        const tierId = tier || selectedTier || null;
+        const tierDataSafe = tierData || {};
 
         // Create user data
         const userData = {
@@ -511,30 +520,37 @@ exports.registerUser = functions.https.onCall(async (data, context) => {
             firstName: firstName,
             lastName: lastName,
             displayName: `${firstName} ${lastName}`,
+            tier: tierId,
             businessInfo: {
                 name: businessName,
                 address: businessAddress,
                 phone: businessPhone,
                 type: businessType
             },
+            isFranchise: isFranchise || false,
+            franchiseName: franchiseName || '',
+            brandName: brandName || '',
             createdAt: admin.database.ServerValue.TIMESTAMP,
             updatedAt: admin.database.ServerValue.TIMESTAMP,
             status: 'active',
             role: 'user'
         };
 
-        // Create subscription data
+        // Create subscription data. Write both `tier` (canonical) and
+        // `tierId` (legacy) to bridge the historical field-name drift —
+        // see docs/plans/2026-05-05-pr42-signup-v2-hifi.md §2 Q5.
         const subscriptionData = {
             userId: userId,
-            tierId: selectedTier,
+            tier: tierId,
+            tierId: tierId,
             status: 'trial', // Start with trial
             startDate: admin.database.ServerValue.TIMESTAMP,
             trialEndDate: Date.now() + (14 * 24 * 60 * 60 * 1000), // 14-day trial
-            features: tierData.features || {},
-            limits: tierData.limits || {},
+            features: tierDataSafe.features || {},
+            limits: tierDataSafe.limits || {},
             metadata: {
                 signupSource: 'web',
-                initialTier: selectedTier
+                initialTier: tierId
             }
         };
 
@@ -586,6 +602,9 @@ exports.registerUser = functions.https.onCall(async (data, context) => {
             phone: businessPhone,
             type: businessType,
             ownerId: userId,
+            isFranchise: isFranchise || false,
+            franchiseName: franchiseName || '',
+            brandName: brandName || businessName,
             createdAt: admin.database.ServerValue.TIMESTAMP,
             status: 'active',
             settings: {
@@ -599,6 +618,18 @@ exports.registerUser = functions.https.onCall(async (data, context) => {
         const locationRef = await admin.database().ref('locations').push();
         await locationRef.set(locationData);
         await admin.database().ref(`userLocations/${userId}/${locationRef.key}`).set(true);
+
+        // PR 2 + PR 1 contract: initialise onboarding-progress so the
+        // post-login router has clean state to read. Idempotent via
+        // transaction — only writes when the node is absent, so we can't
+        // stomp a wizard that has already advanced past helloSeen.
+        await admin.database().ref(`onboarding-progress/${userId}`).transaction(cur => (
+            cur || {
+                completed: false,
+                helloSeen: false,
+                createdAt: admin.database.ServerValue.TIMESTAMP
+            }
+        ));
 
         return { success: true, userId: userId };
 
