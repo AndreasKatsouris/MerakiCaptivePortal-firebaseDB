@@ -7,15 +7,17 @@
 //   import HiFi from '/js/design-system/hifi/index.js'
 //   app.use(HiFi)  // registers all components globally as <HfButton/>, etc.
 
-import HfButton  from './components/HfButton.vue'
-import HfChip    from './components/HfChip.vue'
-import HfCard    from './components/HfCard.vue'
-import HfInput   from './components/HfInput.vue'
-import HfIcon    from './components/HfIcon.vue'
-import HfAvatar  from './components/HfAvatar.vue'
-import HfLogo    from './components/HfLogo.vue'
-import HfNavItem from './components/HfNavItem.vue'
-import HfKbd     from './components/HfKbd.vue'
+import HfButton   from './components/HfButton.vue'
+import HfChip     from './components/HfChip.vue'
+import HfCard     from './components/HfCard.vue'
+import HfInput    from './components/HfInput.vue'
+import HfSelect   from './components/HfSelect.vue'
+import HfCheckbox from './components/HfCheckbox.vue'
+import HfIcon     from './components/HfIcon.vue'
+import HfAvatar   from './components/HfAvatar.vue'
+import HfLogo     from './components/HfLogo.vue'
+import HfNavItem  from './components/HfNavItem.vue'
+import HfKbd      from './components/HfKbd.vue'
 
 import HfLineChart      from './charts/HfLineChart.vue'
 import HfBarChart       from './charts/HfBarChart.vue'
@@ -27,13 +29,13 @@ import HfPieChart       from './charts/HfPieChart.vue'
 import HfMultiLineChart from './charts/HfMultiLineChart.vue'
 
 const components = {
-  HfButton, HfChip, HfCard, HfInput, HfIcon, HfAvatar, HfLogo, HfNavItem, HfKbd,
+  HfButton, HfChip, HfCard, HfInput, HfSelect, HfCheckbox, HfIcon, HfAvatar, HfLogo, HfNavItem, HfKbd,
   HfLineChart, HfBarChart, HfDonut, HfSparkline, HfCompareChart, HfChartTooltip,
   HfPieChart, HfMultiLineChart,
 }
 
 export {
-  HfButton, HfChip, HfCard, HfInput, HfIcon, HfAvatar, HfLogo, HfNavItem, HfKbd,
+  HfButton, HfChip, HfCard, HfInput, HfSelect, HfCheckbox, HfIcon, HfAvatar, HfLogo, HfNavItem, HfKbd,
   HfLineChart, HfBarChart, HfDonut, HfSparkline, HfCompareChart, HfChartTooltip,
   HfPieChart, HfMultiLineChart,
 }

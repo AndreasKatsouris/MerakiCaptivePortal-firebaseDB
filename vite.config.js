@@ -23,6 +23,7 @@ export default defineConfig({
         'campaigns-v2':             resolve(__dirname, 'public/campaigns-v2.html'),
         'receipts-v2':              resolve(__dirname, 'public/receipts-v2.html'),
         'index-v2':                 resolve(__dirname, 'public/index-v2.html'),
+        'signup':                   resolve(__dirname, 'public/signup.html'),
         'project-status':           resolve(__dirname, 'public/project-status.html')
       }
     }
