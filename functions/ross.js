@@ -193,7 +193,7 @@ exports.rossGetTemplates = onRequest(async (req, res) => {
         if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' });
         try {
             const decodedToken = await verifyAuthToken(req);
-            await verifyUserOrAdmin(decodedToken);
+            const { uid, isSuperAdmin } = await verifyUserOrAdmin(decodedToken);
 
             const data = req.body.data || req.body;
             const { category } = data || {};
@@ -205,6 +205,11 @@ exports.rossGetTemplates = onRequest(async (req, res) => {
             if (category && VALID_CATEGORIES.includes(category)) {
                 templates = templates.filter(t => t.category === category);
             }
+
+            // Tier filter — Phase 6 PR 1A. SuperAdmin sees all; All-in sees all;
+            // Free + missing-tier-user see only tier === 'free' templates.
+            const userTier = await readUserTier(uid);
+            templates = filterTemplatesByTier(templates, userTier, isSuperAdmin);
 
             templates.sort((a, b) => (a.name || '').localeCompare(b.name || ''));
             res.json({ result: { success: true, templates } });
