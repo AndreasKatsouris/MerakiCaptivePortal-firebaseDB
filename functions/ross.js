@@ -13,6 +13,7 @@ const { onRequest } = require('firebase-functions/v2/https');
 const { onSchedule } = require('firebase-functions/v2/scheduler');
 const admin = require('firebase-admin');
 const cors = require('cors')({ origin: true });
+const { validateTier, userCanActivate, filterTemplatesByTier } = require('./ross-tier');
 
 const db = admin.database();
 
@@ -189,10 +190,12 @@ exports.rossCreateTemplate = onRequest(async (req, res) => {
             const uid = await verifySuperAdmin(decodedToken);
 
             const data = req.body.data || req.body;
-            const { name, category, description, recurrence, daysBeforeAlert, subtasks, tags } = data;
+            const { name, category, description, recurrence, daysBeforeAlert, subtasks, tags, tier } = data;
 
             if (!name || !name.trim()) return res.status(400).json({ error: 'Template name is required' });
             if (!VALID_CATEGORIES.includes(category)) return res.status(400).json({ error: 'Invalid category' });
+            const tierError = validateTier(tier);
+            if (tierError) return res.status(400).json({ error: tierError });
             if (!VALID_RECURRENCES.includes(recurrence)) return res.status(400).json({ error: 'Invalid recurrence' });
 
             // Phase 4e.2: enforce inputType enum on each subtask so the
@@ -208,6 +211,7 @@ exports.rossCreateTemplate = onRequest(async (req, res) => {
                 templateId,
                 name: name.trim(),
                 category,
+                tier,
                 description: description?.trim() || '',
                 recurrence,
                 daysBeforeAlert: Array.isArray(daysBeforeAlert)
