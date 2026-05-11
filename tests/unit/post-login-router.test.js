@@ -59,7 +59,7 @@ describe('resolvePostLoginDestination — auth state', () => {
   })
 })
 
-describe('resolvePostLoginDestination — onboarding incomplete', () => {
+describe('resolvePostLoginDestination — corrupt / missing node', () => {
   test('onboarding-progress node missing → wizard', async () => {
     get.mockResolvedValueOnce(snap(null))
     expect(await resolvePostLoginDestination({ uid: 'u1' })).toBe(WIZARD)
@@ -69,20 +69,26 @@ describe('resolvePostLoginDestination — onboarding incomplete', () => {
     get.mockResolvedValueOnce(snap('not-an-object'))
     expect(await resolvePostLoginDestination({ uid: 'u1' })).toBe(WIZARD)
   })
-
-  test('onboarding-progress.completed missing → wizard', async () => {
-    get.mockResolvedValueOnce(snap({ helloSeen: true }))
-    expect(await resolvePostLoginDestination({ uid: 'u1' })).toBe(WIZARD)
-  })
-
-  test('onboarding-progress.completed === false → wizard', async () => {
-    get.mockResolvedValueOnce(snap({ completed: false, helloSeen: true }))
-    expect(await resolvePostLoginDestination({ uid: 'u1' })).toBe(WIZARD)
-  })
 })
 
-describe('resolvePostLoginDestination — backwards-compat (helloSeen missing)', () => {
-  test('completed, helloSeen missing, HELLO on, IS_HOME on → ross (treat as seen)', async () => {
+describe('resolvePostLoginDestination — legacy pre-PR42 account (helloSeen missing)', () => {
+  test('completed missing → wizard', async () => {
+    get.mockResolvedValueOnce(snap({}))
+    isEnabled.mockImplementation((flag) =>
+      ({ ROSS_ONBOARDING_HELLO: true, ROSS_IS_HOME: true })[flag]
+    )
+    expect(await resolvePostLoginDestination({ uid: 'u1' })).toBe(WIZARD)
+  })
+
+  test('completed === false → wizard', async () => {
+    get.mockResolvedValueOnce(snap({ completed: false }))
+    isEnabled.mockImplementation((flag) =>
+      ({ ROSS_ONBOARDING_HELLO: true, ROSS_IS_HOME: true })[flag]
+    )
+    expect(await resolvePostLoginDestination({ uid: 'u1' })).toBe(WIZARD)
+  })
+
+  test('completed, IS_HOME on → ross', async () => {
     get.mockResolvedValueOnce(snap({ completed: true }))
     isEnabled.mockImplementation((flag) =>
       ({ ROSS_ONBOARDING_HELLO: true, ROSS_IS_HOME: true })[flag]
@@ -90,7 +96,7 @@ describe('resolvePostLoginDestination — backwards-compat (helloSeen missing)',
     expect(await resolvePostLoginDestination({ uid: 'u1' })).toBe(ROSS)
   })
 
-  test('completed, helloSeen missing, HELLO on, IS_HOME off → legacy', async () => {
+  test('completed, IS_HOME off → legacy', async () => {
     get.mockResolvedValueOnce(snap({ completed: true }))
     isEnabled.mockImplementation((flag) =>
       ({ ROSS_ONBOARDING_HELLO: true, ROSS_IS_HOME: false })[flag]
@@ -99,8 +105,16 @@ describe('resolvePostLoginDestination — backwards-compat (helloSeen missing)',
   })
 })
 
-describe('resolvePostLoginDestination — helloSeen === false', () => {
-  test('HELLO flag on → hello', async () => {
+describe('resolvePostLoginDestination — helloSeen === false (fresh signup)', () => {
+  test('HELLO flag on → hello (completed irrelevant)', async () => {
+    get.mockResolvedValueOnce(snap({ completed: false, helloSeen: false }))
+    isEnabled.mockImplementation((flag) =>
+      ({ ROSS_ONBOARDING_HELLO: true, ROSS_IS_HOME: true })[flag]
+    )
+    expect(await resolvePostLoginDestination({ uid: 'u1' })).toBe(HELLO)
+  })
+
+  test('HELLO flag on, completed true → still hello', async () => {
     get.mockResolvedValueOnce(snap({ completed: true, helloSeen: false }))
     isEnabled.mockImplementation((flag) =>
       ({ ROSS_ONBOARDING_HELLO: true, ROSS_IS_HOME: true })[flag]
@@ -108,16 +122,16 @@ describe('resolvePostLoginDestination — helloSeen === false', () => {
     expect(await resolvePostLoginDestination({ uid: 'u1' })).toBe(HELLO)
   })
 
-  test('HELLO flag off, IS_HOME on → ross', async () => {
-    get.mockResolvedValueOnce(snap({ completed: true, helloSeen: false }))
+  test('HELLO flag off, IS_HOME on → ross (rollback bypasses hello)', async () => {
+    get.mockResolvedValueOnce(snap({ completed: false, helloSeen: false }))
     isEnabled.mockImplementation((flag) =>
       ({ ROSS_ONBOARDING_HELLO: false, ROSS_IS_HOME: true })[flag]
     )
     expect(await resolvePostLoginDestination({ uid: 'u1' })).toBe(ROSS)
   })
 
-  test('HELLO flag off, IS_HOME off → legacy', async () => {
-    get.mockResolvedValueOnce(snap({ completed: true, helloSeen: false }))
+  test('HELLO flag off, IS_HOME off → legacy (full rollback)', async () => {
+    get.mockResolvedValueOnce(snap({ completed: false, helloSeen: false }))
     isEnabled.mockImplementation((flag) =>
       ({ ROSS_ONBOARDING_HELLO: false, ROSS_IS_HOME: false })[flag]
     )
@@ -125,8 +139,16 @@ describe('resolvePostLoginDestination — helloSeen === false', () => {
   })
 })
 
-describe('resolvePostLoginDestination — helloSeen === true', () => {
-  test('IS_HOME on → ross', async () => {
+describe('resolvePostLoginDestination — helloSeen === true (post-hello account)', () => {
+  test('IS_HOME on → ross (wizard skipped — PR 6 lock)', async () => {
+    get.mockResolvedValueOnce(snap({ completed: false, helloSeen: true }))
+    isEnabled.mockImplementation((flag) =>
+      ({ ROSS_ONBOARDING_HELLO: true, ROSS_IS_HOME: true })[flag]
+    )
+    expect(await resolvePostLoginDestination({ uid: 'u1' })).toBe(ROSS)
+  })
+
+  test('IS_HOME on, completed true → ross', async () => {
     get.mockResolvedValueOnce(snap({ completed: true, helloSeen: true }))
     isEnabled.mockImplementation((flag) =>
       ({ ROSS_ONBOARDING_HELLO: true, ROSS_IS_HOME: true })[flag]

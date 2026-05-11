@@ -402,6 +402,6 @@ async function completeOnboarding() {
     }
 }
 
-function goToDashboard() {
-    routePostLogin(auth.currentUser);
+async function goToDashboard() {
+    await routePostLogin(auth.currentUser);
 }

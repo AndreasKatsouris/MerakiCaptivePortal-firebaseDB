@@ -16,23 +16,29 @@ const LEGACY_DASHBOARD_URL = '/user-dashboard.html'
  * Pure decision: given an authed user, return the path they belong on.
  * Reads `onboarding-progress/{uid}` from RTDB; performs no navigation.
  *
+ * The `helloSeen` field has three states with distinct semantics:
+ * - `false`   → post-PR42 fresh signup, hasn't yet completed the hello.
+ *               Per Phase 5 PR 6 lock: send to hello, skip the legacy wizard.
+ * - `true`    → post-PR42 account that has completed the hello.
+ *               Wizard is skipped entirely; route to home.
+ * - missing   → legacy pre-PR42 account. Field never existed on this user.
+ *               Use the original wizard-gated path: !completed → wizard.
+ *
  * Decision matrix:
  *
- * | auth | progress.completed | helloSeen | HELLO flag | IS_HOME flag | →           |
- * |------|--------------------|-----------|------------|--------------|-------------|
- * | none | -                  | -         | -          | -            | login       |
- * | yes  | missing/false      | -         | -          | -            | wizard      |
- * | yes  | true               | missing*  | on         | on           | ross        |
- * | yes  | true               | missing*  | on         | off          | legacy      |
- * | yes  | true               | false     | on         | -            | hello       |
- * | yes  | true               | false     | off        | on           | ross        |
- * | yes  | true               | false     | off        | off          | legacy      |
- * | yes  | true               | true      | -          | on           | ross        |
- * | yes  | true               | true      | -          | off          | legacy      |
- *
- * *missing helloSeen on a completed wizard is treated as `true` so
- * existing accounts (created before this field shipped) never get
- * shown the hello retroactively.
+ * | auth | helloSeen | progress.completed | HELLO flag | IS_HOME flag | →           |
+ * |------|-----------|--------------------|------------|--------------|-------------|
+ * | none | -         | -                  | -          | -            | login       |
+ * | yes  | -         | missing node       | -          | -            | wizard      |
+ * | yes  | -         | corrupt (non-obj)  | -          | -            | wizard      |
+ * | yes  | false     | -                  | on         | -            | hello       |
+ * | yes  | false     | -                  | off        | on           | ross        |
+ * | yes  | false     | -                  | off        | off          | legacy      |
+ * | yes  | true      | -                  | -          | on           | ross        |
+ * | yes  | true      | -                  | -          | off          | legacy      |
+ * | yes  | missing   | false/missing      | -          | -            | wizard      |
+ * | yes  | missing   | true               | -          | on           | ross        |
+ * | yes  | missing   | true               | -          | off          | legacy      |
  *
  * Soft impurity: `isEnabled()` reads `window.location.search` to honour
  * QA flag overrides (`?flags=ROSS_IS_HOME`). Acceptable — flag-override
@@ -50,16 +56,21 @@ export async function resolvePostLoginDestination(user) {
 
   const data = snap.val()
   if (!data || typeof data !== 'object') return WIZARD_URL
-  if (!data.completed) return WIZARD_URL
 
   const helloEnabled = isEnabled('ROSS_ONBOARDING_HELLO')
   const isHomeEnabled = isEnabled('ROSS_IS_HOME')
+  const home = isHomeEnabled ? ROSS_URL : LEGACY_DASHBOARD_URL
+  const helloSeenRaw = data.helloSeen
 
-  // Backwards-compat: existing accounts pre-helloSeen field treated as already-seen.
-  const helloSeen = data.helloSeen === undefined ? true : !!data.helloSeen
+  // Post-PR42 fresh signup: not yet through hello.
+  if (helloSeenRaw === false) return helloEnabled ? HELLO_URL : home
 
-  if (helloEnabled && helloSeen === false) return HELLO_URL
-  return isHomeEnabled ? ROSS_URL : LEGACY_DASHBOARD_URL
+  // Post-PR42 account that's completed hello — wizard is skipped (PR 6 lock).
+  if (helloSeenRaw === true) return home
+
+  // Legacy pre-PR42 account (helloSeen field never set): original behaviour.
+  if (!data.completed) return WIZARD_URL
+  return home
 }
 
 /**

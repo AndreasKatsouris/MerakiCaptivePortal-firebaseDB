@@ -3,9 +3,8 @@
 //
 // Two mount modes (Q4 lock — see Phase 5 spec §3.4):
 //   1) Default (post-signup): no props passed → loads findings from the
-//      Pinia store, navigates CTAs to /onboarding-wizard.html, persists
-//      helloSeen=true on the user's onboarding-progress so the router
-//      doesn't re-route the user back here on next login.
+//      Pinia store, persists helloSeen=true, then sends the user to ROSS
+//      (the legacy wizard is skipped for fresh accounts — Phase 5 PR 6).
 //   2) Public homepage: parent passes `findings` (synthetic), plus
 //      `continueHref` / `tourHref` overrides → CTAs send the visitor
 //      into /signup.html instead. markHelloSeen() already no-ops when
@@ -19,9 +18,10 @@ const props = defineProps({
   // When provided, takes precedence over store.findings. Skip the store
   // load entirely so the public mount doesn't trigger a real-data fetch.
   findings:     { type: Object, default: null },
-  // CTA destinations. Defaults preserve the post-signup wizard flow.
-  continueHref: { type: String, default: '/onboarding-wizard.html' },
-  tourHref:     { type: String, default: '/onboarding-wizard.html?tour=1' },
+  // CTA destinations. Defaults send fresh signups straight to ROSS (PR 6:
+  // wizard is skipped — signup already collects the data it asked for).
+  continueHref: { type: String, default: '/ross.html' },
+  tourHref:     { type: String, default: '/ross.html?tour=1' },
 })
 
 const store = useRossStore()
