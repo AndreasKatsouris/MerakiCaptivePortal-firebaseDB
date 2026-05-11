@@ -3,7 +3,7 @@
 > Claude reads this file at the start of every session and updates it at the end.
 > The Sprint Goal is the contract for the session — don't deviate without explicit user confirmation.
 
-Last updated: 2026-05-11 (post PR #46 — reflect cycle. **PR 4 + PR 6 (folded) merged.** ROSS is now the post-login destination for every post-PR42 account; legacy pre-PR42 accounts still respect the original `!completed → wizard` path. PR 5 (sidebar cleanup) is the only remaining Phase 5 PR.)
+Last updated: 2026-05-11 (post PR #48 — reflect cycle. **Phase 5 CLOSED.** All 5 cleanup PRs (#39 router, #42 signup, #44 homepage, #46 router rollout + PR 6 folded, #48 sidebar cleanup) shipped. ROSS is now home end-to-end: fresh signup → hello → ross; existing signed-in users → ross; sidebar collapsed to Today + Ross's brain; module deep-links removed from ROSS primary nav. Sprint goal achieved. **Phase 6 (Playbook UX enrichment + template library curation) is the next sprint.**)
 
 ---
 
@@ -21,7 +21,7 @@ Sprint: 2026-04-30 → until complete
 
 | Item | Branch | Notes |
 |------|--------|-------|
-| — | — | Idle. Next sprint task: Phase 5 PR 5 = `feat/ross-sidebar-cleanup` (≈ PR #48, since this reflect sync is ≈#47). Last remaining Phase 5 cleanup PR before Phase 6 (Playbook UX enrichment + template library curation) opens. |
+| — | — | Idle. **Phase 5 sprint closed.** Next sprint: Phase 6 (Playbook UX enrichment + template library curation). Recommended first task: curate the 5-template Free starter library (smallest piece; unblocks the tier-gated template list + day-zero auto-activation that follow). |
 
 ---
 
@@ -55,7 +55,7 @@ Spec: `docs/superpowers/specs/2026-05-02-ross-central-funnel-cleanup-design.md`.
 - [x] **PR 2 (PR #42)** — `feat/signup-v2-hifi`: Hi-Fi Vue 3 rewrite of `/signup.html` (no Pinia, ephemeral form state). Dynamic-tier reframe (operator pivot — admin curates Free/All-in via existing admin-dashboard Tier Management UI rather than hardcoding in code constants). Service layer extracted to `signup-service.js`. `tier` written to `users/{uid}/tier`, `subscriptions/{uid}/tier` (canonical) AND `subscriptions/{uid}/tierId` (legacy compat). `registerUser` CF gap closed: server-side `subscriptionTiers/{tierId}` validation, length-bounds on free-text fields, atomic multi-path `update()` for users + subscriptions + onboarding-progress, idempotent onboarding-progress init. New `.validate` rule on `subscriptions/$uid` rejects unknown tier IDs (defense in depth). Two new Hi-Fi components shipped: `HfSelect` (rebuilt as true custom combobox after operator flagged native dropdown panel ignored design tokens — full WAI-ARIA + keyboard) and `HfCheckbox`. v2 surface uses inline error/success banners (not SweetAlert2 — that util silently no-ops on the Hi-Fi mount shell). Doc housekeeping: 3 plan stragglers relocated `docs/superpowers/plans/` → `docs/plans/` after operator clarified the canonical location; LESSON corrected.
 - [x] **PR 3 (PR #44)** — `feat/homepage-v2-hifi`: `/index.html` itself promoted to Hi-Fi mount shell (legacy v1 + index-v2.html chrome stepping-stone + landing-page.css all deleted). Workflow-centric narrative replaces fabricated stats/testimonials/success stories — three concrete workflow cards (Daily Opening Checklist / Weekly Compliance Sweep / Monthly Marketing Push), single primary CTA "Start free", honest tone throughout. Synthetic public hello preview embeds the actual `RossOnboardingHello.vue` (Q4 lock — same component, two data feeds) with a Tannie's-Kitchen Cape Town narrative; CTAs route to `/signup.html`. RossOnboardingHello refactored with three optional props (`findings` / `continueHref` / `tourHref`) — defaults preserve post-signup behavior byte-for-byte. Pricing section reads `subscriptionTiers` via new shared `services/subscription-tiers.js` (extracted from PR 2's signup-service); static Free/All-in fallback if RTDB empty. Founder Lakis Katsouris quote preserved in single-card layout. Hero photo (`/img/ob-bg.jpg`) replaced with typographic workflow-card panel demonstrating the product in miniature. Module rename `landing-v2/` → `marketing/landing/`. SEO preserved (`<title>`, meta description, `#features`/`#about`/`#testimonials` alias). Three review fixes landed in same PR: logo `smoothScroll` always preventDefault, All-in fallback gets "Pricing announced soon" subtext, magic `top:-80px` promoted to `--lp-nav-height` custom property.
 - [x] **PR 4 + PR 6 (folded) (PR #46)** — `feat/post-login-router-rollout`: wired the 5 remaining redirect call sites (`user-login.js` ×2, `onboarding-wizard.js` ×2, `user-dashboard.js`, `dashboard.store.js`) to the router; `user-dashboard.html` got a sticky deprecation banner. Review surfaced a real bug — fresh signups (`completed: false && helloSeen: false`) hit the wizard because the router's `!completed` short-circuit fired before the helloSeen branch. Fix folded the PR 6 work in: `resolvePostLoginDestination` rewritten with three explicit helloSeen states — `false` → hello, `true` → home (wizard skipped, PR 6 lock), missing → legacy `!completed`-gated path. Hello component default `continueHref` updated `/onboarding-wizard.html` → `/ross.html`. AUTHENTICATION_FLOW.md gained a Post-Login Routing section. 21/21 router tests pass (was 19 — added fresh-signup + PR 6 cases). The wizard remains reachable by direct URL for legacy use; only fresh signups skip it. **ROSS is now home.**
-- [ ] **PR 5 (≈#48)** — `feat/ross-sidebar-cleanup`: collapse sidebar to just Today + Ross's brain (3 sections). v1 module deep-links removed from ROSS sidebar; operator reaches them via `/admin-dashboard.html`. Last remaining Phase 5 PR — closes the sprint when merged.
+- [x] **PR 5 (PR #48)** — `feat/ross-sidebar-cleanup`: collapsed sidebar to Today + Ross's brain only (4 sections / 13 items → 2 sections / 4 items). All v1 module deep-links removed from ROSS primary nav (Overview / Queue / Guests / Operations all gone). Mobile bottom nav folded in (Overview / Guests / Queue / You → Playbook / Activity / People). v1 modules remain reachable via `/admin-dashboard.html` per Q3 lock. Operator caught on preview that the footer Profile/Settings block shipped hardcoded prototype data (`Maya Alvarez` / `Group Ops` / `MA`) — my original plan said "footer already serves the role" but conflated structure with content. Fix landed same PR: both desktop footer + mobile topbar now read `auth.currentUser` reactively via `onAuthStateChanged`, with proper unsubscribe in `onUnmounted`. Display shows `displayName` (or email local-part fallback) + email + live initials. Gear icon stays non-interactive — `/profile-settings.html` doesn't exist yet (only `/receipt-settings.html` which is per-restaurant config, different domain). **Phase 5 sprint closed.**
 
 Lower-priority Phase 5 items (deferred to dedicated polish PR after the 5-PR sequence): surface `store.error` in `RossOnboardingHello.vue`; lower `FINDING_MIN_LIFT` threshold; parallelise nested RTDB reads in `detectBestWeekday`; un-hardcode the 3-of-5 step counter.
 
@@ -98,6 +98,7 @@ Lower-priority Phase 5 items (deferred to dedicated polish PR after the 5-PR seq
 10. **`HfModal` / `HfConfirm` design-system components** — v2 needs a Hi-Fi-native modal pattern for cases that genuinely warrant an overlay (bulk-action confirms, multi-step wizards, etc.). PR #25 dropped SweetAlert2 in favour of inline confirms / inline error banners — that works for the People tab's single-row destructive actions but won't scale. Land in `public/js/design-system/hifi/components/` with --hf-* tokens, focus trap, ESC + scrim dismiss, and a worked example in `public/hifi/components.html`. Update CLAUDE.md convention: SweetAlert2 is v1-only.
 11. **Fix KB doc field-name drift for ROSS templates** — `public/kb/features/ROSS.md` "Templates" block lists `id: string` but the actual server uses `templateId` (per seed + `rossCreateTemplate`). Same doc says template tasks are at `tasks: Task[]` but server stores `subtasks` (per `rossActivateWorkflow`, seed). Drift directly caused the PR #28 activate-from-template bug. One-line audit + edit. **[Done in PR #30]**
 12. **Catalog ROSS Cloud Functions in `KNOWLEDGE BASE/api/CLOUD_FUNCTIONS_CATALOG.md`** — `functions/ross.js` is missing from the Source File Map and none of the ROSS CFs are documented there (`rossGetTemplates`, `rossCreateTemplate`, `rossUpdateTemplate`, `rossDeleteTemplate`, `rossGetWorkflows`, `rossCreateWorkflow`, `rossUpdateWorkflow`, `rossDeleteWorkflow`, `rossActivateWorkflow`, `rossManageTask`, `rossGetReports`, `rossScheduledReminder`, `rossV2Snooze`). Pre-existing drift surfaced during PR #30 review. Allowed-fields lists for each mutator are the highest-value payload — would have caught the PR #28 `t.id` bug at planning time.
+13. **Build `/profile-settings.html` for ROSS user account** — sidebar/topbar footer (PR #48) reads `auth.currentUser` reactively but the gear icon is non-interactive because no settings page exists. Account-scoped (display name, password change, email, notification prefs) — `receipt-settings.html` is per-restaurant config, different domain. Once shipped, wire the footer click (`RossHomeDesktop.vue:118` block + `RossHomeMobile.vue` topbar) to navigate there. Belongs in Phase 6 polish or as standalone follow-up.
 
 ### Low Priority / Nice-to-Have
 
@@ -114,7 +115,7 @@ Lower-priority Phase 5 items (deferred to dedicated polish PR after the 5-PR seq
 
 | Bug | Severity | Discovered | Blocking Sprint? |
 |-----|----------|------------|-----------------|
-| — | — | — | — |
+| `feature-access-control.js:64` dynamic import with `?v=${Date.now()}` cache-buster — Vite can't statically analyse a runtime-computed path, throws `Unknown variable dynamic import` on every `checkFeatureAccess` call post-build. Fix is one line (drop the `?v=…`; Vite content-hashes outputs natively) but the file is shared infra — every FeatureAccess consumer across the app calls it. Deserves own focused PR with consumer audit, NOT a fold-in. Discovered on PR #48 preview when operator opened `/ross.html` console. | Medium (visible console error, blocks no functionality) | PR #48 review | No |
 
 ---
 
@@ -122,11 +123,11 @@ Lower-priority Phase 5 items (deferred to dedicated polish PR after the 5-PR seq
 
 | Feature | PR | Merged |
 |---------|----|--------|
+| ROSS sidebar cleanup — collapse to Today + Ross's brain + footer wired to auth.currentUser (Phase 5 PR 5, **closes Phase 5**) | #48 | 2026-05-11 |
+| docs(ross-v2) — post-PR-46 reflect cycle + tighten Session Opening Protocol | #47 | 2026-05-11 |
+| post-login router rollout + skip wizard for fresh signups (Phase 5 PR 4 + PR 6 folded) | #46 | 2026-05-11 |
+| docs(ross-v2) — post-merge sync + reflect cycle after PR #44 + hook fix | #45 | 2026-05-05 |
 | homepage v2 — Hi-Fi promotion + workflow-centric copy + dynamic pricing + reused public hello + typographic hero panel (Phase 5 PR 3) | #44 | 2026-05-05 |
-| docs(ross-v2) — post-merge sync + reflect cycle after PR #42 | #43 | 2026-05-05 |
-| signup v2 — Hi-Fi Vue 3 rewrite + tier writes + registerUser update + .validate rule (Phase 5 PR 2) | #42 | 2026-05-05 |
-| docs(ross-v2) — close out PR #40, advance PR numbers | #41 | 2026-05-02 |
-| docs(ross-v2) — post-merge sync + reflect cycle after PR #39 | #40 | 2026-05-02 |
 
 ---
 
