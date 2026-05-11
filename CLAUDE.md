@@ -32,6 +32,7 @@ You are the primary development agent for this project. You have full read/write
 - Vue 3 modules: Pinia stores, ES module imports, DDD-style structure (services/ + stores/ + components/ + constants/)
 - SA date format (DD/MM/YYYY) default for ambiguous dates
 - Chart.js uses CategoryScale (not TimeScale) to avoid ESM dual-package hazard
+- Post-login destination is decided by `routePostLogin(user)` from `public/js/auth/post-login-router.js` — never hardcode `/user-dashboard.html` or `/ross.html` in auth/onboarding redirects. The router honours `ROSS_IS_HOME`, `ROSS_ONBOARDING_HELLO`, and `onboarding-progress/{uid}` state.
 - See: `KNOWLEDGE BASE/development/CODING_STANDARDS.md` for full standards
 
 ## Key Paths

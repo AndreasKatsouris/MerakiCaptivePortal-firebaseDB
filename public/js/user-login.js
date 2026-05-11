@@ -6,6 +6,7 @@
 import { auth, rtdb, ref, get, update, signInWithEmailAndPassword, onAuthStateChanged, set } from './config/firebase-config.js';
 import { showToast } from './utils/toast.js';
 import { getSessionExpiryMessage, getRedirectAfterLogin } from './auth/session-expiry-handler.js';
+import { routePostLogin } from './auth/post-login-router.js';
 
 class UserLoginManager {
     constructor() {
@@ -22,8 +23,8 @@ class UserLoginManager {
                 
                 // If no userData or role is not explicitly 'admin', treat as regular user
                 if (!userData || (userData.role !== 'admin' && userData.isAdmin !== true)) {
-                    // Redirect to user dashboard
-                    window.location.href = '/user-dashboard.html';
+                    // Route via post-login-router so onboarding + ROSS_IS_HOME state decide the destination.
+                    await routePostLogin(user);
                 }
             }
         });
@@ -222,10 +223,15 @@ class UserLoginManager {
 
             showToast('Login successful! Redirecting...', 'success');
 
-            // Redirect to user dashboard
-            setTimeout(() => {
-                window.location.href = '/user-dashboard.html';
-            }, 1000);
+            // Route via post-login-router; defer navigation ~1s so the toast is visible.
+            // Deferred-navigator pattern (LESSONS: Promise.all timing) — resolve destination
+            // without navigating, hold for the toast, then go.
+            let dest = '/user-dashboard.html';
+            await Promise.all([
+                routePostLogin(user, (d) => { dest = d; }),
+                new Promise(r => setTimeout(r, 1000)),
+            ]);
+            window.location.href = dest;
 
         } catch (error) {
             console.error('Login error:', error);

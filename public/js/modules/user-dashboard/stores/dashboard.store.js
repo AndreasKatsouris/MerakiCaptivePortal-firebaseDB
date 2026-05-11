@@ -22,6 +22,7 @@ import {
 import { fetchDashboardStatistics } from '../services/statistics-service.js'
 import { fetchWhatsAppMappings } from '../services/whatsapp-service.js'
 import { checkAllFeatures, showUpgradePrompt } from '../services/feature-service.js'
+import { routePostLogin } from '../../../auth/post-login-router.js'
 
 export const useDashboardStore = defineStore('dashboard', {
   state: () => ({
@@ -92,7 +93,7 @@ export const useDashboardStore = defineStore('dashboard', {
       try {
         const onboardingComplete = await checkOnboardingComplete(user.uid)
         if (!onboardingComplete) {
-          window.location.href = '/onboarding-wizard.html'
+          await routePostLogin(user)
           return
         }
 

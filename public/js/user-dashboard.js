@@ -9,6 +9,7 @@ import { featureAccessControl } from './modules/access-control/services/feature-
 import { runCompleteDatabaseFix, fixUserSubscriptionData } from './utils/subscription-tier-fix.js';
 import { dbPaginator } from './utils/database-paginator.js';
 import { initSessionExpiryHandler } from './auth/session-expiry-handler.js';
+import { routePostLogin } from './auth/post-login-router.js';
 
 class UserDashboard {
     constructor() {
@@ -37,9 +38,10 @@ class UserDashboard {
                 const onboardingSnapshot = await get(onboardingRef);
 
                 if (!onboardingSnapshot.exists() || !onboardingSnapshot.val().completed) {
-                    // Redirect to onboarding wizard
-                    console.log('[Dashboard] User has not completed onboarding, redirecting...');
-                    window.location.href = '/onboarding-wizard.html';
+                    // Route via post-login-router — resolves to wizard for incomplete onboarding,
+                    // or to ross/hello/dashboard once onboarding state evolves.
+                    console.log('[Dashboard] User has not completed onboarding, routing...');
+                    await routePostLogin(user);
                     return;
                 }
 
