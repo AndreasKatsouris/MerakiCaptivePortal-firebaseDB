@@ -1,6 +1,6 @@
 {
-  "lastUpdated": "2026-05-05",
-  "lastUpdatedNote": "Reflect cycle complete (post PR #44); ready to start Phase 5 PR 4 = feat/post-login-router-rollout (≈ PR #46). New Phase 5 PR 6 added: drop wizard for new accounts (option b chosen 2026-05-05).",
+  "lastUpdated": "2026-05-11",
+  "lastUpdatedNote": "PR #46 feat/post-login-router-rollout open + under review. PR 6 (drop wizard for new accounts) folded into PR 4 after review surfaced a fresh-signup routing bug whose fix was exactly the PR 6 work — resolvePostLoginDestination rewritten with 3-state helloSeen semantics (false=hello, true=home/wizard-skipped, missing=legacy back-compat). 21/21 router tests pass. PR 5 (sidebar cleanup) is the only remaining Phase 5 PR.",
   "sprint": {
     "goal": "Effective implementation of Hi-Fi v2, with ROSS as the central post-login surface for every subscribed user",
     "started": "2026-04-30",
@@ -42,7 +42,7 @@
       "id": 5,
       "name": "ROSS v2 — central-funnel cleanup",
       "status": "in_progress",
-      "summary": "Spec locked 2026-05-02 at docs/superpowers/specs/2026-05-02-ross-central-funnel-cleanup-design.md. Six PRs sequenced (PR 6 added 2026-05-05): post-login router (#39, merged), signup v2 Hi-Fi + dynamic tier writes (#42, merged), homepage v2 Hi-Fi + reused public hello (#44, merged), router rollout — ROSS becomes home (≈#46), ROSS sidebar cleanup (≈#47), drop wizard for new accounts (≈#48 — option b 'drop' chosen over a 'slim'). Q1–Q5 product questions resolved: Free = full UI + 5 starter templates, day-zero = pre-populated demo workflow, v1 access = admin-only via admin-dashboard, hello = same component two data feeds (delivered in PR #44), ROSS_IS_HOME flag wired for rollback safety."
+      "summary": "Spec locked 2026-05-02. Sequenced PRs: post-login router (#39, merged), signup v2 Hi-Fi + dynamic tier writes (#42, merged), homepage v2 Hi-Fi + reused public hello (#44, merged), router rollout + drop wizard for new accounts (PR #46, open + under review — PR 6 folded in after review bug), ROSS sidebar cleanup (≈#47). Q1–Q5 product questions resolved: Free = full UI + 5 starter templates, day-zero = pre-populated demo workflow, v1 access = admin-only via admin-dashboard, hello = same component two data feeds (delivered in PR #44), ROSS_IS_HOME flag wired for rollback safety. PR 6 collapse decision (2026-05-11): the router contract was incoherent without the 3-state helloSeen semantics — folding in keeps the matrix consistent rather than landing a known-broken contract then patching it."
     },
     {
       "id": 6,
@@ -74,18 +74,25 @@
     { "id": "phase-5-pr1-router", "label": "PR 1 (PR #39) — post-login-router + hello auth gate + helloSeen field", "done": true, "phase": 5 },
     { "id": "phase-5-pr2-signup", "label": "PR 2 (PR #42) — signup v2 Hi-Fi Vue 3 rewrite + dynamic tier writes + registerUser CF closure + .validate rule + HfSelect/HfCheckbox", "done": true, "phase": 5 },
     { "id": "phase-5-pr3-homepage", "label": "PR 3 (PR #44) — homepage v2 Hi-Fi promotion + workflow-centric copy + dynamic pricing + reused public hello + typographic hero panel", "done": true, "phase": 5 },
-    { "id": "phase-5-pr4-rollout", "label": "PR 4 (≈#46) — router rollout — ROSS becomes home", "done": false, "phase": 5 },
-    { "id": "phase-5-pr5-sidebar", "label": "PR 5 (≈#47) — ROSS sidebar cleanup (Today + Ross's brain)", "done": false, "phase": 5 },
-    { "id": "phase-5-pr6-drop-wizard", "label": "PR 6 (≈#48) — drop onboarding-wizard for new accounts (decision: option b 'drop' over a 'slim', 2026-05-05)", "done": false, "phase": 5 },
+    { "id": "phase-5-pr4-rollout", "label": "PR 4 + PR 6 folded (PR #46) — router rollout + drop wizard for fresh signups (3-state helloSeen semantics) — OPEN, under review", "done": false, "phase": 5 },
+    { "id": "phase-5-pr5-sidebar", "label": "PR 5 (≈#47) — ROSS sidebar cleanup (Today + Ross's brain) — only remaining Phase 5 PR after #46 merges", "done": false, "phase": 5 },
     { "id": "phase-6-templates", "label": "Phase 6 — Workflow runner + step types + starter template library", "done": false, "phase": 6 }
   ],
-  "inProgress": [],
+  "inProgress": [
+    {
+      "title": "Phase 5 PR 4 + PR 6 (folded) — router rollout + drop wizard for new accounts",
+      "branch": "feat/post-login-router-rollout",
+      "pr": 46,
+      "state": "open-under-review",
+      "notes": "Two commits: (1) wire 5 redirect sites to routePostLogin + deprecation banner on user-dashboard.html; (2) review fixes + fold PR 6 in (router rewrite with 3-state helloSeen semantics, hello continueHref default → /ross.html, dedupe RTDB reads, AUTHENTICATION_FLOW.md sync). Build green; 21/21 router tests pass. Awaiting operator smoke-test on preview channel pr46-feat-post-login-r-v0ap5l8a.web.app + merge."
+    }
+  ],
   "recentlyCompleted": [
-    { "title": "docs(ross-v2): post-merge sync + reflect cycle after PR #39", "pr": 40, "mergedAt": "2026-05-02" },
-    { "title": "ross-v2: post-login router foundation + hello auth gate (phase 5 PR 1)", "pr": 39, "mergedAt": "2026-05-02" },
-    { "title": "docs(ross-v2): post-merge sync + reflect cycle after PR #37", "pr": 38, "mergedAt": "2026-05-02" },
-    { "title": "docs(ross-v2): phase 5 spec — ROSS as central funnel + cleanup plan", "pr": 37, "mergedAt": "2026-05-02" },
-    { "title": "docs(ross-v2): post-merge sync + reflect cycle after PR #35", "pr": 36, "mergedAt": "2026-05-02" }
+    { "title": "homepage v2 — Hi-Fi promotion + workflow-centric copy + dynamic pricing + reused public hello (Phase 5 PR 3)", "pr": 44, "mergedAt": "2026-05-05" },
+    { "title": "docs(ross-v2): post-merge sync + reflect cycle after PR #42", "pr": 43, "mergedAt": "2026-05-05" },
+    { "title": "signup v2 — Hi-Fi Vue 3 rewrite + tier writes + registerUser update + .validate rule (Phase 5 PR 2)", "pr": 42, "mergedAt": "2026-05-05" },
+    { "title": "docs(ross-v2): close out PR #40, advance PR numbers", "pr": 41, "mergedAt": "2026-05-02" },
+    { "title": "docs(ross-v2): post-merge sync + reflect cycle after PR #39", "pr": 40, "mergedAt": "2026-05-02" }
   ],
   "bugs": [],
   "backlog": {
