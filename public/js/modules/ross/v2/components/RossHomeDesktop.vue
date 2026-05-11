@@ -2,7 +2,7 @@
 // Ross home — desktop 3-column editorial layout.
 // Left: venue nav. Center: greeting + 3 story cards. Right: Ask Ross +
 // live venue strip + Ross suggestions.
-import { onMounted, computed, ref } from 'vue'
+import { onMounted, onUnmounted, computed, ref } from 'vue'
 import { useRossStore } from '../store.js'
 import {
   HfIcon, HfChip, HfCard, HfButton, HfAvatar, HfLogo, HfNavItem, HfKbd,
@@ -10,9 +10,30 @@ import {
 } from '/js/design-system/hifi/index.js'
 import { seededLine } from '../content.js'
 import { snoozeCard } from '../ross-service.js'
+import { auth, onAuthStateChanged } from '/js/config/firebase-config.js'
 
 const store = useRossStore()
 onMounted(() => { if (!store.feed) store.loadHome() })
+
+// Footer profile — reactive to auth state. Real /profile-settings.html
+// destination is Phase 6; gear icon stays non-interactive for now.
+const currentUser = ref(auth.currentUser)
+const unsubAuth = onAuthStateChanged(auth, (u) => { currentUser.value = u })
+onUnmounted(() => { try { unsubAuth?.() } catch (_) { /* noop */ } })
+
+const userDisplayName = computed(() => {
+  const u = currentUser.value
+  if (!u) return '—'
+  return u.displayName || u.email?.split('@')[0] || 'You'
+})
+const userEmail = computed(() => currentUser.value?.email || '')
+const userInitials = computed(() => {
+  const src = currentUser.value?.displayName || currentUser.value?.email || ''
+  const parts = src.split(/[\s@.]+/).filter(Boolean)
+  if (parts.length === 0) return '·'
+  if (parts.length === 1) return parts[0].slice(0, 2).toUpperCase()
+  return (parts[0][0] + parts[parts.length - 1][0]).toUpperCase()
+})
 
 // Track per-card pending state so we can disable the snooze button while
 // the round-trip is in flight. Keyed by card.id.
@@ -62,25 +83,12 @@ async function dispatch(action, card) {
 
 const navSections = [
   { eyebrow: 'Today', items: [
-    { label: 'Ross',     icon: 'bolt',  active: true },
-    { label: 'Overview', icon: 'chart', href: '/group-overview-v2.html' },
-    { label: 'Queue',    icon: 'clock', href: '/queue-v2.html' },
-  ]},
-  { eyebrow: 'Guests', items: [
-    { label: 'Profiles',  icon: 'user',  href: '/guests-v2.html'    },
-    { label: 'Segments',  icon: 'users', href: '/guests-v2.html'    },
-    { label: 'Campaigns', icon: 'send',  href: '/campaigns-v2.html' },
-  ]},
-  { eyebrow: 'Operations', items: [
-    { label: 'Analytics',   icon: 'line',    href: '/analytics-v2.html'  },
-    { label: 'Food cost',   icon: 'leaf',    href: '/food-cost-v2.html' },
-    { label: 'Receipts',    icon: 'cart',    href: '/receipts-v2.html'  },
-    { label: 'Forecasting', icon: 'sparkle', href: '/analytics-v2.html?tab=forecast' },
+    { label: 'Ross', icon: 'bolt', active: true },
   ]},
   { eyebrow: "Ross's brain", items: [
-    { label: 'Playbook',  icon: 'check', href: '/ross.html?tab=playbook' },
-    { label: 'Activity',  icon: 'line',  href: '/ross.html?tab=activity' },
-    { label: 'People',    icon: 'users', href: '/ross.html?tab=people' },
+    { label: 'Playbook', icon: 'check', href: '/ross.html?tab=playbook' },
+    { label: 'Activity', icon: 'line',  href: '/ross.html?tab=activity' },
+    { label: 'People',   icon: 'users', href: '/ross.html?tab=people' },
   ]},
 ]
 
@@ -116,10 +124,10 @@ const sidebar = computed(() => store.sidebar)
       </template>
 
       <div class="ross-home__profile">
-        <HfAvatar initials="MA" :size="28" />
+        <HfAvatar :initials="userInitials" :size="28" />
         <div class="ross-home__profile-text">
-          <div>Maya Alvarez</div>
-          <div class="hf-mono ross-home__profile-role">Group Ops</div>
+          <div>{{ userDisplayName }}</div>
+          <div v-if="userEmail" class="hf-mono ross-home__profile-role">{{ userEmail }}</div>
         </div>
         <HfIcon name="gear" :size="14" color="var(--hf-muted)" />
       </div>

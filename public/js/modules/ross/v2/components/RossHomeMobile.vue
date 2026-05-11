@@ -2,23 +2,35 @@
 // Ross home — mobile (single column, bottom nav, Ask Ross pill).
 // Reuses the same store/feed as the desktop view; renders a compressed
 // card per story card without the sidecar KPIs.
-import { onMounted, computed } from 'vue'
+import { onMounted, onUnmounted, computed, ref } from 'vue'
 import { useRossStore } from '../store.js'
 import {
   HfIcon, HfChip, HfAvatar, HfLogo, HfSparkline,
 } from '/js/design-system/hifi/index.js'
+import { auth, onAuthStateChanged } from '/js/config/firebase-config.js'
 
 const store = useRossStore()
 onMounted(() => { if (!store.feed) store.loadHome() })
 
 const feed = computed(() => store.feed)
 
+const currentUser = ref(auth.currentUser)
+const unsubAuth = onAuthStateChanged(auth, (u) => { currentUser.value = u })
+onUnmounted(() => { try { unsubAuth?.() } catch (_) { /* noop */ } })
+
+const userInitials = computed(() => {
+  const src = currentUser.value?.displayName || currentUser.value?.email || ''
+  const parts = src.split(/[\s@.]+/).filter(Boolean)
+  if (parts.length === 0) return '·'
+  if (parts.length === 1) return parts[0].slice(0, 2).toUpperCase()
+  return (parts[0][0] + parts[parts.length - 1][0]).toUpperCase()
+})
+
 const bottomNav = [
-  { icon: 'bolt', active: true, label: 'Ross' },
-  { icon: 'chart', label: 'Overview' },
-  { icon: 'users', label: 'Guests' },
-  { icon: 'clock', label: 'Queue' },
-  { icon: 'user',  label: 'You' },
+  { icon: 'bolt',  active: true, label: 'Ross' },
+  { icon: 'check', label: 'Playbook' },
+  { icon: 'line',  label: 'Activity' },
+  { icon: 'users', label: 'People' },
 ]
 
 const chipFor = (c) => ({
@@ -38,7 +50,7 @@ const chipFor = (c) => ({
     <div class="ross-mobile__scroll">
       <div class="ross-mobile__topbar">
         <HfLogo :size="18" />
-        <HfAvatar initials="MA" :size="30" />
+        <HfAvatar :initials="userInitials" :size="30" />
       </div>
 
       <div class="ross-mobile__greeting">
