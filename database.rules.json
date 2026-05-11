@@ -489,7 +489,12 @@
     "ross": {
       "templates": {
         ".read": "auth != null",
-        ".write": false
+        ".write": false,
+        "$templateId": {
+          "tier": {
+            ".validate": "newData.isString() && (newData.val() === 'free' || newData.val() === 'all-in')"
+          }
+        }
       },
       "workflows": {
         "$ownerId": {
@@ -529,6 +534,15 @@
           ".write": "auth != null && auth.uid === $uid",
           "$cardId": {
             ".validate": "!newData.exists() || (newData.hasChildren(['expiresAt', 'snoozedAt']) && newData.child('expiresAt').isNumber() && newData.child('snoozedAt').isNumber())"
+          }
+        }
+      },
+      "auditLog": {
+        ".read": "auth != null && root.child('admins').child(auth.uid).child('superAdmin').val() === true",
+        ".write": false,
+        "templateActivationDenials": {
+          "$pushId": {
+            ".validate": "newData.hasChildren(['uid', 'templateId', 'templateTier', 'timestamp'])"
           }
         }
       }
