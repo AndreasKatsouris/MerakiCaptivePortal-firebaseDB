@@ -39,6 +39,8 @@ const navSections = [
 
 No other changes to this file. The footer `ross-home__profile` block (lines 118–125) already serves as the Profile/Settings footer — `HfAvatar` + name + role + gear icon, separated by `border-top` and pinned with `margin-top: auto`. Spec §3.2 lists `[footer] Profile / Settings` and the existing markup matches. Wiring the gear icon to a Settings route is Phase 6, not PR 5.
 
+**Scope correction (post-review, 2026-05-11):** Operator caught on preview that the footer shipped hardcoded prototype data (`Maya Alvarez` / `MA` / `Group Ops`). My original assessment ("footer already serves the role") conflated structure with content. Spec §3.2 calls out `[footer] Profile / Settings` as part of PR 5 scope, so the data wiring is in-scope and was a real gap. Fixed in same PR: footer now reads `auth.currentUser` reactively via `onAuthStateChanged`, shows `displayName` (or email local-part fallback), email under the name, and live initials. Gear icon **remains non-interactive** — `/profile-settings.html` doesn't exist yet (only `/receipt-settings.html` which is per-restaurant config, different domain). Logging "build `/profile-settings.html` for ROSS user account" to Phase 6 backlog. Same fix applied to `RossHomeMobile.vue` topbar avatar (was also hardcoded `initials="MA"`).
+
 ### Edit: `public/js/modules/ross/v2/components/RossHomeMobile.vue` (lines 16–22)
 
 **Before:** 5 items — Ross / Overview / Guests / Queue / You.
