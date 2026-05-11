@@ -81,6 +81,44 @@ function generateId() {
 }
 
 /**
+ * Read the calling user's subscription tier from RTDB.
+ * Source-of-truth field is `users/{uid}/tier` (written at signup per
+ * registerUser CF). Returns null if missing — caller fails closed.
+ */
+async function readUserTier(uid) {
+    try {
+        const snap = await db.ref(`users/${uid}/tier`).once('value');
+        const val = snap.val();
+        return (typeof val === 'string') ? val : null;
+    } catch (_err) {
+        return null;  // fail closed
+    }
+}
+
+/**
+ * Write an audit-log entry when a tier gate denies a template
+ * activation. Stored under ross/auditLog/templateActivationDenials/{pushId}.
+ * Best-effort: a failed audit-log write does NOT block the response;
+ * the user still gets their 403.
+ */
+async function logActivationDenial({ uid, email, templateId, templateName, userTier, templateTier }) {
+    try {
+        const entry = {
+            uid,
+            email: email || null,
+            templateId,
+            templateName: templateName || null,
+            userTier: userTier || null,
+            templateTier,
+            timestamp: admin.database.ServerValue.TIMESTAMP,
+        };
+        await db.ref('ross/auditLog/templateActivationDenials').push(entry);
+    } catch (err) {
+        console.warn('[logActivationDenial] audit write failed (non-blocking):', err.message);
+    }
+}
+
+/**
  * Verify the caller has access to every requested location.
  * Super admins bypass — they manage the entire platform.
  * All other users must have each locationId in userLocations/{uid}.
@@ -392,6 +430,23 @@ exports.rossActivateWorkflow = onRequest(async (req, res) => {
             const templateSnap = await db.ref(`ross/templates/${templateId}`).once('value');
             if (!templateSnap.exists()) return res.status(404).json({ error: 'Template not found' });
             const template = templateSnap.val();
+
+            // Tier gate — Phase 6 PR 1A. SuperAdmin bypasses. Missing user tier
+            // fails closed (treated as 'free'). Audit-log denials regardless.
+            const userTier = await readUserTier(uid);
+            if (!userCanActivate(userTier, template.tier, isSuperAdmin)) {
+                await logActivationDenial({
+                    uid,
+                    email: decodedToken.email,
+                    templateId,
+                    templateName: template.name,
+                    userTier,
+                    templateTier: template.tier,
+                });
+                return res.status(403).json({
+                    error: `Template "${template.name}" requires the All-in tier`,
+                });
+            }
 
             const workflowId = generateId();
             const now = Date.now();
