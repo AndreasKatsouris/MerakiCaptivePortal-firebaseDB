@@ -14,11 +14,10 @@ onMounted(() => { if (!store.feed) store.loadHome() })
 const feed = computed(() => store.feed)
 
 const bottomNav = [
-  { icon: 'bolt', active: true, label: 'Ross' },
-  { icon: 'chart', label: 'Overview' },
-  { icon: 'users', label: 'Guests' },
-  { icon: 'clock', label: 'Queue' },
-  { icon: 'user',  label: 'You' },
+  { icon: 'bolt',  active: true, label: 'Ross' },
+  { icon: 'check', label: 'Playbook' },
+  { icon: 'line',  label: 'Activity' },
+  { icon: 'users', label: 'People' },
 ]
 
 const chipFor = (c) => ({

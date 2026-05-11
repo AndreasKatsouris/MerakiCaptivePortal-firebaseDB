@@ -62,25 +62,12 @@ async function dispatch(action, card) {
 
 const navSections = [
   { eyebrow: 'Today', items: [
-    { label: 'Ross',     icon: 'bolt',  active: true },
-    { label: 'Overview', icon: 'chart', href: '/group-overview-v2.html' },
-    { label: 'Queue',    icon: 'clock', href: '/queue-v2.html' },
-  ]},
-  { eyebrow: 'Guests', items: [
-    { label: 'Profiles',  icon: 'user',  href: '/guests-v2.html'    },
-    { label: 'Segments',  icon: 'users', href: '/guests-v2.html'    },
-    { label: 'Campaigns', icon: 'send',  href: '/campaigns-v2.html' },
-  ]},
-  { eyebrow: 'Operations', items: [
-    { label: 'Analytics',   icon: 'line',    href: '/analytics-v2.html'  },
-    { label: 'Food cost',   icon: 'leaf',    href: '/food-cost-v2.html' },
-    { label: 'Receipts',    icon: 'cart',    href: '/receipts-v2.html'  },
-    { label: 'Forecasting', icon: 'sparkle', href: '/analytics-v2.html?tab=forecast' },
+    { label: 'Ross', icon: 'bolt', active: true },
   ]},
   { eyebrow: "Ross's brain", items: [
-    { label: 'Playbook',  icon: 'check', href: '/ross.html?tab=playbook' },
-    { label: 'Activity',  icon: 'line',  href: '/ross.html?tab=activity' },
-    { label: 'People',    icon: 'users', href: '/ross.html?tab=people' },
+    { label: 'Playbook', icon: 'check', href: '/ross.html?tab=playbook' },
+    { label: 'Activity', icon: 'line',  href: '/ross.html?tab=activity' },
+    { label: 'People',   icon: 'users', href: '/ross.html?tab=people' },
   ]},
 ]
 
