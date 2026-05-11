@@ -9,6 +9,7 @@ import { featureAccessControl } from './modules/access-control/services/feature-
 import { runCompleteDatabaseFix, fixUserSubscriptionData } from './utils/subscription-tier-fix.js';
 import { dbPaginator } from './utils/database-paginator.js';
 import { initSessionExpiryHandler } from './auth/session-expiry-handler.js';
+import { resolvePostLoginDestination } from './auth/post-login-router.js';
 
 class UserDashboard {
     constructor() {
@@ -32,14 +33,13 @@ class UserDashboard {
             if (user) {
                 this.currentUser = user;
 
-                // Check if user needs to complete onboarding
-                const onboardingRef = ref(rtdb, `onboarding-progress/${user.uid}`);
-                const onboardingSnapshot = await get(onboardingRef);
-
-                if (!onboardingSnapshot.exists() || !onboardingSnapshot.val().completed) {
-                    // Redirect to onboarding wizard
-                    console.log('[Dashboard] User has not completed onboarding, redirecting...');
-                    window.location.href = '/onboarding-wizard.html';
+                // Single source of truth for "where does this user belong?".
+                // Resolves via post-login-router: wizard for incomplete onboarding,
+                // hello for unseen hello, ross when ROSS_IS_HOME is on, else here.
+                const dest = await resolvePostLoginDestination(user);
+                if (dest !== '/user-dashboard.html') {
+                    console.log(`[Dashboard] Redirecting via post-login-router → ${dest}`);
+                    window.location.href = dest;
                     return;
                 }
 

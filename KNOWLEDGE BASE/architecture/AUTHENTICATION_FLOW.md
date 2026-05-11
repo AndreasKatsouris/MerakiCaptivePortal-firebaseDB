@@ -53,6 +53,39 @@ The client imports Firebase Auth methods and exports them for use throughout the
 2. The token is refreshed automatically by Firebase SDK
 3. Custom claims (including `admin: true`) are available on the decoded token
 
+## Post-Login Routing
+
+After successful authentication on a regular-user surface (signup, login, wizard, dashboard), the destination is decided by a single module — **never hardcoded**.
+
+**Module:** `public/js/auth/post-login-router.js`
+
+```javascript
+import { routePostLogin } from './auth/post-login-router.js'
+await routePostLogin(user)              // navigates
+// or, when you need the path without navigating:
+import { resolvePostLoginDestination } from './auth/post-login-router.js'
+const dest = await resolvePostLoginDestination(user)
+```
+
+**Inputs the router reads:**
+- `onboarding-progress/{uid}` (RTDB) — `completed` and `helloSeen` fields
+- `ROSS_IS_HOME` feature flag — flag-off falls everything back to `/user-dashboard.html`
+- `ROSS_ONBOARDING_HELLO` feature flag — flag-off skips the hello surface
+
+**Decision summary (helloSeen has three states):**
+
+| `helloSeen` | Account shape | →                                              |
+|-------------|---------------|------------------------------------------------|
+| `false`     | Post-PR42 fresh signup, not yet through hello | `/onboarding-ross-hello.html` (HELLO flag on) |
+| `true`      | Post-PR42, hello complete | `/ross.html` (or `/user-dashboard.html` if `ROSS_IS_HOME` off) — wizard is **skipped** for fresh accounts (Phase 5 PR 6) |
+| missing     | Legacy pre-PR42 account | Original behaviour: `!completed` → wizard, else home |
+
+**Call sites (Phase 5 PR 4 rollout):** `SignupApp.vue`, `public/js/user-login.js` (×2), `public/js/onboarding-wizard.js` (×2), `public/js/user-dashboard.js`, `public/js/modules/user-dashboard/stores/dashboard.store.js`. All six delegate to the router — `grep -r '/user-dashboard.html' public/js/` on those files should return zero hardcoded redirects.
+
+**Rollback safety:** flipping `ROSS_IS_HOME` to `false` reverts every entry point to `/user-dashboard.html` via the router's `home` fallback. Single-flag rollback for the entire ROSS-as-home shift.
+
+**Tests:** `tests/unit/post-login-router.test.js` — full decision-matrix coverage including legacy-account back-compat and flag-rollback paths.
+
 ## User Registration Flow
 
 ### Cloud Function: `registerUser` (onCall)

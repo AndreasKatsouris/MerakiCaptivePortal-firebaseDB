@@ -2,6 +2,7 @@
 import { auth, rtdb, ref, get, set, update, push } from './config/firebase-config.js';
 import { updatePassword } from 'https://www.gstatic.com/firebasejs/10.12.5/firebase-auth.js';
 import { escapeHtml } from './modules/compliance/utils/html-escape.js';
+import { routePostLogin } from './auth/post-login-router.js';
 
 // Wizard state
 let currentStep = 1;
@@ -38,8 +39,9 @@ async function checkAuthAndInit() {
         if (snapshot.exists()) {
             const progress = snapshot.val();
             if (progress.completed) {
-                // User already completed onboarding, redirect to dashboard
-                window.location.href = 'user-dashboard.html';
+                // User already completed onboarding — route via post-login-router
+                // so ROSS_IS_HOME and helloSeen state decide the destination.
+                await routePostLogin(user);
                 return;
             }
         }
@@ -400,6 +402,6 @@ async function completeOnboarding() {
     }
 }
 
-function goToDashboard() {
-    window.location.href = 'user-dashboard.html';
+async function goToDashboard() {
+    await routePostLogin(auth.currentUser);
 }

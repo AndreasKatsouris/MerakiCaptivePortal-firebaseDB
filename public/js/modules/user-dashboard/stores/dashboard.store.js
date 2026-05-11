@@ -11,7 +11,6 @@ import {
   fetchUserData,
   fetchSubscriptionData,
   fetchTierData,
-  checkOnboardingComplete,
   signOut
 } from '../services/user-service.js'
 import {
@@ -22,6 +21,7 @@ import {
 import { fetchDashboardStatistics } from '../services/statistics-service.js'
 import { fetchWhatsAppMappings } from '../services/whatsapp-service.js'
 import { checkAllFeatures, showUpgradePrompt } from '../services/feature-service.js'
+import { resolvePostLoginDestination } from '../../../auth/post-login-router.js'
 
 export const useDashboardStore = defineStore('dashboard', {
   state: () => ({
@@ -90,9 +90,11 @@ export const useDashboardStore = defineStore('dashboard', {
       this.error = null
 
       try {
-        const onboardingComplete = await checkOnboardingComplete(user.uid)
-        if (!onboardingComplete) {
-          window.location.href = '/onboarding-wizard.html'
+        // Single source of truth for "where does this user belong?".
+        // Router-decided destination — wizard / hello / ross / legacy.
+        const dest = await resolvePostLoginDestination(user)
+        if (dest !== '/user-dashboard.html') {
+          window.location.href = dest
           return
         }
 
