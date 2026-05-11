@@ -91,7 +91,7 @@ At the start of EVERY session, before any code is written or plan agreed:
 1. Read `KNOWLEDGE BASE/PROJECT_BACKLOG.md`
 2. State the Sprint Goal in your **first response**:
    > "Current sprint goal: [X]. [N] sprint tasks remain. Is this still the plan, or are we pivoting?"
-3. Read `KNOWLEDGE BASE/development/SELF_OPTIMIZATION.md` for relevant patterns
+3. Read **all four feedback files** before any planning or code: `KNOWLEDGE BASE/PROJECT_BACKLOG.md` (already done in step 1) + `KNOWLEDGE BASE/development/SELF_OPTIMIZATION.md` + `KNOWLEDGE BASE/development/LESSONS.md` + `KNOWLEDGE BASE/development/SCORECARD.md`. The backlog is the *what*; the other three are the *how* — skipping any of them means inherited gotchas don't fire when they should
 4. If the user's opening message is a bug report or off-topic request, apply the Bug Triage Rule below before acting
 
 Never skip this step. A session that starts without a declared goal will drift into reactive bug-fixing.
