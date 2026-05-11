@@ -13,6 +13,7 @@ import { fetchLocationNames } from './utils/location-names.js'
 // list changes.
 export const VALID_CATEGORIES = ['compliance', 'operations', 'growth', 'finance', 'hr', 'maintenance']
 export const VALID_RECURRENCES = ['once', 'daily', 'weekly', 'monthly', 'quarterly', 'annually']
+export const VALID_TIERS = ['free', 'all-in']
 
 // rossUpdateWorkflow allowedFields (functions/ross.js). Only these
 // fields can be edited on an existing workflow — category, recurrence,
