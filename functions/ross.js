@@ -266,8 +266,12 @@ exports.rossUpdateTemplate = onRequest(async (req, res) => {
                 const subtaskTypeError = validateSubtasksInputTypes(updates.subtasks);
                 if (subtaskTypeError) return res.status(400).json({ error: subtaskTypeError });
             }
+            if (updates.tier !== undefined) {
+                const tierError = validateTier(updates.tier);
+                if (tierError) return res.status(400).json({ error: tierError });
+            }
 
-            const allowedFields = ['name', 'category', 'description', 'recurrence', 'daysBeforeAlert', 'subtasks', 'tags'];
+            const allowedFields = ['name', 'category', 'tier', 'description', 'recurrence', 'daysBeforeAlert', 'subtasks', 'tags'];
             const sanitized = { updatedAt: Date.now() };
             allowedFields.forEach(field => {
                 if (updates[field] !== undefined) sanitized[field] = updates[field];
