@@ -790,10 +790,10 @@ function backToHome() {
   right: var(--hf-space-3);
   font-size: 0.75rem;
   padding: var(--hf-space-1) var(--hf-space-2);
-  border-radius: var(--hf-radius-2);
-  background: var(--hf-surface-muted);
-  color: var(--hf-fg-muted);
-  border: 1px solid var(--hf-border);
+  border-radius: var(--hf-radius-sm);
+  background: var(--hf-bg2);
+  color: var(--hf-muted);
+  border: 1px solid var(--hf-line);
   font-weight: 500;
   letter-spacing: 0.01em;
 }
