@@ -13,6 +13,9 @@
  * is a regression.
  */
 
+const MS_PER_DAY = 86400000;
+const DEFAULT_DAYS_BEFORE_ALERT = [30, 7];
+
 function buildTaskFromSubtask(subtask, nextDueDate, validInputTypes) {
     const rawType = subtask.inputType;
     const inputType = validInputTypes.includes(rawType) ? rawType : 'checkbox';
@@ -22,7 +25,7 @@ function buildTaskFromSubtask(subtask, nextDueDate, validInputTypes) {
     return {
         title: (subtask.title || '').trim() || 'Untitled Task',
         status: 'pending',
-        dueDate: nextDueDate + ((subtask.daysOffset || 0) * 86400000),
+        dueDate: nextDueDate + ((subtask.daysOffset || 0) * MS_PER_DAY),
         completedAt: null,
         assignedTo: null,
         order: subtask.order || 1,
@@ -105,7 +108,7 @@ function buildWorkflowRecord({
         notifyEmail: notifyEmail || null,
         daysBeforeAlert: Array.isArray(daysBeforeAlert)
             ? daysBeforeAlert.filter((d) => Number.isInteger(d) && d > 0)
-            : (Array.isArray(template.daysBeforeAlert) ? template.daysBeforeAlert : [30, 7]),
+            : (Array.isArray(template.daysBeforeAlert) ? template.daysBeforeAlert : DEFAULT_DAYS_BEFORE_ALERT),
         createdAt: now,
         updatedAt: now,
         locations,
