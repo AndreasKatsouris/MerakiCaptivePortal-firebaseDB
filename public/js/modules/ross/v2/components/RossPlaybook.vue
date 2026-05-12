@@ -392,7 +392,7 @@ function backToHome() {
             class="playbook__template"
             :class="{ 'template-card--locked': t.locked }"
           >
-            <span v-if="t.locked" class="template-card__lock-badge">🔒 All-in</span>
+            <span v-if="t.locked" class="template-card__lock-badge">All-in</span>
             <div class="hf-eyebrow">{{ t.category || 'general' }}</div>
             <h3 class="playbook__template-name">{{ t.name }}</h3>
             <p v-if="t.description" class="playbook__template-desc">{{ t.description }}</p>
@@ -789,7 +789,7 @@ function backToHome() {
   top: var(--hf-space-3);
   right: var(--hf-space-3);
   font-size: 0.75rem;
-  padding: 2px 8px;
+  padding: var(--hf-space-1) var(--hf-space-2);
   border-radius: var(--hf-radius-2);
   background: var(--hf-surface-muted);
   color: var(--hf-fg-muted);
