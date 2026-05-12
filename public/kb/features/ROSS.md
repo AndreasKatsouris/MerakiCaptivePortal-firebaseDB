@@ -361,6 +361,33 @@ touches `ross/templates/*/tier`, never `ross/workflows`.
 
 See `docs/plans/2026-05-12-ross-tier-curation-design.md` for the full rationale.
 
+### Locked-card upsell UX (Phase 6 PR 1C, 2026-05-12)
+
+Free users now see all 13 templates in the v2 Playbook tab, not just the
+5 Free ones. The 8 All-in templates render as **dimmed cards** (opacity
+0.7) with an `All-in` badge top-right and a `Upgrade to All-in` ghost
+button instead of the normal `Activate` button. The button routes to
+`/upgrade.html?from=template&id=<templateId>` — a Hi-Fi Vue 3 page that
+shows a Free vs All-in comparison and an email contact CTA (self-service
+checkout is Phase 6 D).
+
+**Server contract:** `rossGetTemplates` accepts an opt-in
+`includeLocked: true` request param. When set, Free users receive All-in
+templates in the response with `locked: true` stamped on them instead
+of being filtered out. v1 admin callers omit the param and continue to
+receive the filtered list — no regression.
+
+**Defense in depth:** the client never calls `rossActivateWorkflow` for
+locked templates (the upgrade button short-circuits to the upgrade
+page). Additionally, `RossPlaybook.vue` filters out any all-in template
+that arrives without `locked: true` — defending against a stale-cache
+or malformed-server response from rendering a live Activate button.
+PR 1A's activate gate remains the security backstop — any direct
+attempt to activate a locked template is rejected 403 and logged to
+`ross/auditLog/templateActivationDenials/{pushId}`.
+
+See `docs/plans/2026-05-12-ross-tier-gated-template-list-design.md`.
+
 ---
 
 ## Cloud Functions
