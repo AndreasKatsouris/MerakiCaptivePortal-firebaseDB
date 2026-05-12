@@ -492,8 +492,8 @@
         ".write": false
       },
       "config": {
-        ".read": "false",
-        ".write": "false"
+        ".read": false,
+        ".write": false
       },
       "workflows": {
         "$ownerId": {
