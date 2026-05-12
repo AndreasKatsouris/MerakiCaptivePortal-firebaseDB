@@ -76,5 +76,7 @@ PR 1B is the content decision that activates the gate. No new code paths, no sch
 
 - `functions/seeds/ross-templates-seed.js` — 8 single-line edits
 - `functions/seeds/ross-templates-curate-tiers.js` — new file
+- `functions/seeds/ross-templates-backfill-tier.js` — folded sibling fix: align databaseURL with rest of codebase
 - `public/kb/features/ROSS.md` — append "Curated tier split" subsection
-- `docs/superpowers/specs/2026-05-12-ross-tier-curation-design.md` — this file
+- `docs/plans/2026-05-12-ross-tier-curation-design.md` — this file
+- `docs/plans/2026-05-12-ross-tier-curation-plan.md` — implementation plan

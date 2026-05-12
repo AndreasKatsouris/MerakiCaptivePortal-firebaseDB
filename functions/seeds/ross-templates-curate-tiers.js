@@ -48,6 +48,7 @@ async function curateTiers() {
     const updates = {};
     const found = new Set();
     let skipped = 0;
+    let flipping = 0;
 
     for (const [templateId, template] of Object.entries(templates)) {
         if (!template || typeof template !== 'object') continue;
@@ -62,6 +63,7 @@ async function curateTiers() {
             updates[`ross/templates/${templateId}/updatedAt`] = Date.now();
             console.log(`  Flipping → all-in: ${template.name} (${templateId})`);
             found.add(template.name);
+            flipping += 1;
         }
     }
 
@@ -71,7 +73,6 @@ async function curateTiers() {
         missing.forEach(n => console.warn(`  - ${n}`));
     }
 
-    const flipping = Object.keys(updates).length / 2;
     if (flipping === 0) {
         console.log(`Nothing to update (${skipped} already all-in, ${missing.length} missing).`);
         process.exit(0);
