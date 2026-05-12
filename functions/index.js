@@ -475,6 +475,90 @@ const ROSS_VALID_INPUT_TYPES = [
     'dropdown', 'rating', 'photo', 'signature', 'date',
 ];
 
+// Day-zero auto-activation helper. Called best-effort from registerUser
+// after the first location is created. Every failure branch logs and
+// returns — the caller's try/catch swallows any thrown error so
+// registerUser ALWAYS succeeds regardless of seed outcome.
+// Spec: docs/plans/2026-05-12-ross-day-zero-auto-activation-design.md
+async function seedFirstWorkflow({ userId, locationId, locationName }) {
+    const db = admin.database();
+
+    // Idempotency: if a prior signup attempt for this uid already seeded,
+    // do nothing. (Outer guard is registerUser's existingOnboardingSnap
+    // short-circuit; this inner guard catches manual replays and any
+    // future re-entry path.)
+    const seededSnap = await db.ref(`onboarding-progress/${userId}/firstWorkflowSeededAt`).once('value');
+    if (seededSnap.exists()) {
+        console.warn('[registerUser] day-zero seed skipped:', { uid: userId, reason: 'already_seeded' });
+        return;
+    }
+
+    const pointerSnap = await db.ref('ross/config/firstWorkflowTemplateId').once('value');
+    const seedTemplateId = pointerSnap.val();
+    if (!seedTemplateId) {
+        console.warn('[registerUser] day-zero seed skipped:', { uid: userId, reason: 'pointer_absent' });
+        return;
+    }
+
+    const templateSnap = await db.ref(`ross/templates/${seedTemplateId}`).once('value');
+    if (!templateSnap.exists()) {
+        console.warn('[registerUser] day-zero seed skipped:', { uid: userId, reason: 'template_missing', templateId: seedTemplateId });
+        return;
+    }
+
+    const template = templateSnap.val();
+    if (template.tier && template.tier !== 'free') {
+        console.warn('[registerUser] day-zero seed skipped:', { uid: userId, reason: 'tier_mismatch', templateTier: template.tier });
+        return;
+    }
+
+    // Use current wall-clock epoch ms as nextDueDate. The builder adds
+    // daysOffset * 86400000 to compute each task's dueDate; subtasks with
+    // daysOffset === 0 are immediately due. SAST timezone affects only
+    // how the UI renders the date — storage is plain UTC epoch ms.
+    const now = Date.now();
+    const seedWorkflowId = db.ref().push().key;
+    const generateTaskId = () => db.ref().push().key;
+
+    const { workflowId, atomicWrite } = buildWorkflowRecord({
+        template,
+        locationIds: [locationId],
+        locationNames: [locationName],
+        locationAssignedTo: null,
+        nextDueDate: now,
+        uid: userId,
+        name: null,
+        description: null,
+        customInterval: null,
+        daysBeforeAlert: null,
+        notifyPhone: null,
+        notifyEmail: null,
+        workflowId: seedWorkflowId,
+        validInputTypes: ROSS_VALID_INPUT_TYPES,
+        generateTaskId,
+        now,
+    });
+
+    atomicWrite[`onboarding-progress/${userId}/firstWorkflowSeededAt`] =
+        admin.database.ServerValue.TIMESTAMP;
+    const auditKey = db.ref().push().key;
+    atomicWrite[`ross/auditLog/firstWorkflowSeeded/${auditKey}`] = {
+        uid: userId,
+        templateId: seedTemplateId,
+        workflowId,
+        locationId,
+        seededAt: admin.database.ServerValue.TIMESTAMP,
+    };
+
+    await db.ref().update(atomicWrite);
+    console.log('[registerUser] day-zero seed:', {
+        uid: userId,
+        workflowId,
+        templateId: seedTemplateId,
+        locationId,
+    });
+}
+
 /**
  * Cloud Function for user registration
  * This function securely creates user data in the database when a new user signs up
@@ -669,75 +753,14 @@ exports.registerUser = functions.https.onCall(async (data, context) => {
         await locationRef.set(locationData);
         await admin.database().ref(`userLocations/${userId}/${locationRef.key}`).set(true);
 
-        // Day-zero auto-activation — best-effort, non-blocking. Seeds one
-        // starter workflow against the freshly-created location so a fresh
-        // signup lands on ROSS with a runnable workflow. Every failure
-        // branch logs and continues — registerUser must always succeed.
-        // Spec: docs/plans/2026-05-12-ross-day-zero-auto-activation-design.md
+        // Day-zero auto-activation — best-effort, non-blocking. Any error
+        // is caught and logged; registerUser still returns success.
         try {
-            const pointerSnap = await admin.database()
-                .ref('ross/config/firstWorkflowTemplateId')
-                .once('value');
-            const seedTemplateId = pointerSnap.val();
-            if (!seedTemplateId) {
-                console.warn('[registerUser] day-zero seed skipped:', { uid: userId, reason: 'pointer_absent' });
-            } else {
-                const templateSnap = await admin.database()
-                    .ref(`ross/templates/${seedTemplateId}`)
-                    .once('value');
-                if (!templateSnap.exists()) {
-                    console.warn('[registerUser] day-zero seed skipped:', { uid: userId, reason: 'template_missing', templateId: seedTemplateId });
-                } else {
-                    const template = templateSnap.val();
-                    if (template.tier && template.tier !== 'free') {
-                        console.warn('[registerUser] day-zero seed skipped:', { uid: userId, reason: 'tier_mismatch', templateTier: template.tier });
-                    } else {
-                        // SAST = UTC+2. Compute today's date as YYYY-MM-DD-equivalent
-                        // millis at SAST midnight, matching the format daysOffset
-                        // arithmetic expects (millis at task scheduling).
-                        const sastNow = Date.now();
-                        const seedWorkflowId = admin.database().ref().push().key;
-                        const generateTaskId = () => admin.database().ref().push().key;
-                        const { workflowId, atomicWrite } = buildWorkflowRecord({
-                            template,
-                            locationIds: [locationRef.key],
-                            locationNames: [businessName],
-                            locationAssignedTo: null,
-                            nextDueDate: sastNow,
-                            uid: userId,
-                            name: null,
-                            description: null,
-                            customInterval: null,
-                            daysBeforeAlert: null,
-                            notifyPhone: null,
-                            notifyEmail: null,
-                            workflowId: seedWorkflowId,
-                            validInputTypes: ROSS_VALID_INPUT_TYPES,
-                            generateTaskId,
-                            now: sastNow,
-                        });
-
-                        atomicWrite[`onboarding-progress/${userId}/firstWorkflowSeededAt`] =
-                            admin.database.ServerValue.TIMESTAMP;
-                        const auditKey = admin.database().ref('ross/auditLog/firstWorkflowSeeded').push().key;
-                        atomicWrite[`ross/auditLog/firstWorkflowSeeded/${auditKey}`] = {
-                            uid: userId,
-                            templateId: seedTemplateId,
-                            workflowId,
-                            locationId: locationRef.key,
-                            seededAt: admin.database.ServerValue.TIMESTAMP,
-                        };
-
-                        await admin.database().ref().update(atomicWrite);
-                        console.log('[registerUser] day-zero seed:', {
-                            uid: userId,
-                            workflowId,
-                            templateId: seedTemplateId,
-                            locationId: locationRef.key,
-                        });
-                    }
-                }
-            }
+            await seedFirstWorkflow({
+                userId,
+                locationId: locationRef.key,
+                locationName: businessName,
+            });
         } catch (seedError) {
             console.error('[registerUser] day-zero seed failed (non-blocking):', seedError);
         }
