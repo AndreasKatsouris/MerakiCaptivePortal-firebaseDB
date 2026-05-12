@@ -14,6 +14,7 @@ const { onSchedule } = require('firebase-functions/v2/scheduler');
 const admin = require('firebase-admin');
 const cors = require('cors')({ origin: true });
 const { validateTier, userCanActivate, filterTemplatesByTier } = require('./ross-tier');
+const { buildWorkflowRecord } = require('./ross-workflow-builder');
 
 const db = admin.database();
 
@@ -456,57 +457,24 @@ exports.rossActivateWorkflow = onRequest(async (req, res) => {
                 });
             }
 
-            const workflowId = generateId();
-            const now = Date.now();
-
-            // Build per-location records with tasks from template subtasks.
-            // Phase 4e.2: inputType + inputConfig now propagate through
-            // buildTaskFromSubtask (defensive fallback to 'checkbox' for
-            // legacy templates with no inputType set).
-            const locations = {};
-            locationIds.forEach((locationId, idx) => {
-                const tasks = {};
-                if (Array.isArray(template.subtasks)) {
-                    template.subtasks.forEach(subtask => {
-                        const taskId = generateId();
-                        tasks[taskId] = buildTaskFromSubtask(subtask, nextDueDate);
-                    });
-                }
-                locations[locationId] = {
-                    locationName: (locationNames && locationNames[idx]) || locationId,
-                    locationAssignedTo: (locationAssignedTo && locationAssignedTo[locationId]) || null,
-                    status: 'active',
-                    nextDueDate,
-                    activatedAt: now,
-                    tasks
-                };
+            const { workflowId, workflowData, atomicWrite } = buildWorkflowRecord({
+                template,
+                locationIds,
+                locationNames,
+                locationAssignedTo,
+                nextDueDate,
+                uid,
+                name,
+                description,
+                customInterval,
+                daysBeforeAlert,
+                notifyPhone,
+                notifyEmail,
+                workflowId: generateId(),
+                validInputTypes: VALID_INPUT_TYPES,
+                generateTaskId: generateId,
+                now: Date.now(),
             });
-
-            const workflowData = {
-                workflowId,
-                templateId,
-                ownerId: uid,
-                name: (name || template.name).trim(),
-                description: ((description != null ? description : template.description) || '').trim() || null,
-                category: template.category,
-                recurrence: template.recurrence,
-                customInterval: (Number.isInteger(customInterval) && customInterval > 0) ? customInterval : null,
-                notificationChannels: ['in_app'],
-                notifyPhone: notifyPhone || null,
-                notifyEmail: notifyEmail || null,
-                daysBeforeAlert: Array.isArray(daysBeforeAlert)
-                    ? daysBeforeAlert.filter(d => Number.isInteger(d) && d > 0)
-                    : (Array.isArray(template.daysBeforeAlert) ? template.daysBeforeAlert : [30, 7]),
-                createdAt: now,
-                updatedAt: now,
-                locations
-            };
-
-            const atomicWrite = {
-                [`ross/workflows/${uid}/${workflowId}`]: workflowData,
-                [`ross/ownerIndex/${uid}`]: true,
-                ...locationIndexUpdates(workflowId, uid, locationIds)
-            };
             await db.ref().update(atomicWrite);
             res.json({ result: { success: true, workflowId, workflow: workflowData } });
         } catch (error) {
