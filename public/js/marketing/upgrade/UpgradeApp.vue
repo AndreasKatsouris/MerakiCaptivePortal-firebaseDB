@@ -83,10 +83,17 @@ const allInLabel = computed(() => {
   return `R${t.monthlyPrice} / month`
 })
 
+// Strip control chars (CR, LF, tabs, etc.) before they reach the
+// mailto body — prevents header-injection-style payloads in ?id=.
+const stripControlChars = (s) => (s || '').replace(/[\x00-\x1F\x7F]/g, '')
+
 const ctaContext = (() => {
   if (typeof window === 'undefined') return { from: '', id: '' }
   const p = new URLSearchParams(window.location.search)
-  return { from: (p.get('from') || '').slice(0, 32), id: (p.get('id') || '').slice(0, 64) }
+  return {
+    from: stripControlChars(p.get('from')).slice(0, 32),
+    id: stripControlChars(p.get('id')).slice(0, 64),
+  }
 })()
 
 const mailtoUrl = computed(() => {
