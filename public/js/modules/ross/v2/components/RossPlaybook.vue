@@ -96,10 +96,13 @@ const templates = computed(() => {
   // all-in tier users see everything (no locked flag needed).
   if (store.currentUserTier === 'all-in') return list
   // Free users (or unknown/null tier): server now returns all templates
-  // with locked:true on All-in entries. Pass them through so the UI can
-  // render dimmed locked cards with an upgrade CTA. The server-side
-  // activate gate (PR #51) remains the security backstop.
-  return list
+  // with locked:true on All-in entries — render them as dimmed locked
+  // cards with an upgrade CTA. Defense in depth: if the server's
+  // response is stale or malformed and contains an All-in template
+  // WITHOUT locked:true, hide it rather than render a live Activate
+  // button. The PR #51 server-side activate gate is the security
+  // backstop; this guard prevents flash-of-broken-state in the UI.
+  return list.filter(t => !(t && t.tier === 'all-in' && t.locked !== true))
 })
 const byCategory = computed(() => store.workflowsByCategory)
 
