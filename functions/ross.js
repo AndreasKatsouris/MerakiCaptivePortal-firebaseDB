@@ -196,7 +196,7 @@ exports.rossGetTemplates = onRequest(async (req, res) => {
             const { uid, isSuperAdmin } = await verifyUserOrAdmin(decodedToken);
 
             const data = req.body.data || req.body;
-            const { category } = data || {};
+            const { category, includeLocked } = data || {};
 
             const snapshot = await db.ref('ross/templates').once('value');
             const raw = snapshot.val() || {};
@@ -208,8 +208,11 @@ exports.rossGetTemplates = onRequest(async (req, res) => {
 
             // Tier filter — Phase 6 PR 1A. SuperAdmin sees all; All-in sees all;
             // Free + missing-tier-user see only tier === 'free' templates.
+            // PR 1C: callers can opt in to `includeLocked: true` to receive
+            // All-in templates with a `locked: true` flag instead of being
+            // filtered out — used by the v2 Playbook tab for the upsell UX.
             const userTier = await readUserTier(uid);
-            templates = filterTemplatesByTier(templates, userTier, isSuperAdmin);
+            templates = filterTemplatesByTier(templates, userTier, isSuperAdmin, includeLocked === true);
 
             templates.sort((a, b) => (a.name || '').localeCompare(b.name || ''));
             res.json({ result: { success: true, templates } });
