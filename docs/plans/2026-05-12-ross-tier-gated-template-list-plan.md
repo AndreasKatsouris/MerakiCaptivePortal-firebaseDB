@@ -296,9 +296,7 @@ not sent (preserved for any other caller)."
 **Files:**
 - Create: `public/js/services/contact.js`
 
-**Context:** The upgrade page needs WhatsApp + email contact info. Centralising as a single source so the upgrade page (and future contact CTAs) read from one place. No existing file owns this — `KNOWLEDGE BASE/WHATSAPP_BOT_SOP.md` is documentation, not code config.
-
-Use placeholder values from `KNOWLEDGE BASE/` if available; otherwise commit with the agreed contact numbers (operator to confirm before merge). For now, ship reasonable Sparks Hospitality defaults that the operator can edit in this same PR if needed.
+**Context:** The upgrade page needs an email contact CTA. Centralising as a single source so the upgrade page (and future contact CTAs) read from one place.
 
 - [ ] **Step 1: Create the file**
 
@@ -310,25 +308,14 @@ Use placeholder values from `KNOWLEDGE BASE/` if available; otherwise commit wit
  *  - `/upgrade.html` — All-in upgrade CTA (Phase 6 PR 1C)
  *
  * Future consumers: any "Contact us" button across the app should
- * import from here so a number change is a single-file edit. When the
- * Phase 6 D self-service checkout ships, the WhatsApp/email CTAs become
- * the fallback path for operators who prefer human contact.
+ * import from here so an address change is a single-file edit. When the
+ * Phase 6 D self-service checkout ships, the email CTA becomes the
+ * fallback path for operators who prefer human contact.
  */
 
 export const SPARKS_CONTACT = {
-  whatsappE164: '+27123456789',          // operator: replace with the real Sparks sales WhatsApp number
-  email: 'hello@sparkshospitality.co.za', // operator: replace with the real Sparks sales inbox
-  displayName: 'Sparks Hospitality',
-}
-
-/**
- * Build a `wa.me` deep link. `message` is URL-encoded.
- * E164 number is stripped of the leading `+` per wa.me convention.
- */
-export function buildWhatsAppUrl(message = '') {
-  const n = (SPARKS_CONTACT.whatsappE164 || '').replace(/^\+/, '')
-  const text = encodeURIComponent(message)
-  return `https://wa.me/${n}${text ? `?text=${text}` : ''}`
+  email: 'andreas@sparksclub.co.za',
+  displayName: 'Sparks',
 }
 
 /**
@@ -346,12 +333,11 @@ export function buildMailtoUrl(subject = '', body = '') {
 
 ```bash
 git add public/js/services/contact.js
-git commit -m "feat(services): central contact info + wa.me/mailto builders
+git commit -m "feat(services): central contact info + mailto builder
 
 One-source contact constants for upsell + sales CTAs. Consumed first by
 the Phase 6 PR 1C upgrade page; future Contact buttons should import
-from here. Placeholder number/email — operator to verify the real Sparks
-sales WhatsApp + inbox before merge."
+from here."
 ```
 
 ---
@@ -500,12 +486,11 @@ Mirrors marketing/landing/main.js."
 
     <!-- CTA -->
     <section class="upgrade__cta">
-      <hf-button as="a" :href="whatsAppUrl" variant="solid" size="lg">
-        Contact us on WhatsApp
+      <hf-button as="a" :href="mailtoUrl" variant="solid" size="lg">
+        Email us to upgrade
       </hf-button>
-      <a class="upgrade__mailto" :href="mailtoUrl">…or email us instead</a>
       <p class="upgrade__cta-hint">
-        Self-service checkout is coming soon — for now a quick chat gets you All-in
+        Self-service checkout is coming soon — for now a quick email gets you All-in
         within the same business day.
       </p>
     </section>
@@ -517,7 +502,7 @@ Mirrors marketing/landing/main.js."
 <script setup>
 import { ref, computed, onMounted } from 'vue'
 import { loadTiers } from '/js/services/subscription-tiers.js'
-import { buildWhatsAppUrl, buildMailtoUrl, SPARKS_CONTACT } from '/js/services/contact.js'
+import { buildMailtoUrl, SPARKS_CONTACT } from '/js/services/contact.js'
 
 const tiers = ref([])
 const loadError = ref('')
@@ -548,19 +533,11 @@ const ctaContext = (() => {
   return { from: (p.get('from') || '').slice(0, 32), id: (p.get('id') || '').slice(0, 64) }
 })()
 
-const whatsAppUrl = computed(() => {
-  const base = `Hi ${SPARKS_CONTACT.displayName}, I'd like to upgrade to All-in.`
-  const trail = ctaContext.from === 'template' && ctaContext.id
-    ? ` (Triggered from template id: ${ctaContext.id})`
-    : ''
-  return buildWhatsAppUrl(base + trail)
-})
-
 const mailtoUrl = computed(() => {
   const subject = 'Upgrade to All-in'
   const body = ctaContext.from === 'template' && ctaContext.id
-    ? `Hi,\n\nI'd like to upgrade my Sparks account to All-in.\n\nTriggered from template id: ${ctaContext.id}\n\nThanks.`
-    : `Hi,\n\nI'd like to upgrade my Sparks account to All-in.\n\nThanks.`
+    ? `Hi ${SPARKS_CONTACT.displayName},\n\nI'd like to upgrade my Sparks account to All-in.\n\nTriggered from template id: ${ctaContext.id}\n\nThanks.`
+    : `Hi ${SPARKS_CONTACT.displayName},\n\nI'd like to upgrade my Sparks account to All-in.\n\nThanks.`
   return buildMailtoUrl(subject, body)
 })
 
@@ -643,12 +620,6 @@ onMounted(async () => {
 .upgrade__cta {
   text-align: center;
   padding: var(--hf-space-6) 0;
-}
-.upgrade__mailto {
-  display: inline-block;
-  margin-top: var(--hf-space-3);
-  color: var(--hf-fg-muted);
-  text-decoration: underline;
 }
 .upgrade__cta-hint {
   margin-top: var(--hf-space-4);
@@ -940,7 +911,7 @@ gh pr create --title "feat(ross): tier-gated template list + upgrade page (Phase
 
 - Server: `filterTemplatesByTier` gains opt-in `includeLocked` param — Free users receive All-in templates stamped `locked: true` instead of being filtered out (v1 admin callers untouched)
 - Client v2 Playbook tab: locked All-in cards render dimmed (0.7) + `🔒 All-in` badge + `Upgrade to All-in` ghost button
-- Upgrade button routes to new `/upgrade.html` — Hi-Fi Vue 3 comparison page with WhatsApp + email contact CTAs; structured to swap in a self-service checkout button later (Phase 6 D)
+- Upgrade button routes to new `/upgrade.html` — Hi-Fi Vue 3 comparison page with an email-us CTA (andreas@sparksclub.co.za); structured to swap in a self-service checkout button later (Phase 6 D)
 - 8 new vitest unit tests covering the new param + edge cases
 - Defense in depth: PR #51's `rossActivateWorkflow` gate stays as the security backstop — locked cards never call activate
 
@@ -950,7 +921,7 @@ See `docs/plans/2026-05-12-ross-tier-gated-template-list-design.md` for the full
 
 - [x] `npm run build` clean; `dist/upgrade.html` present
 - [x] `npm test` — all tests pass (8 new in `tests/unit/ross-tier.test.js`)
-- [ ] Preview: Free account → 13 cards visible in Playbook, 8 dimmed; click locked → `/upgrade.html?from=template&id=<id>` loads with WhatsApp pre-fill containing the template id
+- [ ] Preview: Free account → 13 cards visible in Playbook, 8 dimmed; click locked → `/upgrade.html?from=template&id=<id>` loads with mailto pre-fill containing the template id
 - [ ] Preview: All-in / superAdmin account → 13 unlocked cards; no upgrade button; Activate works
 - [ ] Direct nav to `/upgrade.html` (no query params) → page loads, generic CTA copy
 - [ ] Defense check: dev console call `rossActivateWorkflow` with a locked template ID as a Free user → 403; audit log entry at `ross/auditLog/templateActivationDenials/{pushId}`
@@ -960,7 +931,7 @@ See `docs/plans/2026-05-12-ross-tier-gated-template-list-design.md` for the full
 - Self-service checkout (Phase 6 D)
 - Upgrade-request RTDB write path
 - Analytics on upgrade page visits
-- Verifying the WhatsApp number / email in `services/contact.js` — operator to replace the placeholder values before merge if the defaults aren't right
+- WhatsApp / SMS contact paths — email-only for this PR
 EOF
 )"
 ```
@@ -975,7 +946,6 @@ Note the URL returned by `gh pr create`. Hand it back to the operator.
 
 Per Standard Task Workflow step 11, after PR merge:
 
-1. Verify the WhatsApp number + email in `public/js/services/contact.js` are real Sparks contacts; if not, open a one-line follow-up PR with the corrections (this is the kind of value where placeholder commits get embarrassing if they sit on prod)
-2. Reflect cycle: update `KNOWLEDGE BASE/development/SELF_OPTIMIZATION.md`, `LESSONS.md`, `SCORECARD.md`, `PROJECT_BACKLOG.md`
-3. Remove worktree: `git worktree remove .claude/worktrees/ross-tier-gated-list`
-4. Spot-check `/upgrade.html` on prod — comparison renders, WhatsApp link opens correctly
+1. Reflect cycle: update `KNOWLEDGE BASE/development/SELF_OPTIMIZATION.md`, `LESSONS.md`, `SCORECARD.md`, `PROJECT_BACKLOG.md`
+2. Remove worktree: `git worktree remove .claude/worktrees/ross-tier-gated-list`
+3. Spot-check `/upgrade.html` on prod — comparison renders, mailto link opens with the right pre-fill
