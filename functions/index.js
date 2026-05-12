@@ -464,8 +464,16 @@ exports.merakiWebhook = onRequest((req, res) => {
 
 // Export Guest Sync Functions
 const guestSync = require('./guestSync');
+const { buildWorkflowRecord } = require('./ross-workflow-builder');
 exports.syncWifiToGuest = guestSync.syncWifiToGuest;
 exports.syncGuestToSendGrid = guestSync.syncGuestToSendGrid;
+
+// ROSS day-zero seed — must match VALID_INPUT_TYPES in functions/ross.js.
+// Kept in sync manually; any new input type must be added here too.
+const ROSS_VALID_INPUT_TYPES = [
+    'checkbox', 'number', 'temperature', 'text', 'longtext',
+    'dropdown', 'rating', 'photo', 'signature', 'date',
+];
 
 /**
  * Cloud Function for user registration
@@ -660,6 +668,79 @@ exports.registerUser = functions.https.onCall(async (data, context) => {
         const locationRef = await admin.database().ref('locations').push();
         await locationRef.set(locationData);
         await admin.database().ref(`userLocations/${userId}/${locationRef.key}`).set(true);
+
+        // Day-zero auto-activation — best-effort, non-blocking. Seeds one
+        // starter workflow against the freshly-created location so a fresh
+        // signup lands on ROSS with a runnable workflow. Every failure
+        // branch logs and continues — registerUser must always succeed.
+        // Spec: docs/plans/2026-05-12-ross-day-zero-auto-activation-design.md
+        try {
+            const pointerSnap = await admin.database()
+                .ref('ross/config/firstWorkflowTemplateId')
+                .once('value');
+            const seedTemplateId = pointerSnap.val();
+            if (!seedTemplateId) {
+                console.warn('[registerUser] day-zero seed skipped:', { uid: userId, reason: 'pointer_absent' });
+            } else {
+                const templateSnap = await admin.database()
+                    .ref(`ross/templates/${seedTemplateId}`)
+                    .once('value');
+                if (!templateSnap.exists()) {
+                    console.warn('[registerUser] day-zero seed skipped:', { uid: userId, reason: 'template_missing', templateId: seedTemplateId });
+                } else {
+                    const template = templateSnap.val();
+                    if (template.tier && template.tier !== 'free') {
+                        console.warn('[registerUser] day-zero seed skipped:', { uid: userId, reason: 'tier_mismatch', templateTier: template.tier });
+                    } else {
+                        // SAST = UTC+2. Compute today's date as YYYY-MM-DD-equivalent
+                        // millis at SAST midnight, matching the format daysOffset
+                        // arithmetic expects (millis at task scheduling).
+                        const sastNow = Date.now();
+                        const seedWorkflowId = admin.database().ref().push().key;
+                        const generateTaskId = () => admin.database().ref().push().key;
+                        const { workflowId, atomicWrite } = buildWorkflowRecord({
+                            template,
+                            locationIds: [locationRef.key],
+                            locationNames: [businessName],
+                            locationAssignedTo: null,
+                            nextDueDate: sastNow,
+                            uid: userId,
+                            name: null,
+                            description: null,
+                            customInterval: null,
+                            daysBeforeAlert: null,
+                            notifyPhone: null,
+                            notifyEmail: null,
+                            workflowId: seedWorkflowId,
+                            validInputTypes: ROSS_VALID_INPUT_TYPES,
+                            generateTaskId,
+                            now: sastNow,
+                        });
+
+                        atomicWrite[`onboarding-progress/${userId}/firstWorkflowSeededAt`] =
+                            admin.database.ServerValue.TIMESTAMP;
+                        const auditKey = admin.database().ref('ross/auditLog/firstWorkflowSeeded').push().key;
+                        atomicWrite[`ross/auditLog/firstWorkflowSeeded/${auditKey}`] = {
+                            uid: userId,
+                            templateId: seedTemplateId,
+                            workflowId,
+                            locationId: locationRef.key,
+                            seededAt: admin.database.ServerValue.TIMESTAMP,
+                        };
+
+                        await admin.database().ref().update(atomicWrite);
+                        console.log('[registerUser] day-zero seed:', {
+                            uid: userId,
+                            workflowId,
+                            templateId: seedTemplateId,
+                            locationId: locationRef.key,
+                        });
+                    }
+                }
+            }
+        } catch (seedError) {
+            console.error('[registerUser] day-zero seed failed (non-blocking):', seedError);
+        }
 
         return { success: true, userId: userId };
 
