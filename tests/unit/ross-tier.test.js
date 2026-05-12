@@ -111,3 +111,62 @@ describe('filterTemplatesByTier', () => {
     expect(filterTemplatesByTier([], 'free', false)).toEqual([])
   })
 })
+
+describe('filterTemplatesByTier — includeLocked param', () => {
+  const templates = [
+    { templateId: 't1', name: 'Free A', tier: 'free' },
+    { templateId: 't2', name: 'Free B', tier: 'free' },
+    { templateId: 't3', name: 'All-in A', tier: 'all-in' },
+    { templateId: 't4', name: 'All-in B', tier: 'all-in' },
+  ]
+
+  test('Free user with includeLocked:true keeps all-in templates and stamps locked:true', () => {
+    const result = filterTemplatesByTier(templates, 'free', false, true)
+    expect(result).toHaveLength(4)
+    expect(result.find(t => t.templateId === 't1').locked).toBeUndefined()
+    expect(result.find(t => t.templateId === 't2').locked).toBeUndefined()
+    expect(result.find(t => t.templateId === 't3').locked).toBe(true)
+    expect(result.find(t => t.templateId === 't4').locked).toBe(true)
+  })
+
+  test('Free user with includeLocked:false (default) drops all-in templates — unchanged behavior', () => {
+    const result = filterTemplatesByTier(templates, 'free', false)
+    expect(result).toHaveLength(2)
+    expect(result.every(t => t.tier === 'free')).toBe(true)
+  })
+
+  test('Free user with includeLocked omitted matches includeLocked:false', () => {
+    const a = filterTemplatesByTier(templates, 'free', false)
+    const b = filterTemplatesByTier(templates, 'free', false, false)
+    expect(a).toEqual(b)
+  })
+
+  test('All-in user with includeLocked:true returns all templates with no locked flag', () => {
+    const result = filterTemplatesByTier(templates, 'all-in', false, true)
+    expect(result).toHaveLength(4)
+    expect(result.some(t => t.locked === true)).toBe(false)
+  })
+
+  test('SuperAdmin with includeLocked:true returns all templates with no locked flag', () => {
+    const result = filterTemplatesByTier(templates, 'free', true, true)
+    expect(result).toHaveLength(4)
+    expect(result.some(t => t.locked === true)).toBe(false)
+  })
+
+  test('Missing userTier with includeLocked:true behaves like Free', () => {
+    const result = filterTemplatesByTier(templates, null, false, true)
+    expect(result).toHaveLength(4)
+    expect(result.find(t => t.tier === 'all-in').locked).toBe(true)
+  })
+
+  test('Falsy includeLocked values (string "true", 1, etc.) do NOT activate locked mode — strict === true only', () => {
+    const result = filterTemplatesByTier(templates, 'free', false, 1)
+    expect(result).toHaveLength(2)
+  })
+
+  test('Locked flag does not mutate input templates', () => {
+    const input = templates.map(t => ({ ...t }))
+    filterTemplatesByTier(input, 'free', false, true)
+    expect(input.find(t => t.templateId === 't3').locked).toBeUndefined()
+  })
+})
