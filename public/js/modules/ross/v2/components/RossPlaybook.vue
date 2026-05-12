@@ -24,6 +24,9 @@ onMounted(() => {
   // Probe superAdmin status independently — the template CRUD UI is
   // gated on it. Server still enforces verifySuperAdmin on every CF.
   store.loadSuperAdminStatus()
+  // Probe tier for defensive client-side template filter (belt-and-braces
+  // — server already filters in rossGetTemplates).
+  store.loadCurrentUserTier()
 })
 
 // Template delete confirm: which templateId is currently in confirm
@@ -86,7 +89,17 @@ const showEditor = computed(() => store.editingWorkflowId !== null)
 const loading = computed(() => store.loading.workflows || store.loading.templates)
 const error = computed(() => store.error)
 const workflows = computed(() => store.workflows)
-const templates = computed(() => store.templates)
+const templates = computed(() => {
+  const list = store.templates || []
+  // SuperAdmins see all templates regardless of tier (they author them).
+  if (store.isSuperAdmin) return list
+  // all-in tier users see everything.
+  if (store.currentUserTier === 'all-in') return list
+  // Defensive fall-through: Free users (or unknown/null tier) only see
+  // tier:'free' templates. Belt-and-braces — server already filtered via
+  // rossGetTemplates; this prevents a flash during tier change or stale cache.
+  return list.filter(t => t && t.tier === 'free')
+})
 const byCategory = computed(() => store.workflowsByCategory)
 
 // Category order is intentional: compliance first (highest stakes),

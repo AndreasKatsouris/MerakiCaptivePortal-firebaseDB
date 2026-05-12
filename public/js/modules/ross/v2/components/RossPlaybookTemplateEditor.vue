@@ -15,7 +15,7 @@
 
 import { computed, ref, watch } from 'vue'
 import {
-  usePlaybookStore, VALID_CATEGORIES, VALID_RECURRENCES,
+  usePlaybookStore, VALID_CATEGORIES, VALID_RECURRENCES, VALID_TIERS,
 } from '../playbook-store.js'
 import {
   defaultInputConfig, sanitiseInputConfig, validateInputConfig,
@@ -53,6 +53,7 @@ function blankForm() {
     name: '',
     description: '',
     category: 'operations',
+    tier: 'free',
     recurrence: 'weekly',
     daysBeforeAlert: [7, 1],
     subtasks: [],          // [{ title, daysOffset, order }]
@@ -76,6 +77,7 @@ watch(
         name: t.name || '',
         description: t.description || '',
         category: t.category || 'operations',
+        tier: t.tier === 'all-in' ? 'all-in' : 'free',
         recurrence: t.recurrence || 'weekly',
         daysBeforeAlert: Array.isArray(t.daysBeforeAlert) ? [...t.daysBeforeAlert] : [7, 1],
         // Phase 4e.2: hydrate inputType + inputConfig if present.
@@ -188,6 +190,7 @@ const errors = computed(() => {
   const out = {}
   if (!form.value.name.trim()) out.name = 'Required'
   if (!VALID_CATEGORIES.includes(form.value.category)) out.category = 'Invalid'
+  if (!VALID_TIERS.includes(form.value.tier)) out.tier = 'Invalid'
   if (!VALID_RECURRENCES.includes(form.value.recurrence)) out.recurrence = 'Invalid'
   // An empty alert array silently disables every reminder for the
   // template. Surface it as a form error rather than letting the user
@@ -211,6 +214,7 @@ function buildPayload() {
   return {
     name: form.value.name.trim(),
     category: form.value.category,
+    tier: form.value.tier,
     description: form.value.description.trim() || '',
     recurrence: form.value.recurrence,
     daysBeforeAlert: form.value.daysBeforeAlert.filter((d) => Number.isInteger(d) && d > 0),
@@ -302,6 +306,15 @@ const categoryOptions = [
         <select v-model="form.category" class="tpleditor__select">
           <option v-for="c in categoryOptions" :key="c.id" :value="c.id">{{ c.label }}</option>
         </select>
+      </label>
+
+      <label v-if="store.isSuperAdmin" class="tpleditor__field">
+        <span class="hf-eyebrow">Tier</span>
+        <select v-model="form.tier" class="tpleditor__select">
+          <option value="free">Free</option>
+          <option value="all-in">All-in</option>
+        </select>
+        <span v-if="errors.tier" class="tpleditor__field-err">{{ errors.tier }}</span>
       </label>
 
       <label class="tpleditor__field">

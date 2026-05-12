@@ -531,6 +531,10 @@
             ".validate": "!newData.exists() || (newData.hasChildren(['expiresAt', 'snoozedAt']) && newData.child('expiresAt').isNumber() && newData.child('snoozedAt').isNumber())"
           }
         }
+      },
+      "auditLog": {
+        ".read": "auth != null && root.child('admins').child(auth.uid).child('superAdmin').val() === true",
+        ".write": false
       }
     }
   }

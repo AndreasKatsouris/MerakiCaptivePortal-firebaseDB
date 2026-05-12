@@ -13,6 +13,8 @@ import { fetchLocationNames } from './utils/location-names.js'
 // list changes.
 export const VALID_CATEGORIES = ['compliance', 'operations', 'growth', 'finance', 'hr', 'maintenance']
 export const VALID_RECURRENCES = ['once', 'daily', 'weekly', 'monthly', 'quarterly', 'annually']
+// Mirrors VALID_TIERS in functions/ross-tier.js — keep in sync.
+export const VALID_TIERS = ['free', 'all-in']
 
 // rossUpdateWorkflow allowedFields (functions/ross.js). Only these
 // fields can be edited on an existing workflow — category, recurrence,
@@ -79,6 +81,13 @@ export const usePlaybookStore = defineStore('rossPlaybook', {
     // false; the server always enforces.
     isSuperAdmin: false,
     _superAdminLoaded: false,
+
+    // Current user's subscription tier. Lazily loaded once per session
+    // via loadCurrentUserTier(). Defensive client-side filter uses this
+    // to avoid flash-of-all-templates during tier change or stale cache.
+    // Server (rossGetTemplates) is the source of truth; this is belt-and-braces.
+    currentUserTier: null,
+    _currentUserTierLoaded: false,
 
     // --- Task editor state (Phase 4e.1) --------------------------
     // editingTasksFor binds to a specific (workflowId, locationId)
@@ -315,6 +324,28 @@ export const usePlaybookStore = defineStore('rossPlaybook', {
         // not-superAdmin.
         this.isSuperAdmin = false
         this._superAdminLoaded = true
+      }
+    },
+
+    // --- Tier gate -----------------------------------------------
+    // Reads users/{uid}/tier once. Server (rossGetTemplates) is the
+    // source of truth; this read only decides which templates to render
+    // client-side so Free users don't see a flash of all-in templates
+    // during a tier change or stale-cache window.
+    async loadCurrentUserTier() {
+      if (this._currentUserTierLoaded) return
+      const user = auth.currentUser
+      if (!user) return
+      try {
+        const snap = await get(ref(rtdb, `users/${user.uid}/tier`))
+        const v = snap.val()
+        this.currentUserTier = (typeof v === 'string') ? v : null
+        this._currentUserTierLoaded = true
+      } catch (_) {
+        // Permission denied or network failure — fail closed (treat as
+        // no tier = Free filter applies). Don't set _currentUserTierLoaded
+        // so a subsequent successful call can pick up the real value.
+        this.currentUserTier = null
       }
     },
 

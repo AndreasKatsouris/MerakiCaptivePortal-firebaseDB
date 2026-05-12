@@ -13,6 +13,7 @@ const { onRequest } = require('firebase-functions/v2/https');
 const { onSchedule } = require('firebase-functions/v2/scheduler');
 const admin = require('firebase-admin');
 const cors = require('cors')({ origin: true });
+const { validateTier, userCanActivate, filterTemplatesByTier } = require('./ross-tier');
 
 const db = admin.database();
 
@@ -77,6 +78,44 @@ async function verifySuperAdmin(decodedToken) {
 
 function generateId() {
     return db.ref().push().key;
+}
+
+/**
+ * Read the calling user's subscription tier from RTDB.
+ * Source-of-truth field is `users/{uid}/tier` (written at signup per
+ * registerUser CF). Returns null if missing — caller fails closed.
+ */
+async function readUserTier(uid) {
+    try {
+        const snap = await db.ref(`users/${uid}/tier`).once('value');
+        const val = snap.val();
+        return (typeof val === 'string') ? val : null;
+    } catch (_err) {
+        return null;  // fail closed
+    }
+}
+
+/**
+ * Write an audit-log entry when a tier gate denies a template
+ * activation. Stored under ross/auditLog/templateActivationDenials/{pushId}.
+ * Best-effort: a failed audit-log write does NOT block the response;
+ * the user still gets their 403.
+ */
+async function logActivationDenial({ uid, email, templateId, templateName, userTier, templateTier }) {
+    try {
+        const entry = {
+            uid,
+            email: email || null,
+            templateId,
+            templateName: templateName || null,
+            userTier: userTier || null,
+            templateTier,
+            timestamp: admin.database.ServerValue.TIMESTAMP,
+        };
+        await db.ref('ross/auditLog/templateActivationDenials').push(entry);
+    } catch (err) {
+        console.warn('[logActivationDenial] audit write failed (non-blocking):', err.message);
+    }
 }
 
 /**
@@ -154,7 +193,7 @@ exports.rossGetTemplates = onRequest(async (req, res) => {
         if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' });
         try {
             const decodedToken = await verifyAuthToken(req);
-            await verifyUserOrAdmin(decodedToken);
+            const { uid, isSuperAdmin } = await verifyUserOrAdmin(decodedToken);
 
             const data = req.body.data || req.body;
             const { category } = data || {};
@@ -166,6 +205,11 @@ exports.rossGetTemplates = onRequest(async (req, res) => {
             if (category && VALID_CATEGORIES.includes(category)) {
                 templates = templates.filter(t => t.category === category);
             }
+
+            // Tier filter — Phase 6 PR 1A. SuperAdmin sees all; All-in sees all;
+            // Free + missing-tier-user see only tier === 'free' templates.
+            const userTier = await readUserTier(uid);
+            templates = filterTemplatesByTier(templates, userTier, isSuperAdmin);
 
             templates.sort((a, b) => (a.name || '').localeCompare(b.name || ''));
             res.json({ result: { success: true, templates } });
@@ -189,10 +233,12 @@ exports.rossCreateTemplate = onRequest(async (req, res) => {
             const uid = await verifySuperAdmin(decodedToken);
 
             const data = req.body.data || req.body;
-            const { name, category, description, recurrence, daysBeforeAlert, subtasks, tags } = data;
+            const { name, category, description, recurrence, daysBeforeAlert, subtasks, tags, tier } = data;
 
             if (!name || !name.trim()) return res.status(400).json({ error: 'Template name is required' });
             if (!VALID_CATEGORIES.includes(category)) return res.status(400).json({ error: 'Invalid category' });
+            const tierError = validateTier(tier);
+            if (tierError) return res.status(400).json({ error: tierError });
             if (!VALID_RECURRENCES.includes(recurrence)) return res.status(400).json({ error: 'Invalid recurrence' });
 
             // Phase 4e.2: enforce inputType enum on each subtask so the
@@ -208,6 +254,7 @@ exports.rossCreateTemplate = onRequest(async (req, res) => {
                 templateId,
                 name: name.trim(),
                 category,
+                tier,
                 description: description?.trim() || '',
                 recurrence,
                 daysBeforeAlert: Array.isArray(daysBeforeAlert)
@@ -262,8 +309,12 @@ exports.rossUpdateTemplate = onRequest(async (req, res) => {
                 const subtaskTypeError = validateSubtasksInputTypes(updates.subtasks);
                 if (subtaskTypeError) return res.status(400).json({ error: subtaskTypeError });
             }
+            if (updates.tier !== undefined) {
+                const tierError = validateTier(updates.tier);
+                if (tierError) return res.status(400).json({ error: tierError });
+            }
 
-            const allowedFields = ['name', 'category', 'description', 'recurrence', 'daysBeforeAlert', 'subtasks', 'tags'];
+            const allowedFields = ['name', 'category', 'tier', 'description', 'recurrence', 'daysBeforeAlert', 'subtasks', 'tags'];
             const sanitized = { updatedAt: Date.now() };
             allowedFields.forEach(field => {
                 if (updates[field] !== undefined) sanitized[field] = updates[field];
@@ -384,6 +435,23 @@ exports.rossActivateWorkflow = onRequest(async (req, res) => {
             const templateSnap = await db.ref(`ross/templates/${templateId}`).once('value');
             if (!templateSnap.exists()) return res.status(404).json({ error: 'Template not found' });
             const template = templateSnap.val();
+
+            // Tier gate — Phase 6 PR 1A. SuperAdmin bypasses. Missing user tier
+            // fails closed (treated as 'free'). Audit-log denials regardless.
+            const userTier = await readUserTier(uid);
+            if (!userCanActivate(userTier, template.tier, isSuperAdmin)) {
+                await logActivationDenial({
+                    uid,
+                    email: decodedToken.email,
+                    templateId,
+                    templateName: template.name,
+                    userTier,
+                    templateTier: template.tier,
+                });
+                return res.status(403).json({
+                    error: 'Template requires the All-in tier',
+                });
+            }
 
             const workflowId = generateId();
             const now = Date.now();

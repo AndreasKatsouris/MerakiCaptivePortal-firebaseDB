@@ -291,6 +291,36 @@ ross/
 
 ---
 
+## Tier gating (Phase 6 PR 1A — shipped 2026-05-11)
+
+Templates carry a `tier: 'free' | 'all-in'` field (required, `.validate`-enforced).
+Users have `users/{uid}/tier` written at signup. Gate fires at three points:
+
+- **Server read (`rossGetTemplates`)**: filter response by user tier. Free users
+  receive only `tier: 'free'` templates. SuperAdmin sees all.
+- **Server activate (`rossActivateWorkflow`)**: reject 403 if a Free user tries
+  to activate an All-in template. Denial logged to
+  `ross/auditLog/templateActivationDenials/{pushId}`.
+- **Client render (`RossPlaybook.vue`)**: defensive filter — same logic, prevents
+  stale-cache flash-of-all-in.
+
+### Tier downgrade policy
+
+**Activation-time gate only.** If an All-in user downgrades to Free with active
+workflows from premium templates, those workflows keep running on their own
+schedule. They cannot activate *new* All-in workflows post-downgrade, but
+existing work is never yanked. This is intentional — don't pull paid work out
+from under operators.
+
+### Missing tier fields (fail closed)
+
+The server- and client-side filters treat missing `users/{uid}/tier` as `'free'`
+(most-restrictive). Templates missing the `tier` field are excluded from Free
+users entirely. Post-backfill (PR 1A migration) every template has `tier` set,
+so this only matters during the deploy window.
+
+---
+
 ## Cloud Functions
 
 All ROSS functions are defined in `functions/ross.js` and exported from `functions/index.js`.

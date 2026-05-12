@@ -20,6 +20,7 @@ const templates = [
     {
         name: 'Certificate of Acceptability',
         category: 'compliance',
+        tier: 'free',
         description: 'Annual CoA renewal tracking from application through to approval.',
         recurrence: 'annually',
         daysBeforeAlert: [90, 30, 7],
@@ -34,6 +35,7 @@ const templates = [
     {
         name: 'Liquor Licence Renewal',
         category: 'compliance',
+        tier: 'free',
         description: 'Annual liquor licence renewal with local authority.',
         recurrence: 'annually',
         daysBeforeAlert: [60, 30, 7],
@@ -48,6 +50,7 @@ const templates = [
     {
         name: 'Health & Safety Audit',
         category: 'compliance',
+        tier: 'free',
         description: 'Quarterly internal health and safety inspection checklist.',
         recurrence: 'quarterly',
         daysBeforeAlert: [14, 7, 1],
@@ -62,6 +65,7 @@ const templates = [
     {
         name: 'Daily Opening Checklist',
         category: 'operations',
+        tier: 'free',
         description: 'Standard opening procedures for front-of-house and kitchen.',
         recurrence: 'daily',
         daysBeforeAlert: [0],
@@ -76,6 +80,7 @@ const templates = [
     {
         name: 'Daily Closing Checklist',
         category: 'operations',
+        tier: 'free',
         description: 'Standard closing procedures for front-of-house and kitchen.',
         recurrence: 'daily',
         daysBeforeAlert: [0],
@@ -90,6 +95,7 @@ const templates = [
     {
         name: 'Weekly Deep Clean Checklist',
         category: 'operations',
+        tier: 'free',
         description: 'Comprehensive weekly deep clean of kitchen and front-of-house.',
         recurrence: 'weekly',
         daysBeforeAlert: [2, 1],
@@ -104,6 +110,7 @@ const templates = [
     {
         name: 'Weekly Social Media Campaign',
         category: 'growth',
+        tier: 'free',
         description: 'Plan, create, and post weekly social media content.',
         recurrence: 'weekly',
         daysBeforeAlert: [2],
@@ -118,6 +125,7 @@ const templates = [
     {
         name: 'Monthly Google Review Campaign',
         category: 'growth',
+        tier: 'free',
         description: 'Monthly outreach to encourage satisfied guests to leave Google reviews.',
         recurrence: 'monthly',
         daysBeforeAlert: [7, 1],
@@ -132,6 +140,7 @@ const templates = [
     {
         name: 'Monthly Food Cost Review',
         category: 'finance',
+        tier: 'free',
         description: 'Monthly review of food cost percentage and supplier pricing.',
         recurrence: 'monthly',
         daysBeforeAlert: [7, 1],
@@ -146,6 +155,7 @@ const templates = [
     {
         name: 'Weekly Supplier Payment Run',
         category: 'finance',
+        tier: 'free',
         description: 'Weekly review and processing of outstanding supplier invoices.',
         recurrence: 'weekly',
         daysBeforeAlert: [1],
@@ -160,6 +170,7 @@ const templates = [
     {
         name: 'Monthly Staff Meeting',
         category: 'hr',
+        tier: 'free',
         description: 'Monthly all-staff meeting to discuss performance, updates, and goals.',
         recurrence: 'monthly',
         daysBeforeAlert: [7, 2],
@@ -174,6 +185,7 @@ const templates = [
     {
         name: 'Quarterly Staff Performance Review',
         category: 'hr',
+        tier: 'free',
         description: 'Quarterly one-on-one performance reviews for all staff members.',
         recurrence: 'quarterly',
         daysBeforeAlert: [14, 7],
@@ -188,6 +200,7 @@ const templates = [
     {
         name: 'Monthly Equipment Service Check',
         category: 'maintenance',
+        tier: 'free',
         description: 'Monthly inspection and service check of all kitchen equipment.',
         recurrence: 'monthly',
         daysBeforeAlert: [7, 1],
