@@ -489,12 +489,7 @@
     "ross": {
       "templates": {
         ".read": "auth != null",
-        ".write": false,
-        "$templateId": {
-          "tier": {
-            ".validate": "newData.isString() && (newData.val() === 'free' || newData.val() === 'all-in')"
-          }
-        }
+        ".write": false
       },
       "workflows": {
         "$ownerId": {
@@ -539,12 +534,7 @@
       },
       "auditLog": {
         ".read": "auth != null && root.child('admins').child(auth.uid).child('superAdmin').val() === true",
-        ".write": false,
-        "templateActivationDenials": {
-          "$pushId": {
-            ".validate": "newData.hasChildren(['uid', 'templateId', 'templateTier', 'timestamp'])"
-          }
-        }
+        ".write": false
       }
     }
   }

@@ -308,7 +308,7 @@ const categoryOptions = [
         </select>
       </label>
 
-      <label class="tpleditor__field">
+      <label v-if="store.isSuperAdmin" class="tpleditor__field">
         <span class="hf-eyebrow">Tier</span>
         <select v-model="form.tier" class="tpleditor__select">
           <option value="free">Free</option>

@@ -13,6 +13,7 @@ import { fetchLocationNames } from './utils/location-names.js'
 // list changes.
 export const VALID_CATEGORIES = ['compliance', 'operations', 'growth', 'finance', 'hr', 'maintenance']
 export const VALID_RECURRENCES = ['once', 'daily', 'weekly', 'monthly', 'quarterly', 'annually']
+// Mirrors VALID_TIERS in functions/ross-tier.js — keep in sync.
 export const VALID_TIERS = ['free', 'all-in']
 
 // rossUpdateWorkflow allowedFields (functions/ross.js). Only these

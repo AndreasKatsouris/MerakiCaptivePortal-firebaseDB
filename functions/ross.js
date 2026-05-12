@@ -449,7 +449,7 @@ exports.rossActivateWorkflow = onRequest(async (req, res) => {
                     templateTier: template.tier,
                 });
                 return res.status(403).json({
-                    error: `Template "${template.name}" requires the All-in tier`,
+                    error: 'Template requires the All-in tier',
                 });
             }
 

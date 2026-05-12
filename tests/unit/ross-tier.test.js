@@ -61,6 +61,18 @@ describe('userCanActivate', () => {
   test('missing user tier can still activate free template', () => {
     expect(userCanActivate(null, 'free', false)).toBe(true)
   })
+  test('null template tier fails closed for free user', () => {
+    expect(userCanActivate('free', null, false)).toBe(false)
+  })
+  test('undefined template tier fails closed for free user', () => {
+    expect(userCanActivate('free', undefined, false)).toBe(false)
+  })
+  test('null template tier still passes for all-in user', () => {
+    expect(userCanActivate('all-in', null, false)).toBe(true)
+  })
+  test('null template tier still passes for superAdmin', () => {
+    expect(userCanActivate(null, null, true)).toBe(true)
+  })
 })
 
 describe('filterTemplatesByTier', () => {
