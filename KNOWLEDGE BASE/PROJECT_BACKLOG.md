@@ -3,7 +3,7 @@
 > Claude reads this file at the start of every session and updates it at the end.
 > The Sprint Goal is the contract for the session — don't deviate without explicit user confirmation.
 
-Last updated: 2026-05-12 (post PR #55 — reflect cycle. Phase 6 PR 1C shipped: locked-card upsell UX in Playbook tab + Hi-Fi `/upgrade.html` comparison page. Tier-gate is now both enforced AND visible.)
+Last updated: 2026-05-12 (post PR #58 — reflect cycle. Phase 6 PR 2 shipped: day-zero auto-activation. Fresh signups now land on ROSS with a seeded Daily Opening Checklist workflow. Discovered a pre-existing prod bug in `registerUser` callable during preview testing — pivoted architecture mid-PR to a dedicated CF called from `signup-service.js`.)
 
 ---
 
@@ -21,7 +21,7 @@ Sprint: 2026-04-30 → until complete
 
 | Item | Branch | Notes |
 |------|--------|-------|
-| — | — | Idle. Phase 6 PR 1C merged. Operator validated locked-card UX on preview end-to-end. Next: day-zero auto-activation (seed one starter workflow per new account), then operator-facing Run execution UI honouring all 10 inputTypes. |
+| — | — | Idle. Phase 6 PR 2 merged. Day-zero seed live in prod (CF deployed, pointer set, operator-verified end-to-end). Next: operator-facing Run execution UI honouring all 10 inputTypes, then concierge home active-run surfacing. |
 
 ---
 
@@ -66,7 +66,7 @@ Lower-priority Phase 5 items (deferred to dedicated polish PR after the 5-PR seq
 - [x] **Tier gating mechanism** (PR #51, 2026-05-12) — `tier:'free'|'all-in'` schema, server filter on `rossGetTemplates`, activate gate on `rossActivateWorkflow` with audit log, symmetric validators on Create/Update Template, editor field, defensive client filter, KB docs. Mechanism complete; gate is inert until PR 1B flips templates.
 - [x] **Curate starter library** (PR #53, 2026-05-12) — 5 Free (Daily Opening / Daily Closing / Weekly Deep Clean / Monthly Food Cost Review / Health & Safety Audit) + 8 All-in (CoA / Liquor Licence / Weekly Social / Monthly Google Reviews / Weekly Supplier Pay / Monthly Staff Meeting / Quarterly Performance Review / Monthly Equipment Service). Seed file updated for fresh deploys; one-off update script (`functions/seeds/ross-templates-curate-tiers.js`) ready for prod RTDB. Folded a sibling fix on PR #51's backfill script (legacy databaseURL → canonical `-default-rtdb` form).
 - [x] **Tier-gated template list (upgrade affordance)** (PR #55, 2026-05-12) — server's `filterTemplatesByTier` now accepts opt-in `includeLocked:true` (v1 callers untouched); v2 Playbook renders locked All-in templates dimmed + "All-in" badge + ghost "Upgrade to All-in" button → `/upgrade.html`. New Hi-Fi comparison page reads `subscriptionTiers/` via `loadTiers()` with email CTA pre-filled by `?from=template&id=<id>` context. 8 new vitest cases (34/34 passing). 5+ review fixes folded mid-PR including a security finding (CRLF in mailto body via `?id=` query param)
-- [ ] **Day-zero auto-activation** — at account creation (post-onboarding completion), programmatically call `rossActivateWorkflow` for one starter template against the user's default location, so a new operator lands in ROSS with one runnable workflow already attached. May need a new CF (e.g. `rossSeedFirstWorkflow`) or a hook in `signup.js` / wizard completion
+- [x] **Day-zero auto-activation** (PR #58, 2026-05-12) — new `rossSeedFirstWorkflow` CF called from `signup-service.js` after both signup paths (callable + fallback) complete. Server resolves locationId from `userLocations/{uid}` and templateId from `ross/config/firstWorkflowTemplateId` pointer (set per-environment via one-off script). Idempotency marker on `onboarding-progress/{uid}/firstWorkflowSeededAt`; client wraps the call in `Promise.race` with a 1500ms cap so a cold-start CF can't block the post-signup redirect. Also: pure helpers `buildLocationsFromTemplate` + `buildWorkflowRecord` extracted from `rossActivateWorkflow` (17 unit tests). Originally inlined the seed inside `registerUser` — preview testing revealed `registerUser` callable has been throwing `unauthenticated` on every call due to a pre-existing v1-vs-v2 signature bug, and `signup-service.js` silently falls back to direct RTDB writes. Architecture pivot mid-PR to the dedicated CF.
 - [ ] **Operator-facing Run execution UI** — richer run-execution surface honouring all 10 `inputType`s (existing UI in v1 admin handles checkbox; v2 needs the full matrix — number/temperature with auto-flag handling + 422 note enforcement, dropdown, rating, photo/signature placeholders, etc.). Extends `?tab=playbook` workflow card → "Start run" → run UI
 - [ ] **Concierge home active-run surfacing** — replace the current scripted/illustrative cards on `/ross.html` with real-data cards driven by my activated workflows: today's pending tasks, overdue runs, recent completions. Uses existing `rossGetWorkflows` + `rossGetRun` per active workflow
 - [ ] (Stretch) **Compliance Sweep** as the first end-to-end curated template if not already in seed (recommended starter — small `inputType` footprint, strongest SA-locale moat per LESSONS / spec rationale)
@@ -119,6 +119,9 @@ Lower-priority Phase 5 items (deferred to dedicated polish PR after the 5-PR seq
 | Bug | Severity | Discovered | Blocking Sprint? |
 |-----|----------|------------|-----------------|
 | `feature-access-control.js:64` dynamic import with `?v=${Date.now()}` cache-buster — Vite can't statically analyse a runtime-computed path, throws `Unknown variable dynamic import` on every `checkFeatureAccess` call post-build. Fix is one line (drop the `?v=…`; Vite content-hashes outputs natively) but the file is shared infra — every FeatureAccess consumer across the app calls it. Deserves own focused PR with consumer audit, NOT a fold-in. Discovered on PR #48 preview when operator opened `/ross.html` console. | Medium (visible console error, blocks no functionality) | PR #48 review | No |
+| **`registerUser` callable throws `unauthenticated` on every call** — `functions/index.js:474` uses v1 callable signature `onCall((data, context) => ...)` but the prod runtime is Gen 2 (Node 22). Auth context arrives as the first arg (`request.auth`), not on a separate `context` param. Result: every fresh signup hits the v1 callable, gets `unauthenticated`, and `signup-service.js:109-111` silently swallows it and runs the Path B fallback. Production has been silently degraded for an unknown amount of time. Fix: migrate the handler to v2 callable signature `onCall((request) => { const { auth, data } = request; ... })`. Touches a 200-line handler with multiple readers; deserves own PR with careful diff. | **HIGH** (silent prod degradation; explains why fallback path keeps getting used) | PR #58 preview test | No (already mitigated by fallback; signup works) |
+| **Mobile nav missing Playbook/Activity/People access** — operator flagged on PR #58 preview that the Ross home mobile bottom-nav doesn't expose the three governance destinations from the desktop sidebar. PR #48 noted the mobile topbar was supposed to fold them in. Either pre-existing on master or regression since PR #48. Investigation needed before fix. | Medium | PR #58 preview test | No |
+| **Double-seed race on signup retry** — `rossSeedFirstWorkflow`'s idempotency pre-check is not transactional. A user double-clicking signup or hitting a network retry could pass the pre-check in both invocations and produce two seeded workflows. Mitigation options: (a) RTDB `transaction()` on the `firstWorkflowSeededAt` marker, OR (b) deterministic workflow ID per uid (e.g. `seed_{uid}` rather than push key) so duplicate write is overwrite. Exposure small; consequence mild (duplicate workflow, no corruption). | Low | PR #58 final review | No |
 
 ---
 
@@ -126,11 +129,11 @@ Lower-priority Phase 5 items (deferred to dedicated polish PR after the 5-PR seq
 
 | Feature | PR | Merged |
 |---------|----|--------|
+| ROSS day-zero auto-activation (Phase 6 PR 2) — new `rossSeedFirstWorkflow` CF + client integration in `signup-service.js`; pure `buildLocationsFromTemplate`/`buildWorkflowRecord` helpers extracted from `rossActivateWorkflow` (17 unit tests); RTDB pointer `ross/config/firstWorkflowTemplateId` + one-off setup script. Architecture pivoted mid-PR after preview testing revealed `registerUser` callable bug. | #58 | 2026-05-12 |
 | ROSS tier-gated template list + Hi-Fi upgrade page (Phase 6 PR 1C) — server `includeLocked` opt-in, locked card UX, `/upgrade.html` comparison page with email CTA | #55 | 2026-05-12 |
 | ROSS starter library curation — 5 Free / 8 All-in split (Phase 6 PR 1B) + folded backfill URL fix on PR #51's sibling | #53 | 2026-05-12 |
 | ROSS template tier-gating mechanism (Phase 6 PR 1A) — schema, three gate points (read/activate/client), audit log, editor field, KB docs | #51 | 2026-05-12 |
 | ROSS sidebar cleanup — collapse to Today + Ross's brain + footer wired to auth.currentUser (Phase 5 PR 5, **closes Phase 5**) | #48 | 2026-05-11 |
-| docs(ross-v2) — post-PR-46 reflect cycle + tighten Session Opening Protocol | #47 | 2026-05-11 |
 
 ---
 
