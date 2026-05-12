@@ -3,7 +3,7 @@
 > Claude reads this file at the start of every session and updates it at the end.
 > The Sprint Goal is the contract for the session — don't deviate without explicit user confirmation.
 
-Last updated: 2026-05-11 (post PR #48 — reflect cycle. **Phase 5 CLOSED.** All 5 cleanup PRs (#39 router, #42 signup, #44 homepage, #46 router rollout + PR 6 folded, #48 sidebar cleanup) shipped. ROSS is now home end-to-end: fresh signup → hello → ross; existing signed-in users → ross; sidebar collapsed to Today + Ross's brain; module deep-links removed from ROSS primary nav. Sprint goal achieved. **Phase 6 (Playbook UX enrichment + template library curation) is the next sprint.**)
+Last updated: 2026-05-12 (post PR #51 — reflect cycle. Phase 6 PR 1A shipped. ROSS templates now carry tier:'free'|'all-in', enforced at three gate points server + client. Gate is inert until PR 1B flips templates to All-in.)
 
 ---
 
@@ -21,7 +21,7 @@ Sprint: 2026-04-30 → until complete
 
 | Item | Branch | Notes |
 |------|--------|-------|
-| — | — | Idle. **Phase 5 sprint closed.** Next sprint: Phase 6 (Playbook UX enrichment + template library curation). Recommended first task: curate the 5-template Free starter library (smallest piece; unblocks the tier-gated template list + day-zero auto-activation that follow). |
+| — | — | Idle. Phase 6 PR 1A merged. Next: PR 1B — curate the starter library (decide which templates ship Free vs which extend to All-in). |
 
 ---
 
@@ -63,6 +63,7 @@ Lower-priority Phase 5 items (deferred to dedicated polish PR after the 5-PR seq
 
 > **Vocabulary anchor (per `public/kb/features/ROSS.md`):** Templates → activated → Workflows (per location) → composed of Tasks → executed via Runs. The Runs server surface (`rossCreateRun`, `rossSubmitResponse`, auto-flag, 422-on-required-note) is already shipped — Phase 6 is the operator-facing UX layer on top, plus content (template curation + tier gating).
 
+- [x] **Tier gating mechanism** (PR #51, 2026-05-12) — `tier:'free'|'all-in'` schema, server filter on `rossGetTemplates`, activate gate on `rossActivateWorkflow` with audit log, symmetric validators on Create/Update Template, editor field, defensive client filter, KB docs. Mechanism complete; gate is inert until PR 1B flips templates.
 - [ ] **Curate starter library** — decide which 5 existing templates ship Free; what extends to All-in (existing seed has Opening Checklist, Closing Checklist, Weekly Deep Clean, Monthly Stock Audit per KB; need at least 1 more for free + N for all-in)
 - [ ] **Tier-gated template list** — filter the existing Templates list inside the Playbook tab on `users/{uid}/tier` or `subscriptions/{uid}/tier`; gate `rossActivateWorkflow` server-side too (defence in depth)
 - [ ] **Day-zero auto-activation** — at account creation (post-onboarding completion), programmatically call `rossActivateWorkflow` for one starter template against the user's default location, so a new operator lands in ROSS with one runnable workflow already attached. May need a new CF (e.g. `rossSeedFirstWorkflow`) or a hook in `signup.js` / wizard completion
@@ -99,6 +100,8 @@ Lower-priority Phase 5 items (deferred to dedicated polish PR after the 5-PR seq
 11. **Fix KB doc field-name drift for ROSS templates** — `public/kb/features/ROSS.md` "Templates" block lists `id: string` but the actual server uses `templateId` (per seed + `rossCreateTemplate`). Same doc says template tasks are at `tasks: Task[]` but server stores `subtasks` (per `rossActivateWorkflow`, seed). Drift directly caused the PR #28 activate-from-template bug. One-line audit + edit. **[Done in PR #30]**
 12. **Catalog ROSS Cloud Functions in `KNOWLEDGE BASE/api/CLOUD_FUNCTIONS_CATALOG.md`** — `functions/ross.js` is missing from the Source File Map and none of the ROSS CFs are documented there (`rossGetTemplates`, `rossCreateTemplate`, `rossUpdateTemplate`, `rossDeleteTemplate`, `rossGetWorkflows`, `rossCreateWorkflow`, `rossUpdateWorkflow`, `rossDeleteWorkflow`, `rossActivateWorkflow`, `rossManageTask`, `rossGetReports`, `rossScheduledReminder`, `rossV2Snooze`). Pre-existing drift surfaced during PR #30 review. Allowed-fields lists for each mutator are the highest-value payload — would have caught the PR #28 `t.id` bug at planning time.
 13. **Build `/profile-settings.html` for ROSS user account** — sidebar/topbar footer (PR #48) reads `auth.currentUser` reactively but the gear icon is non-interactive because no settings page exists. Account-scoped (display name, password change, email, notification prefs) — `receipt-settings.html` is per-restaurant config, different domain. Once shipped, wire the footer click (`RossHomeDesktop.vue:118` block + `RossHomeMobile.vue` topbar) to navigate there. Belongs in Phase 6 polish or as standalone follow-up.
+14. **Fold `readUserTier` into `verifyUserOrAdmin` — eliminate the extra RTDB read on the hot path for tier-gated handlers.** PR #51 review finding #3. Currently `verifyUserOrAdmin` already reads `admins/{uid}` and possibly `subscriptions/{uid}`; adding `users/{uid}/tier` to the same call would drop one round trip per request. Touches the return shape consumed by 10+ handlers (`rossCreateWorkflow`, `rossUpdateWorkflow`, `rossDeleteWorkflow`, `rossActivateWorkflow`, `rossGetTemplates`, `rossManageTask`, etc.) — broader perf-refactor PR than this branch warranted. Long-term: consider promoting `tier` to a Firebase Auth custom claim so it rides the decoded token at zero RTDB cost.
+15. **Backfill script polish (PR 1A follow-up)** — (a) add a pre-flight check warning if `database.rules.json` has been deployed with a `.validate` on `tier` BEFORE the backfill runs (rules+unbackfilled-records gives unpredictable behaviour); (b) pull `databaseURL` from `process.env.FIREBASE_DATABASE_URL` with a fallback, guarded against accidental copy-paste into other Firebase projects. PR #51 review findings #7 and #8. Cheap; bundle into a single script-polish PR.
 
 ### Low Priority / Nice-to-Have
 
@@ -123,11 +126,11 @@ Lower-priority Phase 5 items (deferred to dedicated polish PR after the 5-PR seq
 
 | Feature | PR | Merged |
 |---------|----|--------|
+| ROSS template tier-gating mechanism (Phase 6 PR 1A) — schema, three gate points (read/activate/client), audit log, editor field, KB docs | #51 | 2026-05-12 |
 | ROSS sidebar cleanup — collapse to Today + Ross's brain + footer wired to auth.currentUser (Phase 5 PR 5, **closes Phase 5**) | #48 | 2026-05-11 |
 | docs(ross-v2) — post-PR-46 reflect cycle + tighten Session Opening Protocol | #47 | 2026-05-11 |
 | post-login router rollout + skip wizard for fresh signups (Phase 5 PR 4 + PR 6 folded) | #46 | 2026-05-11 |
 | docs(ross-v2) — post-merge sync + reflect cycle after PR #44 + hook fix | #45 | 2026-05-05 |
-| homepage v2 — Hi-Fi promotion + workflow-centric copy + dynamic pricing + reused public hello + typographic hero panel (Phase 5 PR 3) | #44 | 2026-05-05 |
 
 ---
 
