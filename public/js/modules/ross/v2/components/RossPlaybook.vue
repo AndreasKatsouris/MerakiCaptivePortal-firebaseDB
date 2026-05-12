@@ -93,12 +93,13 @@ const templates = computed(() => {
   const list = store.templates || []
   // SuperAdmins see all templates regardless of tier (they author them).
   if (store.isSuperAdmin) return list
-  // all-in tier users see everything.
+  // all-in tier users see everything (no locked flag needed).
   if (store.currentUserTier === 'all-in') return list
-  // Defensive fall-through: Free users (or unknown/null tier) only see
-  // tier:'free' templates. Belt-and-braces — server already filtered via
-  // rossGetTemplates; this prevents a flash during tier change or stale cache.
-  return list.filter(t => t && t.tier === 'free')
+  // Free users (or unknown/null tier): server now returns all templates
+  // with locked:true on All-in entries. Pass them through so the UI can
+  // render dimmed locked cards with an upgrade CTA. The server-side
+  // activate gate (PR #51) remains the security backstop.
+  return list
 })
 const byCategory = computed(() => store.workflowsByCategory)
 
@@ -148,6 +149,11 @@ function templateSubtasks(t) {
 }
 function templateSubtaskCount(t) {
   return templateSubtasks(t).length
+}
+
+function onUpgradeClick(template) {
+  const id = encodeURIComponent(template.templateId || '')
+  window.location.href = `/upgrade.html?from=template&id=${id}`
 }
 
 function backToHome() {
@@ -381,7 +387,9 @@ function backToHome() {
             v-for="t in templates" :key="t.templateId || t.id"
             :padded="false"
             class="playbook__template"
+            :class="{ 'template-card--locked': t.locked }"
           >
+            <span v-if="t.locked" class="template-card__lock-badge">🔒 All-in</span>
             <div class="hf-eyebrow">{{ t.category || 'general' }}</div>
             <h3 class="playbook__template-name">{{ t.name }}</h3>
             <p v-if="t.description" class="playbook__template-desc">{{ t.description }}</p>
@@ -404,11 +412,19 @@ function backToHome() {
 
             <div v-if="!showEditor && !showTemplateEditor" class="playbook__template-actions">
               <HfButton
+                v-if="!t.locked"
                 variant="ghost" size="sm"
                 @click="store.openActivateTemplate(t.templateId || t.id)"
                 :disabled="store.saving || store.templateSaving"
               >
                 Activate
+              </HfButton>
+              <HfButton
+                v-else
+                variant="ghost" size="sm"
+                @click="onUpgradeClick(t)"
+              >
+                Upgrade to All-in
               </HfButton>
               <HfButton
                 v-if="store.isSuperAdmin"
@@ -753,5 +769,29 @@ function backToHome() {
   border-top: 1px solid var(--hf-line);
   color: var(--hf-muted);
   font-size: 11px;
+}
+
+/* Locked template cards */
+.playbook__template {
+  position: relative;
+}
+.template-card--locked {
+  opacity: 0.7;
+}
+.template-card--locked:hover {
+  opacity: 0.85;
+}
+.template-card__lock-badge {
+  position: absolute;
+  top: var(--hf-space-3);
+  right: var(--hf-space-3);
+  font-size: 0.75rem;
+  padding: 2px 8px;
+  border-radius: var(--hf-radius-2);
+  background: var(--hf-surface-muted);
+  color: var(--hf-fg-muted);
+  border: 1px solid var(--hf-border);
+  font-weight: 500;
+  letter-spacing: 0.01em;
 }
 </style>
