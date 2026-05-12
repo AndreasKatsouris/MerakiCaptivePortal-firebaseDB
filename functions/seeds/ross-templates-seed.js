@@ -20,7 +20,7 @@ const templates = [
     {
         name: 'Certificate of Acceptability',
         category: 'compliance',
-        tier: 'free',
+        tier: 'all-in',
         description: 'Annual CoA renewal tracking from application through to approval.',
         recurrence: 'annually',
         daysBeforeAlert: [90, 30, 7],
@@ -35,7 +35,7 @@ const templates = [
     {
         name: 'Liquor Licence Renewal',
         category: 'compliance',
-        tier: 'free',
+        tier: 'all-in',
         description: 'Annual liquor licence renewal with local authority.',
         recurrence: 'annually',
         daysBeforeAlert: [60, 30, 7],
@@ -110,7 +110,7 @@ const templates = [
     {
         name: 'Weekly Social Media Campaign',
         category: 'growth',
-        tier: 'free',
+        tier: 'all-in',
         description: 'Plan, create, and post weekly social media content.',
         recurrence: 'weekly',
         daysBeforeAlert: [2],
@@ -125,7 +125,7 @@ const templates = [
     {
         name: 'Monthly Google Review Campaign',
         category: 'growth',
-        tier: 'free',
+        tier: 'all-in',
         description: 'Monthly outreach to encourage satisfied guests to leave Google reviews.',
         recurrence: 'monthly',
         daysBeforeAlert: [7, 1],
@@ -155,7 +155,7 @@ const templates = [
     {
         name: 'Weekly Supplier Payment Run',
         category: 'finance',
-        tier: 'free',
+        tier: 'all-in',
         description: 'Weekly review and processing of outstanding supplier invoices.',
         recurrence: 'weekly',
         daysBeforeAlert: [1],
@@ -170,7 +170,7 @@ const templates = [
     {
         name: 'Monthly Staff Meeting',
         category: 'hr',
-        tier: 'free',
+        tier: 'all-in',
         description: 'Monthly all-staff meeting to discuss performance, updates, and goals.',
         recurrence: 'monthly',
         daysBeforeAlert: [7, 2],
@@ -185,7 +185,7 @@ const templates = [
     {
         name: 'Quarterly Staff Performance Review',
         category: 'hr',
-        tier: 'free',
+        tier: 'all-in',
         description: 'Quarterly one-on-one performance reviews for all staff members.',
         recurrence: 'quarterly',
         daysBeforeAlert: [14, 7],
@@ -200,7 +200,7 @@ const templates = [
     {
         name: 'Monthly Equipment Service Check',
         category: 'maintenance',
-        tier: 'free',
+        tier: 'all-in',
         description: 'Monthly inspection and service check of all kitchen equipment.',
         recurrence: 'monthly',
         daysBeforeAlert: [7, 1],
