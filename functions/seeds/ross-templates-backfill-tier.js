@@ -20,7 +20,7 @@ const admin = require('firebase-admin');
 if (!admin.apps.length) {
     admin.initializeApp({
         credential: admin.credential.applicationDefault(),
-        databaseURL: 'https://merakicaptiveportal-firebasedb.firebaseio.com',
+        databaseURL: 'https://merakicaptiveportal-firebasedb-default-rtdb.firebaseio.com',
     });
 }
 
