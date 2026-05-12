@@ -319,6 +319,48 @@ The server- and client-side filters treat missing `users/{uid}/tier` as `'free'`
 users entirely. Post-backfill (PR 1A migration) every template has `tier` set,
 so this only matters during the deploy window.
 
+### Curated tier split (Phase 6 PR 1B, 2026-05-12)
+
+The 13 starter templates ship across two tiers, enforced by the PR 1A gate
+mechanism described above.
+
+**Free (5) — "Run your day on ROSS":**
+
+| Template | Cadence | Role |
+|---|---|---|
+| Daily Opening Checklist | daily | Daily habit anchor |
+| Daily Closing Checklist | daily | Daily habit anchor (pair) |
+| Weekly Deep Clean Checklist | weekly | Weekly cadence demonstration |
+| Monthly Food Cost Review | monthly | Cross-sells the food-cost module |
+| Health & Safety Audit | quarterly | SA-locale compliance taste |
+
+**All-in (8) — depth, back-office, high-stakes compliance:**
+
+| Template | Category | Why upgrade-gated |
+|---|---|---|
+| Certificate of Acceptability | compliance | High-stakes SA regulatory annual |
+| Liquor Licence Renewal | compliance | Revenue-blocking if missed |
+| Weekly Social Media Campaign | growth | Growth category — ROI conversation |
+| Monthly Google Review Campaign | growth | Growth depth |
+| Weekly Supplier Payment Run | finance | Back-office finance depth |
+| Monthly Staff Meeting | hr | HR entirely behind paywall — for teams |
+| Quarterly Staff Performance Review | hr | HR depth |
+| Monthly Equipment Service Check | maintenance | Maintenance category — back-office |
+
+**Curation principle:** Free covers the daily habit anchor plus one template
+per major cadence (weekly / monthly / quarterly), with one SA-locale
+compliance taste. All-in unlocks entire categories (HR, growth, maintenance)
+rather than scattered templates, so the upgrade conversation is "unlock the
+rest of the playbook" rather than "unlock one more weekly checklist".
+
+**Note on existing workflows:** The activate-time gate only affects *new*
+activations. Workflows already activated before the curation flip continue
+to run regardless of the source template's current tier. The one-off
+update script (`functions/seeds/ross-templates-curate-tiers.js`) only
+touches `ross/templates/*/tier`, never `ross/workflows`.
+
+See `docs/plans/2026-05-12-ross-tier-curation-design.md` for the full rationale.
+
 ---
 
 ## Cloud Functions
