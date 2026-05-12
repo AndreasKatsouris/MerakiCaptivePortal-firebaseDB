@@ -52,6 +52,32 @@ export async function loadTiers() {
   }
 }
 
+// Day-zero auto-activation — best-effort, non-blocking. Called by both
+// signup paths after location writes complete. Server resolves
+// templateId + locationId; client only needs to authenticate.
+async function seedFirstWorkflow(user) {
+  try {
+    const idToken = await user.getIdToken()
+    const url = 'https://us-central1-merakicaptiveportal-firebasedb.cloudfunctions.net/rossSeedFirstWorkflow'
+    const res = await fetch(url, {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${idToken}`,
+        'Content-Type': 'application/json',
+      },
+      body: '{}',
+    })
+    const json = await res.json().catch(() => ({}))
+    if (!res.ok) {
+      console.warn('[Signup] day-zero seed CF returned error:', res.status, json)
+    } else {
+      console.log('[Signup] day-zero seed result:', json.result || json)
+    }
+  } catch (err) {
+    console.warn('[Signup] day-zero seed call failed (non-blocking):', err)
+  }
+}
+
 // Creates the auth user, runs the dual-path RTDB write, and returns the
 // authenticated user object. Caller (the Vue component) handles toasts
 // and routing.
@@ -111,6 +137,7 @@ export async function createAccount({ formData, tier, tierData = {} }) {
   }
 
   if (registrationSuccessful) {
+    await seedFirstWorkflow(freshUser)
     return { user: freshUser }
   }
 
@@ -227,5 +254,6 @@ export async function createAccount({ formData, tier, tierData = {} }) {
   await set(newLocationRef, locationData)
   await set(ref(rtdb, `userLocations/${freshUser.uid}/${newLocationRef.key}`), true)
 
+  await seedFirstWorkflow(freshUser)
   return { user: freshUser }
 }

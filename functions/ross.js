@@ -453,6 +453,119 @@ exports.rossActivateWorkflow = onRequest(async (req, res) => {
 });
 
 /**
+ * Day-zero auto-activation. Called by signup-service.js immediately
+ * after the user's first location is created (covers both the
+ * registerUser-callable success path AND the direct-RTDB-writes fallback
+ * path). Server resolves locationId from userLocations/{uid}, reads
+ * ross/config/firstWorkflowTemplateId pointer, fetches the template,
+ * and atomically writes a seeded workflow + idempotency marker +
+ * audit-log entry.
+ *
+ * Idempotency: onboarding-progress/{uid}/firstWorkflowSeededAt is
+ * checked before any work and written inside the atomic update. The
+ * CF is safe to call multiple times — subsequent calls return
+ * { skipped: true, reason: 'already_seeded' }.
+ *
+ * Best-effort: every skip branch returns 200 with a structured reason.
+ * The CALLER (signup-service.js) wraps its fetch in try/catch and
+ * never blocks the signup flow on a seed failure.
+ *
+ * Access: authenticated user only.
+ */
+exports.rossSeedFirstWorkflow = onRequest(async (req, res) => {
+    return cors(req, res, async () => {
+        if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' });
+        try {
+            const decodedToken = await verifyAuthToken(req);
+            const { uid } = await verifyUserOrAdmin(decodedToken);
+
+            // Idempotency pre-check.
+            const seededSnap = await db.ref(`onboarding-progress/${uid}/firstWorkflowSeededAt`).once('value');
+            if (seededSnap.exists()) {
+                console.warn('[rossSeedFirstWorkflow] skipped:', { uid, reason: 'already_seeded' });
+                return res.json({ result: { skipped: true, reason: 'already_seeded' } });
+            }
+
+            // Resolve location from userLocations/{uid} — take the first owned location.
+            const userLocsSnap = await db.ref(`userLocations/${uid}`).once('value');
+            const userLocs = userLocsSnap.val() || {};
+            const locationIds = Object.keys(userLocs);
+            if (locationIds.length === 0) {
+                console.warn('[rossSeedFirstWorkflow] skipped:', { uid, reason: 'no_locations' });
+                return res.json({ result: { skipped: true, reason: 'no_locations' } });
+            }
+            const locationId = locationIds[0];
+
+            // Resolve location name for the workflow record.
+            const locationSnap = await db.ref(`locations/${locationId}`).once('value');
+            const locationName = (locationSnap.val() && locationSnap.val().name) || locationId;
+
+            // Resolve seed template via pointer.
+            const pointerSnap = await db.ref('ross/config/firstWorkflowTemplateId').once('value');
+            const seedTemplateId = pointerSnap.val();
+            if (!seedTemplateId) {
+                console.warn('[rossSeedFirstWorkflow] skipped:', { uid, reason: 'pointer_absent' });
+                return res.json({ result: { skipped: true, reason: 'pointer_absent' } });
+            }
+
+            const templateSnap = await db.ref(`ross/templates/${seedTemplateId}`).once('value');
+            if (!templateSnap.exists()) {
+                console.warn('[rossSeedFirstWorkflow] skipped:', { uid, reason: 'template_missing', templateId: seedTemplateId });
+                return res.json({ result: { skipped: true, reason: 'template_missing' } });
+            }
+
+            const template = templateSnap.val();
+            if (template.tier && template.tier !== 'free') {
+                console.warn('[rossSeedFirstWorkflow] skipped:', { uid, reason: 'tier_mismatch', templateTier: template.tier });
+                return res.json({ result: { skipped: true, reason: 'tier_mismatch' } });
+            }
+
+            const now = Date.now();
+            const seedWorkflowId = generateId();
+            const generateTaskId = generateId;
+
+            const { workflowId, atomicWrite } = buildWorkflowRecord({
+                template,
+                locationIds: [locationId],
+                locationNames: [locationName],
+                locationAssignedTo: null,
+                nextDueDate: now,
+                uid,
+                name: null,
+                description: null,
+                customInterval: null,
+                daysBeforeAlert: null,
+                notifyPhone: null,
+                notifyEmail: null,
+                workflowId: seedWorkflowId,
+                validInputTypes: VALID_INPUT_TYPES,
+                generateTaskId,
+                now,
+            });
+
+            atomicWrite[`onboarding-progress/${uid}/firstWorkflowSeededAt`] =
+                admin.database.ServerValue.TIMESTAMP;
+            const auditKey = db.ref('ross/auditLog/firstWorkflowSeeded').push().key;
+            atomicWrite[`ross/auditLog/firstWorkflowSeeded/${auditKey}`] = {
+                uid,
+                templateId: seedTemplateId,
+                workflowId,
+                locationId,
+                seededAt: admin.database.ServerValue.TIMESTAMP,
+            };
+
+            await db.ref().update(atomicWrite);
+            console.log('[rossSeedFirstWorkflow] seeded:', { uid, workflowId, templateId: seedTemplateId, locationId });
+            res.json({ result: { success: true, workflowId, templateId: seedTemplateId, locationId } });
+        } catch (error) {
+            console.error('[rossSeedFirstWorkflow] error:', error.message);
+            const statusCode = (error.message.includes('access denied') || error.message.includes('Unauthorized')) ? 403 : 500;
+            res.status(statusCode).json({ error: error.message });
+        }
+    });
+});
+
+/**
  * Create a custom workflow from scratch (no template)
  * Access: All admins
  */
