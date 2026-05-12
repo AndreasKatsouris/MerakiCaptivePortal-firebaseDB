@@ -291,6 +291,36 @@ ross/
 
 ---
 
+## Day-zero auto-activation
+
+A new operator who completes signup via `registerUser` is automatically
+opted into one seeded workflow so they land on ROSS with something
+runnable. Mechanics:
+
+- Template selection is driven by an RTDB pointer at
+  `ross/config/firstWorkflowTemplateId`. The pointer is set once per
+  environment by `functions/seeds/ross-config-set-first-workflow.js`,
+  which resolves the "Daily Opening Checklist" template by name.
+- The seed runs inline inside `registerUser`, immediately after the
+  user's first location is created. It writes the workflow, the
+  ownerIndex, the per-location index, an `onboarding-progress/{uid}/
+  firstWorkflowSeededAt` marker, and an audit-log entry at
+  `ross/auditLog/firstWorkflowSeeded/{pushId}` — all in a single
+  atomic `update()`.
+- Failure is silent and logged. If the pointer is absent, the template
+  is missing, the template is misconfigured to All-in, or any RTDB
+  call throws, the seed is skipped and the user lands on an empty
+  Playbook (same as the pre-day-zero behaviour). `registerUser` itself
+  always succeeds.
+- Admin-provisioned accounts via `createUserAccount` are NOT seeded —
+  that flow has different stakeholders and may already attach workflows.
+
+Operator can swap the seeded template at any time by re-running the
+setup script after editing its `SEED_TEMPLATE_NAME` constant, or by
+writing the pointer directly via the Firebase Console.
+
+---
+
 ## Tier gating (Phase 6 PR 1A — shipped 2026-05-11)
 
 Templates carry a `tier: 'free' | 'all-in'` field (required, `.validate`-enforced).

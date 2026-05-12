@@ -52,6 +52,40 @@ export async function loadTiers() {
   }
 }
 
+// Day-zero auto-activation — best-effort. Called by both signup paths
+// after location writes complete. Server resolves templateId +
+// locationId; client only needs to authenticate. Capped at 1500ms so
+// a cold-start CF can't block the post-signup redirect — if the call
+// is still in flight when the cap hits, signup proceeds and the seed
+// lands in the background (workflow appears on next ROSS read).
+const SEED_TIMEOUT_MS = 1500
+async function seedFirstWorkflow(user) {
+  const work = (async () => {
+    try {
+      const idToken = await user.getIdToken()
+      const url = 'https://us-central1-merakicaptiveportal-firebasedb.cloudfunctions.net/rossSeedFirstWorkflow'
+      const res = await fetch(url, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${idToken}`,
+          'Content-Type': 'application/json',
+        },
+        body: '{}',
+      })
+      const json = await res.json().catch(() => ({}))
+      if (!res.ok) {
+        console.warn('[Signup] day-zero seed CF returned error:', res.status, json)
+      } else {
+        console.log('[Signup] day-zero seed result:', json.result || json)
+      }
+    } catch (err) {
+      console.warn('[Signup] day-zero seed call failed (non-blocking):', err)
+    }
+  })()
+  const timeout = new Promise((resolve) => setTimeout(resolve, SEED_TIMEOUT_MS))
+  await Promise.race([work, timeout])
+}
+
 // Creates the auth user, runs the dual-path RTDB write, and returns the
 // authenticated user object. Caller (the Vue component) handles toasts
 // and routing.
@@ -111,6 +145,7 @@ export async function createAccount({ formData, tier, tierData = {} }) {
   }
 
   if (registrationSuccessful) {
+    await seedFirstWorkflow(freshUser)
     return { user: freshUser }
   }
 
@@ -227,5 +262,6 @@ export async function createAccount({ formData, tier, tierData = {} }) {
   await set(newLocationRef, locationData)
   await set(ref(rtdb, `userLocations/${freshUser.uid}/${newLocationRef.key}`), true)
 
+  await seedFirstWorkflow(freshUser)
   return { user: freshUser }
 }

@@ -491,6 +491,10 @@
         ".read": "auth != null",
         ".write": false
       },
+      "config": {
+        ".read": false,
+        ".write": false
+      },
       "workflows": {
         "$ownerId": {
           ".read": "auth != null && auth.uid === $ownerId",

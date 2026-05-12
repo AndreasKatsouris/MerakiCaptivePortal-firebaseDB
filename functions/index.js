@@ -3513,6 +3513,7 @@ exports.rossCreateTemplate = ross.rossCreateTemplate;
 exports.rossUpdateTemplate = ross.rossUpdateTemplate;
 exports.rossDeleteTemplate = ross.rossDeleteTemplate;
 exports.rossActivateWorkflow = ross.rossActivateWorkflow;
+exports.rossSeedFirstWorkflow = ross.rossSeedFirstWorkflow;
 exports.rossCreateWorkflow = ross.rossCreateWorkflow;
 exports.rossUpdateWorkflow = ross.rossUpdateWorkflow;
 exports.rossDeleteWorkflow = ross.rossDeleteWorkflow;

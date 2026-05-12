@@ -14,6 +14,7 @@ const { onSchedule } = require('firebase-functions/v2/scheduler');
 const admin = require('firebase-admin');
 const cors = require('cors')({ origin: true });
 const { validateTier, userCanActivate, filterTemplatesByTier } = require('./ross-tier');
+const { buildWorkflowRecord, buildTaskFromSubtask } = require('./ross-workflow-builder');
 
 const db = admin.database();
 
@@ -360,39 +361,6 @@ exports.rossDeleteTemplate = onRequest(async (req, res) => {
     });
 });
 
-// ============================================
-// SUBTASK → TASK PROPAGATION (Phase 4e.2)
-// ============================================
-//
-// Single source of truth for building a per-location task object from
-// a template subtask or workflow create-mode subtask. Centralised so
-// rossActivateWorkflow + rossCreateWorkflow stay in lockstep — drift
-// between create-from-scratch and activate-from-template is the
-// highest-leverage risk on this code path.
-//
-// inputType is enum-validated upstream by validateSubtasksInputTypes
-// at write time (rossCreateWorkflow / rossCreateTemplate /
-// rossUpdateTemplate). rossActivateWorkflow stays defensive — invalid
-// historical values fall back to 'checkbox' rather than rejecting the
-// activation. inputConfig is stored verbatim (matches rossManageTask).
-function buildTaskFromSubtask(subtask, nextDueDate) {
-    const rawType = subtask.inputType;
-    const inputType = VALID_INPUT_TYPES.includes(rawType) ? rawType : 'checkbox';
-    const inputConfig = (subtask.inputConfig && typeof subtask.inputConfig === 'object')
-        ? subtask.inputConfig
-        : {};
-    return {
-        title: (subtask.title || '').trim() || 'Untitled Task',
-        status: 'pending',
-        dueDate: nextDueDate + ((subtask.daysOffset || 0) * 86400000),
-        completedAt: null,
-        assignedTo: null,
-        order: subtask.order || 1,
-        inputType,
-        inputConfig,
-    };
-}
-
 // Validate inputType enum on every subtask in an array. Returns an
 // error string or null. Used at every write path that accepts
 // subtasks (rossCreateWorkflow, rossCreateTemplate, rossUpdateTemplate)
@@ -456,62 +424,142 @@ exports.rossActivateWorkflow = onRequest(async (req, res) => {
                 });
             }
 
-            const workflowId = generateId();
-            const now = Date.now();
-
-            // Build per-location records with tasks from template subtasks.
-            // Phase 4e.2: inputType + inputConfig now propagate through
-            // buildTaskFromSubtask (defensive fallback to 'checkbox' for
-            // legacy templates with no inputType set).
-            const locations = {};
-            locationIds.forEach((locationId, idx) => {
-                const tasks = {};
-                if (Array.isArray(template.subtasks)) {
-                    template.subtasks.forEach(subtask => {
-                        const taskId = generateId();
-                        tasks[taskId] = buildTaskFromSubtask(subtask, nextDueDate);
-                    });
-                }
-                locations[locationId] = {
-                    locationName: (locationNames && locationNames[idx]) || locationId,
-                    locationAssignedTo: (locationAssignedTo && locationAssignedTo[locationId]) || null,
-                    status: 'active',
-                    nextDueDate,
-                    activatedAt: now,
-                    tasks
-                };
+            const { workflowId, workflowData, atomicWrite } = buildWorkflowRecord({
+                template,
+                locationIds,
+                locationNames,
+                locationAssignedTo,
+                nextDueDate,
+                uid,
+                name,
+                description,
+                customInterval,
+                daysBeforeAlert,
+                notifyPhone,
+                notifyEmail,
+                workflowId: generateId(),
+                validInputTypes: VALID_INPUT_TYPES,
+                generateTaskId: generateId,
+                now: Date.now(),
             });
-
-            const workflowData = {
-                workflowId,
-                templateId,
-                ownerId: uid,
-                name: (name || template.name).trim(),
-                description: ((description != null ? description : template.description) || '').trim() || null,
-                category: template.category,
-                recurrence: template.recurrence,
-                customInterval: (Number.isInteger(customInterval) && customInterval > 0) ? customInterval : null,
-                notificationChannels: ['in_app'],
-                notifyPhone: notifyPhone || null,
-                notifyEmail: notifyEmail || null,
-                daysBeforeAlert: Array.isArray(daysBeforeAlert)
-                    ? daysBeforeAlert.filter(d => Number.isInteger(d) && d > 0)
-                    : (Array.isArray(template.daysBeforeAlert) ? template.daysBeforeAlert : [30, 7]),
-                createdAt: now,
-                updatedAt: now,
-                locations
-            };
-
-            const atomicWrite = {
-                [`ross/workflows/${uid}/${workflowId}`]: workflowData,
-                [`ross/ownerIndex/${uid}`]: true,
-                ...locationIndexUpdates(workflowId, uid, locationIds)
-            };
             await db.ref().update(atomicWrite);
             res.json({ result: { success: true, workflowId, workflow: workflowData } });
         } catch (error) {
             console.error('[rossActivateWorkflow] Error:', error.message);
             const statusCode = (error.message.includes('Admin') || error.message.includes('Super Admin') || error.message.includes('access denied')) ? 403 : 500;
+            res.status(statusCode).json({ error: error.message });
+        }
+    });
+});
+
+/**
+ * Day-zero auto-activation. Called by signup-service.js immediately
+ * after the user's first location is created (covers both the
+ * registerUser-callable success path AND the direct-RTDB-writes fallback
+ * path). Server resolves locationId from userLocations/{uid}, reads
+ * ross/config/firstWorkflowTemplateId pointer, fetches the template,
+ * and atomically writes a seeded workflow + idempotency marker +
+ * audit-log entry.
+ *
+ * Idempotency: onboarding-progress/{uid}/firstWorkflowSeededAt is
+ * checked before any work and written inside the atomic update. The
+ * CF is safe to call multiple times — subsequent calls return
+ * { skipped: true, reason: 'already_seeded' }.
+ *
+ * Best-effort: every skip branch returns 200 with a structured reason.
+ * The CALLER (signup-service.js) wraps its fetch in try/catch and
+ * never blocks the signup flow on a seed failure.
+ *
+ * Access: authenticated user only.
+ */
+exports.rossSeedFirstWorkflow = onRequest(async (req, res) => {
+    return cors(req, res, async () => {
+        if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' });
+        try {
+            const decodedToken = await verifyAuthToken(req);
+            const { uid } = await verifyUserOrAdmin(decodedToken);
+
+            // Idempotency pre-check.
+            const seededSnap = await db.ref(`onboarding-progress/${uid}/firstWorkflowSeededAt`).once('value');
+            if (seededSnap.exists()) {
+                console.warn('[rossSeedFirstWorkflow] skipped:', { uid, reason: 'already_seeded' });
+                return res.json({ result: { skipped: true, reason: 'already_seeded' } });
+            }
+
+            // Resolve location from userLocations/{uid} — take the first owned location.
+            const userLocsSnap = await db.ref(`userLocations/${uid}`).once('value');
+            const userLocs = userLocsSnap.val() || {};
+            const locationIds = Object.keys(userLocs);
+            if (locationIds.length === 0) {
+                console.warn('[rossSeedFirstWorkflow] skipped:', { uid, reason: 'no_locations' });
+                return res.json({ result: { skipped: true, reason: 'no_locations' } });
+            }
+            const locationId = locationIds[0];
+
+            // Resolve location name for the workflow record.
+            const locationSnap = await db.ref(`locations/${locationId}`).once('value');
+            const locationName = (locationSnap.val() && locationSnap.val().name) || locationId;
+
+            // Resolve seed template via pointer.
+            const pointerSnap = await db.ref('ross/config/firstWorkflowTemplateId').once('value');
+            const seedTemplateId = pointerSnap.val();
+            if (!seedTemplateId) {
+                console.warn('[rossSeedFirstWorkflow] skipped:', { uid, reason: 'pointer_absent' });
+                return res.json({ result: { skipped: true, reason: 'pointer_absent' } });
+            }
+
+            const templateSnap = await db.ref(`ross/templates/${seedTemplateId}`).once('value');
+            if (!templateSnap.exists()) {
+                console.warn('[rossSeedFirstWorkflow] skipped:', { uid, reason: 'template_missing', templateId: seedTemplateId });
+                return res.json({ result: { skipped: true, reason: 'template_missing' } });
+            }
+
+            const template = templateSnap.val();
+            if (template.tier && template.tier !== 'free') {
+                console.warn('[rossSeedFirstWorkflow] skipped:', { uid, reason: 'tier_mismatch', templateTier: template.tier });
+                return res.json({ result: { skipped: true, reason: 'tier_mismatch' } });
+            }
+
+            const now = Date.now();
+            const seedWorkflowId = generateId();
+            const generateTaskId = generateId;
+
+            const { workflowId, atomicWrite } = buildWorkflowRecord({
+                template,
+                locationIds: [locationId],
+                locationNames: [locationName],
+                locationAssignedTo: null,
+                nextDueDate: now,
+                uid,
+                name: null,
+                description: null,
+                customInterval: null,
+                daysBeforeAlert: null,
+                notifyPhone: null,
+                notifyEmail: null,
+                workflowId: seedWorkflowId,
+                validInputTypes: VALID_INPUT_TYPES,
+                generateTaskId,
+                now,
+            });
+
+            atomicWrite[`onboarding-progress/${uid}/firstWorkflowSeededAt`] =
+                admin.database.ServerValue.TIMESTAMP;
+            const auditKey = db.ref('ross/auditLog/firstWorkflowSeeded').push().key;
+            atomicWrite[`ross/auditLog/firstWorkflowSeeded/${auditKey}`] = {
+                uid,
+                templateId: seedTemplateId,
+                workflowId,
+                locationId,
+                seededAt: admin.database.ServerValue.TIMESTAMP,
+            };
+
+            await db.ref().update(atomicWrite);
+            console.log('[rossSeedFirstWorkflow] seeded:', { uid, workflowId, templateId: seedTemplateId, locationId });
+            res.json({ result: { success: true, workflowId, templateId: seedTemplateId, locationId } });
+        } catch (error) {
+            console.error('[rossSeedFirstWorkflow] error:', error.message);
+            const statusCode = (error.message.includes('access denied') || error.message.includes('Unauthorized')) ? 403 : 500;
             res.status(statusCode).json({ error: error.message });
         }
     });
@@ -552,7 +600,7 @@ exports.rossCreateWorkflow = onRequest(async (req, res) => {
                 if (Array.isArray(subtasks)) {
                     subtasks.forEach(subtask => {
                         const taskId = generateId();
-                        tasks[taskId] = buildTaskFromSubtask(subtask, nextDueDate);
+                        tasks[taskId] = buildTaskFromSubtask(subtask, nextDueDate, VALID_INPUT_TYPES);
                     });
                 }
                 locations[locationId] = {
@@ -1533,3 +1581,5 @@ exports.rossGetStaff = onRequest(async (req, res) => {
         }
     });
 });
+
+module.exports.VALID_INPUT_TYPES = VALID_INPUT_TYPES;
