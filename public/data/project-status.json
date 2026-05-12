@@ -1,11 +1,11 @@
 {
-  "lastUpdated": "2026-05-11",
-  "lastUpdatedNote": "PR #46 feat/post-login-router-rollout open + under review. PR 6 (drop wizard for new accounts) folded into PR 4 after review surfaced a fresh-signup routing bug whose fix was exactly the PR 6 work — resolvePostLoginDestination rewritten with 3-state helloSeen semantics (false=hello, true=home/wizard-skipped, missing=legacy back-compat). 21/21 router tests pass. PR 5 (sidebar cleanup) is the only remaining Phase 5 PR.",
+  "lastUpdated": "2026-05-12",
+  "lastUpdatedNote": "PR #51 (Phase 6 PR 1A — ROSS template tier-gating mechanism) merged. Schema + 3 gate points + audit log + editor field + KB docs shipped end-to-end. Gate is functional but inert until PR 1B flips templates to All-in. Phase 5 closed previously (PR #46 + #48). Phase 6 sprint active.",
   "sprint": {
     "goal": "Effective implementation of Hi-Fi v2, with ROSS as the central post-login surface for every subscribed user",
     "started": "2026-04-30",
     "state": "active",
-    "summary": "Concierge-first IA. v1 admin tabs reframed as 'Ross's playbook' — the rules and procedures the future AI agent runs against. Six v1 tabs collapse to three v2 destinations behind the concierge home: Playbook / Activity / People. Phase 5 reframed 2026-05-02 — the actual scope is making ROSS the post-login destination for the first time + Hi-Fi-rewriting the public→ROSS funnel (homepage, signup, wizard) and stripping the module-launcher pattern from ROSS sidebar. Workflows are the product; v1 modules become workflow step types over time. Two tiers only: Free (full UI + 5 starter templates), All-in (full library)."
+    "summary": "Concierge-first IA. v1 admin tabs reframed as 'Ross's playbook' — the rules and procedures the future AI agent runs against. Phase 5 closed 2026-05-11 with all five cleanup PRs merged (#39 / #42 / #44 / #46 / #48): ROSS is now the post-login destination end-to-end; homepage / signup / sidebar all Hi-Fi-promoted. Phase 6 active: Playbook UX enrichment + template library curation. PR 1A (the mechanism) shipped 2026-05-12; next is PR 1B (curation — flip some templates to All-in). Workflows are the product; v1 modules become workflow step types over time. Two tiers only: Free (full UI + 5 starter templates), All-in (full library)."
   },
   "phases": [
     {
@@ -41,14 +41,14 @@
     {
       "id": 5,
       "name": "ROSS v2 — central-funnel cleanup",
-      "status": "in_progress",
-      "summary": "Spec locked 2026-05-02. Sequenced PRs: post-login router (#39, merged), signup v2 Hi-Fi + dynamic tier writes (#42, merged), homepage v2 Hi-Fi + reused public hello (#44, merged), router rollout + drop wizard for new accounts (PR #46, open + under review — PR 6 folded in after review bug), ROSS sidebar cleanup (≈#47). Q1–Q5 product questions resolved: Free = full UI + 5 starter templates, day-zero = pre-populated demo workflow, v1 access = admin-only via admin-dashboard, hello = same component two data feeds (delivered in PR #44), ROSS_IS_HOME flag wired for rollback safety. PR 6 collapse decision (2026-05-11): the router contract was incoherent without the 3-state helloSeen semantics — folding in keeps the matrix consistent rather than landing a known-broken contract then patching it."
+      "status": "done",
+      "summary": "Closed 2026-05-11. Five PRs all merged: post-login router (#39), signup v2 Hi-Fi + dynamic tier writes (#42), homepage v2 Hi-Fi + reused public hello (#44), router rollout + drop wizard for fresh signups (#46, PR 4 + PR 6 folded), ROSS sidebar cleanup (#48). ROSS is now the post-login destination end-to-end: fresh signup → hello → ross; existing signed-in users → ross; sidebar collapsed to Today + Ross's brain; module deep-links removed from ROSS primary nav. Q1–Q5 product questions resolved: Free = full UI + 5 starter templates, day-zero = pre-populated demo workflow, v1 access = admin-only via admin-dashboard, hello = same component two data feeds, ROSS_IS_HOME flag wired for rollback safety."
     },
     {
       "id": 6,
       "name": "ROSS v2 — playbook UX enrichment + template library curation",
-      "status": "planned",
-      "summary": "Next sprint after Phase 5 cleanup. The Runs server surface (rossCreateRun/rossSubmitResponse + auto-flag + 422-on-required-note) is already shipped — Phase 6 is the operator-facing UX layer on top: tier-gated template list (Free=5/All-in=full from existing seed), day-zero auto-activation of one starter template, richer run execution UI honouring all 10 inputTypes, and concierge home cards driven by real activated workflows instead of scripted findings. Vocabulary per public/kb/features/ROSS.md: Templates → Workflows → Tasks → Runs. Compliance Sweep recommended as first curated template."
+      "status": "in_progress",
+      "summary": "Active sprint. PR 1A (#51) shipped 2026-05-12 — the tier-gating mechanism: `tier:'free'|'all-in'` schema, server filter on rossGetTemplates, activate gate on rossActivateWorkflow with audit log, symmetric validators on Create/Update Template, editor field, defensive client filter, KB docs. Gate is functional but inert until PR 1B flips templates. Next: PR 1B — curate the starter library (decide which templates ship Free vs which extend to All-in). The Runs server surface (rossCreateRun/rossSubmitResponse + auto-flag + 422-on-required-note) is already shipped. Vocabulary per public/kb/features/ROSS.md: Templates → Workflows → Tasks → Runs. Compliance Sweep recommended as first curated template."
     },
     {
       "id": 7,
@@ -74,41 +74,52 @@
     { "id": "phase-5-pr1-router", "label": "PR 1 (PR #39) — post-login-router + hello auth gate + helloSeen field", "done": true, "phase": 5 },
     { "id": "phase-5-pr2-signup", "label": "PR 2 (PR #42) — signup v2 Hi-Fi Vue 3 rewrite + dynamic tier writes + registerUser CF closure + .validate rule + HfSelect/HfCheckbox", "done": true, "phase": 5 },
     { "id": "phase-5-pr3-homepage", "label": "PR 3 (PR #44) — homepage v2 Hi-Fi promotion + workflow-centric copy + dynamic pricing + reused public hello + typographic hero panel", "done": true, "phase": 5 },
-    { "id": "phase-5-pr4-rollout", "label": "PR 4 + PR 6 folded (PR #46) — router rollout + drop wizard for fresh signups (3-state helloSeen semantics) — OPEN, under review", "done": false, "phase": 5 },
-    { "id": "phase-5-pr5-sidebar", "label": "PR 5 (≈#47) — ROSS sidebar cleanup (Today + Ross's brain) — only remaining Phase 5 PR after #46 merges", "done": false, "phase": 5 },
-    { "id": "phase-6-templates", "label": "Phase 6 — Workflow runner + step types + starter template library", "done": false, "phase": 6 }
+    { "id": "phase-5-pr4-rollout", "label": "PR 4 + PR 6 folded (PR #46) — router rollout + drop wizard for fresh signups (3-state helloSeen semantics)", "done": true, "phase": 5 },
+    { "id": "phase-5-pr5-sidebar", "label": "PR 5 (PR #48) — ROSS sidebar cleanup (Today + Ross's brain) + footer wired to auth.currentUser", "done": true, "phase": 5 },
+    { "id": "phase-6-pr1a-tier-mechanism", "label": "Phase 6 PR 1A (PR #51) — template tier-gating mechanism: schema, three gate points (read/activate/client), audit log, editor field, KB docs", "done": true, "phase": 6 },
+    { "id": "phase-6-pr1b-curate", "label": "Phase 6 PR 1B — curate starter library (decide Free vs All-in for the 13 templates; flip some to All-in)", "done": false, "phase": 6 },
+    { "id": "phase-6-day-zero", "label": "Phase 6 — day-zero auto-activation of one starter template at account creation", "done": false, "phase": 6 },
+    { "id": "phase-6-run-ui", "label": "Phase 6 — operator-facing Run execution UI honouring all 10 inputTypes (number/temperature with auto-flag, dropdown, rating, photo/signature placeholders)", "done": false, "phase": 6 },
+    { "id": "phase-6-home-cards", "label": "Phase 6 — concierge home cards driven by real activated workflows (replace scripted findings)", "done": false, "phase": 6 }
   ],
-  "inProgress": [
+  "inProgress": [],
+  "recentlyCompleted": [
+    { "title": "ROSS template tier-gating mechanism (Phase 6 PR 1A) — schema, three gate points (read/activate/client), audit log, editor field, KB docs", "pr": 51, "mergedAt": "2026-05-12" },
+    { "title": "docs(ross-v2): tier-gating mechanism spec for ROSS templates (Phase 6 PR 1A)", "pr": 50, "mergedAt": "2026-05-11" },
+    { "title": "docs(ross-v2): post-PR-48 reflect cycle — Phase 5 CLOSED", "pr": 49, "mergedAt": "2026-05-11" },
+    { "title": "ROSS sidebar cleanup — collapse to Today + Ross's brain + footer wired to auth.currentUser (Phase 5 PR 5, closes Phase 5)", "pr": 48, "mergedAt": "2026-05-11" },
+    { "title": "post-login router rollout + skip wizard for fresh signups (Phase 5 PR 4 + PR 6 folded)", "pr": 46, "mergedAt": "2026-05-11" }
+  ],
+  "bugs": [
     {
-      "title": "Phase 5 PR 4 + PR 6 (folded) — router rollout + drop wizard for new accounts",
-      "branch": "feat/post-login-router-rollout",
-      "pr": 46,
-      "state": "open-under-review",
-      "notes": "Two commits: (1) wire 5 redirect sites to routePostLogin + deprecation banner on user-dashboard.html; (2) review fixes + fold PR 6 in (router rewrite with 3-state helloSeen semantics, hello continueHref default → /ross.html, dedupe RTDB reads, AUTHENTICATION_FLOW.md sync). Build green; 21/21 router tests pass. Awaiting operator smoke-test on preview channel pr46-feat-post-login-r-v0ap5l8a.web.app + merge."
+      "title": "feature-access-control.js:64 — dynamic import with ?v=${Date.now()} cache-buster breaks Vite build-time analysis",
+      "severity": "medium",
+      "discoveredAt": "2026-05-11",
+      "discoveredOn": "PR #48 preview review",
+      "blockingSprint": false,
+      "notes": "Vite can't statically analyse a runtime-computed path — throws `Unknown variable dynamic import` on every checkFeatureAccess call post-build. Fix is one line (drop the ?v=…; Vite content-hashes outputs natively) but the file is shared infra. Needs own focused PR with consumer audit."
     }
   ],
-  "recentlyCompleted": [
-    { "title": "homepage v2 — Hi-Fi promotion + workflow-centric copy + dynamic pricing + reused public hello (Phase 5 PR 3)", "pr": 44, "mergedAt": "2026-05-05" },
-    { "title": "docs(ross-v2): post-merge sync + reflect cycle after PR #42", "pr": 43, "mergedAt": "2026-05-05" },
-    { "title": "signup v2 — Hi-Fi Vue 3 rewrite + tier writes + registerUser update + .validate rule (Phase 5 PR 2)", "pr": 42, "mergedAt": "2026-05-05" },
-    { "title": "docs(ross-v2): close out PR #40, advance PR numbers", "pr": 41, "mergedAt": "2026-05-02" },
-    { "title": "docs(ross-v2): post-merge sync + reflect cycle after PR #39", "pr": 40, "mergedAt": "2026-05-02" }
-  ],
-  "bugs": [],
   "backlog": {
     "high": [
+      "Phase 6 PR 1B — curate starter library (decide Free vs All-in for the 13 seeded templates)",
+      "Phase 6 — day-zero auto-activation of one starter template at signup completion",
+      "Phase 6 — operator-facing Run execution UI for all 10 inputTypes",
+      "Phase 6 — concierge home cards driven by real activated workflows",
       "Food cost open PR — review and merge",
-      "Chart.js retirement (soak ends ~2026-05-07)",
-      "Phase 6 — workflow templates (after Phase 5 cleanup ships; spec to be drafted)"
+      "Chart.js retirement (soak ended ~2026-05-07; execute removal per CHARTJS_REMOVAL_AUDIT.md — 16 of 23 sites have v2 replacements)"
     ],
     "medium": [
-      "Hi-Fi v2 → v1 promotions (guests, queue, analytics, campaigns, receipts) — partially superseded by Phase 5 PR 5 sidebar cleanup which removes them from ROSS nav",
+      "Fold readUserTier into verifyUserOrAdmin to eliminate the extra RTDB read on tier-gated handlers (PR #51 review finding #3 — touches 10+ handlers, perf-refactor PR)",
+      "Backfill script polish: pre-flight check warning if rules deployed before backfill + pull databaseURL from process.env with fallback (PR #51 review findings #7/#8)",
+      "Hi-Fi v2 → v1 promotions (guests, queue, analytics, campaigns, receipts) — partially superseded by Phase 5 PR 5 sidebar cleanup",
       "WhatsApp template UI polish",
       "QA cleanup (~65 test artifact files)",
       "Project status auto-derive from PROJECT_BACKLOG.md",
       "Factor out fetchLocationNames helper across activity/playbook/people stores",
       "HfModal / HfConfirm design-system components — v2 needs a Hi-Fi-native modal pattern; SweetAlert2 is v1-only",
-      "Catalog ROSS Cloud Functions in CLOUD_FUNCTIONS_CATALOG.md (rossManageTask, rossActivateWorkflow, etc.)"
+      "Catalog ROSS Cloud Functions in CLOUD_FUNCTIONS_CATALOG.md (rossManageTask, rossActivateWorkflow, ross-tier helpers, audit log node, etc.)",
+      "Build /profile-settings.html for ROSS user account (sidebar footer gear icon non-interactive until shipped — PR #48 follow-up)"
     ],
     "low": [
       "Subscription admin charts migration",
