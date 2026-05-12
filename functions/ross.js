@@ -14,7 +14,7 @@ const { onSchedule } = require('firebase-functions/v2/scheduler');
 const admin = require('firebase-admin');
 const cors = require('cors')({ origin: true });
 const { validateTier, userCanActivate, filterTemplatesByTier } = require('./ross-tier');
-const { buildWorkflowRecord } = require('./ross-workflow-builder');
+const { buildWorkflowRecord, buildTaskFromSubtask } = require('./ross-workflow-builder');
 
 const db = admin.database();
 
@@ -361,39 +361,6 @@ exports.rossDeleteTemplate = onRequest(async (req, res) => {
     });
 });
 
-// ============================================
-// SUBTASK → TASK PROPAGATION (Phase 4e.2)
-// ============================================
-//
-// Single source of truth for building a per-location task object from
-// a template subtask or workflow create-mode subtask. Centralised so
-// rossActivateWorkflow + rossCreateWorkflow stay in lockstep — drift
-// between create-from-scratch and activate-from-template is the
-// highest-leverage risk on this code path.
-//
-// inputType is enum-validated upstream by validateSubtasksInputTypes
-// at write time (rossCreateWorkflow / rossCreateTemplate /
-// rossUpdateTemplate). rossActivateWorkflow stays defensive — invalid
-// historical values fall back to 'checkbox' rather than rejecting the
-// activation. inputConfig is stored verbatim (matches rossManageTask).
-function buildTaskFromSubtask(subtask, nextDueDate) {
-    const rawType = subtask.inputType;
-    const inputType = VALID_INPUT_TYPES.includes(rawType) ? rawType : 'checkbox';
-    const inputConfig = (subtask.inputConfig && typeof subtask.inputConfig === 'object')
-        ? subtask.inputConfig
-        : {};
-    return {
-        title: (subtask.title || '').trim() || 'Untitled Task',
-        status: 'pending',
-        dueDate: nextDueDate + ((subtask.daysOffset || 0) * 86400000),
-        completedAt: null,
-        assignedTo: null,
-        order: subtask.order || 1,
-        inputType,
-        inputConfig,
-    };
-}
-
 // Validate inputType enum on every subtask in an array. Returns an
 // error string or null. Used at every write path that accepts
 // subtasks (rossCreateWorkflow, rossCreateTemplate, rossUpdateTemplate)
@@ -520,7 +487,7 @@ exports.rossCreateWorkflow = onRequest(async (req, res) => {
                 if (Array.isArray(subtasks)) {
                     subtasks.forEach(subtask => {
                         const taskId = generateId();
-                        tasks[taskId] = buildTaskFromSubtask(subtask, nextDueDate);
+                        tasks[taskId] = buildTaskFromSubtask(subtask, nextDueDate, VALID_INPUT_TYPES);
                     });
                 }
                 locations[locationId] = {
