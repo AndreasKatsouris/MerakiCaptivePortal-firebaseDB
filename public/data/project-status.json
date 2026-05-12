@@ -1,11 +1,11 @@
 {
   "lastUpdated": "2026-05-12",
-  "lastUpdatedNote": "PR #55 (Phase 6 PR 1C — tier-gated template list + Hi-Fi upgrade page) merged. Locked-card upsell UX live: Free users see all 13 templates in the v2 Playbook, 8 of them dimmed with 'Upgrade to All-in' ghost button routing to a new /upgrade.html comparison page. PR 1A (mechanism) and PR 1B (curated split) already shipped. Tier-gate is now enforced AND visible end-to-end. Phase 6 sprint active — next: day-zero auto-activation.",
+  "lastUpdatedNote": "PR #58 (Phase 6 PR 2 — day-zero auto-activation) merged. Fresh signups now land on ROSS with a seeded Daily Opening Checklist workflow. Architecture pivoted mid-PR after preview testing revealed registerUser callable has a pre-existing v1-vs-v2 signature bug that throws unauthenticated on every call — signup-service.js silently falls back to direct RTDB writes. Hoisted the seed into a new dedicated CF (rossSeedFirstWorkflow) called from signup-service.js after both signup paths. RTDB pointer set in prod, operator-verified end-to-end.",
   "sprint": {
     "goal": "Effective implementation of Hi-Fi v2, with ROSS as the central post-login surface for every subscribed user",
     "started": "2026-04-30",
     "state": "active",
-    "summary": "Concierge-first IA. v1 admin tabs reframed as 'Ross's playbook' — the rules and procedures the future AI agent runs against. Phase 5 closed 2026-05-11 with all five cleanup PRs merged (#39 / #42 / #44 / #46 / #48): ROSS is now the post-login destination end-to-end; homepage / signup / sidebar all Hi-Fi-promoted. Phase 6 active: Playbook UX enrichment + template library curation. PR 1A (the mechanism) shipped 2026-05-12; next is PR 1B (curation — flip some templates to All-in). Workflows are the product; v1 modules become workflow step types over time. Two tiers only: Free (full UI + 5 starter templates), All-in (full library)."
+    "summary": "Concierge-first IA. v1 admin tabs reframed as 'Ross's playbook' — the rules and procedures the future AI agent runs against. Phase 5 closed 2026-05-11 with all five cleanup PRs merged: ROSS is the post-login destination end-to-end. Phase 6 in progress: PRs 1A/1B/1C/2 shipped (tier-gating mechanism + curated 5/8 split + locked-card upsell UX + day-zero seed). Workflows are the product; v1 modules become workflow step types over time. Two tiers only: Free (full UI + 5 starter templates), All-in (full library). Next: operator-facing Run execution UI, then concierge home active-run surfacing."
   },
   "phases": [
     {
@@ -42,13 +42,13 @@
       "id": 5,
       "name": "ROSS v2 — central-funnel cleanup",
       "status": "done",
-      "summary": "Closed 2026-05-11. Five PRs all merged: post-login router (#39), signup v2 Hi-Fi + dynamic tier writes (#42), homepage v2 Hi-Fi + reused public hello (#44), router rollout + drop wizard for fresh signups (#46, PR 4 + PR 6 folded), ROSS sidebar cleanup (#48). ROSS is now the post-login destination end-to-end: fresh signup → hello → ross; existing signed-in users → ross; sidebar collapsed to Today + Ross's brain; module deep-links removed from ROSS primary nav. Q1–Q5 product questions resolved: Free = full UI + 5 starter templates, day-zero = pre-populated demo workflow, v1 access = admin-only via admin-dashboard, hello = same component two data feeds, ROSS_IS_HOME flag wired for rollback safety."
+      "summary": "Closed 2026-05-11. Five PRs all merged: post-login router (#39), signup v2 Hi-Fi + dynamic tier writes (#42), homepage v2 Hi-Fi + reused public hello (#44), router rollout + drop wizard for fresh signups (#46, PR 4 + PR 6 folded), ROSS sidebar cleanup (#48). ROSS is now the post-login destination end-to-end."
     },
     {
       "id": 6,
       "name": "ROSS v2 — playbook UX enrichment + template library curation",
       "status": "in_progress",
-      "summary": "Active sprint. PR 1A (#51, 2026-05-12) shipped the tier-gating mechanism. PR 1B (#53, 2026-05-12) curated the 5 Free / 8 All-in split. PR 1C (#55, 2026-05-12) shipped the locked-card upsell UX in the v2 Playbook tab + Hi-Fi /upgrade.html comparison page (email CTA to andreas@sparksclub.co.za, D-ready for self-service checkout). Tier-gate is now enforced AND visible. Next: day-zero auto-activation (seed one starter workflow per new account), then operator-facing Run execution UI for all 10 inputTypes, then concierge home cards driven by real activated workflows. The Runs server surface is already shipped. Vocabulary per public/kb/features/ROSS.md: Templates → Workflows → Tasks → Runs."
+      "summary": "Active sprint. PR 1A (#51) shipped the tier-gating mechanism. PR 1B (#53) curated the 5 Free / 8 All-in split. PR 1C (#55) shipped the locked-card upsell UX + /upgrade.html. PR 2 (#58, 2026-05-12) shipped day-zero auto-activation — new rossSeedFirstWorkflow CF, called from signup-service.js after both signup paths; RTDB pointer ross/config/firstWorkflowTemplateId drives template selection. Originally inlined inside registerUser; preview testing exposed that the callable has been throwing unauthenticated on every call (v1-vs-v2 signature bug from firebase-functions v7), and signup-service.js silently falls back — required mid-PR architecture pivot to a dedicated CF. Next: operator-facing Run execution UI for all 10 inputTypes, then concierge home cards driven by real activated workflows. The Runs server surface is already shipped. Vocabulary per public/kb/features/ROSS.md: Templates → Workflows → Tasks → Runs."
     },
     {
       "id": 7,
@@ -79,19 +79,43 @@
     { "id": "phase-6-pr1a-tier-mechanism", "label": "Phase 6 PR 1A (PR #51) — template tier-gating mechanism: schema, three gate points (read/activate/client), audit log, editor field, KB docs", "done": true, "phase": 6 },
     { "id": "phase-6-pr1b-curate", "label": "Phase 6 PR 1B (PR #53) — curated starter library (5 Free / 8 All-in split) + folded backfill URL fix on PR #51's sibling", "done": true, "phase": 6 },
     { "id": "phase-6-pr1c-locked-list", "label": "Phase 6 PR 1C (PR #55) — tier-gated template list with locked-card upsell UX + Hi-Fi /upgrade.html comparison page (email CTA, ?from=template&id= pre-fill)", "done": true, "phase": 6 },
-    { "id": "phase-6-day-zero", "label": "Phase 6 — day-zero auto-activation of one starter template at account creation", "done": false, "phase": 6 },
+    { "id": "phase-6-day-zero", "label": "Phase 6 PR 2 (PR #58) — day-zero auto-activation: new rossSeedFirstWorkflow CF + signup-service.js integration + buildLocationsFromTemplate/buildWorkflowRecord helper extraction + RTDB pointer at ross/config/firstWorkflowTemplateId", "done": true, "phase": 6 },
     { "id": "phase-6-run-ui", "label": "Phase 6 — operator-facing Run execution UI honouring all 10 inputTypes (number/temperature with auto-flag, dropdown, rating, photo/signature placeholders)", "done": false, "phase": 6 },
     { "id": "phase-6-home-cards", "label": "Phase 6 — concierge home cards driven by real activated workflows (replace scripted findings)", "done": false, "phase": 6 }
   ],
   "inProgress": [],
   "recentlyCompleted": [
+    { "title": "ROSS day-zero auto-activation (Phase 6 PR 2) — rossSeedFirstWorkflow CF + signup-service.js integration; helper extraction with 17 unit tests; RTDB pointer; architecture pivoted mid-PR after preview revealed pre-existing registerUser callable bug", "pr": 58, "mergedAt": "2026-05-12" },
     { "title": "ROSS tier-gated template list + Hi-Fi upgrade page (Phase 6 PR 1C) — server includeLocked opt-in, locked-card UX in v2 Playbook, /upgrade.html comparison page with email CTA", "pr": 55, "mergedAt": "2026-05-12" },
     { "title": "ROSS starter library curation — 5 Free / 8 All-in split (Phase 6 PR 1B) + folded backfill URL fix on PR #51's sibling", "pr": 53, "mergedAt": "2026-05-12" },
     { "title": "ROSS template tier-gating mechanism (Phase 6 PR 1A) — schema, three gate points (read/activate/client), audit log, editor field, KB docs", "pr": 51, "mergedAt": "2026-05-12" },
-    { "title": "ROSS sidebar cleanup — collapse to Today + Ross's brain + footer wired to auth.currentUser (Phase 5 PR 5, closes Phase 5)", "pr": 48, "mergedAt": "2026-05-11" },
-    { "title": "post-login router rollout + skip wizard for fresh signups (Phase 5 PR 4 + PR 6 folded)", "pr": 46, "mergedAt": "2026-05-11" }
+    { "title": "ROSS sidebar cleanup — collapse to Today + Ross's brain + footer wired to auth.currentUser (Phase 5 PR 5, closes Phase 5)", "pr": 48, "mergedAt": "2026-05-11" }
   ],
   "bugs": [
+    {
+      "title": "registerUser callable throws unauthenticated on every call — v1-vs-v2 signature bug from firebase-functions v7 upgrade",
+      "severity": "high",
+      "discoveredAt": "2026-05-12",
+      "discoveredOn": "PR #58 preview test",
+      "blockingSprint": false,
+      "notes": "functions/index.js:474 uses v1 callable signature `onCall((data, context) => ...)` but prod runtime is Gen 2 (Node 22). Auth context arrives as request.auth on the first arg, not on a separate context param. Every fresh signup hits the v1 callable, gets unauthenticated, and signup-service.js:109-111 silently swallows it and runs the Path B fallback. Production has been silently degraded for an unknown stretch — the fallback handles signup, but the callable's server-side tier validation + atomic multi-path write + initialised onboarding-progress never run. Fix: migrate handler to v2 callable signature. Touches a 200-line function with multiple consumers; deserves its own dedicated PR."
+    },
+    {
+      "title": "Mobile nav missing Playbook/Activity/People access on ROSS home",
+      "severity": "medium",
+      "discoveredAt": "2026-05-12",
+      "discoveredOn": "PR #58 preview test",
+      "blockingSprint": false,
+      "notes": "Operator flagged on PR #58 preview that the Ross home mobile bottom-nav doesn't expose the three governance destinations from the desktop sidebar. PR #48 noted the mobile topbar was supposed to fold them in. Either pre-existing on master or regression since PR #48. Investigation needed before fix."
+    },
+    {
+      "title": "Double-seed race on signup retry — rossSeedFirstWorkflow idempotency pre-check is not transactional",
+      "severity": "low",
+      "discoveredAt": "2026-05-12",
+      "discoveredOn": "PR #58 final review",
+      "blockingSprint": false,
+      "notes": "A user double-clicking signup or hitting a network retry could pass the firstWorkflowSeededAt pre-check in both invocations and produce two seeded workflows. Mitigation options: (a) RTDB transaction() on the marker, OR (b) deterministic workflow ID per uid (e.g. seed_{uid}) so duplicate write is overwrite. Exposure small; consequence mild (duplicate workflow, no corruption)."
+    },
     {
       "title": "feature-access-control.js:64 — dynamic import with ?v=${Date.now()} cache-buster breaks Vite build-time analysis",
       "severity": "medium",
@@ -103,7 +127,7 @@
   ],
   "backlog": {
     "high": [
-      "Phase 6 — day-zero auto-activation of one starter template at signup completion",
+      "Fix registerUser callable v1-vs-v2 signature bug — silent prod degradation since the firebase-functions v7 upgrade. Migrate handler to v2 callable signature (request.auth, request.data). Touches a 200-line function with multiple consumers.",
       "Phase 6 — operator-facing Run execution UI for all 10 inputTypes",
       "Phase 6 — concierge home cards driven by real activated workflows",
       "Food cost open PR — review and merge",
@@ -111,17 +135,20 @@
     ],
     "medium": [
       "Fold readUserTier into verifyUserOrAdmin to eliminate the extra RTDB read on tier-gated handlers (PR #51 review finding #3 — touches 10+ handlers, perf-refactor PR)",
-      "Backfill script polish: pre-flight check warning if rules deployed before backfill + pull databaseURL from process.env with fallback (PR #51 review findings #7/#8)",
+      "Backfill script polish: pre-flight check warning if rules deployed before backfill + pull databaseURL from process.env with fallback (PR #51 review findings #7/#8; sister to PR #58's hardcoded URL in ross-config-set-first-workflow.js)",
+      "rossCreateWorkflow refactor to use buildWorkflowRecord helper (PR #58 reviewer Should-Fix #3 — out-of-scope for that PR; finishes the rossActivateWorkflow extraction work)",
+      "Investigate mobile nav missing Playbook/Activity/People on ROSS home (operator-flagged PR #58)",
       "Hi-Fi v2 → v1 promotions (guests, queue, analytics, campaigns, receipts) — partially superseded by Phase 5 PR 5 sidebar cleanup",
       "WhatsApp template UI polish",
       "QA cleanup (~65 test artifact files)",
       "Project status auto-derive from PROJECT_BACKLOG.md",
       "Factor out fetchLocationNames helper across activity/playbook/people stores",
       "HfModal / HfConfirm design-system components — v2 needs a Hi-Fi-native modal pattern; SweetAlert2 is v1-only",
-      "Catalog ROSS Cloud Functions in CLOUD_FUNCTIONS_CATALOG.md (rossManageTask, rossActivateWorkflow, ross-tier helpers, audit log node, etc.)",
+      "Catalog ROSS Cloud Functions in CLOUD_FUNCTIONS_CATALOG.md (rossManageTask, rossActivateWorkflow, rossSeedFirstWorkflow, ross-tier helpers, audit log nodes, etc.)",
       "Build /profile-settings.html for ROSS user account (sidebar footer gear icon non-interactive until shipped — PR #48 follow-up)"
     ],
     "low": [
+      "Double-seed race on signup retry — rossSeedFirstWorkflow idempotency pre-check is not transactional (PR #58 final-review note; mitigation: RTDB transaction or deterministic workflow ID per uid)",
       "Subscription admin charts migration",
       "Group overview v2 → v1 promotion (likely dropped — see Phase 5 PR 5)",
       "Onboarding flow improvements (lower-priority items in spec — surface store.error, lower FINDING_MIN_LIFT, parallelise detectBestWeekday reads, un-hardcode 3-of-5 step counter)",
