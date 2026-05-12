@@ -1501,3 +1501,5 @@ exports.rossGetStaff = onRequest(async (req, res) => {
         }
     });
 });
+
+module.exports.VALID_INPUT_TYPES = VALID_INPUT_TYPES;

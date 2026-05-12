@@ -465,15 +465,9 @@ exports.merakiWebhook = onRequest((req, res) => {
 // Export Guest Sync Functions
 const guestSync = require('./guestSync');
 const { buildWorkflowRecord } = require('./ross-workflow-builder');
+const { VALID_INPUT_TYPES } = require('./ross');
 exports.syncWifiToGuest = guestSync.syncWifiToGuest;
 exports.syncGuestToSendGrid = guestSync.syncGuestToSendGrid;
-
-// ROSS day-zero seed — must match VALID_INPUT_TYPES in functions/ross.js.
-// Kept in sync manually; any new input type must be added here too.
-const ROSS_VALID_INPUT_TYPES = [
-    'checkbox', 'number', 'temperature', 'text', 'longtext',
-    'dropdown', 'rating', 'photo', 'signature', 'date',
-];
 
 // Day-zero auto-activation helper. Called best-effort from registerUser
 // after the first location is created. Every failure branch logs and
@@ -534,7 +528,7 @@ async function seedFirstWorkflow({ userId, locationId, locationName }) {
         notifyPhone: null,
         notifyEmail: null,
         workflowId: seedWorkflowId,
-        validInputTypes: ROSS_VALID_INPUT_TYPES,
+        validInputTypes: VALID_INPUT_TYPES,
         generateTaskId,
         now,
     });
