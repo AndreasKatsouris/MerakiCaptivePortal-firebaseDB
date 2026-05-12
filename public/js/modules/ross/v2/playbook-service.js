@@ -121,8 +121,7 @@ export async function getPlaybookWorkflows({ locationId } = {}) {
  * templates cannot be activated even if a client tries.
  */
 export async function getPlaybookTemplates({ category } = {}) {
-  const args = { includeLocked: true }
-  if (category) args.category = category
+  const args = { includeLocked: true, ...(category ? { category } : {}) }
   const result = await callFunction('rossGetTemplates', args)
   return Array.isArray(result?.templates) ? result.templates : []
 }
