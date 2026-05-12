@@ -23,11 +23,19 @@ function userCanActivate(userTier, templateTier, isSuperAdmin) {
     return userTier === 'all-in';
 }
 
-function filterTemplatesByTier(templates, userTier, isSuperAdmin) {
+function filterTemplatesByTier(templates, userTier, isSuperAdmin, includeLocked) {
     if (!Array.isArray(templates)) return [];
     if (isSuperAdmin) return templates;
     if (userTier === 'all-in') return templates;
-    return templates.filter(t => t && t.tier === 'free');
+    // Free or missing tier
+    if (includeLocked !== true) {
+        return templates.filter(t => t && t.tier === 'free');
+    }
+    return templates.map(t => {
+        if (!t || typeof t !== 'object') return t;
+        if (t.tier === 'free') return t;
+        return { ...t, locked: true };
+    });
 }
 
 module.exports = {

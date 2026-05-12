@@ -113,9 +113,15 @@ export async function getPlaybookWorkflows({ locationId } = {}) {
 /**
  * Fetch all templates the user can see (their own + public). Optional
  * category filter is server-side.
+ *
+ * PR 1C: passes `includeLocked: true` so All-in templates appear in the
+ * response with `locked: true` (rather than being filtered out) for Free
+ * users. The component renders them as upgrade-affordance cards. The
+ * server-side activate gate (PR #51) remains authoritative — locked
+ * templates cannot be activated even if a client tries.
  */
 export async function getPlaybookTemplates({ category } = {}) {
-  const args = category ? { category } : {}
+  const args = { includeLocked: true, ...(category ? { category } : {}) }
   const result = await callFunction('rossGetTemplates', args)
   return Array.isArray(result?.templates) ? result.templates : []
 }

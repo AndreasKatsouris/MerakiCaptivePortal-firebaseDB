@@ -24,6 +24,7 @@ export default defineConfig({
         'receipts-v2':              resolve(__dirname, 'public/receipts-v2.html'),
         'index':                    resolve(__dirname, 'public/index.html'),
         'signup':                   resolve(__dirname, 'public/signup.html'),
+        'upgrade':                  resolve(__dirname, 'public/upgrade.html'),
         'project-status':           resolve(__dirname, 'public/project-status.html')
       }
     }
