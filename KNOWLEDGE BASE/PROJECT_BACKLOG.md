@@ -3,7 +3,7 @@
 > Claude reads this file at the start of every session and updates it at the end.
 > The Sprint Goal is the contract for the session — don't deviate without explicit user confirmation.
 
-Last updated: 2026-05-12 (post PR #53 — reflect cycle. Phase 6 PR 1B shipped. 5 Free / 8 All-in split now live in the seed; one-off update script ready for prod RTDB. Tier-gate is no longer inert.)
+Last updated: 2026-05-12 (post PR #55 — reflect cycle. Phase 6 PR 1C shipped: locked-card upsell UX in Playbook tab + Hi-Fi `/upgrade.html` comparison page. Tier-gate is now both enforced AND visible.)
 
 ---
 
@@ -21,7 +21,7 @@ Sprint: 2026-04-30 → until complete
 
 | Item | Branch | Notes |
 |------|--------|-------|
-| — | — | Idle. Phase 6 PR 1B merged. Operator to run `node functions/seeds/ross-templates-curate-tiers.js` against prod RTDB to flip the 8 existing records (or use the `firebase database:update` pattern from PR #51). Next: tier-gated client list filter on Templates UI, then day-zero auto-activation. |
+| — | — | Idle. Phase 6 PR 1C merged. Operator validated locked-card UX on preview end-to-end. Next: day-zero auto-activation (seed one starter workflow per new account), then operator-facing Run execution UI honouring all 10 inputTypes. |
 
 ---
 
@@ -65,7 +65,7 @@ Lower-priority Phase 5 items (deferred to dedicated polish PR after the 5-PR seq
 
 - [x] **Tier gating mechanism** (PR #51, 2026-05-12) — `tier:'free'|'all-in'` schema, server filter on `rossGetTemplates`, activate gate on `rossActivateWorkflow` with audit log, symmetric validators on Create/Update Template, editor field, defensive client filter, KB docs. Mechanism complete; gate is inert until PR 1B flips templates.
 - [x] **Curate starter library** (PR #53, 2026-05-12) — 5 Free (Daily Opening / Daily Closing / Weekly Deep Clean / Monthly Food Cost Review / Health & Safety Audit) + 8 All-in (CoA / Liquor Licence / Weekly Social / Monthly Google Reviews / Weekly Supplier Pay / Monthly Staff Meeting / Quarterly Performance Review / Monthly Equipment Service). Seed file updated for fresh deploys; one-off update script (`functions/seeds/ross-templates-curate-tiers.js`) ready for prod RTDB. Folded a sibling fix on PR #51's backfill script (legacy databaseURL → canonical `-default-rtdb` form).
-- [ ] **Tier-gated template list (client filter)** — the **server** already filters per PR #51, so a Free user currently sees exactly 5 cards once the prod backfill runs. This task is the **upgrade affordance**: render All-in templates as locked-with-upsell cards (🔒 indicator + "Upgrade to All-in" CTA) instead of hiding them entirely. Requires reading the user's tier client-side + a new HfBadge/HfCard state. Phase 6 UX work — not infrastructure
+- [x] **Tier-gated template list (upgrade affordance)** (PR #55, 2026-05-12) — server's `filterTemplatesByTier` now accepts opt-in `includeLocked:true` (v1 callers untouched); v2 Playbook renders locked All-in templates dimmed + "All-in" badge + ghost "Upgrade to All-in" button → `/upgrade.html`. New Hi-Fi comparison page reads `subscriptionTiers/` via `loadTiers()` with email CTA pre-filled by `?from=template&id=<id>` context. 8 new vitest cases (34/34 passing). 5+ review fixes folded mid-PR including a security finding (CRLF in mailto body via `?id=` query param)
 - [ ] **Day-zero auto-activation** — at account creation (post-onboarding completion), programmatically call `rossActivateWorkflow` for one starter template against the user's default location, so a new operator lands in ROSS with one runnable workflow already attached. May need a new CF (e.g. `rossSeedFirstWorkflow`) or a hook in `signup.js` / wizard completion
 - [ ] **Operator-facing Run execution UI** — richer run-execution surface honouring all 10 `inputType`s (existing UI in v1 admin handles checkbox; v2 needs the full matrix — number/temperature with auto-flag handling + 422 note enforcement, dropdown, rating, photo/signature placeholders, etc.). Extends `?tab=playbook` workflow card → "Start run" → run UI
 - [ ] **Concierge home active-run surfacing** — replace the current scripted/illustrative cards on `/ross.html` with real-data cards driven by my activated workflows: today's pending tasks, overdue runs, recent completions. Uses existing `rossGetWorkflows` + `rossGetRun` per active workflow
@@ -126,11 +126,11 @@ Lower-priority Phase 5 items (deferred to dedicated polish PR after the 5-PR seq
 
 | Feature | PR | Merged |
 |---------|----|--------|
+| ROSS tier-gated template list + Hi-Fi upgrade page (Phase 6 PR 1C) — server `includeLocked` opt-in, locked card UX, `/upgrade.html` comparison page with email CTA | #55 | 2026-05-12 |
 | ROSS starter library curation — 5 Free / 8 All-in split (Phase 6 PR 1B) + folded backfill URL fix on PR #51's sibling | #53 | 2026-05-12 |
 | ROSS template tier-gating mechanism (Phase 6 PR 1A) — schema, three gate points (read/activate/client), audit log, editor field, KB docs | #51 | 2026-05-12 |
 | ROSS sidebar cleanup — collapse to Today + Ross's brain + footer wired to auth.currentUser (Phase 5 PR 5, **closes Phase 5**) | #48 | 2026-05-11 |
 | docs(ross-v2) — post-PR-46 reflect cycle + tighten Session Opening Protocol | #47 | 2026-05-11 |
-| post-login router rollout + skip wizard for fresh signups (Phase 5 PR 4 + PR 6 folded) | #46 | 2026-05-11 |
 
 ---
 
