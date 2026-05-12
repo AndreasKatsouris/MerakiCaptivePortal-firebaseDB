@@ -102,7 +102,7 @@ const templates = computed(() => {
   // WITHOUT locked:true, hide it rather than render a live Activate
   // button. The PR #51 server-side activate gate is the security
   // backstop; this guard prevents flash-of-broken-state in the UI.
-  return list.filter(t => !(t && t.tier === 'all-in' && t.locked !== true))
+  return list.filter(t => t && !(t.tier === 'all-in' && t.locked !== true))
 })
 const byCategory = computed(() => store.workflowsByCategory)
 
