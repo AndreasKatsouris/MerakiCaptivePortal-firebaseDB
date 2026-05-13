@@ -116,16 +116,13 @@ describe('reset', () => {
 })
 
 describe('commitResponse', () => {
-  test('200: saveStatus saving → saved, response stored', async () => {
+  test('200: saveStatus saving → saved, response built client-side from submitted value', async () => {
     runService.submitResponse.mockResolvedValue({
       status: 200,
-      result: {
-        runId: 'r1', status: 'in_progress',
-        responses: { t1: { value: 3, submittedAt: 100, flagged: false } },
-      },
+      result: { success: true, taskId: 't1', flagged: false, runCompleted: false },
     })
     const store = useRunStore()
-    store.currentRun = { runId: 'r1', status: 'in_progress' }
+    store.currentRun = { runId: 'r1', completedAt: null }
     store.workflow = { workflowId: 'w1', locationId: 'l1', tasks: [] }
 
     const pending = store.commitResponse('t1', 3)
@@ -133,26 +130,26 @@ describe('commitResponse', () => {
     await pending
     expect(store.saveStatus.t1).toBe('saved')
     expect(store.responses.t1.value).toBe(3)
+    expect(store.responses.t1.flagged).toBe(false)
     expect(store.errors.t1).toBeNull()
   })
 
-  test('200 with run completed: currentRun.status flips to completed', async () => {
+  test('200 with runCompleted: currentRun.completedAt is stamped, flaggedCount computed', async () => {
     runService.submitResponse.mockResolvedValue({
       status: 200,
-      result: {
-        runId: 'r1', status: 'completed', completedAt: 200,
-        onTime: true, flaggedCount: 0,
-        responses: { t1: { value: 3, submittedAt: 100, flagged: false } },
-      },
+      result: { success: true, taskId: 't1', flagged: true, runCompleted: true },
     })
     const store = useRunStore()
-    store.currentRun = { runId: 'r1', status: 'in_progress' }
+    store.currentRun = { runId: 'r1', completedAt: null }
     store.workflow = { workflowId: 'w1', locationId: 'l1', tasks: [] }
+    // Pre-existing response, also flagged → flaggedCount should be 2
+    store.responses = { t0: { value: 99, flagged: true } }
 
-    await store.commitResponse('t1', 3)
-    expect(store.currentRun.status).toBe('completed')
-    expect(store.currentRun.onTime).toBe(true)
-    expect(store.currentRun.flaggedCount).toBe(0)
+    await store.commitResponse('t1', 12, 'out of range')
+    expect(store.currentRun.completedAt).toBeGreaterThan(0)
+    expect(store.currentRun.flaggedCount).toBe(2)
+    expect(store.responses.t1.flagged).toBe(true)
+    expect(store.responses.t1.note).toBe('out of range')
   })
 
   test('422 requiredNote: returns { requiredNote:true }, saveStatus idle, no error', async () => {

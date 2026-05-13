@@ -75,13 +75,35 @@ export const useRunStore = defineStore('ross-run', {
           this.saveStatus = { ...this.saveStatus, [taskId]: 'idle' }
           return { requiredNote: true }
         }
-        // 200
+        // 200 — server returns { success, taskId, flagged, runCompleted }
+        // (functions/ross.js:1337). Server does NOT return the full responses
+        // map, so build the response object client-side from the values we
+        // submitted plus server's flagged flag.
         const result = out.result
-        if (result.responses && result.responses[taskId]) {
-          this.responses = { ...this.responses, [taskId]: result.responses[taskId] }
+        const builtResponse = {
+          taskId,
+          value,
+          note: note ?? null,
+          flagged: !!result.flagged,
+          submittedAt: Date.now(),
         }
-        if (result.status === 'completed') {
-          this.currentRun = { ...this.currentRun, ...result }
+        this.responses = { ...this.responses, [taskId]: builtResponse }
+
+        // Server signals completion via runCompleted boolean. Reflect it on
+        // currentRun so the UI can swap the summary bar for the completion
+        // banner. completedAt is stamped now (client clock — close enough
+        // for UX; the server timestamp lands on getRun if we ever refresh).
+        if (result.runCompleted) {
+          const flaggedCount = Object.values({ ...this.responses }).filter(r => r.flagged).length
+          // onTime is optimistic (true). Computing it accurately requires the
+          // workflow's nextDueDate at activation time, which we don't carry
+          // in client state. A future getRun refresh would correct it.
+          this.currentRun = {
+            ...this.currentRun,
+            completedAt: Date.now(),
+            onTime: true,
+            flaggedCount,
+          }
         }
         this.saveStatus = { ...this.saveStatus, [taskId]: 'saved' }
       } catch (err) {

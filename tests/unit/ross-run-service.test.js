@@ -55,10 +55,12 @@ describe('submitResponse', () => {
   })
 
   test('surfaces 422 as { status:422, requiredNote:true } (not thrown)', async () => {
+    // Server's 422 body uses { error, flagged: true } per functions/ross.js:1287.
+    // run-service wraps any 422 into { status: 422, requiredNote: true } for the caller.
     global.fetch.mockResolvedValue({
       ok: false,
       status: 422,
-      text: () => Promise.resolve(JSON.stringify({ error: 'Note required', requiredNote: true })),
+      text: () => Promise.resolve(JSON.stringify({ error: 'A note is required when the value is out of range', flagged: true })),
     })
     const out = await submitResponse({
       workflowId: 'w1', locationId: 'l1', runId: 'r1',

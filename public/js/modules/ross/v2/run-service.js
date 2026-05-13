@@ -80,8 +80,10 @@ export async function submitResponse({ workflowId, locationId, runId, taskId, va
   if (res.status === 422) {
     const text = await res.text().catch(() => '')
     let body = {}
-    try { body = text ? JSON.parse(text) : {} } catch { /* not JSON */ }
-    return { status: 422, requiredNote: body.requiredNote === true, error: body.error || null }
+    try { body = JSON.parse(text) } catch { /* not JSON */ }
+    // Server's 422 body uses { error, flagged: true } per functions/ross.js:1287.
+    // Any 422 from rossSubmitResponse means a note is required.
+    return { status: 422, requiredNote: true, error: body.error || null }
   }
   if (!res.ok) {
     throw new Error(await errorMessageFrom(res, 'rossSubmitResponse'))

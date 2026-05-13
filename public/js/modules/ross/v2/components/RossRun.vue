@@ -27,7 +27,7 @@ const requiredDone = computed(() =>
 const optionalDone = computed(() =>
   optionalTasks.value.filter(t => t.id in store.responses).length,
 )
-const isCompleted = computed(() => store.currentRun?.status === 'completed')
+const isCompleted = computed(() => !!store.currentRun?.completedAt)
 
 function navTo(url) {
   window.history.pushState({}, '', url)
