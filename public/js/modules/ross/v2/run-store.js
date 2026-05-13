@@ -2,6 +2,17 @@ import { defineStore } from 'pinia'
 import { createRun, submitResponse } from './run-service.js'
 import { getPlaybookWorkflows } from './playbook-service.js'
 
+// playbook-service.js returns tasks as an object keyed by taskId (RTDB
+// native shape, see playbook-service.js:103). The Run UI iterates tasks
+// as an array sorted by `order`. Normalize on ingest.
+function normalizeTasks(rawTasks) {
+  if (Array.isArray(rawTasks)) return rawTasks
+  if (!rawTasks || typeof rawTasks !== 'object') return []
+  return Object.entries(rawTasks)
+    .map(([id, t]) => ({ id, ...(t || {}) }))
+    .sort((a, b) => (a.order ?? 0) - (b.order ?? 0))
+}
+
 export const useRunStore = defineStore('ross-run', {
   state: () => ({
     currentRun: null,
@@ -27,7 +38,7 @@ export const useRunStore = defineStore('ross-run', {
           this.loadError = 'Workflow not found at this location.'
           return
         }
-        this.workflow = wf
+        this.workflow = { ...wf, tasks: normalizeTasks(wf.tasks) }
         this.currentRun = run
         this.responses = run.responses || {}
       } catch (err) {

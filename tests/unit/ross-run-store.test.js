@@ -40,6 +40,32 @@ describe('initRun', () => {
     expect(store.loadError).toBeNull()
   })
 
+  test('tasks normalize: object-shaped tasks from playbook-service become a sorted array with id', async () => {
+    runService.createRun.mockResolvedValue({
+      runId: 'r1', status: 'in_progress', startedAt: 123, responses: {},
+    })
+    // playbook-service.js returns tasks as an OBJECT keyed by taskId
+    // (RTDB native shape), not an array. Store must normalize.
+    playbookService.getPlaybookWorkflows.mockResolvedValue([
+      { workflowId: 'w1', locationId: 'l1', name: 'Daily Opening',
+        tasks: {
+          t2: { title: 'Cash float', order: 2, required: true, inputType: 'number' },
+          t1: { title: 'Lights on', order: 1, required: true, inputType: 'checkbox' },
+          t3: { title: 'Notes', order: 3, required: false, inputType: 'text' },
+        } },
+    ])
+
+    const store = useRunStore()
+    await store.initRun('w1', 'l1')
+
+    expect(Array.isArray(store.workflow.tasks)).toBe(true)
+    expect(store.workflow.tasks).toHaveLength(3)
+    // sorted by order, with id injected from the key
+    expect(store.workflow.tasks[0]).toMatchObject({ id: 't1', title: 'Lights on', order: 1 })
+    expect(store.workflow.tasks[1]).toMatchObject({ id: 't2', title: 'Cash float', order: 2 })
+    expect(store.workflow.tasks[2]).toMatchObject({ id: 't3', title: 'Notes', order: 3 })
+  })
+
   test('resume: createRun returns in-progress run with responses → responses hydrated', async () => {
     runService.createRun.mockResolvedValue({
       runId: 'r1', status: 'in_progress', startedAt: 123,
