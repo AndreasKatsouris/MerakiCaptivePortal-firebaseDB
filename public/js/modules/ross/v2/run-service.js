@@ -55,12 +55,17 @@ async function callFunction(functionName, data = {}) {
 }
 
 /**
- * Start a new run for a workflow at a location.
+ * Start a new run for a workflow at a location, or resume the existing
+ * in-progress one (server is idempotent on completedAt: null).
  * CF: rossCreateRun({ workflowId, locationId })
- * Returns: { runId, status, responses, ... }
+ *
+ * Server returns { success, runId, run, created } where `run` is the
+ * actual record (startedAt, completedAt, responses?, etc.). We unwrap
+ * to return the run object with runId guaranteed at the top level.
  */
 export async function createRun({ workflowId, locationId }) {
-  return callFunction('rossCreateRun', { workflowId, locationId })
+  const result = await callFunction('rossCreateRun', { workflowId, locationId })
+  return { ...(result.run || {}), runId: result.runId }
 }
 
 /**

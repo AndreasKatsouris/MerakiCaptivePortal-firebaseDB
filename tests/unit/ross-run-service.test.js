@@ -13,17 +13,54 @@ beforeEach(() => {
 })
 
 describe('createRun', () => {
-  test('POSTs workflowId+locationId, returns server result', async () => {
+  test('POSTs workflowId+locationId, unwraps server { run, runId } envelope', async () => {
+    // Server returns { success, runId, run, created }. Service must
+    // unwrap to the run record with runId guaranteed at the top.
     global.fetch.mockResolvedValue({
       ok: true,
       status: 200,
-      json: () => Promise.resolve({ result: { runId: 'r1', status: 'in_progress', responses: {} } }),
+      json: () => Promise.resolve({
+        result: {
+          success: true,
+          runId: 'r1',
+          run: {
+            id: 'r1', workflowId: 'w1', locationId: 'l1',
+            startedAt: 100, completedAt: null,
+          },
+          created: true,
+        },
+      }),
     })
     const out = await createRun({ workflowId: 'w1', locationId: 'l1' })
-    expect(out).toEqual({ runId: 'r1', status: 'in_progress', responses: {} })
+    expect(out.runId).toBe('r1')
+    expect(out.startedAt).toBe(100)
+    expect(out.completedAt).toBeNull()
     expect(global.fetch).toHaveBeenCalledOnce()
     const [, opts] = global.fetch.mock.calls[0]
     expect(JSON.parse(opts.body)).toEqual({ data: { workflowId: 'w1', locationId: 'l1' } })
+  })
+
+  test('resume: server returns existing run with responses subtree → unwrapped intact', async () => {
+    global.fetch.mockResolvedValue({
+      ok: true,
+      status: 200,
+      json: () => Promise.resolve({
+        result: {
+          success: true,
+          runId: 'r1',
+          run: {
+            id: 'r1', workflowId: 'w1', locationId: 'l1',
+            startedAt: 100, completedAt: null,
+            responses: {
+              t1: { value: true, flagged: false, respondedAt: 110 },
+            },
+          },
+          created: false,
+        },
+      }),
+    })
+    const out = await createRun({ workflowId: 'w1', locationId: 'l1' })
+    expect(out.responses.t1.value).toBe(true)
   })
 })
 
