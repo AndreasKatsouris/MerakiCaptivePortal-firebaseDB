@@ -1,6 +1,6 @@
 {
   "lastUpdated": "2026-05-13",
-  "lastUpdatedNote": "Housekeeping/recovery session. Recovered 2 legitimately unmerged commits from stale worktrees via cherry-pick PRs #60 (project-status.json sync for PR #58) and #61 (Ross v2 UX fix: snooze + nav hrefs on scripted/learning fallback cards — a fix that pre-dated PR #20's merge by an hour but never opened as its own PR). Synced prod hosting via firebase deploy. Tidied repo: PR #62 gitignored .superpowers/ + CLAUDE - OLD.md; PR #63 tightened CLAUDE.md Session Opening Protocol. Cleaned 9 stale local branches + 4 of 6 merged worktrees. Sprint goal unchanged. Next sprint task: operator-facing Run execution UI honouring all 10 inputTypes.",
+  "lastUpdatedNote": "Housekeeping/recovery session. Recovered 2 legitimately unmerged commits from stale worktrees via cherry-pick PRs #60 (project-status.json sync for PR #58) and #61 (Ross v2 UX fix: snooze + nav hrefs on scripted/learning fallback cards). Synced prod hosting via firebase deploy. Tidied repo: PR #62 gitignored .superpowers/ + CLAUDE - OLD.md; PR #63 tightened CLAUDE.md Session Opening Protocol. Cleaned 9 stale local branches + 4 of 6 merged worktrees. PR #65 (Run execution UI) open, rebased onto current master 2026-05-15, awaiting operator merge.",
   "sprint": {
     "goal": "Effective implementation of Hi-Fi v2, with ROSS as the central post-login surface for every subscribed user",
     "started": "2026-04-30",
