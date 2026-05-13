@@ -159,6 +159,12 @@ function onUpgradeClick(template) {
   window.location.href = `/upgrade.html?from=template&id=${id}`
 }
 
+function goToRun(workflow) {
+  const url = `/ross.html?tab=run&workflowId=${encodeURIComponent(workflow.workflowId)}&locationId=${encodeURIComponent(workflow.locationId)}`
+  window.history.pushState({}, '', url)
+  window.dispatchEvent(new PopStateEvent('popstate'))
+}
+
 function backToHome() {
   // Align with the popstate-based tab routing in RossHome.vue: push a
   // clean URL and dispatch popstate so the parent switcher re-reads
@@ -306,6 +312,11 @@ function backToHome() {
                    so the user's eye stays with the form, not a grid of
                    tempting alternatives. -->
               <div v-if="!showEditor" class="playbook__workflow-actions">
+                <HfButton
+                  variant="solid" size="sm"
+                  @click="goToRun(w)"
+                  :disabled="store.saving || store.taskSaving || !w.locationId"
+                >Start run</HfButton>
                 <HfButton variant="ghost" size="sm" @click="store.openEdit(w.workflowId)" :disabled="store.saving || store.taskSaving">
                   Edit
                 </HfButton>
