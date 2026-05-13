@@ -5,6 +5,7 @@ import HfCheckbox from '../../../../design-system/hifi/components/HfCheckbox.vue
 import HfInput    from '../../../../design-system/hifi/components/HfInput.vue'
 import HfSelect   from '../../../../design-system/hifi/components/HfSelect.vue'
 import HfButton   from '../../../../design-system/hifi/components/HfButton.vue'
+import HfChip     from '../../../../design-system/hifi/components/HfChip.vue'
 
 const props = defineProps({
   task:     { type: Object, required: true },
@@ -59,6 +60,12 @@ function onTimestampChange(e) {
 function onRating(stars) {
   local.value = stars
   commit(stars)
+}
+
+// photo / signature — Phase 2 placeholder; Mark N/A bypasses pre-flight
+function markNa() {
+  local.value = NA_SENTINEL
+  emit('commit', NA_SENTINEL)
 }
 
 // number / temperature — update local on input, commit on blur
@@ -192,7 +199,26 @@ function onNumberBlur() {
       >&#9733;</button>
     </div>
 
-    <!-- fallback (photo/signature handled in Task 7) -->
+    <!-- photo / signature placeholder -->
+    <div
+      v-else-if="task.inputType === 'photo' || task.inputType === 'signature'"
+      class="rrti__placeholder"
+    >
+      <HfChip>Coming soon</HfChip>
+      <span class="rrti__placeholder-text">
+        {{ task.inputType === 'photo' ? 'Photo capture' : 'Signature' }} not yet available.
+      </span>
+      <HfButton
+        v-if="local !== NA_SENTINEL"
+        variant="ghost"
+        size="sm"
+        :disabled="disabled"
+        @click="markNa"
+      >Mark N/A</HfButton>
+      <span v-else class="rrti__placeholder-na">Marked N/A</span>
+    </div>
+
+    <!-- fallback — catches unknown / typo input types -->
     <div v-else class="rrti__fallback">
       Input type &#34;{{ task.inputType }}&#34; not yet implemented.
     </div>
@@ -217,6 +243,14 @@ function onNumberBlur() {
 .rrti__star--filled { color: var(--hf-gold); }
 .rrti__star:disabled { cursor: default; }
 .rrti__fallback { color: var(--hf-muted); font-style: italic; }
+.rrti__placeholder {
+  display: inline-flex; align-items: center; gap: var(--hf-space-3);
+  padding: var(--hf-space-2) var(--hf-space-3);
+  background: var(--hf-bg2); border: 1px dashed var(--hf-line-2);
+  border-radius: var(--hf-radius-md);
+}
+.rrti__placeholder-text { color: var(--hf-muted); font-size: 0.9rem; }
+.rrti__placeholder-na { color: var(--hf-good); font-size: 0.9rem; }
 .rrti__number, .rrti__temperature { display: inline-flex; align-items: baseline; gap: var(--hf-space-2); }
 .rrti__numinput {
   font: inherit; color: var(--hf-ink);
