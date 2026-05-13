@@ -36,6 +36,7 @@ function onTextInput(v) {
   local.value = v
 }
 function onTextBlur() {
+  if (local.value === props.value) return  // no change, skip spurious commits
   commit(local.value)
 }
 
@@ -74,26 +75,35 @@ function onRating(stars) {
     </label>
 
     <!-- text -->
-    <!-- HfInput exposes update:modelValue; @blur falls through to root <label> -->
-    <HfInput
+    <!-- HfInput doesn't emit blur and its root is <label>, so @blur on the
+         component tag wouldn't bubble. Wrap in a div that captures DOM
+         focusout (which DOES bubble) to drive the commit. -->
+    <div
       v-else-if="task.inputType === 'text'"
-      :model-value="local ?? ''"
-      :disabled="disabled"
-      :placeholder="task.inputConfig?.placeholder || 'Enter response'"
-      @update:model-value="onTextInput"
-      @blur="onTextBlur"
-    />
+      class="rrti__text-wrap"
+      @focusout="onTextBlur"
+    >
+      <HfInput
+        :model-value="local ?? ''"
+        :disabled="disabled"
+        :aria-label="task.title || 'Response'"
+        :placeholder="task.inputConfig?.placeholder || 'Enter response'"
+        @update:model-value="onTextInput"
+      />
+    </div>
 
     <!-- yes_no -->
     <!-- HfButton variants: solid | ghost | outline | accent (no "primary") -->
     <div v-else-if="task.inputType === 'yes_no'" class="rrti__yesno">
       <HfButton
         :variant="local === 'yes' ? 'solid' : 'ghost'"
+        :aria-pressed="local === 'yes'"
         :disabled="disabled"
         @click="onYesNo('yes')"
       >Yes</HfButton>
       <HfButton
         :variant="local === 'no' ? 'solid' : 'ghost'"
+        :aria-pressed="local === 'no'"
         :disabled="disabled"
         @click="onYesNo('no')"
       >No</HfButton>
@@ -105,6 +115,7 @@ function onRating(stars) {
       :model-value="local ?? ''"
       :options="(task.inputConfig?.options || []).map(o => ({ value: o, label: o }))"
       :disabled="disabled"
+      :aria-label="task.title || 'Select an option'"
       placeholder="Select an option"
       @update:model-value="onDropdownChange"
     />
@@ -116,11 +127,17 @@ function onRating(stars) {
       class="rrti__timestamp"
       :value="local ?? ''"
       :disabled="disabled"
+      :aria-label="task.title || 'Timestamp'"
       @change="onTimestampChange"
     />
 
     <!-- rating -->
-    <div v-else-if="task.inputType === 'rating'" class="rrti__rating">
+    <div
+      v-else-if="task.inputType === 'rating'"
+      class="rrti__rating"
+      role="group"
+      :aria-label="task.title || 'Rating'"
+    >
       <button
         v-for="n in (task.inputConfig?.scale || task.inputConfig?.max || 5)"
         :key="n"
