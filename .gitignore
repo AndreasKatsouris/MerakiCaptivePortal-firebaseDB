@@ -77,3 +77,7 @@ node_modules/
 # Playwright MCP screenshot scratch
 .playwright-mcp/
 .claude/worktrees/
+
+# Local agent / editor state — never tracked
+.superpowers/
+CLAUDE - OLD.md
