@@ -1,5 +1,5 @@
 import { defineStore } from 'pinia'
-import { createRun, getRun } from './run-service.js'
+import { createRun } from './run-service.js'
 import { getPlaybookWorkflows } from './playbook-service.js'
 
 export const useRunStore = defineStore('ross-run', {
@@ -18,11 +18,7 @@ export const useRunStore = defineStore('ross-run', {
       this.loading = true
       this.loadError = null
       try {
-        const existing = await getRun({ workflowId, locationId })
         const run = await createRun({ workflowId, locationId })
-        this.currentRun = run
-        this.responses = run.responses || existing?.currentRun?.responses || {}
-
         const workflows = await getPlaybookWorkflows()
         const wf = workflows.find(
           w => w.workflowId === workflowId && w.locationId === locationId,
@@ -32,6 +28,8 @@ export const useRunStore = defineStore('ross-run', {
           return
         }
         this.workflow = wf
+        this.currentRun = run
+        this.responses = run.responses || {}
       } catch (err) {
         this.loadError = err.message || 'Failed to start run.'
       } finally {

@@ -20,8 +20,7 @@ beforeEach(() => {
 })
 
 describe('initRun', () => {
-  test('happy path: getRun + createRun + workflow load → state populated', async () => {
-    runService.getRun.mockResolvedValue({ currentRun: null, previousResponses: {} })
+  test('happy path: createRun + workflow load → state populated', async () => {
     runService.createRun.mockResolvedValue({
       runId: 'r1', status: 'in_progress', startedAt: 123, responses: {},
     })
@@ -41,14 +40,7 @@ describe('initRun', () => {
     expect(store.loadError).toBeNull()
   })
 
-  test('resume: getRun returns in-progress run → responses hydrated', async () => {
-    runService.getRun.mockResolvedValue({
-      currentRun: {
-        runId: 'r1', status: 'in_progress',
-        responses: { t1: { value: true, submittedAt: 99, flagged: false } },
-      },
-      previousResponses: {},
-    })
+  test('resume: createRun returns in-progress run with responses → responses hydrated', async () => {
     runService.createRun.mockResolvedValue({
       runId: 'r1', status: 'in_progress', startedAt: 123,
       responses: { t1: { value: true, submittedAt: 99, flagged: false } },
@@ -63,8 +55,7 @@ describe('initRun', () => {
     expect(store.responses.t1.value).toBe(true)
   })
 
-  test('workflow not found → loadError surfaced', async () => {
-    runService.getRun.mockResolvedValue({ currentRun: null, previousResponses: {} })
+  test('workflow not found → loadError surfaced, currentRun stays null', async () => {
     runService.createRun.mockResolvedValue({ runId: 'r1', status: 'in_progress', responses: {} })
     playbookService.getPlaybookWorkflows.mockResolvedValue([])
 
@@ -72,10 +63,11 @@ describe('initRun', () => {
     await store.initRun('w1', 'l1')
 
     expect(store.loadError).toMatch(/workflow/i)
+    expect(store.currentRun).toBeNull()
+    expect(store.workflow).toBeNull()
   })
 
   test('createRun throws → loadError surfaced, loading false', async () => {
-    runService.getRun.mockResolvedValue({ currentRun: null, previousResponses: {} })
     runService.createRun.mockRejectedValue(new Error('Network down'))
 
     const store = useRunStore()
