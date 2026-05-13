@@ -60,6 +60,16 @@ function onRating(stars) {
   local.value = stars
   commit(stars)
 }
+
+// number / temperature — update local on input, commit on blur
+function onNumberInput(e) {
+  const raw = e.target.value
+  local.value = raw === '' ? undefined : Number(raw)
+}
+function onNumberBlur() {
+  if (local.value === undefined || local.value === '' || Number.isNaN(local.value)) return
+  commit(local.value)
+}
 </script>
 
 <template>
@@ -90,6 +100,38 @@ function onRating(stars) {
         :placeholder="task.inputConfig?.placeholder || 'Enter response'"
         @update:model-value="onTextInput"
       />
+    </div>
+
+    <!-- number -->
+    <div v-else-if="task.inputType === 'number'" class="rrti__number">
+      <input
+        type="number"
+        class="rrti__numinput"
+        :value="local ?? ''"
+        :disabled="disabled"
+        :min="task.inputConfig?.min"
+        :max="task.inputConfig?.max"
+        :aria-label="task.title || 'Number'"
+        @input="onNumberInput"
+        @blur="onNumberBlur"
+      />
+    </div>
+
+    <!-- temperature -->
+    <div v-else-if="task.inputType === 'temperature'" class="rrti__temperature">
+      <input
+        type="number"
+        class="rrti__numinput"
+        :value="local ?? ''"
+        :disabled="disabled"
+        :min="task.inputConfig?.min"
+        :max="task.inputConfig?.max"
+        :aria-label="task.title || 'Temperature'"
+        step="0.1"
+        @input="onNumberInput"
+        @blur="onNumberBlur"
+      />
+      <span v-if="task.inputConfig?.unit" class="rrti__unit">{{ task.inputConfig.unit }}</span>
     </div>
 
     <!-- yes_no -->
@@ -150,7 +192,7 @@ function onRating(stars) {
       >&#9733;</button>
     </div>
 
-    <!-- fallback (number/temperature handled in Task 6; photo/signature in Task 7) -->
+    <!-- fallback (photo/signature handled in Task 7) -->
     <div v-else class="rrti__fallback">
       Input type &#34;{{ task.inputType }}&#34; not yet implemented.
     </div>
@@ -175,4 +217,12 @@ function onRating(stars) {
 .rrti__star--filled { color: var(--hf-gold); }
 .rrti__star:disabled { cursor: default; }
 .rrti__fallback { color: var(--hf-muted); font-style: italic; }
+.rrti__number, .rrti__temperature { display: inline-flex; align-items: baseline; gap: var(--hf-space-2); }
+.rrti__numinput {
+  font: inherit; color: var(--hf-ink);
+  background: var(--hf-paper); border: 1px solid var(--hf-line);
+  border-radius: var(--hf-radius-md); padding: var(--hf-space-2) var(--hf-space-3);
+  width: 8rem;
+}
+.rrti__unit { color: var(--hf-muted); font-family: var(--hf-font-mono); }
 </style>
