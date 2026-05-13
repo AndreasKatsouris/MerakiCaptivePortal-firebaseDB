@@ -1,5 +1,5 @@
 import { defineStore } from 'pinia'
-import { createRun } from './run-service.js'
+import { createRun, submitResponse } from './run-service.js'
 import { getPlaybookWorkflows } from './playbook-service.js'
 
 export const useRunStore = defineStore('ross-run', {
@@ -45,6 +45,43 @@ export const useRunStore = defineStore('ross-run', {
       this.errors = {}
       this.loading = false
       this.loadError = null
+    },
+
+    async commitResponse(taskId, value, note) {
+      if (!this.currentRun?.runId || !this.workflow) return
+      this.saveStatus = { ...this.saveStatus, [taskId]: 'saving' }
+      this.errors = { ...this.errors, [taskId]: null }
+      try {
+        const out = await submitResponse({
+          workflowId: this.workflow.workflowId,
+          locationId: this.workflow.locationId,
+          runId: this.currentRun.runId,
+          taskId,
+          value,
+          note,
+        })
+        if (out.status === 422 && out.requiredNote) {
+          this.saveStatus = { ...this.saveStatus, [taskId]: 'idle' }
+          return { requiredNote: true }
+        }
+        // 200
+        const result = out.result
+        if (result.responses && result.responses[taskId]) {
+          this.responses = { ...this.responses, [taskId]: result.responses[taskId] }
+        }
+        if (result.status === 'completed') {
+          this.currentRun = { ...this.currentRun, ...result }
+        }
+        this.saveStatus = { ...this.saveStatus, [taskId]: 'saved' }
+      } catch (err) {
+        this.saveStatus = { ...this.saveStatus, [taskId]: 'error' }
+        this.errors = { ...this.errors, [taskId]: err.message || 'Save failed' }
+      }
+    },
+
+    dismissError(taskId) {
+      this.errors = { ...this.errors, [taskId]: null }
+      this.saveStatus = { ...this.saveStatus, [taskId]: 'idle' }
     },
   },
 })

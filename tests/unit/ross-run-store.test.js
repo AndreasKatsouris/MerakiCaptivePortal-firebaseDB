@@ -88,3 +88,80 @@ describe('reset', () => {
     expect(store.responses).toEqual({})
   })
 })
+
+describe('commitResponse', () => {
+  test('200: saveStatus saving → saved, response stored', async () => {
+    runService.submitResponse.mockResolvedValue({
+      status: 200,
+      result: {
+        runId: 'r1', status: 'in_progress',
+        responses: { t1: { value: 3, submittedAt: 100, flagged: false } },
+      },
+    })
+    const store = useRunStore()
+    store.currentRun = { runId: 'r1', status: 'in_progress' }
+    store.workflow = { workflowId: 'w1', locationId: 'l1', tasks: [] }
+
+    const pending = store.commitResponse('t1', 3)
+    expect(store.saveStatus.t1).toBe('saving')
+    await pending
+    expect(store.saveStatus.t1).toBe('saved')
+    expect(store.responses.t1.value).toBe(3)
+    expect(store.errors.t1).toBeNull()
+  })
+
+  test('200 with run completed: currentRun.status flips to completed', async () => {
+    runService.submitResponse.mockResolvedValue({
+      status: 200,
+      result: {
+        runId: 'r1', status: 'completed', completedAt: 200,
+        onTime: true, flaggedCount: 0,
+        responses: { t1: { value: 3, submittedAt: 100, flagged: false } },
+      },
+    })
+    const store = useRunStore()
+    store.currentRun = { runId: 'r1', status: 'in_progress' }
+    store.workflow = { workflowId: 'w1', locationId: 'l1', tasks: [] }
+
+    await store.commitResponse('t1', 3)
+    expect(store.currentRun.status).toBe('completed')
+    expect(store.currentRun.onTime).toBe(true)
+    expect(store.currentRun.flaggedCount).toBe(0)
+  })
+
+  test('422 requiredNote: returns { requiredNote:true }, saveStatus idle, no error', async () => {
+    runService.submitResponse.mockResolvedValue({
+      status: 422, requiredNote: true, error: 'Note required',
+    })
+    const store = useRunStore()
+    store.currentRun = { runId: 'r1', status: 'in_progress' }
+    store.workflow = { workflowId: 'w1', locationId: 'l1', tasks: [] }
+
+    const result = await store.commitResponse('t1', 12)
+    expect(result).toEqual({ requiredNote: true })
+    expect(store.saveStatus.t1).toBe('idle')
+    expect(store.errors.t1).toBeNull()
+  })
+
+  test('thrown error: saveStatus error, errors[taskId] populated', async () => {
+    runService.submitResponse.mockRejectedValue(new Error('Network fail'))
+    const store = useRunStore()
+    store.currentRun = { runId: 'r1', status: 'in_progress' }
+    store.workflow = { workflowId: 'w1', locationId: 'l1', tasks: [] }
+
+    await store.commitResponse('t1', 3)
+    expect(store.saveStatus.t1).toBe('error')
+    expect(store.errors.t1).toBe('Network fail')
+  })
+})
+
+describe('dismissError', () => {
+  test('clears errors[taskId] and resets saveStatus to idle', () => {
+    const store = useRunStore()
+    store.errors = { t1: 'oops' }
+    store.saveStatus = { t1: 'error' }
+    store.dismissError('t1')
+    expect(store.errors.t1).toBeNull()
+    expect(store.saveStatus.t1).toBe('idle')
+  })
+})
