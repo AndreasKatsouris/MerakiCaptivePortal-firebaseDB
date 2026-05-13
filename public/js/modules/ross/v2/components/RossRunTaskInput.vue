@@ -143,18 +143,20 @@ function onNumberBlur() {
 
     <!-- yes_no -->
     <!-- HfButton variants: solid | ghost | outline | accent (no "primary") -->
+    <!-- Emits boolean true/false — server validateResponseValue requires
+         typeof value === 'boolean' for yes_no tasks (functions/ross.js:1215). -->
     <div v-else-if="task.inputType === 'yes_no'" class="rrti__yesno">
       <HfButton
-        :variant="local === 'yes' ? 'solid' : 'ghost'"
-        :aria-pressed="local === 'yes'"
+        :variant="local === true ? 'solid' : 'ghost'"
+        :aria-pressed="local === true"
         :disabled="disabled"
-        @click="onYesNo('yes')"
+        @click="onYesNo(true)"
       >Yes</HfButton>
       <HfButton
-        :variant="local === 'no' ? 'solid' : 'ghost'"
-        :aria-pressed="local === 'no'"
+        :variant="local === false ? 'solid' : 'ghost'"
+        :aria-pressed="local === false"
         :disabled="disabled"
-        @click="onYesNo('no')"
+        @click="onYesNo(false)"
       >No</HfButton>
     </div>
 
