@@ -3,7 +3,7 @@
 > Claude reads this file at the start of every session and updates it at the end.
 > The Sprint Goal is the contract for the session — don't deviate without explicit user confirmation.
 
-Last updated: 2026-05-12 (post PR #58 — reflect cycle. Phase 6 PR 2 shipped: day-zero auto-activation. Fresh signups now land on ROSS with a seeded Daily Opening Checklist workflow. Discovered a pre-existing prod bug in `registerUser` callable during preview testing — pivoted architecture mid-PR to a dedicated CF called from `signup-service.js`.)
+Last updated: 2026-05-13 (housekeeping session — recovered 2 legitimately unmerged commits from old worktrees via cherry-pick PRs #60 (project-status.json sync for PR #58) and #61 (UX fix: snooze + nav hrefs on Ross v2 scripted/learning fallback cards). Also synced `dist/` to prod via `firebase deploy --only hosting`. Tidied repo: PR #62 gitignored `.superpowers/` + `CLAUDE - OLD.md`; PR #63 tightened CLAUDE.md Session Opening Protocol wording (linter edit promoted to canon). Cleaned 9 stale local branches + 4 of 6 merged worktrees (3 disk leftovers still locked by Windows file handles).)
 
 ---
 
@@ -21,7 +21,7 @@ Sprint: 2026-04-30 → until complete
 
 | Item | Branch | Notes |
 |------|--------|-------|
-| — | — | Idle. Phase 6 PR 2 merged. Day-zero seed live in prod (CF deployed, pointer set, operator-verified end-to-end). Next: operator-facing Run execution UI honouring all 10 inputTypes, then concierge home active-run surfacing. |
+| — | — | Idle. Housekeeping/recovery PRs #60-#63 merged 2026-05-13. Local master = origin/master = prod hosting (`firebase deploy --only hosting` shipped PR #60 + #61 to live). Next: operator-facing Run execution UI honouring all 10 inputTypes, then concierge home active-run surfacing. |
 
 ---
 
@@ -129,11 +129,11 @@ Lower-priority Phase 5 items (deferred to dedicated polish PR after the 5-PR seq
 
 | Feature | PR | Merged |
 |---------|----|--------|
+| Housekeeping — gitignore local agent/editor state + Session Opening Protocol clarification + dead-worktree cleanup | #62, #63 | 2026-05-13 |
+| Ross v2 fallback cards — snooze + nav hrefs on scripted/learning cards (recovered from `feature/ross-v2-actions` worktree; commit pre-dated PR #20's merge by 1 hour but never opened as own PR) | #61 | 2026-05-13 |
+| project-status.json — sync after PR #58 merge (cherry-picked from `docs/post-pr58-reflect` worktree; missed from PR #59 reflect cycle) | #60 | 2026-05-13 |
 | ROSS day-zero auto-activation (Phase 6 PR 2) — new `rossSeedFirstWorkflow` CF + client integration in `signup-service.js`; pure `buildLocationsFromTemplate`/`buildWorkflowRecord` helpers extracted from `rossActivateWorkflow` (17 unit tests); RTDB pointer `ross/config/firstWorkflowTemplateId` + one-off setup script. Architecture pivoted mid-PR after preview testing revealed `registerUser` callable bug. | #58 | 2026-05-12 |
 | ROSS tier-gated template list + Hi-Fi upgrade page (Phase 6 PR 1C) — server `includeLocked` opt-in, locked card UX, `/upgrade.html` comparison page with email CTA | #55 | 2026-05-12 |
-| ROSS starter library curation — 5 Free / 8 All-in split (Phase 6 PR 1B) + folded backfill URL fix on PR #51's sibling | #53 | 2026-05-12 |
-| ROSS template tier-gating mechanism (Phase 6 PR 1A) — schema, three gate points (read/activate/client), audit log, editor field, KB docs | #51 | 2026-05-12 |
-| ROSS sidebar cleanup — collapse to Today + Ross's brain + footer wired to auth.currentUser (Phase 5 PR 5, **closes Phase 5**) | #48 | 2026-05-11 |
 
 ---
 
