@@ -86,7 +86,7 @@ Primary KB: `KNOWLEDGE BASE/` (project root). Curated subset for UI: `public/kb/
 
 ## Session Opening Protocol (REQUIRED)
 
-At the start of EVERY session, before any code is written or plan agreed:
+At the start of EVERY session, before any code is written or plan agreed - run through step 1-4 below, and only then ask user for clarification of user request or before starting any code changes:
 
 1. Read `KNOWLEDGE BASE/PROJECT_BACKLOG.md`
 2. State the Sprint Goal in your **first response**:
