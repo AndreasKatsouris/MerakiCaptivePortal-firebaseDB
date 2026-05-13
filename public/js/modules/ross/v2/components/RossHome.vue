@@ -16,16 +16,25 @@ import RossHomeMobile from './RossHomeMobile.vue'
 import RossPlaybook from './RossPlaybook.vue'
 import RossActivity from './RossActivity.vue'
 import RossPeople from './RossPeople.vue'
+import RossRun from './RossRun.vue'
 
 const isDesktop = ref(true)
 let mql = null
 
-const VALID_TABS = new Set(['home', 'playbook', 'activity', 'people'])
+const VALID_TABS = new Set(['home', 'playbook', 'activity', 'people', 'run'])
 const tab = ref('home')
+const runWorkflowId = ref('')
+const runLocationId = ref('')
 
 function readTab() {
   if (typeof window === 'undefined') return 'home'
-  const t = new URLSearchParams(window.location.search).get('tab')
+  const params = new URLSearchParams(window.location.search)
+  const t = params.get('tab')
+  if (t === 'run') {
+    runWorkflowId.value = params.get('workflowId') || ''
+    runLocationId.value = params.get('locationId') || ''
+    if (!runWorkflowId.value || !runLocationId.value) return 'playbook'
+  }
   return t && VALID_TABS.has(t) ? t : 'home'
 }
 
@@ -37,6 +46,7 @@ const view = computed(() => {
     case 'playbook': return 'playbook'
     case 'activity': return 'activity'
     case 'people':   return 'people'
+    case 'run':      return 'run'
     default:         return isDesktop.value ? 'home-desktop' : 'home-mobile'
   }
 })
@@ -61,5 +71,10 @@ onBeforeUnmount(() => {
   <RossPlaybook v-else-if="view === 'playbook'" />
   <RossActivity v-else-if="view === 'activity'" />
   <RossPeople v-else-if="view === 'people'" />
+  <RossRun
+    v-else-if="view === 'run'"
+    :workflow-id="runWorkflowId"
+    :location-id="runLocationId"
+  />
 </template>
 
