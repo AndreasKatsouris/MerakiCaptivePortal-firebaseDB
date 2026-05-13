@@ -27,6 +27,18 @@ describe('createRun', () => {
   })
 })
 
+describe('createRun error', () => {
+  test('throws with server error message on 500', async () => {
+    global.fetch.mockResolvedValue({
+      ok: false,
+      status: 500,
+      text: () => Promise.resolve(JSON.stringify({ error: 'Workflow not found' })),
+    })
+    await expect(createRun({ workflowId: 'w1', locationId: 'l1' }))
+      .rejects.toThrow(/Workflow not found/)
+  })
+})
+
 describe('submitResponse', () => {
   test('returns 200 result with status:200 wrapper', async () => {
     global.fetch.mockResolvedValue({
@@ -46,7 +58,7 @@ describe('submitResponse', () => {
     global.fetch.mockResolvedValue({
       ok: false,
       status: 422,
-      json: () => Promise.resolve({ error: 'Note required', requiredNote: true }),
+      text: () => Promise.resolve(JSON.stringify({ error: 'Note required', requiredNote: true })),
     })
     const out = await submitResponse({
       workflowId: 'w1', locationId: 'l1', runId: 'r1',
@@ -60,7 +72,7 @@ describe('submitResponse', () => {
     global.fetch.mockResolvedValue({
       ok: false,
       status: 500,
-      json: () => Promise.resolve({ error: 'Internal' }),
+      text: () => Promise.resolve(JSON.stringify({ error: 'Internal' })),
     })
     await expect(submitResponse({
       workflowId: 'w1', locationId: 'l1', runId: 'r1',
@@ -80,5 +92,17 @@ describe('getRun', () => {
     })
     const out = await getRun({ workflowId: 'w1', locationId: 'l1' })
     expect(out.currentRun.runId).toBe('r1')
+  })
+})
+
+describe('getRun error', () => {
+  test('throws with server error message on 500', async () => {
+    global.fetch.mockResolvedValue({
+      ok: false,
+      status: 500,
+      text: () => Promise.resolve(JSON.stringify({ error: 'Auth failed' })),
+    })
+    await expect(getRun({ workflowId: 'w1', locationId: 'l1' }))
+      .rejects.toThrow(/Auth failed/)
   })
 })

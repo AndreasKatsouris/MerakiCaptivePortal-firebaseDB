@@ -11,11 +11,15 @@ import { auth } from '../../../config/firebase-config.js'
 
 const FUNCTIONS_BASE_URL = 'https://us-central1-merakicaptiveportal-firebasedb.cloudfunctions.net'
 
-async function callFunction(functionName, data = {}) {
+// Low-level POST. Returns the raw Response so callers that need to
+// inspect status (e.g. submitResponse's 422 branch) can do so. Most
+// callers should prefer callFunction() which centralises the ok/error
+// handling.
+async function callFunctionRaw(functionName, data = {}) {
   const user = auth.currentUser
   if (!user) throw new Error('Not authenticated')
   const idToken = await user.getIdToken()
-  const res = await fetch(`${FUNCTIONS_BASE_URL}/${functionName}`, {
+  return fetch(`${FUNCTIONS_BASE_URL}/${functionName}`, {
     method: 'POST',
     headers: {
       'Authorization': `Bearer ${idToken}`,
@@ -24,7 +28,30 @@ async function callFunction(functionName, data = {}) {
     },
     body: JSON.stringify({ data }),
   })
-  return res
+}
+
+// Build an Error message from a non-ok Response. Reads the body via
+// res.text() first so we still get useful diagnostics when the server
+// returns HTML, a proxy error page, or a cold-start crash dump rather
+// than JSON. If the text parses as JSON with an `.error` field, prefer
+// that; otherwise append the raw text to a generic message.
+async function errorMessageFrom(res, functionName) {
+  const text = await res.text().catch(() => '')
+  let body = {}
+  try { body = text ? JSON.parse(text) : {} } catch { /* not JSON */ }
+  if (body.error) return body.error
+  return `${functionName} failed (${res.status})${text ? ': ' + text : ''}`
+}
+
+// High-level helper: throws on !res.ok with a useful message; returns
+// the unwrapped `result`. Used by createRun and getRun.
+async function callFunction(functionName, data = {}) {
+  const res = await callFunctionRaw(functionName, data)
+  if (!res.ok) {
+    throw new Error(await errorMessageFrom(res, functionName))
+  }
+  const body = await res.json()
+  return body.result
 }
 
 /**
@@ -33,13 +60,7 @@ async function callFunction(functionName, data = {}) {
  * Returns: { runId, status, responses, ... }
  */
 export async function createRun({ workflowId, locationId }) {
-  const res = await callFunction('rossCreateRun', { workflowId, locationId })
-  if (!res.ok) {
-    const body = await res.json().catch(() => ({}))
-    throw new Error(body.error || `rossCreateRun failed (${res.status})`)
-  }
-  const body = await res.json()
-  return body.result
+  return callFunction('rossCreateRun', { workflowId, locationId })
 }
 
 /**
@@ -55,14 +76,15 @@ export async function createRun({ workflowId, locationId }) {
 export async function submitResponse({ workflowId, locationId, runId, taskId, value, note }) {
   const payload = { workflowId, locationId, runId, taskId, value }
   if (note !== undefined && note !== null) payload.note = note
-  const res = await callFunction('rossSubmitResponse', payload)
+  const res = await callFunctionRaw('rossSubmitResponse', payload)
   if (res.status === 422) {
-    const body = await res.json().catch(() => ({}))
+    const text = await res.text().catch(() => '')
+    let body = {}
+    try { body = text ? JSON.parse(text) : {} } catch { /* not JSON */ }
     return { status: 422, requiredNote: body.requiredNote === true, error: body.error || null }
   }
   if (!res.ok) {
-    const body = await res.json().catch(() => ({}))
-    throw new Error(body.error || `rossSubmitResponse failed (${res.status})`)
+    throw new Error(await errorMessageFrom(res, 'rossSubmitResponse'))
   }
   const body = await res.json()
   return { status: 200, result: body.result }
@@ -74,11 +96,5 @@ export async function submitResponse({ workflowId, locationId, runId, taskId, va
  * Returns: { currentRun, previousResponses }
  */
 export async function getRun({ workflowId, locationId }) {
-  const res = await callFunction('rossGetRun', { workflowId, locationId })
-  if (!res.ok) {
-    const body = await res.json().catch(() => ({}))
-    throw new Error(body.error || `rossGetRun failed (${res.status})`)
-  }
-  const body = await res.json()
-  return body.result
+  return callFunction('rossGetRun', { workflowId, locationId })
 }
