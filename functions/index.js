@@ -471,15 +471,7 @@ exports.syncGuestToSendGrid = guestSync.syncGuestToSendGrid;
  * Cloud Function for user registration
  * This function securely creates user data in the database when a new user signs up
  */
-// Migrated from v1 callable signature `(data, context) => ...` to v2.
-// firebase-functions@7 deploys this as Gen 2 (environment: GEN_2 in prod);
-// Gen 2 callables pass a single CallableRequest, so the v1 `context` arg
-// was always undefined and the platform-validated auth never reached
-// the handler — every call threw `unauthenticated` and signup-service.js
-// silently fell back to the Path B direct-RTDB write. Diagnosed via
-// `firebase functions:log --only registeruser`:
-//   `"Callable request verification passed", verifications: { auth: "VALID" }`
-//   followed by `[registerUser] Function called with context: { hasAuth: false }`
+// v2 callable: single `request` arg replaces v1 `(data, context)` — see PR #67.
 exports.registerUser = onCall(async (request) => {
     const { data, auth } = request;
 
@@ -675,6 +667,11 @@ exports.registerUser = onCall(async (request) => {
         return { success: true, userId: userId };
 
     } catch (error) {
+        // Let explicit HttpsError validation throws (invalid-argument for
+        // bad tier, name-too-long, etc.) propagate with their original code
+        // and message. Without this guard the outer catch rewraps them as
+        // generic 'internal', hiding validation reasons from the client.
+        if (error instanceof HttpsError) throw error;
         console.error('Error in registerUser function:', error);
         throw new HttpsError(
             'internal',
