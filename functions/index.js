@@ -1,4 +1,4 @@
-const { onRequest } = require('firebase-functions/v2/https');
+const { onRequest, onCall, HttpsError } = require('firebase-functions/v2/https');
 const functions = require('firebase-functions');
 const admin = require('firebase-admin');
 // CORS allowlist:
@@ -471,26 +471,37 @@ exports.syncGuestToSendGrid = guestSync.syncGuestToSendGrid;
  * Cloud Function for user registration
  * This function securely creates user data in the database when a new user signs up
  */
-exports.registerUser = functions.https.onCall(async (data, context) => {
-    console.log('[registerUser] Function called with context:', {
-        hasAuth: !!context.auth,
-        uid: context.auth?.uid,
-        email: context.auth?.token?.email,
-        emailVerified: context.auth?.token?.email_verified
+// Migrated from v1 callable signature `(data, context) => ...` to v2.
+// firebase-functions@7 deploys this as Gen 2 (environment: GEN_2 in prod);
+// Gen 2 callables pass a single CallableRequest, so the v1 `context` arg
+// was always undefined and the platform-validated auth never reached
+// the handler — every call threw `unauthenticated` and signup-service.js
+// silently fell back to the Path B direct-RTDB write. Diagnosed via
+// `firebase functions:log --only registeruser`:
+//   `"Callable request verification passed", verifications: { auth: "VALID" }`
+//   followed by `[registerUser] Function called with context: { hasAuth: false }`
+exports.registerUser = onCall(async (request) => {
+    const { data, auth } = request;
+
+    console.log('[registerUser] Function called with auth:', {
+        hasAuth: !!auth,
+        uid: auth?.uid,
+        email: auth?.token?.email,
+        emailVerified: auth?.token?.email_verified
     });
 
     // Ensure user is authenticated
-    if (!context.auth) {
+    if (!auth) {
         console.error('[registerUser] No authentication context found');
-        throw new functions.https.HttpsError(
+        throw new HttpsError(
             'unauthenticated',
             'You must be logged in to register.'
         );
     }
 
     try {
-        const userId = context.auth.uid;
-        const userEmail = context.auth.token.email || data.email;
+        const userId = auth.uid;
+        const userEmail = auth.token.email || data.email;
         console.log('[registerUser] Processing registration for user:', userId, userEmail);
 
         const {
@@ -518,12 +529,12 @@ exports.registerUser = functions.https.onCall(async (data, context) => {
         // server-fetched tier data for features/limits so a client can't
         // inflate its own subscription by stuffing tierData on the way in.
         if (!tierId) {
-            throw new functions.https.HttpsError('invalid-argument', 'Tier is required.');
+            throw new HttpsError('invalid-argument', 'Tier is required.');
         }
         const canonicalTierSnap = await admin.database().ref(`subscriptionTiers/${tierId}`).once('value');
         if (!canonicalTierSnap.exists()) {
             console.error('[registerUser] Invalid tier:', tierId);
-            throw new functions.https.HttpsError('invalid-argument', `Unknown tier: ${tierId}`);
+            throw new HttpsError('invalid-argument', `Unknown tier: ${tierId}`);
         }
         const canonicalTierData = canonicalTierSnap.val() || {};
 
@@ -532,9 +543,9 @@ exports.registerUser = functions.https.onCall(async (data, context) => {
         // client from writing arbitrarily large blobs into shared nodes.
         const MAX_NAME = 200;
         const tooLong = (s) => typeof s === 'string' && s.length > MAX_NAME;
-        if (tooLong(franchiseName)) throw new functions.https.HttpsError('invalid-argument', 'franchiseName too long.');
-        if (tooLong(brandName))     throw new functions.https.HttpsError('invalid-argument', 'brandName too long.');
-        if (tooLong(businessName))  throw new functions.https.HttpsError('invalid-argument', 'businessName too long.');
+        if (tooLong(franchiseName)) throw new HttpsError('invalid-argument', 'franchiseName too long.');
+        if (tooLong(brandName))     throw new HttpsError('invalid-argument', 'brandName too long.');
+        if (tooLong(businessName))  throw new HttpsError('invalid-argument', 'businessName too long.');
 
         // Create user data
         const userData = {
@@ -665,7 +676,7 @@ exports.registerUser = functions.https.onCall(async (data, context) => {
 
     } catch (error) {
         console.error('Error in registerUser function:', error);
-        throw new functions.https.HttpsError(
+        throw new HttpsError(
             'internal',
             'An error occurred during registration.'
         );
