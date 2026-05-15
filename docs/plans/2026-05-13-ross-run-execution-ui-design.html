@@ -1,0 +1,358 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>ROSS Run Execution UI — Design Spec (Phase 6 PR 3)</title>
+<style>
+  :root {
+    --ink: #111;
+    --muted: #5a5a5a;
+    --line: #d8d8d8;
+    --bg: #fafafa;
+    --paper: #fff;
+    --accent: #2c5fb3;
+    --warn: #b35a00;
+    --code-bg: #f4f4f4;
+  }
+  * { box-sizing: border-box; }
+  html { font: 16px/1.55 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; color: var(--ink); background: var(--bg); }
+  body { max-width: 920px; margin: 0 auto; padding: 2rem 1.5rem 4rem; }
+  h1 { font-size: 1.8rem; line-height: 1.2; margin: 0 0 0.5rem; }
+  h2 { font-size: 1.3rem; margin: 2.5rem 0 0.75rem; padding-top: 1rem; border-top: 1px solid var(--line); }
+  h3 { font-size: 1.05rem; margin: 1.5rem 0 0.5rem; }
+  h4 { font-size: 0.95rem; margin: 1.25rem 0 0.4rem; color: var(--muted); text-transform: uppercase; letter-spacing: 0.04em; }
+  p, li { margin: 0.4rem 0; }
+  ul, ol { padding-left: 1.4rem; }
+  code { font: 0.88em ui-monospace, "SF Mono", Consolas, monospace; background: var(--code-bg); padding: 0.08em 0.35em; border-radius: 3px; }
+  pre { background: var(--code-bg); padding: 0.9rem 1rem; border-radius: 4px; overflow-x: auto; font: 0.85em/1.45 ui-monospace, "SF Mono", Consolas, monospace; }
+  pre code { background: none; padding: 0; }
+  table { border-collapse: collapse; width: 100%; margin: 0.75rem 0; font-size: 0.95em; }
+  th, td { border: 1px solid var(--line); padding: 0.5rem 0.7rem; text-align: left; vertical-align: top; }
+  th { background: var(--paper); font-weight: 600; }
+  .meta { color: var(--muted); font-size: 0.9rem; margin-bottom: 1.5rem; }
+  .meta strong { color: var(--ink); }
+  .callout { background: var(--paper); border-left: 3px solid var(--accent); padding: 0.75rem 1rem; margin: 1rem 0; border-radius: 0 3px 3px 0; }
+  .callout--warn { border-left-color: var(--warn); }
+  .pill { display: inline-block; font-size: 0.75em; padding: 0.1em 0.5em; border-radius: 10px; background: var(--code-bg); color: var(--muted); }
+  .pill--locked { background: #fff4e0; color: var(--warn); }
+  hr { border: none; border-top: 1px solid var(--line); margin: 2rem 0; }
+</style>
+</head>
+<body>
+
+<h1>ROSS Run Execution UI — Design Spec</h1>
+<p class="meta">
+  <strong>Date:</strong> 2026-05-13 ·
+  <strong>Sprint:</strong> Hi-Fi v2 with ROSS as central post-login surface — Phase 6 PR 3 ·
+  <strong>Predecessor:</strong> PR #58 (day-zero auto-activation) ·
+  <strong>Successor:</strong> Concierge home active-run surfacing (next sprint task)
+</p>
+
+<h2>Context</h2>
+
+<p>The ROSS Runs server surface (<code>rossCreateRun</code>, <code>rossSubmitResponse</code>, <code>rossGetRun</code>, <code>rossGetRunHistory</code>) has been shipped for some time. It supports the full 10-inputType matrix, auto-flagging of out-of-range values, server-side <code>requiredNote</code> enforcement via HTTP 422, idempotent run creation, and auto-completion when all required tasks have responses.</p>
+
+<p>It has zero UI callers. The v1 admin module (<code>public/js/modules/ross/index.js</code>) uses <code>rossCompleteTask</code> for checkbox-style task completion — no runs, no responses, no inputType awareness. As a result, a fresh operator who lands on ROSS with a seeded Daily Opening Checklist (post PR #58) has nothing to actually <em>do</em> with the seeded workflow.</p>
+
+<p>This spec defines the operator-facing Run execution UI: the v2 surface where a manager taps "Start run" on a workflow card, works through its tasks honouring all 10 <code>inputType</code>s, and lands on a completion banner showing on-time + flagged-count telemetry.</p>
+
+<h2>Strategic decisions (locked during brainstorm 2026-05-13)</h2>
+
+<table>
+  <thead>
+    <tr><th>Q</th><th>Decision</th></tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td>Where does the Run UI mount structurally?</td>
+      <td><strong>New tab on the existing concierge shell:</strong> <code>/ross.html?tab=run&amp;workflowId=W&amp;locationId=L</code>. Reuses the existing <code>URLSearchParams</code> + <code>popstate</code> tab routing in <code>RossHome.vue</code>. Deep-linkable, browser-back works, identity-aware sidebar/footer stay visible. Not a sidebar destination — only linkable-to from Playbook cards (and, next sprint, concierge home cards).</td>
+    </tr>
+    <tr>
+      <td>How do tasks lay out?</td>
+      <td><strong>Single scrollable list</strong> of task cards top-to-bottom, with a sticky bottom summary bar. Operator scrolls and jumps freely (matches real-world spatial behaviour — temp check first because the fridge is right there, then back to "lights on"). No wizard, no accordion, no two-pane.</td>
+    </tr>
+    <tr>
+      <td>When does a response persist?</td>
+      <td><strong>Auto-save on commit, per task.</strong> Each input commits on its native semantics (toggle / blur / select / tap / star tap). Small "Saving…/Saved" indicator per card. No per-task Save button. Pairs naturally with the server's idempotent run + one-response-at-a-time API.</td>
+    </tr>
+    <tr>
+      <td>How is the <code>requiredNote</code> / out-of-range flow surfaced?</td>
+      <td><strong>Client pre-flight + server safety net.</strong> On commit of a number/temperature input, the client reads <code>inputConfig.min</code>/<code>max</code>/<code>requiredNote</code>. If out of range AND <code>requiredNote: true</code>, the note textarea is revealed inline <em>before</em> the network round-trip. Value + note submit together. Server still enforces 422 if anyone bypasses the client; the same UI code path handles both.</td>
+    </tr>
+    <tr>
+      <td>What does the operator see at run completion?</td>
+      <td><strong>Inline completion banner; stay on the run page.</strong> Sticky bar flips to a green completion banner showing <code>onTime</code> + <code>flaggedCount</code> chips and two ghost buttons: <em>Back to Playbook</em> and <em>View in Activity</em>. Run cards become read-only (inputs disabled, checkmarks shown) so the operator can spot-review their submissions. No surprise redirects.</td>
+    </tr>
+    <tr>
+      <td>How are photo and signature inputs handled?</td>
+      <td><strong>Render as "Coming soon" placeholder cards</strong> with a single <em>Mark N/A</em> ghost button that submits the sentinel string <code>'n/a'</code> as the response value. This prevents these task types from blocking required-task auto-completion. The server's <code>validateResponseValue</code> has no case for photo/signature, so any string passes type-validation. Upload pipeline + signature pad are Phase 2; out of scope here.</td>
+    </tr>
+  </tbody>
+</table>
+
+<h2>Architecture</h2>
+
+<h3>New files (all under <code>public/js/modules/ross/v2/</code>)</h3>
+
+<pre><code>run-service.js                       ← CF wrappers (rossCreateRun, rossSubmitResponse, rossGetRun)
+run-store.js                         ← Pinia store: currentRun, responses, saveStatus, errors
+
+components/
+  RossRun.vue                        ← page; mounts when ?tab=run; owns load + summary + completion
+  RossRunTaskCard.vue                ← one task: title, required pill, input slot, note slot, save indicator, error slot
+  RossRunTaskInput.vue               ← polymorphic; switches on inputType; emits commit + preflightNote
+  RossRunSummaryBar.vue              ← sticky bottom bar; progress, Finish-and-leave button
+  RossRunCompletionBanner.vue        ← post-completion success banner + two nav buttons
+</code></pre>
+
+<h3>Modified files</h3>
+
+<ul>
+  <li><code>RossHome.vue</code> — extend the existing <code>?tab=</code> switch to recognize <code>tab=run</code>; read <code>workflowId</code> + <code>locationId</code> from the query and pass as props; fall back to <code>?tab=playbook</code> if either is missing.</li>
+  <li><code>RossPlaybook.vue</code> — add a <code>Start run</code> ghost button to each activated workflow card (templates do not get one). Click does <code>history.pushState</code> to the run URL and dispatches the existing <code>popstate</code>-like trigger so the home shell swaps to <code>RossRun</code>.</li>
+</ul>
+
+<h3>Not touched</h3>
+
+<ul>
+  <li>Cloud Functions. The Runs server surface is already shipped (Phase 4e.2 + earlier). Zero CF changes in this PR.</li>
+  <li>Sidebar / mobile bottom-nav. Run is link-only, not browsable-to.</li>
+  <li>v1 admin module (<code>public/js/modules/ross/index.js</code>). Run UI is v2-only.</li>
+  <li>Hi-Fi design system. Reuses existing <code>Hf*</code> components — no new primitives required.</li>
+</ul>
+
+<h2>Data layer</h2>
+
+<h3><code>run-service.js</code></h3>
+
+<p>Thin wrappers over the three Run CFs. Follows the same id-token / fetch / error-shape pattern as <code>playbook-service.js</code> and <code>people-service.js</code>. No new patterns introduced.</p>
+
+<pre><code>createRun({ workflowId, locationId })
+    → POST rossCreateRun
+    → returns { runId, status, responses }   // idempotent: returns existing in-progress run if one exists
+
+submitResponse({ workflowId, locationId, runId, taskId, value, note? })
+    → POST rossSubmitResponse
+    → returns 200 with updated run, OR
+    → returns 422 with { error, requiredNote: true }
+    → 422 is NOT thrown — service surfaces { status: 422, requiredNote: true } so the store can react
+
+getRun({ workflowId, locationId })
+    → POST rossGetRun
+    → returns { currentRun, previousResponses }   // used on mount to resume
+</code></pre>
+
+<h3><code>run-store.js</code> (Pinia)</h3>
+
+<pre><code>state:
+  currentRun:  null | { runId, status, startedAt, completedAt?, onTime?, flaggedCount? }
+  workflow:    null | { workflowId, name, tasks[] }   // task[] carries inputType + inputConfig + required
+  responses:   { [taskId]: { value, note?, submittedAt, flagged } }
+  saveStatus:  { [taskId]: 'idle' | 'saving' | 'saved' | 'error' }
+  errors:      { [taskId]: string | null }            // server message verbatim per People-tab pattern
+  loading:     boolean
+  loadError:   string | null
+
+actions:
+  initRun(workflowId, locationId)
+      // 1. getRun  → hydrate responses if in-progress
+      // 2. createRun → idempotent; returns same run if mid-flight
+      // 3. load workflow definition for the per-task inputType/inputConfig/required fields
+  commitResponse(taskId, value, note?)
+      // optimistic: saveStatus='saving' → service.submitResponse → handle 200/422/other
+  dismissError(taskId)
+  reset()
+</code></pre>
+
+<h2>Component responsibilities</h2>
+
+<table>
+  <thead>
+    <tr><th>Component</th><th>Owns</th><th>Does not own</th></tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td><code>RossRun.vue</code></td>
+      <td>Mount + route param read; calls <code>store.initRun</code>; renders page-level loading / error / empty states; renders task list + summary bar / completion banner.</td>
+      <td>Per-task state, input rendering, save mechanics.</td>
+    </tr>
+    <tr>
+      <td><code>RossRunTaskCard.vue</code></td>
+      <td>One task's frame — title, required pill, description, hosts the input, hosts the inline note textarea when revealed, shows <code>saveStatus</code> indicator, shows per-card error banner with dismiss button.</td>
+      <td>Server calls, input semantics, range validation.</td>
+    </tr>
+    <tr>
+      <td><code>RossRunTaskInput.vue</code></td>
+      <td>The input itself. Switches on <code>inputType</code> internally. Emits <code>commit(value)</code> on per-type commit semantics. Emits <code>preflightNote(reason)</code> when client-side range check trips on number / temperature with <code>requiredNote: true</code>.</td>
+      <td>Saving (delegates up), note text capture (parent owns), persistence.</td>
+    </tr>
+    <tr>
+      <td><code>RossRunSummaryBar.vue</code></td>
+      <td>Sticky bottom bar: progress count (<code>required_done / required_total</code>), Finish-and-leave button. Server auto-completes; Finish is a navigation affordance, not a submit.</td>
+      <td>Run state, task data.</td>
+    </tr>
+    <tr>
+      <td><code>RossRunCompletionBanner.vue</code></td>
+      <td>Mounts when <code>currentRun.status === 'completed'</code>. Renders success copy + <code>onTime</code> + <code>flaggedCount</code> chips + two ghost buttons (<em>Back to Playbook</em>, <em>View in Activity</em>). Data via props.</td>
+      <td>Routing decisions (parent decides which URL the buttons go to).</td>
+    </tr>
+  </tbody>
+</table>
+
+<h2>Key flows</h2>
+
+<h3>Start / resume</h3>
+
+<ol>
+  <li><code>RossHome.vue</code> sees <code>?tab=run&amp;workflowId=W&amp;locationId=L</code>, mounts <code>RossRun.vue</code> with those as props.</li>
+  <li><code>RossRun.onMounted</code> calls <code>store.initRun(W, L)</code>:
+    <ol>
+      <li><code>getRun</code> first — if an in-progress run exists, hydrate <code>currentRun</code> + <code>responses</code> from the server response.</li>
+      <li><code>createRun</code> next — server returns the same in-progress run (idempotent) or creates a fresh one.</li>
+      <li>Load workflow definition so we have <code>task[]</code> with <code>inputType</code>, <code>inputConfig</code>, <code>required</code>.</li>
+    </ol>
+  </li>
+  <li>Render. Tasks with existing responses show pre-filled, with a checkmark and <code>Saved</code> indicator.</li>
+</ol>
+
+<h3>Save-on-commit (one task)</h3>
+
+<pre><code>User commits value in RossRunTaskInput
+    ↓ emit commit(value)
+RossRunTaskCard runs pre-flight check for number/temperature:
+    if out-of-range AND inputConfig.requiredNote === true:
+        reveal note textarea, focus it, do NOT save yet
+        wait for note input + blur
+    ↓ emit save({ value, note? })
+RossRun → store.commitResponse(taskId, value, note?)
+    saveStatus[taskId] = 'saving'
+    ↓ service.submitResponse(...)
+        ├─ 200 → responses[taskId] = updated;  saveStatus='saved'  (fade to 'idle' after 1.5s)
+        ├─ 422 → re-emit preflightNote to card; saveStatus='idle'  (note flow is expected, not an error)
+        └─ other error → errors[taskId] = message; saveStatus='error'
+</code></pre>
+
+<p>If the 200 response indicates the run flipped to <code>completed</code>, store updates <code>currentRun.status</code> and <code>RossRun.vue</code> reactively renders <code>RossRunCompletionBanner</code> in place of the summary bar; cards transition to read-only.</p>
+
+<h3>Photo / signature placeholder</h3>
+
+<p>Card renders a disabled visual control (icon + label "Photo capture" or "Signature") with a <span class="pill pill--locked">Coming soon</span> tag and a single ghost button <em>Mark N/A</em>. Tapping the button submits <code>value: 'n/a'</code> via the standard commit flow. The server's <code>validateResponseValue</code> has no case for photo/signature, so any string passes type-validation. The task counts as responded and does not block run auto-completion.</p>
+
+<div class="callout callout--warn">
+  <strong>Template authoring note:</strong> If a template author sets a photo/signature task as <code>required: true</code>, the operator can still complete via <em>Mark N/A</em>. This is intentional for v1 — the alternative is blocking completion until the upload pipeline ships, which would be worse. Template authors can mitigate by marking these tasks <code>required: false</code> until Phase 2.
+</div>
+
+<h3>Leave and return</h3>
+
+<p>Operator navigates away mid-run (back to Playbook, closes tab, signs out and back in tomorrow morning). <code>store.reset()</code> fires on unmount. Returning to the same URL re-runs <code>initRun</code>; <code>rossGetRun</code> returns the same in-progress run; responses hydrate. Fully idempotent.</p>
+
+<h2>Error handling</h2>
+
+<table>
+  <thead>
+    <tr><th>Failure</th><th>UX</th></tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td>Per-task save failure (non-422)</td>
+      <td>Error banner inside the affected card with server message verbatim + dismiss button. Same pattern as People tab. Retry happens implicitly when operator re-commits.</td>
+    </tr>
+    <tr>
+      <td><code>initRun</code> failure</td>
+      <td>Page-level error banner with Retry button. <em>Back to Playbook</em> link always present so user is never stranded.</td>
+    </tr>
+    <tr>
+      <td>Network offline mid-run</td>
+      <td><code>saveStatus</code> stays <code>'saving'</code> until the request resolves or fails. No client-side queue. Operator re-commits when reconnected. Documented limitation; offline-queue is a separate enhancement.</td>
+    </tr>
+    <tr>
+      <td>Stale token / 401</td>
+      <td>Service catches 401, store surfaces "Session expired — sign in again" at page level. Mirrors existing v2 services.</td>
+    </tr>
+  </tbody>
+</table>
+
+<h2>Testing strategy</h2>
+
+<h3>Unit (vitest)</h3>
+
+<ul>
+  <li><code>run-store.test.js</code> — <code>initRun</code> happy path; <code>initRun</code> resumes mid-run (responses hydrate); <code>commitResponse</code> 200 / 422 / other-error branches; <code>commitResponse</code> flips <code>currentRun.status</code> to <code>completed</code> when server response indicates auto-completion.</li>
+  <li><code>RossRunTaskInput.preflight.test.js</code> — pre-flight reveals note field for out-of-range temperature with <code>requiredNote: true</code>; does NOT reveal for in-range; does NOT reveal when <code>requiredNote: false</code>; does NOT reveal for non-numeric input types.</li>
+</ul>
+
+<p>Coverage target: 80%+ on <code>run-store.js</code> and the pre-flight logic in <code>RossRunTaskInput.vue</code>. Light coverage on presentational components.</p>
+
+<h3>Manual smoke (before claiming done)</h3>
+
+<ol>
+  <li>Start a new run of the seeded Daily Opening Checklist; complete all tasks; verify completion banner shows <code>onTime</code> + <code>flaggedCount</code> chips.</li>
+  <li>Start a run, exit mid-way, reopen the URL — responses hydrate, focus lands on the first unanswered task.</li>
+  <li>Enter <code>12°C</code> on a fridge-temp task with <code>min: 0, max: 5, requiredNote: true</code>; verify note field reveals client-side with no round-trip; save with note; verify saved + flagged.</li>
+  <li>Enter <code>12°C</code> then clear the note textarea — verify save is blocked / value is not persisted.</li>
+  <li>Mobile breakpoint (≤640px) — full smoke on a phone or DevTools mobile.</li>
+  <li>Photo / signature <em>Mark N/A</em> completes the task and counts toward auto-completion.</li>
+</ol>
+
+<h3>Preview channel</h3>
+
+<p>Deploy from worktree before requesting operator preview validation. CFs need no deploy (no server changes). Per LESSONS pattern: preview validates client/hosting; since this PR has no CF changes, preview is sufficient verification.</p>
+
+<h2>Out of scope (explicit non-goals)</h2>
+
+<ul>
+  <li><strong>Concierge home active-run surfacing</strong> — separate sprint task. This PR only adds the Run UI; the home cards remain scripted until that follow-up.</li>
+  <li><strong>Photo upload pipeline</strong> — Phase 2. Cloud Storage bucket wiring, image compression, thumbnails, etc.</li>
+  <li><strong>Signature pad</strong> — Phase 2. Canvas-based signature capture + storage.</li>
+  <li><strong>Offline queue</strong> — saves that fire while disconnected are not retried automatically. Documented limitation.</li>
+  <li><strong>Operator-initiated "Cancel run"</strong> — the server has no <code>rossCancelRun</code>. Runs that the operator abandons remain <code>in_progress</code> indefinitely until completed.</li>
+  <li><strong>Run history / re-open completed runs</strong> — that's the Activity tab's job. Completion banner links there.</li>
+  <li><strong>Mobile bottom-nav addition</strong> — Run is link-only, not a destination users browse to. (The pre-existing "mobile nav missing Playbook/Activity/People" backlog bug is independent and untouched.)</li>
+</ul>
+
+<h2>Risks</h2>
+
+<table>
+  <thead>
+    <tr><th>Risk</th><th>Mitigation</th></tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td>Auto-save on every commit could spam the server if the operator rapidly toggles a checkbox.</td>
+      <td>Acceptable for v1 — server is idempotent on the same response; checkbox toggling is operator behaviour, not a hot loop. If load becomes an issue, add a 250ms debounce on the commit emit.</td>
+    </tr>
+    <tr>
+      <td>Client pre-flight diverges from server validation logic if either changes.</td>
+      <td>Server is the safety net — its 422 path is exercised by the same UI code as pre-flight reveal. If the client check drifts, the server path still surfaces correctly. Unit test asserts both paths share UX.</td>
+    </tr>
+    <tr>
+      <td>Hi-Fi token names: same family of bugs as PR #55 (used non-existent <code>--hf-fg</code>, <code>--hf-surface</code>, etc.).</td>
+      <td>Verify all <code>--hf-*</code> tokens against <code>public/css/hifi-tokens.css</code> before authoring any scoped style block. Listed in LESSONS 2026-05-12.</td>
+    </tr>
+    <tr>
+      <td>Worktree Read paths: Edit silently rejects files Read from master path while in a worktree.</td>
+      <td>Read every file from the worktree path. Asset-hash delta after <code>npm run build</code> is the verification signal, not just build-green. Listed in LESSONS 2026-05-11.</td>
+    </tr>
+    <tr>
+      <td>Double-click "Start run" race could theoretically create duplicate runs.</td>
+      <td><code>rossCreateRun</code> is server-idempotent — returns the existing in-progress run. No client-side guard needed.</td>
+    </tr>
+  </tbody>
+</table>
+
+<h2>Open questions (resolved)</h2>
+
+<p>All foundational questions were resolved during the 2026-05-13 brainstorm. Listed for posterity:</p>
+
+<ul>
+  <li>Mount location → new tab on <code>/ross.html</code></li>
+  <li>Layout shape → single scrollable list + sticky bar</li>
+  <li>Save trigger → auto-save on commit</li>
+  <li>Note flow → client pre-flight + server safety net</li>
+  <li>Completion UX → inline banner, stay on page</li>
+  <li>Component split → pragmatic (Approach B): one polymorphic <code>RossRunTaskInput</code>, dedicated card + summary + banner components</li>
+  <li>Photo / signature → "Coming soon" placeholder + <em>Mark N/A</em> sentinel submit</li>
+</ul>
+
+</body>
+</html>
