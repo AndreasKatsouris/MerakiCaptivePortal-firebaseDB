@@ -23,7 +23,7 @@ The platform deploys **69+ Cloud Functions** from a single `functions/index.js` 
 
 | Function | Trigger | Auth | Purpose |
 |----------|---------|------|---------|
-| `registerUser` | onCall (v1) | Authenticated | Creates user profile, subscription, initial location during registration |
+| `registerUser` | onCall (v2) | Authenticated | Creates user profile, subscription, initial location during registration |
 | `setAdminClaim` | HTTP POST (v2) | Admin | Sets/removes admin custom claim and `admin-claims` DB entry |
 | `verifyAdminStatus` | HTTP GET (v2) | Authenticated | Returns `{ isAdmin: true/false }` via dual claim + DB check |
 | `createUserAccount` | HTTP POST (v2) | Admin | Creates Firebase Auth user, profile, subscription, location assignments |
@@ -285,13 +285,20 @@ const idToken = req.headers.authorization?.split('Bearer ')[1];
 const decodedToken = await admin.auth().verifyIdToken(idToken);
 ```
 
-### Callable Functions (onCall)
+### Callable Functions (onCall — v2)
 ```javascript
-if (!context.auth) {
-    throw new functions.https.HttpsError('unauthenticated', '...');
-}
-const userId = context.auth.uid;
+const { onCall, HttpsError } = require('firebase-functions/v2/https');
+
+exports.myCallable = onCall(async (request) => {
+    const { data, auth } = request;
+    if (!auth) {
+        throw new HttpsError('unauthenticated', '...');
+    }
+    const userId = auth.uid;
+    // ...
+});
 ```
+> Note: `firebase-functions@7` deploys handlers as Gen 2 regardless of whether you use the v1 namespace (`functions.https.onCall`) or the explicit v2 import. **Use the v2 import** — the v1 signature `(data, context)` receives a single `CallableRequest` as `data` and an undefined `context`, so `context.auth` is always missing and every call throws `unauthenticated`. See PR #67.
 
 ### Admin Check (Dual Verification)
 ```javascript
