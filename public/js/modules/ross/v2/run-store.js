@@ -22,6 +22,12 @@ export const useRunStore = defineStore('ross-run', {
     errors: {},
     loading: false,
     loadError: null,
+    // Set to a taskId when the server returns 422 { requiredNote: true } —
+    // i.e. the client-side pre-flight didn't fire (task lacked
+    // inputConfig.requiredNote) but the server still demands a note for the
+    // out-of-range value. Card watches its own taskId against this and opens
+    // the note field. Cleared once the resubmit-with-note succeeds.
+    pendingNoteTaskId: null,
   }),
 
   actions: {
@@ -56,6 +62,7 @@ export const useRunStore = defineStore('ross-run', {
       this.errors = {}
       this.loading = false
       this.loadError = null
+      this.pendingNoteTaskId = null
     },
 
     async commitResponse(taskId, value, note) {
@@ -73,8 +80,11 @@ export const useRunStore = defineStore('ross-run', {
         })
         if (out.status === 422 && out.requiredNote) {
           this.saveStatus = { ...this.saveStatus, [taskId]: 'idle' }
+          this.pendingNoteTaskId = taskId
           return { requiredNote: true }
         }
+        // success path — if we previously asked for a note on this task, clear
+        if (this.pendingNoteTaskId === taskId) this.pendingNoteTaskId = null
         // 200 — server returns { success, taskId, flagged, runCompleted }
         // (functions/ross.js:1337). Server does NOT return the full responses
         // map, so build the response object client-side from the values we

@@ -1,15 +1,16 @@
 <script setup>
-import { ref } from 'vue'
+import { ref, watch } from 'vue'
 import RossRunTaskInput from './RossRunTaskInput.vue'
 import HfChip from '../../../../design-system/hifi/components/HfChip.vue'
 import HfButton from '../../../../design-system/hifi/components/HfButton.vue'
 
 const props = defineProps({
-  task:        { type: Object, required: true },
-  response:    { default: null },               // { value, note, submittedAt, flagged } or null
-  saveStatus:  { type: String, default: 'idle' }, // idle | saving | saved | error
-  error:       { type: String, default: null },
-  disabled:    { type: Boolean, default: false }, // true after run completes
+  task:         { type: Object, required: true },
+  response:     { default: null },               // { value, note, submittedAt, flagged } or null
+  saveStatus:   { type: String, default: 'idle' }, // idle | saving | saved | error
+  error:        { type: String, default: null },
+  requiresNote: { type: Boolean, default: false }, // server 422 fallback: open note field
+  disabled:     { type: Boolean, default: false }, // true after run completes
 })
 
 const emit = defineEmits(['save', 'dismissError'])
@@ -19,7 +20,10 @@ const pendingValue = ref(undefined)
 const noteText = ref('')
 
 function onCommit(value) {
-  // No pre-flight tripped — just save.
+  // No client-side pre-flight tripped — save without a note. Stash the value
+  // so the server-fallback path (watch on requiresNote below) can resubmit it
+  // with a note if the server returns 422.
+  pendingValue.value = value
   noteFieldOpen.value = false
   emit('save', { value, note: undefined })
 }
@@ -29,6 +33,16 @@ function onPreflightNote({ value }) {
   noteText.value = props.response?.note ?? ''
   noteFieldOpen.value = true
 }
+
+// Server safety net: when the store flags this task as requiring a note
+// (server 422 path), open the note field with the value we just submitted
+// stashed in pendingValue.
+watch(() => props.requiresNote, (val) => {
+  if (val) {
+    noteText.value = props.response?.note ?? ''
+    noteFieldOpen.value = true
+  }
+})
 
 function onNoteBlur() {
   const note = noteText.value.trim()

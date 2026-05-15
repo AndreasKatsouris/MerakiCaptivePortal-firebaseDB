@@ -37,7 +37,9 @@ function onTextInput(v) {
   local.value = v
 }
 function onTextBlur() {
-  if (local.value === props.value) return  // no change, skip spurious commits
+  // Normalize undefined → '' so a first-mount blur on an empty field doesn't
+  // commit '' against an undefined props.value (would fire a spurious save).
+  if (local.value === (props.value ?? '')) return
   commit(local.value)
 }
 

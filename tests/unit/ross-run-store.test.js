@@ -4,7 +4,6 @@ import { setActivePinia, createPinia } from 'pinia'
 vi.mock('../../public/js/modules/ross/v2/run-service.js', () => ({
   createRun: vi.fn(),
   submitResponse: vi.fn(),
-  getRun: vi.fn(),
 }))
 vi.mock('../../public/js/modules/ross/v2/playbook-service.js', () => ({
   getPlaybookWorkflows: vi.fn(),
@@ -152,7 +151,7 @@ describe('commitResponse', () => {
     expect(store.responses.t1.note).toBe('out of range')
   })
 
-  test('422 requiredNote: returns { requiredNote:true }, saveStatus idle, no error', async () => {
+  test('422 requiredNote: returns { requiredNote:true }, saveStatus idle, pendingNoteTaskId set, no error', async () => {
     runService.submitResponse.mockResolvedValue({
       status: 422, requiredNote: true, error: 'Note required',
     })
@@ -164,6 +163,30 @@ describe('commitResponse', () => {
     expect(result).toEqual({ requiredNote: true })
     expect(store.saveStatus.t1).toBe('idle')
     expect(store.errors.t1).toBeNull()
+    expect(store.pendingNoteTaskId).toBe('t1')
+  })
+
+  test('422 → resubmit with note 200: pendingNoteTaskId cleared after success', async () => {
+    runService.submitResponse
+      .mockResolvedValueOnce({ status: 422, requiredNote: true, error: 'Note required' })
+      .mockResolvedValueOnce({ result: { success: true, taskId: 't1', flagged: true, runCompleted: false } })
+    const store = useRunStore()
+    store.currentRun = { runId: 'r1', status: 'in_progress' }
+    store.workflow = { workflowId: 'w1', locationId: 'l1', tasks: [] }
+
+    await store.commitResponse('t1', 12)
+    expect(store.pendingNoteTaskId).toBe('t1')
+
+    await store.commitResponse('t1', 12, 'Calibration drift')
+    expect(store.pendingNoteTaskId).toBeNull()
+    expect(store.saveStatus.t1).toBe('saved')
+  })
+
+  test('reset: clears pendingNoteTaskId', async () => {
+    const store = useRunStore()
+    store.pendingNoteTaskId = 't1'
+    store.reset()
+    expect(store.pendingNoteTaskId).toBeNull()
   })
 
   test('thrown error: saveStatus error, errors[taskId] populated', async () => {

@@ -64,7 +64,10 @@ onBeforeUnmount(() => {
 
     <div v-else-if="store.loadError" class="rross-run__error">
       <p>{{ store.loadError }}</p>
-      <HfButton variant="solid" @click="store.initRun(props.workflowId, props.locationId)">Retry</HfButton>
+      <div class="rross-run__error-actions">
+        <HfButton variant="solid" @click="store.initRun(props.workflowId, props.locationId)">Retry</HfButton>
+        <HfButton variant="ghost" @click="navTo('/ross.html?tab=playbook')">Back to Playbook</HfButton>
+      </div>
     </div>
 
     <template v-else-if="store.workflow">
@@ -77,6 +80,7 @@ onBeforeUnmount(() => {
           :response="store.responses[task.id] || null"
           :save-status="store.saveStatus[task.id] || 'idle'"
           :error="store.errors[task.id] || null"
+          :requires-note="store.pendingNoteTaskId === task.id"
           :disabled="isCompleted"
           @save="payload => onSave(task.id, payload)"
           @dismiss-error="store.dismissError(task.id)"
@@ -144,4 +148,5 @@ onBeforeUnmount(() => {
   text-align: center; color: var(--hf-muted);
 }
 .rross-run__error p { color: var(--hf-crit); margin: 0 0 var(--hf-space-3); }
+.rross-run__error-actions { display: inline-flex; gap: var(--hf-space-3); justify-content: center; }
 </style>
