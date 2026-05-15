@@ -80,25 +80,25 @@
     { "id": "phase-6-pr1b-curate", "label": "Phase 6 PR 1B (PR #53) — curated starter library (5 Free / 8 All-in split) + folded backfill URL fix on PR #51's sibling", "done": true, "phase": 6 },
     { "id": "phase-6-pr1c-locked-list", "label": "Phase 6 PR 1C (PR #55) — tier-gated template list with locked-card upsell UX + Hi-Fi /upgrade.html comparison page (email CTA, ?from=template&id= pre-fill)", "done": true, "phase": 6 },
     { "id": "phase-6-day-zero", "label": "Phase 6 PR 2 (PR #58) — day-zero auto-activation: new rossSeedFirstWorkflow CF + signup-service.js integration + buildLocationsFromTemplate/buildWorkflowRecord helper extraction + RTDB pointer at ross/config/firstWorkflowTemplateId", "done": true, "phase": 6 },
-    { "id": "phase-6-run-ui", "label": "Phase 6 — operator-facing Run execution UI honouring all 10 inputTypes (number/temperature with auto-flag, dropdown, rating, photo/signature placeholders)", "done": false, "phase": 6 },
+    { "id": "phase-6-run-ui", "label": "Phase 6 PR 3 (PR #65) — operator-facing Run execution UI honouring all 10 inputTypes (number/temperature with auto-flag + client pre-flight requiredNote + server-422 safety net via store.pendingNoteTaskId + card watcher / yes_no / dropdown / timestamp / rating / photo/signature placeholders); auto-save on commit; sticky summary bar; inline completion banner; 40 unit tests across 4 new suites", "done": true, "phase": 6 },
     { "id": "phase-6-home-cards", "label": "Phase 6 — concierge home cards driven by real activated workflows (replace scripted findings)", "done": false, "phase": 6 }
   ],
   "inProgress": [],
   "recentlyCompleted": [
+    { "title": "registerUser callable Gen-2 signature fix (HIGH-sev bug-triage) — migrated v1 (data, context) => to v2 (request) =>; closed silent prod degradation that had been masking Path A code path since the firebase-functions v7 upgrade; pre-merge fold-in for HttpsError re-throw + KB doc sync; validated end-to-end on prod (positive + invalid-tier negative test)", "pr": 67, "mergedAt": "2026-05-15" },
+    { "title": "ROSS Run execution UI (Phase 6 PR 3) — ?tab=run page covering all 10 inputTypes with auto-save, client pre-flight requiredNote + server-422 safety net via store.pendingNoteTaskId, sticky summary bar, inline completion banner; 40 unit tests across 4 new suites; pre-merge fold-in resolved 6 of 7 automated-review items", "pr": 65, "mergedAt": "2026-05-15" },
     { "title": "ROSS day-zero auto-activation (Phase 6 PR 2) — rossSeedFirstWorkflow CF + signup-service.js integration; helper extraction with 17 unit tests; RTDB pointer; architecture pivoted mid-PR after preview revealed pre-existing registerUser callable bug", "pr": 58, "mergedAt": "2026-05-12" },
     { "title": "ROSS tier-gated template list + Hi-Fi upgrade page (Phase 6 PR 1C) — server includeLocked opt-in, locked-card UX in v2 Playbook, /upgrade.html comparison page with email CTA", "pr": 55, "mergedAt": "2026-05-12" },
-    { "title": "ROSS starter library curation — 5 Free / 8 All-in split (Phase 6 PR 1B) + folded backfill URL fix on PR #51's sibling", "pr": 53, "mergedAt": "2026-05-12" },
-    { "title": "ROSS template tier-gating mechanism (Phase 6 PR 1A) — schema, three gate points (read/activate/client), audit log, editor field, KB docs", "pr": 51, "mergedAt": "2026-05-12" },
-    { "title": "ROSS sidebar cleanup — collapse to Today + Ross's brain + footer wired to auth.currentUser (Phase 5 PR 5, closes Phase 5)", "pr": 48, "mergedAt": "2026-05-11" }
+    { "title": "ROSS starter library curation — 5 Free / 8 All-in split (Phase 6 PR 1B) + folded backfill URL fix on PR #51's sibling", "pr": 53, "mergedAt": "2026-05-12" }
   ],
   "bugs": [
     {
-      "title": "registerUser callable throws unauthenticated on every call — v1-vs-v2 signature bug from firebase-functions v7 upgrade",
-      "severity": "high",
-      "discoveredAt": "2026-05-12",
-      "discoveredOn": "PR #58 preview test",
+      "title": "Other 7 v1 callables in functions/index.js share the same Gen-2 signature bug (getQMSTierInfo, getQMSUsageStats, validateQMSFeatureAccess, validateQMSWhatsAppIntegration, performanceTest, runSystemOptimization, getSystemMetrics)",
+      "severity": "medium",
+      "discoveredAt": "2026-05-15",
+      "discoveredOn": "PR #67 audit",
       "blockingSprint": false,
-      "notes": "functions/index.js:474 uses v1 callable signature `onCall((data, context) => ...)` but prod runtime is Gen 2 (Node 22). Auth context arrives as request.auth on the first arg, not on a separate context param. Every fresh signup hits the v1 callable, gets unauthenticated, and signup-service.js:109-111 silently swallows it and runs the Path B fallback. Production has been silently degraded for an unknown stretch — the fallback handles signup, but the callable's server-side tier validation + atomic multi-path write + initialised onboarding-progress never run. Fix: migrate handler to v2 callable signature. Touches a 200-line function with multiple consumers; deserves its own dedicated PR."
+      "notes": "All seven still use functions.https.onCall((data, context) => ...) and will throw unauthenticated on every call (same Gen-2 vs v1 signature mismatch fixed for registerUser in PR #67). Audit findings: two QMS callables show no recent invocations; the other five had logs-API errors on the audit pass. Consumer audit (public/): performanceTest has a working HTTP fallback (performanceTestHTTP); runSystemOptimization called only from admin-internal firebase-performance-monitor.js; QMS callables have no public/ consumers. None on user-facing critical path. Fix: same mechanical migration as PR #67 — onCall((request) => { const { data, auth } = request; ... }) with HttpsError from firebase-functions/v2/https. Recommend one sweep PR addressing all seven at once for consistent diff + single deploy."
     },
     {
       "title": "Mobile nav missing Playbook/Activity/People access on ROSS home",
@@ -127,9 +127,8 @@
   ],
   "backlog": {
     "high": [
-      "Fix registerUser callable v1-vs-v2 signature bug — silent prod degradation since the firebase-functions v7 upgrade. Migrate handler to v2 callable signature (request.auth, request.data). Touches a 200-line function with multiple consumers.",
-      "Phase 6 — operator-facing Run execution UI for all 10 inputTypes",
       "Phase 6 — concierge home cards driven by real activated workflows",
+      "Sweep PR for the 7 other v1 callables in functions/index.js sharing the Gen-2 signature bug (getQMS*, validateQMS*, performanceTest, runSystemOptimization, getSystemMetrics) — same mechanical migration as PR #67",
       "Food cost open PR — review and merge",
       "Chart.js retirement (soak ended ~2026-05-07; execute removal per CHARTJS_REMOVAL_AUDIT.md — 16 of 23 sites have v2 replacements)"
     ],
