@@ -16,7 +16,18 @@ const cors = require('cors')({ origin: true });
 const { validateTier, userCanActivate, filterTemplatesByTier } = require('./ross-tier');
 const { buildWorkflowRecord, buildTaskFromSubtask } = require('./ross-workflow-builder');
 
-const db = admin.database();
+// Lazy db accessor — deferred so unit tests can require this module without a
+// live Firebase app being initialised at load time.  All CF handlers are
+// invoked asynchronously and therefore always have a live app by the time they
+// call db.ref().
+let _db = null;
+function getDb() {
+    if (!_db) _db = admin.database();
+    return _db;
+}
+// Alias: keeps the rest of the file unchanged while individual call-sites are
+// migrated.  Any place that used `db.ref(...)` now calls `getDb().ref(...)`.
+const db = new Proxy({}, { get: (_t, prop) => getDb()[prop] });
 
 // ============================================
 // CONSTANTS
@@ -179,6 +190,157 @@ async function resolveWorkflowOwner(workflowId, locationId, callerUid) {
     const own = await db.ref(`ross/workflows/${callerUid}/${workflowId}/locations/${locationId}`).once('value');
     if (own.exists()) return callerUid;
     return null;
+}
+
+// =====================================================================
+//  HOME WORKFLOW DIGEST helper (pure, exported for unit tests)
+// =====================================================================
+
+const HOME_DIGEST_RECENT_WINDOW_MS = 24 * 60 * 60 * 1000;
+const HOME_DIGEST_DAY_MS = 24 * 60 * 60 * 1000;
+
+function _todayUTC(now) {
+    return new Date(now).toISOString().slice(0, 10);
+}
+
+function _dateDiffDays(fromISO, toISO) {
+    // positive when toISO > fromISO
+    const f = Date.parse(fromISO + 'T00:00:00Z');
+    const t = Date.parse(toISO + 'T00:00:00Z');
+    if (Number.isNaN(f) || Number.isNaN(t)) return 0;
+    return Math.round((t - f) / HOME_DIGEST_DAY_MS);
+}
+
+function _latestRun(runsForPair) {
+    if (!runsForPair || typeof runsForPair !== 'object') return null;
+    let best = null;
+    for (const r of Object.values(runsForPair)) {
+        if (!r || typeof r !== 'object') continue;
+        if (!best || (Number(r.startedAt) || 0) > (Number(best.startedAt) || 0)) {
+            best = r;
+        }
+    }
+    return best;
+}
+
+function _countRequiredTasks(tasks) {
+    if (!tasks || typeof tasks !== 'object') return 0;
+    let n = 0;
+    for (const t of Object.values(tasks)) {
+        if (t && t.required !== false) n++;
+    }
+    return n;
+}
+
+function _countResponses(run) {
+    if (!run || !run.responses || typeof run.responses !== 'object') return 0;
+    return Object.keys(run.responses).length;
+}
+
+function buildHomeWorkflowDigest({ workflows, runs, clientToday, now }) {
+    const today = clientToday || _todayUTC(now);
+    const safeWorkflows = (workflows && typeof workflows === 'object') ? workflows : {};
+    const safeRuns = (runs && typeof runs === 'object') ? runs : {};
+
+    const overdue = [];
+    const todayBucket = [];
+    const recentCompletions = [];
+
+    const activeWorkflowIds = new Set();
+    let upcoming = null;
+
+    for (const [workflowId, w] of Object.entries(safeWorkflows)) {
+        if (!w || typeof w !== 'object') continue;
+        if (w.status === 'paused') continue;
+        if (!w.locations || typeof w.locations !== 'object') {
+            console.warn(`[ross] skipped malformed workflow ${workflowId}: no locations`);
+            continue;
+        }
+
+        let workflowCountsAsActive = false;
+
+        for (const [locationId, loc] of Object.entries(w.locations)) {
+            if (!loc || typeof loc !== 'object') continue;
+            if (!loc.nextDueDate) {
+                console.warn(`[ross] skipped malformed workflow ${workflowId}/${locationId}: no nextDueDate`);
+                continue;
+            }
+
+            workflowCountsAsActive = true;
+            const runsForPair = (safeRuns[workflowId] && safeRuns[workflowId][locationId]) || {};
+            const latestRun = _latestRun(runsForPair);
+            const requiredTaskCount = _countRequiredTasks(loc.tasks);
+            const completedTaskCount = _countResponses(latestRun);
+
+            const nextDueMs = Date.parse(loc.nextDueDate + 'T00:00:00Z');
+            const runCoversCurrentPeriod = latestRun
+                && Number.isFinite(nextDueMs)
+                && Number(latestRun.startedAt) >= nextDueMs;
+
+            const daysLate = _dateDiffDays(loc.nextDueDate, today);
+            const name = w.name || 'Workflow';
+            const locationName = loc.locationName || 'Venue';
+
+            const baseEntry = {
+                workflowId, locationId, name, locationName,
+                nextDueDate: loc.nextDueDate,
+            };
+
+            if (loc.nextDueDate < today && !runCoversCurrentPeriod) {
+                overdue.push({ ...baseEntry, daysLate, requiredTaskCount });
+            } else if (loc.nextDueDate === today && latestRun && latestRun.status === 'in_progress') {
+                todayBucket.push({
+                    ...baseEntry,
+                    subState: 'in_progress',
+                    runId: latestRun.runId,
+                    startedAt: Number(latestRun.startedAt) || 0,
+                    completedTaskCount,
+                    requiredTaskCount,
+                });
+            } else if (loc.nextDueDate === today && !runCoversCurrentPeriod) {
+                todayBucket.push({
+                    ...baseEntry,
+                    subState: 'pending',
+                    requiredTaskCount,
+                });
+            } else if (latestRun && latestRun.status === 'completed'
+                && (now - Number(latestRun.completedAt)) < HOME_DIGEST_RECENT_WINDOW_MS) {
+                recentCompletions.push({
+                    ...baseEntry,
+                    runId: latestRun.runId,
+                    completedAt: Number(latestRun.completedAt) || 0,
+                    onTime: latestRun.onTime !== false,
+                    flaggedCount: Number(latestRun.flaggedCount) || 0,
+                });
+            }
+
+            if (loc.nextDueDate > today) {
+                if (!upcoming || loc.nextDueDate < upcoming.nextDueDate) {
+                    upcoming = { ...baseEntry };
+                }
+            }
+        }
+
+        if (workflowCountsAsActive) activeWorkflowIds.add(workflowId);
+    }
+
+    overdue.sort((a, b) => b.daysLate - a.daysLate);
+    todayBucket.sort((a, b) => {
+        if (a.subState !== b.subState) return a.subState === 'in_progress' ? -1 : 1;
+        if (a.nextDueDate !== b.nextDueDate) return a.nextDueDate < b.nextDueDate ? -1 : 1;
+        return a.name.localeCompare(b.name);
+    });
+    recentCompletions.sort((a, b) => b.completedAt - a.completedAt);
+
+    return {
+        overdue,
+        today: todayBucket,
+        recentCompletions,
+        hasActiveWorkflows: activeWorkflowIds.size > 0,
+        activeWorkflowCount: activeWorkflowIds.size,
+        upcoming,
+        generatedAt: now,
+    };
 }
 
 // ============================================
@@ -1583,3 +1745,5 @@ exports.rossGetStaff = onRequest(async (req, res) => {
 });
 
 module.exports.VALID_INPUT_TYPES = VALID_INPUT_TYPES;
+// Pure helper — exported for unit tests and the rossGetHomeWorkflowDigest CF (Task 2)
+module.exports.buildHomeWorkflowDigest = buildHomeWorkflowDigest;
