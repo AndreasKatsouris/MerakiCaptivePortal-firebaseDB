@@ -388,18 +388,30 @@ export function buildHeadline(ctx, realCards) {
 //  Card 0: Active workflows (slot 1 — workflow card variants A-E)
 // =========================================================================
 
+// Threshold for the "Missed" framing: workflows ≥4 days late are visually
+// distinguished from short-term-overdue ones. Per operator design call on
+// PR #72 — "Overdue" implies acknowledgement; "Missed" implies the
+// workflow has gone untouched and warrants stronger attention.
+const MISSED_DAYS_THRESHOLD = 4
+
 function _buildOverdueCard(entry, allOverdue) {
   const overdueCount = allOverdue.length
+  const isMissed = entry.daysLate >= MISSED_DAYS_THRESHOLD
+  const chipLabel = isMissed ? 'Missed' : 'Overdue'
   const daysLateLabel = `${entry.daysLate} day${entry.daysLate === 1 ? '' : 's'} late`
+  const verbPhrase = isMissed ? 'has been missed' : 'is overdue'
   const aggSuffix = overdueCount > 1
-    ? ` And ${overdueCount - 1} more venue${overdueCount - 1 === 1 ? '' : 's'} overdue.`
+    ? ` And ${overdueCount - 1} more venue${overdueCount - 1 === 1 ? '' : 's'} ${isMissed ? 'missed' : 'overdue'}.`
     : ''
+  const footnoteText = overdueCount > 1
+    ? `${overdueCount} workflows ${isMissed ? 'missed' : 'overdue'}`
+    : undefined
   return {
     id: `workflow:${entry.workflowId}:${entry.locationId}`,
     tone: 'warn',
     eyebrow: `${entry.locationName} · ${daysLateLabel}`,
-    chip: { tone: 'warn', label: 'Overdue' },
-    headline: `${entry.name} is overdue at ${entry.locationName} (${daysLateLabel}).`,
+    chip: { tone: 'warn', label: chipLabel },
+    headline: `${entry.name} ${verbPhrase} at ${entry.locationName} (${daysLateLabel}).`,
     detail: `${entry.requiredTaskCount} task${entry.requiredTaskCount === 1 ? '' : 's'} pending. Start now to catch up.${aggSuffix}`,
     actions: [
       { id: 'run-workflow', label: 'Start now', variant: 'solid', trailing: 'arrow',
@@ -408,15 +420,15 @@ function _buildOverdueCard(entry, allOverdue) {
         href: '/ross.html?tab=playbook' },
       { id: 'snooze', label: 'Snooze 24h', variant: 'ghost' },
     ],
-    footnote: overdueCount > 1 ? `${overdueCount} workflows overdue` : undefined,
+    footnote: footnoteText,
     sidecar: {
       kind: 'kpi-spark', eyebrow: 'Days late',
       value: entry.daysLate, unit: 'd',
-      target: 'target: 0 overdue',
+      target: isMissed ? 'untouched' : 'target: 0 overdue',
       trend: [0, 0, 0, 0, 0, 0, entry.daysLate],
       color: 'var(--hf-warn)',
     },
-    _meta: { contextLine: `${entry.name} is ${entry.daysLate} day${entry.daysLate === 1 ? '' : 's'} overdue at ${entry.locationName}.` },
+    _meta: { contextLine: `${entry.name} ${isMissed ? 'has been missed' : 'is'} ${entry.daysLate} day${entry.daysLate === 1 ? '' : 's'} ${isMissed ? '' : 'overdue'} at ${entry.locationName}.`.replace(/\s+/g, ' ').trim() },
   }
 }
 

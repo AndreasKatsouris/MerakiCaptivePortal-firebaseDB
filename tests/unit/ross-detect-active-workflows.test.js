@@ -58,11 +58,13 @@ describe('detectActiveWorkflows priority + variants', () => {
       overdue: [{
         workflowId: 'w1', locationId: 'locA',
         name: 'X', locationName: 'A',
-        nextDueDate: '2026-05-15', daysLate: 4, requiredTaskCount: 3,
+        nextDueDate: '2026-05-16', daysLate: 3, requiredTaskCount: 3,
       }],
     }))
     const card = await detectActiveWorkflows(baseCtx)
-    expect(card.headline).toContain('4 days late')
+    expect(card.headline).toContain('3 days late')
+    // 3 days is still under the Missed threshold → keeps "Overdue" framing
+    expect(card.chip.label).toBe('Overdue')
   })
 
   test('overdue plural (3 overdue) → aggSuffix + footnote', async () => {
@@ -70,7 +72,7 @@ describe('detectActiveWorkflows priority + variants', () => {
       hasActiveWorkflows: true,
       activeWorkflowCount: 3,
       overdue: [
-        { workflowId: 'w1', locationId: 'locA', name: 'A', locationName: 'X', nextDueDate: '2026-05-15', daysLate: 4, requiredTaskCount: 3 },
+        { workflowId: 'w1', locationId: 'locA', name: 'A', locationName: 'X', nextDueDate: '2026-05-16', daysLate: 3, requiredTaskCount: 3 },
         { workflowId: 'w2', locationId: 'locB', name: 'B', locationName: 'Y', nextDueDate: '2026-05-17', daysLate: 2, requiredTaskCount: 1 },
         { workflowId: 'w3', locationId: 'locC', name: 'C', locationName: 'Z', nextDueDate: '2026-05-18', daysLate: 1, requiredTaskCount: 2 },
       ],
@@ -78,6 +80,58 @@ describe('detectActiveWorkflows priority + variants', () => {
     const card = await detectActiveWorkflows(baseCtx)
     expect(card.detail).toContain('And 2 more')
     expect(card.footnote).toBe('3 workflows overdue')
+  })
+
+  // Missed-threshold tests (per operator design call on PR #72):
+  // daysLate ≥ 4 swaps the chip label, headline verb, footnote wording,
+  // and sidecar target copy from "overdue" framing to "missed" framing.
+  test('daysLate=4 → chip flips to "Missed" + headline uses "has been missed"', async () => {
+    getHomeWorkflowDigest.mockResolvedValue(digest({
+      hasActiveWorkflows: true,
+      activeWorkflowCount: 1,
+      overdue: [{
+        workflowId: 'w1', locationId: 'locA',
+        name: 'Weekly Deep Clean', locationName: 'Ocean Club',
+        nextDueDate: '2026-05-15', daysLate: 4, requiredTaskCount: 5,
+      }],
+    }))
+    const card = await detectActiveWorkflows(baseCtx)
+    expect(card.chip.label).toBe('Missed')
+    expect(card.headline).toContain('has been missed')
+    expect(card.headline).toContain('Weekly Deep Clean')
+    expect(card.headline).toContain('4 days late')
+    expect(card.sidecar.target).toBe('untouched')
+  })
+
+  test('daysLate=3 → still "Overdue" (boundary)', async () => {
+    getHomeWorkflowDigest.mockResolvedValue(digest({
+      hasActiveWorkflows: true,
+      activeWorkflowCount: 1,
+      overdue: [{
+        workflowId: 'w1', locationId: 'locA',
+        name: 'X', locationName: 'A',
+        nextDueDate: '2026-05-16', daysLate: 3, requiredTaskCount: 1,
+      }],
+    }))
+    const card = await detectActiveWorkflows(baseCtx)
+    expect(card.chip.label).toBe('Overdue')
+    expect(card.headline).toContain('is overdue')
+    expect(card.sidecar.target).toBe('target: 0 overdue')
+  })
+
+  test('multiple missed → aggSuffix + footnote use "missed" wording', async () => {
+    getHomeWorkflowDigest.mockResolvedValue(digest({
+      hasActiveWorkflows: true,
+      activeWorkflowCount: 2,
+      overdue: [
+        { workflowId: 'w1', locationId: 'locA', name: 'A', locationName: 'X', nextDueDate: '2026-05-10', daysLate: 9, requiredTaskCount: 3 },
+        { workflowId: 'w2', locationId: 'locB', name: 'B', locationName: 'Y', nextDueDate: '2026-05-12', daysLate: 7, requiredTaskCount: 1 },
+      ],
+    }))
+    const card = await detectActiveWorkflows(baseCtx)
+    expect(card.chip.label).toBe('Missed')
+    expect(card.detail).toContain('And 1 more venue missed')
+    expect(card.footnote).toBe('2 workflows missed')
   })
 
   test('today/in_progress → variant B (donut, Resume run)', async () => {
