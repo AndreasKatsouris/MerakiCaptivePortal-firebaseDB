@@ -1,6 +1,6 @@
 {
-  "lastUpdated": "2026-05-15",
-  "lastUpdatedNote": "PR #67 merged — HIGH-sev registerUser callable Gen-2 signature bug fixed. Migrated v1 (data, context) => to v2 (request) =>; closes silent prod degradation that masked Path A code path since the firebase-functions v7 upgrade. Validated end-to-end on prod via fresh signup + invalid-tier negative test. Pre-merge fold-in: HttpsError re-throw (preserves invalid-argument codes), KB doc sync, comment trim. Audit of other 7 v1 callables logged as Medium-sev triage entry — none on user-facing critical path. Phase 6 sprint: 2 items remaining (concierge home active-run surfacing + Compliance Sweep stretch).",
+  "lastUpdated": "2026-05-19",
+  "lastUpdatedNote": "PR #70 merged — mid-session bug-triage pivot from Phase 6 sprint. Admin dashboard 'Clear Scanning Data' button hit RTDB's WRITE_TOO_BIG (~16 MB) limit on a grown /scanningData node. Operator unblocked today via firebase database:remove /scanningData CLI. PR #70 shipped the durable fix: migrated clearScanningData from broken onRequest + httpsCallable-shape-mismatch to v2 onCall + chunked-delete (500/batch, 100K/call cap, client loops for larger nodes). Also dropped tempClearData (hardcoded 2024 secret, same WRITE_TOO_BIG bug, same file/concern per fold-in scope rule). Deployed + smoke-tested before merge. Phase 6 sprint: 2 items remaining (concierge home active-run surfacing + Compliance Sweep stretch).",
   "sprint": {
     "goal": "Effective implementation of Hi-Fi v2, with ROSS as the central post-login surface for every subscribed user",
     "started": "2026-04-30",
