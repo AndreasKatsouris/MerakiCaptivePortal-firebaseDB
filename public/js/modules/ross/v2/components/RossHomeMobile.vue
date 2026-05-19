@@ -27,11 +27,18 @@ const userInitials = computed(() => {
   return (parts[0][0] + parts[parts.length - 1][0]).toUpperCase()
 })
 
+// Mirrors the desktop sidebar nav in RossHomeDesktop.vue. Each item
+// carries an href so the bottom-nav icon is actually navigable —
+// previously rendered as decorative <button> elements with no click
+// handler (operator-flagged on PR #58 preview). The 'Ross' entry is
+// always active here because this component only mounts on the home
+// tab; navigating to Playbook/Activity/People swaps to a different
+// RossHome.vue view via the popstate listener.
 const bottomNav = [
-  { icon: 'bolt',  active: true, label: 'Ross' },
-  { icon: 'check', label: 'Playbook' },
-  { icon: 'line',  label: 'Activity' },
-  { icon: 'users', label: 'People' },
+  { icon: 'bolt',  active: true, label: 'Ross',     href: '/ross.html' },
+  { icon: 'check', label: 'Playbook',                href: '/ross.html?tab=playbook' },
+  { icon: 'line',  label: 'Activity',                href: '/ross.html?tab=activity' },
+  { icon: 'users', label: 'People',                  href: '/ross.html?tab=people' },
 ]
 
 const chipFor = (c) => ({
@@ -39,6 +46,33 @@ const chipFor = (c) => ({
   label: c.chip.label,
   icon: c.chip.icon,
 })
+
+// Card footer meta text. The desktop view uses dedicated sidecar
+// components per sidecar.kind (kpi-spark / donut / kpi-bars) that
+// surface every field; mobile collapses to a single line of context.
+// Previously hardcoded strings ("Target 28% · 3 days running", etc.)
+// were prototype debris from the original Hi-Fi mock and showed up
+// on every live workflow card — operator caught on PR #79 preview.
+function cardMeta(c) {
+  const s = c?.sidecar
+  if (!s) return ''
+  if (s.kind === 'kpi-spark') {
+    const target = s.target ? String(s.target) : ''
+    const eyebrow = s.eyebrow ? String(s.eyebrow) : ''
+    return [eyebrow, target].filter(Boolean).join(' · ')
+  }
+  if (s.kind === 'donut') {
+    const label = s.label != null ? String(s.label) : ''
+    const sub = s.sub ? String(s.sub) : ''
+    return [label, sub].filter(Boolean).join(' · ')
+  }
+  if (s.kind === 'kpi-bars') {
+    const eyebrow = s.eyebrow ? String(s.eyebrow) : ''
+    const delta = s.delta?.label ? String(s.delta.label) : ''
+    return [eyebrow, delta].filter(Boolean).join(' · ')
+  }
+  return ''
+}
 </script>
 
 <template>
@@ -82,11 +116,7 @@ const chipFor = (c) => ({
             :data="c.sidecar.trend" :height="34"
             :stroke="c.sidecar.color" :fill="c.sidecar.color"
           />
-          <div class="hf-mono ross-mobile__card-meta">
-            <template v-if="c.sidecar.kind === 'kpi-spark'">Target 28% · 3 days running</template>
-            <template v-else-if="c.sidecar.kind === 'donut'">$2,180 avg LTV · 28% projected return</template>
-            <template v-else-if="c.sidecar.kind === 'kpi-bars'">Patio promo driving it</template>
-          </div>
+          <div class="hf-mono ross-mobile__card-meta">{{ cardMeta(c) }}</div>
         </article>
       </div>
     </div>
@@ -98,13 +128,15 @@ const chipFor = (c) => ({
     </div>
 
     <nav class="ross-mobile__nav">
-      <button
+      <a
         v-for="(n, i) in bottomNav" :key="i"
+        :href="n.href"
         :class="['ross-mobile__nav-btn', { 'is-active': n.active }]"
         :aria-label="n.label"
+        :aria-current="n.active ? 'page' : undefined"
       >
         <HfIcon :name="n.icon" :size="20" />
-      </button>
+      </a>
     </nav>
   </div>
 
@@ -187,6 +219,9 @@ const chipFor = (c) => ({
   padding: 8px;
   background: none; border: none; cursor: pointer;
   color: var(--hf-muted);
+  /* selector now matches an <a> tag — strip default link styling */
+  text-decoration: none;
+  display: inline-flex; align-items: center; justify-content: center;
 }
 .ross-mobile__nav-btn.is-active { color: var(--hf-ink); }
 .ross-mobile__nav-btn:focus-visible { outline: 2px solid var(--hf-accent); outline-offset: 2px; border-radius: 4px; }
