@@ -1642,8 +1642,11 @@ async function initializeAdminBookingTab() {
 
         bookingContainer.innerHTML = '<div class="booking-tab-loading"><div class="spinner-border text-primary mb-3"><span class="visually-hidden">Loading...</span></div><p class="text-muted">Initializing booking management...</p></div>';
 
-        // Load booking management component with cache-busting
-        const bookingModule = await import(`./modules/booking-management.js?v=${Date.now()}`);
+        // Load booking management component. Vite content-hashes outputs
+        // natively; the runtime ?v=${Date.now()} cache-buster prevented
+        // static analysis and threw `Unknown variable dynamic import`
+        // post-build (same class as feature-access-control.js:64).
+        const bookingModule = await import('./modules/booking-management.js');
 
         // Change the container ID temporarily for initialization
         bookingContainer.id = 'bookingManagementContent';
