@@ -46,6 +46,33 @@ const chipFor = (c) => ({
   label: c.chip.label,
   icon: c.chip.icon,
 })
+
+// Card footer meta text. The desktop view uses dedicated sidecar
+// components per sidecar.kind (kpi-spark / donut / kpi-bars) that
+// surface every field; mobile collapses to a single line of context.
+// Previously hardcoded strings ("Target 28% · 3 days running", etc.)
+// were prototype debris from the original Hi-Fi mock and showed up
+// on every live workflow card — operator caught on PR #79 preview.
+function cardMeta(c) {
+  const s = c?.sidecar
+  if (!s) return ''
+  if (s.kind === 'kpi-spark') {
+    const target = s.target ? String(s.target) : ''
+    const eyebrow = s.eyebrow ? String(s.eyebrow) : ''
+    return [eyebrow, target].filter(Boolean).join(' · ')
+  }
+  if (s.kind === 'donut') {
+    const label = s.label != null ? String(s.label) : ''
+    const sub = s.sub ? String(s.sub) : ''
+    return [label, sub].filter(Boolean).join(' · ')
+  }
+  if (s.kind === 'kpi-bars') {
+    const eyebrow = s.eyebrow ? String(s.eyebrow) : ''
+    const delta = s.delta?.label ? String(s.delta.label) : ''
+    return [eyebrow, delta].filter(Boolean).join(' · ')
+  }
+  return ''
+}
 </script>
 
 <template>
@@ -89,11 +116,7 @@ const chipFor = (c) => ({
             :data="c.sidecar.trend" :height="34"
             :stroke="c.sidecar.color" :fill="c.sidecar.color"
           />
-          <div class="hf-mono ross-mobile__card-meta">
-            <template v-if="c.sidecar.kind === 'kpi-spark'">Target 28% · 3 days running</template>
-            <template v-else-if="c.sidecar.kind === 'donut'">$2,180 avg LTV · 28% projected return</template>
-            <template v-else-if="c.sidecar.kind === 'kpi-bars'">Patio promo driving it</template>
-          </div>
+          <div class="hf-mono ross-mobile__card-meta">{{ cardMeta(c) }}</div>
         </article>
       </div>
     </div>
