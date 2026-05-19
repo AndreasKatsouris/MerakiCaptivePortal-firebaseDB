@@ -197,16 +197,38 @@
       }
     },
     "wifiLogins": {
-      ".read": "auth != null",
-      ".write": true
+      ".read": "auth != null && auth.token.admin === true",
+      ".write": "auth != null && auth.token.admin === true",
+      "$sessionId": {
+        ".validate": "newData.hasChildren(['sessionID', 'timestamp', 'name', 'email'])",
+        "sessionID":   { ".validate": "newData.isString() && newData.val().length <= 64" },
+        "timestamp":   { ".validate": "newData.isString() && newData.val().length <= 64" },
+        "name":        { ".validate": "newData.isString() && newData.val().length <= 120" },
+        "email":       { ".validate": "newData.isString() && newData.val().length <= 254" },
+        "phoneNumber": { ".validate": "newData.isString() && newData.val().length <= 24" },
+        "table":       { ".validate": "newData.isString() && newData.val().length <= 24" },
+        "client_mac":  { ".validate": "newData.isString() && newData.val().length <= 32" },
+        "node_mac":    { ".validate": "newData.isString() && newData.val().length <= 32" },
+        "client_ip":   { ".validate": "newData.isString() && newData.val().length <= 45" },
+        "active":      { ".validate": "newData.isBoolean()" },
+        "anonUid":     { ".validate": "newData.isString() && newData.val().length <= 64" },
+        "$other":      { ".validate": false }
+      }
     },
     "activeUsers": {
-      ".read": "auth != null",
-      ".write": true
+      ".read": "auth != null && auth.token.admin === true",
+      ".write": "auth != null && auth.token.admin === true"
     },
     "userPreferences": {
-      ".read": "auth != null",
-      ".write": true
+      ".read": "auth != null && auth.token.admin === true",
+      ".write": "auth != null && auth.token.admin === true"
+    },
+    "rateLimitsWifi": {
+      ".read": false,
+      ".write": false,
+      "$uid": {
+        ".read": "auth != null && auth.uid === $uid"
+      }
     },
     "stockUsage": {
       ".read": "auth != null",

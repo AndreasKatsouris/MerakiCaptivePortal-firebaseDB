@@ -80,6 +80,7 @@ The platform deploys **69+ Cloud Functions** from a single `functions/index.js` 
 | Function | Trigger | Auth | Purpose |
 |----------|---------|------|---------|
 | `clearScanningData` | Callable (v2 onCall) | Admin (custom claim + `admin-claims/{uid}`) | Chunked delete of `/scanningData`. Returns `{ deleted, batches, done, durationMs }`; client loops until `done: true` if the per-call cap (100K records) is hit. |
+| `submitWifiLogin` | Callable (v2 onCall) | Anonymous Firebase Auth | Server-side write path for guest captive-portal login. Validates name/email/phone/MAC, 5s/UID rate-limit, atomic multi-path write to `wifiLogins/{sessionID}` + `activeUsers/{client_mac\|sessionID}` + `rateLimitsWifi/{uid}`. Replaced the prior direct-client RTDB writes that required `.write:true` (public-internet exposure). Returns `{ success, sessionID }`. |
 | `getGoogleConfig` | HTTP (v2 onRequest) | None | Returns Google Places API key and place ID from config |
 
 ---

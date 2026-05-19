@@ -18,13 +18,49 @@ stores the results in a Firebase database, and authenticates the user with the M
  */
 
 // Import Firebase modules from the centralized config file
-import { rtdb, ref, set, update, push, get } from './config/firebase-config.js';
+import { auth, functions, httpsCallable, signInAnonymously } from './config/firebase-config.js';
 import { logPageView, logFormSubmission, logWiFiConnection } from './config/firebase-analytics.js';
+
+// Allowed host patterns for the Meraki splash-grant redirect. The
+// `base_grant_url` query param is operator-controlled in the Meraki
+// dashboard, but our page receives it from any URL and writes it to
+// window.location.href; without this guard a crafted URL could phish
+// guests through our captive portal. Per the 2014 Meraki EXCAP
+// whitepaper the host is dynamic on the subdomain but the family is
+// stable (n##.meraki.com or *.network-auth.com).
+const ALLOWED_MERAKI_HOST_PATTERNS = [
+    /^n\d+\.meraki\.com$/i,
+    /\.network-auth\.com$/i
+];
+function isAllowedMerakiHost(url) {
+    try {
+        const u = new URL(url);
+        return ALLOWED_MERAKI_HOST_PATTERNS.some(p => p.test(u.hostname));
+    } catch {
+        return false;
+    }
+}
+
+// Callable handle for the server-side write CF. Replaces the prior
+// direct-RTDB writes which required .write:true on wifiLogins/
+// activeUsers/userPreferences — a public-internet exposure.
+const submitWifiLoginCF = httpsCallable(functions, 'submitWifiLogin');
 
 document.addEventListener('DOMContentLoaded', function() {
     'use strict';
-    
+
     console.log('=== WiFi LOGIN DEBUG: Script initialized ===');
+
+    // Sign in anonymously so the submitWifiLogin CF has a stable per-
+    // device UID for rate-limiting + write attribution. Anonymous Auth
+    // uses the same auth hostname family as RTDB, which already works
+    // through Meraki walled gardens at every deployed venue. Failure
+    // here is non-fatal: the CF call will throw `unauthenticated`,
+    // the client falls through to the localStorage offline retry
+    // queue, and the Meraki redirect still fires unconditionally.
+    signInAnonymously(auth).catch(err => {
+        console.warn('WiFi LOGIN: anonymous auth failed; will retry via offline queue:', err);
+    });
     
     // Parse and log all URL parameters for debugging
     const urlParams = {};
@@ -306,6 +342,17 @@ document.addEventListener('DOMContentLoaded', function() {
                     // Immediately redirect to Meraki auth URL
                     if (base_grant_url) {
                         const redirectURL = constructRedirectURL(base_grant_url, user_continue_url);
+
+                        // Open-redirect guard. base_grant_url comes from
+                        // the page's query string; without this check a
+                        // crafted URL with an arbitrary host could phish
+                        // guests through our captive portal.
+                        if (!isAllowedMerakiHost(redirectURL)) {
+                            console.error('WiFi LOGIN: refused to redirect to non-Meraki host:', redirectURL);
+                            displayError('Invalid network configuration. Please contact venue staff.');
+                            return;
+                        }
+
                         console.log('WiFi LOGIN DEBUG: Redirecting to Meraki auth URL:', redirectURL);
                         setTimeout(() => {
                             // Direct redirect instead of using the removed safeRedirect function
@@ -466,164 +513,72 @@ document.addEventListener('DOMContentLoaded', function() {
         return table.trim() !== "";
     }
 
-    // Function to write user data to Firebase using the proper Firebase methods
+    // Submit the guest's form data via the submitWifiLogin CF.
+    //
+    // Previously this function called set(ref(rtdb, 'wifiLogins/...')) +
+    // set(ref(rtdb, 'activeUsers/...')) directly, which required
+    // .write:true on those nodes (public-internet exposure). Now we
+    // route through a v2 onCall CF that authenticates the anonymous
+    // guest, rate-limits per anon UID, validates shape, and writes via
+    // the Admin SDK. The CF returns a server-generated sessionID
+    // (replaces the prior Math.random() session ID).
+    //
+    // Failure modes:
+    //   - Anon auth not yet ready -> CF throws unauthenticated -> caller
+    //     keeps the localStorage offline-queue payload; checkAndUploadOfflineData
+    //     retries on next page load.
+    //   - CF unreachable (e.g. walled-garden missing *.cloudfunctions.net)
+    //     -> same fallback path. No Meraki-redirect impact.
     async function writeUserData(data, client_mac, node_mac) {
-        console.log('WiFi LOGIN DEBUG: Starting writeUserData function');
-        
-        try {
-            // Validate required parameters
-            if (!client_mac) {
-                console.error('WiFi LOGIN DEBUG: Missing client_mac in writeUserData');
-                throw new Error('Missing client MAC address');
-            }
-            
-            // Generate a session ID if not already provided
-            const sessionID = data.sessionID || generateSessionID();
-            console.log('WiFi LOGIN DEBUG: Using session ID:', sessionID);
-            
-            // Create wifi login data structure
-            const loginData = {
-                timestamp: data.timestamp || new Date().toISOString(),
-                name: data.name || '',
-                email: data.email || '',
-                phoneNumber: data.phoneNumber || '', // Changed from 'phone' to 'phoneNumber' for consistency
-                client_mac: client_mac,
-                node_mac: node_mac || '',
-                client_ip: data.client_ip || '',
-                sessionID: sessionID,
-                active: true,
-                message: data.message || ''
-            };
-            console.log('WiFi LOGIN DEBUG: Login data prepared:', loginData);
-            
-            // Create a new entry in the wifiLogins collection
-            console.log('WiFi LOGIN DEBUG: Writing to wifiLogins path...');
-            try {
-                await set(ref(rtdb, `wifiLogins/${sessionID}`), loginData);
-                console.log('WiFi LOGIN DEBUG: Successfully wrote to wifiLogins path');
-            } catch (fbError) {
-                console.error('WiFi LOGIN DEBUG: Error writing to wifiLogins:', fbError);
-                throw fbError;
-            }
-            
-            // Add to active users
-            console.log('WiFi LOGIN DEBUG: Writing to activeUsers path...');
-            try {
-                await set(ref(rtdb, `activeUsers/${client_mac}`), {
-                    sessionID: sessionID,
-                    timestamp: loginData.timestamp,
-                    lastSeen: loginData.timestamp,
-                    name: loginData.name || '',
-                    email: loginData.email || '',
-                    phoneNumber: loginData.phoneNumber || '' // Added phone number to activeUsers record
-                });
-                console.log('WiFi LOGIN DEBUG: Successfully wrote to activeUsers path');
-            } catch (fbError) {
-                console.error('WiFi LOGIN DEBUG: Error writing to activeUsers:', fbError);
-                // Continue even if this fails
-            }
-            
-            console.log('WiFi LOGIN DEBUG: All Firebase writes completed successfully');
-            return sessionID;
-        } catch (error) {
-            console.error('WiFi LOGIN DEBUG: Error in writeUserData:', error);
-            throw error;
-        }
+        console.log('WiFi LOGIN DEBUG: Calling submitWifiLogin CF');
+
+        const payload = {
+            name: data.name || '',
+            email: data.email || '',
+            phoneNumber: data.phoneNumber || '',
+            table: data.table || '',
+            client_mac: client_mac || '',
+            node_mac: node_mac || '',
+            client_ip: data.client_ip || ''
+        };
+
+        const { data: result } = await submitWifiLoginCF(payload);
+        console.log('WiFi LOGIN DEBUG: submitWifiLogin CF returned:', result);
+        return result.sessionID;
     }
 
-    // Function to store user preferences in Firebase using MAC address as the key
-    async function storeUserPreferences(macAddress, preferences) {
-        if (!macAddress) return;
-        
-        try {
-            await set(ref(rtdb, 'userPreferences/' + macAddress), {
-                ...preferences,
-                updatedAt: Date.now()
-            });
-            console.log('Preferences saved for MAC:', macAddress);
-        } catch (error) {
-            console.error('Error saving preferences:', error);
-            throw error; // Rethrow to be handled by the caller
-        }
+    // Stub: preferences are no longer persisted from the captive portal.
+    // The form never collected them; the previous direct RTDB write to
+    // /userPreferences was dead code. Retention/admin schema for
+    // preferences will be revisited in the PR 2 Hi-Fi rewrite.
+    async function storeUserPreferences(_macAddress, _preferences) {
+        // Intentional no-op; see submitWifiLogin CF for the canonical write.
     }
-    
-    // Function to log user connection data
+
+    // Wire up the disconnect handler. The CF already wrote the
+    // activeUsers record; this just attaches the beforeunload listener.
+    // The disconnect write itself (logUserDisconnection) targets an
+    // admin-only path post-rules-tightening and will fail silently —
+    // acceptable for a best-effort browser-unload signal that's already
+    // unreliable on mobile.
     async function logUserConnection(data) {
-        try {
-            console.log('WiFi LOGIN DEBUG: logUserConnection called with data:', data);
-            
-            // Ensure we have valid data values and provide defaults where necessary
-            const date = new Date();
-            const localTimestamp = date.toLocaleString();
-            const sessionID = data.sessionID || localStorage.getItem('sessionID') || generateSessionID();
-            
-            // Store sessionID for potential future use
-            localStorage.setItem('sessionID', sessionID);
-            
-            // Extract and validate the MAC address - this is the source of the error
-            const macAddress = data.client_mac || data.macAddress || '';
-            
-            if (!macAddress) {
-                console.warn('WiFi LOGIN DEBUG: No MAC address provided for connection logging');
-            }
-            
-            console.log('WiFi LOGIN DEBUG: Using MAC address:', macAddress);
-            console.log('WiFi LOGIN DEBUG: Using session ID:', sessionID);
-        
-            const connectionData = {
-                sessionID: sessionID,
-                name: data.name || '',
-                email: data.email || '',
-                table: data.table || '',
-                phoneNumber: data.phoneNumber || '',
-                macAddress: macAddress,
-                connectionTime: localTimestamp,
-                timestamp: Date.now(),
-                status: 'connected'
-            };
-            
-            console.log('WiFi LOGIN DEBUG: Connection data prepared:', connectionData);
-        
-            // Store the connection data in Firebase under the 'activeUsers' node
-            if (sessionID) {
-                console.log(`WiFi LOGIN DEBUG: Writing to activeUsers/${sessionID}`);
-                await set(ref(rtdb, `activeUsers/${sessionID}`), connectionData);
-                console.log('WiFi LOGIN DEBUG: Successfully wrote connection data to Firebase');
-            } else {
-                throw new Error('Invalid session ID for connection logging');
-            }
-            
-            // Set up disconnect handler
-            window.addEventListener('beforeunload', function() {
-                logUserDisconnection(sessionID);
-            });
-            
-            return sessionID;
-        } catch (error) {
-            console.error('Database operation failed in logUserConnection:', error);
-            // Don't throw the error, just log it and return a session ID anyway
-            // This prevents the connection error from blocking the WiFi login
-            return data.sessionID || localStorage.getItem('sessionID') || generateSessionID();
-        }
+        const sessionID = data.sessionID || localStorage.getItem('sessionID') || generateSessionID();
+        localStorage.setItem('sessionID', sessionID);
+
+        window.addEventListener('beforeunload', function() {
+            logUserDisconnection(sessionID);
+        });
+
+        return sessionID;
     }
-    
-    // Function to log user disconnection
-    async function logUserDisconnection(sessionID) {
-        if (!sessionID) return;
-        
-        try {
-            const disconnectionTime = new Date().toLocaleString();
-            
-            // Update the status of the session to 'disconnected'
-            await update(ref(rtdb, 'activeUsers/' + sessionID), {
-                status: 'disconnected',
-                disconnectionTime: disconnectionTime,
-                disconnectedAt: Date.now()
-            });
-        } catch (error) {
-            console.error('Database operation failed in logUserDisconnection:', error);
-            // No need to throw as this is called during page unload
-        }
+
+    // Best-effort disconnect signal. Post-rules-tightening this is a
+    // no-op from the client side (admin-only write). A dedicated
+    // updateWifiDisconnect CF would be the proper fix; deferred to
+    // backlog rather than scope-creeping this PR.
+    async function logUserDisconnection(_sessionID) {
+        // Intentional no-op; see PR description for the disconnect-tracking
+        // backlog item.
     }
     
     // Function to generate a session ID

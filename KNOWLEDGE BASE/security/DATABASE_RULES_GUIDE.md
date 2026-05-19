@@ -718,3 +718,18 @@ The rules handle two phone formats:
 ```
 
 Ensure all code paths normalize phone numbers before writing to the database. The `guardRail.js:normalizePhoneNumber()` function handles this for the backend, but client-side code must be consistent too.
+
+---
+
+## Hardening Previously-Open Write Paths
+
+`wifiLogins`, `activeUsers`, `userPreferences` historically shipped with `.write: true` (unauthenticated public-internet writes) to support the captive-portal direct-client flow. Hardened in PR feature/wifi-login-security (2026-05-19) — the canonical pattern for any node previously open this way:
+
+1. **Route the write through a Cloud Function.** The CF authenticates the writer (anonymous Firebase Auth is acceptable for captive-portal guests; admin claim required for admin-driven writes), validates the input shape and length caps, applies rate limiting per UID, then writes via the Admin SDK (which bypasses the rules layer cleanly).
+2. **Flip the rules to admin-only.** `".write": "auth != null && auth.token.admin === true"` blocks anonymous/guest direct writes; the CF still works because Admin SDK bypasses `.write`. Admin dashboard delete buttons (`remove(ref(rtdb, ...))`) keep working without changes.
+3. **Add `.validate` rules on the child shape** — for future-proofing, not as defense in depth for the CF write. Per the 2026-05-12 lesson, the Admin SDK (which the CF uses) bypasses ALL RTDB rules including `.validate`. So the `.validate` rules here only fire when an admin user writes via the **client** SDK (e.g. a future admin dashboard create/edit form on the same node). **The real validation for CF writes is the input-checking code inside the CF itself** — see the validation block in `submitWifiLogin`. Add `.validate` rules anyway, capping every string field's length and using `"$other": { ".validate": false }` to reject unexpected fields, so the day someone DOES add an admin client write path it lands on a typed surface.
+4. **Tighten the matching `.read` rule.** Open `.read` on a PII node (name + email + phone + MAC) means every authenticated user can enumerate the data — usually a separate exposure from the write-side issue. Audit consumers before tightening: admin-dashboard reads are fine under admin-claim gating; other readers may surface unexpected dependencies.
+
+**Worked example — `wifiLogins`** (see `submitWifiLogin` in `functions/index.js` + `database.rules.json:199-218`).
+
+**Common mistake to avoid:** assuming `.validate` rules on a CF-only write path provide active defense in depth. They don't — the Admin SDK bypasses `.validate`. The CF's own input-validation code is the load-bearing check. Treat `.validate` as documentation + a guardrail for *non-CF* writes that might land on the same node later.
