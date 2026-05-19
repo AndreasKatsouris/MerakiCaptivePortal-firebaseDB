@@ -61,7 +61,10 @@ export const featureAccessControl = {
   async performAdminVerification(userId) {
     try {
       console.log('[FeatureAccess] Importing AdminClaims module...');
-      const { AdminClaims } = await import(`../../../auth/admin-claims.js?v=${Date.now()}`);
+      // Vite content-hashes outputs natively; the runtime ?v=${Date.now()}
+      // cache-buster prevented static analysis and threw
+      // `Unknown variable dynamic import` post-build on every call.
+      const { AdminClaims } = await import('../../../auth/admin-claims.js');
       console.log('[FeatureAccess] Verifying admin status...');
       const isAdmin = await AdminClaims.verifyAdminStatus(auth.currentUser);
       console.log('[FeatureAccess] Admin verification result:', isAdmin);
