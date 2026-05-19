@@ -18,11 +18,16 @@ function mkTask(required = true) {
   return { title: 't', required }
 }
 
+// Run factory matches the SERVER schema (functions/ross.js rossCreateRun
+// L1378-1389): the runId field is `id`, NOT `runId`. There is NO `status`
+// field — lifecycle is encoded via `completedAt === null` (in-progress) vs
+// non-null (completed). `onTime` / `flaggedCount` live on history records,
+// not on the run object itself.
 function mkRun(overrides = {}) {
   return {
-    runId: 'r1',
-    status: 'in_progress',
+    id: 'r1',
     startedAt: baseNow - 3_600_000,
+    completedAt: null,
     responses: {},
     ...overrides,
   }
@@ -84,7 +89,7 @@ describe('buildHomeWorkflowDigest', () => {
         locA: {
           r1: mkRun({
             runId: 'r1',
-            status: 'in_progress',
+            completedAt: null,
             startedAt: baseNow - 1_800_000,
             responses: { t1: { value: 'on' }, t2: { value: 'on' } },
           }),
@@ -112,7 +117,7 @@ describe('buildHomeWorkflowDigest', () => {
         locA: {
           r1: mkRun({
             runId: 'r1',
-            status: 'completed',
+            completedAt: undefined, // overridden below if set
             startedAt: baseNow - 7_200_000,
             completedAt: baseNow - 3_600_000,
             onTime: true,
@@ -137,7 +142,7 @@ describe('buildHomeWorkflowDigest', () => {
     }
     const runs = {
       w1: { locA: { r1: mkRun({
-        status: 'completed',
+        completedAt: undefined, // overridden below if set
         completedAt: baseNow - 25 * 3_600_000,
         responses: { t1: { value: 'on' } },
       }) } },
@@ -252,7 +257,7 @@ describe('buildHomeWorkflowDigest', () => {
       w2: mkWorkflow('w2', 'B', { locB: mkLocation('B', '2026-05-19', { t1: mkTask() }) }),
     }
     const runs = {
-      w2: { locB: { r1: mkRun({ status: 'in_progress', startedAt: baseNow - 600_000, responses: {} }) } },
+      w2: { locB: { r1: mkRun({ completedAt: null, startedAt: baseNow - 600_000, responses: {} }) } },
     }
     const d = buildHomeWorkflowDigest({ workflows, runs, clientToday: '2026-05-19', now: baseNow })
     expect(d.today[0].subState).toBe('in_progress')
@@ -272,7 +277,7 @@ describe('buildHomeWorkflowDigest', () => {
     }
     const runs = {
       w1: { locA: { r1: mkRun({
-        status: 'in_progress',
+        completedAt: null,
         // Started 3 days ago — well before the 2026-05-18 nextDueDate boundary
         startedAt: baseNow - 3 * 24 * 3_600_000,
         responses: {},
@@ -299,7 +304,7 @@ describe('buildHomeWorkflowDigest', () => {
     }
     const runs = {
       w1: { locA: { r1: mkRun({
-        status: 'in_progress',
+        completedAt: null,
         startedAt: baseNow - 1_800_000,
         responses: {
           t1: { value: 'on' },   // required → counted
@@ -357,6 +362,79 @@ describe('buildHomeWorkflowDigest', () => {
     expect(d.today[0].nextDueDate).toBe('2026-05-19')
   })
 
+  // Canonical server shape: run uses `id` (not `runId`), and lifecycle is
+  // `completedAt === null` (in-progress) vs non-null (completed). NO `status`
+  // field exists on the run. Caught by operator preview on PR #72: 2 active
+  // workflows, in-progress run, but the in-progress card never appeared because
+  // the helper was checking `latestRun.status === 'in_progress'` which is
+  // always undefined for real server data.
+  test('canonical server schema: id field + completedAt null = in_progress (no status field)', () => {
+    const workflows = {
+      w1: mkWorkflow('w1', 'X', {
+        locA: mkLocation('A', '2026-05-19', { t1: mkTask(), t2: mkTask() }),
+      }),
+    }
+    const runs = {
+      w1: {
+        locA: {
+          // Exact shape written by rossCreateRun (functions/ross.js:1380-1388):
+          'runabc': {
+            id: 'runabc',
+            workflowId: 'w1',
+            locationId: 'locA',
+            startedAt: baseNow - 600_000,
+            startedBy: 'u1',
+            completedAt: null,
+            completedBy: null,
+            responses: { t1: { value: 'on' } },
+          },
+        },
+      },
+    }
+    const d = buildHomeWorkflowDigest({ workflows, runs, clientToday: '2026-05-19', now: baseNow })
+    expect(d.today).toHaveLength(1)
+    expect(d.today[0].subState).toBe('in_progress')
+    expect(d.today[0].runId).toBe('runabc')
+    expect(d.today[0].completedTaskCount).toBe(1)
+    expect(d.today[0].requiredTaskCount).toBe(2)
+  })
+
+  // Canonical completion shape: rossSubmitResponse stamps completedAt on the
+  // run (functions/ross.js:1511) but does NOT add an `onTime` or `flaggedCount`
+  // field — those live on the history record. The home digest derives them
+  // from the run's responses + workflow nextDueDate.
+  test('canonical completion shape: derives onTime + flaggedCount from run data', () => {
+    const workflows = {
+      w1: mkWorkflow('w1', 'X', {
+        locA: mkLocation('A', '2026-05-20', { t1: mkTask(), t2: mkTask() }),
+      }),
+    }
+    const runs = {
+      w1: {
+        locA: {
+          'runxyz': {
+            id: 'runxyz',
+            workflowId: 'w1',
+            locationId: 'locA',
+            startedAt: baseNow - 7_200_000,
+            startedBy: 'u1',
+            completedAt: baseNow - 3_600_000,  // 1h ago
+            completedBy: 'u1',
+            responses: {
+              t1: { value: 'on', flagged: false },
+              t2: { value: 'high', flagged: true },  // flagged response
+            },
+          },
+        },
+      },
+    }
+    const d = buildHomeWorkflowDigest({ workflows, runs, clientToday: '2026-05-19', now: baseNow })
+    expect(d.recentCompletions).toHaveLength(1)
+    expect(d.recentCompletions[0].runId).toBe('runxyz')
+    expect(d.recentCompletions[0].flaggedCount).toBe(1)
+    expect(d.recentCompletions[0].onTime).toBe(true)  // completed before nextDueDate+1day
+  })
+
   // Documents behaviour: a today-due workflow whose last completion was
   // yesterday (more than 24h ago) lands in today/pending — not silently
   // dropped. The recentCompletions branch is gated on <24h; the today/pending
@@ -370,7 +448,7 @@ describe('buildHomeWorkflowDigest', () => {
     }
     const runs = {
       w1: { locA: { r1: mkRun({
-        status: 'completed',
+        completedAt: undefined, // overridden below if set
         // Started yesterday morning, completed yesterday evening — >24h before now
         startedAt: baseNow - 30 * 3_600_000,
         completedAt: baseNow - 25 * 3_600_000,

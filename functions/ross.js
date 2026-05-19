@@ -304,6 +304,14 @@ function buildHomeWorkflowDigest({ workflows, runs, clientToday, now }) {
             const requiredTaskCount = _countRequiredTasks(loc.tasks);
             const completedTaskCount = _countCompletedRequiredTasks(latestRun, loc.tasks);
 
+            // Server schema reality (functions/ross.js rossCreateRun L1378-1389,
+            // rossSubmitResponse L1511): runs have NO `status` field. The
+            // lifecycle is encoded via `completedAt === null` (in-progress)
+            // vs non-null (completed). The runId field is `id`, not `runId`.
+            const runIsInProgress = !!latestRun && !latestRun.completedAt;
+            const runIsCompleted = !!latestRun && !!latestRun.completedAt;
+            const runIdField = latestRun ? (latestRun.id || latestRun.runId || null) : null;
+
             const nextDueMs = Date.parse(normalizedNextDueDate + 'T00:00:00Z');
             const runCoversCurrentPeriod = latestRun
                 && Number.isFinite(nextDueMs)
@@ -320,11 +328,11 @@ function buildHomeWorkflowDigest({ workflows, runs, clientToday, now }) {
 
             if (normalizedNextDueDate < today && !runCoversCurrentPeriod) {
                 overdue.push({ ...baseEntry, daysLate, requiredTaskCount });
-            } else if (normalizedNextDueDate === today && latestRun && latestRun.status === 'in_progress') {
+            } else if (normalizedNextDueDate === today && runIsInProgress) {
                 todayBucket.push({
                     ...baseEntry,
                     subState: 'in_progress',
-                    runId: latestRun.runId,
+                    runId: runIdField,
                     startedAt: Number(latestRun.startedAt) || 0,
                     completedTaskCount,
                     requiredTaskCount,
@@ -335,14 +343,21 @@ function buildHomeWorkflowDigest({ workflows, runs, clientToday, now }) {
                     subState: 'pending',
                     requiredTaskCount,
                 });
-            } else if (latestRun && latestRun.status === 'completed'
+            } else if (runIsCompleted
                 && (now - Number(latestRun.completedAt)) < HOME_DIGEST_RECENT_WINDOW_MS) {
+                // Derive onTime / flaggedCount from run data — server writes
+                // these to the history record, not the run itself.
+                const onTime = Number.isFinite(nextDueMs)
+                    ? Number(latestRun.completedAt) <= (nextDueMs + MS_PER_DAY)
+                    : true;
+                const responses = (latestRun.responses && typeof latestRun.responses === 'object') ? latestRun.responses : {};
+                const flaggedCount = Object.values(responses).filter(r => r && r.flagged).length;
                 recentCompletions.push({
                     ...baseEntry,
-                    runId: latestRun.runId,
+                    runId: runIdField,
                     completedAt: Number(latestRun.completedAt) || 0,
-                    onTime: latestRun.onTime !== false,
-                    flaggedCount: Number(latestRun.flaggedCount) || 0,
+                    onTime,
+                    flaggedCount,
                 });
             }
 
