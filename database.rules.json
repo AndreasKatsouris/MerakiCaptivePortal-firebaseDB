@@ -212,6 +212,7 @@
         "client_ip":   { ".validate": "newData.isString() && newData.val().length <= 45" },
         "active":      { ".validate": "newData.isBoolean()" },
         "anonUid":     { ".validate": "newData.isString() && newData.val().length <= 64" },
+        "marketingConsent": { ".validate": "newData.isBoolean()" },
         "$other":      { ".validate": false }
       }
     },
