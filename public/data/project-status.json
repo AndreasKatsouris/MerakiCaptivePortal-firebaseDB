@@ -1,11 +1,11 @@
 {
   "lastUpdated": "2026-05-19",
-  "lastUpdatedNote": "PR #73 merged — wifi-login security hardening (PR 1 of 2 on the same-day wifi-login pivot, after PR #70's clearScanningData fix). Closes 4 highest-severity audit findings: open .write:true on three PII nodes (wifiLogins/activeUsers/userPreferences), no .validate, open-redirect via base_grant_url, MAC-keyed overwrite vector. New submitWifiLogin v2 onCall CF with anonymous Firebase Auth + per-UID 5s debounce + shape validation + push-key sessionID + atomic multi-path write. Open-redirect host-pattern whitelist (n##.meraki.com / .network-auth.com). Read rules also tightened admin-only (scope expansion: guest PII was readable by any signed-in user). Client fallback chain preserves Meraki redirect on CF failure (operator guardrail). 7 findings deferred to PR 2 (Hi-Fi v2 rewrite) or backlog with explicit rationale. Plan in docs/plans/2026-05-19-wifi-login-security-plan.md. Deployed CF + rules pre-merge; hosting closes the brief data-capture gap. Automated review caught a self-inflicted 🔴: DATABASE_RULES_GUIDE doc claimed .validate fires on Admin SDK writes — contradicts the 2026-05-12 LESSON I had loaded. Fixed in fold-in commit before merge. Phase 6 sprint: 2 items remaining.",
+  "lastUpdatedNote": "PRs #70, #73, #72, #75 all merged 2026-05-19. Phase 6 main scope is COMPLETE with PR #72 (concierge home active-run surfacing): new rossGetHomeWorkflowDigest CF (read-only, verifyUserOrAdmin) + thin client detector + 5 card variants (Overdue / In-progress / Due-today / Recently-completed / All-clear) + LEARNING_MODE fallback. Hybrid card composition preserved — workflow slot 1 + food-cost/VIP/revenue detectors slots 2-3. 38 unit tests, build green. Two operator-preview defects folded in: (a) nextDueDate stored as epoch-ms NUMBER not ISO string — string comparison silently failed every branch; (b) runs have NO status field — lifecycle is completedAt === null vs non-null, runId field is `id` not `runId`. Both fixed via fold-in commits — same root-cause pattern (KB doc shape ≠ CF write-path shape), second occurrence in 18 days of the validated 2026-05-01 SELF_OPT. Operator design call mid-PR: 'Missed' chip framing at daysLate >= 4. Home feed auto-reload on every mount. PR #75 reflect cycle promoted the pre-flight + pre-push self-review disciplines into CLAUDE.md as literal Standard Task Workflow steps. Earlier same-day: PR #70 fixed admin Clear Scanning Data button (WRITE_TOO_BIG ceiling on /scanningData node — chunked-delete CF); PR #73 hardened wifi-login security (4 highest-sev audit findings closed). Phase 6 stretch task (Compliance Sweep starter template) remains optional.",
   "sprint": {
     "goal": "Effective implementation of Hi-Fi v2, with ROSS as the central post-login surface for every subscribed user",
     "started": "2026-04-30",
     "state": "active",
-    "summary": "Concierge-first IA. v1 admin tabs reframed as 'Ross's playbook' — the rules and procedures the future AI agent runs against. Phase 5 closed 2026-05-11 with all five cleanup PRs merged: ROSS is the post-login destination end-to-end. Phase 6 in progress: PRs 1A/1B/1C/2 shipped (tier-gating mechanism + curated 5/8 split + locked-card upsell UX + day-zero seed). Workflows are the product; v1 modules become workflow step types over time. Two tiers only: Free (full UI + 5 starter templates), All-in (full library). Next: operator-facing Run execution UI, then concierge home active-run surfacing."
+    "summary": "Concierge-first IA. v1 admin tabs reframed as 'Ross's playbook' — the rules and procedures the future AI agent runs against. Phase 5 closed 2026-05-11. Phase 6 MAIN SCOPE COMPLETE 2026-05-19: all 5 PRs shipped — PR 1A tier-gating mechanism (#51), PR 1B curated 5/8 starter library (#53), PR 1C locked-card upsell UX (#55), PR 2 day-zero auto-activation (#58), PR 3 Run execution UI (#65), PR 4 concierge home active-run surfacing (#72). Workflows are the product; v1 modules become workflow step types over time. Two tiers only: Free (full UI + 5 starter templates), All-in (full library). Stretch task remains: Compliance Sweep starter template. Next sprint candidates: Phase 7 askRoss LLM, recurrence-engine gap (logged from PR #72 preview), Playbook/Activity stat-counter Missed/Overdue consistency."
   },
   "phases": [
     {
@@ -47,8 +47,8 @@
     {
       "id": 6,
       "name": "ROSS v2 — playbook UX enrichment + template library curation",
-      "status": "in_progress",
-      "summary": "Active sprint. PR 1A (#51) shipped the tier-gating mechanism. PR 1B (#53) curated the 5 Free / 8 All-in split. PR 1C (#55) shipped the locked-card upsell UX + /upgrade.html. PR 2 (#58, 2026-05-12) shipped day-zero auto-activation — new rossSeedFirstWorkflow CF, called from signup-service.js after both signup paths; RTDB pointer ross/config/firstWorkflowTemplateId drives template selection. Originally inlined inside registerUser; preview testing exposed that the callable has been throwing unauthenticated on every call (v1-vs-v2 signature bug from firebase-functions v7), and signup-service.js silently falls back — required mid-PR architecture pivot to a dedicated CF. Next: operator-facing Run execution UI for all 10 inputTypes, then concierge home cards driven by real activated workflows. The Runs server surface is already shipped. Vocabulary per public/kb/features/ROSS.md: Templates → Workflows → Tasks → Runs."
+      "status": "done",
+      "summary": "Main scope complete 2026-05-19. PR 1A (#51) tier-gating mechanism. PR 1B (#53) curated 5 Free / 8 All-in split. PR 1C (#55) locked-card upsell UX + /upgrade.html. PR 2 (#58) day-zero auto-activation (mid-PR architecture pivot to dedicated rossSeedFirstWorkflow CF after preview revealed registerUser callable throwing unauthenticated). PR 3 (#65) operator-facing Run execution UI for all 10 inputTypes. PR 4 (#72) concierge home active-run surfacing — new rossGetHomeWorkflowDigest CF + 5 card variants + LEARNING_MODE fallback + 'Missed' chip framing at daysLate >= 4 + home feed auto-reload on mount. Two preview-driven defects in PR #72 (nextDueDate number-not-string; runs have no status field) — same root-cause family as the validated 2026-05-01 SELF_OPT, second occurrence in 18 days. Stretch task (Compliance Sweep starter template) remains optional. Vocabulary per public/kb/features/ROSS.md: Templates → Workflows → Tasks → Runs."
     },
     {
       "id": 7,
@@ -81,17 +81,34 @@
     { "id": "phase-6-pr1c-locked-list", "label": "Phase 6 PR 1C (PR #55) — tier-gated template list with locked-card upsell UX + Hi-Fi /upgrade.html comparison page (email CTA, ?from=template&id= pre-fill)", "done": true, "phase": 6 },
     { "id": "phase-6-day-zero", "label": "Phase 6 PR 2 (PR #58) — day-zero auto-activation: new rossSeedFirstWorkflow CF + signup-service.js integration + buildLocationsFromTemplate/buildWorkflowRecord helper extraction + RTDB pointer at ross/config/firstWorkflowTemplateId", "done": true, "phase": 6 },
     { "id": "phase-6-run-ui", "label": "Phase 6 PR 3 (PR #65) — operator-facing Run execution UI honouring all 10 inputTypes (number/temperature with auto-flag + client pre-flight requiredNote + server-422 safety net via store.pendingNoteTaskId + card watcher / yes_no / dropdown / timestamp / rating / photo/signature placeholders); auto-save on commit; sticky summary bar; inline completion banner; 40 unit tests across 4 new suites", "done": true, "phase": 6 },
-    { "id": "phase-6-home-cards", "label": "Phase 6 — concierge home cards driven by real activated workflows (replace scripted findings)", "done": false, "phase": 6 }
+    { "id": "phase-6-pr4-home-cards", "label": "Phase 6 PR 4 (PR #72) — concierge home active-run surfacing: rossGetHomeWorkflowDigest CF + detectActiveWorkflows + 5 card variants (Overdue/InProgress/DueToday/Completed/AllClear) + LEARNING_MODE_WORKFLOW_CARD fallback + 'Missed' chip at daysLate >= 4 + home feed auto-reload on mount; 38 unit tests; two preview defects folded (nextDueDate number normalisation + canonical run schema)", "done": true, "phase": 6 },
+    { "id": "phase-6-stretch-compliance-sweep", "label": "Phase 6 stretch — Compliance Sweep as first end-to-end curated template (small inputType footprint, strongest SA-locale moat)", "done": false, "phase": 6 }
   ],
   "inProgress": [],
   "recentlyCompleted": [
+    { "title": "ROSS concierge home active-run surfacing (Phase 6 PR 4) — new rossGetHomeWorkflowDigest CF (onRequest + verifyUserOrAdmin, read-only) + thin client detector detectActiveWorkflows + 5 card variants (Overdue/In-progress/Due-today/Recently-completed/All-clear) + LEARNING_MODE_WORKFLOW_CARD fallback; hybrid card composition preserved (workflow slot 1 + food-cost/VIP/revenue detectors slots 2-3); 38 unit tests; two preview-driven defects folded (numeric-nextDueDate normalisation + canonical run schema with no status field); mid-PR operator design call: 'Missed' framing at daysLate >= 4; home feed auto-reload on every mount", "pr": 72, "mergedAt": "2026-05-19" },
+    { "title": "WiFi login security hardening (PR 1 of 2) — new submitWifiLogin v2 onCall CF replaces direct-client RTDB writes; anonymous Firebase Auth + per-UID 5s debounce + shape validation + push-key sessionID + atomic multi-path write to wifiLogins/activeUsers/rateLimitsWifi; rules tightened from .write:auth!=null to admin-only on three PII nodes; open-redirect host-pattern whitelist on base_grant_url; client fallback chain preserves Meraki redirect on CF failure", "pr": 73, "mergedAt": "2026-05-19" },
+    { "title": "clearScanningData chunked-delete + WRITE_TOO_BIG fix — admin Clear Scanning Data button hit RTDB ~16 MB single-write ceiling on grown /scanningData node; migrated CF from onRequest to v2 onCall + chunked delete via orderByKey().limitToFirst(500) + multi-path null update(); hard cap 200 batches/invocation; client loops across calls for larger nodes; folded tempClearData deletion (hardcoded secret, same bug)", "pr": 70, "mergedAt": "2026-05-19" },
     { "title": "registerUser callable Gen-2 signature fix (HIGH-sev bug-triage) — migrated v1 (data, context) => to v2 (request) =>; closed silent prod degradation that had been masking Path A code path since the firebase-functions v7 upgrade; pre-merge fold-in for HttpsError re-throw + KB doc sync; validated end-to-end on prod (positive + invalid-tier negative test)", "pr": 67, "mergedAt": "2026-05-15" },
-    { "title": "ROSS Run execution UI (Phase 6 PR 3) — ?tab=run page covering all 10 inputTypes with auto-save, client pre-flight requiredNote + server-422 safety net via store.pendingNoteTaskId, sticky summary bar, inline completion banner; 40 unit tests across 4 new suites; pre-merge fold-in resolved 6 of 7 automated-review items", "pr": 65, "mergedAt": "2026-05-15" },
-    { "title": "ROSS day-zero auto-activation (Phase 6 PR 2) — rossSeedFirstWorkflow CF + signup-service.js integration; helper extraction with 17 unit tests; RTDB pointer; architecture pivoted mid-PR after preview revealed pre-existing registerUser callable bug", "pr": 58, "mergedAt": "2026-05-12" },
-    { "title": "ROSS tier-gated template list + Hi-Fi upgrade page (Phase 6 PR 1C) — server includeLocked opt-in, locked-card UX in v2 Playbook, /upgrade.html comparison page with email CTA", "pr": 55, "mergedAt": "2026-05-12" },
-    { "title": "ROSS starter library curation — 5 Free / 8 All-in split (Phase 6 PR 1B) + folded backfill URL fix on PR #51's sibling", "pr": 53, "mergedAt": "2026-05-12" }
+    { "title": "ROSS Run execution UI (Phase 6 PR 3) — ?tab=run page covering all 10 inputTypes with auto-save, client pre-flight requiredNote + server-422 safety net via store.pendingNoteTaskId, sticky summary bar, inline completion banner; 40 unit tests across 4 new suites; pre-merge fold-in resolved 6 of 7 automated-review items", "pr": 65, "mergedAt": "2026-05-15" }
   ],
   "bugs": [
+    {
+      "title": "Recurrence-engine gap: nextDueDate never advances when daily workflow goes uncompleted",
+      "severity": "medium",
+      "discoveredAt": "2026-05-19",
+      "discoveredOn": "PR #72 preview test",
+      "blockingSprint": false,
+      "notes": "Operator noted on PR #72 preview: 'I see one workflow that hasn't been completed daily since it was created.' rossSubmitResponse auto-completes the run when all required tasks are done but does NOT advance the workflow's nextDueDate for the next cycle. A daily workflow created 10 days ago with no run completed reads as daysLate: 10 instead of rolling forward. Fix needs: (a) on run completion, advance nextDueDate by recurrence period; (b) decide policy when a cycle is fully missed (advance on next 'create run' attempt OR scheduled CF walks every workflow nightly). Touches rossSubmitResponse + possibly rossScheduledReminder. Backlog candidate for a dedicated sprint — recurrence semantics need product input."
+    },
+    {
+      "title": "Playbook + Activity stat counters — Missed/Overdue framing consistency with PR #72 home card",
+      "severity": "low",
+      "discoveredAt": "2026-05-19",
+      "discoveredOn": "PR #72 post-merge",
+      "blockingSprint": false,
+      "notes": "PR #72 introduced threshold-based 'Missed' framing (daysLate >= 4) on the home concierge card. The Playbook tab's stat counter at RossPlaybook.vue:218-220 still reads 'Overdue' from store.overdueCount (counts workflows with locationStatus === 'overdue', no daysLate dimension). Activity tab likely has a similar counter. Operator caught the inconsistency post-merge. Two options for follow-up PR: (a) rename to 'Missed' globally; (b) split into two counters with daysLate-threshold computation mirroring the home card. Design call deferred."
+    },
     {
       "title": "Other 7 v1 callables in functions/index.js share the same Gen-2 signature bug (getQMSTierInfo, getQMSUsageStats, validateQMSFeatureAccess, validateQMSWhatsAppIntegration, performanceTest, runSystemOptimization, getSystemMetrics)",
       "severity": "medium",
@@ -127,7 +144,9 @@
   ],
   "backlog": {
     "high": [
-      "Phase 6 — concierge home cards driven by real activated workflows",
+      "Recurrence-engine gap — nextDueDate doesn't advance when daily workflow goes uncompleted (PR #72 preview catch; needs product input on missed-cycle policy)",
+      "Phase 7 askRoss LLM — separate sprint: rossChat CF + eval harness + cost cap + web-sourced day-zero findings (weather, local events, holidays, suburb demographics)",
+      "Phase 6 stretch — Compliance Sweep as first end-to-end curated template (small inputType footprint, strongest SA-locale moat)",
       "Sweep PR for the 7 other v1 callables in functions/index.js sharing the Gen-2 signature bug (getQMS*, validateQMS*, performanceTest, runSystemOptimization, getSystemMetrics) — same mechanical migration as PR #67",
       "Food cost open PR — review and merge",
       "Chart.js retirement (soak ended ~2026-05-07; execute removal per CHARTJS_REMOVAL_AUDIT.md — 16 of 23 sites have v2 replacements)"
@@ -144,7 +163,8 @@
       "Factor out fetchLocationNames helper across activity/playbook/people stores",
       "HfModal / HfConfirm design-system components — v2 needs a Hi-Fi-native modal pattern; SweetAlert2 is v1-only",
       "Catalog ROSS Cloud Functions in CLOUD_FUNCTIONS_CATALOG.md (rossManageTask, rossActivateWorkflow, rossSeedFirstWorkflow, ross-tier helpers, audit log nodes, etc.)",
-      "Build /profile-settings.html for ROSS user account (sidebar footer gear icon non-interactive until shipped — PR #48 follow-up)"
+      "Build /profile-settings.html for ROSS user account (sidebar footer gear icon non-interactive until shipped — PR #48 follow-up)",
+      "Playbook + Activity stat counters — Missed/Overdue framing consistency with PR #72 home card (rename globally OR split into two counters with daysLate threshold)"
     ],
     "low": [
       "Double-seed race on signup retry — rossSeedFirstWorkflow idempotency pre-check is not transactional (PR #58 final-review note; mitigation: RTDB transaction or deterministic workflow ID per uid)",
