@@ -86,8 +86,7 @@ The platform deploys **69+ Cloud Functions** from a single `functions/index.js` 
 
 | Function | Trigger | Auth | Purpose |
 |----------|---------|------|---------|
-| `clearScanningData` | HTTP POST (v2) | Admin | Clears all `scanningData` records |
-| `tempClearData` | HTTP POST (v2) | Setup Secret | One-time cleanup of scanning data + init admin-claims |
+| `clearScanningData` | Callable (v2 onCall) | Admin (custom claim + `admin-claims/{uid}`) | Chunked delete of `/scanningData`. Returns `{ deleted, batches, done, durationMs }`; client loops until `done: true` if the per-call cap (100K records) is hit. |
 | `getGoogleConfig` | HTTP (v2 onRequest) | None | Returns Google Places API key and place ID from config |
 
 ---
