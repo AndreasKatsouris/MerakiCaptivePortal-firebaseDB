@@ -1301,101 +1301,85 @@ exports.setupInitialAdmin = onRequest(async (req, res) => {
 });
 
 /**
- * TEMPORARY: One-time setup endpoint to clear scanning data
- * WARNING: Remove this endpoint after use!
+ * Cloud Function to clear scanning data — chunked.
+ *
+ * Single-write `remove()` on /scanningData hits RTDB's WRITE_TOO_BIG limit
+ * (~16 MB) once the node grows. This walks the node in batches via
+ * orderByKey().limitToFirst(BATCH) + multi-path null update, staying well
+ * under the per-write ceiling. Returns { done } so the client can loop
+ * across calls if MAX_BATCHES is exhausted (e.g. millions of records).
  */
-exports.tempClearData = onRequest(async (req, res) => {
-    if (req.method !== 'POST') {
-        return res.status(405).json({ error: 'Method not allowed' });
-    }
+exports.clearScanningData = onCall(
+    { timeoutSeconds: 540, memory: '512MiB' },
+    async (request) => {
+        const { auth } = request;
 
-    try {
-        const { setupSecret } = req.body;
-
-        // Simple secret verification
-        const TEMP_SECRET = 'MerakiSetup2024!'; // You should change this
-        if (setupSecret !== TEMP_SECRET) {
-            return res.status(403).json({ error: 'Invalid setup secret' });
+        if (!auth) {
+            throw new HttpsError('unauthenticated', 'Sign-in required.');
         }
 
-        // Get current count for reporting
-        const beforeCount = await admin.database()
-            .ref('scanningData')
+        const uid = auth.uid;
+        const hasAdminClaim = auth.token?.admin === true;
+        const isAdminInDb = await admin.database()
+            .ref(`admin-claims/${uid}`)
             .once('value')
-            .then(snapshot => {
-                const data = snapshot.val();
-                return data ? Object.keys(data).length : 0;
-            });
+            .then(snap => snap.val() === true);
 
-        // Clear the scanning data
-        await admin.database().ref('scanningData').remove();
-
-        // Initialize admin-claims node
-        await admin.database().ref('admin-claims').set({});
-
-        return res.status(200).json({
-            message: 'Database cleaned successfully',
-            recordsCleared: beforeCount,
-            timestamp: new Date().toISOString()
-        });
-    } catch (error) {
-        console.error('Error in setup:', error);
-        return res.status(500).json({ error: error.message });
-    }
-});
-
-/**
- * Cloud Function to clear scanning data
- * Only admins can use this endpoint
- */
-exports.clearScanningData = onRequest(async (req, res) => {
-    // Enable CORS
-    return cors(req, res, async () => {
-        if (req.method !== 'POST') {
-            return res.status(405).json({ error: 'Method not allowed' });
+        if (!hasAdminClaim || !isAdminInDb) {
+            throw new HttpsError('permission-denied', 'Admin access required.');
         }
 
-        try {
-            // Verify admin token
-            const idToken = req.headers.authorization?.split('Bearer ')[1];
-            if (!idToken) {
-                return res.status(401).json({ error: 'No token provided' });
-            }
+        const BATCH_SIZE = 500;
+        const MAX_BATCHES = 200; // hard cap per invocation: 100K records
+        const startedAt = Date.now();
+        let deleted = 0;
+        let batches = 0;
 
-            // Verify the token and check admin status
-            const decodedToken = await admin.auth().verifyIdToken(idToken);
-            const isAdminInDb = await admin.database()
-                .ref(`admin-claims/${decodedToken.uid}`)
-                .once('value')
-                .then(snapshot => snapshot.val() === true);
-
-            if (!decodedToken.admin === true || !isAdminInDb) {
-                return res.status(403).json({ error: 'Unauthorized - Admin access required' });
-            }
-
-            // Get current count for reporting
-            const beforeCount = await admin.database()
+        while (batches < MAX_BATCHES) {
+            const snap = await admin.database()
                 .ref('scanningData')
-                .once('value')
-                .then(snapshot => {
-                    const data = snapshot.val();
-                    return data ? Object.keys(data).length : 0;
-                });
+                .orderByKey()
+                .limitToFirst(BATCH_SIZE)
+                .once('value');
+            const val = snap.val();
+            if (!val) break;
+            const keys = Object.keys(val);
+            if (keys.length === 0) break;
 
-            // Clear the scanning data
-            await admin.database().ref('scanningData').remove();
+            const patch = {};
+            for (const k of keys) patch[`scanningData/${k}`] = null;
+            await admin.database().ref('/').update(patch);
 
-            return res.status(200).json({
-                message: 'Scanning data cleared successfully',
-                recordsCleared: beforeCount,
-                timestamp: new Date().toISOString()
-            });
-        } catch (error) {
-            console.error('Error clearing scanning data:', error);
-            return res.status(500).json({ error: error.message });
+            deleted += keys.length;
+            batches += 1;
+
+            // Short batch = node drained; skip the extra round-trip below
+            if (keys.length < BATCH_SIZE) {
+                return {
+                    success: true,
+                    deleted,
+                    batches,
+                    done: true,
+                    durationMs: Date.now() - startedAt
+                };
+            }
         }
-    });
-});
+
+        // Hit MAX_BATCHES with a full final batch — more may remain
+        const moreSnap = await admin.database()
+            .ref('scanningData')
+            .limitToFirst(1)
+            .once('value');
+
+        return {
+            success: true,
+            deleted,
+            batches,
+            done: !moreSnap.exists(),
+            durationMs: Date.now() - startedAt
+        };
+    }
+);
 
 /**
  * Cloud Function to mark a voucher as redeemed

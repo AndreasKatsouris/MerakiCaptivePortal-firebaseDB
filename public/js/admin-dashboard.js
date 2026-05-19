@@ -2072,28 +2072,40 @@ class AdminDashboard {
                 }
             });
 
-            console.log('Attempting to clear scanning data from Firebase...');
+            console.log('Attempting to clear scanning data via clearScanningData CF (chunked)...');
 
-            // Direct database operation for immediate feedback
-            await remove(ref(rtdb, 'scanningData'));
-            console.log('Successfully removed scanning data from rtdb');
+            // Single-write delete on /scanningData hits RTDB's WRITE_TOO_BIG
+            // ceiling (~16 MB) once the node has grown. The CF walks the node
+            // in 500-record batches; loop here in case it exhausts its
+            // per-call cap (100K records) before the node is empty.
+            const clearScanningDataFunction = httpsCallable(functions, 'clearScanningData');
+            let totalDeleted = 0;
+            let calls = 0;
+            const MAX_CALLS = 50; // safety stop: 5M records before we bail
 
-            // Also try to call the Cloud Function if it exists
-            try {
-                console.log('Attempting to call clearScanningData cloud function...');
-                const clearScanningDataFunction = httpsCallable(functions, 'clearScanningData');
-                await clearScanningDataFunction();
-                console.log('Cloud function clearScanningData executed successfully');
-            } catch (functionError) {
-                console.warn('Cloud function not available or failed, using direct database operation only', functionError);
-                // Continue anyway since we already did the direct database operation
+            // eslint-disable-next-line no-constant-condition
+            while (true) {
+                calls += 1;
+                const { data } = await clearScanningDataFunction();
+                const batchDeleted = data?.deleted || 0;
+                totalDeleted += batchDeleted;
+                console.log(`clearScanningData call ${calls}: deleted=${batchDeleted} done=${data?.done} totalDeleted=${totalDeleted}`);
+
+                Swal.update({
+                    text: `Cleared ${totalDeleted.toLocaleString()} records so far${data?.done ? '' : ' — continuing...'}`
+                });
+
+                if (data?.done) break;
+                if (calls >= MAX_CALLS) {
+                    throw new Error(`Aborted after ${MAX_CALLS} CF calls (${totalDeleted.toLocaleString()} records deleted). Re-run to continue.`);
+                }
             }
 
             // Show success message
-            console.log('Operation completed, showing success message');
+            console.log(`Operation completed, totalDeleted=${totalDeleted}`);
             await Swal.fire({
                 title: 'Success!',
-                text: 'Scanning data has been cleared successfully.',
+                text: `Cleared ${totalDeleted.toLocaleString()} scanning records.`,
                 icon: 'success'
             });
 
