@@ -1,138 +1,324 @@
-﻿<!DOCTYPE html>
+<!DOCTYPE html>
 <html lang='en'>
 <head>
     <meta charset='UTF-8'>
-    <meta name='viewport' content='width=device-width, initial-scale=1'>
+    <meta name='viewport' content='width=device-width, initial-scale=1, viewport-fit=cover'>
     <meta name='description' content='Guest WiFi login powered by Sparks Hospitality'>
     <title>Guest WiFi - Sparks Hospitality</title>
-    <meta name='theme-color' content='#FF6B6B'>
+    <meta name='theme-color' content='#1a1812'>
     <link rel='manifest' href='manifest.json'>
-    <link rel='preconnect' href='https://fonts.googleapis.com'>
-    <link rel='preconnect' href='https://fonts.gstatic.com' crossorigin>
-    <link href='https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap' rel='stylesheet'>
-    <link rel='stylesheet' href='css/bootstrap.min.css'>
-    <link rel='stylesheet' href='css/all.min.css'>
-    <link rel='stylesheet' href='css/style.css'>
+
+    <!-- Hi-Fi fonts + tokens + base (self-hosted, walled-garden friendly).
+         hifi-fonts.css contains the @font-face declarations; fonts are
+         loaded on first use without explicit preload. Matches ross.html's
+         link order so the cascade behaves identically across v2 surfaces. -->
+    <link rel='stylesheet' href='css/hifi-fonts.css'>
+    <link rel='stylesheet' href='css/hifi-tokens.css'>
+    <link rel='stylesheet' href='css/hifi-base.css'>
+
+    <!-- intlTelInput stays for the phone field -->
     <link rel='stylesheet' href='css/intlTelInput.css'>
+
     <style>
-      .iti { width: 100%; display: block; }
-      :root {
-        --primary-color: #FF6B6B;
-        --secondary-color: #4ECDC4;
-        --primary-gradient: linear-gradient(135deg, #FF6B6B 0%, #4ECDC4 100%);
+      /* Captive-portal-specific layout (scoped via .wf- prefix) */
+      body {
+        min-height: 100dvh;
+        margin: 0;
+        background-color: var(--hf-bg);
+        color: var(--hf-ink);
+        font-family: var(--hf-font-body);
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: flex-start;
+        padding: var(--hf-space-5) var(--hf-space-4);
+        box-sizing: border-box;
       }
-      body { font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; }
-      .welcome-title { color: #2D3436; font-weight: 700; }
-      .btn-primary { background: var(--primary-gradient); border: none; transition: all 0.3s ease; }
-      .btn-primary:hover { transform: translateY(-2px); box-shadow: 0 5px 15px rgba(0, 0, 0, 0.2); }
-      .form-control:focus { border-color: var(--primary-color); box-shadow: 0 0 0 0.2rem rgba(255, 107, 107, 0.25); }
-      .wifi-instructions .card { border: 1px solid rgba(255, 107, 107, 0.2); }
-      .wifi-instructions .card-title { color: var(--primary-color); }
-      .powered-by { text-align: center; margin-top: 2rem; color: #636E72; font-size: 0.875rem; }
-      .powered-by a { color: var(--primary-color); text-decoration: none; font-weight: 600; }
-      .powered-by a:hover { text-decoration: underline; }
+      .wf-card {
+        width: 100%;
+        max-width: 480px;
+        background: var(--hf-paper);
+        border: 1px solid var(--hf-line);
+        border-radius: var(--hf-radius-lg);
+        box-shadow: var(--hf-shadow-2);
+        padding: var(--hf-space-6) var(--hf-space-5);
+        margin-top: var(--hf-space-5);
+        box-sizing: border-box;
+      }
+      .wf-logo {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        gap: var(--hf-space-2);
+        margin-bottom: var(--hf-space-5);
+      }
+      .wf-logo__wordmark {
+        font-family: var(--hf-font-display);
+        font-size: 26px;
+        line-height: 1;
+        letter-spacing: -0.01em;
+        color: var(--hf-ink);
+      }
+      .wf-title {
+        font-family: var(--hf-font-display);
+        font-size: 22px;
+        font-weight: 400;
+        text-align: center;
+        margin: 0 0 var(--hf-space-5) 0;
+        color: var(--hf-ink-2);
+      }
+      .wf-field { margin-bottom: var(--hf-space-4); }
+      .wf-field__label {
+        display: block;
+        font-size: 13px;
+        font-weight: 500;
+        color: var(--hf-ink-2);
+        margin-bottom: var(--hf-space-1);
+      }
+      .wf-field__hint {
+        display: block;
+        font-size: 12px;
+        color: var(--hf-muted);
+        margin-top: var(--hf-space-1);
+      }
+      .wf-input {
+        width: 100%;
+        min-height: 44px;
+        padding: 10px 12px;
+        border: 1px solid var(--hf-line);
+        border-radius: var(--hf-radius-md);
+        background: var(--hf-paper);
+        color: var(--hf-ink);
+        font: inherit;
+        font-size: 16px; /* iOS no-zoom on focus */
+        box-sizing: border-box;
+        transition: border-color var(--hf-transition);
+      }
+      .wf-input:focus {
+        outline: none;
+        border-color: var(--hf-ink);
+      }
+      .wf-input.is-invalid { border-color: var(--hf-warn); }
+      .wf-error {
+        display: none;
+        color: var(--hf-warn);
+        font-size: 12px;
+        margin-top: var(--hf-space-1);
+      }
+      .wf-input.is-invalid + .wf-error { display: block; }
+      .wf-check {
+        display: flex;
+        align-items: flex-start;
+        gap: var(--hf-space-2);
+        margin-bottom: var(--hf-space-3);
+        font-size: 14px;
+        line-height: 1.4;
+      }
+      .wf-check input[type='checkbox'] {
+        width: 20px; height: 20px; margin: 0; flex-shrink: 0;
+        accent-color: var(--hf-ink);
+      }
+      .wf-check a, .wf-check button.wf-linklike {
+        color: var(--hf-ink);
+        text-decoration: underline;
+        background: none;
+        border: 0;
+        padding: 0;
+        font: inherit;
+        cursor: pointer;
+      }
+      .wf-disclosure {
+        font-size: 12px;
+        color: var(--hf-muted);
+        line-height: 1.45;
+        margin: var(--hf-space-4) 0;
+      }
+      .wf-disclosure .wf-linklike { color: var(--hf-ink-2); }
+      .wf-status {
+        display: none;
+        padding: 10px 12px;
+        border-radius: var(--hf-radius-md);
+        font-size: 14px;
+        margin-bottom: var(--hf-space-3);
+      }
+      .wf-status--error {
+        display: block;
+        background: rgba(176, 85, 58, 0.08);
+        color: var(--hf-warn);
+        border: 1px solid rgba(176, 85, 58, 0.25);
+      }
+      .wf-status--success {
+        display: block;
+        background: rgba(92, 122, 74, 0.08);
+        color: var(--hf-good);
+        border: 1px solid rgba(92, 122, 74, 0.25);
+      }
+      .wf-submit {
+        width: 100%;
+        min-height: 56px;
+        padding: 14px 20px;
+        background: var(--hf-ink);
+        color: var(--hf-paper);
+        border: 0;
+        border-radius: var(--hf-radius-md);
+        font: inherit;
+        font-size: 16px;
+        font-weight: 500;
+        cursor: pointer;
+        transition: opacity var(--hf-transition);
+      }
+      .wf-submit:hover:not(:disabled) { opacity: 0.92; }
+      .wf-submit:disabled { opacity: 0.55; cursor: progress; }
+      .wf-footer {
+        text-align: center;
+        font-size: 12px;
+        color: var(--hf-muted);
+        margin: var(--hf-space-5) 0 var(--hf-space-3) 0;
+        padding-bottom: env(safe-area-inset-bottom);
+      }
+      /* intlTelInput visual tweaks (closed state only; open dropdown
+         retains some native chrome -- known limit, documented in spec) */
+      .iti { width: 100%; display: block; }
+      .iti__flag-container { background: var(--hf-paper); }
+
+      /* Native <dialog> styling */
+      dialog.wf-modal {
+        border: 1px solid var(--hf-line);
+        border-radius: var(--hf-radius-lg);
+        padding: var(--hf-space-5);
+        max-width: 480px;
+        width: calc(100% - var(--hf-space-5));
+        background: var(--hf-paper);
+        color: var(--hf-ink);
+        font-family: var(--hf-font-body);
+        line-height: 1.5;
+      }
+      dialog.wf-modal::backdrop {
+        background: rgba(10, 8, 4, 0.45);
+      }
+      dialog.wf-modal h2 {
+        font-family: var(--hf-font-display);
+        font-size: 20px;
+        margin: 0 0 var(--hf-space-3) 0;
+      }
+      dialog.wf-modal p { margin: var(--hf-space-2) 0; font-size: 14px; }
+      dialog.wf-modal ul { padding-left: var(--hf-space-5); font-size: 14px; }
+      dialog.wf-modal .wf-modal__close {
+        margin-top: var(--hf-space-4);
+        min-height: 44px;
+        padding: 10px 18px;
+        background: var(--hf-ink);
+        color: var(--hf-paper);
+        border: 0;
+        border-radius: var(--hf-radius-md);
+        font: inherit;
+        cursor: pointer;
+      }
     </style>
 </head>
 <body>
-    <div class='container'>
-        <div class='row justify-content-center'>
-            <div class='col-md-8 col-lg-6'>
-                <div class='text-center mt-4 mb-3'>
-                    <img id='logo' src='img/platfrm_logo.png' alt='Restaurant Logo' class='img-fluid mb-2' style='max-width: 200px;'>
-                    <!-- <h1 class='welcome-title'>Welcome to Our Guest WiFi</h1> -->
-                </div>
-                <div class='wifi-instructions mb-4'>
-                    <div class='card'>
-                        <div class='card-body'>
-                            <h5 class='card-title'><i class='fas fa-wifi me-2'></i>Guest WiFi Access</h5>
-                            <p class='card-text'>Please sign in with your details below to enjoy complimentary WiFi during your visit.</p>
-                        </div>
-                    </div>
-                </div>
-                <div class='login-container'>
-                    <form id='loginForm' class='needs-validation' novalidate>
-                        <div class='form-group mb-3'>
-                            <label for='username' class='form-label'>Full Name</label>
-                            <div class='input-group'>
-                                <span class='input-group-text'><i class='fas fa-user'></i></span>
-                                <input type='text' class='form-control' id='username' placeholder='Enter your full name' required autocomplete='name'/>
-                            </div>
-                            <div class='invalid-feedback' id='nameValidationMessage'></div>
-                        </div>
-                        <div class='form-group mb-3'>
-                            <label for='email' class='form-label'>Email Address</label>
-                            <div class='input-group'>
-                                <span class='input-group-text'><i class='fas fa-envelope'></i></span>
-                                <input type='email' class='form-control' id='email' placeholder='Enter your email' required autocomplete='email'/>
-                            </div>
-                            <div class='invalid-feedback' id='emailValidationMessage'></div>
-                        </div>
-                        <div class='form-group mb-3'>
-                            <label for='phone' class='form-label'>Phone Number</label>
-                            <input id='phone' type='tel' class='form-control' placeholder='Enter your phone number' required autocomplete='tel'>
-                            <div class='invalid-feedback' id='phoneValidationMessage'></div>
-                        </div>
-                        <div class='form-group mb-3'>
-                            <label for='table' class='form-label'>Table Number</label>
-                            <div class='input-group'>
-                                <span class='input-group-text'><i class='fas fa-utensils'></i></span>
-                                <input type='text' class='form-control' id='table' placeholder='Enter your table number' autocomplete='off'/>
-                            </div>
-                            <div class='invalid-feedback' id='tableValidationMessage'></div>
-                        </div>
-                        <div class='form-group mb-4'>
-                            <div class='form-check'>
-                                <input type='checkbox' class='form-check-input' id='terms' required>
-                                <label class='form-check-label' for='terms'>
-                                    I agree to the <a href='#' data-bs-toggle='modal' data-bs-target='#termsModal'>terms and conditions</a>
-                                </label>
-                                <div class='invalid-feedback' id='termsValidationMessage'></div>
-                            </div>
-                        </div>
-                        <div class='d-grid'>
-                            <button type='submit' class='btn btn-primary btn-lg login-button'>
-                                <i class='fas fa-wifi me-2'></i>Connect to WiFi
-                            </button>
-                        </div>
-                    </form>
-                </div>
-                <div id='error-container' class='alert alert-danger mt-3' style='display: none;'></div>
-                <div class='powered-by'>
-                    <img src='img/platfrm_logo.png' alt='Sparks Hospitality' style='height: 24px; width: auto; vertical-align: middle; margin-right: 8px;'>
-                    Powered by <a href='/' target='_blank'>Sparks Hospitality</a>
-                </div>
-                <div class='text-center mt-3 mb-5'>
-                    <a href='admin-login.html' class='btn btn-sm btn-outline-secondary'>
-                        <i class='fas fa-cog me-1'></i>Admin Login
-                    </a>
-                </div>
+    <main class='wf-card'>
+        <!-- Sparks logo (inline SVG mark + wordmark; matches HfLogo.vue) -->
+        <div class='wf-logo' aria-label='Sparks Hospitality'>
+            <svg width='28' height='28' viewBox='0 0 24 24' fill='none' aria-hidden='true'>
+                <path d='M12 2 L14 10 L22 12 L14 14 L12 22 L10 14 L2 12 L10 10 Z' fill='var(--hf-ink)'/>
+            </svg>
+            <span class='wf-logo__wordmark'>Sparks</span>
+        </div>
+
+        <h1 class='wf-title'>Sign in for free WiFi</h1>
+
+        <div id='error-container' class='wf-status' role='alert' aria-live='polite'></div>
+
+        <form id='loginForm' novalidate>
+            <div class='wf-field'>
+                <label class='wf-field__label' for='username'>Full name</label>
+                <input type='text' class='wf-input' id='username' placeholder='First and last name' required autocomplete='name' />
+                <div class='wf-error' id='nameValidationMessage'></div>
             </div>
-        </div>
-    </div>
-    <footer class='text-center py-3 mt-3'>
-        <div class='container'>
-            <small class='text-muted'>Sparks Hospitality WiFi Portal v2.0</small>
-        </div>
-    </footer>
+
+            <div class='wf-field'>
+                <label class='wf-field__label' for='email'>Email</label>
+                <input type='email' class='wf-input' id='email' placeholder='you@example.com' required autocomplete='email' inputmode='email' />
+                <div class='wf-error' id='emailValidationMessage'></div>
+            </div>
+
+            <div class='wf-field'>
+                <label class='wf-field__label' for='phone'>Phone</label>
+                <input id='phone' type='tel' class='wf-input' placeholder='Phone number' required autocomplete='tel' inputmode='tel' />
+                <div class='wf-error' id='phoneValidationMessage'></div>
+            </div>
+
+            <div class='wf-field'>
+                <label class='wf-field__label' for='table'>Table number</label>
+                <input type='text' class='wf-input' id='table' placeholder='e.g. 12' autocomplete='off' inputmode='numeric' />
+                <span class='wf-field__hint'>Leave blank if you're not seated at a table.</span>
+                <div class='wf-error' id='tableValidationMessage'></div>
+            </div>
+
+            <label class='wf-check' for='marketingConsent'>
+                <input type='checkbox' id='marketingConsent'>
+                <span>Send me offers and updates from this venue.</span>
+            </label>
+
+            <label class='wf-check' for='terms'>
+                <input type='checkbox' id='terms' required>
+                <span>I agree to the <button type='button' class='wf-linklike' data-open-modal='termsModal'>terms and conditions</button>.</span>
+            </label>
+            <div class='wf-error' id='termsValidationMessage'></div>
+
+            <p class='wf-disclosure'>
+                By submitting, you agree we can store these details with this venue's WiFi system. We detect your country (via ipinfo.io) to format your phone number.
+                <button type='button' class='wf-linklike' data-open-modal='privacyModal'>Privacy details</button>
+            </p>
+
+            <button type='submit' class='wf-submit'>Connect to WiFi</button>
+        </form>
+
+        <p class='wf-footer'>Powered by Sparks Hospitality</p>
+    </main>
+
+    <!-- Privacy modal -->
+    <dialog id='privacyModal' class='wf-modal'>
+        <h2>What we collect</h2>
+        <p>When you sign in to WiFi at this venue, we store:</p>
+        <ul>
+            <li>Your name, email, phone number, and (optional) table number</li>
+            <li>The MAC address of your device (a hardware ID your phone broadcasts to nearby WiFi networks)</li>
+            <li>An anonymous device identifier we generate</li>
+            <li>Whether you opted in to marketing messages from this venue</li>
+        </ul>
+        <p><strong>Who can see it:</strong> This venue's admin staff. We don't share with third parties.</p>
+        <p><strong>Country detection:</strong> We call ipinfo.io once when this page loads to detect your country, so the phone field starts with the right dial code. We send your IP address to ipinfo.io; we don't send your name, email, or phone. Their privacy policy: ipinfo.io/privacy-policy.</p>
+        <p><strong>Marketing messages:</strong> If you opt in, this venue may email or message you with offers and updates. You can opt out any time by replying to a marketing message.</p>
+        <p><strong>Want your details removed?</strong> Email privacy@sparkshospitality.com with the venue name and your email.</p>
+        <button type='button' class='wf-modal__close' data-close-modal>Close</button>
+    </dialog>
+
+    <!-- Terms modal -->
+    <dialog id='termsModal' class='wf-modal'>
+        <h2>Terms of use</h2>
+        <p>By connecting to this WiFi network you agree to use it lawfully and at your own risk. The venue is not responsible for the security of your connection or the integrity of data you transmit.</p>
+        <p>The venue may suspend access at its discretion. Connection metadata (timestamps, device MAC address) is retained for the venue's operational and compliance purposes.</p>
+        <button type='button' class='wf-modal__close' data-close-modal>Close</button>
+    </dialog>
+
+    <!-- Customization reader: applies per-venue branding overrides on top
+         of the Sparks defaults. Same shape as v1; only the logoURL bit
+         is removed since v2 is Sparks-only branding. -->
     <script type='module'>
-        import { rtdb, ref, get, set } from './js/config/firebase-config.js';
+        import { rtdb, ref, get } from './js/config/firebase-config.js';
         document.addEventListener('DOMContentLoaded', function () {
             get(ref(rtdb, 'customization/'))
                 .then(function(snapshot) {
                     const settings = snapshot.val();
-                    if (settings) {
-                        document.body.style.backgroundColor = settings.bgColor || '#ffffff';
-                        document.body.style.fontFamily = settings.font || 'Inter, sans-serif';
-                        document.body.style.fontSize = settings.fontSize ? settings.fontSize + 'px' : '16px';
-                        if (settings.logoURL) {
-                            document.getElementById('logo').src = settings.logoURL;
-                        }
-                        if (settings.bgImageUrl) {
-                            document.body.style.backgroundImage = 'url(' + settings.bgImageUrl + ')';
-                            document.body.style.backgroundSize = 'cover';
-                            document.body.style.backgroundPosition = 'center';
-                            document.body.style.backgroundRepeat = 'no-repeat';
-                        }
+                    if (!settings) return;
+                    if (settings.bgColor) document.body.style.backgroundColor = settings.bgColor;
+                    if (settings.bgImageUrl) {
+                        document.body.style.backgroundImage = 'url(' + settings.bgImageUrl + ')';
+                        document.body.style.backgroundSize = 'cover';
+                        document.body.style.backgroundPosition = 'center';
+                        document.body.style.backgroundRepeat = 'no-repeat';
                     }
                 })
                 .catch(function(error) {
@@ -140,19 +326,12 @@
                 });
         });
     </script>
-    <script>
-        function generateSessionID() {
-            return 'session-' + Math.random().toString(36).substr(2, 9);
-        }
-        let sessionID = localStorage.getItem('sessionID');
-        if (!sessionID) {
-            sessionID = generateSessionID();
-            localStorage.setItem('sessionID', sessionID);
-        }
-    </script>
-    <script src='js/bootstrap.bundle.min.js'></script>
+
+    <!-- intlTelInput stays for the phone field -->
     <script src='js/intlTelInput.min.js'></script>
+    <!-- Main captive-portal logic (anonymous auth + submitWifiLogin CF) -->
     <script type='module' src='js/merakiFirebase.js'></script>
+    <!-- Service worker -->
     <script src='js/service-worker-registration.js'></script>
 </body>
 </html>
