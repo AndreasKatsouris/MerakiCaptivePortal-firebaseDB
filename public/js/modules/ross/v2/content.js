@@ -226,6 +226,36 @@ export const ROSS_SUGGESTIONS = [
   { id: 'olive-oil', text: 'Olive oil runs out in 2 days',            action: 'Reorder now' },
 ]
 
+// Slot-1 fallback card when the user has NO active workflows at all
+// (rossGetHomeWorkflowDigest returns hasActiveWorkflows: false).
+// Distinct from variant E ("All clear"), which fires when the user
+// HAS workflows but none are pressing today.
+export const LEARNING_MODE_WORKFLOW_CARD = {
+  id: 'learning-workflow',
+  tone: 'default',
+  eyebrow: 'Your playbook · empty',
+  chip: { tone: 'default', label: 'Playbook', icon: 'check' },
+  headline: 'Your playbook is empty.',
+  detail:
+    'Activate a starter template — Daily Opening Checklist is the most ' +
+    'common starting point.',
+  actions: [
+    { id: 'open-playbook', label: 'Activate a template', variant: 'solid',
+      trailing: 'arrow', href: '/ross.html?tab=playbook' },
+    { id: 'snooze', label: 'Hide for a day', variant: 'ghost' },
+  ],
+  footnote: 'No active workflows yet',
+  sidecar: {
+    kind: 'kpi-spark',
+    eyebrow: 'Workflows',
+    value: '—',
+    unit: '',
+    target: 'none active',
+    trend: [0, 0, 0, 0, 0, 0, 0],
+    color: 'var(--hf-muted)',
+  },
+}
+
 // Tiny deterministic PRNG so the "live" sparkline seeds stay stable
 // across renders without pulling in the handoff's seed-based random.
 export function seededLine(seed, n = 12) {

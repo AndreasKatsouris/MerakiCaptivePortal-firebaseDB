@@ -16,7 +16,18 @@ const cors = require('cors')({ origin: true });
 const { validateTier, userCanActivate, filterTemplatesByTier } = require('./ross-tier');
 const { buildWorkflowRecord, buildTaskFromSubtask } = require('./ross-workflow-builder');
 
-const db = admin.database();
+// Lazy db accessor — deferred so unit tests can require this module without a
+// live Firebase app being initialised at load time.  All CF handlers are
+// invoked asynchronously and therefore always have a live app by the time they
+// call db.ref().
+let _db = null;
+function getDb() {
+    if (!_db) _db = admin.database();
+    return _db;
+}
+// Alias: keeps the rest of the file unchanged while individual call-sites are
+// migrated.  Any place that used `db.ref(...)` now calls `getDb().ref(...)`.
+const db = new Proxy({}, { get: (_t, prop) => getDb()[prop] });
 
 // ============================================
 // CONSTANTS
@@ -179,6 +190,204 @@ async function resolveWorkflowOwner(workflowId, locationId, callerUid) {
     const own = await db.ref(`ross/workflows/${callerUid}/${workflowId}/locations/${locationId}`).once('value');
     if (own.exists()) return callerUid;
     return null;
+}
+
+// =====================================================================
+//  HOME WORKFLOW DIGEST helper (pure, exported for unit tests)
+// =====================================================================
+
+const MS_PER_DAY = 24 * 60 * 60 * 1000;
+const HOME_DIGEST_RECENT_WINDOW_MS = MS_PER_DAY;
+
+function _todayUTC(now) {
+    return new Date(now).toISOString().slice(0, 10);
+}
+
+function _dateDiffDays(fromISO, toISO) {
+    // positive when toISO > fromISO
+    const f = Date.parse(fromISO + 'T00:00:00Z');
+    const t = Date.parse(toISO + 'T00:00:00Z');
+    if (Number.isNaN(f) || Number.isNaN(t)) return 0;
+    return Math.round((t - f) / MS_PER_DAY);
+}
+
+function _latestRun(runsForPair) {
+    if (!runsForPair || typeof runsForPair !== 'object') return null;
+    let best = null;
+    for (const r of Object.values(runsForPair)) {
+        if (!r || typeof r !== 'object') continue;
+        if (!best || (Number(r.startedAt) || 0) > (Number(best.startedAt) || 0)) {
+            best = r;
+        }
+    }
+    return best;
+}
+
+function _countRequiredTasks(tasks) {
+    if (!tasks || typeof tasks !== 'object') return 0;
+    let n = 0;
+    for (const t of Object.values(tasks)) {
+        if (t && t.required !== false) n++;
+    }
+    return n;
+}
+
+// Normalise nextDueDate to ISO date string ('YYYY-MM-DD').
+//
+// Existing ROSS workflows store nextDueDate as an epoch-ms NUMBER (see
+// functions/ross.js lines 703, 1150, 1282, 1502 — all numeric arithmetic).
+// Operator-edited values via Firebase Console may land as strings. Both
+// shapes are normalised to the same ISO slice so the bucket comparisons
+// (`<`, `===`, `>`) against `clientToday` work consistently.
+//
+// Returns null for unparseable input (caller skips with a warn).
+function _normalizeNextDueDate(val) {
+    if (typeof val === 'string' && val.length > 0) {
+        // Accept either 'YYYY-MM-DD' or full ISO 'YYYY-MM-DDTHH:mm:ss...';
+        // slice to the date portion.
+        return val.slice(0, 10);
+    }
+    const n = Number(val);
+    if (Number.isFinite(n) && n > 0) {
+        return new Date(n).toISOString().slice(0, 10);
+    }
+    return null;
+}
+
+// Count responses to REQUIRED tasks only. The donut on the in-progress
+// card shows completed-of-required tasks; responses to optional tasks
+// would inflate the numerator past 100%.
+function _countCompletedRequiredTasks(run, tasks) {
+    if (!run || !run.responses || typeof run.responses !== 'object') return 0;
+    if (!tasks || typeof tasks !== 'object') return 0;
+    let n = 0;
+    for (const taskId of Object.keys(run.responses)) {
+        const task = tasks[taskId];
+        if (task && task.required !== false) n++;
+    }
+    return n;
+}
+
+function buildHomeWorkflowDigest({ workflows, runs, clientToday, now }) {
+    const today = clientToday || _todayUTC(now);
+    const safeWorkflows = (workflows && typeof workflows === 'object') ? workflows : {};
+    const safeRuns = (runs && typeof runs === 'object') ? runs : {};
+
+    const overdue = [];
+    const todayBucket = [];
+    const recentCompletions = [];
+
+    const activeWorkflowIds = new Set();
+    let upcoming = null;
+
+    for (const [workflowId, w] of Object.entries(safeWorkflows)) {
+        if (!w || typeof w !== 'object') continue;
+        if (w.status === 'paused') continue;
+        if (!w.locations || typeof w.locations !== 'object') {
+            console.warn(`[ross] skipped malformed workflow ${workflowId}: no locations`);
+            continue;
+        }
+
+        let workflowCountsAsActive = false;
+
+        for (const [locationId, loc] of Object.entries(w.locations)) {
+            if (!loc || typeof loc !== 'object') continue;
+            const normalizedNextDueDate = _normalizeNextDueDate(loc.nextDueDate);
+            if (!normalizedNextDueDate) {
+                console.warn(`[ross] skipped malformed workflow ${workflowId}/${locationId}: nextDueDate=${JSON.stringify(loc.nextDueDate)}`);
+                continue;
+            }
+
+            workflowCountsAsActive = true;
+            const runsForPair = (safeRuns[workflowId] && safeRuns[workflowId][locationId]) || {};
+            const latestRun = _latestRun(runsForPair);
+            const requiredTaskCount = _countRequiredTasks(loc.tasks);
+            const completedTaskCount = _countCompletedRequiredTasks(latestRun, loc.tasks);
+
+            // Server schema reality (functions/ross.js rossCreateRun L1378-1389,
+            // rossSubmitResponse L1511): runs have NO `status` field. The
+            // lifecycle is encoded via `completedAt === null` (in-progress)
+            // vs non-null (completed). The runId field is `id`, not `runId`.
+            const runIsInProgress = !!latestRun && !latestRun.completedAt;
+            const runIsCompleted = !!latestRun && !!latestRun.completedAt;
+            const runIdField = latestRun ? (latestRun.id || latestRun.runId || null) : null;
+
+            const nextDueMs = Date.parse(normalizedNextDueDate + 'T00:00:00Z');
+            const runCoversCurrentPeriod = latestRun
+                && Number.isFinite(nextDueMs)
+                && Number(latestRun.startedAt) >= nextDueMs;
+
+            const daysLate = _dateDiffDays(normalizedNextDueDate, today);
+            const name = w.name || 'Workflow';
+            const locationName = loc.locationName || 'Venue';
+
+            const baseEntry = {
+                workflowId, locationId, name, locationName,
+                nextDueDate: normalizedNextDueDate,
+            };
+
+            if (normalizedNextDueDate < today && !runCoversCurrentPeriod) {
+                overdue.push({ ...baseEntry, daysLate, requiredTaskCount });
+            } else if (normalizedNextDueDate === today && runIsInProgress) {
+                todayBucket.push({
+                    ...baseEntry,
+                    subState: 'in_progress',
+                    runId: runIdField,
+                    startedAt: Number(latestRun.startedAt) || 0,
+                    completedTaskCount,
+                    requiredTaskCount,
+                });
+            } else if (normalizedNextDueDate === today && !runCoversCurrentPeriod) {
+                todayBucket.push({
+                    ...baseEntry,
+                    subState: 'pending',
+                    requiredTaskCount,
+                });
+            } else if (runIsCompleted
+                && (now - Number(latestRun.completedAt)) < HOME_DIGEST_RECENT_WINDOW_MS) {
+                // Derive onTime / flaggedCount from run data — server writes
+                // these to the history record, not the run itself.
+                const onTime = Number.isFinite(nextDueMs)
+                    ? Number(latestRun.completedAt) <= (nextDueMs + MS_PER_DAY)
+                    : true;
+                const responses = (latestRun.responses && typeof latestRun.responses === 'object') ? latestRun.responses : {};
+                const flaggedCount = Object.values(responses).filter(r => r && r.flagged).length;
+                recentCompletions.push({
+                    ...baseEntry,
+                    runId: runIdField,
+                    completedAt: Number(latestRun.completedAt) || 0,
+                    onTime,
+                    flaggedCount,
+                });
+            }
+
+            if (normalizedNextDueDate > today) {
+                if (!upcoming || normalizedNextDueDate < upcoming.nextDueDate) {
+                    upcoming = { ...baseEntry };
+                }
+            }
+        }
+
+        if (workflowCountsAsActive) activeWorkflowIds.add(workflowId);
+    }
+
+    overdue.sort((a, b) => b.daysLate - a.daysLate);
+    todayBucket.sort((a, b) => {
+        if (a.subState !== b.subState) return a.subState === 'in_progress' ? -1 : 1;
+        if (a.nextDueDate !== b.nextDueDate) return a.nextDueDate < b.nextDueDate ? -1 : 1;
+        return a.name.localeCompare(b.name);
+    });
+    recentCompletions.sort((a, b) => b.completedAt - a.completedAt);
+
+    return {
+        overdue,
+        today: todayBucket,
+        recentCompletions,
+        hasActiveWorkflows: activeWorkflowIds.size > 0,
+        activeWorkflowCount: activeWorkflowIds.size,
+        upcoming,
+        generatedAt: now,
+    };
 }
 
 // ============================================
@@ -1582,4 +1791,61 @@ exports.rossGetStaff = onRequest(async (req, res) => {
     });
 });
 
+// =====================================================================
+//  rossGetHomeWorkflowDigest — concierge home active-run surfacing
+//
+//  Read-only digest of the caller's active workflows for /ross.html slot 1.
+//  Reads ross/workflows/{uid} + ross/runs/{uid} in parallel, delegates the
+//  bucketing to the pure helper buildHomeWorkflowDigest.
+//
+//  Auth: verifyUserOrAdmin (home is accessible to any authenticated user,
+//        not just admins — mirrors rossGetWorkflows since the 2026-03-24
+//        user-dashboard change).
+//
+//  Request body (POST): { data: { clientToday?: 'YYYY-MM-DD' } }
+//  Response: res.json({ result: { success: true, ...digest } })
+// =====================================================================
+
+exports.rossGetHomeWorkflowDigest = onRequest(async (req, res) => {
+    return cors(req, res, async () => {
+        if (req.method !== 'POST') {
+            return res.status(405).json({ error: 'Method not allowed' });
+        }
+        try {
+            const decodedToken = await verifyAuthToken(req);
+            const { uid } = await verifyUserOrAdmin(decodedToken);
+
+            const data = req.body.data || req.body || {};
+            const clientToday = (typeof data.clientToday === 'string' && data.clientToday)
+                ? data.clientToday
+                : null;
+
+            console.log(`[rossGetHomeWorkflowDigest] uid=${uid} clientToday=${clientToday || '<utc>'}`);
+
+            const [workflowsSnap, runsSnap] = await Promise.all([
+                db.ref(`ross/workflows/${uid}`).once('value'),
+                db.ref(`ross/runs/${uid}`).once('value'),
+            ]);
+
+            const digest = buildHomeWorkflowDigest({
+                workflows: workflowsSnap.exists() ? workflowsSnap.val() : {},
+                runs: runsSnap.exists() ? runsSnap.val() : {},
+                clientToday,
+                now: Date.now(),
+            });
+
+            res.json({ result: { success: true, ...digest } });
+        } catch (error) {
+            console.error('[rossGetHomeWorkflowDigest] Error:', error.message);
+            const msg = error.message || '';
+            let statusCode = 500;
+            if (msg.includes('authorization') || msg.includes('token')) statusCode = 401;
+            else if (msg.includes('Admin') || msg.includes('User') || msg.includes('access')) statusCode = 403;
+            res.status(statusCode).json({ error: msg });
+        }
+    });
+});
+
 module.exports.VALID_INPUT_TYPES = VALID_INPUT_TYPES;
+// Pure helper — exported for unit tests and the rossGetHomeWorkflowDigest CF (Task 2)
+module.exports.buildHomeWorkflowDigest = buildHomeWorkflowDigest;

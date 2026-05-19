@@ -18,6 +18,7 @@ import {
   HOME_HEADLINE,
   QUICK_JUMPS,
   LEARNING_MODE_CARDS,
+  LEARNING_MODE_WORKFLOW_CARD,    // NEW — slot 1 fallback when no workflows exist
   ASK_ROSS_SAMPLE,
   LIVE_VENUES,
   ROSS_SUGGESTIONS,
@@ -28,6 +29,7 @@ import { isEnabled } from '../../../config/feature-flags.js'
 import {
   buildContext,
   buildHeadline,
+  detectActiveWorkflows,        // NEW — slot 1 workflow card
   detectFoodCostDrift,
   detectLapsedVIPs,
   detectRevenueTrend,
@@ -73,6 +75,43 @@ export async function snoozeCard(cardId, hours = 24) {
   return json.result || json
 }
 
+/**
+ * Fetch the home workflow digest from rossGetHomeWorkflowDigest CF.
+ * Server returns { result: { success, hasActiveWorkflows, activeWorkflowCount,
+ * upcoming, overdue, today, recentCompletions, generatedAt } }.
+ * The .result wrapper is unwrapped here (same as snoozeCard).
+ *
+ * Throws on auth failure or network error — caller (detectActiveWorkflows)
+ * wraps in try/catch + returns null for graceful card-fallback.
+ */
+export async function getHomeWorkflowDigest() {
+  const user = auth.currentUser
+  if (!user) throw new Error('Not authenticated')
+  const idToken = await user.getIdToken()
+
+  // Client-local date in SA timezone — server uses it for "today" boundaries.
+  const clientToday = new Intl.DateTimeFormat('en-CA', {
+    timeZone: 'Africa/Johannesburg',
+    year: 'numeric', month: '2-digit', day: '2-digit',
+  }).format(new Date())
+
+  const res = await fetch(`${FUNCTIONS_BASE_URL}/rossGetHomeWorkflowDigest`, {
+    method: 'POST',
+    headers: {
+      'Authorization': `Bearer ${idToken}`,
+      'Content-Type': 'application/json',
+      'Accept': 'application/json',
+    },
+    body: JSON.stringify({ data: { clientToday } }),
+  })
+  if (!res.ok) {
+    const text = await res.text().catch(() => '')
+    throw new Error(`rossGetHomeWorkflowDigest failed (${res.status}): ${text}`)
+  }
+  const json = await res.json()
+  return json.result || json
+}
+
 function scriptedFeed() {
   return {
     headline: HOME_HEADLINE,
@@ -89,6 +128,24 @@ function padCards(realCards) {
   return [...realCards, ...fillers].slice(0, 3)
 }
 
+// Compose the 3-card grid with slot 1 reserved for the workflow card.
+// If detectActiveWorkflows produced a (non-snoozed) card, it leads slot 1.
+// Otherwise LEARNING_MODE_WORKFLOW_CARD fills slot 1 (unless that's snoozed
+// too, in which case slot 1 falls through to generic learning fillers
+// via padCards). Slots 2-3 stay detector-driven with generic
+// LEARNING_MODE_CARDS as last-resort filler.
+function composeFeedCards(workflowCard, otherCards, snoozes) {
+  let slot1 = null
+  if (workflowCard && !snoozes.has(workflowCard.id)) {
+    slot1 = workflowCard
+  } else if (!snoozes.has(LEARNING_MODE_WORKFLOW_CARD.id)) {
+    slot1 = LEARNING_MODE_WORKFLOW_CARD
+  }
+  const remaining = otherCards.filter((c) => c && !snoozes.has(c.id))
+  const head = slot1 ? [slot1] : []
+  return padCards([...head, ...remaining])
+}
+
 /**
  * Fetch the 3-card home feed. With the flag ON, pulls from RTDB via
  * detectors. Caller (Pinia store) still gets the same shape.
@@ -103,19 +160,20 @@ export async function getHomeFeed() {
     const ctx = await buildContext(auth)
     if (!ctx.uid) return scriptedFeed()
 
-    const [fc, vip, rev, snoozes] = await Promise.all([
+    const [workflow, fc, vip, rev, snoozes] = await Promise.all([
+      detectActiveWorkflows(ctx).catch((e) => { console.warn('[ross] active-workflows detector failed', e); return null }),
       detectFoodCostDrift(ctx).catch((e) => { console.warn('[ross] food-cost detector failed', e); return null }),
       detectLapsedVIPs(ctx).catch((e) => { console.warn('[ross] lapsed-VIPs detector failed', e); return null }),
       detectRevenueTrend(ctx).catch((e) => { console.warn('[ross] revenue detector failed', e); return null }),
       getActiveSnoozes(ctx).catch((e) => { console.warn('[ross] snoozes read failed', e); return new Set() }),
     ])
 
-    // Filter out cards the user has snoozed; padCards re-fills the grid
-    // with LEARNING_MODE_CARDS so the layout stays 3-wide.
-    const realCards = [fc, vip, rev].filter((c) => c && !snoozes.has(c.id))
-    const cards = padCards(realCards)
+    const otherCards = [fc, vip, rev]
+    const cards = composeFeedCards(workflow, otherCards, snoozes)
+    const realCardsForHeadline = [workflow, fc, vip, rev].filter((c) => c && !snoozes.has(c.id))
+
     return {
-      headline: buildHeadline(ctx, realCards),
+      headline: buildHeadline(ctx, realCardsForHeadline),
       dateLine: currentDateLine(),
       cards,
       quickJumps: QUICK_JUMPS,

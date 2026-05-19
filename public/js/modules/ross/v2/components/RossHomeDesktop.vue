@@ -13,7 +13,12 @@ import { snoozeCard } from '../ross-service.js'
 import { auth, onAuthStateChanged } from '/js/config/firebase-config.js'
 
 const store = useRossStore()
-onMounted(() => { if (!store.feed) store.loadHome() })
+// Always reload on mount. The Pinia store survives across in-app tab
+// switches (Playbook ↔ Home ↔ Activity), so a `!store.feed` guard would
+// serve stale data when the operator returns to Home after starting,
+// completing, or activating a workflow elsewhere. Cold-start cost is
+// acceptable here — the home is the freshness-sensitive surface.
+onMounted(() => { store.loadHome() })
 
 // Footer profile — reactive to auth state. Real /profile-settings.html
 // destination is Phase 6; gear icon stays non-interactive for now.

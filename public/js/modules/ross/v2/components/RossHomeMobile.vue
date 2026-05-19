@@ -10,7 +10,8 @@ import {
 import { auth, onAuthStateChanged } from '/js/config/firebase-config.js'
 
 const store = useRossStore()
-onMounted(() => { if (!store.feed) store.loadHome() })
+// Always reload on mount (see RossHomeDesktop.vue for rationale).
+onMounted(() => { store.loadHome() })
 
 const feed = computed(() => store.feed)
 

@@ -488,6 +488,33 @@ Values are auto-flagged server-side when `Number(value) > inputConfig.max` or `<
 
 ## Frontend Vue Module
 
+### Concierge home active-run surfacing (Phase 6 PR 4, shipped 2026-05-19)
+
+Slot 1 of the 3-card home grid is reserved for a workflow-engagement card
+driven by `rossGetHomeWorkflowDigest`. Five variants, picked by priority:
+
+1. **Overdue** — `nextDueDate` < today AND no run started ≥ nextDueDate
+2. **In progress (today)** — `nextDueDate === today` AND latest run `status: in_progress`
+3. **Due today (pending)** — `nextDueDate === today` AND no run for the current period
+4. **Recently completed** — completed run within last 24h, no current obligation
+5. **All clear** — user has active workflows but nothing pressing right now
+
+If `hasActiveWorkflows === false` (no active workflows at all), slot 1
+falls back to `LEARNING_MODE_WORKFLOW_CARD` ("Your playbook is empty —
+activate a starter template").
+
+The detector lives at `public/js/modules/ross/v2/detectors.js` →
+`detectActiveWorkflows(ctx)`. Snooze interop via card id
+`workflow:{workflowId}:{locationId}` (per-pair, so snoozing one venue
+doesn't snooze another). Slots 2-3 remain detector-driven (food-cost /
+VIP / revenue) with generic `LEARNING_MODE_CARDS` as last-resort filler.
+
+URL scheme for run CTAs: `/ross.html?tab=run&workflowId=<id>&locationId=<id>`
+(matches the param keys read by `RossHome.vue:34-35`).
+
+Scope note: server reads `ross/workflows/{callerUid}` — owner-only view.
+Shared-location-admin case is backlog follow-up.
+
 **File:** `public/js/modules/ross/index.js`
 
 This is a self-contained Vue 3 CDN application. It is mounted/unmounted by `admin-dashboard.js`.
