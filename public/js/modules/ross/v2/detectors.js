@@ -12,6 +12,8 @@
 import {
   rtdb, ref, get, query, orderByChild, equalTo,
 } from '../../../config/firebase-config.js'
+import { getHomeWorkflowDigest } from './ross-service.js'
+import { relTime } from './utils/rel-time.js'
 
 /**
  * Read this user's currently-active snoozes from ross/v2Snoozes/{uid}.
@@ -379,5 +381,190 @@ export function buildHeadline(ctx, realCards) {
     greeting: `Good ${greetingTime}, ${first}.`,
     subtitle,
     lead,
+  }
+}
+
+// =========================================================================
+//  Card 0: Active workflows (slot 1 — workflow card variants A-E)
+// =========================================================================
+
+function _buildOverdueCard(entry, allOverdue) {
+  const overdueCount = allOverdue.length
+  const daysLateLabel = `${entry.daysLate} day${entry.daysLate === 1 ? '' : 's'} late`
+  const aggSuffix = overdueCount > 1
+    ? ` And ${overdueCount - 1} more venue${overdueCount - 1 === 1 ? '' : 's'} overdue.`
+    : ''
+  return {
+    id: `workflow:${entry.workflowId}:${entry.locationId}`,
+    tone: 'warn',
+    eyebrow: `${entry.locationName} · ${daysLateLabel}`,
+    chip: { tone: 'warn', label: 'Overdue' },
+    headline: `${entry.name} is overdue at ${entry.locationName} (${daysLateLabel}).`,
+    detail: `${entry.requiredTaskCount} task${entry.requiredTaskCount === 1 ? '' : 's'} pending. Start now to catch up.${aggSuffix}`,
+    actions: [
+      { id: 'run-workflow', label: 'Start now', variant: 'solid', trailing: 'arrow',
+        href: `/ross.html?tab=run&workflowId=${entry.workflowId}&locationId=${entry.locationId}` },
+      { id: 'view-workflow', label: 'View workflow', variant: 'ghost',
+        href: '/ross.html?tab=playbook' },
+      { id: 'snooze', label: 'Snooze 24h', variant: 'ghost' },
+    ],
+    footnote: overdueCount > 1 ? `${overdueCount} workflows overdue` : undefined,
+    sidecar: {
+      kind: 'kpi-spark', eyebrow: 'Days late',
+      value: entry.daysLate, unit: 'd',
+      target: 'target: 0 overdue',
+      trend: [0, 0, 0, 0, 0, 0, entry.daysLate],
+      color: 'var(--hf-warn)',
+    },
+    _meta: { contextLine: `${entry.name} is ${entry.daysLate} day${entry.daysLate === 1 ? '' : 's'} overdue at ${entry.locationName}.` },
+  }
+}
+
+function _buildInProgressCard(entry, allToday) {
+  const pending = Math.max(0, entry.requiredTaskCount - entry.completedTaskCount)
+  const total = entry.requiredTaskCount
+  const pct = total > 0 ? Math.round((entry.completedTaskCount / total) * 100) : 0
+  const otherTodayCount = Math.max(0, allToday.length - 1)
+  const aggSuffix = otherTodayCount > 0
+    ? ` Plus ${otherTodayCount} other workflow${otherTodayCount === 1 ? '' : 's'} due today.`
+    : ''
+  return {
+    id: `workflow:${entry.workflowId}:${entry.locationId}`,
+    tone: 'default',
+    chip: { tone: 'default', label: 'In progress', icon: 'sparkle' },
+    eyebrow: `${entry.locationName} · started ${relTime(entry.startedAt)}`,
+    headline: `${entry.name} is half-done — ${pending} of ${total} tasks pending.`,
+    detail: `Resume to keep on track today.${aggSuffix}`,
+    actions: [
+      { id: 'run-workflow', label: 'Resume run', variant: 'solid', trailing: 'arrow',
+        href: `/ross.html?tab=run&workflowId=${entry.workflowId}&locationId=${entry.locationId}` },
+      { id: 'snooze', label: 'Snooze 24h', variant: 'ghost' },
+    ],
+    sidecar: {
+      kind: 'donut',
+      value: total > 0 ? entry.completedTaskCount / total : 0,
+      label: `${pct}%`,
+      sub: `${entry.completedTaskCount}/${total}`,
+      color: 'var(--hf-accent)',
+    },
+    _meta: { contextLine: `${entry.name} run in progress at ${entry.locationName}.` },
+  }
+}
+
+function _buildPendingTodayCard(entry, allToday) {
+  const otherTodayCount = Math.max(0, allToday.length - 1)
+  const aggSuffix = otherTodayCount > 0
+    ? ` Plus ${otherTodayCount} other workflow${otherTodayCount === 1 ? '' : 's'} due today.`
+    : ''
+  return {
+    id: `workflow:${entry.workflowId}:${entry.locationId}`,
+    tone: 'default',
+    chip: { tone: 'default', label: 'Due today', icon: 'cal' },
+    eyebrow: `${entry.locationName} · ${entry.requiredTaskCount} task${entry.requiredTaskCount === 1 ? '' : 's'}`,
+    headline: `${entry.name} is due today at ${entry.locationName}.`,
+    detail: `${entry.requiredTaskCount} task${entry.requiredTaskCount === 1 ? '' : 's'} to run.${aggSuffix}`,
+    actions: [
+      { id: 'run-workflow', label: 'Start run', variant: 'solid', trailing: 'arrow',
+        href: `/ross.html?tab=run&workflowId=${entry.workflowId}&locationId=${entry.locationId}` },
+      { id: 'snooze', label: 'Snooze 24h', variant: 'ghost' },
+    ],
+    sidecar: {
+      kind: 'kpi-spark', eyebrow: 'Tasks',
+      value: entry.requiredTaskCount, unit: '',
+      target: 'due today',
+      trend: Array(7).fill(entry.requiredTaskCount),
+      color: 'var(--hf-accent)',
+    },
+    _meta: { contextLine: `${entry.name} due today at ${entry.locationName}.` },
+  }
+}
+
+function _buildRecentCompletionCard(entry) {
+  const flagged = Number(entry.flaggedCount) || 0
+  const tone = flagged > 0 ? 'warn' : 'good'
+  const chipLabel = flagged > 0 ? 'Completed with flags' : 'Just completed'
+  const chipIcon = flagged > 0 ? 'alert' : 'check'
+  const flaggedSuffix = flagged > 0
+    ? ` ${flagged} response${flagged === 1 ? '' : 's'} flagged for review.`
+    : ''
+  return {
+    id: `workflow:${entry.workflowId}:${entry.locationId}`,
+    tone,
+    chip: { tone, label: chipLabel, icon: chipIcon },
+    eyebrow: `${entry.locationName} · completed ${relTime(entry.completedAt)}`,
+    headline: `${entry.name} completed ${relTime(entry.completedAt)}.`,
+    detail: `${entry.onTime ? 'On time.' : 'Completed late.'}${flaggedSuffix}`,
+    actions: [
+      { id: 'see-report', label: 'See report', variant: 'solid', trailing: 'arrow',
+        href: '/ross.html?tab=activity' },
+      { id: 'snooze', label: 'Hide', variant: 'ghost' },
+    ],
+    sidecar: {
+      kind: 'donut', value: 1, label: '100%', sub: 'complete',
+      color: flagged > 0 ? 'var(--hf-warn)' : 'var(--hf-good)',
+    },
+    _meta: { contextLine: `${entry.name} completed ${relTime(entry.completedAt)} at ${entry.locationName}.` },
+  }
+}
+
+function _buildAllClearCard(digest) {
+  const count = digest.activeWorkflowCount
+  const upc = digest.upcoming
+  const nextDueLabel = upc ? `on ${upc.nextDueDate} (${upc.name} at ${upc.locationName})` : 'soon'
+  return {
+    id: 'workflow-all-clear',
+    tone: 'good',
+    eyebrow: 'Your playbook · all clear',
+    chip: { tone: 'good', label: 'All clear', icon: 'check' },
+    headline: 'Nothing pressing right now.',
+    detail: `Your active workflows are on schedule. Next run is ${nextDueLabel}.`,
+    actions: [
+      { id: 'view-playbook', label: 'View playbook', variant: 'ghost', trailing: 'arrow',
+        href: '/ross.html?tab=playbook' },
+      { id: 'snooze', label: 'Hide for a day', variant: 'ghost' },
+    ],
+    footnote: `${count} workflow${count === 1 ? '' : 's'} running`,
+    sidecar: {
+      kind: 'kpi-spark', eyebrow: 'On schedule',
+      value: count, unit: '',
+      target: 'all on track',
+      trend: [1, 1, 1, 1, 1, 1, 1],
+      color: 'var(--hf-good)',
+    },
+    _meta: { contextLine: `${count} active workflows on schedule.` },
+  }
+}
+
+export async function detectActiveWorkflows(ctx) {
+  if (!ctx?.uid) return null
+  let digest
+  try {
+    digest = await getHomeWorkflowDigest()
+  } catch (e) {
+    console.warn('[ross] active-workflows detector failed', e)
+    return null
+  }
+
+  try {
+    if (digest.overdue && digest.overdue.length > 0) {
+      return _buildOverdueCard(digest.overdue[0], digest.overdue)
+    }
+    if (digest.today && digest.today.length > 0) {
+      const first = digest.today[0]
+      if (first.subState === 'in_progress') {
+        return _buildInProgressCard(first, digest.today)
+      }
+      return _buildPendingTodayCard(first, digest.today)
+    }
+    if (digest.recentCompletions && digest.recentCompletions.length > 0) {
+      return _buildRecentCompletionCard(digest.recentCompletions[0])
+    }
+    if (digest.hasActiveWorkflows) {
+      return _buildAllClearCard(digest)
+    }
+    return null
+  } catch (e) {
+    console.warn('[ross] active-workflows card builder threw', e)
+    return null
   }
 }
