@@ -1753,6 +1753,61 @@ exports.rossGetStaff = onRequest(async (req, res) => {
     });
 });
 
+// =====================================================================
+//  rossGetHomeWorkflowDigest — concierge home active-run surfacing
+//
+//  Read-only digest of the caller's active workflows for /ross.html slot 1.
+//  Reads ross/workflows/{uid} + ross/runs/{uid} in parallel, delegates the
+//  bucketing to the pure helper buildHomeWorkflowDigest.
+//
+//  Auth: verifyUserOrAdmin (home is accessible to any authenticated user,
+//        not just admins — mirrors rossGetWorkflows since the 2026-03-24
+//        user-dashboard change).
+//
+//  Request body (POST): { data: { clientToday?: 'YYYY-MM-DD' } }
+//  Response: res.json({ result: { success: true, ...digest } })
+// =====================================================================
+
+exports.rossGetHomeWorkflowDigest = onRequest(async (req, res) => {
+    return cors(req, res, async () => {
+        if (req.method !== 'POST') {
+            return res.status(405).json({ error: 'Method not allowed' });
+        }
+        try {
+            const decodedToken = await verifyAuthToken(req);
+            const { uid } = await verifyUserOrAdmin(decodedToken);
+
+            const data = req.body.data || req.body || {};
+            const clientToday = (typeof data.clientToday === 'string' && data.clientToday)
+                ? data.clientToday
+                : null;
+
+            console.log(`[rossGetHomeWorkflowDigest] uid=${uid} clientToday=${clientToday || '<utc>'}`);
+
+            const [workflowsSnap, runsSnap] = await Promise.all([
+                db.ref(`ross/workflows/${uid}`).once('value'),
+                db.ref(`ross/runs/${uid}`).once('value'),
+            ]);
+
+            const digest = buildHomeWorkflowDigest({
+                workflows: workflowsSnap.exists() ? workflowsSnap.val() : {},
+                runs: runsSnap.exists() ? runsSnap.val() : {},
+                clientToday,
+                now: Date.now(),
+            });
+
+            res.json({ result: { success: true, ...digest } });
+        } catch (error) {
+            console.error('[rossGetHomeWorkflowDigest] Error:', error.message);
+            const msg = error.message || '';
+            let statusCode = 500;
+            if (msg.includes('authorization') || msg.includes('token')) statusCode = 401;
+            else if (msg.includes('Admin') || msg.includes('User') || msg.includes('access')) statusCode = 403;
+            res.status(statusCode).json({ error: msg });
+        }
+    });
+});
+
 module.exports.VALID_INPUT_TYPES = VALID_INPUT_TYPES;
 // Pure helper — exported for unit tests and the rossGetHomeWorkflowDigest CF (Task 2)
 module.exports.buildHomeWorkflowDigest = buildHomeWorkflowDigest;
