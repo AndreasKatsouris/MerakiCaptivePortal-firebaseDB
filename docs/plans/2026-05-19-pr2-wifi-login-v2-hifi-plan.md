@@ -47,7 +47,7 @@ Run:
 ls public/fonts/hifi/
 ```
 
-Expected: at minimum `Geist-Regular.woff2`, `Geist-Medium.woff2`, `Instrument-Serif-Regular.woff2`. These are reachable from the captive portal (same hosting domain — walled-garden-OK by transitivity).
+Expected: `geist-300-latin.woff2`, `instrument-serif-400-latin.woff2`, `jetbrains-mono-400-latin.woff2` (plus `-ext` and italic variants). These are wired into `public/css/hifi-fonts.css` via `@font-face src: url(...)` declarations — loading `hifi-fonts.css` in the page is sufficient (no explicit preload needed). Reachable from the captive portal (same hosting domain — walled-garden-OK by transitivity).
 
 - [ ] **Step 3: Confirm no other consumer of `pendingWifiLogin` or `generateSessionID`**
 
@@ -592,12 +592,11 @@ The new file is short enough to write in one pass. Overwrite the file with:
     <meta name='theme-color' content='#1a1812'>
     <link rel='manifest' href='manifest.json'>
 
-    <!-- Self-hosted fonts (walled-garden friendly) -->
-    <link rel='preload' href='fonts/hifi/Geist-Regular.woff2' as='font' type='font/woff2' crossorigin>
-    <link rel='preload' href='fonts/hifi/Geist-Medium.woff2' as='font' type='font/woff2' crossorigin>
-    <link rel='preload' href='fonts/hifi/Instrument-Serif-Regular.woff2' as='font' type='font/woff2' crossorigin>
-
-    <!-- Hi-Fi tokens + base (self-hosted, walled-garden friendly) -->
+    <!-- Hi-Fi fonts + tokens + base (self-hosted, walled-garden friendly).
+         hifi-fonts.css contains the @font-face declarations; fonts are
+         loaded on first use without explicit preload. Matches ross.html's
+         link order so the cascade behaves identically across v2 surfaces. -->
+    <link rel='stylesheet' href='css/hifi-fonts.css'>
     <link rel='stylesheet' href='css/hifi-tokens.css'>
     <link rel='stylesheet' href='css/hifi-base.css'>
 
