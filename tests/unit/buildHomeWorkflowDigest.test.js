@@ -258,4 +258,87 @@ describe('buildHomeWorkflowDigest', () => {
     expect(d.today[0].subState).toBe('in_progress')
     expect(d.today[0].workflowId).toBe('w2')
   })
+
+  // Documents code-review finding: overdue workflow with a stale in-progress run
+  // (started before nextDueMs) lands in overdue, not today/in_progress.
+  // The stale run is invisible in the digest payload — operator's "Start now"
+  // CTA routes to rossCreateRun, which is idempotent (returns the existing
+  // in-progress run), so the user can still resume it from the Run UI.
+  test('overdue + stale in_progress run (started before nextDueMs) → overdue, run not surfaced', () => {
+    const workflows = {
+      w1: mkWorkflow('w1', 'Daily Opening', {
+        locA: mkLocation('Ocean Club', '2026-05-18', { t1: mkTask() }),
+      }),
+    }
+    const runs = {
+      w1: { locA: { r1: mkRun({
+        status: 'in_progress',
+        // Started 3 days ago — well before the 2026-05-18 nextDueDate boundary
+        startedAt: baseNow - 3 * 24 * 3_600_000,
+        responses: {},
+      }) } },
+    }
+    const d = buildHomeWorkflowDigest({ workflows, runs, clientToday: '2026-05-19', now: baseNow })
+    expect(d.overdue).toHaveLength(1)
+    expect(d.today).toEqual([])
+    expect(d.overdue[0]).not.toHaveProperty('runId')
+  })
+
+  // completedTaskCount must filter responses to required tasks only.
+  // Spec: the donut on the in-progress card shows completed-of-required;
+  // responses to optional tasks must not inflate the numerator.
+  test('completedTaskCount excludes responses to optional tasks', () => {
+    const workflows = {
+      w1: mkWorkflow('w1', 'X', {
+        locA: mkLocation('A', '2026-05-19', {
+          t1: mkTask(true),
+          t2: mkTask(false),
+          t3: mkTask(true),
+        }),
+      }),
+    }
+    const runs = {
+      w1: { locA: { r1: mkRun({
+        status: 'in_progress',
+        startedAt: baseNow - 1_800_000,
+        responses: {
+          t1: { value: 'on' },   // required → counted
+          t2: { value: 'on' },   // optional → NOT counted
+          t3: { value: 'on' },   // required → counted
+        },
+      }) } },
+    }
+    const d = buildHomeWorkflowDigest({ workflows, runs, clientToday: '2026-05-19', now: baseNow })
+    expect(d.today[0].subState).toBe('in_progress')
+    expect(d.today[0].completedTaskCount).toBe(2)  // not 3
+    expect(d.today[0].requiredTaskCount).toBe(2)
+  })
+
+  // Documents behaviour: a today-due workflow whose last completion was
+  // yesterday (more than 24h ago) lands in today/pending — not silently
+  // dropped. The recentCompletions branch is gated on <24h; the today/pending
+  // branch catches it because runCoversCurrentPeriod is false (the completed
+  // run started before today midnight).
+  test('today + last completion >24h ago → today/pending (not silently dropped)', () => {
+    const workflows = {
+      w1: mkWorkflow('w1', 'X', {
+        locA: mkLocation('A', '2026-05-19', { t1: mkTask() }),
+      }),
+    }
+    const runs = {
+      w1: { locA: { r1: mkRun({
+        status: 'completed',
+        // Started yesterday morning, completed yesterday evening — >24h before now
+        startedAt: baseNow - 30 * 3_600_000,
+        completedAt: baseNow - 25 * 3_600_000,
+        onTime: true,
+        flaggedCount: 0,
+        responses: { t1: { value: 'on' } },
+      }) } },
+    }
+    const d = buildHomeWorkflowDigest({ workflows, runs, clientToday: '2026-05-19', now: baseNow })
+    expect(d.today).toHaveLength(1)
+    expect(d.today[0].subState).toBe('pending')
+    expect(d.recentCompletions).toEqual([])
+  })
 })

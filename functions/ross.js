@@ -196,8 +196,8 @@ async function resolveWorkflowOwner(workflowId, locationId, callerUid) {
 //  HOME WORKFLOW DIGEST helper (pure, exported for unit tests)
 // =====================================================================
 
-const HOME_DIGEST_RECENT_WINDOW_MS = 24 * 60 * 60 * 1000;
-const HOME_DIGEST_DAY_MS = 24 * 60 * 60 * 1000;
+const MS_PER_DAY = 24 * 60 * 60 * 1000;
+const HOME_DIGEST_RECENT_WINDOW_MS = MS_PER_DAY;
 
 function _todayUTC(now) {
     return new Date(now).toISOString().slice(0, 10);
@@ -208,7 +208,7 @@ function _dateDiffDays(fromISO, toISO) {
     const f = Date.parse(fromISO + 'T00:00:00Z');
     const t = Date.parse(toISO + 'T00:00:00Z');
     if (Number.isNaN(f) || Number.isNaN(t)) return 0;
-    return Math.round((t - f) / HOME_DIGEST_DAY_MS);
+    return Math.round((t - f) / MS_PER_DAY);
 }
 
 function _latestRun(runsForPair) {
@@ -232,9 +232,18 @@ function _countRequiredTasks(tasks) {
     return n;
 }
 
-function _countResponses(run) {
+// Count responses to REQUIRED tasks only. The donut on the in-progress
+// card shows completed-of-required tasks; responses to optional tasks
+// would inflate the numerator past 100%.
+function _countCompletedRequiredTasks(run, tasks) {
     if (!run || !run.responses || typeof run.responses !== 'object') return 0;
-    return Object.keys(run.responses).length;
+    if (!tasks || typeof tasks !== 'object') return 0;
+    let n = 0;
+    for (const taskId of Object.keys(run.responses)) {
+        const task = tasks[taskId];
+        if (task && task.required !== false) n++;
+    }
+    return n;
 }
 
 function buildHomeWorkflowDigest({ workflows, runs, clientToday, now }) {
@@ -270,7 +279,7 @@ function buildHomeWorkflowDigest({ workflows, runs, clientToday, now }) {
             const runsForPair = (safeRuns[workflowId] && safeRuns[workflowId][locationId]) || {};
             const latestRun = _latestRun(runsForPair);
             const requiredTaskCount = _countRequiredTasks(loc.tasks);
-            const completedTaskCount = _countResponses(latestRun);
+            const completedTaskCount = _countCompletedRequiredTasks(latestRun, loc.tasks);
 
             const nextDueMs = Date.parse(loc.nextDueDate + 'T00:00:00Z');
             const runCoversCurrentPeriod = latestRun
