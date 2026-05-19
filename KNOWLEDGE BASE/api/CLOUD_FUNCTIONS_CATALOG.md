@@ -241,6 +241,16 @@ The platform deploys **69+ Cloud Functions** from a single `functions/index.js` 
 
 ---
 
+### ROSS Functions
+
+| Function | Auth | Purpose |
+|----------|------|---------|
+| `rossGetHomeWorkflowDigest` | `verifyUserOrAdmin` | Read-only digest of caller's active workflows for `/ross.html` slot 1. Returns `{ hasActiveWorkflows, activeWorkflowCount, upcoming, overdue[], today[], recentCompletions[], generatedAt }`. POST body: `{ data: { clientToday?: 'YYYY-MM-DD' } }` (caller's local-tz date for boundary computation; falls back to UTC date if missing). |
+
+> For the full ROSS Cloud Functions catalog (rossGetWorkflows, rossCreateRun, rossSubmitResponse, etc.) see `public/kb/features/ROSS.md#cloud-functions`.
+
+---
+
 ## Source File Map
 
 | File | Functions |
