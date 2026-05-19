@@ -544,7 +544,7 @@ document.addEventListener('DOMContentLoaded', function() {
 
         const { data: result } = await submitWifiLoginCF(payload);
         console.log('WiFi LOGIN DEBUG: submitWifiLogin CF returned:', result);
-        return result?.sessionID || data.sessionID;
+        return result.sessionID;
     }
 
     // Stub: preferences are no longer persisted from the captive portal.
