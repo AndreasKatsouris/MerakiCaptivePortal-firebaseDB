@@ -1,6 +1,6 @@
 {
   "lastUpdated": "2026-05-19",
-  "lastUpdatedNote": "PRs #70, #73, #72, #75 all merged 2026-05-19. Phase 6 main scope is COMPLETE with PR #72 (concierge home active-run surfacing): new rossGetHomeWorkflowDigest CF (read-only, verifyUserOrAdmin) + thin client detector + 5 card variants (Overdue / In-progress / Due-today / Recently-completed / All-clear) + LEARNING_MODE fallback. Hybrid card composition preserved — workflow slot 1 + food-cost/VIP/revenue detectors slots 2-3. 38 unit tests, build green. Two operator-preview defects folded in: (a) nextDueDate stored as epoch-ms NUMBER not ISO string — string comparison silently failed every branch; (b) runs have NO status field — lifecycle is completedAt === null vs non-null, runId field is `id` not `runId`. Both fixed via fold-in commits — same root-cause pattern (KB doc shape ≠ CF write-path shape), second occurrence in 18 days of the validated 2026-05-01 SELF_OPT. Operator design call mid-PR: 'Missed' chip framing at daysLate >= 4. Home feed auto-reload on every mount. PR #75 reflect cycle promoted the pre-flight + pre-push self-review disciplines into CLAUDE.md as literal Standard Task Workflow steps. Earlier same-day: PR #70 fixed admin Clear Scanning Data button (WRITE_TOO_BIG ceiling on /scanningData node — chunked-delete CF); PR #73 hardened wifi-login security (4 highest-sev audit findings closed). Phase 6 stretch task (Compliance Sweep starter template) remains optional.",
+  "lastUpdatedNote": "Bug-knock-off bundle merged: PR #77 (dead temp-setup.html), PR #78 (Vite cache-buster fix at 2 sites — feature-access-control.js:64 + queue-management.js:1646; audit found the second site), PR #79 (mobile bottom-nav decorative <button> → real <a href>, + folded fix for mobile card-footer hardcoded mock strings replaced with dynamic cardMeta(c) helper reading c.sidecar). Three small backlog items closed in a single bug-bundle session. Second occurrence of the prototype-debris-on-v2-surfaces pattern (PR #48 first; PR #79 fold-in second) — new LESSON shipped for mobile-variant data-wiring + icon-only-no-behaviour affordance. Earlier same-day: PRs #70 (clearScanningData WRITE_TOO_BIG), #72 (Phase 6 PR 4 active-run surfacing), #73 (wifi-login security PR 1), #75 (post-PR-72 reflect + CLAUDE.md promotion of pre-flight write-path verification + pre-push self-review sub-steps), #76 (project-status.json sync).",
   "sprint": {
     "goal": "Effective implementation of Hi-Fi v2, with ROSS as the central post-login surface for every subscribed user",
     "started": "2026-04-30",
@@ -86,11 +86,11 @@
   ],
   "inProgress": [],
   "recentlyCompleted": [
+    { "title": "Bug-knock-off bundle (PRs #77/#78/#79): #77 deleted dead public/tools/archive/temp-setup.html (called CF removed in PR #70); #78 dropped ?v=${Date.now()} Vite-breaking cache-busters at 2 sites (feature-access-control.js:64 + queue-management.js:1646 — audit hit); #79 fixed mobile bottom-nav decorative buttons → real <a href> destinations AND folded mobile card-footer hardcoded mock strings replaced with dynamic cardMeta(c) helper. Three small backlog items in one session.", "pr": "77/78/79", "mergedAt": "2026-05-19" },
     { "title": "ROSS concierge home active-run surfacing (Phase 6 PR 4) — new rossGetHomeWorkflowDigest CF (onRequest + verifyUserOrAdmin, read-only) + thin client detector detectActiveWorkflows + 5 card variants (Overdue/In-progress/Due-today/Recently-completed/All-clear) + LEARNING_MODE_WORKFLOW_CARD fallback; hybrid card composition preserved (workflow slot 1 + food-cost/VIP/revenue detectors slots 2-3); 38 unit tests; two preview-driven defects folded (numeric-nextDueDate normalisation + canonical run schema with no status field); mid-PR operator design call: 'Missed' framing at daysLate >= 4; home feed auto-reload on every mount", "pr": 72, "mergedAt": "2026-05-19" },
     { "title": "WiFi login security hardening (PR 1 of 2) — new submitWifiLogin v2 onCall CF replaces direct-client RTDB writes; anonymous Firebase Auth + per-UID 5s debounce + shape validation + push-key sessionID + atomic multi-path write to wifiLogins/activeUsers/rateLimitsWifi; rules tightened from .write:auth!=null to admin-only on three PII nodes; open-redirect host-pattern whitelist on base_grant_url; client fallback chain preserves Meraki redirect on CF failure", "pr": 73, "mergedAt": "2026-05-19" },
     { "title": "clearScanningData chunked-delete + WRITE_TOO_BIG fix — admin Clear Scanning Data button hit RTDB ~16 MB single-write ceiling on grown /scanningData node; migrated CF from onRequest to v2 onCall + chunked delete via orderByKey().limitToFirst(500) + multi-path null update(); hard cap 200 batches/invocation; client loops across calls for larger nodes; folded tempClearData deletion (hardcoded secret, same bug)", "pr": 70, "mergedAt": "2026-05-19" },
-    { "title": "registerUser callable Gen-2 signature fix (HIGH-sev bug-triage) — migrated v1 (data, context) => to v2 (request) =>; closed silent prod degradation that had been masking Path A code path since the firebase-functions v7 upgrade; pre-merge fold-in for HttpsError re-throw + KB doc sync; validated end-to-end on prod (positive + invalid-tier negative test)", "pr": 67, "mergedAt": "2026-05-15" },
-    { "title": "ROSS Run execution UI (Phase 6 PR 3) — ?tab=run page covering all 10 inputTypes with auto-save, client pre-flight requiredNote + server-422 safety net via store.pendingNoteTaskId, sticky summary bar, inline completion banner; 40 unit tests across 4 new suites; pre-merge fold-in resolved 6 of 7 automated-review items", "pr": 65, "mergedAt": "2026-05-15" }
+    { "title": "registerUser callable Gen-2 signature fix (HIGH-sev bug-triage) — migrated v1 (data, context) => to v2 (request) =>; closed silent prod degradation that had been masking Path A code path since the firebase-functions v7 upgrade; pre-merge fold-in for HttpsError re-throw + KB doc sync; validated end-to-end on prod (positive + invalid-tier negative test)", "pr": 67, "mergedAt": "2026-05-15" }
   ],
   "bugs": [
     {
@@ -118,28 +118,12 @@
       "notes": "All seven still use functions.https.onCall((data, context) => ...) and will throw unauthenticated on every call (same Gen-2 vs v1 signature mismatch fixed for registerUser in PR #67). Audit findings: two QMS callables show no recent invocations; the other five had logs-API errors on the audit pass. Consumer audit (public/): performanceTest has a working HTTP fallback (performanceTestHTTP); runSystemOptimization called only from admin-internal firebase-performance-monitor.js; QMS callables have no public/ consumers. None on user-facing critical path. Fix: same mechanical migration as PR #67 — onCall((request) => { const { data, auth } = request; ... }) with HttpsError from firebase-functions/v2/https. Recommend one sweep PR addressing all seven at once for consistent diff + single deploy."
     },
     {
-      "title": "Mobile nav missing Playbook/Activity/People access on ROSS home",
-      "severity": "medium",
-      "discoveredAt": "2026-05-12",
-      "discoveredOn": "PR #58 preview test",
-      "blockingSprint": false,
-      "notes": "Operator flagged on PR #58 preview that the Ross home mobile bottom-nav doesn't expose the three governance destinations from the desktop sidebar. PR #48 noted the mobile topbar was supposed to fold them in. Either pre-existing on master or regression since PR #48. Investigation needed before fix."
-    },
-    {
       "title": "Double-seed race on signup retry — rossSeedFirstWorkflow idempotency pre-check is not transactional",
       "severity": "low",
       "discoveredAt": "2026-05-12",
       "discoveredOn": "PR #58 final review",
       "blockingSprint": false,
       "notes": "A user double-clicking signup or hitting a network retry could pass the firstWorkflowSeededAt pre-check in both invocations and produce two seeded workflows. Mitigation options: (a) RTDB transaction() on the marker, OR (b) deterministic workflow ID per uid (e.g. seed_{uid}) so duplicate write is overwrite. Exposure small; consequence mild (duplicate workflow, no corruption)."
-    },
-    {
-      "title": "feature-access-control.js:64 — dynamic import with ?v=${Date.now()} cache-buster breaks Vite build-time analysis",
-      "severity": "medium",
-      "discoveredAt": "2026-05-11",
-      "discoveredOn": "PR #48 preview review",
-      "blockingSprint": false,
-      "notes": "Vite can't statically analyse a runtime-computed path — throws `Unknown variable dynamic import` on every checkFeatureAccess call post-build. Fix is one line (drop the ?v=…; Vite content-hashes outputs natively) but the file is shared infra. Needs own focused PR with consumer audit."
     }
   ],
   "backlog": {
