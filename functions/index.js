@@ -1301,6 +1301,118 @@ exports.setupInitialAdmin = onRequest(async (req, res) => {
 });
 
 /**
+ * Cloud Function to record a guest WiFi captive-portal login.
+ *
+ * Replaces the prior client-side direct RTDB write to /wifiLogins and
+ * /activeUsers, which required `.write: true` on those nodes — a public-
+ * internet exposure (anyone could write arbitrary data). Now those nodes
+ * are admin-only at the rules layer; this CF is the sole guest-write path,
+ * running under the Admin SDK after anonymous-auth + per-UID rate limit +
+ * shape validation.
+ *
+ * Auth model: anonymous Firebase Auth. The captive-portal guest has no
+ * other identity. Anon UID gives a per-device handle for rate limiting
+ * and write attribution. Anonymous-auth uses the same auth hostname
+ * family (identitytoolkit.googleapis.com) as RTDB, so it reaches the
+ * client through walled gardens that already permit the existing RTDB
+ * writes — no new walled-garden whitelist needed for auth itself.
+ * (Cloud Functions hostname is the one new dependency; client handles
+ * CF failure by falling through to the existing localStorage offline
+ * retry queue, so the Meraki redirect path never blocks.)
+ */
+exports.submitWifiLogin = onCall(
+    { timeoutSeconds: 30, memory: '256MiB' },
+    async (request) => {
+        const { auth, data } = request;
+
+        if (!auth) {
+            throw new HttpsError('unauthenticated', 'Sign-in required.');
+        }
+        const uid = auth.uid;
+
+        // Per-UID 5s debounce. Captive portal is a one-shot flow per
+        // device; abuse vector is bot flooding, debounce is sufficient
+        // (sliding-window would be overkill).
+        const rateRef = admin.database().ref(`rateLimitsWifi/${uid}`);
+        const lastSnap = await rateRef.once('value');
+        const last = lastSnap.val();
+        const now = Date.now();
+        if (last?.lastWriteAt && now - last.lastWriteAt < 5000) {
+            throw new HttpsError('resource-exhausted', 'Please wait a moment before retrying.');
+        }
+
+        // Shape validation + length caps. Caps mirror the .validate rules
+        // in database.rules.json (defense in depth — the rules fire on
+        // the Admin SDK's multi-path update() below).
+        const name = String(data?.name || '').trim().slice(0, 120);
+        const email = String(data?.email || '').trim().slice(0, 254);
+        const phoneNumber = String(data?.phoneNumber || '').trim().slice(0, 24);
+        const table = String(data?.table || '').trim().slice(0, 24);
+        const client_mac = String(data?.client_mac || '').trim().slice(0, 32);
+        const node_mac = String(data?.node_mac || '').trim().slice(0, 32);
+        const client_ip = String(data?.client_ip || '').trim().slice(0, 45);
+
+        if (!name || name.split(/\s+/).length < 2) {
+            throw new HttpsError('invalid-argument', 'Full name (first + last) is required.');
+        }
+        if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+            throw new HttpsError('invalid-argument', 'Valid email is required.');
+        }
+        const digits = phoneNumber.replace(/[\s\-()]/g, '');
+        if (!/^\+?\d{7,15}$/.test(digits)) {
+            throw new HttpsError('invalid-argument', 'Valid phone number is required.');
+        }
+        const macPattern = /^([0-9A-Fa-f]{2}[:-]){5}[0-9A-Fa-f]{2}$/;
+        if (client_mac && !macPattern.test(client_mac)) {
+            throw new HttpsError('invalid-argument', 'Invalid client MAC.');
+        }
+        if (node_mac && !macPattern.test(node_mac)) {
+            throw new HttpsError('invalid-argument', 'Invalid node MAC.');
+        }
+
+        // Server-generated sessionID (replaces client Math.random which
+        // is non-cryptographic and collidable).
+        const sessionID = admin.database().ref('wifiLogins').push().key;
+        const timestamp = new Date().toISOString();
+
+        const loginRecord = {
+            sessionID,
+            timestamp,
+            name,
+            email,
+            phoneNumber,
+            table,
+            client_mac,
+            node_mac,
+            client_ip,
+            active: true,
+            anonUid: uid
+        };
+        const activeRecord = {
+            sessionID,
+            timestamp,
+            lastSeen: timestamp,
+            name,
+            email,
+            phoneNumber,
+            anonUid: uid
+        };
+
+        // Atomic multi-path write. activeUsers key falls back to
+        // sessionID when client_mac is empty (e.g. dev / non-Meraki test).
+        const activeKey = client_mac || sessionID;
+        const patch = {
+            [`wifiLogins/${sessionID}`]: loginRecord,
+            [`activeUsers/${activeKey}`]: activeRecord,
+            [`rateLimitsWifi/${uid}`]: { lastWriteAt: now }
+        };
+        await admin.database().ref('/').update(patch);
+
+        return { success: true, sessionID };
+    }
+);
+
+/**
  * Cloud Function to clear scanning data — chunked.
  *
  * Single-write `remove()` on /scanningData hits RTDB's WRITE_TOO_BIG limit

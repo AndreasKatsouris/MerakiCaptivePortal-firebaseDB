@@ -718,3 +718,18 @@ The rules handle two phone formats:
 ```
 
 Ensure all code paths normalize phone numbers before writing to the database. The `guardRail.js:normalizePhoneNumber()` function handles this for the backend, but client-side code must be consistent too.
+
+---
+
+## Hardening Previously-Open Write Paths
+
+`wifiLogins`, `activeUsers`, `userPreferences` historically shipped with `.write: true` (unauthenticated public-internet writes) to support the captive-portal direct-client flow. Hardened in PR feature/wifi-login-security (2026-05-19) — the canonical pattern for any node previously open this way:
+
+1. **Route the write through a Cloud Function.** The CF authenticates the writer (anonymous Firebase Auth is acceptable for captive-portal guests; admin claim required for admin-driven writes), validates the input shape and length caps, applies rate limiting per UID, then writes via the Admin SDK (which bypasses the rules layer cleanly).
+2. **Flip the rules to admin-only.** `".write": "auth != null && auth.token.admin === true"` blocks anonymous/guest direct writes; the CF still works because Admin SDK bypasses `.write`. Admin dashboard delete buttons (`remove(ref(rtdb, ...))`) keep working without changes.
+3. **Add `.validate` rules on the child shape.** `.validate` rules DO fire on Admin SDK multi-path `update()` calls — defense in depth against malformed CF input or a misconfigured Admin call from another service. Cap every string field's length; enumerate allowed children with `"$other": { ".validate": false }` to reject unexpected fields. Per the 2026-05-12 lesson, `.validate` rules under `.write: false` are unreachable but `.validate` under admin-only `.write` IS reachable when the Admin SDK touches the path.
+4. **Tighten the matching `.read` rule.** Open `.read` on a PII node (name + email + phone + MAC) means every authenticated user can enumerate the data — usually a separate exposure from the write-side issue. Audit consumers before tightening: admin-dashboard reads are fine under admin-claim gating; other readers may surface unexpected dependencies.
+
+**Worked example — `wifiLogins`** (see `submitWifiLogin` in `functions/index.js` + `database.rules.json:199-218`).
+
+**Reachability proof for `.validate` under admin-only `.write`:** Admin SDK multi-path `update({"path/a": x, "path/b": y})` is treated as a write at each leaf path, and Firebase evaluates `.validate` at every level of each path. So `.validate` on `wifiLogins/$sessionId/name` fires when `submitWifiLogin` runs its `ref('/').update({...})` patch.
