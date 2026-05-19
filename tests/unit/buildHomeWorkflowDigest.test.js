@@ -314,6 +314,49 @@ describe('buildHomeWorkflowDigest', () => {
     expect(d.today[0].requiredTaskCount).toBe(2)
   })
 
+  // Existing workflows in prod store nextDueDate as a NUMBER (epoch ms),
+  // not an ISO string (per functions/ross.js:703, 1150, 1282, 1502).
+  // The helper must normalise both shapes to ISO before bucket comparison.
+  // Caught by operator preview on PR #72: 2 active workflows, 0 buckets fired.
+  test('numeric nextDueDate (epoch ms) is normalised and buckets correctly', () => {
+    // 2026-05-18T00:00:00Z = 1747526400000 (yesterday relative to 2026-05-19)
+    const yesterdayMs = Date.parse('2026-05-18T00:00:00Z')
+    const workflows = {
+      w1: mkWorkflow('w1', 'Daily Opening', {
+        locA: { locationName: 'Ocean Club', nextDueDate: yesterdayMs, tasks: { t1: mkTask() } },
+      }),
+    }
+    const d = buildHomeWorkflowDigest({ workflows, runs: {}, clientToday: '2026-05-19', now: baseNow })
+    expect(d.overdue).toHaveLength(1)
+    expect(d.overdue[0].daysLate).toBe(1)
+    // The digest payload normalises to the ISO string so the client receives a stable shape
+    expect(d.overdue[0].nextDueDate).toBe('2026-05-18')
+  })
+
+  test('numeric nextDueDate (today) → today/pending', () => {
+    const todayMs = Date.parse('2026-05-19T00:00:00Z')
+    const workflows = {
+      w1: mkWorkflow('w1', 'X', {
+        locA: { locationName: 'A', nextDueDate: todayMs, tasks: { t1: mkTask() } },
+      }),
+    }
+    const d = buildHomeWorkflowDigest({ workflows, runs: {}, clientToday: '2026-05-19', now: baseNow })
+    expect(d.today).toHaveLength(1)
+    expect(d.today[0].subState).toBe('pending')
+    expect(d.today[0].nextDueDate).toBe('2026-05-19')
+  })
+
+  test('full ISO timestamp string (with T suffix) sliced to date portion', () => {
+    const workflows = {
+      w1: mkWorkflow('w1', 'X', {
+        locA: { locationName: 'A', nextDueDate: '2026-05-19T10:30:00.000Z', tasks: { t1: mkTask() } },
+      }),
+    }
+    const d = buildHomeWorkflowDigest({ workflows, runs: {}, clientToday: '2026-05-19', now: baseNow })
+    expect(d.today).toHaveLength(1)
+    expect(d.today[0].nextDueDate).toBe('2026-05-19')
+  })
+
   // Documents behaviour: a today-due workflow whose last completion was
   // yesterday (more than 24h ago) lands in today/pending — not silently
   // dropped. The recentCompletions branch is gated on <24h; the today/pending

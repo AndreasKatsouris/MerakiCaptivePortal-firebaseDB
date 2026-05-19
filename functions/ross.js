@@ -232,6 +232,28 @@ function _countRequiredTasks(tasks) {
     return n;
 }
 
+// Normalise nextDueDate to ISO date string ('YYYY-MM-DD').
+//
+// Existing ROSS workflows store nextDueDate as an epoch-ms NUMBER (see
+// functions/ross.js lines 703, 1150, 1282, 1502 — all numeric arithmetic).
+// Operator-edited values via Firebase Console may land as strings. Both
+// shapes are normalised to the same ISO slice so the bucket comparisons
+// (`<`, `===`, `>`) against `clientToday` work consistently.
+//
+// Returns null for unparseable input (caller skips with a warn).
+function _normalizeNextDueDate(val) {
+    if (typeof val === 'string' && val.length > 0) {
+        // Accept either 'YYYY-MM-DD' or full ISO 'YYYY-MM-DDTHH:mm:ss...';
+        // slice to the date portion.
+        return val.slice(0, 10);
+    }
+    const n = Number(val);
+    if (Number.isFinite(n) && n > 0) {
+        return new Date(n).toISOString().slice(0, 10);
+    }
+    return null;
+}
+
 // Count responses to REQUIRED tasks only. The donut on the in-progress
 // card shows completed-of-required tasks; responses to optional tasks
 // would inflate the numerator past 100%.
@@ -270,8 +292,9 @@ function buildHomeWorkflowDigest({ workflows, runs, clientToday, now }) {
 
         for (const [locationId, loc] of Object.entries(w.locations)) {
             if (!loc || typeof loc !== 'object') continue;
-            if (!loc.nextDueDate) {
-                console.warn(`[ross] skipped malformed workflow ${workflowId}/${locationId}: no nextDueDate`);
+            const normalizedNextDueDate = _normalizeNextDueDate(loc.nextDueDate);
+            if (!normalizedNextDueDate) {
+                console.warn(`[ross] skipped malformed workflow ${workflowId}/${locationId}: nextDueDate=${JSON.stringify(loc.nextDueDate)}`);
                 continue;
             }
 
@@ -281,23 +304,23 @@ function buildHomeWorkflowDigest({ workflows, runs, clientToday, now }) {
             const requiredTaskCount = _countRequiredTasks(loc.tasks);
             const completedTaskCount = _countCompletedRequiredTasks(latestRun, loc.tasks);
 
-            const nextDueMs = Date.parse(loc.nextDueDate + 'T00:00:00Z');
+            const nextDueMs = Date.parse(normalizedNextDueDate + 'T00:00:00Z');
             const runCoversCurrentPeriod = latestRun
                 && Number.isFinite(nextDueMs)
                 && Number(latestRun.startedAt) >= nextDueMs;
 
-            const daysLate = _dateDiffDays(loc.nextDueDate, today);
+            const daysLate = _dateDiffDays(normalizedNextDueDate, today);
             const name = w.name || 'Workflow';
             const locationName = loc.locationName || 'Venue';
 
             const baseEntry = {
                 workflowId, locationId, name, locationName,
-                nextDueDate: loc.nextDueDate,
+                nextDueDate: normalizedNextDueDate,
             };
 
-            if (loc.nextDueDate < today && !runCoversCurrentPeriod) {
+            if (normalizedNextDueDate < today && !runCoversCurrentPeriod) {
                 overdue.push({ ...baseEntry, daysLate, requiredTaskCount });
-            } else if (loc.nextDueDate === today && latestRun && latestRun.status === 'in_progress') {
+            } else if (normalizedNextDueDate === today && latestRun && latestRun.status === 'in_progress') {
                 todayBucket.push({
                     ...baseEntry,
                     subState: 'in_progress',
@@ -306,7 +329,7 @@ function buildHomeWorkflowDigest({ workflows, runs, clientToday, now }) {
                     completedTaskCount,
                     requiredTaskCount,
                 });
-            } else if (loc.nextDueDate === today && !runCoversCurrentPeriod) {
+            } else if (normalizedNextDueDate === today && !runCoversCurrentPeriod) {
                 todayBucket.push({
                     ...baseEntry,
                     subState: 'pending',
@@ -323,8 +346,8 @@ function buildHomeWorkflowDigest({ workflows, runs, clientToday, now }) {
                 });
             }
 
-            if (loc.nextDueDate > today) {
-                if (!upcoming || loc.nextDueDate < upcoming.nextDueDate) {
+            if (normalizedNextDueDate > today) {
+                if (!upcoming || normalizedNextDueDate < upcoming.nextDueDate) {
                     upcoming = { ...baseEntry };
                 }
             }
