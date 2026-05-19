@@ -73,6 +73,43 @@ export async function snoozeCard(cardId, hours = 24) {
   return json.result || json
 }
 
+/**
+ * Fetch the home workflow digest from rossGetHomeWorkflowDigest CF.
+ * Server returns { result: { success, hasActiveWorkflows, activeWorkflowCount,
+ * upcoming, overdue, today, recentCompletions, generatedAt } }.
+ * The .result wrapper is unwrapped here (same as snoozeCard).
+ *
+ * Throws on auth failure or network error — caller (detectActiveWorkflows)
+ * wraps in try/catch + returns null for graceful card-fallback.
+ */
+export async function getHomeWorkflowDigest() {
+  const user = auth.currentUser
+  if (!user) throw new Error('Not authenticated')
+  const idToken = await user.getIdToken()
+
+  // Client-local date in SA timezone — server uses it for "today" boundaries.
+  const clientToday = new Intl.DateTimeFormat('en-CA', {
+    timeZone: 'Africa/Johannesburg',
+    year: 'numeric', month: '2-digit', day: '2-digit',
+  }).format(new Date())
+
+  const res = await fetch(`${FUNCTIONS_BASE_URL}/rossGetHomeWorkflowDigest`, {
+    method: 'POST',
+    headers: {
+      'Authorization': `Bearer ${idToken}`,
+      'Content-Type': 'application/json',
+      'Accept': 'application/json',
+    },
+    body: JSON.stringify({ data: { clientToday } }),
+  })
+  if (!res.ok) {
+    const text = await res.text().catch(() => '')
+    throw new Error(`rossGetHomeWorkflowDigest failed (${res.status}): ${text}`)
+  }
+  const json = await res.json()
+  return json.result || json
+}
+
 function scriptedFeed() {
   return {
     headline: HOME_HEADLINE,
