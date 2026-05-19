@@ -27,11 +27,18 @@ const userInitials = computed(() => {
   return (parts[0][0] + parts[parts.length - 1][0]).toUpperCase()
 })
 
+// Mirrors the desktop sidebar nav in RossHomeDesktop.vue. Each item
+// carries an href so the bottom-nav icon is actually navigable —
+// previously rendered as decorative <button> elements with no click
+// handler (operator-flagged on PR #58 preview). The 'Ross' entry is
+// always active here because this component only mounts on the home
+// tab; navigating to Playbook/Activity/People swaps to a different
+// RossHome.vue view via the popstate listener.
 const bottomNav = [
-  { icon: 'bolt',  active: true, label: 'Ross' },
-  { icon: 'check', label: 'Playbook' },
-  { icon: 'line',  label: 'Activity' },
-  { icon: 'users', label: 'People' },
+  { icon: 'bolt',  active: true, label: 'Ross',     href: '/ross.html' },
+  { icon: 'check', label: 'Playbook',                href: '/ross.html?tab=playbook' },
+  { icon: 'line',  label: 'Activity',                href: '/ross.html?tab=activity' },
+  { icon: 'users', label: 'People',                  href: '/ross.html?tab=people' },
 ]
 
 const chipFor = (c) => ({
@@ -98,13 +105,15 @@ const chipFor = (c) => ({
     </div>
 
     <nav class="ross-mobile__nav">
-      <button
+      <a
         v-for="(n, i) in bottomNav" :key="i"
+        :href="n.href"
         :class="['ross-mobile__nav-btn', { 'is-active': n.active }]"
         :aria-label="n.label"
+        :aria-current="n.active ? 'page' : undefined"
       >
         <HfIcon :name="n.icon" :size="20" />
-      </button>
+      </a>
     </nav>
   </div>
 
@@ -187,6 +196,9 @@ const chipFor = (c) => ({
   padding: 8px;
   background: none; border: none; cursor: pointer;
   color: var(--hf-muted);
+  /* selector now matches an <a> tag — strip default link styling */
+  text-decoration: none;
+  display: inline-flex; align-items: center; justify-content: center;
 }
 .ross-mobile__nav-btn.is-active { color: var(--hf-ink); }
 .ross-mobile__nav-btn:focus-visible { outline: 2px solid var(--hf-accent); outline-offset: 2px; border-radius: 4px; }
