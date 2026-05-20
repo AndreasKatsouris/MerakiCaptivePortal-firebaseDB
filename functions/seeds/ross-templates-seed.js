@@ -63,6 +63,50 @@ const templates = [
         ]
     },
     {
+        name: 'Weekly Compliance Sweep',
+        category: 'compliance',
+        tier: 'free',
+        description: 'Weekly SA food-safety compliance pass: fridge/freezer temperatures, fire safety, first aid, and incident log.',
+        recurrence: 'weekly',
+        daysBeforeAlert: [2, 1],
+        tags: ['compliance', 'safety', 'weekly'],
+        subtasks: [
+            {
+                order: 1,
+                title: 'Fridge temperature reading (target ≤ 4°C)',
+                daysOffset: 0,
+                inputType: 'temperature',
+                inputConfig: { min: -1, max: 4, unit: 'C', requiredNote: true }
+            },
+            {
+                order: 2,
+                title: 'Freezer temperature reading (target ≤ -18°C)',
+                daysOffset: 0,
+                inputType: 'temperature',
+                inputConfig: { min: -25, max: -18, unit: 'C', requiredNote: true }
+            },
+            {
+                order: 3,
+                title: 'Fire extinguisher service date still in date',
+                daysOffset: 0,
+                inputType: 'yes_no'
+            },
+            {
+                order: 4,
+                title: 'First aid kit stocked and seal intact',
+                daysOffset: 0,
+                inputType: 'checkbox'
+            },
+            {
+                order: 5,
+                title: 'Incidents or near-misses to log this week',
+                daysOffset: 0,
+                inputType: 'text',
+                inputConfig: { placeholder: 'Leave blank if none', maxLength: 500 }
+            }
+        ]
+    },
+    {
         name: 'Daily Opening Checklist',
         category: 'operations',
         tier: 'free',
@@ -228,7 +272,7 @@ async function seed() {
         await db.ref(`ross/templates/${id}`).set(record);
         console.log(`  Created: ${template.name}`);
     }
-    console.log('Done. 13 templates seeded.');
+    console.log(`Done. ${templates.length} templates seeded.`);
     process.exit(0);
 }
 
