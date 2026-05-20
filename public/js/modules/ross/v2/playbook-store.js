@@ -7,6 +7,7 @@ import {
 } from './playbook-service.js'
 import { auth, rtdb, ref, get } from '../../../config/firebase-config.js'
 import { fetchLocationNames } from './utils/location-names.js'
+import { isOverdue, isMissed } from './workflow-status.js'
 
 // VALID_CATEGORIES / VALID_RECURRENCES mirror functions/ross.js so the
 // editor can validate before the round trip. Keep in sync if the server
@@ -112,8 +113,18 @@ export const usePlaybookStore = defineStore('rossPlaybook', {
     activeCount(state) {
       return state.workflows.filter((w) => w.status !== 'paused' && w.status !== 'archived').length
     },
+    // Derive overdue / missed CLIENT-SIDE from each row's nextDueDate.
+    // The server's `locData.status` field is set to 'active' on activation
+    // and is never updated to 'overdue', so the previous
+    // `w.status === 'overdue'` filter always returned 0 (operator-reported
+    // bug on PR #72 home card). The home digest CF derives the same
+    // numbers from nextDueDate; this getter mirrors that derivation via
+    // the shared workflow-status helper.
     overdueCount(state) {
-      return state.workflows.filter((w) => w.status === 'overdue').length
+      return state.workflows.filter((w) => isOverdue(w)).length
+    },
+    missedCount(state) {
+      return state.workflows.filter((w) => isMissed(w)).length
     },
     // The flat list returned by rossGetWorkflows has one entry per
     // (workflowId, locationId). De-duplicate by workflowId for editor

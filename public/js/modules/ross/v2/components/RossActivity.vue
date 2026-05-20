@@ -117,14 +117,16 @@ function backToHome() {
           <div class="hf-mono activity__stat-sub">in scope</div>
         </HfCard>
         <HfCard :padded="false" class="activity__stat">
-          <div class="hf-eyebrow">Overdue</div>
+          <!-- Dynamic label mirrors the PR #72 home concierge card.
+               See RossPlaybook.vue for the same pattern. -->
+          <div class="hf-eyebrow">{{ store.missedRows.length > 0 ? 'Missed' : 'Overdue' }}</div>
           <div
             class="hf-num activity__stat-value"
             :class="{ 'is-warn': !loading && store.overdueRows.length > 0 }"
           >
-            {{ loading ? '—' : store.overdueRows.length }}
+            {{ loading ? '—' : (store.missedRows.length > 0 ? store.missedRows.length : store.overdueRows.length) }}
           </div>
-          <div class="hf-mono activity__stat-sub">need attention</div>
+          <div class="hf-mono activity__stat-sub">{{ store.missedRows.length > 0 ? 'untouched' : 'need attention' }}</div>
         </HfCard>
         <HfCard :padded="false" class="activity__stat">
           <div class="hf-eyebrow">On-track rows</div>

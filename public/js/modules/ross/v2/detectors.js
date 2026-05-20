@@ -14,6 +14,7 @@ import {
 } from '../../../config/firebase-config.js'
 import { getHomeWorkflowDigest } from './ross-service.js'
 import { relTime } from './utils/rel-time.js'
+import { MISSED_DAYS_THRESHOLD } from './workflow-status.js'
 
 /**
  * Read this user's currently-active snoozes from ross/v2Snoozes/{uid}.
@@ -388,11 +389,8 @@ export function buildHeadline(ctx, realCards) {
 //  Card 0: Active workflows (slot 1 — workflow card variants A-E)
 // =========================================================================
 
-// Threshold for the "Missed" framing: workflows ≥4 days late are visually
-// distinguished from short-term-overdue ones. Per operator design call on
-// PR #72 — "Overdue" implies acknowledgement; "Missed" implies the
-// workflow has gone untouched and warrants stronger attention.
-const MISSED_DAYS_THRESHOLD = 4
+// MISSED_DAYS_THRESHOLD is now imported from ./workflow-status.js so
+// the home card + Playbook/Activity stat counters all use one threshold.
 
 function _buildOverdueCard(entry, allOverdue) {
   const overdueCount = allOverdue.length

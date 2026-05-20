@@ -1,6 +1,7 @@
 import { defineStore } from 'pinia'
 import { getActivityReport, getWorkflowRunHistory } from './activity-service.js'
 import { fetchLocationNames } from './utils/location-names.js'
+import { isOverdue, isMissed } from './workflow-status.js'
 
 export const useActivityStore = defineStore('rossActivity', {
   state: () => ({
@@ -20,11 +21,17 @@ export const useActivityStore = defineStore('rossActivity', {
       const ids = new Set(state.rows.map((r) => r.workflowId))
       return ids.size
     },
+    // Derive overdue / missed CLIENT-SIDE from each row's nextDueDate —
+    // same fix as playbook-store. Server never writes status:'overdue'
+    // (locData.status is 'active' from rossActivateWorkflow onwards).
     overdueRows(state) {
-      return state.rows.filter((r) => r.status === 'overdue')
+      return state.rows.filter((r) => isOverdue(r))
+    },
+    missedRows(state) {
+      return state.rows.filter((r) => isMissed(r))
     },
     onTrackRows(state) {
-      return state.rows.filter((r) => r.status !== 'overdue' && r.status !== 'paused')
+      return state.rows.filter((r) => !isOverdue(r) && r.status !== 'paused')
     },
     averageCompletion(state) {
       if (!state.rows.length) return 0
