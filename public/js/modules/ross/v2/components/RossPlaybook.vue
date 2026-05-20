@@ -215,11 +215,15 @@ function backToHome() {
           <div class="hf-mono playbook__stat-sub">across your venues</div>
         </HfCard>
         <HfCard :padded="false" class="playbook__stat">
-          <div class="hf-eyebrow">Overdue</div>
+          <!-- Dynamic label mirrors the PR #72 home concierge card:
+               'Missed' when any workflow is ≥4 days late, 'Overdue'
+               otherwise. Value is the missed count when missed exists,
+               otherwise the overdue count. -->
+          <div class="hf-eyebrow">{{ store.missedCount > 0 ? 'Missed' : 'Overdue' }}</div>
           <div class="hf-num playbook__stat-value" :class="{ 'is-warn': !loading && store.overdueCount > 0 }">
-            {{ loading ? '—' : store.overdueCount }}
+            {{ loading ? '—' : (store.missedCount > 0 ? store.missedCount : store.overdueCount) }}
           </div>
-          <div class="hf-mono playbook__stat-sub">need attention</div>
+          <div class="hf-mono playbook__stat-sub">{{ store.missedCount > 0 ? 'untouched' : 'need attention' }}</div>
         </HfCard>
         <HfCard :padded="false" class="playbook__stat">
           <div class="hf-eyebrow">Templates</div>
