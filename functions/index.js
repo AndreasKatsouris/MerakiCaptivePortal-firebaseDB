@@ -1348,6 +1348,7 @@ exports.submitWifiLogin = onCall(
         const email = String(data?.email || '').trim().slice(0, 254);
         const phoneNumber = String(data?.phoneNumber || '').trim().slice(0, 24);
         const table = String(data?.table || '').trim().slice(0, 24);
+        const marketingConsent = Boolean(data?.marketingConsent);
         const client_mac = String(data?.client_mac || '').trim().slice(0, 32);
         const node_mac = String(data?.node_mac || '').trim().slice(0, 32);
         const client_ip = String(data?.client_ip || '').trim().slice(0, 45);
@@ -1382,6 +1383,7 @@ exports.submitWifiLogin = onCall(
             email,
             phoneNumber,
             table,
+            marketingConsent,
             client_mac,
             node_mac,
             client_ip,
