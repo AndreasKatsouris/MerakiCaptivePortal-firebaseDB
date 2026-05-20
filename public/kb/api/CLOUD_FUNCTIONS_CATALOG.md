@@ -23,17 +23,24 @@ The platform deploys **69+ Cloud Functions** from a single `functions/index.js` 
 
 | Function | Trigger | Auth | Purpose |
 |----------|---------|------|---------|
-| `registerUser` | onCall (v1) | Authenticated | Creates user profile, subscription, initial location during registration |
+| `registerUser` | onCall (v2) | Authenticated | Creates user profile, subscription, initial location during registration |
 | `setAdminClaim` | HTTP POST (v2) | Admin | Sets/removes admin custom claim and `admin-claims` DB entry |
 | `verifyAdminStatus` | HTTP GET (v2) | Authenticated | Returns `{ isAdmin: true/false }` via dual claim + DB check |
 | `createUserAccount` | HTTP POST (v2) | Admin | Creates Firebase Auth user, profile, subscription, location assignments |
 | `setupInitialAdmin` | HTTP POST (v2) | Setup Secret | One-time bootstrap for first admin user |
 
 **`registerUser` Details:**
-- Input: `{ firstName, lastName, businessName, businessAddress, businessPhone, businessType, selectedTier, tierData }`
-- Creates: `users/{uid}`, `subscriptions/{uid}`, `locations/{pushId}`, `userLocations/{uid}/{locationId}`
+- Input: `{ firstName, lastName, businessName, businessAddress, businessPhone, businessType, isFranchise, franchiseName, brandName, tier, selectedTier?, tierData? }`
+  - `tier` is the canonical tier ID; `selectedTier` is accepted as a legacy alias when `tier` is absent
+  - `tierData` is accepted but ignored — the CF re-fetches tier features/limits from `subscriptionTiers/{tierId}` so a client cannot inflate its own subscription
+- Validation: rejects with `invalid-argument` when `tier` is missing, when `tier` does not exist in `subscriptionTiers/{tierId}`, or when `businessName` / `franchiseName` / `brandName` exceed 200 chars
+- Creates / updates atomically (single multi-path `update`):
+  - `users/{uid}` — includes `tier`, `isFranchise`, `franchiseName`, `brandName`
+  - `subscriptions/{uid}` — `tier` (canonical) AND `tierId` (legacy compat); `features` / `limits` populated from server-fetched tier data
+  - `onboarding-progress/{uid}` — initialised with `{ completed: false, helloSeen: false }` only when absent (idempotent re-entry)
+- Creates separately (needs push key): `locations/{pushId}`, `userLocations/{uid}/{locationId}`
 - Trial: 14-day trial period
-- Protection: Merges instead of overwriting existing data
+- Protection: Merges instead of overwriting existing data on `users` / `subscriptions` (preserves phone numbers; preserves wizard progress)
 
 **`createUserAccount` Details:**
 - Input: `{ email, password, firstName, lastName, businessName, phoneNumber, tier, isAdmin, locationIds }`
@@ -131,10 +138,10 @@ The platform deploys **69+ Cloud Functions** from a single `functions/index.js` 
 
 | Function | Trigger | Auth | Purpose |
 |----------|---------|------|---------|
-| `getQMSTierInfo` | onCall (v1) | Authenticated | Returns user's QMS tier info and limits |
-| `getQMSUsageStats` | onCall (v1) | Authenticated | Returns QMS usage statistics with tier checking |
-| `validateQMSFeatureAccess` | onCall (v1) | Authenticated | Validates access to specific QMS features |
-| `validateQMSWhatsAppIntegration` | onCall (v1) | Authenticated | Validates WhatsApp integration access for QMS |
+| `getQMSTierInfo` | onCall (v2) | Authenticated | Returns user's QMS tier info and limits |
+| `getQMSUsageStats` | onCall (v2) | Authenticated | Returns QMS usage statistics with tier checking |
+| `validateQMSFeatureAccess` | onCall (v2) | Authenticated | Validates access to specific QMS features |
+| `validateQMSWhatsAppIntegration` | onCall (v2) | Authenticated | Validates WhatsApp integration access for QMS |
 
 **`getQMSUsageStats` Input:** `{ locationId }`
 **`validateQMSFeatureAccess` Input:** `{ featureId }`
@@ -175,10 +182,10 @@ The platform deploys **69+ Cloud Functions** from a single `functions/index.js` 
 
 | Function | Trigger | Auth | Purpose |
 |----------|---------|------|---------|
-| `performanceTest` | onCall (v1) | Admin | Tests function response time, memory, cold starts |
+| `performanceTest` | onCall (v2) | Admin | Tests function response time, memory, cold starts |
 | `performanceTestHTTP` | HTTP (v1) | Admin | Same as above, HTTP endpoint for direct fetch |
-| `runSystemOptimization` | onCall (v1) | Admin | Cleans old logs, clears caches, runs GC |
-| `getSystemMetrics` | onCall (v1) | Admin | Comprehensive system metrics (node, memory, DB, cache) |
+| `runSystemOptimization` | onCall (v2) | Admin | Cleans old logs, clears caches, runs GC |
+| `getSystemMetrics` | onCall (v2) | Admin | Comprehensive system metrics (node, memory, DB, cache) |
 
 **`performanceTest` Output:**
 ```json
@@ -223,38 +230,6 @@ The platform deploys **69+ Cloud Functions** from a single `functions/index.js` 
 
 ---
 
-### ROSS -- Restaurant Operations Support System
-
-| Function | Trigger | Auth | Purpose |
-|----------|---------|------|---------|
-| `rossGetWorkflows` | HTTP POST (v2) | Admin | List all workflows for the current user, flattened with location data |
-| `rossCreateWorkflow` | HTTP POST (v2) | Admin | Create workflow, attach to `locationIds[]`, write `ross/ownerIndex` |
-| `rossUpdateWorkflow` | HTTP POST (v2) | Admin | Update workflow metadata; validates `status` against `['active','paused']`; validates `daysBeforeAlert` to positive integers |
-| `rossDeleteWorkflow` | HTTP POST (v2) | Admin | Delete workflow (404 if not found); cleans up `ownerIndex` when last workflow removed |
-| `rossManageTask` | HTTP POST (v2) | Admin | Create / update / delete tasks within a workflow location |
-| `rossCompleteTask` | HTTP POST (v2) | Admin | Atomic task completion via RTDB transaction; writes history when all tasks done; 404 if task not found |
-| `rossActivateWorkflow` | HTTP POST (v2) | Admin | Attach existing workflow to additional locations; write `ownerIndex` |
-| `rossGetTemplates` | HTTP POST (v2) | Admin | List all templates (public + own) |
-| `rossCreateTemplate` | HTTP POST (v2) | Super Admin | Create a new workflow template |
-| `rossUpdateTemplate` | HTTP POST (v2) | Super Admin | Update template; null guard on `updates` |
-| `rossDeleteTemplate` | HTTP POST (v2) | Super Admin | Delete template (404 existence check) |
-| `rossGetReports` | HTTP POST (v2) | Admin | Fetch completion reports across all workflows and locations |
-| `rossGetStaff` | HTTP POST (v2) | Admin | List staff members for a location |
-| `rossManageStaff` | HTTP POST (v2) | Admin | Create / update / delete staff members for a location |
-| `rossCreateRun` | HTTP POST (v2) | Admin | Create or resume an in-progress run for a workflow+location (idempotent) |
-| `rossSubmitResponse` | HTTP POST (v2) | Admin | Submit a typed response for a task in a run; auto-flags out-of-range number/temperature; HTTP 422 when `requiredNote` is set and value is flagged but no note is provided; auto-completes the run when all required tasks are done |
-| `rossGetRun` | HTTP POST (v2) | Admin | Get the latest in-progress run plus the most recent completed run as `previousResponses` |
-| `rossGetRunHistory` | HTTP POST (v2) | Admin | List completed runs (newest first, paginated) for a workflow+location |
-| `rossScheduledReminder` | Scheduled (cron `0 5 * * *`) | N/A | Scheduled reminder using `ross/ownerIndex` fan-out (not full-tree scan) |
-
-**Authentication notes:**
-- Template CRUD requires `verifySuperAdmin` (not just `verifyAdmin`). The Admin SDK bypasses RTDB security rules, so Cloud Functions enforce the superAdmin restriction.
-- `rossCompleteTask` uses an RTDB `transaction()` for atomic completion to prevent race conditions.
-- `rossManageTask` requires `taskData` only for `create` and `update` actions -- `delete` works without it.
-- All client writes to `/ross/*` are denied by RTDB rules; mutations must go through these functions. See `public/kb/security/DATABASE_RULES_GUIDE.md`.
-
----
-
 ### Subscription Status Management
 
 | Function | Trigger | Auth | Purpose |
@@ -263,6 +238,16 @@ The platform deploys **69+ Cloud Functions** from a single `functions/index.js` 
 | `triggerSubscriptionStatusCheck` | onCall (v1) | Admin | Admin-triggered subscription status check |
 | `onTrialEndDateUpdate` | RTDB trigger | N/A | Reacts to trial end date changes |
 | `onRenewalDateUpdate` | RTDB trigger | N/A | Reacts to renewal date changes |
+
+---
+
+### ROSS Functions
+
+| Function | Auth | Purpose |
+|----------|------|---------|
+| `rossGetHomeWorkflowDigest` | `verifyUserOrAdmin` | Read-only digest of caller's active workflows for `/ross.html` slot 1. Returns `{ hasActiveWorkflows, activeWorkflowCount, upcoming, overdue[], today[], recentCompletions[], generatedAt }`. POST body: `{ data: { clientToday?: 'YYYY-MM-DD' } }` (caller's local-tz date for boundary computation; falls back to UTC date if missing). |
+
+> For the full ROSS Cloud Functions catalog (rossGetWorkflows, rossCreateRun, rossSubmitResponse, etc.) see `public/kb/features/ROSS.md#cloud-functions`.
 
 ---
 
@@ -284,7 +269,6 @@ The platform deploys **69+ Cloud Functions** from a single `functions/index.js` 
 | `functions/receiptProcessor.js` | Google Vision OCR processing |
 | `functions/receiptTemplateManager.js` | [TODO: verify] Template CRUD operations |
 | `functions/templateBasedExtraction.js` | Brand-specific receipt parsing |
-| `functions/ross.js` | ROSS workflow, template, task, and reminder functions |
 | `functions/projectManagement.js` | Admin project CRUD |
 | `functions/subscriptionStatusManager.js` | Subscription lifecycle management |
 | `functions/dataManagement.js` | Phone number normalization utilities |
@@ -311,13 +295,20 @@ const idToken = req.headers.authorization?.split('Bearer ')[1];
 const decodedToken = await admin.auth().verifyIdToken(idToken);
 ```
 
-### Callable Functions (onCall)
+### Callable Functions (onCall — v2)
 ```javascript
-if (!context.auth) {
-    throw new functions.https.HttpsError('unauthenticated', '...');
-}
-const userId = context.auth.uid;
+const { onCall, HttpsError } = require('firebase-functions/v2/https');
+
+exports.myCallable = onCall(async (request) => {
+    const { data, auth } = request;
+    if (!auth) {
+        throw new HttpsError('unauthenticated', '...');
+    }
+    const userId = auth.uid;
+    // ...
+});
 ```
+> Note: `firebase-functions@7` deploys handlers as Gen 2 regardless of whether you use the v1 namespace (`functions.https.onCall`) or the explicit v2 import. **Use the v2 import** — the v1 signature `(data, context)` receives a single `CallableRequest` as `data` and an undefined `context`, so `context.auth` is always missing and every call throws `unauthenticated`. See PR #67.
 
 ### Admin Check (Dual Verification)
 ```javascript
