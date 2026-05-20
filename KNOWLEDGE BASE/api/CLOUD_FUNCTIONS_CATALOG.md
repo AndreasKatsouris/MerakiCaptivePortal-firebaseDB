@@ -256,7 +256,7 @@ All 22 ROSS functions live in `functions/ross.js`. Full catalog with auth, descr
 | Home / UX | `rossGetHomeWorkflowDigest`, `rossV2Snooze` |
 | Scheduled | `rossScheduledReminder` (cron `0 5 * * *`) |
 
-> **Field-verify rule.** Before reading any ROSS field from a CF response or RTDB on the client, grep the corresponding `set()` / `update()` / `res.json(...)` call in `functions/ross.js` and confirm the field is actually written there. Server's `locData.status` is `'active'` forever; the home digest derives overdue state from `nextDueDate < today`. Use the client helper at `public/js/modules/ross/v2/workflow-status.js` (ships with PR #86).
+> **Field-verify rule.** Before reading any ROSS field from a CF response or RTDB on the client, grep the corresponding `set()` / `update()` / `res.json(...)` call in `functions/ross.js` and confirm the field is actually written there. Server's `locData.status` is `'active'` forever; the home digest derives overdue state from `nextDueDate < today`. Use the client helper at `public/js/modules/ross/v2/workflow-status.js` (shipped in PR #86).
 
 ---
 
