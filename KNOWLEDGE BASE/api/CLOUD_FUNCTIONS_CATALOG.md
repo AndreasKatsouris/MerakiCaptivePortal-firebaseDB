@@ -138,10 +138,10 @@ The platform deploys **69+ Cloud Functions** from a single `functions/index.js` 
 
 | Function | Trigger | Auth | Purpose |
 |----------|---------|------|---------|
-| `getQMSTierInfo` | onCall (v1) | Authenticated | Returns user's QMS tier info and limits |
-| `getQMSUsageStats` | onCall (v1) | Authenticated | Returns QMS usage statistics with tier checking |
-| `validateQMSFeatureAccess` | onCall (v1) | Authenticated | Validates access to specific QMS features |
-| `validateQMSWhatsAppIntegration` | onCall (v1) | Authenticated | Validates WhatsApp integration access for QMS |
+| `getQMSTierInfo` | onCall (v2) | Authenticated | Returns user's QMS tier info and limits |
+| `getQMSUsageStats` | onCall (v2) | Authenticated | Returns QMS usage statistics with tier checking |
+| `validateQMSFeatureAccess` | onCall (v2) | Authenticated | Validates access to specific QMS features |
+| `validateQMSWhatsAppIntegration` | onCall (v2) | Authenticated | Validates WhatsApp integration access for QMS |
 
 **`getQMSUsageStats` Input:** `{ locationId }`
 **`validateQMSFeatureAccess` Input:** `{ featureId }`
@@ -182,10 +182,10 @@ The platform deploys **69+ Cloud Functions** from a single `functions/index.js` 
 
 | Function | Trigger | Auth | Purpose |
 |----------|---------|------|---------|
-| `performanceTest` | onCall (v1) | Admin | Tests function response time, memory, cold starts |
+| `performanceTest` | onCall (v2) | Admin | Tests function response time, memory, cold starts |
 | `performanceTestHTTP` | HTTP (v1) | Admin | Same as above, HTTP endpoint for direct fetch |
-| `runSystemOptimization` | onCall (v1) | Admin | Cleans old logs, clears caches, runs GC |
-| `getSystemMetrics` | onCall (v1) | Admin | Comprehensive system metrics (node, memory, DB, cache) |
+| `runSystemOptimization` | onCall (v2) | Admin | Cleans old logs, clears caches, runs GC |
+| `getSystemMetrics` | onCall (v2) | Admin | Comprehensive system metrics (node, memory, DB, cache) |
 
 **`performanceTest` Output:**
 ```json

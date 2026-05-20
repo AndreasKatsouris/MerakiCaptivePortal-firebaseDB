@@ -2301,24 +2301,27 @@ exports.clearQueueCache = functions.https.onRequest(async (req, res) => {
  * Cloud Function for QMS tier information
  * Returns user's QMS tier information and limits
  */
-exports.getQMSTierInfo = functions.https.onCall(async (data, context) => {
+// v2 callable: single `request` arg replaces v1 `(data, context)` — see PR #67.
+exports.getQMSTierInfo = onCall(async (request) => {
+    const { auth } = request;
     try {
         // Ensure user is authenticated
-        if (!context.auth) {
-            throw new functions.https.HttpsError('unauthenticated', 'User must be authenticated');
+        if (!auth) {
+            throw new HttpsError('unauthenticated', 'User must be authenticated');
         }
 
-        const userId = context.auth.uid;
+        const userId = auth.uid;
         const result = await getQMSTierInfo(userId);
 
         if (!result.success) {
-            throw new functions.https.HttpsError('internal', result.message);
+            throw new HttpsError('internal', result.message);
         }
 
         return result.tierInfo;
     } catch (error) {
         console.error('Error in getQMSTierInfo:', error);
-        throw new functions.https.HttpsError('internal', 'Failed to get QMS tier information');
+        if (error instanceof HttpsError) throw error;
+        throw new HttpsError('internal', 'Failed to get QMS tier information');
     }
 });
 
@@ -2326,38 +2329,38 @@ exports.getQMSTierInfo = functions.https.onCall(async (data, context) => {
  * Cloud Function for QMS usage statistics
  * Returns user's QMS usage statistics for analytics
  */
-exports.getQMSUsageStats = functions.https.onCall(async (data, context) => {
+// v2 callable: single `request` arg replaces v1 `(data, context)` — see PR #67.
+exports.getQMSUsageStats = onCall(async (request) => {
+    const { data, auth } = request;
     try {
         // Ensure user is authenticated
-        if (!context.auth) {
-            throw new functions.https.HttpsError('unauthenticated', 'User must be authenticated');
+        if (!auth) {
+            throw new HttpsError('unauthenticated', 'User must be authenticated');
         }
 
         const { locationId } = data;
         if (!locationId) {
-            throw new functions.https.HttpsError('invalid-argument', 'Location ID is required');
+            throw new HttpsError('invalid-argument', 'Location ID is required');
         }
 
-        const userId = context.auth.uid;
+        const userId = auth.uid;
         const result = await getQMSUsageStats(userId, locationId);
 
         if (!result.success) {
             if (result.requiresUpgrade) {
-                throw new functions.https.HttpsError('permission-denied', result.message, {
+                throw new HttpsError('permission-denied', result.message, {
                     requiresUpgrade: true,
                     requiredFeature: result.requiredFeature
                 });
             }
-            throw new functions.https.HttpsError('internal', result.message);
+            throw new HttpsError('internal', result.message);
         }
 
         return result.usageStats;
     } catch (error) {
         console.error('Error in getQMSUsageStats:', error);
-        if (error.code) {
-            throw error; // Re-throw HttpsError
-        }
-        throw new functions.https.HttpsError('internal', 'Failed to get QMS usage statistics');
+        if (error instanceof HttpsError) throw error;
+        throw new HttpsError('internal', 'Failed to get QMS usage statistics');
     }
 });
 
@@ -2365,19 +2368,21 @@ exports.getQMSUsageStats = functions.https.onCall(async (data, context) => {
  * Cloud Function for QMS feature access validation
  * Validates if user has access to specific QMS features
  */
-exports.validateQMSFeatureAccess = functions.https.onCall(async (data, context) => {
+// v2 callable: single `request` arg replaces v1 `(data, context)` — see PR #67.
+exports.validateQMSFeatureAccess = onCall(async (request) => {
+    const { data, auth } = request;
     try {
         // Ensure user is authenticated
-        if (!context.auth) {
-            throw new functions.https.HttpsError('unauthenticated', 'User must be authenticated');
+        if (!auth) {
+            throw new HttpsError('unauthenticated', 'User must be authenticated');
         }
 
         const { featureId } = data;
         if (!featureId) {
-            throw new functions.https.HttpsError('invalid-argument', 'Feature ID is required');
+            throw new HttpsError('invalid-argument', 'Feature ID is required');
         }
 
-        const userId = context.auth.uid;
+        const userId = auth.uid;
         const hasAccess = await validateQMSFeatureAccess(userId, featureId);
 
         return {
@@ -2387,7 +2392,8 @@ exports.validateQMSFeatureAccess = functions.https.onCall(async (data, context) 
         };
     } catch (error) {
         console.error('Error in validateQMSFeatureAccess:', error);
-        throw new functions.https.HttpsError('internal', 'Failed to validate QMS feature access');
+        if (error instanceof HttpsError) throw error;
+        throw new HttpsError('internal', 'Failed to validate QMS feature access');
     }
 });
 
@@ -2395,24 +2401,26 @@ exports.validateQMSFeatureAccess = functions.https.onCall(async (data, context) 
  * Cloud Function for QMS WhatsApp integration validation
  * Validates if user has access to WhatsApp integration features
  */
-exports.validateQMSWhatsAppIntegration = functions.https.onCall(async (data, context) => {
+// v2 callable: single `request` arg replaces v1 `(data, context)` — see PR #67.
+exports.validateQMSWhatsAppIntegration = onCall(async (request) => {
+    const { auth } = request;
     try {
         // Ensure user is authenticated
-        if (!context.auth) {
-            throw new functions.https.HttpsError('unauthenticated', 'User must be authenticated');
+        if (!auth) {
+            throw new HttpsError('unauthenticated', 'User must be authenticated');
         }
 
-        const userId = context.auth.uid;
+        const userId = auth.uid;
         const result = await validateQMSWhatsAppIntegration(userId);
 
         if (!result.success) {
             if (result.requiresUpgrade) {
-                throw new functions.https.HttpsError('permission-denied', result.message, {
+                throw new HttpsError('permission-denied', result.message, {
                     requiresUpgrade: true,
                     requiredFeature: result.requiredFeature
                 });
             }
-            throw new functions.https.HttpsError('internal', result.message);
+            throw new HttpsError('internal', result.message);
         }
 
         return {
@@ -2421,10 +2429,8 @@ exports.validateQMSWhatsAppIntegration = functions.https.onCall(async (data, con
         };
     } catch (error) {
         console.error('Error in validateQMSWhatsAppIntegration:', error);
-        if (error.code) {
-            throw error; // Re-throw HttpsError
-        }
-        throw new functions.https.HttpsError('internal', 'Failed to validate WhatsApp integration access');
+        if (error instanceof HttpsError) throw error;
+        throw new HttpsError('internal', 'Failed to validate WhatsApp integration access');
     }
 });
 
@@ -2849,20 +2855,22 @@ exports.startMigration = functions.https.onRequest(async (req, res) => {
  * Tests function response time, memory usage, and cold starts
  * Note: onCall functions automatically handle CORS for allowed Firebase app domains
  */
-exports.performanceTest = functions.https.onCall(async (data, context) => {
+// v2 callable: single `request` arg replaces v1 `(data, context)` — see PR #67.
+exports.performanceTest = onCall(async (request) => {
+    const { auth } = request;
     const startTime = process.hrtime.bigint();
 
     try {
         // Verify admin authentication
-        if (!context.auth) {
-            throw new functions.https.HttpsError('unauthenticated', 'Authentication required');
+        if (!auth) {
+            throw new HttpsError('unauthenticated', 'Authentication required');
         }
 
-        const token = await admin.auth().getUser(context.auth.uid);
+        const token = await admin.auth().getUser(auth.uid);
         const customClaims = token.customClaims || {};
 
         if (!customClaims.admin && customClaims.role !== 'admin') {
-            throw new functions.https.HttpsError('permission-denied', 'Admin privileges required');
+            throw new HttpsError('permission-denied', 'Admin privileges required');
         }
 
         // Collect performance metrics
@@ -2899,11 +2907,11 @@ exports.performanceTest = functions.https.onCall(async (data, context) => {
     } catch (error) {
         console.error('[FPM] Performance test error:', error);
 
-        if (error instanceof functions.https.HttpsError) {
+        if (error instanceof HttpsError) {
             throw error;
         }
 
-        throw new functions.https.HttpsError('internal', 'Performance test failed');
+        throw new HttpsError('internal', 'Performance test failed');
     }
 });
 
@@ -3005,18 +3013,20 @@ exports.performanceTestHTTP = functions.https.onRequest((req, res) => {
 /**
  * System optimization function for automated performance improvements
  */
-exports.runSystemOptimization = functions.https.onCall(async (data, context) => {
+// v2 callable: single `request` arg replaces v1 `(data, context)` — see PR #67.
+exports.runSystemOptimization = onCall(async (request) => {
+    const { auth } = request;
     try {
         // Verify admin authentication
-        if (!context.auth) {
-            throw new functions.https.HttpsError('unauthenticated', 'Authentication required');
+        if (!auth) {
+            throw new HttpsError('unauthenticated', 'Authentication required');
         }
 
-        const token = await admin.auth().getUser(context.auth.uid);
+        const token = await admin.auth().getUser(auth.uid);
         const customClaims = token.customClaims || {};
 
         if (!customClaims.admin && customClaims.role !== 'admin') {
-            throw new functions.https.HttpsError('permission-denied', 'Admin privileges required');
+            throw new HttpsError('permission-denied', 'Admin privileges required');
         }
 
         const optimizations = [];
@@ -3086,7 +3096,7 @@ exports.runSystemOptimization = functions.https.onCall(async (data, context) => 
         // Log optimization results
         const logData = {
             timestamp: Date.now(),
-            userId: context.auth.uid,
+            userId: auth.uid,
             optimizations: optimizations,
             totalOptimizations: optimizations.length
         };
@@ -3103,29 +3113,31 @@ exports.runSystemOptimization = functions.https.onCall(async (data, context) => 
     } catch (error) {
         console.error('[FPM] System optimization error:', error);
 
-        if (error instanceof functions.https.HttpsError) {
+        if (error instanceof HttpsError) {
             throw error;
         }
 
-        throw new functions.https.HttpsError('internal', 'System optimization failed');
+        throw new HttpsError('internal', 'System optimization failed');
     }
 });
 
 /**
  * Get comprehensive system metrics for FPM dashboard
  */
-exports.getSystemMetrics = functions.https.onCall(async (data, context) => {
+// v2 callable: single `request` arg replaces v1 `(data, context)` — see PR #67.
+exports.getSystemMetrics = onCall(async (request) => {
+    const { auth } = request;
     try {
         // Verify admin authentication
-        if (!context.auth) {
-            throw new functions.https.HttpsError('unauthenticated', 'Authentication required');
+        if (!auth) {
+            throw new HttpsError('unauthenticated', 'Authentication required');
         }
 
-        const token = await admin.auth().getUser(context.auth.uid);
+        const token = await admin.auth().getUser(auth.uid);
         const customClaims = token.customClaims || {};
 
         if (!customClaims.admin && customClaims.role !== 'admin') {
-            throw new functions.https.HttpsError('permission-denied', 'Admin privileges required');
+            throw new HttpsError('permission-denied', 'Admin privileges required');
         }
 
         const metrics = {
@@ -3154,11 +3166,11 @@ exports.getSystemMetrics = functions.https.onCall(async (data, context) => {
     } catch (error) {
         console.error('[FPM] System metrics error:', error);
 
-        if (error instanceof functions.https.HttpsError) {
+        if (error instanceof HttpsError) {
             throw error;
         }
 
-        throw new functions.https.HttpsError('internal', 'Failed to collect system metrics');
+        throw new HttpsError('internal', 'Failed to collect system metrics');
     }
 });
 
