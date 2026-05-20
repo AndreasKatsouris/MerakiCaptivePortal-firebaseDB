@@ -243,11 +243,20 @@ The platform deploys **69+ Cloud Functions** from a single `functions/index.js` 
 
 ### ROSS Functions
 
-| Function | Auth | Purpose |
-|----------|------|---------|
-| `rossGetHomeWorkflowDigest` | `verifyUserOrAdmin` | Read-only digest of caller's active workflows for `/ross.html` slot 1. Returns `{ hasActiveWorkflows, activeWorkflowCount, upcoming, overdue[], today[], recentCompletions[], generatedAt }`. POST body: `{ data: { clientToday?: 'YYYY-MM-DD' } }` (caller's local-tz date for boundary computation; falls back to UTC date if missing). |
+All 22 ROSS functions live in `functions/ross.js`. Full catalog with auth, descriptions, response shapes, and **allowed-fields per mutator** is in **`public/kb/features/ROSS.md#cloud-functions`** — that is the canonical source. Summary by category:
 
-> For the full ROSS Cloud Functions catalog (rossGetWorkflows, rossCreateRun, rossSubmitResponse, etc.) see `public/kb/features/ROSS.md#cloud-functions`.
+| Category | Functions |
+|----------|-----------|
+| Workflows | `rossGetWorkflows`, `rossCreateWorkflow`, `rossUpdateWorkflow`, `rossDeleteWorkflow`, `rossActivateWorkflow`, `rossSeedFirstWorkflow` |
+| Templates | `rossGetTemplates`, `rossCreateTemplate`, `rossUpdateTemplate`, `rossDeleteTemplate` |
+| Tasks | `rossManageTask`, `rossCompleteTask` |
+| Runs | `rossCreateRun`, `rossSubmitResponse`, `rossGetRun`, `rossGetRunHistory` |
+| Reports | `rossGetReports` |
+| Staff | `rossManageStaff`, `rossGetStaff` |
+| Home / UX | `rossGetHomeWorkflowDigest`, `rossV2Snooze` |
+| Scheduled | `rossScheduledReminder` (cron `0 5 * * *`) |
+
+> **Field-verify rule.** Before reading any ROSS field from a CF response or RTDB on the client, grep the corresponding `set()` / `update()` / `res.json(...)` call in `functions/ross.js` and confirm the field is actually written there. Server's `locData.status` is `'active'` forever; the home digest derives overdue state from `nextDueDate < today`. Use the client helper at `public/js/modules/ross/v2/workflow-status.js` (PR #86).
 
 ---
 
@@ -256,6 +265,9 @@ The platform deploys **69+ Cloud Functions** from a single `functions/index.js` 
 | File | Functions |
 |------|----------|
 | `functions/index.js` | All exports (entry point) |
+| `functions/ross.js` | All 22 ROSS functions — see `public/kb/features/ROSS.md#cloud-functions` for catalog |
+| `functions/ross-tier.js` | Tier-gating helpers (`readUserTier`, `filterTemplatesByTier`, audit logger) |
+| `functions/ross-workflow-builder.js` | `buildWorkflowRecord`, `buildLocationsFromTemplate`, `buildTaskFromSubtask` |
 | `functions/guestSync.js` | `syncWifiToGuest`, `syncGuestToSendGrid` |
 | `functions/queueManagement.js` | QMS business logic |
 | `functions/queueWhatsAppIntegration.js` | Queue WhatsApp message processing |
