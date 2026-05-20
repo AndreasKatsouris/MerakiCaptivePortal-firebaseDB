@@ -427,23 +427,40 @@ All ROSS functions are defined in `functions/ross.js` and exported from `functio
 | Function | Auth | Description |
 |---|---|---|
 | `rossGetWorkflows` | `verifyAdmin` | List all workflows for the current user, flattened with location data |
-| `rossCreateWorkflow` | `verifyAdmin` | Create a new workflow, attach to `locationIds[]`, write `ownerIndex` |
+| `rossCreateWorkflow` | `verifyAdmin` | Create a new workflow, attach to `locationIds[]`, write `ownerIndex`; enum-validates `inputType` on subtasks |
 | `rossUpdateWorkflow` | `verifyAdmin` | Update workflow metadata; null guard on `updates`; `status` field validated against `['active','paused']`; `daysBeforeAlert` validated to positive integers |
 | `rossDeleteWorkflow` | `verifyAdmin` | Delete a workflow (404 if not found); clean up `ownerIndex` when last workflow removed |
-| `rossManageTask` | `verifyAdmin` | Create / update / delete a task; `taskData` guard scoped to `create` and `update` only -- delete works without `taskData` |
+| `rossManageTask` | `verifyAdmin` | Create / update / delete a task; `taskData` guard scoped to `create` and `update` only -- delete works without `taskData`; enum-validates `inputType` on update |
 | `rossCompleteTask` | `verifyAdmin` | Mark a task complete using RTDB transaction (atomic); returns 404 if task not found; writes history record when all tasks in a location are done |
-| `rossActivateWorkflow` | `verifyAdmin` | Attach an existing workflow to additional locations; write `ownerIndex` |
-| `rossGetTemplates` | `verifyAdmin` | List all templates (public + own) |
-| `rossCreateTemplate` | `verifySuperAdmin` | Create a new template |
-| `rossUpdateTemplate` | `verifySuperAdmin` | Update an existing template; null guard on `updates` before property access |
+| `rossActivateWorkflow` | `verifyAdmin` | Attach an existing workflow to additional locations; write `ownerIndex`. Tier-gated (Phase 6 PR 1A): All-in template activation by a Free user returns 403 + audit-log entry |
+| `rossSeedFirstWorkflow` | `verifyUserOrAdmin` | Day-zero auto-activation (PR #58). Resolves location from `userLocations/{uid}` and templateId from `ross/config/firstWorkflowTemplateId`; idempotent via `onboarding-progress/{uid}/firstWorkflowSeededAt` marker. Returns `{ skipped: true, reason: 'already_seeded'\|'no_locations' }` or `{ created: true, workflowId, locationId }` |
+| `rossGetTemplates` | `verifyAdmin` | List all templates (public + own); filters by user tier (Phase 6 PR 1A); opt-in `includeLocked:true` returns locked All-in templates with `locked:true` for upgrade UI (Phase 6 PR 1C) |
+| `rossCreateTemplate` | `verifySuperAdmin` | Create a new template; enum-validates `inputType` on subtasks |
+| `rossUpdateTemplate` | `verifySuperAdmin` | Update an existing template; null guard on `updates`; enum-validates `inputType` on subtasks |
 | `rossDeleteTemplate` | `verifySuperAdmin` | Delete a template (404 existence check added) |
-| `rossGetReports` | `verifyAdmin` | Fetch completion reports across all workflows and locations |
+| `rossGetReports` | `verifyAdmin` | Fetch completion reports across all workflows and locations. Returns `{ workflowId, name, category, recurrence, locationId, locationName, status, nextDueDate, tasksTotal, tasksCompleted, completionRate, history }[]`. **`status` here is `locData.status` — set to `'active'` on activation and never updated.** Use `nextDueDate < today` for derived overdue state, not `status === 'overdue'` (PR #72 lesson; client-side helper at `public/js/modules/ross/v2/workflow-status.js` shipped in PR #86) |
+| `rossManageStaff` | `verifyUserOrAdmin` | Create / update / delete a staff member for a location; verifies `verifyLocationAccess` |
 | `rossGetStaff` | `verifyAdmin` | List staff members for a location |
 | `rossScheduledReminder` | Scheduled (cron `0 5 * * *`) | Fan-out via `ross/ownerIndex` instead of full-tree scan |
-| `rossCreateRun` | `verifyAdmin` | Create or return the current in-progress run for a workflow+location (idempotent) |
-| `rossSubmitResponse` | `verifyAdmin` | Submit a typed response for a task within a run; auto-flags out-of-range values; enforces `requiredNote` |
+| `rossCreateRun` | `verifyAdmin` | Create or return the current in-progress run for a workflow+location (idempotent). **Returns `{ success, runId, run, created }`** — the run object is nested under `.run` (verbatim shape per `functions/ross.js:1388` existing-run path and `:1405` new-run path; copy into vitest mocks rather than reconstruct) |
+| `rossSubmitResponse` | `verifyAdmin` | Submit a typed response for a task within a run; auto-flags out-of-range `number`/`temperature` values; enforces `requiredNote` (returns HTTP **422** until note supplied). **Returns `{ success, taskId, flagged, runCompleted }`** — NOT the full responses map |
 | `rossGetRun` | `verifyAdmin` | Get the current run and previous responses for a workflow+location |
 | `rossGetRunHistory` | `verifyAdmin` | List completed runs (newest first, paginated) for a workflow+location |
+| `rossV2Snooze` | `verifyUserOrAdmin` | Snooze a home-feed card by id (PR #20). POST body: `{ cardId, hours }`. Writes to `ross/v2Snoozes/{uid}/{cardId}` with `expiresAt` epoch ms; detectors filter cards whose expiresAt is still in the future |
+| `rossGetHomeWorkflowDigest` | `verifyUserOrAdmin` | Read-only digest for `/ross.html` slot 1 (PR #72). Reads `ross/workflows/{uid}` + `ross/runs/{uid}` in parallel; returns `{ hasActiveWorkflows, activeWorkflowCount, upcoming, overdue[], today[], recentCompletions[], generatedAt }`. POST body: `{ data: { clientToday?: 'YYYY-MM-DD' } }`. `overdue[]` carries `daysLate` derived server-side from `nextDueDate < today` |
+
+### Allowed-fields per mutator
+
+Server's `allowedFields` lists are the contract for editor field-locking. Keep client-side `UPDATABLE_FIELDS` constants in sync (currently mirrored in `playbook-store.js`).
+
+| Mutator | `allowedFields` |
+|---|---|
+| `rossUpdateWorkflow` (functions/ross.js:882) | `name`, `notificationChannels`, `notifyPhone`, `notifyEmail`, `daysBeforeAlert`, `status` |
+| `rossUpdateTemplate` (functions/ross.js:530) | `name`, `category`, `tier`, `description`, `recurrence`, `daysBeforeAlert`, `subtasks`, `tags` |
+| `rossManageTask` update action (functions/ross.js:1100) | `title`, `inputType`, `inputConfig`, `required`, `status`, `dueDate`, `assignedTo`, `order` |
+| `rossManageStaff` update action (functions/ross.js:1697) | `name`, `role`, `phone`, `email`, `notificationChannels` |
+
+> **Field-verify rule (Standard Task Workflow Step 0).** Before reading a workflow / template / task / run field on the client, grep the corresponding `set()` / `update()` / `res.json(...)` call in `functions/ross.js` and confirm the field is actually written there. KB docs lie or lag — the write path is ground truth. Pattern fired as negative confirmation on PR #28 (`t.id` vs `templateId`), PR #72 (`status` field that's never written + `nextDueDate` number-not-string), PR #86 (`status === 'overdue'` filter always 0).
 
 > **Note:** Template CRUD (`rossCreateTemplate`, `rossUpdateTemplate`, `rossDeleteTemplate`) requires `verifySuperAdmin`. The Admin SDK bypasses RTDB security rules, so Cloud Functions must enforce the same superAdmin restriction that the RTDB rules intend.
 
