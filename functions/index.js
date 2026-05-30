@@ -11,7 +11,7 @@ const MERAKI_SHARED_SECRET = defineSecret('MERAKI_SHARED_SECRET');
 const INITIAL_ADMIN_SETUP_SECRET = defineSecret('INITIAL_ADMIN_SETUP_SECRET');
 // CORS origin allowlist — shared with ross.js (and any future entry point)
 // via ./cors-allowlist so the policy has a single source of truth.
-const { isAllowedOrigin, corsOptions } = require('./cors-allowlist');
+const { corsOptions } = require('./cors-allowlist');
 const cors = require('cors')(corsOptions);
 const express = require('express');
 
