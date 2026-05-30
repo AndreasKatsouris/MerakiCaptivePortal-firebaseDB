@@ -1,6 +1,7 @@
 // Google Reviews Management Module
 //require('dotenv').config();
 import { getConfig, REQUIRED_FIELDS } from './googleAPIclient.js';
+import { auth, onAuthStateChanged } from './config/firebase-config.js';
 
 const googleReviewsManager = {
     // State management
@@ -24,7 +25,23 @@ const googleReviewsManager = {
     // Initialize the module
     async initialize() {
         try {
-            const response = await fetch('/api/getGoogleConfig');
+            // Resolve the current user via onAuthStateChanged rather than reading
+            // auth.currentUser directly — the latter is null during the Auth SDK
+            // init window and would spuriously reject a legitimately signed-in user.
+            const user = await new Promise(resolve =>
+                onAuthStateChanged(auth, resolve, () => resolve(null))
+            );
+            if (!user) {
+                throw new Error('You must be signed in to load Google configuration.');
+            }
+            const idToken = await user.getIdToken();
+
+            const response = await fetch('/api/getGoogleConfig', {
+                headers: { 'Authorization': `Bearer ${idToken}` }
+            });
+            if (!response.ok) {
+                throw new Error(`Failed to load Google configuration (${response.status}).`);
+            }
             const config = await response.json();
             
             this.config = {

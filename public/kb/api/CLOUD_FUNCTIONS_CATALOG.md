@@ -88,7 +88,7 @@ The platform deploys **69+ Cloud Functions** from a single `functions/index.js` 
 |----------|---------|------|---------|
 | `clearScanningData` | Callable (v2 onCall) | Admin (custom claim + `admin-claims/{uid}`) | Chunked delete of `/scanningData`. Returns `{ deleted, batches, done, durationMs }`; client loops until `done: true` if the per-call cap (100K records) is hit. |
 | `submitWifiLogin` | Callable (v2 onCall) | Anonymous Firebase Auth | Server-side write path for guest captive-portal login. Validates name/email/phone/MAC, 5s/UID rate-limit, atomic multi-path write to `wifiLogins/{sessionID}` + `activeUsers/{client_mac\|sessionID}` + `rateLimitsWifi/{uid}`. Accepts: `{ name, email, phoneNumber, table, marketingConsent: bool, client_mac, node_mac, client_ip }`. Replaced the prior direct-client RTDB writes that required `.write:true` (public-internet exposure). Returns `{ success, sessionID }`. |
-| `getGoogleConfig` | HTTP (v2 onRequest) | None | Returns Google Places API key and place ID from config |
+| `getGoogleConfig` | HTTP (v2 onRequest) | Admin (`Bearer <idToken>`) | Returns Google Places API key and place ID from config |
 
 ---
 
@@ -111,13 +111,13 @@ The platform deploys **69+ Cloud Functions** from a single `functions/index.js` 
 
 | Function | Trigger | Auth | Purpose |
 |----------|---------|------|---------|
-| `addGuestToQueue` | HTTP POST (v1) | CORS | Adds guest to location queue |
-| `removeGuestFromQueue` | HTTP POST (v1) | CORS | Removes guest from queue |
-| `updateQueueEntryStatus` | HTTP POST (v1) | CORS | Updates queue entry status |
-| `getQueueStatus` | HTTP GET (v1) | CORS | Returns queue status for location |
+| `addGuestToQueue` | HTTP POST (v1) | Admin (`Bearer <idToken>`) | Adds guest to location queue |
+| `removeGuestFromQueue` | HTTP POST (v1) | Admin (`Bearer <idToken>`) | Removes guest from queue |
+| `updateQueueEntryStatus` | HTTP POST (v1) | Admin (`Bearer <idToken>`) | Updates queue entry status |
+| `getQueueStatus` | HTTP GET (v1) | CORS (no auth — guest position checks) | Returns queue status for location |
 | `bulkQueueOperations` | HTTP POST (v1) | Admin | Bulk queue operations |
 | `getGuestQueuePosition` | HTTP GET (v1) | CORS | Returns guest's position in queue |
-| `processQueueMessage` | HTTP POST (v1) | CORS | Processes WhatsApp queue messages |
+| `processQueueMessage` | HTTP POST (v1) | Admin (`Bearer <idToken>`) | Processes WhatsApp queue messages |
 | `sendQueueNotification` | HTTP POST (v1) | Admin | Sends WhatsApp queue notification |
 | `sendManualQueueAdditionNotification` | HTTP POST (v1) | Admin | WhatsApp notification for manual queue addition |
 | `cleanupOldQueues` | HTTP POST (v1) | Admin | Manual queue cleanup (configurable retention) |
