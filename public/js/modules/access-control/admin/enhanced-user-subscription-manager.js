@@ -881,9 +881,11 @@ const EnhancedUserSubscriptionManager = {
     // User Creation — calls createUserAccount Cloud Function
     generateTempPassword() {
       const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZabcdefghjkmnpqrstuvwxyz23456789';
+      // Use the Web Crypto CSPRNG, not Math.random (predictable from seed state).
+      const randomValues = window.crypto.getRandomValues(new Uint32Array(12));
       let password = '';
       for (let i = 0; i < 12; i++) {
-        password += chars.charAt(Math.floor(Math.random() * chars.length));
+        password += chars.charAt(randomValues[i] % chars.length);
       }
       this.newUserData.password = password;
     },

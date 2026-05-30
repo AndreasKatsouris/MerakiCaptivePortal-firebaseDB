@@ -1001,7 +1001,12 @@ async function receiveWhatsAppMessageEnhanced(req, res) {
     console.log('🚀 Processing WhatsApp message with multi-location routing...');
     console.log('Request method:', req.method);
     console.log('Content-Type:', req.headers['content-type']);
-    console.log('Received payload:', JSON.stringify(req.body, null, 2));
+    // POPIA: never log the full Twilio body — From/Body/MediaUrl are guest PII.
+    console.log('Received payload:', {
+        MessageSid: req.body?.MessageSid,
+        To: req.body?.To,
+        NumMedia: req.body?.NumMedia
+    });
     
     // Only accept POST requests from Twilio
     if (req.method !== 'POST') {
