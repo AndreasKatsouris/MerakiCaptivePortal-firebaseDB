@@ -381,22 +381,22 @@
     },
     "receiptPatternLogs": {
       ".read": "auth != null && auth.token.admin === true",
-      ".write": true,
+      ".write": "auth != null && auth.token.admin === true",
       ".indexOn": ["templateId", "success", "timestamp", "brandName"],
       "$logId": {
         ".read": "auth != null && auth.token.admin === true",
-        ".write": true,
+        ".write": "auth != null && auth.token.admin === true",
         ".validate": "newData.hasChildren(['receiptId', 'success', 'timestamp'])"
       }
     },
     "debug": {
       ".read": "auth != null && auth.token.admin === true",
-      ".write": true,
+      ".write": "auth != null && auth.token.admin === true",
       "ocr-logs": {
         ".indexOn": ["timestamp", "phoneNumber"],
         "$logId": {
           ".read": "auth != null && auth.token.admin === true",
-          ".write": true
+          ".write": "auth != null && auth.token.admin === true"
         }
       }
     },

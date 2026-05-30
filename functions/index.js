@@ -1,6 +1,13 @@
 const { onRequest, onCall, HttpsError } = require('firebase-functions/v2/https');
+const { defineSecret } = require('firebase-functions/params');
 const functions = require('firebase-functions');
 const admin = require('firebase-admin');
+
+// Secrets — provisioned via Firebase Secrets Manager, never hardcoded.
+//   firebase functions:secrets:set MERAKI_SHARED_SECRET
+//   firebase functions:secrets:set INITIAL_ADMIN_SETUP_SECRET
+const MERAKI_SHARED_SECRET = defineSecret('MERAKI_SHARED_SECRET');
+const INITIAL_ADMIN_SETUP_SECRET = defineSecret('INITIAL_ADMIN_SETUP_SECRET');
 // CORS allowlist:
 //  - localhost ports for dev
 //  - canonical Firebase Hosting domains (live)
@@ -431,7 +438,7 @@ function formatGuestStatusUpdate(booking) {
 /**
  * Cloud Function to handle Meraki Webhook
  */
-exports.merakiWebhook = onRequest((req, res) => {
+exports.merakiWebhook = onRequest({ secrets: [MERAKI_SHARED_SECRET] }, (req, res) => {
     if (req.method === 'GET') {
         const validator = "371de0de57b8741627daa5e30f25beb917614141"; // Replace with your validator string
         console.log("Meraki validator string requested.");
@@ -440,9 +447,9 @@ exports.merakiWebhook = onRequest((req, res) => {
 
     console.log('Received POST request from Meraki Scanning API.');
 
-    const sharedSecret = 'Giulietta!16'; // Replace with your shared secret
+    const sharedSecret = MERAKI_SHARED_SECRET.value();
 
-    if (req.body.secret !== sharedSecret) {
+    if (!sharedSecret || req.body.secret !== sharedSecret) {
         console.error('Invalid secret received. Unauthorized access attempt.');
         return res.status(403).send('Unauthorized');
     }
@@ -723,7 +730,7 @@ exports.setAdminClaim = onRequest(async (req, res) => {
         });
 
         // Check if the caller is an admin
-        if (!callerToken.admin === true) {
+        if (callerToken.admin !== true) {
             console.error('[setAdminClaim] Caller is not admin:', callerToken.uid);
             return res.status(403).json({ error: 'Forbidden - Caller is not an admin' });
         }
@@ -1226,12 +1233,17 @@ exports.resendWelcomeEmail = onRequest({ invoker: 'public' }, async (req, res) =
  * One-time setup endpoint to create the initial admin user
  * This should be secured and disabled after initial setup
  */
-exports.setupInitialAdmin = onRequest(async (req, res) => {
+exports.setupInitialAdmin = onRequest({ secrets: [INITIAL_ADMIN_SETUP_SECRET] }, async (req, res) => {
     console.log('[setupInitialAdmin] Received request:', {
         method: req.method,
-        headers: req.headers,
         origin: req.headers.origin || 'No origin'
     });
+
+    // Bootstrap endpoint — disabled unless explicitly enabled. Keep INITIAL_SETUP_ENABLED
+    // unset (or anything other than 'true') in production so this cannot be reached.
+    if (process.env.INITIAL_SETUP_ENABLED !== 'true') {
+        return res.status(404).end();
+    }
 
     // Enable CORS
     return cors(req, res, async () => {
@@ -1247,9 +1259,9 @@ exports.setupInitialAdmin = onRequest(async (req, res) => {
             console.log('[setupInitialAdmin] Processing setup for email:', email);
 
             // Verify setup secret to prevent unauthorized access
-            const SETUP_SECRET = 'MerakiAdmin2024!'; // You should change this!
+            const SETUP_SECRET = INITIAL_ADMIN_SETUP_SECRET.value();
             console.log('[setupInitialAdmin] Verifying setup secret');
-            if (setupSecret !== SETUP_SECRET) {
+            if (!SETUP_SECRET || setupSecret !== SETUP_SECRET) {
                 console.error('[setupInitialAdmin] Invalid setup secret provided');
                 return res.status(403).json({ error: 'Invalid setup secret' });
             }
@@ -1518,7 +1530,7 @@ exports.markVoucherRedeemed = onRequest(async (req, res) => {
                 .once('value')
                 .then(snapshot => snapshot.val() === true);
 
-            if (!decodedToken.admin === true || !isAdminInDb) {
+            if (decodedToken.admin !== true || !isAdminInDb) {
                 return res.status(403).json({ error: 'Unauthorized - Admin access required' });
             }
 
@@ -1568,7 +1580,7 @@ exports.getVoucherDetails = onRequest(async (req, res) => {
                 .once('value')
                 .then(snapshot => snapshot.val() === true);
 
-            if (!decodedToken.admin === true || !isAdminInDb) {
+            if (decodedToken.admin !== true || !isAdminInDb) {
                 return res.status(403).json({ error: 'Unauthorized - Admin access required' });
             }
 
@@ -1615,7 +1627,7 @@ exports.getVoucherPoolAvailability = onRequest(async (req, res) => {
                 .once('value')
                 .then(snapshot => snapshot.val() === true);
 
-            if (!decodedToken.admin === true || !isAdminInDb) {
+            if (decodedToken.admin !== true || !isAdminInDb) {
                 return res.status(403).json({ error: 'Unauthorized - Admin access required' });
             }
 
@@ -1657,7 +1669,7 @@ exports.updateVoucherPoolStats = onRequest(async (req, res) => {
                 .once('value')
                 .then(snapshot => snapshot.val() === true);
 
-            if (!decodedToken.admin === true || !isAdminInDb) {
+            if (decodedToken.admin !== true || !isAdminInDb) {
                 return res.status(403).json({ error: 'Unauthorized - Admin access required' });
             }
 
@@ -1822,7 +1834,7 @@ exports.bulkQueueOperations = functions.https.onRequest(async (req, res) => {
                 .once('value')
                 .then(snapshot => snapshot.val() === true);
 
-            if (!decodedToken.admin === true || !isAdminInDb) {
+            if (decodedToken.admin !== true || !isAdminInDb) {
                 return res.status(403).json({ error: 'Unauthorized - Admin access required' });
             }
 
@@ -1932,7 +1944,7 @@ exports.sendQueueNotification = functions.https.onRequest(async (req, res) => {
                 .once('value')
                 .then(snapshot => snapshot.val() === true);
 
-            if (!decodedToken.admin === true || !isAdminInDb) {
+            if (decodedToken.admin !== true || !isAdminInDb) {
                 console.error('[sendQueueNotification] Unauthorized access attempt by user:', decodedToken.uid);
                 return res.status(403).json({ error: 'Unauthorized - Admin access required' });
             }
@@ -2005,7 +2017,7 @@ exports.sendManualQueueAdditionNotification = functions.https.onRequest(async (r
                 .once('value')
                 .then(snapshot => snapshot.val() === true);
 
-            if (!decodedToken.admin === true || !isAdminInDb) {
+            if (decodedToken.admin !== true || !isAdminInDb) {
                 console.error('[sendManualQueueAdditionNotification] Unauthorized access attempt by user:', decodedToken.uid);
                 return res.status(403).json({ error: 'Unauthorized - Admin access required' });
             }
@@ -2100,7 +2112,7 @@ exports.cleanupOldQueues = functions.https.onRequest(async (req, res) => {
                 .once('value')
                 .then(snapshot => snapshot.val() === true);
 
-            if (!decodedToken.admin === true || !isAdminInDb) {
+            if (decodedToken.admin !== true || !isAdminInDb) {
                 return res.status(403).json({ error: 'Unauthorized - Admin access required' });
             }
 
@@ -2144,7 +2156,7 @@ exports.getQueueAnalytics = functions.https.onRequest(async (req, res) => {
                 .once('value')
                 .then(snapshot => snapshot.val() === true);
 
-            if (!decodedToken.admin === true || !isAdminInDb) {
+            if (decodedToken.admin !== true || !isAdminInDb) {
                 return res.status(403).json({ error: 'Unauthorized - Admin access required' });
             }
 
@@ -2229,7 +2241,7 @@ exports.getQueuePerformanceStats = functions.https.onRequest(async (req, res) =>
                 .once('value')
                 .then(snapshot => snapshot.val() === true);
 
-            if (!decodedToken.admin === true || !isAdminInDb) {
+            if (decodedToken.admin !== true || !isAdminInDb) {
                 return res.status(403).json({ error: 'Unauthorized - Admin access required' });
             }
 
@@ -2276,7 +2288,7 @@ exports.clearQueueCache = functions.https.onRequest(async (req, res) => {
                 .once('value')
                 .then(snapshot => snapshot.val() === true);
 
-            if (!decodedToken.admin === true || !isAdminInDb) {
+            if (decodedToken.admin !== true || !isAdminInDb) {
                 return res.status(403).json({ error: 'Unauthorized - Admin access required' });
             }
 
