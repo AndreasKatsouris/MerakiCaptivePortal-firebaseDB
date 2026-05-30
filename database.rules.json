@@ -40,7 +40,8 @@
       ".indexOn": ["userId", "ownerId", "isActive", "createdAt", "name"],
       "$locationId": {
         ".read": "auth != null",
-        ".write": "auth != null && (auth.uid === data.child('ownerId').val() || auth.token.admin === true || !data.exists())"
+        ".write": "auth != null && (auth.uid === data.child('ownerId').val() || auth.token.admin === true || !data.exists())",
+        ".validate": "auth.token.admin === true || newData.child('ownerId').val() === auth.uid"
       }
     },
     "userLocations": {
