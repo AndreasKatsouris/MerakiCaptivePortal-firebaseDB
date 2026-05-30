@@ -711,19 +711,11 @@ exports.registerUser = onCall(async (request) => {
 });
 
 exports.getGoogleConfig = onRequest(async (req, res) => {
-    // Require a valid Firebase ID token — this returns a billable API key and
-    // must not be reachable by anonymous callers. (Defence in depth: the key
-    // should also carry an HTTP-referrer restriction in the GCP console.)
-    const idToken = req.headers.authorization?.split('Bearer ')[1];
-    if (!idToken) {
-        return res.status(401).json({ error: 'No token provided' });
-    }
-    try {
-        await admin.auth().verifyIdToken(idToken);
-    } catch (error) {
-        console.error('[getGoogleConfig] Token verification failed:', error.message);
-        return res.status(401).json({ error: 'Invalid token' });
-    }
+    // Returns a billable API key — admin only. Non-admin operators also hold
+    // Firebase Auth accounts, so a token-only check would still leak the key.
+    // (Defence in depth: the key should also carry an HTTP-referrer
+    // restriction in the GCP console.)
+    if (!await requireAdmin(req, res)) return;
 
     res.json({
         apiKey: functions.config.google.places_api_key,
