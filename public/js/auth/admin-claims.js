@@ -1,15 +1,7 @@
-import { auth, signOut } from '../config/firebase-config.js';
-
-// Get Firebase config
-const firebaseConfig = {
-    apiKey: "AIzaSyBqXVRPtq-DGbXMUAhxHH8B10MOV5OZkzI",
-    authDomain: "merakicaptiveportal-firebasedb.firebaseapp.com",
-    databaseURL: "https://merakicaptiveportal-firebasedb-default-rtdb.firebaseio.com",
-    projectId: "merakicaptiveportal-firebasedb",
-    storageBucket: "merakicaptiveportal-firebasedb.appspot.com",
-    messagingSenderId: "854311920907",
-    appId: "1:854311920907:web:dd6e51c7f0989887c6c3bc"
-};
+import { auth, signOut, app } from '../config/firebase-config.js';
+// Use the single shared Firebase app — no second inline config. The previous
+// inline firebaseConfig carried a different apiKey + messagingSenderId (a stale
+// config from another project) and only its projectId was ever read.
 
 export class AdminClaims {
     /**
@@ -18,7 +10,7 @@ export class AdminClaims {
      */
     static getFunctionsBaseUrl() {
         const region = 'us-central1';
-        const baseUrl = `https://${region}-${firebaseConfig.projectId}.cloudfunctions.net`;
+        const baseUrl = `https://${region}-${app.options.projectId}.cloudfunctions.net`;
         console.log('[AdminClaims] Functions base URL:', baseUrl);
         return baseUrl;
     }

@@ -16,6 +16,7 @@ const {
 
 const { formatToSASTDateTime } = require('./utils/timezoneUtils');
 const { sendReceiptConfirmationTemplate } = require('./utils/whatsappClient');
+const crypto = require('crypto');
 
 /**
  * Main function to process rewards for a validated receipt
@@ -640,7 +641,14 @@ function isTimeInRange(time, start, end) {
  * @returns {string} Random alphanumeric code
  */
 function generateFallbackCode() {
-    return Math.random().toString(36).substring(2, 8).toUpperCase();
+    // CSPRNG, not Math.random — voucher codes must be unguessable.
+    const chars = '0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ';
+    const bytes = crypto.randomBytes(6);
+    let code = '';
+    for (let i = 0; i < 6; i++) {
+        code += chars.charAt(bytes[i] % chars.length);
+    }
+    return code;
 }
 
 /**
