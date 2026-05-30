@@ -304,16 +304,41 @@ async function processReceipt(imageUrl, phoneNumber) {
 async function detectReceiptText(imageUrl) {
     try {
         console.log('Starting text detection for URL:', imageUrl);
+
+        // SSRF guard: only fetch images from known-good hosts. Without this, a
+        // user-supplied imageUrl could direct the Vision API at internal/metadata
+        // endpoints. Parse the URL properly — substring checks like
+        // .includes('twilio.com') are bypassable (e.g. evil.twilio.com.attacker.com).
+        let hostname;
+        try {
+            const parsed = new URL(imageUrl);
+            if (parsed.protocol !== 'https:') {
+                throw new Error('non-https');
+            }
+            hostname = parsed.hostname;
+        } catch (e) {
+            throw new Error('Invalid image URL.');
+        }
+
+        const isTwilio = hostname.endsWith('.twilio.com');
+        const isFirebaseStorage =
+            hostname === 'firebasestorage.googleapis.com' ||
+            hostname === 'storage.googleapis.com';
+
+        if (!isTwilio && !isFirebaseStorage) {
+            throw new Error('Invalid image URL.');
+        }
+
         const client = new vision.ImageAnnotatorClient();
 
-        // Check if this is a Twilio Media URL that needs authentication
-        if (imageUrl.includes('twilio.com')) {
+        // Twilio Media URLs need authentication — download and re-host first.
+        if (isTwilio) {
             console.log('Detected Twilio media URL, downloading and uploading to Firebase Storage first');
             const processedImageUrl = await downloadAndStoreImage(imageUrl);
             console.log('Using processed image URL:', processedImageUrl);
             return await client.textDetection(processedImageUrl);
         } else {
-            // Direct URL processing
+            // Direct processing — guaranteed Firebase Storage by the allowlist above.
             console.log('Processing image URL directly');
             return await client.textDetection(imageUrl);
         }

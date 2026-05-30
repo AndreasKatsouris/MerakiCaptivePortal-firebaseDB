@@ -14,7 +14,7 @@ service firebase.storage {
     // Processed receipts from WhatsApp/Twilio (created by receiptProcessor.js)
     match /receipts/{receiptFile} {
       allow read: if request.auth != null; // All authenticated users can read
-      allow write: if true; // Allow functions to write (no auth context)
+      allow write: if false; // Cloud Functions use the Admin SDK and bypass rules; no client writes
     }
   }
 }
