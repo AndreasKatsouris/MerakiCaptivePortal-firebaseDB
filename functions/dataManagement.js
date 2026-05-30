@@ -47,17 +47,24 @@ async function deleteUserData(phoneNumber) {
         // POPIA: also purge PII-bearing records keyed/queried by phone number
         // that the original deletion missed (wifiLogins, WhatsApp history,
         // bookings, activeUsers). Query each by its phoneNumber field.
+        // Resilient per-node reads: a single failing query must not abort the
+        // whole deletion (which would leave the core guest data un-deleted).
         const byPhone = async (path, field) => {
-            const snap = await admin.database().ref(path)
-                .orderByChild(field).equalTo(normalizedPhone).once('value');
-            return snap.val() || {};
+            try {
+                const snap = await admin.database().ref(path)
+                    .orderByChild(field).equalTo(normalizedPhone).once('value');
+                return snap.val() || {};
+            } catch (e) {
+                console.error(`[deleteUserData] query failed for ${path}:`, e.message);
+                return {};
+            }
         };
         const [wifiLogins, whatsappHistory, bookings, activeUsers, queueData] = await Promise.all([
             byPhone('wifiLogins', 'phoneNumber'),
             byPhone('whatsapp-message-history', 'phoneNumber'),
             byPhone('bookings', 'phoneNumber'),
             byPhone('activeUsers', 'phoneNumber'),
-            admin.database().ref('queue').once('value').then(s => s.val() || {})
+            admin.database().ref('queue').once('value').then(s => s.val() || {}).catch(() => ({}))
         ]);
 
         // Prepare deletion operations using normalized phone number
