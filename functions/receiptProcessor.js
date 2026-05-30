@@ -320,13 +320,13 @@ async function detectReceiptText(imageUrl) {
             throw new Error('Invalid image URL.');
         }
 
-        const isTwilio = hostname === 'api.twilio.com' || hostname.endsWith('.twilio.com');
+        const isTwilio = hostname.endsWith('.twilio.com');
         const isFirebaseStorage =
             hostname === 'firebasestorage.googleapis.com' ||
             hostname === 'storage.googleapis.com';
 
         if (!isTwilio && !isFirebaseStorage) {
-            throw new Error('Image URL host is not allowed.');
+            throw new Error('Invalid image URL.');
         }
 
         const client = new vision.ImageAnnotatorClient();
