@@ -159,6 +159,12 @@ exports.health = onRequest(async (req, res) => {
 // Test data endpoint for persistence verification
 exports.createTestData = onRequest(async (req, res) => {
     try {
+        // Test-data seeding must never run in production. Disabled unless
+        // ENABLE_TEST_DATA is explicitly set to 'true' (local/dev only).
+        if (process.env.ENABLE_TEST_DATA !== 'true') {
+            return res.status(404).end();
+        }
+
         // Enable CORS
         res.set('Access-Control-Allow-Origin', '*');
         res.set('Access-Control-Allow-Methods', 'POST, GET, DELETE');
@@ -734,7 +740,7 @@ exports.setAdminClaim = onRequest((req, res) => cors(req, res, async () => {
         const callerToken = await admin.auth().verifyIdToken(idToken);
         console.log('[setAdminClaim] Caller token verified:', {
             uid: callerToken.uid,
-            claims: callerToken
+            admin: callerToken.admin === true
         });
 
         // Check if the caller is an admin
@@ -811,7 +817,7 @@ exports.verifyAdminStatus = onRequest(async (req, res) => {
             const decodedToken = await admin.auth().verifyIdToken(idToken);
             console.log('[verifyAdminStatus] Token verified. User:', {
                 uid: decodedToken.uid,
-                claims: decodedToken
+                admin: decodedToken.admin === true
             });
 
             // Check admin claim and admin-claims database entry
@@ -3522,8 +3528,7 @@ exports.ocrReceiptForTemplate = onRequest({ cors: true }, async (req, res) => {
             }
 
             const token = authHeader.split('Bearer ')[1];
-            console.log('Token extracted, length:', token ? token.length : 0);
-            console.log('Token first 50 chars:', token ? token.substring(0, 50) : 'null');
+            console.log('Token extracted, present:', !!token);
 
             if (!token || token.trim() === '') {
                 console.error('Empty token in authorization header');
