@@ -2,6 +2,7 @@ const { onRequest, onCall, HttpsError } = require('firebase-functions/v2/https')
 const { defineSecret } = require('firebase-functions/params');
 const functions = require('firebase-functions');
 const admin = require('firebase-admin');
+const crypto = require('crypto');
 
 // Secrets — provisioned via Firebase Secrets Manager, never hardcoded.
 //   firebase functions:secrets:set MERAKI_SHARED_SECRET
@@ -737,7 +738,6 @@ exports.getGoogleConfig = onRequest(async (req, res) => {
 exports.setAdminClaim = onRequest(async (req, res) => {
     console.log('[setAdminClaim] Received request:', {
         method: req.method,
-        headers: req.headers,
         origin: req.headers.origin || 'No origin'
     });
 
@@ -810,7 +810,6 @@ exports.setAdminClaim = onRequest(async (req, res) => {
 exports.verifyAdminStatus = onRequest(async (req, res) => {
     console.log('[verifyAdminStatus] Received request:', {
         method: req.method,
-        headers: req.headers,
         origin: req.headers.origin || 'No origin'
     });
 
@@ -898,7 +897,7 @@ exports.verifyAdminStatus = onRequest(async (req, res) => {
 exports.createUserAccount = onRequest({ invoker: 'public' }, async (req, res) => {
     console.log('[createUserAccount] Received request:', {
         method: req.method,
-        headers: req.headers
+        contentType: req.headers['content-type']
     });
 
     // Enable CORS
@@ -1197,7 +1196,7 @@ exports.resendWelcomeEmail = onRequest({ invoker: 'public' }, async (req, res) =
             const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZabcdefghjkmnpqrstuvwxyz23456789';
             let tempPassword = '';
             for (let i = 0; i < 12; i++) {
-                tempPassword += chars.charAt(Math.floor(Math.random() * chars.length));
+                tempPassword += chars.charAt(crypto.randomInt(chars.length));
             }
             await admin.auth().updateUser(userId, { password: tempPassword });
 
