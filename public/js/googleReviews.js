@@ -1,6 +1,7 @@
 // Google Reviews Management Module
 //require('dotenv').config();
 import { getConfig, REQUIRED_FIELDS } from './googleAPIclient.js';
+import { auth } from './config/firebase-config.js';
 
 const googleReviewsManager = {
     // State management
@@ -24,7 +25,18 @@ const googleReviewsManager = {
     // Initialize the module
     async initialize() {
         try {
-            const response = await fetch('/api/getGoogleConfig');
+            const user = auth.currentUser;
+            if (!user) {
+                throw new Error('You must be signed in to load Google configuration.');
+            }
+            const idToken = await user.getIdToken();
+
+            const response = await fetch('/api/getGoogleConfig', {
+                headers: { 'Authorization': `Bearer ${idToken}` }
+            });
+            if (!response.ok) {
+                throw new Error(`Failed to load Google configuration (${response.status}).`);
+            }
             const config = await response.json();
             
             this.config = {

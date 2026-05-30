@@ -114,6 +114,36 @@ if (!admin.apps.length) {
     });
 }
 
+/**
+ * Verify the caller holds a valid admin Firebase ID token.
+ * On failure, writes the 401/403 response and returns null.
+ * On success, returns the decoded token.
+ * Mirrors the inline pattern used by markVoucherRedeemed / bulkQueueOperations.
+ */
+async function requireAdmin(req, res) {
+    const idToken = req.headers.authorization?.split('Bearer ')[1];
+    if (!idToken) {
+        res.status(401).json({ error: 'No token provided' });
+        return null;
+    }
+    try {
+        const decodedToken = await admin.auth().verifyIdToken(idToken);
+        const isAdminInDb = await admin.database()
+            .ref(`admin-claims/${decodedToken.uid}`)
+            .once('value')
+            .then(snapshot => snapshot.val() === true);
+        if (decodedToken.admin !== true || !isAdminInDb) {
+            res.status(403).json({ error: 'Unauthorized - Admin access required' });
+            return null;
+        }
+        return decodedToken;
+    } catch (error) {
+        console.error('[requireAdmin] Token verification failed:', error.message);
+        res.status(401).json({ error: 'Invalid token' });
+        return null;
+    }
+}
+
 // Health check endpoint
 exports.health = onRequest(async (req, res) => {
     try {
@@ -681,6 +711,20 @@ exports.registerUser = onCall(async (request) => {
 });
 
 exports.getGoogleConfig = onRequest(async (req, res) => {
+    // Require a valid Firebase ID token — this returns a billable API key and
+    // must not be reachable by anonymous callers. (Defence in depth: the key
+    // should also carry an HTTP-referrer restriction in the GCP console.)
+    const idToken = req.headers.authorization?.split('Bearer ')[1];
+    if (!idToken) {
+        return res.status(401).json({ error: 'No token provided' });
+    }
+    try {
+        await admin.auth().verifyIdToken(idToken);
+    } catch (error) {
+        console.error('[getGoogleConfig] Token verification failed:', error.message);
+        return res.status(401).json({ error: 'Invalid token' });
+    }
+
     res.json({
         apiKey: functions.config.google.places_api_key,
         placeId: functions.config.google.place_id
@@ -1696,6 +1740,8 @@ exports.addGuestToQueue = functions.https.onRequest(async (req, res) => {
         }
 
         try {
+            if (!await requireAdmin(req, res)) return;
+
             const result = await addGuestToQueue(req.body);
 
             if (result.success) {
@@ -1723,6 +1769,8 @@ exports.removeGuestFromQueue = functions.https.onRequest(async (req, res) => {
         }
 
         try {
+            if (!await requireAdmin(req, res)) return;
+
             const result = await removeGuestFromQueue(req.body);
 
             if (result.success) {
@@ -1750,6 +1798,8 @@ exports.updateQueueEntryStatus = functions.https.onRequest(async (req, res) => {
         }
 
         try {
+            if (!await requireAdmin(req, res)) return;
+
             const result = await updateQueueEntryStatus(req.body);
 
             if (result.success) {
@@ -1889,6 +1939,8 @@ exports.processQueueMessage = functions.https.onRequest(async (req, res) => {
         }
 
         try {
+            if (!await requireAdmin(req, res)) return;
+
             const { phoneNumber, message, messageType } = req.body;
 
             if (!phoneNumber || !message) {
