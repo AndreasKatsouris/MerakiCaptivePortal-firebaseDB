@@ -9,38 +9,10 @@ const crypto = require('crypto');
 //   firebase functions:secrets:set INITIAL_ADMIN_SETUP_SECRET
 const MERAKI_SHARED_SECRET = defineSecret('MERAKI_SHARED_SECRET');
 const INITIAL_ADMIN_SETUP_SECRET = defineSecret('INITIAL_ADMIN_SETUP_SECRET');
-// CORS allowlist:
-//  - localhost ports for dev
-//  - canonical Firebase Hosting domains (live)
-//  - Firebase Hosting preview channels: <site>--<channel>-<hash>.web.app
-//    (created by `firebase hosting:channel:deploy`). Without this, every
-//    preview channel fails the verifyAdminStatus preflight and admins are
-//    locked out of the UI on previews.
-const STATIC_CORS_ORIGINS = [
-    'http://localhost:3000',
-    'http://localhost:5000',
-    'http://localhost:8000',
-    'https://merakicaptiveportal-bda0f.web.app',
-    'https://merakicaptiveportal-bda0f.firebaseapp.com',
-    'https://merakicaptiveportal-firebasedb.web.app',
-    'https://merakicaptiveportal-firebasedb.firebaseapp.com'
-];
-const PREVIEW_CHANNEL_PATTERN = /^https:\/\/merakicaptiveportal-firebasedb--[a-z0-9-]+\.web\.app$/;
-
-function isAllowedOrigin(origin) {
-    if (!origin) return true; // same-origin / curl / server-to-server
-    if (STATIC_CORS_ORIGINS.includes(origin)) return true;
-    if (PREVIEW_CHANNEL_PATTERN.test(origin)) return true;
-    return false;
-}
-
-const cors = require('cors')({
-    origin: (origin, callback) => {
-        if (isAllowedOrigin(origin)) return callback(null, true);
-        return callback(new Error(`CORS: origin not allowed: ${origin}`));
-    },
-    credentials: true
-});
+// CORS origin allowlist — shared with ross.js (and any future entry point)
+// via ./cors-allowlist so the policy has a single source of truth.
+const { corsOptions } = require('./cors-allowlist');
+const cors = require('cors')(corsOptions);
 const express = require('express');
 
 function escapeHtml(value) {
@@ -735,7 +707,7 @@ exports.getGoogleConfig = onRequest(async (req, res) => {
  * Cloud Function to set admin claims for a user
  * Requires the caller to be an admin themselves
  */
-exports.setAdminClaim = onRequest(async (req, res) => {
+exports.setAdminClaim = onRequest((req, res) => cors(req, res, async () => {
     console.log('[setAdminClaim] Received request:', {
         method: req.method,
         origin: req.headers.origin || 'No origin'
@@ -801,7 +773,7 @@ exports.setAdminClaim = onRequest(async (req, res) => {
         console.error('[setAdminClaim] Error:', error);
         return res.status(500).json({ error: 'Internal server error' });
     }
-});
+}));
 
 /**
  * Cloud Function to verify admin status of a user
