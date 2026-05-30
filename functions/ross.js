@@ -12,7 +12,8 @@
 const { onRequest } = require('firebase-functions/v2/https');
 const { onSchedule } = require('firebase-functions/v2/scheduler');
 const admin = require('firebase-admin');
-const cors = require('cors')({ origin: true });
+const { corsOptions } = require('./cors-allowlist');
+const cors = require('cors')(corsOptions);
 const { validateTier, userCanActivate, filterTemplatesByTier } = require('./ross-tier');
 const { buildWorkflowRecord, buildTaskFromSubtask } = require('./ross-workflow-builder');
 
