@@ -19,14 +19,14 @@
       }
     },
     "users": {
-      ".read": "auth != null",
+      ".read": "auth != null && auth.token.admin === true",
       "$uid": {
-        ".read": "auth != null",
+        ".read": "auth != null && (auth.uid === $uid || auth.token.admin === true)",
         ".write": "auth != null && (auth.uid === $uid || auth.token.admin === true)"
       }
     },
     "subscriptions": {
-      ".read": "auth != null",
+      ".read": "auth != null && auth.token.admin === true",
       ".indexOn": ["userId", "tier", "status", "expirationDate"],
       "$uid": {
         ".read": "auth != null && (auth.uid === $uid || auth.token.admin === true)",
@@ -484,7 +484,7 @@
       }
     },
     "salesData": {
-      ".read": "auth != null",
+      ".read": "auth != null && auth.token.admin === true",
       ".write": "auth != null",
       ".indexOn": ["userId", "locationId", "uploadedAt"],
       "$salesDataId": {
@@ -493,11 +493,16 @@
       }
     },
     "salesDataIndex": {
-      ".read": "auth != null",
-      ".write": "auth != null"
+      ".read": "auth != null && auth.token.admin === true",
+      ".write": "auth != null",
+      "byLocation": {
+        "$locationId": {
+          ".read": "auth != null && (auth.token.admin === true || root.child('userLocations').child(auth.uid).child($locationId).exists() || root.child('locations').child($locationId).child('ownerId').val() === auth.uid)"
+        }
+      }
     },
     "forecasts": {
-      ".read": "auth != null",
+      ".read": "auth != null && auth.token.admin === true",
       ".write": "auth != null",
       ".indexOn": ["userId", "locationId", "createdAt"],
       "$forecastId": {
@@ -506,8 +511,13 @@
       }
     },
     "forecastIndex": {
-      ".read": "auth != null",
-      ".write": "auth != null"
+      ".read": "auth != null && auth.token.admin === true",
+      ".write": "auth != null",
+      "byLocation": {
+        "$locationId": {
+          ".read": "auth != null && (auth.token.admin === true || root.child('userLocations').child(auth.uid).child($locationId).exists() || root.child('locations').child($locationId).child('ownerId').val() === auth.uid)"
+        }
+      }
     },
     "ross": {
       "templates": {
