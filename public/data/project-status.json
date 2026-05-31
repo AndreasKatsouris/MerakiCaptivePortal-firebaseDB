@@ -404,7 +404,6 @@
   "backlog": {
     "high": [
       "Recurrence-engine gap — nextDueDate doesn't advance when daily workflow goes uncompleted (PR #72 preview catch; needs product input on missed-cycle policy)",
-      "Phase 7 askRoss LLM — separate sprint: rossChat CF + eval harness + cost cap + web-sourced day-zero findings (weather, local events, holidays, suburb demographics)",
       "Food cost open PR — review and merge",
       "Chart.js retirement (soak ended ~2026-05-07; execute removal per CHARTJS_REMOVAL_AUDIT.md — 16 of 23 sites have v2 replacements)"
     ],
