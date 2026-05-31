@@ -279,16 +279,51 @@ comp/support tool.
 
 ---
 
-## 10. Open questions for review
+## 10. Open questions — RESOLVED (2026-05-31, operator delegated "you decide")
 
-1. **Markup value** — what multiplier? (Placeholder 1.3 / 30%.) Decide before the
-   price table is seeded; it lives in config so it's a one-edit change later.
-2. **FX source** — manual `usdToZar` in the price table (updated by script), or a
-   scheduled FX-fetch CF? v1 recommendation: manual, updated when you top up your
-   own Anthropic credit. Revisit in ③.
-3. **`minCents` gate threshold** — block a turn at balance ≤ 0, or keep a small
-   reserve (e.g. ≤ 50c) to avoid mid-conversation cut-offs? Recommend a small
-   reserve; final value set with the ② Agent UX.
-4. **Credit expiry** — Anthropic expires credits after 1 year. Mirror that for
-   owner credits, or not? Recommend **not** in v1 (grant-only beta); revisit in ③.
+1. **Markup value** — **LOCKED at 1.30 (30%).** SA-market starting point covering ZAR
+   volatility buffer + support cost. Lives in `priceTable/markup` config, so it's a
+   one-edit change with forward-only effect (history is rate-snapshotted).
+2. **FX source** — **Manual `usdToZar` in `priceTable/fx`, updated by script** when
+   topping up your own Anthropic credit. PLUS: `billingGetBalance` returns
+   `fxStaleWarning: true` when `priceTable/fx/updatedAt` is > 7 days old, so a
+   silently-stale FX surfaces to the admin UI without a scheduled CF. Revisit a
+   scheduled FX-fetch in ③.
+3. **`minCents` gate threshold** — **`DEFAULT_MIN_BALANCE_CENTS = 50`** (≈ 2–8 typical
+   turns of headroom at current Sonnet-4-6 + 30% rates) to avoid mid-conversation
+   cut-offs. Exported named constant (not a magic number). **Final value is owned by
+   the ② Agent UX spec** — the agent's "low balance" state determines the right
+   reserve; this is the safe default until then.
+4. **Credit expiry** — **None in v1** (grant-only beta, small user set, trivial to
+   re-grant). Mirror Anthropic's 1-year window only when ③ Payment Rail lands and
+   owners top up real money.
+
+## 11. Implementation notes (from #106 review — fold into the build PR)
+
+These are build-phase concerns, captured here so they don't surprise the
+implementation PR. None change the architecture above.
+
+1. **Atomicity — debit then usage-write.** `transaction()` is single-path; the
+   `push()` of the usage record is a second write. To avoid "charged with no audit
+   row" if the second write fails: **pre-generate the push key before the
+   transaction** (`const recordKey = push(ref(db, \`billing/usage/${uid}\`)).key` —
+   local, no I/O), compute `balanceAfterCents` inside the transaction, then write the
+   usage record at the known `recordKey` with retry (idempotent on the same key).
+   Comment the gap + retry contract in `ledger.js`.
+2. **`units` dispatch — throw on unknown service.** The cost formula is token-specific;
+   a future `units: { pages: 3 }` would compute `undefined/1e6 = NaN`. Implement
+   `computeCostCents(service, units, rateSnapshot)` with a `switch` that **throws on an
+   unknown service** rather than silently billing zero. v1 implements only `askRoss`.
+3. **`billingGetUsage` newest-first.** RTDB orders ascending — use
+   `orderByKey() + endBefore(before) + limitToLast(limit)` then reverse
+   (`snap.forEach(c => rows.unshift(...))`). Without this, "newest-first" silently
+   returns oldest-first.
+4. **Rules in the same commit as `ledger.js`.** Ship the `billing/*` `.read:false /
+   .write:false` rules in the **same** commit/deploy as the module — never the module
+   first (avoids the PR #73-class window where Admin SDK writes work but the public
+   surface isn't yet locked).
+5. **Export the 3 CFs** (`billingGrantCredit`, `billingGetBalance`, `billingGetUsage`)
+   from `functions/index.js` — easy to miss in a new-module PR.
+6. **KB catalog drift** — add the 3 CFs to `CLOUD_FUNCTIONS_CATALOG.md` (both copies)
+   in the implementation PR.
 ```
