@@ -222,14 +222,14 @@ const googleReviewsManager = {
                             <div>
                                 <h3 class="card-title mb-2">${escapeHtml(this.state.placeDetails.name)}</h3>
                                 <p class="text-muted mb-1">${escapeHtml(this.state.placeDetails.address)}</p>
-                                <p class="mb-0">${escapeHtml(this.state.placeDetails.phoneNumber) || 'No phone number available'}</p>
+                                <p class="mb-0">${escapeHtml(this.state.placeDetails.phoneNumber || 'No phone number available')}</p>
                             </div>
                             <div class="text-end">
                                 <div class="d-flex align-items-center mb-2">
                                     ${this.generateStarRating(this.state.placeDetails.rating)}
-                                    <span class="ms-2 h4 mb-0">${this.state.placeDetails.rating}</span>
+                                    <span class="ms-2 h4 mb-0">${escapeHtml(this.state.placeDetails.rating)}</span>
                                 </div>
-                                <p class="text-muted mb-0">${this.state.placeDetails.totalRatings} reviews</p>
+                                <p class="text-muted mb-0">${escapeHtml(this.state.placeDetails.totalRatings)} reviews</p>
                             </div>
                         </div>
                     </div>
