@@ -152,7 +152,15 @@ Every current entitlement writer (finding C) is re-pointed through the resolver:
 | `createUserAccount` (CF) | Same |
 | `subscription-service.js` `createSubscription`/`updateSubscription`/`startFreeTrial` (CLIENT) | **Stop writing features/limits from the client.** Call a server CF (`entitlementSetTier`) that updates `tier` and recomputes server-side |
 | `user-subscription.js` upgrade (CLIENT) | Route tier change through the same `entitlementSetTier` CF |
-| `subscriptionStatusManager.js` | Unchanged (writes only status/paymentStatus) — but a status change to `expired` should trigger a recompute |
+| `subscriptionStatusManager.js` | Still writes status/paymentStatus, **and now calls `recomputeEntitlements(uid)` directly** in the same execution immediately after writing `status: 'expired'` (synchronous direct call — not left to the daily cron, so an expired subscription loses premium entitlements at expiry, not up to 24h later). |
+
+> **Concurrency note (low-risk in v1):** `recomputeEntitlements` reads-then-writes
+> without a multi-path transaction, so two simultaneous add-on grants could
+> last-write-wins (the second overwrites the first's contribution). Since v1 grants
+> are **superAdmin-manual** (near-zero concurrency) and the **daily recompute** is a
+> safety net that re-derives the correct merged state from the durable `addOns`
+> sub-tree, last-write-wins is acceptable for v1. Revisit with a transaction if
+> ③ Payment Rail introduces automated concurrent grants.
 
 Then flip `subscriptions/$uid` `.write` to admin/server-only and add a `.validate`
 that rejects client-supplied `features`/`limits`.
@@ -163,7 +171,7 @@ that rejects client-supplied `features`/`limits`.
 
 | CF | Auth | Purpose |
 |----|------|---------|
-| `entitlementSetTier` | userOrAdmin* | Change base tier server-side + recompute (replaces client-side tier writes). *Self-serve tier change keeps its existing product gating; the point is the *write* is server-side. |
+| `entitlementSetTier` | **superAdmin** | Change base tier server-side + recompute (replaces client-side tier writes). **v1 = superAdmin-only** (see §12 Q3 — a `userOrAdmin` tier-change with no payment gate would let any owner self-upgrade to `all-in` for free, re-opening the exact vector this spec closes). Becomes `userOrAdmin` in v2 only when ③ Payment Rail enforces the charge before the call. |
 | `entitlementGrantAddOn` | superAdmin | Attach add-on + recompute (v1 comp bridge; mirrors `billingGrantCredit`) |
 | `entitlementCancelAddOn` | superAdmin | Cancel add-on + recompute |
 | `entitlementGetEffective` | userOrAdmin | Owner reads own effective features/limits/add-ons |
@@ -219,20 +227,25 @@ rail.
 
 ---
 
-## 12. Open questions (with recommendations)
+## 12. Open questions — RESOLVED (2026-05-31, operator delegated "you decide")
 
-1. **Limit merge semantics** — additive + `-1` sentinel for unlimited. (Recommended;
-   confirm.)
-2. **Add-on expiry without payment rail** — daily scheduled recompute (reuse
-   `rossScheduledReminder` cron). (Recommended.)
-3. **`entitlementSetTier` self-serve scope** — does an owner change their own tier in
-   v1, or is even tier-change superAdmin-only until ③ checkout exists? Recommend
-   superAdmin-only in v1 (no self-serve upgrade path without payment anyway).
-4. **`mapToBaseTier` table** — explicit map of the four legacy tiers →
-   {free, all-in} until ④b. Needs the product call on which legacy tiers count as
-   "all-in" (likely professional + enterprise → all-in; free + starter → free).
-   Confirm with operator.
-5. **Backfill** — existing `subscriptions/{uid}` records have client-written
-   (possibly drifted) features/limits. A one-off `recomputeEntitlements` sweep over
-   all users re-materializes them correctly post-deploy. Idempotent; safe to re-run.
-```
+1. **Limit merge semantics** — **LOCKED: additive + `-1` sentinel for unlimited**,
+   exported as `UNLIMITED_SENTINEL = -1` in `functions/entitlements/constants.js`
+   (named constant, not magic-number comparisons).
+2. **Add-on expiry without payment rail** — **LOCKED: daily scheduled recompute**
+   (reuse the `rossScheduledReminder` cron pattern) expires time-bound add-ons.
+3. **`entitlementSetTier` self-serve scope** — **LOCKED: superAdmin-only in v1.**
+   A `userOrAdmin` tier-change with no payment gate would let any owner self-upgrade
+   to `all-in` for free — the same privilege-escalation class this spec closes. §7
+   updated to `superAdmin`. Becomes `userOrAdmin` in v2 when ③ Payment Rail enforces
+   the charge before the call.
+4. **`mapToBaseTier` table** — **PROPOSED, pending operator confirm:**
+   `free → free`, `starter → free`, `professional → all-in`, `enterprise → all-in`.
+   (This is the one decision that needs a product call before the build, because it
+   determines what existing paying users get post-collapse. Flagged for operator.)
+5. **Backfill** — **LOCKED:** a one-off `recomputeEntitlements` sweep over all users
+   re-materializes correct entitlements post-deploy (idempotent; safe to re-run),
+   correcting any client-written drift in existing records.
+
+> **Intentional, not a bug:** `addOns/{addOnId}/addOnId` stores the key inside the
+> record (standard RTDB convenience to survive snapshot key-loss).
