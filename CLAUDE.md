@@ -153,6 +153,7 @@ Every non-trivial change follows these steps in order. No deviation without expl
     - `KNOWLEDGE BASE/development/LESSONS.md` — any non-obvious gotchas hit during this work?
     - `KNOWLEDGE BASE/development/SCORECARD.md` — score this session on the rubric, summarise out loud
     - `KNOWLEDGE BASE/PROJECT_BACKLOG.md` — mark sprint tasks done, move feature to Recently Completed, log any new bugs
+    - **`public/data/project-status.json` — MUST be updated in the SAME commit/PR as any `PROJECT_BACKLOG.md` body change.** This file powers the `/project-status.html` dashboard and is a *parallel copy* of the backlog's machine-readable data — it drifts silently if you only touch the markdown (it has, twice). Keep these fields in lockstep with the backlog: `lastUpdated` (today), `lastUpdatedNote`, `recentlyCompleted` (every PR you moved to Recently Completed — newest first), `bugs` (mirror the Bug Triage Queue's operational rows; security-audit follow-ups live in the dashboard's `security` panel, not here), and `sprint`/`phases`/`tasks` if the sprint state changed. `progress` is derived in `service.js` — don't hand-set it. **Verify before commit:** `node -e "const d=require('./public/data/project-status.json'); console.log('recent PRs', d.recentlyCompleted.map(r=>r.pr), '| bugs', d.bugs.length)"` and confirm those match what you just wrote to the backlog. (A generator to auto-derive this from the markdown is backlog item "Project status auto-derive from PROJECT_BACKLOG.md" — until then this is manual and easy to forget, hence this explicit rule.)
 
     Report format (always shown to user after a PR/merge): a brief bullet list covering score, top lesson, and any patterns promoted.
 
@@ -195,5 +196,6 @@ Read at session start, update at session end.
 | `KNOWLEDGE BASE/development/SELF_OPTIMIZATION.md` | Start (read) + end (update) | Workflow patterns, promoted after 3x validation |
 | `KNOWLEDGE BASE/development/LESSONS.md` | End (if gotchas found) | Rolling log of non-obvious discoveries (max 20) |
 | `KNOWLEDGE BASE/development/SCORECARD.md` | End | Self-evaluation against fixed rubric (max 10 entries) |
+| `public/data/project-status.json` | End (**same PR** as any backlog body change) | Parallel machine-readable copy powering `/project-status.html` — keep `recentlyCompleted` / `bugs` / `lastUpdated` in lockstep with the backlog (see Step 11). Drifts silently if skipped. |
 
-**Session-end backlog update:** mark completed sprint tasks `[x]`, move finished features to Recently Completed, log newly discovered bugs in Bug Triage Queue, clear the In Progress row if the branch merged.
+**Session-end backlog update:** mark completed sprint tasks `[x]`, move finished features to Recently Completed, log newly discovered bugs in Bug Triage Queue, clear the In Progress row if the branch merged — **and mirror the same changes into `public/data/project-status.json` in the same commit** (Step 11).
