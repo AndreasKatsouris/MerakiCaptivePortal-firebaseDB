@@ -1,6 +1,6 @@
 {
   "lastUpdated": "2026-05-31",
-  "lastUpdatedNote": "Phase 7 (askRoss) design phase complete: decomposed into a 4-component program (ledger → entitlements/④a → agent → payment rail); specs ① ledger + ④a entitlements MERGED (#106/#107/#108). Logged a High bug — entitlement self-grant (clients can write their own subscriptions/{uid}/features+limits, database.rules.json:33), fix scoped into the ④a build. Next: ② Agent brainstorm. ——— Prior: Synced to PROJECT_BACKLOG.md: recentlyCompleted now includes the OWASP remediation (14 PRs #89–#102), bug triage queue mirrors the backlog's operational items (OWASP follow-ups live in the new Security panel), and the Security panel summarises the audit. ——— Prior: added the Security panel; before that, cleanup-mode evening (PR #86 + #87).",
+  "lastUpdatedNote": "Phase 7 (askRoss) DESIGN PHASE COMPLETE: all 3 near-term specs MERGED — ① ledger (#106/#108), ④a entitlements (#107), ② askRoss Agent (#110). Logged a High bug — entitlement self-grant (database.rules.json:33), fix scoped into the ④a build. Agent §3.1 measurement-gates submitResponse (no fabricated compliance records). Next: /plan → build in order ① → ④a → ②. ——— Prior: Synced to PROJECT_BACKLOG.md: recentlyCompleted now includes the OWASP remediation (14 PRs #89–#102), bug triage queue mirrors the backlog's operational items (OWASP follow-ups live in the new Security panel), and the Security panel summarises the audit. ——— Prior: added the Security panel; before that, cleanup-mode evening (PR #86 + #87).",
   "sprint": {
     "goal": "Effective implementation of Hi-Fi v2, with ROSS as the central post-login surface for every subscribed user",
     "started": "2026-04-30",
@@ -213,8 +213,8 @@
   "inProgress": [],
   "recentlyCompleted": [
     {
-      "title": "Phase 7 askRoss — design phase (① ledger + ④a entitlements specs). Decomposed Phase 7 into a 4-component program (ledger → entitlements → agent → payment rail), each its own spec. Shipped 2 design docs: prepaid-ZAR Credit Ledger (modelled on Anthropic's prepaid wallet) + Entitlement resolver/add-on layer. The ④a design audit (Explore agent over the live subscription module) caught a live entitlement self-grant vuln (client-writable subscriptions/{uid}/features+limits, logged High) — structural fix scoped into the ④a build. Build order ① → ④a → ②; ② Agent brainstorm next.",
-      "pr": "106, 107, 108",
+      "title": "Phase 7 askRoss — design phase COMPLETE (all 3 near-term specs). Decomposed Phase 7 into a 4-component program (ledger → entitlements → agent → payment rail), each its own spec. Shipped 3 design docs: ① prepaid-ZAR Credit Ledger (modelled on Anthropic's prepaid wallet); ④a Entitlement resolver/add-on layer; ② askRoss Agent (reactive-v1/proactive-ready tool-use agent, bands A+B, graduated-risk policy engine + kill switch + audit, Sonnet 4.6/streaming SSE/prompt caching, ledger+entitlement pre-flight gates, 20-prompt eval harness). The ④a design audit caught a live entitlement self-grant vuln (logged High; fix scoped into the ④a build); the ② review caught a compliance-fabrication risk → spec §3.1 measurement-gates submitResponse. Next: /plan → build in order ① → ④a → ②.",
+      "pr": "106, 107, 108, 110",
       "mergedAt": "2026-05-31"
     },
     {
