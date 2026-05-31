@@ -19,10 +19,20 @@ const ledger = require('./ledger');
 const { LEDGER_CURRENCY } = require('./constants');
 const { verifyAuthToken, verifySuperAdmin } = require('./auth');
 
+/** A 400 validation error carrying an explicit status for the mapper. */
+function badRequest(message) {
+    const err = new Error(message);
+    err.statusCode = 400;
+    return err;
+}
+
+/**
+ * Map an error to an HTTP status. Prefers an explicit `err.statusCode` (auth
+ * helpers throw 403, validation throws 400); falls back to 500 for anything
+ * unexpected. No fragile message-substring matching.
+ */
 function statusFor(err) {
-    const m = (err && err.message) || '';
-    if (m.includes('Admin') || m.includes('authorization') || m.includes('token') || m.includes('access')) return 403;
-    if (m.includes('Invalid request') || m.includes('must be')) return 400;
+    if (err && Number.isInteger(err.statusCode)) return err.statusCode;
     return 500;
 }
 
@@ -38,9 +48,9 @@ exports.billingGrantCredit = onRequest(async (req, res) => cors(req, res, async 
 
         const data = req.body.data || req.body || {};
         const { uid, amountCents, reason } = data;
-        if (!uid || typeof uid !== 'string') throw new Error('Invalid request: uid is required');
+        if (!uid || typeof uid !== 'string') throw badRequest('Invalid request: uid is required');
         if (!Number.isInteger(amountCents) || amountCents <= 0) {
-            throw new Error('Invalid request: amountCents must be a positive integer');
+            throw badRequest('Invalid request: amountCents must be a positive integer');
         }
 
         const { balanceAfterCents } = await ledger.grantCredit({ uid, amountCents, grantedBy, reason: reason || null });

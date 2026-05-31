@@ -48,13 +48,13 @@ async function seedPriceTable() {
         models: CONFIG.models,
     };
     await admin.database().ref('billing/priceTable').set(priceTable);
-    console.log('✅ Seeded billing/priceTable:');
+    console.log('[OK] Seeded billing/priceTable:');
     console.log(JSON.stringify(priceTable, null, 2));
 }
 
 seedPriceTable()
     .then(() => process.exit(0))
     .catch((err) => {
-        console.error('❌ Seed failed:', err);
+        console.error('[FAIL] Seed failed:', err);
         process.exit(1);
     });

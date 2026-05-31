@@ -10,15 +10,26 @@
 
 const admin = require('firebase-admin');
 
+/** Auth/authorization error carrying an explicit HTTP status (403) for the CF mapper. */
+function authError(message) {
+    const err = new Error(message);
+    err.statusCode = 403;
+    return err;
+}
+
 /** Decode the Bearer ID token from the request. Throws on a missing/invalid header. */
 async function verifyAuthToken(req) {
     const authHeader = req.headers.authorization;
     if (!authHeader || !authHeader.startsWith('Bearer ')) {
-        throw new Error('No valid authorization header');
+        throw authError('No valid authorization header');
     }
     const idToken = authHeader.split('Bearer ')[1];
-    if (!idToken) throw new Error('No token in authorization header');
-    return admin.auth().verifyIdToken(idToken);
+    if (!idToken) throw authError('No token in authorization header');
+    try {
+        return await admin.auth().verifyIdToken(idToken);
+    } catch (_err) {
+        throw authError('Invalid or expired token');
+    }
 }
 
 /** Require Super Admin (`admins/{uid}.superAdmin === true`). Returns the uid. */
@@ -27,7 +38,7 @@ async function verifySuperAdmin(decodedToken) {
     const snap = await admin.database().ref(`admins/${uid}`).once('value');
     const adminData = snap.val();
     if (!adminData || !adminData.superAdmin) {
-        throw new Error('Super Admin access required');
+        throw authError('Super Admin access required');
     }
     return uid;
 }

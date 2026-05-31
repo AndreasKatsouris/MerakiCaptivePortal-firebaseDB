@@ -116,6 +116,14 @@ describe('recordUsageAndDebit', () => {
         expect(await ledger.getBalanceCents('u1')).toBe(1000); // untouched
     });
 
+    it('throws on a missing/unknown model (no price-table entry) and does NOT debit', async () => {
+        await ledger.grantCredit({ uid: 'u1', amountCents: 1000, grantedBy: 'a', reason: 'seed' });
+        await expect(ledger.recordUsageAndDebit({
+            uid: 'u1', service: SERVICES.ASK_ROSS, model: 'claude-unknown-9', units: { inputTokens: 1_000_000 }, meta: {},
+        })).rejects.toThrow(/no price-table entry for model/);
+        expect(await ledger.getBalanceCents('u1')).toBe(1000); // balance untouched (NaN guard before transaction)
+    });
+
     it('allows a single overspend (balance can go negative; the next gate stops further spend)', async () => {
         await ledger.grantCredit({ uid: 'u1', amountCents: 100, grantedBy: 'a', reason: 'seed' });
         const res = await ledger.recordUsageAndDebit({

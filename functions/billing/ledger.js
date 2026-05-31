@@ -149,12 +149,20 @@ async function recordUsageAndDebit({ uid, service, model, units, meta = {} }) {
 
     // 2. Snapshot rates + compute cost (throws on unknown service → no debit).
     const rateSnapshot = await loadRateSnapshot(model);
+    // Guard a missing/unknown model BEFORE the transaction: an absent price-table
+    // entry leaves usdPerMtok* undefined → wholesaleUsd = NaN → a NaN debit would
+    // corrupt the balance. Throw first so the balance is never touched.
+    if (rateSnapshot.usdPerMtokInput == null || rateSnapshot.usdPerMtokOutput == null) {
+        throw new Error(`recordUsageAndDebit: no price-table entry for model '${model}'`);
+    }
     const { costCents, wholesaleUsdCents } = computeCostCents(service, units, rateSnapshot);
 
     // 3. Atomic debit.
     const balanceRef = getDb().ref(`${creditsPath(uid)}/balanceCents`);
     const txn = await balanceRef.transaction((current) => (current || 0) - costCents);
     const balanceAfterCents = txn.snapshot.val();
+    // Best-effort metadata stamp — NOT part of the atomic guarantee (the debit/
+    // credit already committed in the transaction above).
     await getDb().ref(creditsPath(uid)).update({ currency: LEDGER_CURRENCY, updatedAt: Date.now() });
 
     // 4. Immutable usage record at the pre-generated key, retry-safe.
@@ -183,6 +191,8 @@ async function grantCredit({ uid, amountCents, grantedBy, reason }) {
     const balanceRef = getDb().ref(`${creditsPath(uid)}/balanceCents`);
     const txn = await balanceRef.transaction((current) => (current || 0) + amountCents);
     const balanceAfterCents = txn.snapshot.val();
+    // Best-effort metadata stamp — NOT part of the atomic guarantee (the debit/
+    // credit already committed in the transaction above).
     await getDb().ref(creditsPath(uid)).update({ currency: LEDGER_CURRENCY, updatedAt: Date.now() });
 
     const grantKey = getDb().ref(grantsPath(uid)).push().key;
