@@ -40,7 +40,15 @@ destructive/config actions stay the human's — deferred to v2.
 ## 2. Where it runs & the turn loop
 
 A new **`rossChat`** Cloud Function — `onRequest` (for SSE streaming),
-`verifyUserOrAdmin`, Anthropic key via `defineSecret('ANTHROPIC_API_KEY')`.
+Anthropic key via `defineSecret('ANTHROPIC_API_KEY')`.
+
+> **Auth-helper build dependency (review #4):** the existing `verifyUserOrAdmin`
+> (`ross.js:66-84`) admits non-admins only on `features.rossBasic ||
+> features.rossAdvanced`. ④a's resolver writes `features.rossAgent` — so a
+> Ross-entitled user lacking the legacy flags would be **denied at the auth step
+> before reaching pre-flight gate (c)**. `rossChat` must use an auth helper that
+> recognises `rossAgent` (extend `verifyUserOrAdmin` or add `verifyRossAgentAccess`).
+> Build slice 1/2 dependency.
 
 ```
 rossChat(req) — one turn:
@@ -51,6 +59,10 @@ rossChat(req) — one turn:
        c. effectiveEntitlements(uid).features.rossAgent === true   (entitlement gate)
        d. ledger.checkBalance(uid, DEFAULT_MIN_BALANCE_CENTS) === true
      → on fail: stream a friendly terminal state (disabled / no-credit / not-entitled)
+     → ADMIN SHORT-CIRCUIT (review #5): if isSuperAdmin, skip (c) entitlement +
+       (d) balance so Sparks staff can test without comping themselves credit.
+       Non-super admins and owners pass all four gates. Make this explicit so the
+       implementer neither locks admins out nor adds an unauthenticated bypass.
   2. BUILD MESSAGES:
        [ cached system prefix ] [ cached owner-context ] [ history ] [ new message ]
   3. AGENT LOOP (Sonnet 4.6, streaming):
@@ -77,6 +89,17 @@ click POSTs back to `rossChat` with `{ resumeTurnId, decision }`, which replays
 the conversation + the resolved tool_result and continues. (Stateless-friendly:
 the agent never holds an open socket waiting for a human.)
 
+**Resume safety (review #2 + #3) — RTDB has no native TTL, so enforce both in code:**
+1. **Expiry check:** the resume handler reads `agentPending/{uid}/{resumeTurnId}.expiresAt`
+   and **rejects with 410 Gone if `now > expiresAt`** before executing the tool —
+   otherwise a pending action is valid indefinitely and replayable by anyone holding
+   the `turnId`.
+2. **One-time use:** on resume, **atomically consume** the pending node
+   (`update({ \`ross/agentPending/${uid}/${resumeTurnId}\`: null })` as a guarded
+   check-and-delete) *before* executing — so a double-click / replay can't fire the
+   tool twice.
+Both are explicit acceptance criteria on build slice 4.
+
 ---
 
 ## 3. Tool catalog (v1 — bands A + B)
@@ -97,7 +120,7 @@ underlying CF logic with the owner's uid; no cross-tenant access.
 | `getGuestsSummary` | guest module read | auto | aggregate counts, no PII dump |
 | `getSalesSummary` | sales-forecasting read | auto | |
 | `startRun` | `rossCreateRun` | auto | idempotent |
-| `submitResponse` | `rossSubmitResponse` | auto | honours 422 requiredNote |
+| `submitResponse` | `rossSubmitResponse` | auto* | *measurement-gated — see §3.1; honours 422 requiredNote |
 | `snoozeCard` | `rossV2Snooze` | auto | |
 | `advanceDueDate` | (recurrence advance) | auto | the core "paperwork" — rolls nextDueDate |
 | `activateTemplate` | `rossActivateWorkflow` | **confirm** | entitlement-gated on `maxWorkflows` |
@@ -105,11 +128,33 @@ underlying CF logic with the owner's uid; no cross-tenant access.
 | `editWorkflow` | `rossUpdateWorkflow` | **confirm** | changes the playbook |
 | `pauseWorkflow` | `rossUpdateWorkflow` (status) | **confirm** | |
 
-> **Tier rationale:** routine *execution* (start/submit/snooze/advance) is auto —
+> **Tier rationale:** routine *execution* (start/snooze/advance) is auto —
 > it's the drudgery Ross exists to absorb, and each is reversible or low-stakes.
 > Anything that *authors or changes the playbook itself* (create/edit/activate/pause)
 > is confirm — it's the owner's policy. Bands C/D aren't in the registry at all in
 > v1 (a tool that doesn't exist can't be called).
+
+### 3.1 `submitResponse` is measurement-gated — the agent must never fabricate a record (review #1)
+
+**The hard rule:** Ross has no sensors. It cannot measure a walk-in fridge temperature,
+verify a fire extinguisher's date, or count a stock level. Auto-submitting a *value*
+for such a task would **fabricate a regulatory-compliance record** — a food-safety /
+liability risk, and a direct violation of "amplify, not replace." (The 422
+`requiredNote` net stops an *incomplete* submission; it does **not** stop a *fabricated
+primary value*.)
+
+So `submitResponse` auto-execution is allowed **only** when the task's `inputType` is a
+non-measurement type the agent can legitimately satisfy from the conversation —
+`text`, `checkbox`, `signature` — **and** `inputConfig.requiredNote !== true`.
+
+For **any measurement / attestation type** (`temperature`, `number`, `rating`,
+`yes_no`, `photo`, or any task with `requiredNote === true`) the agent **must not
+submit a value**. Instead it escalates: surface the task to the owner ("I've started
+the Compliance Sweep — the fridge temp needs your reading") and let them enter the real
+measurement. (Implementation: the `submitResponse` adapter inspects the target task's
+`inputType`/`inputConfig` and refuses measurement types server-side — defence that
+doesn't depend on the model behaving; codified in the eval harness §6 as a hard
+assertion.)
 
 ---
 
@@ -130,7 +175,10 @@ effectivePolicy(tool, owner):
 - **Global kill switch** `ross/config/agentKillSwitch` — superAdmin, halts all agents.
 - **Per-owner enable** `ross/agentConfig/{uid}/enabled`.
 - **Audit** every executed tool → `ross/agentAudit/{uid}/{turnId}/{i}`
-  `{ tool, args, result, tier, autoExecuted|confirmedBy, at }`.
+  `{ tool, args, result, tier, autoExecuted|confirmedBy, at }`. For tools with **no
+  native undo** (notably `advanceDueDate`), the audit entry also records the
+  **prior value** (`prev: { nextDueDate }`) so an admin can restore it from the log
+  if Ross mis-advances a deadline (review #9).
 
 ---
 
@@ -178,8 +226,9 @@ alongside; mocked tool results copied verbatim from each CF's `res.json(...)`
 - Threads at `ross/agentChats/{uid}/{threadId}/turns/{turnId}` (owner-scoped,
   server-only writes; owner reads own via a CF).
 - **Bounded context:** include the last N turns up to a token budget (default ~last
-  10 turns / ~4k tokens) in the suffix; older turns summarised or dropped. Keeps the
-  uncached tail small (cost) and within window.
+  10 turns / ~4k tokens) in the suffix; older turns **dropped** (oldest-first). Keeps
+  the uncached tail small (cost) and within window. (Summarising older turns needs a
+  second LLM call — **v2 enhancement**, not v1; review #7.)
 
 ---
 
@@ -215,7 +264,12 @@ on `/ross.html`, replacing the scripted `askRoss()` stub in `ross-service.js`.
 1. `llm-client.js` (Anthropic SDK + prompt caching + streaming) — isolated, mockable.
 2. Tool registry + adapters (bands A+B) + policy engine + audit.
 3. `rossChat` CF: pre-flight gates → agent loop → ledger debit → SSE.
-4. Confirm-flow (pending action + resume).
+   **+ CORS** via the shared `cors-allowlist.js` (PR #94 pattern — `onRequest` SSE is
+   browser-blocked without it; review #6). **+ update `CLOUD_FUNCTIONS_CATALOG.md`**
+   (both copies) — `rossChat` is the project's first AI-inference CF (review #8).
+   **+ the `rossAgent`-aware auth helper** (review #4).
+4. Confirm-flow (pending action + resume) — **incl. `expiresAt` 410 check + atomic
+   one-time-use consume** (review #2/#3).
 5. Client: Ask Ross surface (SSE consumer, confirm-cards, terminal states).
 6. Eval harness (20-prompt golden set, CI).
 7. RTDB rules for the new `ross/agent*` nodes.
