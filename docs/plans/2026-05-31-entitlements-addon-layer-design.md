@@ -239,10 +239,14 @@ rail.
    to `all-in` for free — the same privilege-escalation class this spec closes. §7
    updated to `superAdmin`. Becomes `userOrAdmin` in v2 when ③ Payment Rail enforces
    the charge before the call.
-4. **`mapToBaseTier` table** — **PROPOSED, pending operator confirm:**
-   `free → free`, `starter → free`, `professional → all-in`, `enterprise → all-in`.
-   (This is the one decision that needs a product call before the build, because it
-   determines what existing paying users get post-collapse. Flagged for operator.)
+4. **`mapToBaseTier` table** — **RESOLVED: operationally moot — there are no paying
+   customers** (operator confirmed 2026-05-31). No live entitlement records carry
+   revenue, so the mapping carries no migration risk. Default: `free → free`,
+   `starter → free`, `professional → all-in`, `enterprise → all-in` (sane fallback for
+   any stray test records); the backfill recompute (#5) re-materializes everyone
+   correctly regardless. **This also de-risks ④b** — the future 4→2 collapse is no
+   longer a "carefully migrate live paying records" job; it's effectively a config
+   change + a recompute sweep over test data.
 5. **Backfill** — **LOCKED:** a one-off `recomputeEntitlements` sweep over all users
    re-materializes correct entitlements post-deploy (idempotent; safe to re-run),
    correcting any client-written drift in existing records.
