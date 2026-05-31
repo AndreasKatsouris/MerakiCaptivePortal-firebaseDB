@@ -1,6 +1,6 @@
 {
-  "lastUpdated": "2026-05-20",
-  "lastUpdatedNote": "Cleanup-mode evening — PR #86 + #87 merged. PR #86: fix Missed/Overdue counter consistency operator-reported on PR #72 — server's locData.status is 'active' forever (never updated to 'overdue'), so client-side `w.status === 'overdue'` filter always returned 0. New `public/js/modules/ross/v2/workflow-status.js` shared helper (MISSED_DAYS_THRESHOLD + computeDaysLate + isOverdue + isMissed) consumed by both stores AND detectors.js — single source of truth across three surfaces. RossPlaybook/RossActivity stat tiles use dynamic Missed/Overdue label mirroring the home card. 25 new vitest cases including a real-server-shape contract test. PR #87: catalog all 22 ROSS CFs + allowed-fields per mutator in ROSS.md (canonical), with 8-category summary + Source File Map updates in CLOUD_FUNCTIONS_CATALOG.md. Field-verify rule footnote cites PRs #28 / #72 / #86 as negative-confirmations. Automated review caught a forward-reference between in-flight PRs — fixed via 'ships with PR #86' qualifier, then past tense after #86 merged + rebase. Earlier same day: PRs #81 / #82 / #83 / #84 / #85.",
+  "lastUpdated": "2026-05-31",
+  "lastUpdatedNote": "Added a Security panel to this dashboard summarising the OWASP audit remediation (14 PRs #89–#102: all Criticals + Highs, most Mediums/Lows). Panel reads the new `security` key in this file. ——— Prior: Cleanup-mode evening — PR #86 + #87 merged. PR #86: fix Missed/Overdue counter consistency operator-reported on PR #72 — server's locData.status is 'active' forever (never updated to 'overdue'), so client-side `w.status === 'overdue'` filter always returned 0. New `public/js/modules/ross/v2/workflow-status.js` shared helper (MISSED_DAYS_THRESHOLD + computeDaysLate + isOverdue + isMissed) consumed by both stores AND detectors.js — single source of truth across three surfaces. RossPlaybook/RossActivity stat tiles use dynamic Missed/Overdue label mirroring the home card. 25 new vitest cases including a real-server-shape contract test. PR #87: catalog all 22 ROSS CFs + allowed-fields per mutator in ROSS.md (canonical), with 8-category summary + Source File Map updates in CLOUD_FUNCTIONS_CATALOG.md. Field-verify rule footnote cites PRs #28 / #72 / #86 as negative-confirmations. Automated review caught a forward-reference between in-flight PRs — fixed via 'ships with PR #86' qualifier, then past tense after #86 merged + rebase. Earlier same day: PRs #81 / #82 / #83 / #84 / #85.",
   "sprint": {
     "goal": "Effective implementation of Hi-Fi v2, with ROSS as the central post-login surface for every subscribed user",
     "started": "2026-04-30",
@@ -135,6 +135,32 @@
       "Group overview v2 → v1 promotion (likely dropped — see Phase 5 PR 5)",
       "Onboarding flow improvements (lower-priority items in spec — surface store.error, lower FINDING_MIN_LIFT, parallelise detectBestWeekday reads, un-hardcode 3-of-5 step counter)",
       "Edit-mode multi-location pill render in workflow editor"
+    ]
+  },
+  "security": {
+    "audit": "OWASP Top 10 (2021)",
+    "auditedAt": "2026-05-30",
+    "summary": "Operator-supplied audit remediated across 14 PRs (#89–#102). All Criticals and Highs closed; most Mediums/Lows done. Remaining items are scoped follow-ups.",
+    "severities": [
+      { "level": "Critical", "resolved": 5, "total": 5 },
+      { "level": "High", "resolved": 10, "total": 10 },
+      { "level": "Medium", "resolved": 6, "total": 10 },
+      { "level": "Low", "resolved": 4, "total": 6 }
+    ],
+    "remaining": [
+      "H-2 Bucket C — guests/queue/receipts root-read refactor (needs architecture decision)",
+      "M-3 — Subresource Integrity (SRI) on CDN scripts across all HTML pages",
+      "M-5 / M-7 / L-3 — Bucket-C-class root reads (consumer mapping first)",
+      "M-9 — admin MFA enforcement",
+      "L-4 — minimum password length 6 → 8",
+      "Content-Security-Policy header (per-page source audit)",
+      "firebase-admin@13 upgrade (clears last 8 moderate npm advisories)"
+    ],
+    "deployPrereqs": [
+      "firebase functions:secrets:set MERAKI_SHARED_SECRET + INITIAL_ADMIN_SETUP_SECRET",
+      "Rotate the leaked Meraki + admin secrets and update the Meraki dashboard",
+      "GCP console: add an HTTP-referrer restriction to the Google Places API key",
+      "Run emulator/preview smoke on the rules changes (#96 / #100 / #102)"
     ]
   }
 }

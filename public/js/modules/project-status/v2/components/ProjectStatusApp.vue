@@ -41,6 +41,10 @@ const backlogList = (key) => {
   const v = data.value?.backlog?.[key]
   return Array.isArray(v) ? v : []
 }
+
+const security = computed(() => data.value?.security)
+const sevTone = (s) => (s.total > 0 && s.resolved >= s.total) ? 'good' : 'partial'
+const sevPct = (s) => s.total > 0 ? Math.round((s.resolved / s.total) * 100) : 0
 </script>
 
 <template>
@@ -139,6 +143,52 @@ const backlogList = (key) => {
             </div>
           </li>
         </ol>
+      </section>
+
+      <!-- Security posture -->
+      <section class="ps__panel" v-if="security">
+        <div class="ps__panel-head">
+          <h3 class="ps__panel-title">Security</h3>
+          <div class="hf-mono ps__panel-sub">
+            {{ security.audit }}<template v-if="security.auditedAt"> · audited {{ formatDate(security.auditedAt) }}</template>
+          </div>
+        </div>
+        <p class="ps__sec-summary" v-if="security.summary">{{ security.summary }}</p>
+
+        <div class="ps__sec-sevs">
+          <div
+            v-for="s in security.severities"
+            :key="s.level"
+            class="ps__sev"
+            :data-tone="sevTone(s)"
+          >
+            <div class="hf-eyebrow">{{ s.level }}</div>
+            <div class="hf-num ps__sev-val">
+              {{ s.resolved }}<span class="ps__sev-of">/{{ s.total }}</span>
+            </div>
+            <div class="ps__sev-bar">
+              <div class="ps__sev-fill" :style="{ width: `${sevPct(s)}%` }" />
+            </div>
+            <div class="hf-mono ps__sev-label">resolved</div>
+          </div>
+        </div>
+
+        <div class="ps__sec-cols">
+          <div class="ps__sec-col">
+            <div class="hf-eyebrow">Remaining</div>
+            <ul>
+              <li v-for="(item, i) in security.remaining" :key="i">{{ item }}</li>
+              <li v-if="!security.remaining?.length" class="ps__empty">All clear</li>
+            </ul>
+          </div>
+          <div class="ps__sec-col ps__sec-col--deploy">
+            <div class="hf-eyebrow">Before deploy</div>
+            <ul>
+              <li v-for="(item, i) in security.deployPrereqs" :key="i">{{ item }}</li>
+              <li v-if="!security.deployPrereqs?.length" class="ps__empty">None pending</li>
+            </ul>
+          </div>
+        </div>
       </section>
 
       <!-- Two columns: tasks + in-progress / recent -->
@@ -497,6 +547,56 @@ const backlogList = (key) => {
   border-bottom: 1px solid var(--hf-line);
 }
 .ps__backlog-col li:last-child { border-bottom: none; }
+
+/* Security */
+.ps__sec-summary {
+  margin: 14px 0 0;
+  font-size: 13px;
+  color: var(--hf-ink-2);
+  max-width: 820px;
+}
+.ps__sec-sevs {
+  display: grid; grid-template-columns: repeat(4, 1fr);
+  gap: 14px; margin-top: 16px;
+}
+@media (max-width: 960px) {
+  .ps__sec-sevs { grid-template-columns: repeat(2, 1fr); }
+}
+.ps__sev {
+  padding: 12px 14px;
+  border: 1px solid var(--hf-line-2);
+  border-radius: var(--hf-radius-md);
+  background: var(--hf-bg);
+}
+.ps__sev-val { font-size: 26px; margin: 4px 0 8px; line-height: 1; }
+.ps__sev-of { font-size: 14px; color: var(--hf-muted); margin-left: 2px; }
+.ps__sev-bar {
+  height: 4px; background: var(--hf-line);
+  border-radius: 2px; overflow: hidden;
+}
+.ps__sev-fill {
+  height: 100%; background: var(--hf-good);
+  transition: width 300ms var(--hf-ease);
+}
+.ps__sev[data-tone="partial"] .ps__sev-fill { background: var(--hf-warn); }
+.ps__sev-label {
+  font-size: 10px; color: var(--hf-muted);
+  margin-top: 6px; text-transform: uppercase; letter-spacing: 0.08em;
+}
+.ps__sec-cols {
+  display: grid; grid-template-columns: 1fr 1fr;
+  gap: 14px; margin-top: 18px;
+}
+@media (max-width: 960px) {
+  .ps__sec-cols { grid-template-columns: 1fr; }
+}
+.ps__sec-col ul { list-style: none; margin: 8px 0 0; padding: 0; }
+.ps__sec-col li {
+  font-size: 13px; color: var(--hf-ink);
+  padding: 7px 0; border-bottom: 1px solid var(--hf-line);
+}
+.ps__sec-col li:last-child { border-bottom: none; }
+.ps__sec-col--deploy li { color: var(--hf-ink-2); }
 
 /* Bugs */
 .ps__bugs { list-style: none; margin: 14px 0 0; padding: 0; }
