@@ -3,6 +3,24 @@
 import { getConfig, REQUIRED_FIELDS } from './googleAPIclient.js';
 import { auth, onAuthStateChanged } from './config/firebase-config.js';
 
+// XSS guards — review data (name/text/response) and place details come from
+// the Google Places API / RTDB and are attacker-influenceable, so every value
+// interpolated into innerHTML must be escaped.
+function escapeHtml(value) {
+    if (value === null || value === undefined) return '';
+    return String(value)
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#39;');
+}
+// Only allow http(s) URLs in href/src — blocks javascript:/data: URIs.
+function safeUrl(value) {
+    const url = String(value || '');
+    return /^https?:\/\//i.test(url) ? escapeHtml(url) : '';
+}
+
 const googleReviewsManager = {
     // State management
     state: {
@@ -202,16 +220,16 @@ const googleReviewsManager = {
                     <div class="card-body">
                         <div class="d-flex justify-content-between align-items-start">
                             <div>
-                                <h3 class="card-title mb-2">${this.state.placeDetails.name}</h3>
-                                <p class="text-muted mb-1">${this.state.placeDetails.address}</p>
-                                <p class="mb-0">${this.state.placeDetails.phoneNumber || 'No phone number available'}</p>
+                                <h3 class="card-title mb-2">${escapeHtml(this.state.placeDetails.name)}</h3>
+                                <p class="text-muted mb-1">${escapeHtml(this.state.placeDetails.address)}</p>
+                                <p class="mb-0">${escapeHtml(this.state.placeDetails.phoneNumber || 'No phone number available')}</p>
                             </div>
                             <div class="text-end">
                                 <div class="d-flex align-items-center mb-2">
                                     ${this.generateStarRating(this.state.placeDetails.rating)}
-                                    <span class="ms-2 h4 mb-0">${this.state.placeDetails.rating}</span>
+                                    <span class="ms-2 h4 mb-0">${escapeHtml(this.state.placeDetails.rating)}</span>
                                 </div>
-                                <p class="text-muted mb-0">${this.state.placeDetails.totalRatings} reviews</p>
+                                <p class="text-muted mb-0">${escapeHtml(this.state.placeDetails.totalRatings)} reviews</p>
                             </div>
                         </div>
                     </div>
@@ -251,35 +269,35 @@ const googleReviewsManager = {
                 <td>
                     <div class="d-flex align-items-center">
                         <div class="me-2">
-                            <img src="${review.profilePhoto || '/images/default-avatar.png'}" 
-                                 alt="${review.reviewerName}" 
+                            <img src="${safeUrl(review.profilePhoto) || '/images/default-avatar.png'}"
+                                 alt="${escapeHtml(review.reviewerName)}"
                                  class="rounded-circle"
                                  width="32" height="32">
                         </div>
                         <div>
                             <div class="fw-bold">
-                                ${review.authorUrl 
-                                    ? `<a href="${review.authorUrl}" target="_blank" rel="noopener noreferrer">${review.reviewerName}</a>`
-                                    : review.reviewerName}
+                                ${review.authorUrl && safeUrl(review.authorUrl)
+                                    ? `<a href="${safeUrl(review.authorUrl)}" target="_blank" rel="noopener noreferrer">${escapeHtml(review.reviewerName)}</a>`
+                                    : escapeHtml(review.reviewerName)}
                             </div>
                             <div class="d-flex align-items-center">
                                 ${this.generateStarRating(review.rating)}
-                                <small class="ms-2 text-muted">${review.relativeTimeDescription || ''}</small>
+                                <small class="ms-2 text-muted">${escapeHtml(review.relativeTimeDescription || '')}</small>
                             </div>
                         </div>
                     </div>
                 </td>
                 <td>
                     <div class="review-content">
-                        <p class="mb-1">${review.text}</p>
-                        ${review.language 
-                            ? `<small class="text-muted">Language: ${review.language}</small>`
+                        <p class="mb-1">${escapeHtml(review.text)}</p>
+                        ${review.language
+                            ? `<small class="text-muted">Language: ${escapeHtml(review.language)}</small>`
                             : ''}
                     </div>
-                    ${review.response 
+                    ${review.response
                         ? `<div class="review-response mt-2 p-2 bg-light rounded">
                                <small class="text-muted">Response:</small>
-                               <p class="mb-0">${review.response}</p>
+                               <p class="mb-0">${escapeHtml(review.response)}</p>
                            </div>`
                         : ''}
                 </td>
@@ -327,9 +345,9 @@ const googleReviewsManager = {
             title: 'Respond to Review',
             html: `
                 <div class="mb-3">
-                    <p><strong>Review:</strong> ${review.text}</p>
-                    <textarea id="responseText" class="form-control" 
-                        placeholder="Type your response here...">${review.response || ''}</textarea>
+                    <p><strong>Review:</strong> ${escapeHtml(review.text)}</p>
+                    <textarea id="responseText" class="form-control"
+                        placeholder="Type your response here...">${escapeHtml(review.response || '')}</textarea>
                 </div>
             `,
             showCancelButton: true,
