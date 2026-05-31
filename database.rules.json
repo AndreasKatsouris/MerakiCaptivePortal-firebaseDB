@@ -497,7 +497,7 @@
       ".write": "auth != null",
       "byLocation": {
         "$locationId": {
-          ".read": "auth != null && (auth.token.admin === true || root.child('userLocations').child(auth.uid).child($locationId).exists())"
+          ".read": "auth != null && (auth.token.admin === true || root.child('userLocations').child(auth.uid).child($locationId).exists() || root.child('locations').child($locationId).child('ownerId').val() === auth.uid)"
         }
       }
     },
@@ -515,7 +515,7 @@
       ".write": "auth != null",
       "byLocation": {
         "$locationId": {
-          ".read": "auth != null && (auth.token.admin === true || root.child('userLocations').child(auth.uid).child($locationId).exists())"
+          ".read": "auth != null && (auth.token.admin === true || root.child('userLocations').child(auth.uid).child($locationId).exists() || root.child('locations').child($locationId).child('ownerId').val() === auth.uid)"
         }
       }
     },
