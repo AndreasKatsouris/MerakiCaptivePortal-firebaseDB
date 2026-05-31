@@ -1,6 +1,6 @@
 {
   "lastUpdated": "2026-05-31",
-  "lastUpdatedNote": "Phase 7 (askRoss) entered design: decomposed into a 4-component program (ledger → entitlements/④a → agent → payment rail); two spec docs written. Logged a NEW High bug — entitlement self-grant (clients can write their own subscriptions/{uid}/features+limits, database.rules.json:28), fix scoped into Phase 7 ④a. ——— Prior: Synced to PROJECT_BACKLOG.md: recentlyCompleted now includes the OWASP remediation (14 PRs #89–#102), bug triage queue mirrors the backlog's operational items (OWASP follow-ups live in the new Security panel), and the Security panel summarises the audit. ——— Prior: added the Security panel; before that, cleanup-mode evening (PR #86 + #87).",
+  "lastUpdatedNote": "Phase 7 (askRoss) design phase complete: decomposed into a 4-component program (ledger → entitlements/④a → agent → payment rail); specs ① ledger + ④a entitlements MERGED (#106/#107/#108). Logged a High bug — entitlement self-grant (clients can write their own subscriptions/{uid}/features+limits, database.rules.json:33), fix scoped into the ④a build. Next: ② Agent brainstorm. ——— Prior: Synced to PROJECT_BACKLOG.md: recentlyCompleted now includes the OWASP remediation (14 PRs #89–#102), bug triage queue mirrors the backlog's operational items (OWASP follow-ups live in the new Security panel), and the Security panel summarises the audit. ——— Prior: added the Security panel; before that, cleanup-mode evening (PR #86 + #87).",
   "sprint": {
     "goal": "Effective implementation of Hi-Fi v2, with ROSS as the central post-login surface for every subscribed user",
     "started": "2026-04-30",
@@ -212,6 +212,11 @@
   ],
   "inProgress": [],
   "recentlyCompleted": [
+    {
+      "title": "Phase 7 askRoss — design phase (① ledger + ④a entitlements specs). Decomposed Phase 7 into a 4-component program (ledger → entitlements → agent → payment rail), each its own spec. Shipped 2 design docs: prepaid-ZAR Credit Ledger (modelled on Anthropic's prepaid wallet) + Entitlement resolver/add-on layer. The ④a design audit (Explore agent over the live subscription module) caught a live entitlement self-grant vuln (client-writable subscriptions/{uid}/features+limits, logged High) — structural fix scoped into the ④a build. Build order ① → ④a → ②; ② Agent brainstorm next.",
+      "pr": "106, 107, 108",
+      "mergedAt": "2026-05-31"
+    },
     {
       "title": "OWASP remediation — all Highs + most Mediums/Lows (10 PRs #93–#102). H-4/H-7/H-10 logging+CSPRNG, H-5/H-6 CORS (new shared functions/cors-allowlist.js), H-3/H-4b, H-2 Bucket A/B (6 RTDB root reads locked to admin + userLocations child rules + design doc), H-9 npm audit (lockfile-only, all crit+high cleared), M-1 location ownerId, M-2 security headers, M-4 stored XSS in googleReviews.js, M-6/M-10/L-1/L-2 logging+createTestData gate, M-8 POPIA deletion. Every PR auto-reviewed; 2 must-fixes caught + fixed pre-merge (#96 ownerId fallback, #102 phoneNumber indexes). Consumer-mapping via 3 parallel agents drove the H-2 bucket split.",
       "pr": "93–102",
