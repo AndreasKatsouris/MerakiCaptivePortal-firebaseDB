@@ -71,12 +71,24 @@ Lower-priority Phase 5 items (deferred to dedicated polish PR after the 5-PR seq
 - [x] **Concierge home active-run surfacing** (PR #72, 2026-05-19) — new `rossGetHomeWorkflowDigest` CF (read-only, `verifyUserOrAdmin`, reads `ross/workflows/{uid}` + `ross/runs/{uid}` in parallel, returns structured digest with `overdue`/`today`/`recentCompletions`/`upcoming`/`hasActiveWorkflows`/`activeWorkflowCount`). Thin client detector `detectActiveWorkflows` picks priority (overdue → in-progress → due-today → recently-completed → all-clear) and builds the slot-1 card. Hybrid card mix preserved — food-cost / VIP / revenue detectors keep slots 2-3. `LEARNING_MODE_WORKFLOW_CARD` fallback for users with zero active workflows. Two preview-driven fixes folded in: (a) `_normalizeNextDueDate` accepts number/ISO/full-timestamp shapes (existing workflows store nextDueDate as epoch ms NUMBER per ross.js:703/1150/1282/1502; my helper compared as string → all branches silently failed); (b) canonical run schema — runs have NO `status` field, lifecycle is `completedAt === null` vs non-null; runId field is `id` not `runId`; onTime/flaggedCount derived from responses+nextDueDate (server writes them only to history records). Mid-PR operator design call: "Missed" chip framing at `daysLate >= 4` — flips chip label, headline verb, aggSuffix wording, footnote, sidecar target copy. Home feed auto-reload on every mount (Pinia store survives in-app tab switches → stale data without explicit reload). 38 unit tests, build green, deployed.
 - [x] (Stretch) **Compliance Sweep** as the first end-to-end curated template (PR #83, 2026-05-20) — 5 subtasks × 4 input types (2× temperature with auto-flag + requiredNote, yes_no, checkbox, text), `tier: 'free'`, weekly recurrence. Seed file + idempotent prod-additive script (`ross-templates-add-compliance-sweep.js`). No CF/client changes — the existing `rossActivateWorkflow` + `rossCreateRun` paths already honour `inputType`/`inputConfig` on subtasks per Phase 4e.2 / PR #65.
 
-### Phase 7 — askRoss LLM (separate sprint)
+### Phase 7 — askRoss LLM (active)
 
-- [ ] New `rossChat` Cloud Function (Anthropic SDK + prompt caching)
-- [ ] Eval harness (20-prompt golden set)
-- [ ] Cost cap + secrets management
-- [ ] Web-sourced day-zero findings (weather, local events, public holidays, suburb demographics) — surfaced once LLM is live
+Decomposed during the 2026-05-31 brainstorm from a single CF into a **4-component
+program** (billing turned out to be shared platform infra, not an askRoss feature).
+North star: *Ross runs the paperwork, not the restaurant.* **Design phase COMPLETE —
+3 specs merged.** Build order: ① → ④a → ②.
+
+**Design (done):**
+- [x] **① Credit Ledger** spec — prepaid-ZAR metering modelled on Anthropic's prepaid wallet (`docs/plans/2026-05-31-metering-credit-ledger-design.md`, PR #106/#108)
+- [x] **④a Entitlement resolver + add-on layer** spec — closes the live self-grant vuln (`docs/plans/2026-05-31-entitlements-addon-layer-design.md`, PR #107)
+- [x] **② askRoss Agent** spec — tool-use agent, bands A+B, graduated-risk policy engine (`docs/plans/2026-05-31-askross-agent-design.md`, PR #110)
+
+**Build (next, in dependency order):**
+- [ ] **① Credit Ledger build** — `ledger.js` (cost formula + transaction debit) + `billingGrantCredit`/`billingGetBalance`/`billingGetUsage` CFs + `billing/*` rules
+- [ ] **④a Entitlements build** — resolver = sole writer of `features`/`limits`; route the 7 writers through CFs; lock `subscriptions/$uid` `.write` (fixes the High self-grant vuln); add-on catalog + grant CFs
+- [ ] **② askRoss Agent build** — `llm-client.js` + tool registry + policy engine + `rossChat` SSE CF + confirm-flow + Ask Ross client + 20-prompt eval harness
+
+**Deferred (each own spec later):** ③ Payment Rail (gateway/top-ups — external long-poles), ④b tier 4→2 collapse migration, web-sourced day-zero findings (weather/events/holidays — once the agent is live).
 
 ---
 

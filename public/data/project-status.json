@@ -1,11 +1,11 @@
 {
   "lastUpdated": "2026-05-31",
-  "lastUpdatedNote": "Phase 7 (askRoss) DESIGN PHASE COMPLETE: all 3 near-term specs MERGED — ① ledger (#106/#108), ④a entitlements (#107), ② askRoss Agent (#110). Logged a High bug — entitlement self-grant (database.rules.json:33), fix scoped into the ④a build. Agent §3.1 measurement-gates submitResponse (no fabricated compliance records). Next: /plan → build in order ① → ④a → ②. ——— Prior: Synced to PROJECT_BACKLOG.md: recentlyCompleted now includes the OWASP remediation (14 PRs #89–#102), bug triage queue mirrors the backlog's operational items (OWASP follow-ups live in the new Security panel), and the Security panel summarises the audit. ——— Prior: added the Security panel; before that, cleanup-mode evening (PR #86 + #87).",
+  "lastUpdatedNote": "Dashboard synced to the Phase 7 plan: Phase 7 flipped deferred → in-progress, sprint summary + 6 Phase 7 tasks (3 design done / 3 build pending) added, backlog Phase 7 section rewritten as the 4-component program. ——— Phase 7 (askRoss) DESIGN PHASE COMPLETE: all 3 near-term specs MERGED — ① ledger (#106/#108), ④a entitlements (#107), ② askRoss Agent (#110). Logged a High bug — entitlement self-grant (database.rules.json:33), fix scoped into the ④a build. Agent §3.1 measurement-gates submitResponse (no fabricated compliance records). Next: /plan → build in order ① → ④a → ②. ——— Prior: Synced to PROJECT_BACKLOG.md: recentlyCompleted now includes the OWASP remediation (14 PRs #89–#102), bug triage queue mirrors the backlog's operational items (OWASP follow-ups live in the new Security panel), and the Security panel summarises the audit. ——— Prior: added the Security panel; before that, cleanup-mode evening (PR #86 + #87).",
   "sprint": {
     "goal": "Effective implementation of Hi-Fi v2, with ROSS as the central post-login surface for every subscribed user",
     "started": "2026-04-30",
     "state": "active",
-    "summary": "Concierge-first IA. v1 admin tabs reframed as 'Ross's playbook' — the rules and procedures the future AI agent runs against. Phase 5 closed 2026-05-11. Phase 6 FULLY COMPLETE 2026-05-20 (main scope + stretch): all 5 main PRs shipped — PR 1A tier-gating mechanism (#51), PR 1B curated 5/8 starter library (#53), PR 1C locked-card upsell UX (#55), PR 2 day-zero auto-activation (#58), PR 3 Run execution UI (#65), PR 4 concierge home active-run surfacing (#72) — plus Compliance Sweep stretch template (#83) AND the Missed/Overdue counter consistency follow-up (#86). Workflows are the product; v1 modules become workflow step types over time. Two tiers only: Free (full UI + 5 starter templates), All-in (full library). Sprint idle, ready for next pick. Next sprint candidates: Phase 7 askRoss LLM, recurrence-engine gap (logged from PR #72 preview)."
+    "summary": "Concierge-first IA. v1 admin tabs reframed as 'Ross's playbook' — the rules and procedures the future AI agent runs against. Phase 5 closed 2026-05-11. Phase 6 FULLY COMPLETE 2026-05-20 (main scope + stretch): all 5 main PRs shipped — PR 1A tier-gating mechanism (#51), PR 1B curated 5/8 starter library (#53), PR 1C locked-card upsell UX (#55), PR 2 day-zero auto-activation (#58), PR 3 Run execution UI (#65), PR 4 concierge home active-run surfacing (#72) — plus Compliance Sweep stretch template (#83) AND the Missed/Overdue counter consistency follow-up (#86). Workflows are the product; v1 modules become workflow step types over time. Two tiers only: Free (full UI + 5 starter templates), All-in (full library). NOW ACTIVE — Phase 7 (askRoss LLM): decomposed into a 4-component program (① Credit Ledger, ④a Entitlement resolver + add-ons, ② askRoss Agent, plus deferred ③ Payment Rail + ④b tier migration). Design phase COMPLETE — 3 specs merged (#106/#107/#108/#110). Entering build in order ① → ④a → ②."
   },
   "phases": [
     {
@@ -52,9 +52,9 @@
     },
     {
       "id": 7,
-      "name": "ROSS v2 — askRoss (LLM)",
-      "status": "deferred",
-      "summary": "Separate sprint. Anthropic-backed rossChat CF + eval harness + cost cap + web-sourced day-zero findings (weather, local events, holidays, suburb demographics)."
+      "name": "ROSS v2 — askRoss LLM (4-component program)",
+      "status": "in-progress",
+      "summary": "Decomposed 2026-05-31 from a single CF into a 4-component program (billing is shared platform infra, not an askRoss feature). North star: Ross runs the paperwork, not the restaurant. DESIGN PHASE COMPLETE — 3 specs merged: ① Credit Ledger (prepaid-ZAR metering modelled on Anthropic's prepaid wallet, #106/#108); ④a Entitlement resolver + add-on layer (closes a live entitlement self-grant vuln, #107); ② askRoss Agent (tool-use agent, bands A+B = read + workflow/run ops, graduated-risk policy engine auto/confirm/off + kill switch + audit, Sonnet 4.6/streaming SSE/prompt caching, ledger+entitlement pre-flight gates, 20-prompt eval harness; §3.1 measurement-gates submitResponse so the agent never fabricates a compliance record, #110). Build NEXT in dependency order ① → ④a → ②. Deferred: ③ Payment Rail (gateway/top-ups), ④b tier 4→2 migration, web-sourced day-zero findings."
     }
   ],
   "tasks": [
@@ -208,6 +208,45 @@
       "done": true,
       "phase": 6,
       "pr": 83
+    },
+    {
+      "id": "phase-7-design-ledger",
+      "label": "Phase 7 design — ① Credit Ledger spec (prepaid-ZAR metering, Anthropic-modelled)",
+      "done": true,
+      "phase": 7,
+      "pr": 106
+    },
+    {
+      "id": "phase-7-design-entitlements",
+      "label": "Phase 7 design — ④a Entitlement resolver + add-on layer spec (closes self-grant vuln)",
+      "done": true,
+      "phase": 7,
+      "pr": 107
+    },
+    {
+      "id": "phase-7-design-agent",
+      "label": "Phase 7 design — ② askRoss Agent spec (tool-use, risk-tier policy engine, eval harness)",
+      "done": true,
+      "phase": 7,
+      "pr": 110
+    },
+    {
+      "id": "phase-7-build-ledger",
+      "label": "Phase 7 build — ① Credit Ledger (ledger.js + billing CFs + billing/* rules)",
+      "done": false,
+      "phase": 7
+    },
+    {
+      "id": "phase-7-build-entitlements",
+      "label": "Phase 7 build — ④a Entitlement resolver (sole writer; lock subscriptions/$uid .write; add-on catalog + grant CFs)",
+      "done": false,
+      "phase": 7
+    },
+    {
+      "id": "phase-7-build-agent",
+      "label": "Phase 7 build — ② askRoss Agent (llm-client + tool registry + policy engine + rossChat SSE + Ask Ross client + evals)",
+      "done": false,
+      "phase": 7
     }
   ],
   "inProgress": [],
@@ -365,7 +404,6 @@
   "backlog": {
     "high": [
       "Recurrence-engine gap — nextDueDate doesn't advance when daily workflow goes uncompleted (PR #72 preview catch; needs product input on missed-cycle policy)",
-      "Phase 7 askRoss LLM — separate sprint: rossChat CF + eval harness + cost cap + web-sourced day-zero findings (weather, local events, holidays, suburb demographics)",
       "Food cost open PR — review and merge",
       "Chart.js retirement (soak ended ~2026-05-07; execute removal per CHARTJS_REMOVAL_AUDIT.md — 16 of 23 sites have v2 replacements)"
     ],
