@@ -165,7 +165,9 @@ exports.createTestData = onRequest(async (req, res) => {
             return res.status(404).end();
         }
 
-        // Enable CORS
+        // DANGER: below this point there is NO auth check and wildcard CORS.
+        // This endpoint is safe ONLY because of the ENABLE_TEST_DATA gate above.
+        // Never set ENABLE_TEST_DATA=true in production.
         res.set('Access-Control-Allow-Origin', '*');
         res.set('Access-Control-Allow-Methods', 'POST, GET, DELETE');
         res.set('Access-Control-Allow-Headers', 'Content-Type');
