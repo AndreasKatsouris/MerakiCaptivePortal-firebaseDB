@@ -9,6 +9,10 @@
       ".read": true,
       ".write": "auth != null && auth.token.admin === true"
     },
+    "billing": {
+      ".read": false,
+      ".write": false
+    },
     "guests": {
       ".read": "auth != null",
       ".write": "auth != null && auth.token.admin === true",

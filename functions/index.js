@@ -3684,6 +3684,14 @@ exports.rossV2Snooze = ross.rossV2Snooze;
 exports.rossGetHomeWorkflowDigest = ross.rossGetHomeWorkflowDigest;
 
 // ============================================
+// BILLING — Credit Ledger (Phase 7 ①)
+// ============================================
+const billing = require('./billing/cloud-functions');
+exports.billingGrantCredit = billing.billingGrantCredit;
+exports.billingGetBalance = billing.billingGetBalance;
+exports.billingGetUsage = billing.billingGetUsage;
+
+// ============================================
 // SUBSCRIPTION STATUS MANAGEMENT
 // ============================================
 const subscriptionStatusManager = require('./subscriptionStatusManager');
