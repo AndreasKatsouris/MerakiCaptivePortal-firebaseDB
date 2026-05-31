@@ -9,7 +9,7 @@
 
 const ledger = require('../ledger');
 const { makeFakeRtdb } = require('./helpers/fake-rtdb');
-const { DEFAULT_MIN_BALANCE_CENTS, SERVICES, LEDGER_CURRENCY } = require('../constants');
+const { DEFAULT_BALANCE_FLOOR_CENTS, SERVICES, LEDGER_CURRENCY } = require('../constants');
 
 const MODEL = 'claude-sonnet-4-6';
 
@@ -67,7 +67,7 @@ describe('grantCredit', () => {
 
 describe('checkBalance gate', () => {
     it('false at/below the floor, true above', async () => {
-        await ledger.grantCredit({ uid: 'u1', amountCents: DEFAULT_MIN_BALANCE_CENTS, grantedBy: 'a', reason: 'x' });
+        await ledger.grantCredit({ uid: 'u1', amountCents: DEFAULT_BALANCE_FLOOR_CENTS, grantedBy: 'a', reason: 'x' });
         expect(await ledger.checkBalance('u1')).toBe(false); // exactly at floor → blocked
         await ledger.grantCredit({ uid: 'u1', amountCents: 1, grantedBy: 'a', reason: 'x' });
         expect(await ledger.checkBalance('u1')).toBe(true);  // floor + 1 → allowed

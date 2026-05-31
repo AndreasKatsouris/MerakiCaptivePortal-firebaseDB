@@ -161,7 +161,7 @@ server-side.
 
 ```js
 // Pre-flight gate. Cheap single read. Returns boolean.
-async function checkBalance(uid, minCents = DEFAULT_MIN_BALANCE_CENTS) { ... }
+async function checkBalance(uid, minCents = DEFAULT_BALANCE_FLOOR_CENTS) { ... }
 
 // Post-flight, success-only. Computes cost from the CURRENT price table,
 // snapshots the rate, appends an immutable usage record, and debits the
@@ -293,7 +293,7 @@ comp/support tool.
    multi-currency display + collection is a future "go global" layer in ③ Payment Rail;
    records carry `currency: 'USD'` so the model already supports it. (Removes the prior
    `fxStaleWarning` mechanism — there's no FX to go stale.)
-3. **`minCents` gate threshold** — **`DEFAULT_MIN_BALANCE_CENTS = 50`** (≈ 2–8 typical
+3. **`minCents` gate threshold** — **`DEFAULT_BALANCE_FLOOR_CENTS = 50`** (≈ 2–8 typical
    turns of headroom at current Sonnet-4-6 + 30% rates) to avoid mid-conversation
    cut-offs. Exported named constant (not a magic number). **Final value is owned by
    the ② Agent UX spec** — the agent's "low balance" state determines the right

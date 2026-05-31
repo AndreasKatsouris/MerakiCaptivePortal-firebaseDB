@@ -14,7 +14,7 @@
 // Pre-flight balance gate floor (USD cents). A turn is only authorised when the
 // balance exceeds this. ~a few typical Sonnet turns of headroom; the final value
 // is owned by the ② Agent UX spec (§10.3). Named, not a magic number.
-const DEFAULT_MIN_BALANCE_CENTS = 50;
+const DEFAULT_BALANCE_FLOOR_CENTS = 50;
 
 // Default Anthropic cache multipliers (relative to base input price).
 const DEFAULT_CACHE_WRITE_MULT = 1.25; // 5-minute cache write
@@ -34,7 +34,7 @@ const SERVICES = Object.freeze({
 });
 
 module.exports = {
-    DEFAULT_MIN_BALANCE_CENTS,
+    DEFAULT_BALANCE_FLOOR_CENTS,
     DEFAULT_CACHE_WRITE_MULT,
     DEFAULT_CACHE_READ_MULT,
     DEFAULT_MARKUP,

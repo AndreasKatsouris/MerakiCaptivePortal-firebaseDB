@@ -18,7 +18,7 @@ const {
     DEFAULT_MARKUP,
     DEFAULT_CACHE_WRITE_MULT,
     DEFAULT_CACHE_READ_MULT,
-    DEFAULT_MIN_BALANCE_CENTS,
+    DEFAULT_BALANCE_FLOOR_CENTS,
 } = require('./constants');
 
 // ---------------------------------------------------------------------------
@@ -110,7 +110,7 @@ async function getBalanceCents(uid) {
  * Pre-flight gate. Cheap single read. True only when balance exceeds the floor
  * (so a balance exactly at the floor is blocked).
  */
-async function checkBalance(uid, minCents = DEFAULT_MIN_BALANCE_CENTS) {
+async function checkBalance(uid, minCents = DEFAULT_BALANCE_FLOOR_CENTS) {
     return (await getBalanceCents(uid)) > minCents;
 }
 
@@ -232,6 +232,7 @@ module.exports = {
     recordUsageAndDebit,
     grantCredit,
     getUsage,
+    // exported for tests / introspection only (performs RTDB I/O)
     loadRateSnapshot,
     // test seam
     __setDbForTests,

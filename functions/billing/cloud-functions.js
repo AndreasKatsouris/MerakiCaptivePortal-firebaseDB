@@ -48,9 +48,15 @@ exports.billingGrantCredit = onRequest(async (req, res) => cors(req, res, async 
 
         const data = req.body.data || req.body || {};
         const { uid, amountCents, reason } = data;
+        // NOTE: the uid is not verified to exist in Firebase Auth — superAdmin-only
+        // path, controlled beta. A comp to a non-existent uid only creates a dangling
+        // billing/credits/{uid} node (harmless). Revisit if grants become self-serve.
         if (!uid || typeof uid !== 'string') throw badRequest('Invalid request: uid is required');
         if (!Number.isInteger(amountCents) || amountCents <= 0) {
             throw badRequest('Invalid request: amountCents must be a positive integer');
+        }
+        if (reason != null && (typeof reason !== 'string' || reason.length > 500)) {
+            throw badRequest('Invalid request: reason must be a string of 500 chars or fewer');
         }
 
         const { balanceAfterCents } = await ledger.grantCredit({ uid, amountCents, grantedBy, reason: reason || null });

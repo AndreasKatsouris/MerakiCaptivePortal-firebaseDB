@@ -31,7 +31,7 @@ TDD unit/integration tests. First consumer is askRoss.
 ## Files touched
 | File | Change |
 |---|---|
-| `functions/billing/constants.js` | NEW — `DEFAULT_MIN_BALANCE_CENTS=50`, `FX_STALE_MS`, default multipliers (1.25/0.10), `DEFAULT_MARKUP=1.30`, service enum |
+| `functions/billing/constants.js` | NEW — `DEFAULT_BALANCE_FLOOR_CENTS=50`, `FX_STALE_MS`, default multipliers (1.25/0.10), `DEFAULT_MARKUP=1.30`, service enum |
 | `functions/billing/ledger.js` | NEW — `computeCostCents` (service dispatch, throws on unknown), `checkBalance`, `recordUsageAndDebit`, `grantCredit`, `getBalanceCents`, `getUsage` |
 | `functions/billing/cloud-functions.js` | NEW — 3 `onRequest` CFs |
 | `functions/billing/__tests__/{cost-formula,dispatch,ledger}.test.js` | NEW — TDD |
