@@ -1,6 +1,6 @@
 {
   "lastUpdated": "2026-05-31",
-  "lastUpdatedNote": "Synced to PROJECT_BACKLOG.md: recentlyCompleted now includes the OWASP remediation (14 PRs #89–#102), bug triage queue mirrors the backlog's operational items (OWASP follow-ups live in the new Security panel), and the Security panel summarises the audit. ——— Prior: added the Security panel; before that, cleanup-mode evening (PR #86 + #87).",
+  "lastUpdatedNote": "Phase 7 (askRoss) entered design: decomposed into a 4-component program (ledger → entitlements/④a → agent → payment rail); two spec docs written. Logged a NEW High bug — entitlement self-grant (clients can write their own subscriptions/{uid}/features+limits, database.rules.json:28), fix scoped into Phase 7 ④a. ——— Prior: Synced to PROJECT_BACKLOG.md: recentlyCompleted now includes the OWASP remediation (14 PRs #89–#102), bug triage queue mirrors the backlog's operational items (OWASP follow-ups live in the new Security panel), and the Security panel summarises the audit. ——— Prior: added the Security panel; before that, cleanup-mode evening (PR #86 + #87).",
   "sprint": {
     "goal": "Effective implementation of Hi-Fi v2, with ROSS as the central post-login surface for every subscribed user",
     "started": "2026-04-30",
@@ -239,6 +239,14 @@
     }
   ],
   "bugs": [
+    {
+      "title": "Entitlement self-grant — clients can write their own subscriptions/{uid}/features+limits",
+      "severity": "high",
+      "discoveredAt": "2026-05-31",
+      "discoveredOn": "Phase 7 entitlements design audit",
+      "blockingSprint": false,
+      "notes": "database.rules.json:28 allows $uid/.write for auth.uid === $uid, with a .validate that only checks tier exists in subscriptionTiers. Any authed owner can write features/<anyPremiumFlag>: true or limits/maxWorkflows: 99999 from the browser console — broken access control / privilege escalation. Actively exercised by client subscription-service.js (createSubscription/updateSubscription/startFreeTrial write features/limits from a hardcoded RTDB-unsynced constant). OWASP follow-on the 2026-05-30 audit missed. Fix is structural and scoped into Phase 7 sub-project 4a (docs/plans/2026-05-31-entitlements-addon-layer-design.md): a server-side entitlement resolver becomes the sole writer of materialized features/limits, the 7 divergent writers route through CFs, then subscriptions/$uid .write locks to admin/server-only. No (fixed by Phase 7 4a build)."
+    },
     {
       "title": "Recurrence-engine gap: nextDueDate never advances when daily workflow goes uncompleted",
       "severity": "medium",
