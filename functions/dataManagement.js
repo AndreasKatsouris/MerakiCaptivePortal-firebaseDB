@@ -44,6 +44,29 @@ async function deleteUserData(phoneNumber) {
             .once('value');
         const receipts = receiptsSnapshot.val() || {};
 
+        // POPIA: also purge PII-bearing records keyed/queried by phone number
+        // that the original deletion missed (wifiLogins, WhatsApp history,
+        // bookings, activeUsers). Query each by its phoneNumber field.
+        // Resilient per-node reads: a single failing query must not abort the
+        // whole deletion (which would leave the core guest data un-deleted).
+        const byPhone = async (path, field) => {
+            try {
+                const snap = await admin.database().ref(path)
+                    .orderByChild(field).equalTo(normalizedPhone).once('value');
+                return snap.val() || {};
+            } catch (e) {
+                console.error(`[deleteUserData] query failed for ${path}:`, e.message);
+                return {};
+            }
+        };
+        const [wifiLogins, whatsappHistory, bookings, activeUsers, queueData] = await Promise.all([
+            byPhone('wifiLogins', 'phoneNumber'),
+            byPhone('whatsapp-message-history', 'phoneNumber'),
+            byPhone('bookings', 'phoneNumber'),
+            byPhone('activeUsers', 'phoneNumber'),
+            admin.database().ref('queue').once('value').then(s => s.val() || {}).catch(() => ({}))
+        ]);
+
         // Prepare deletion operations using normalized phone number
         const updates = {
             // Delete main user profile
@@ -71,6 +94,22 @@ async function deleteUserData(phoneNumber) {
             updates[`receipts/${receiptId}/guestPhone`] = null;
             updates[`receipts/${receiptId}/guestName`] = null;
             updates[`receipts/${receiptId}/personalData`] = null;
+        });
+
+        // POPIA: delete the additional PII-bearing records found above.
+        Object.keys(wifiLogins).forEach(id => { updates[`wifiLogins/${id}`] = null; });
+        Object.keys(whatsappHistory).forEach(id => { updates[`whatsapp-message-history/${id}`] = null; });
+        Object.keys(bookings).forEach(id => { updates[`bookings/${id}`] = null; });
+        Object.keys(activeUsers).forEach(id => { updates[`activeUsers/${id}`] = null; });
+
+        // queue is nested: queue/{locationId}/entries/{entryId} — walk and null matches.
+        Object.keys(queueData).forEach(locId => {
+            const entries = (queueData[locId] && queueData[locId].entries) || {};
+            Object.keys(entries).forEach(entryId => {
+                if (entries[entryId] && entries[entryId].phoneNumber === normalizedPhone) {
+                    updates[`queue/${locId}/entries/${entryId}`] = null;
+                }
+            });
         });
 
         // Execute all deletions in a single transaction
