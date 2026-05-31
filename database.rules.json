@@ -199,6 +199,7 @@
     "wifiLogins": {
       ".read": "auth != null && auth.token.admin === true",
       ".write": "auth != null && auth.token.admin === true",
+      ".indexOn": ["phoneNumber"],
       "$sessionId": {
         ".validate": "newData.hasChildren(['sessionID', 'timestamp', 'name', 'email'])",
         "sessionID":   { ".validate": "newData.isString() && newData.val().length <= 64" },
@@ -218,7 +219,8 @@
     },
     "activeUsers": {
       ".read": "auth != null && auth.token.admin === true",
-      ".write": "auth != null && auth.token.admin === true"
+      ".write": "auth != null && auth.token.admin === true",
+      ".indexOn": ["phoneNumber"]
     },
     "userPreferences": {
       ".read": "auth != null && auth.token.admin === true",
@@ -288,7 +290,7 @@
     "bookings": {
       ".read": "auth != null && (auth.token.admin === true || root.child('admin-claims').child(auth.uid).exists())",
       ".write": "auth != null && (auth.token.admin === true || root.child('admin-claims').child(auth.uid).exists())",
-      ".indexOn": ["status", "date", "location", "createdAt"],
+      ".indexOn": ["status", "date", "location", "createdAt", "phoneNumber"],
       "$bookingId": {
         ".read": "auth != null && (
           auth.token.admin === true || 
