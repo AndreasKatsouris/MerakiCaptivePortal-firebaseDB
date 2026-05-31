@@ -49,7 +49,7 @@ cost run away.
 ## 1. Purpose & boundaries
 
 A **shared, feature- and provider-agnostic platform service** that meters paid
-usage per owner and enforces a prepaid ZAR balance. First consumer is askRoss
+usage per owner and enforces a prepaid USD balance. First consumer is askRoss
 (Claude tokens). The same ledger later meters Google Vision OCR (pages) and
 Twilio WhatsApp/SMS (messages) with no rework — those consumers just call the
 same module with different `units`.
@@ -58,7 +58,7 @@ same module with different `units`.
 - RTDB ledger schema: credits, immutable usage log, price table, grant audit.
 - Internal ledger module (`functions/billing/ledger.js`): `checkBalance`,
   `recordUsageAndDebit`, `grantCredit`, plus read helpers.
-- The cost formula (USD rate × FX × markup), with per-record rate snapshot.
+- The cost formula (USD rate × markup; **USD-denominated, no FX in v1**), with per-record rate snapshot.
 - Public CFs: `billingGrantCredit` (superAdmin), `billingGetBalance` and
   `billingGetUsage` (owner-scoped reads).
 - Security rules locking `billing/*` to server-only.
@@ -78,9 +78,9 @@ same module with different `units`.
 
 | Decision | Choice | Rationale |
 |----------|--------|-----------|
-| Unit of account | **ZAR cents + immutable usage log** | Mirrors Anthropic's own prepaid-wallet billing; owners are non-technical SA operators who need honest rand; easy reconciliation against the upstream USD invoice |
-| Cost basis | USD per-token rate × USD→ZAR FX × markup | Passthrough + markup is the chosen revenue model |
-| Rate handling | **Snapshot rate into every usage record** | Historical records never shift when prices/FX/markup change; margin visible per call |
+| Unit of account | **USD cents + immutable usage log** (revised 2026-05-31) | Mirrors Anthropic's own prepaid-wallet billing **1:1 with zero conversion** (they bill us in USD); no FX layer to maintain; **global-ready** — multi-currency display/collection becomes an additive layer (in ③ Payment Rail), not a refactor. Each record carries `currency: 'USD'` so future records can be other currencies. |
+| Cost basis | USD per-token rate × markup (**no FX**) | Passthrough + markup is the chosen revenue model; FX/ZAR conversion deferred to the payment rail (future "go global") |
+| Rate handling | **Snapshot rate into every usage record** | Historical records never shift when prices/markup change; margin visible per call |
 | When charged | **Post-flight, success only** | Matches Anthropic ("only successful calls billed"); exact token counts come from the API response `usage` object — no estimation |
 | Concurrency | RTDB `transaction()` on balance | Race-safe across concurrent turns |
 | v1 credit seeding | **SuperAdmin grant only** | Tightest cost control for a controlled beta; defers the free-allowance product decision |
@@ -97,7 +97,8 @@ All nodes are **server-only** (`.read: false`, `.write: false` — Admin SDK onl
 billing/
   credits/
     {uid}/
-      balanceCents: number        // ZAR cents; mutated only via transaction()
+      balanceCents: number        // USD cents; mutated only via transaction()
+      currency: string            // 'USD' (v1) — present for future multi-currency
       updatedAt: number
 
   usage/
@@ -115,10 +116,10 @@ billing/
           usdPerMtokOutput: number
           cacheWriteMult: number   // e.g. 1.25
           cacheReadMult: number    // e.g. 0.10
-          usdToZar: number
-          markup: number           // e.g. 1.3
-        wholesaleUsdCents: number  // our cost (margin = costZarCents - wholesaleUsd·fx)
-        costZarCents: number       // what the owner paid (debited)
+          markup: number           // e.g. 1.30
+        currency: string           // 'USD' (v1)
+        wholesaleUsdCents: number  // our cost (margin = costCents - wholesaleUsdCents)
+        costCents: number          // USD cents — what the owner paid (debited)
         balanceAfterCents: number  // running balance snapshot at write time
         meta:                      // free-form context, service-specific
           runId: string|null
@@ -127,10 +128,8 @@ billing/
         createdAt: number
 
   priceTable/                      // single config node; superAdmin-writable (server-side)
-    fx:
-      usdToZar: number
-      updatedAt: number
-    markup: number                 // global multiplier on wholesale cost
+    markup: number                 // global multiplier on wholesale cost (1.30)
+    updatedAt: number              // when the rate card was last set
     models/
       {modelId}/                   // e.g. 'claude-sonnet-4-6'
         usdPerMtokInput: number
@@ -162,11 +161,11 @@ server-side.
 
 ```js
 // Pre-flight gate. Cheap single read. Returns boolean.
-async function checkBalance(uid, minCents = 1) { ... }
+async function checkBalance(uid, minCents = DEFAULT_MIN_BALANCE_CENTS) { ... }
 
 // Post-flight, success-only. Computes cost from the CURRENT price table,
 // snapshots the rate, appends an immutable usage record, and debits the
-// balance atomically via transaction(). Returns { costZarCents, balanceAfterCents }.
+// balance atomically via transaction(). Returns { costCents, balanceAfterCents }.
 async function recordUsageAndDebit({ uid, service, model, units, meta }) { ... }
 
 // Comp grant. Credits balance + writes grant audit. (superAdmin enforced at CF layer.)
@@ -185,10 +184,15 @@ outToksUsd   = outputTokens     / 1e6 * usdPerMtokOutput
 cacheWrUsd   = cacheWriteTokens / 1e6 * usdPerMtokInput * cacheWriteMult   // ~1.25×
 cacheRdUsd   = cacheReadTokens  / 1e6 * usdPerMtokInput * cacheReadMult    // ~0.10×
 
-wholesaleUsd   = inToksUsd + outToksUsd + cacheWrUsd + cacheRdUsd
-costZarCents   = round(wholesaleUsd * usdToZar * markup * 100)
+wholesaleUsd      = inToksUsd + outToksUsd + cacheWrUsd + cacheRdUsd
+costCents         = round(wholesaleUsd * markup * 100)   // USD cents (no FX in v1)
 wholesaleUsdCents = round(wholesaleUsd * 100)
 ```
+
+**USD-denominated (no FX).** The ledger stores and charges in USD cents — mirroring
+Anthropic's own USD billing 1:1, no conversion. ZAR/multi-currency display + collection
+is a future "go global" layer in ③ Payment Rail; each record carries `currency: 'USD'`
+so the model already supports it.
 
 Token counts come verbatim from the Claude API response `usage` object
 (`input_tokens`, `output_tokens`, `cache_creation_input_tokens`,
@@ -239,7 +243,7 @@ rule-filtered, so don't expose money data at the root):
 
 ## 7. Testing
 
-- **Cost-formula golden vectors:** assert `costZarCents` for known token mixes
+- **Cost-formula golden vectors:** assert `costCents` for known token mixes
   against the live rate card (incl. cache-read/write multipliers). Copy the rate
   card into the test fixture verbatim.
 - **Concurrency:** two simultaneous `recordUsageAndDebit` calls → balance is
@@ -281,14 +285,14 @@ comp/support tool.
 
 ## 10. Open questions — RESOLVED (2026-05-31, operator delegated "you decide")
 
-1. **Markup value** — **LOCKED at 1.30 (30%).** SA-market starting point covering ZAR
-   volatility buffer + support cost. Lives in `priceTable/markup` config, so it's a
-   one-edit change with forward-only effect (history is rate-snapshotted).
-2. **FX source** — **Manual `usdToZar` in `priceTable/fx`, updated by script** when
-   topping up your own Anthropic credit. PLUS: `billingGetBalance` returns
-   `fxStaleWarning: true` when `priceTable/fx/updatedAt` is > 7 days old, so a
-   silently-stale FX surfaces to the admin UI without a scheduled CF. Revisit a
-   scheduled FX-fetch in ③.
+1. **Markup value** — **LOCKED at 1.30 (30%).** Covers support cost + buffer. Lives in
+   `priceTable/markup` config, so it's a one-edit change with forward-only effect
+   (history is rate-snapshotted).
+2. **FX source** — **N/A. Ledger is USD-denominated (revised 2026-05-31).** No FX in v1
+   — the ledger mirrors Anthropic's USD billing 1:1 with zero conversion. ZAR /
+   multi-currency display + collection is a future "go global" layer in ③ Payment Rail;
+   records carry `currency: 'USD'` so the model already supports it. (Removes the prior
+   `fxStaleWarning` mechanism — there's no FX to go stale.)
 3. **`minCents` gate threshold** — **`DEFAULT_MIN_BALANCE_CENTS = 50`** (≈ 2–8 typical
    turns of headroom at current Sonnet-4-6 + 30% rates) to avoid mid-conversation
    cut-offs. Exported named constant (not a magic number). **Final value is owned by
