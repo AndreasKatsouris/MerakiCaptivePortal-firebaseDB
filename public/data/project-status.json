@@ -245,6 +245,22 @@
   ],
   "bugs": [
     {
+      "title": "salesData .write root still auth != null (any authed user can create new salesData records)",
+      "severity": "low",
+      "discoveredAt": "2026-05-31",
+      "discoveredOn": "PR #111 auto-review (pre-existing)",
+      "blockingSprint": false,
+      "notes": "The H-2 work (PR #96) tightened salesData reads to admin + per-child owner, but the root .write remains auth != null. The per-child .validate guards overwriting an existing record, but any authenticated user can still CREATE new salesData records under arbitrary keys (no userId-match enforced on create). Low-impact (data pollution, not exfiltration) but inconsistent with the read lockdown. Fix: create-path .validate/.write requiring newData.child('userId').val() === auth.uid || admin. Surfaced as a NIT on already-merged code."
+    },
+    {
+      "title": "rewardsProcessor.js:646 modulo bias in generateFallbackCode",
+      "severity": "low",
+      "discoveredAt": "2026-05-31",
+      "discoveredOn": "PR #111 auto-review (pre-existing)",
+      "blockingSprint": false,
+      "notes": "crypto.randomBytes(6) then byte % 36 over-represents chars 0-3 by ~14% (256 % 36 = 4). Far better than the old Math.random() but not uniform for a security-relevant voucher fallback code. Fix: rejection sampling (while code.length<6: b=randomBytes(1)[0]; if b<252 code += chars[b%36]). ~0.09 extra bytes/code. Surfaced as a 🟡 on already-merged OWASP-era code."
+    },
+    {
       "title": "Entitlement self-grant — clients can write their own subscriptions/{uid}/features+limits",
       "severity": "high",
       "discoveredAt": "2026-05-31",
