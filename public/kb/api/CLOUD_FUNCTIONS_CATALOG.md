@@ -19,6 +19,18 @@ The platform deploys **69+ Cloud Functions** from a single `functions/index.js` 
 
 ---
 
+### Billing — Credit Ledger (Phase 7 ①)
+
+Shared, USD-denominated prepaid credit ledger (`functions/billing/`). Meters paid usage per owner and enforces a prepaid USD-cents balance. The debit path (`recordUsageAndDebit` / `checkBalance`) is **module-only** — never a CF; only `billingGrantCredit`/`billingGetBalance`/`billingGetUsage` are exposed. All `billing/*` RTDB nodes are server-only (`.read:false/.write:false`). See `docs/plans/2026-05-31-metering-credit-ledger-design.md`.
+
+| Function | Trigger | Auth | Purpose |
+|----------|---------|------|---------|
+| `billingGrantCredit` | HTTP (v2 onRequest) | Super Admin | Comp a beta owner's balance (v1 credit bridge — no payment rail yet). Body `{ uid, amountCents, reason }`; writes a `billing/grants` audit row |
+| `billingGetBalance` | HTTP (v2 onRequest) | Authenticated (self-scoped) | Owner reads own `balanceCents` (+ `currency`). Scoped to the token uid — a body uid is never honoured |
+| `billingGetUsage` | HTTP (v2 onRequest) | Authenticated (self-scoped) | Owner reads own usage history, newest-first, paginated. Body `{ limit?, before? }` (limit clamped 1–100) |
+
+---
+
 ### Authentication & User Management
 
 | Function | Trigger | Auth | Purpose |
