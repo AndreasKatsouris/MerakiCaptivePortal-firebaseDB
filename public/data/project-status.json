@@ -1,6 +1,6 @@
 {
   "lastUpdated": "2026-05-31",
-  "lastUpdatedNote": "Added a Security panel to this dashboard summarising the OWASP audit remediation (14 PRs #89–#102: all Criticals + Highs, most Mediums/Lows). Panel reads the new `security` key in this file. ——— Prior: Cleanup-mode evening — PR #86 + #87 merged. PR #86: fix Missed/Overdue counter consistency operator-reported on PR #72 — server's locData.status is 'active' forever (never updated to 'overdue'), so client-side `w.status === 'overdue'` filter always returned 0. New `public/js/modules/ross/v2/workflow-status.js` shared helper (MISSED_DAYS_THRESHOLD + computeDaysLate + isOverdue + isMissed) consumed by both stores AND detectors.js — single source of truth across three surfaces. RossPlaybook/RossActivity stat tiles use dynamic Missed/Overdue label mirroring the home card. 25 new vitest cases including a real-server-shape contract test. PR #87: catalog all 22 ROSS CFs + allowed-fields per mutator in ROSS.md (canonical), with 8-category summary + Source File Map updates in CLOUD_FUNCTIONS_CATALOG.md. Field-verify rule footnote cites PRs #28 / #72 / #86 as negative-confirmations. Automated review caught a forward-reference between in-flight PRs — fixed via 'ships with PR #86' qualifier, then past tense after #86 merged + rebase. Earlier same day: PRs #81 / #82 / #83 / #84 / #85.",
+  "lastUpdatedNote": "Synced to PROJECT_BACKLOG.md: recentlyCompleted now includes the OWASP remediation (14 PRs #89–#102), bug triage queue mirrors the backlog's operational items (OWASP follow-ups live in the new Security panel), and the Security panel summarises the audit. ——— Prior: added the Security panel; before that, cleanup-mode evening (PR #86 + #87).",
   "sprint": {
     "goal": "Effective implementation of Hi-Fi v2, with ROSS as the central post-login surface for every subscribed user",
     "started": "2026-04-30",
@@ -58,39 +58,185 @@
     }
   ],
   "tasks": [
-    { "id": "phase-0-shipped", "label": "Phase 0 — Project Status + sidebar cleanup + CORS preview fix", "done": true, "phase": 0 },
-    { "id": "phase-1-shipped", "label": "Phase 1 — Gap analysis & spec doc", "done": true, "phase": 1 },
-    { "id": "phase-2-shipped", "label": "Phase 2 — Sidebar + first-run findings wired", "done": true, "phase": 2 },
-    { "id": "phase-3-shipped", "label": "Phase 3 — Action handlers + snooze CF deployed", "done": true, "phase": 3 },
-    { "id": "phase-4a-playbook", "label": "Phase 4a — Playbook tab read-view + locationName fix", "done": true, "phase": 4 },
-    { "id": "phase-4b-activity", "label": "Phase 4b — Activity tab (run history + reports)", "done": true, "phase": 4 },
-    { "id": "phase-4c-people", "label": "Phase 4c — People tab (staff CRUD)", "done": true, "phase": 4 },
-    { "id": "phase-4d1-workflow-editor", "label": "Phase 4d.1 — Playbook workflow create/edit/lifecycle", "done": true, "phase": 4 },
-    { "id": "phase-4d2-template-crud", "label": "Phase 4d.2 — Template CRUD (superAdmin)", "done": true, "phase": 4 },
-    { "id": "phase-4e1-task-editor", "label": "Phase 4e.1 — Per-task inputType / inputConfig editor (existing workflow tasks)", "done": true, "phase": 4 },
-    { "id": "phase-4e2-propagation", "label": "Phase 4e.2 — Server propagation (subtask→task) + template-level inputType editor", "done": true, "phase": 4 },
-    { "id": "phase-5-audit", "label": "Phase 5 audit — confirms onboarding wiring is functional", "done": true, "phase": 5 },
-    { "id": "phase-5-spec", "label": "Phase 5 spec — central-funnel cleanup design doc (PR #37)", "done": true, "phase": 5 },
-    { "id": "phase-5-pr1-router", "label": "PR 1 (PR #39) — post-login-router + hello auth gate + helloSeen field", "done": true, "phase": 5 },
-    { "id": "phase-5-pr2-signup", "label": "PR 2 (PR #42) — signup v2 Hi-Fi Vue 3 rewrite + dynamic tier writes + registerUser CF closure + .validate rule + HfSelect/HfCheckbox", "done": true, "phase": 5 },
-    { "id": "phase-5-pr3-homepage", "label": "PR 3 (PR #44) — homepage v2 Hi-Fi promotion + workflow-centric copy + dynamic pricing + reused public hello + typographic hero panel", "done": true, "phase": 5 },
-    { "id": "phase-5-pr4-rollout", "label": "PR 4 + PR 6 folded (PR #46) — router rollout + drop wizard for fresh signups (3-state helloSeen semantics)", "done": true, "phase": 5 },
-    { "id": "phase-5-pr5-sidebar", "label": "PR 5 (PR #48) — ROSS sidebar cleanup (Today + Ross's brain) + footer wired to auth.currentUser", "done": true, "phase": 5 },
-    { "id": "phase-6-pr1a-tier-mechanism", "label": "Phase 6 PR 1A (PR #51) — template tier-gating mechanism: schema, three gate points (read/activate/client), audit log, editor field, KB docs", "done": true, "phase": 6 },
-    { "id": "phase-6-pr1b-curate", "label": "Phase 6 PR 1B (PR #53) — curated starter library (5 Free / 8 All-in split) + folded backfill URL fix on PR #51's sibling", "done": true, "phase": 6 },
-    { "id": "phase-6-pr1c-locked-list", "label": "Phase 6 PR 1C (PR #55) — tier-gated template list with locked-card upsell UX + Hi-Fi /upgrade.html comparison page (email CTA, ?from=template&id= pre-fill)", "done": true, "phase": 6 },
-    { "id": "phase-6-day-zero", "label": "Phase 6 PR 2 (PR #58) — day-zero auto-activation: new rossSeedFirstWorkflow CF + signup-service.js integration + buildLocationsFromTemplate/buildWorkflowRecord helper extraction + RTDB pointer at ross/config/firstWorkflowTemplateId", "done": true, "phase": 6 },
-    { "id": "phase-6-run-ui", "label": "Phase 6 PR 3 (PR #65) — operator-facing Run execution UI honouring all 10 inputTypes (number/temperature with auto-flag + client pre-flight requiredNote + server-422 safety net via store.pendingNoteTaskId + card watcher / yes_no / dropdown / timestamp / rating / photo/signature placeholders); auto-save on commit; sticky summary bar; inline completion banner; 40 unit tests across 4 new suites", "done": true, "phase": 6 },
-    { "id": "phase-6-pr4-home-cards", "label": "Phase 6 PR 4 (PR #72) — concierge home active-run surfacing: rossGetHomeWorkflowDigest CF + detectActiveWorkflows + 5 card variants (Overdue/InProgress/DueToday/Completed/AllClear) + LEARNING_MODE_WORKFLOW_CARD fallback + 'Missed' chip at daysLate >= 4 + home feed auto-reload on mount; 38 unit tests; two preview defects folded (nextDueDate number normalisation + canonical run schema)", "done": true, "phase": 6 },
-    { "id": "phase-6-stretch-compliance-sweep", "label": "Phase 6 stretch — Compliance Sweep as first end-to-end curated template (small inputType footprint, strongest SA-locale moat)", "done": true, "phase": 6, "pr": 83 }
+    {
+      "id": "phase-0-shipped",
+      "label": "Phase 0 — Project Status + sidebar cleanup + CORS preview fix",
+      "done": true,
+      "phase": 0
+    },
+    {
+      "id": "phase-1-shipped",
+      "label": "Phase 1 — Gap analysis & spec doc",
+      "done": true,
+      "phase": 1
+    },
+    {
+      "id": "phase-2-shipped",
+      "label": "Phase 2 — Sidebar + first-run findings wired",
+      "done": true,
+      "phase": 2
+    },
+    {
+      "id": "phase-3-shipped",
+      "label": "Phase 3 — Action handlers + snooze CF deployed",
+      "done": true,
+      "phase": 3
+    },
+    {
+      "id": "phase-4a-playbook",
+      "label": "Phase 4a — Playbook tab read-view + locationName fix",
+      "done": true,
+      "phase": 4
+    },
+    {
+      "id": "phase-4b-activity",
+      "label": "Phase 4b — Activity tab (run history + reports)",
+      "done": true,
+      "phase": 4
+    },
+    {
+      "id": "phase-4c-people",
+      "label": "Phase 4c — People tab (staff CRUD)",
+      "done": true,
+      "phase": 4
+    },
+    {
+      "id": "phase-4d1-workflow-editor",
+      "label": "Phase 4d.1 — Playbook workflow create/edit/lifecycle",
+      "done": true,
+      "phase": 4
+    },
+    {
+      "id": "phase-4d2-template-crud",
+      "label": "Phase 4d.2 — Template CRUD (superAdmin)",
+      "done": true,
+      "phase": 4
+    },
+    {
+      "id": "phase-4e1-task-editor",
+      "label": "Phase 4e.1 — Per-task inputType / inputConfig editor (existing workflow tasks)",
+      "done": true,
+      "phase": 4
+    },
+    {
+      "id": "phase-4e2-propagation",
+      "label": "Phase 4e.2 — Server propagation (subtask→task) + template-level inputType editor",
+      "done": true,
+      "phase": 4
+    },
+    {
+      "id": "phase-5-audit",
+      "label": "Phase 5 audit — confirms onboarding wiring is functional",
+      "done": true,
+      "phase": 5
+    },
+    {
+      "id": "phase-5-spec",
+      "label": "Phase 5 spec — central-funnel cleanup design doc (PR #37)",
+      "done": true,
+      "phase": 5
+    },
+    {
+      "id": "phase-5-pr1-router",
+      "label": "PR 1 (PR #39) — post-login-router + hello auth gate + helloSeen field",
+      "done": true,
+      "phase": 5
+    },
+    {
+      "id": "phase-5-pr2-signup",
+      "label": "PR 2 (PR #42) — signup v2 Hi-Fi Vue 3 rewrite + dynamic tier writes + registerUser CF closure + .validate rule + HfSelect/HfCheckbox",
+      "done": true,
+      "phase": 5
+    },
+    {
+      "id": "phase-5-pr3-homepage",
+      "label": "PR 3 (PR #44) — homepage v2 Hi-Fi promotion + workflow-centric copy + dynamic pricing + reused public hello + typographic hero panel",
+      "done": true,
+      "phase": 5
+    },
+    {
+      "id": "phase-5-pr4-rollout",
+      "label": "PR 4 + PR 6 folded (PR #46) — router rollout + drop wizard for fresh signups (3-state helloSeen semantics)",
+      "done": true,
+      "phase": 5
+    },
+    {
+      "id": "phase-5-pr5-sidebar",
+      "label": "PR 5 (PR #48) — ROSS sidebar cleanup (Today + Ross's brain) + footer wired to auth.currentUser",
+      "done": true,
+      "phase": 5
+    },
+    {
+      "id": "phase-6-pr1a-tier-mechanism",
+      "label": "Phase 6 PR 1A (PR #51) — template tier-gating mechanism: schema, three gate points (read/activate/client), audit log, editor field, KB docs",
+      "done": true,
+      "phase": 6
+    },
+    {
+      "id": "phase-6-pr1b-curate",
+      "label": "Phase 6 PR 1B (PR #53) — curated starter library (5 Free / 8 All-in split) + folded backfill URL fix on PR #51's sibling",
+      "done": true,
+      "phase": 6
+    },
+    {
+      "id": "phase-6-pr1c-locked-list",
+      "label": "Phase 6 PR 1C (PR #55) — tier-gated template list with locked-card upsell UX + Hi-Fi /upgrade.html comparison page (email CTA, ?from=template&id= pre-fill)",
+      "done": true,
+      "phase": 6
+    },
+    {
+      "id": "phase-6-day-zero",
+      "label": "Phase 6 PR 2 (PR #58) — day-zero auto-activation: new rossSeedFirstWorkflow CF + signup-service.js integration + buildLocationsFromTemplate/buildWorkflowRecord helper extraction + RTDB pointer at ross/config/firstWorkflowTemplateId",
+      "done": true,
+      "phase": 6
+    },
+    {
+      "id": "phase-6-run-ui",
+      "label": "Phase 6 PR 3 (PR #65) — operator-facing Run execution UI honouring all 10 inputTypes (number/temperature with auto-flag + client pre-flight requiredNote + server-422 safety net via store.pendingNoteTaskId + card watcher / yes_no / dropdown / timestamp / rating / photo/signature placeholders); auto-save on commit; sticky summary bar; inline completion banner; 40 unit tests across 4 new suites",
+      "done": true,
+      "phase": 6
+    },
+    {
+      "id": "phase-6-pr4-home-cards",
+      "label": "Phase 6 PR 4 (PR #72) — concierge home active-run surfacing: rossGetHomeWorkflowDigest CF + detectActiveWorkflows + 5 card variants (Overdue/InProgress/DueToday/Completed/AllClear) + LEARNING_MODE_WORKFLOW_CARD fallback + 'Missed' chip at daysLate >= 4 + home feed auto-reload on mount; 38 unit tests; two preview defects folded (nextDueDate number normalisation + canonical run schema)",
+      "done": true,
+      "phase": 6
+    },
+    {
+      "id": "phase-6-stretch-compliance-sweep",
+      "label": "Phase 6 stretch — Compliance Sweep as first end-to-end curated template (small inputType footprint, strongest SA-locale moat)",
+      "done": true,
+      "phase": 6,
+      "pr": 83
+    }
   ],
   "inProgress": [],
   "recentlyCompleted": [
-    { "title": "ROSS Cloud Functions catalog + allowed-fields per mutator — closed backlog item #12. `public/kb/features/ROSS.md#cloud-functions` is now canonical with all 22 functions documented (was 18 — added rossSeedFirstWorkflow, rossManageStaff, rossV2Snooze, rossGetHomeWorkflowDigest). New 'Allowed-fields per mutator' subsection with file:line refs for the 4 server allowedFields constants — would have caught the PR #28 t.id bug at planning time. CLOUD_FUNCTIONS_CATALOG.md gets 8-category summary + Source File Map entries for the 3 missing ross-*.js files. Field-verify rule footnote cites the three negative-confirmation PRs (#28 / #72 / #86). Automated review caught a forward-reference between in-flight PRs (cited workflow-status.js from PR #86 while #86 still open) — fixed via 'ships with PR #86' qualifier then past tense after rebase.", "pr": 87, "mergedAt": "2026-05-20" },
-    { "title": "Missed/Overdue counter consistency (PR #72 follow-up) — fix operator-reported inconsistency where home card warned about Missed workflows but Playbook + Activity tabs both said 'Overdue: 0'. Root cause: server's locData.status is 'active' forever and never updated to 'overdue' — w.status === 'overdue' filter always returned 0. New public/js/modules/ross/v2/workflow-status.js shared helper (MISSED_DAYS_THRESHOLD + computeDaysLate + isOverdue + isMissed) consumed by both stores AND detectors.js — single source of truth across three surfaces. RossPlaybook + RossActivity stat tiles use dynamic Missed/Overdue label mirroring the home card. 25 new vitest cases including a real-server-shape contract test that reproduces the operator's exact bug.", "pr": 86, "mergedAt": "2026-05-20" },
-    { "title": "Phase 6 stretch — Weekly Compliance Sweep starter template — first end-to-end curated ROSS template exercising Phase 4e.2 per-subtask inputType + inputConfig: 5 subtasks × 4 input types (2× temperature with auto-flag + requiredNote on out-of-range, yes_no, checkbox, text/maxLength 500); tier:free, weekly recurrence, daysBeforeAlert [2,1]; two files (updated seed for fresh deploys + idempotent ross-templates-add-compliance-sweep.js for live prod RTDB matching the PR #51/#58 one-off-script pattern); no CF or client changes — existing rossActivateWorkflow + rossCreateRun paths already honour the contract", "pr": 83, "mergedAt": "2026-05-20" },
-    { "title": "7-callable v2-signature sweep — mechanical migration of 7 remaining v1 (data, context) onCall handlers in functions/index.js to v2 (request) per PR #67's canonical pattern: getQMSTierInfo, getQMSUsageStats, validateQMSFeatureAccess, validateQMSWhatsAppIntegration, performanceTest, runSystemOptimization, getSystemMetrics. Each callable: signature swap + context.auth → auth + functions.https.HttpsError → HttpsError + outer-catch re-throw guard (included from the start per 2026-05-15 scope-discipline-inverse lesson — fix-X makes previously-dead validation paths newly reachable). KB catalog synced (both copies). Zero residual v1 references. None on user-facing critical path per PR #67 audit.", "pr": 82, "mergedAt": "2026-05-20" },
-    { "title": "WiFi login Hi-Fi v2 (PR 2 of 2) — wifi-login.html rewritten in Hi-Fi tokens with Sparks-only branding; adds single marketingConsent:boolean field to wifiLogins; Meraki redirect flow preserved byte-for-byte (operator guardrail); closes deferred audit findings #5-8 + #11 from PR #73 + offline-queue retry-path gap from the PR #73 review", "pr": 81, "mergedAt": "2026-05-19" }
+    {
+      "title": "OWASP remediation — all Highs + most Mediums/Lows (10 PRs #93–#102). H-4/H-7/H-10 logging+CSPRNG, H-5/H-6 CORS (new shared functions/cors-allowlist.js), H-3/H-4b, H-2 Bucket A/B (6 RTDB root reads locked to admin + userLocations child rules + design doc), H-9 npm audit (lockfile-only, all crit+high cleared), M-1 location ownerId, M-2 security headers, M-4 stored XSS in googleReviews.js, M-6/M-10/L-1/L-2 logging+createTestData gate, M-8 POPIA deletion. Every PR auto-reviewed; 2 must-fixes caught + fixed pre-merge (#96 ownerId fallback, #102 phoneNumber indexes). Consumer-mapping via 3 parallel agents drove the H-2 bucket split.",
+      "pr": "93–102",
+      "mergedAt": "2026-05-31"
+    },
+    {
+      "title": "OWASP Top-10 audit remediation — 5/5 Criticals + first Highs (#89/#90/#91). C-1 operator-precedence admin-bypass across 12 CFs (every admin guard was a no-op), C-2 hardcoded secrets → Secrets Manager + gate, C-3 getGoogleConfig admin-gate (+ shared requireAdmin), C-4 public-writable RTDB nodes, C-5 OCR SSRF allowlist, H-1 queue mutators, H-8 Storage write. #91 caught a real auth≠authz must-fix (token-only insufficient for a billable-key endpoint).",
+      "pr": "89–91",
+      "mergedAt": "2026-05-30"
+    },
+    {
+      "title": "ROSS Cloud Functions catalog + allowed-fields per mutator — closed backlog item #12. `public/kb/features/ROSS.md#cloud-functions` is now canonical with all 22 functions documented (was 18 — added rossSeedFirstWorkflow, rossManageStaff, rossV2Snooze, rossGetHomeWorkflowDigest). New 'Allowed-fields per mutator' subsection with file:line refs for the 4 server allowedFields constants — would have caught the PR #28 t.id bug at planning time. CLOUD_FUNCTIONS_CATALOG.md gets 8-category summary + Source File Map entries for the 3 missing ross-*.js files. Field-verify rule footnote cites the three negative-confirmation PRs (#28 / #72 / #86). Automated review caught a forward-reference between in-flight PRs (cited workflow-status.js from PR #86 while #86 still open) — fixed via 'ships with PR #86' qualifier then past tense after rebase.",
+      "pr": 87,
+      "mergedAt": "2026-05-20"
+    },
+    {
+      "title": "Missed/Overdue counter consistency (PR #72 follow-up) — fix operator-reported inconsistency where home card warned about Missed workflows but Playbook + Activity tabs both said 'Overdue: 0'. Root cause: server's locData.status is 'active' forever and never updated to 'overdue' — w.status === 'overdue' filter always returned 0. New public/js/modules/ross/v2/workflow-status.js shared helper (MISSED_DAYS_THRESHOLD + computeDaysLate + isOverdue + isMissed) consumed by both stores AND detectors.js — single source of truth across three surfaces. RossPlaybook + RossActivity stat tiles use dynamic Missed/Overdue label mirroring the home card. 25 new vitest cases including a real-server-shape contract test that reproduces the operator's exact bug.",
+      "pr": 86,
+      "mergedAt": "2026-05-20"
+    },
+    {
+      "title": "Phase 6 stretch — Weekly Compliance Sweep starter template — first end-to-end curated ROSS template exercising Phase 4e.2 per-subtask inputType + inputConfig: 5 subtasks × 4 input types (2× temperature with auto-flag + requiredNote on out-of-range, yes_no, checkbox, text/maxLength 500); tier:free, weekly recurrence, daysBeforeAlert [2,1]; two files (updated seed for fresh deploys + idempotent ross-templates-add-compliance-sweep.js for live prod RTDB matching the PR #51/#58 one-off-script pattern); no CF or client changes — existing rossActivateWorkflow + rossCreateRun paths already honour the contract",
+      "pr": 83,
+      "mergedAt": "2026-05-20"
+    }
   ],
   "bugs": [
     {
@@ -108,6 +254,83 @@
       "discoveredOn": "PR #58 final review",
       "blockingSprint": false,
       "notes": "A user double-clicking signup or hitting a network retry could pass the firstWorkflowSeededAt pre-check in both invocations and produce two seeded workflows. Mitigation options: (a) RTDB transaction() on the marker, OR (b) deterministic workflow ID per uid (e.g. seed_{uid}) so duplicate write is overwrite. Exposure small; consequence mild (duplicate workflow, no corruption)."
+    },
+    {
+      "title": "Unbounded-node retention policy — in-app 'Clear X' buttons are time-bombs without scheduled pruning",
+      "severity": "medium",
+      "discoveredOn": "PR #70 + #73",
+      "blockingSprint": false,
+      "notes": "Covers /scanningData, /wifiLogins, /activeUsers, /userPreferences, /rateLimitsWifi. Options: scheduled prune CF (chunked-delete pattern), TTL-on-write, or rollups. Needs product call on retention window per node."
+    },
+    {
+      "title": "updateWifiDisconnect CF for disconnect-status tracking",
+      "severity": "low",
+      "discoveredOn": "PR #73",
+      "blockingSprint": false,
+      "notes": "logUserDisconnection is now a no-op stub since the direct /activeUsers write is admin-only. Disconnect signal is best-effort browser-unload anyway; analytics filtering by status==='disconnected' see records stuck at active:true. Proper fix: small CF taking sessionID + anonUid."
+    },
+    {
+      "title": "Walled-garden audit at every deployed Meraki venue",
+      "severity": "medium",
+      "discoveredOn": "PR #73",
+      "blockingSprint": false,
+      "notes": "submitWifiLogin CF lives at *.cloudfunctions.net. If a venue's captive-portal walled garden doesn't include that host, the CF call fails silently → offline-queue fallback → guest gets WiFi but no data captured. Audit each venue's whitelist."
+    },
+    {
+      "title": "Phone normalization to E.164 in submitWifiLogin",
+      "severity": "low",
+      "discoveredOn": "PR #73",
+      "blockingSprint": false,
+      "notes": "Stores raw phoneNumber as received from intlTelInput getNumber(). libphonenumber server-side would normalize on write. Deferred to avoid the dep + audit-trail effort."
+    },
+    {
+      "title": "Open-redirect refusal log monitoring",
+      "severity": "low",
+      "discoveredOn": "PR #73",
+      "blockingSprint": false,
+      "notes": "Host-pattern whitelist on base_grant_url emits console.error on refusal but stays client-side. If a new legitimate Meraki host family appears we won't know until a guest reports a block. Fix: forward to Cloud Logging via a tiny CF."
+    },
+    {
+      "title": "/scanningData .write: auth != null audit",
+      "severity": "low",
+      "discoveredOn": "PR #70",
+      "blockingSprint": false,
+      "notes": "Permissive rule — any authed user can write. The Meraki scanner POST flow writes here continuously; tightening without breaking it needs a parallel audit + CF pattern like submitWifiLogin."
+    },
+    {
+      "title": "PR 2 — Hi-Fi v2 wifi-login rewrite (deferred findings)",
+      "severity": "medium",
+      "discoveredOn": "PR #73",
+      "blockingSprint": false,
+      "notes": "Closes deferred audit findings: dual activeUsers schemas, ipinfo.io no consent disclosure, weak email/name regex, localStorage PII unencrypted, footer cosmetic — plus offline-queue retry-path gap (post-Meraki-redirect users won't return to the captive page in-session). Flag-gated via customization/useV2WifiLogin."
+    },
+    {
+      "title": "Workflow task edit not reflected in restarted run",
+      "severity": "medium",
+      "discoveredOn": "PR #65 preview",
+      "blockingSprint": false,
+      "notes": "Operator changed a task's inputType (temperature → photo), saved, started a new run — run UI still showed the old inputType. Could be editor not persisting inputType, rossManageTask not landing, stale read, or viewing an old completed run's snapshot. Needs repro before fix."
+    },
+    {
+      "title": "Task editor UX needs single-Save + success feedback + auto-exit",
+      "severity": "low",
+      "discoveredOn": "PR #65 preview",
+      "blockingSprint": false,
+      "notes": "RossPlaybookWorkflowTasksEditor currently has a Save per row and saving doesn't exit or confirm. Desired: one bottom Save committing all dirty tasks + success message + auto-exit."
+    },
+    {
+      "title": "Subscription resolves 'enterprise' tier for the operator's test account",
+      "severity": "medium",
+      "discoveredOn": "PR #65 preview",
+      "blockingSprint": false,
+      "notes": "feature-access-control log shows Resolved tier ID: enterprise (from tierId). Tier system is free/all-in only. Operator account has legacy tierId:'enterprise'. Decide: backfill to all-in or formalize enterprise as a third tier."
+    },
+    {
+      "title": "Server auto-completes runs after a single response when required-task count is small",
+      "severity": "medium",
+      "discoveredOn": "PR #65 preview",
+      "blockingSprint": false,
+      "notes": "Auto-completion treats all tasks with required!==false as required. Seeded Daily Opening Checklist has 4 subtasks with no explicit required field → all 4 required. Operator hit 'Run is already completed' 409 implying something auto-completed prematurely. Needs focused repro."
     }
   ],
   "backlog": {
@@ -142,10 +365,26 @@
     "auditedAt": "2026-05-30",
     "summary": "Operator-supplied audit remediated across 14 PRs (#89–#102). All Criticals and Highs closed; most Mediums/Lows done. Remaining items are scoped follow-ups.",
     "severities": [
-      { "level": "Critical", "resolved": 5, "total": 5 },
-      { "level": "High", "resolved": 10, "total": 10 },
-      { "level": "Medium", "resolved": 6, "total": 10 },
-      { "level": "Low", "resolved": 4, "total": 6 }
+      {
+        "level": "Critical",
+        "resolved": 5,
+        "total": 5
+      },
+      {
+        "level": "High",
+        "resolved": 10,
+        "total": 10
+      },
+      {
+        "level": "Medium",
+        "resolved": 6,
+        "total": 10
+      },
+      {
+        "level": "Low",
+        "resolved": 4,
+        "total": 6
+      }
     ],
     "remaining": [
       "H-2 Bucket C — guests/queue/receipts root-read refactor (needs architecture decision)",
