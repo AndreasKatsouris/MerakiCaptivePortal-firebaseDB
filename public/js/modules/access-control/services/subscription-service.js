@@ -176,8 +176,9 @@ export async function createSubscription(tierId, billingCycle = 'monthly', payme
     renewalDate,
     billingCycle,
     paymentStatus: 'active',
-    features: { ...SUBSCRIPTION_TIERS[tierId].features },
-    limits: { ...SUBSCRIPTION_TIERS[tierId].limits },
+    // Phase 7 ④a: clients no longer write features/limits. The server-side
+    // entitlement resolver is the sole writer, materializing them from the tier.
+    // (This client path has no live callers; left for reference / future server routing.)
     history: {
       [now]: {
         action: 'created',
@@ -245,8 +246,8 @@ export async function updateSubscription(tierId, billingCycle = null) {
     const now = Date.now();
     const updates = {
       tierId: tierId,
-      features: { ...SUBSCRIPTION_TIERS[tierId].features },
-      limits: { ...SUBSCRIPTION_TIERS[tierId].limits },
+      // Phase 7 ④a: clients no longer write features/limits — the server-side
+      // resolver materializes them. (No live callers; kept for reference.)
       [`history/${now}`]: {
         action: 'updated',
         previousTier: currentSubscription.tierId,
@@ -403,8 +404,8 @@ export async function startFreeTrial(tierId, trialDays = 14) {
       isTrial: true,
       trialEndDate,
       paymentStatus: 'trial',
-      features: { ...SUBSCRIPTION_TIERS[tierId].features },
-      limits: { ...SUBSCRIPTION_TIERS[tierId].limits },
+      // Phase 7 ④a: clients no longer write features/limits — the server-side
+      // resolver materializes them. (No live callers; kept for reference.)
       history: {
         [now]: {
           action: 'trial_started',
