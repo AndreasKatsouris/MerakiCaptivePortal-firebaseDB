@@ -1,0 +1,1198 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>OWASP Security Audit — Sparks Hospitality | 2026-05-30</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --critical: #dc2626;
+      --critical-bg: #fef2f2;
+      --critical-border: #fca5a5;
+      --high: #ea580c;
+      --high-bg: #fff7ed;
+      --high-border: #fdba74;
+      --medium: #ca8a04;
+      --medium-bg: #fefce8;
+      --medium-border: #fde047;
+      --low: #2563eb;
+      --low-bg: #eff6ff;
+      --low-border: #93c5fd;
+      --info: #6b7280;
+      --info-bg: #f9fafb;
+      --info-border: #d1d5db;
+      --surface: #ffffff;
+      --bg: #f1f5f9;
+      --text: #0f172a;
+      --muted: #64748b;
+      --border: #e2e8f0;
+      --code-bg: #1e293b;
+      --code-text: #e2e8f0;
+      --accent: #6366f1;
+    }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      line-height: 1.6;
+      font-size: 14px;
+    }
+
+    /* ── Header ── */
+    .header {
+      background: var(--code-bg);
+      color: #f8fafc;
+      padding: 40px 48px;
+      border-bottom: 3px solid var(--critical);
+    }
+    .header-eyebrow {
+      font-size: 11px;
+      letter-spacing: 0.12em;
+      text-transform: uppercase;
+      color: #94a3b8;
+      margin-bottom: 8px;
+    }
+    .header h1 {
+      font-size: 26px;
+      font-weight: 700;
+      margin-bottom: 6px;
+    }
+    .header-meta {
+      color: #94a3b8;
+      font-size: 13px;
+      display: flex;
+      gap: 24px;
+      flex-wrap: wrap;
+      margin-top: 16px;
+    }
+    .header-meta span { display: flex; align-items: center; gap: 6px; }
+
+    /* ── Layout ── */
+    .container { max-width: 1100px; margin: 0 auto; padding: 32px 24px 64px; }
+
+    /* ── Summary bar ── */
+    .summary {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+      gap: 12px;
+      margin-bottom: 40px;
+    }
+    .summary-card {
+      background: var(--surface);
+      border-radius: 10px;
+      padding: 20px;
+      text-align: center;
+      border-top: 4px solid;
+      box-shadow: 0 1px 3px rgba(0,0,0,.07);
+    }
+    .summary-card.critical { border-color: var(--critical); }
+    .summary-card.high     { border-color: var(--high); }
+    .summary-card.medium   { border-color: var(--medium); }
+    .summary-card.low      { border-color: var(--low); }
+    .summary-card .count   { font-size: 38px; font-weight: 800; line-height: 1; }
+    .summary-card.critical .count { color: var(--critical); }
+    .summary-card.high     .count { color: var(--high); }
+    .summary-card.medium   .count { color: var(--medium); }
+    .summary-card.low      .count { color: var(--low); }
+    .summary-card .label   { font-size: 11px; letter-spacing: .08em; text-transform: uppercase; color: var(--muted); margin-top: 4px; }
+
+    /* ── Section headers ── */
+    .section-header {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      margin: 40px 0 20px;
+      padding-bottom: 12px;
+      border-bottom: 2px solid var(--border);
+    }
+    .section-badge {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      padding: 4px 12px;
+      border-radius: 999px;
+      font-size: 11px;
+      font-weight: 700;
+      letter-spacing: .06em;
+      text-transform: uppercase;
+    }
+    .badge-critical { background: var(--critical); color: #fff; }
+    .badge-high     { background: var(--high);     color: #fff; }
+    .badge-medium   { background: var(--medium);   color: #fff; }
+    .badge-low      { background: var(--low);      color: #fff; }
+
+    .section-header h2 { font-size: 18px; font-weight: 700; }
+
+    /* ── Finding cards ── */
+    .finding {
+      background: var(--surface);
+      border-radius: 10px;
+      border: 1px solid var(--border);
+      border-left: 5px solid;
+      margin-bottom: 16px;
+      overflow: hidden;
+      box-shadow: 0 1px 3px rgba(0,0,0,.05);
+    }
+    .finding.critical { border-left-color: var(--critical); }
+    .finding.high     { border-left-color: var(--high); }
+    .finding.medium   { border-left-color: var(--medium); }
+    .finding.low      { border-left-color: var(--low); }
+
+    .finding-header {
+      display: flex;
+      align-items: flex-start;
+      justify-content: space-between;
+      gap: 16px;
+      padding: 18px 20px;
+      cursor: pointer;
+      user-select: none;
+    }
+    .finding-header:hover { background: #f8fafc; }
+
+    .finding-id {
+      font-size: 11px;
+      font-weight: 700;
+      letter-spacing: .06em;
+      color: var(--muted);
+      text-transform: uppercase;
+      margin-bottom: 4px;
+    }
+    .finding-title { font-size: 15px; font-weight: 600; }
+
+    .finding-tags {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      flex-shrink: 0;
+      flex-wrap: wrap;
+      justify-content: flex-end;
+    }
+    .tag {
+      padding: 2px 8px;
+      border-radius: 4px;
+      font-size: 11px;
+      font-weight: 600;
+      white-space: nowrap;
+    }
+    .tag-owasp { background: #ede9fe; color: #5b21b6; }
+    .tag-file  { background: var(--code-bg); color: var(--code-text); font-family: monospace; }
+
+    .finding-body {
+      padding: 0 20px 20px;
+      border-top: 1px solid var(--border);
+    }
+
+    .finding-section { margin-top: 16px; }
+    .finding-section-label {
+      font-size: 11px;
+      font-weight: 700;
+      letter-spacing: .08em;
+      text-transform: uppercase;
+      color: var(--muted);
+      margin-bottom: 6px;
+    }
+    .finding-section p { font-size: 13px; line-height: 1.7; color: #334155; }
+
+    pre {
+      background: var(--code-bg);
+      color: var(--code-text);
+      border-radius: 6px;
+      padding: 14px 16px;
+      font-size: 12px;
+      line-height: 1.65;
+      overflow-x: auto;
+      font-family: 'Cascadia Code', 'Fira Code', 'Menlo', monospace;
+      margin-top: 8px;
+    }
+    code { font-family: inherit; }
+
+    .fix-box {
+      background: #f0fdf4;
+      border: 1px solid #bbf7d0;
+      border-radius: 6px;
+      padding: 12px 14px;
+      font-size: 13px;
+      color: #166534;
+      line-height: 1.7;
+    }
+    .fix-box strong { display: block; margin-bottom: 4px; }
+
+    /* ── Priority list ── */
+    .priority-section {
+      background: var(--surface);
+      border-radius: 10px;
+      border: 1px solid var(--border);
+      padding: 24px;
+      margin-bottom: 40px;
+      box-shadow: 0 1px 3px rgba(0,0,0,.05);
+    }
+    .priority-section h2 { font-size: 16px; font-weight: 700; margin-bottom: 16px; }
+    .priority-list { list-style: none; counter-reset: priority; }
+    .priority-list li {
+      counter-increment: priority;
+      display: flex;
+      align-items: baseline;
+      gap: 12px;
+      padding: 10px 0;
+      border-bottom: 1px solid var(--border);
+      font-size: 13px;
+    }
+    .priority-list li:last-child { border-bottom: none; }
+    .priority-list li::before {
+      content: counter(priority);
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      width: 22px;
+      height: 22px;
+      border-radius: 50%;
+      background: var(--code-bg);
+      color: #fff;
+      font-size: 11px;
+      font-weight: 700;
+      flex-shrink: 0;
+    }
+    .priority-ref {
+      font-family: monospace;
+      font-weight: 700;
+      font-size: 12px;
+      padding: 1px 6px;
+      border-radius: 4px;
+    }
+    .priority-ref.critical { background: var(--critical-bg); color: var(--critical); border: 1px solid var(--critical-border); }
+    .priority-ref.high     { background: var(--high-bg);     color: var(--high);     border: 1px solid var(--high-border); }
+    .priority-ref.medium   { background: var(--medium-bg);   color: var(--medium);   border: 1px solid var(--medium-border); }
+
+    /* collapsible toggle */
+    .toggle-icon { font-size: 18px; color: var(--muted); flex-shrink: 0; transition: transform .2s; }
+    .finding.open .toggle-icon { transform: rotate(180deg); }
+    .finding-body { display: none; }
+    .finding.open .finding-body { display: block; }
+
+    /* ── Responsive ── */
+    @media (max-width: 640px) {
+      .header { padding: 28px 20px; }
+      .container { padding: 24px 16px 48px; }
+      .finding-tags { display: none; }
+    }
+  </style>
+</head>
+<body>
+
+<div class="header">
+  <div class="header-eyebrow">Security Assessment Report</div>
+  <h1>OWASP Top 10 Audit — Sparks Hospitality</h1>
+  <p style="color:#94a3b8;margin-top:6px">MerakiCaptivePortal-firebaseDB · Firebase + Node.js platform</p>
+  <div class="header-meta">
+    <span>📅 Audit date: 2026-05-30</span>
+    <span>🔍 Standard: OWASP Top 10 (2021)</span>
+    <span>⚠️ Total findings: 31</span>
+  </div>
+</div>
+
+<div class="container">
+
+  <!-- Summary -->
+  <div class="summary" style="margin-top:32px">
+    <div class="summary-card critical"><div class="count">5</div><div class="label">Critical</div></div>
+    <div class="summary-card high">    <div class="count">10</div><div class="label">High</div></div>
+    <div class="summary-card medium">  <div class="count">10</div><div class="label">Medium</div></div>
+    <div class="summary-card low">     <div class="count">6</div><div class="label">Low</div></div>
+  </div>
+
+  <!-- Priority Fix Order -->
+  <div class="priority-section">
+    <h2>⚡ Recommended Fix Order</h2>
+    <ol class="priority-list">
+      <li><span class="priority-ref critical">C-1</span> Fix operator precedence bug — change <code>!decodedToken.admin === true</code> → <code>decodedToken.admin !== true</code> in 12 Cloud Functions. Complete admin bypass currently exploitable by any authenticated user.</li>
+      <li><span class="priority-ref critical">C-4</span> Change <code>receiptPatternLogs</code> and <code>debug</code> RTDB nodes from <code>.write: true</code> → <code>"auth != null &amp;&amp; auth.token.admin === true"</code>.</li>
+      <li><span class="priority-ref critical">C-2</span> Rotate both hardcoded secrets and move to Firebase Secrets Manager. Gate <code>setupInitialAdmin</code> behind an env flag set to false in production.</li>
+      <li><span class="priority-ref high">H-1</span> Add <code>verifyIdToken</code> to the 5 unauthenticated queue management Cloud Function endpoints.</li>
+      <li><span class="priority-ref high">H-8</span> Change Storage rule for <code>/receipts/</code> from <code>allow write: if true</code> → <code>allow write: if false</code>.</li>
+      <li><span class="priority-ref critical">C-3</span> Add Firebase ID token auth check to <code>getGoogleConfig</code> endpoint.</li>
+      <li><span class="priority-ref critical">C-5</span> Add URL allowlist to <code>ocrReceipt</code> before passing <code>imageUrl</code> to Vision API.</li>
+      <li><span class="priority-ref high">H-9</span> Run <code>npm audit fix</code> in both <code>/</code> and <code>/functions</code> package roots.</li>
+      <li><span class="priority-ref high">H-2</span> Tighten cross-tenant RTDB read rules on <code>guests</code>, <code>users</code>, <code>subscriptions</code>, <code>queue</code>, <code>salesData</code> nodes.</li>
+      <li><span class="priority-ref high">H-5</span> Replace <code>cors({ origin: true })</code> in <code>ross.js</code> with the <code>isAllowedOrigin</code> function already defined in <code>index.js</code>.</li>
+    </ol>
+  </div>
+
+  <!-- ══════════════ CRITICAL ══════════════ -->
+  <div class="section-header">
+    <span class="section-badge badge-critical">Critical</span>
+    <h2>Critical Severity Findings</h2>
+  </div>
+
+  <!-- C-1 -->
+  <div class="finding critical" id="C-1">
+    <div class="finding-header" onclick="toggle('C-1')">
+      <div>
+        <div class="finding-id">C-1 · A01 Broken Access Control</div>
+        <div class="finding-title">Operator precedence bug bypasses admin check on 12 Cloud Functions</div>
+      </div>
+      <div class="finding-tags">
+        <span class="tag tag-owasp">A01</span>
+        <span class="tag tag-file">functions/index.js:726,1521+</span>
+        <span class="toggle-icon">▼</span>
+      </div>
+    </div>
+    <div class="finding-body">
+      <div class="finding-section">
+        <div class="finding-section-label">What it is</div>
+        <p>The expression <code>!decodedToken.admin === true</code> evaluates as <code>(!decodedToken.admin) === true</code>. When <code>decodedToken.admin</code> is <code>true</code> (i.e., an actual admin), this returns <code>false</code> — meaning the guard never blocks anyone. Every authenticated user passes the check.</p>
+        <p style="margin-top:8px">Affected functions: <code>setAdminClaim</code>, <code>markVoucherRedeemed</code>, <code>getVoucherDetails</code>, <code>getVoucherPoolAvailability</code>, <code>updateVoucherPoolStats</code>, <code>bulkQueueOperations</code>, <code>sendQueueNotification</code>, <code>sendManualQueueAdditionNotification</code>, <code>cleanupOldQueues</code>, <code>getQueueAnalytics</code>, <code>getRealtimeQueueMetrics</code>, <code>getQueuePerformanceStats</code>.</p>
+      </div>
+      <div class="finding-section">
+        <div class="finding-section-label">Evidence</div>
+        <pre><code>// functions/index.js:726 — allows anyone to promote users to admin
+if (!callerToken.admin === true) {   // BUG: (!true) === true → false → never blocks
+
+// functions/index.js:1521 — allows any auth user to redeem vouchers
+if (!decodedToken.admin === true || !isAdminInDb) {</code></pre>
+      </div>
+      <div class="finding-section">
+        <div class="finding-section-label">Fix</div>
+        <div class="fix-box">
+          <strong>Replace all 12 occurrences:</strong>
+          <code>!decodedToken.admin === true</code> → <code>decodedToken.admin !== true</code><br/>
+          Also update compound checks: <code>decodedToken.admin !== true || !isAdminInDb</code>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- C-2 -->
+  <div class="finding critical" id="C-2">
+    <div class="finding-header" onclick="toggle('C-2')">
+      <div>
+        <div class="finding-id">C-2 · A02 Cryptographic Failures / A05 Security Misconfiguration</div>
+        <div class="finding-title">Hardcoded production secrets in committed source code</div>
+      </div>
+      <div class="finding-tags">
+        <span class="tag tag-owasp">A02</span><span class="tag tag-owasp">A05</span>
+        <span class="tag tag-file">functions/index.js:443,1250</span>
+        <span class="toggle-icon">▼</span>
+      </div>
+    </div>
+    <div class="finding-body">
+      <div class="finding-section">
+        <div class="finding-section-label">What it is</div>
+        <p>Two secrets are hardcoded in version-controlled source code. (1) The Meraki webhook shared secret — anyone who knows this can POST arbitrary scanning data. (2) The admin bootstrap secret — the <code>setupInitialAdmin</code> endpoint promotes any email to platform admin with no secondary guard.</p>
+      </div>
+      <div class="finding-section">
+        <div class="finding-section-label">Evidence</div>
+        <pre><code>// functions/index.js:443
+const sharedSecret = 'Giulietta!16'; // Replace with your shared secret
+
+// functions/index.js:1250
+const SETUP_SECRET = 'MerakiAdmin2024!'; // You should change this!</code></pre>
+      </div>
+      <div class="finding-section">
+        <div class="finding-section-label">Fix</div>
+        <div class="fix-box">
+          <strong>1.</strong> Rotate both secrets immediately.<br/>
+          <strong>2.</strong> Move to Firebase Secrets Manager: <code>firebase functions:secrets:set MERAKI_SHARED_SECRET</code><br/>
+          <strong>3.</strong> Reference via <code>process.env.MERAKI_SHARED_SECRET</code> in the function.<br/>
+          <strong>4.</strong> Gate <code>setupInitialAdmin</code> with <code>if (process.env.INITIAL_SETUP_ENABLED !== 'true') return res.status(404).end()</code> — disabled by default in production.
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- C-3 -->
+  <div class="finding critical" id="C-3">
+    <div class="finding-header" onclick="toggle('C-3')">
+      <div>
+        <div class="finding-id">C-3 · A02 Cryptographic Failures</div>
+        <div class="finding-title">Google Places API key exposed to unauthenticated public via getGoogleConfig</div>
+      </div>
+      <div class="finding-tags">
+        <span class="tag tag-owasp">A02</span>
+        <span class="tag tag-file">functions/index.js:683</span>
+        <span class="toggle-icon">▼</span>
+      </div>
+    </div>
+    <div class="finding-body">
+      <div class="finding-section">
+        <div class="finding-section-label">What it is</div>
+        <p>The <code>getGoogleConfig</code> Cloud Function returns the Google Places API key and Place ID with zero authentication. Any person on the internet can call this endpoint and receive a billable API key.</p>
+      </div>
+      <div class="finding-section">
+        <div class="finding-section-label">Evidence</div>
+        <pre><code>// functions/index.js:683
+exports.getGoogleConfig = onRequest(async (req, res) => {
+    // No auth check before this:
+    res.json({
+        apiKey: functions.config.google.places_api_key,
+        placeId: functions.config.google.place_id
+    });
+});</code></pre>
+      </div>
+      <div class="finding-section">
+        <div class="finding-section-label">Fix</div>
+        <div class="fix-box">
+          <strong>Option A (preferred):</strong> Embed the key at build time (Vite env var) and remove the endpoint entirely. Apply HTTP referrer restriction to the key in Google Cloud Console.<br/>
+          <strong>Option B:</strong> Add a valid Firebase ID token check: verify <code>req.headers.authorization</code> via <code>admin.auth().verifyIdToken()</code> before responding.
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- C-4 -->
+  <div class="finding critical" id="C-4">
+    <div class="finding-header" onclick="toggle('C-4')">
+      <div>
+        <div class="finding-id">C-4 · A01 Broken Access Control</div>
+        <div class="finding-title">receiptPatternLogs and debug RTDB nodes publicly writable without authentication</div>
+      </div>
+      <div class="finding-tags">
+        <span class="tag tag-owasp">A01</span>
+        <span class="tag tag-file">database.rules.json:384,394</span>
+        <span class="toggle-icon">▼</span>
+      </div>
+    </div>
+    <div class="finding-body">
+      <div class="finding-section">
+        <div class="finding-section-label">What it is</div>
+        <p>Both <code>receiptPatternLogs</code> and <code>debug</code> nodes have <code>.write: true</code> — completely unauthenticated. Any actor who knows the database URL can write arbitrary data. The <code>debug</code> path also collects OCR logs containing <code>phoneNumber</code> (PII).</p>
+      </div>
+      <div class="finding-section">
+        <div class="finding-section-label">Evidence</div>
+        <pre><code>// database.rules.json
+"receiptPatternLogs": {
+  ".read": "auth != null && auth.token.admin === true",
+  ".write": true,   // ← PUBLIC — no auth required
+},
+"debug": {
+  ".read": "auth != null && auth.token.admin === true",
+  ".write": true    // ← PUBLIC — no auth required
+}</code></pre>
+      </div>
+      <div class="finding-section">
+        <div class="finding-section-label">Fix</div>
+        <div class="fix-box">
+          Change both to: <code>".write": "auth != null &amp;&amp; auth.token.admin === true"</code>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- C-5 -->
+  <div class="finding critical" id="C-5">
+    <div class="finding-header" onclick="toggle('C-5')">
+      <div>
+        <div class="finding-id">C-5 · A10 Server-Side Request Forgery</div>
+        <div class="finding-title">ocrReceipt passes user-supplied imageUrl directly to Google Vision API (SSRF)</div>
+      </div>
+      <div class="finding-tags">
+        <span class="tag tag-owasp">A10</span>
+        <span class="tag tag-file">functions/index.js:3542</span>
+        <span class="toggle-icon">▼</span>
+      </div>
+    </div>
+    <div class="finding-body">
+      <div class="finding-section">
+        <div class="finding-section-label">What it is</div>
+        <p>The <code>ocrReceipt</code> endpoint accepts <code>imageUrl</code> from the request body and passes it directly to <code>detectReceiptText(imageUrl)</code> → <code>client.textDetection(imageUrl)</code>. An attacker with admin credentials can direct the Cloud Vision API to fetch arbitrary URLs, including internal GCP metadata endpoints. The same URL is also used in <code>receiptProcessor.js</code> with a bypass-able <code>.includes('twilio.com')</code> check (a hostname like <code>evil.twilio.com.attacker.com</code> passes).</p>
+      </div>
+      <div class="finding-section">
+        <div class="finding-section-label">Evidence</div>
+        <pre><code>// functions/index.js:3515
+const { imageUrl, imageData } = req.body;
+...
+} else {
+    [result] = await detectReceiptText(imageUrl);  // no allowlist — SSRF
+}
+
+// functions/receiptProcessor.js:310
+if (imageUrl.includes('twilio.com')) {  // bypassable hostname check</code></pre>
+      </div>
+      <div class="finding-section">
+        <div class="finding-section-label">Fix</div>
+        <div class="fix-box">
+          <strong>Before calling Vision API or any fetch, validate against an explicit allowlist:</strong><br/>
+          <pre style="margin-top:8px;font-size:11px">const ALLOWED_PREFIXES = [
+  'https://firebasestorage.googleapis.com/',
+  'https://storage.googleapis.com/',
+];
+const isAllowed = ALLOWED_PREFIXES.some(p => imageUrl.startsWith(p));
+if (!isAllowed) return res.status(400).json({ error: 'Invalid image URL' });</pre>
+          Also fix the <code>receiptProcessor.js</code> check to use <code>new URL(imageUrl).hostname.endsWith('.twilio.com')</code>.
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ══════════════ HIGH ══════════════ -->
+  <div class="section-header">
+    <span class="section-badge badge-high">High</span>
+    <h2>High Severity Findings</h2>
+  </div>
+
+  <!-- H-1 -->
+  <div class="finding high" id="H-1">
+    <div class="finding-header" onclick="toggle('H-1')">
+      <div>
+        <div class="finding-id">H-1 · A01 Broken Access Control</div>
+        <div class="finding-title">5 queue management Cloud Functions have no authentication</div>
+      </div>
+      <div class="finding-tags">
+        <span class="tag tag-owasp">A01</span>
+        <span class="tag tag-file">functions/index.js:1692–1909</span>
+        <span class="toggle-icon">▼</span>
+      </div>
+    </div>
+    <div class="finding-body">
+      <div class="finding-section">
+        <div class="finding-section-label">What it is</div>
+        <p>Five public endpoints — <code>addGuestToQueue</code>, <code>removeGuestFromQueue</code>, <code>updateQueueEntryStatus</code>, <code>getQueueStatus</code>, <code>processQueueMessage</code> — pass <code>req.body</code> directly to queue logic without any token verification. Any unauthenticated caller can add/remove guests or mark entries as served at any restaurant.</p>
+      </div>
+      <div class="finding-section">
+        <div class="finding-section-label">Evidence</div>
+        <pre><code>exports.addGuestToQueue = functions.https.onRequest(async (req, res) => {
+    return cors(req, res, async () => {
+        // No auth check — req.body passed directly
+        const result = await addGuestToQueue(req.body);
+    });
+});</code></pre>
+      </div>
+      <div class="finding-section">
+        <div class="finding-section-label">Fix</div>
+        <div class="fix-box">
+          Add <code>verifyIdToken</code> (or Firebase anonymous auth check) at the top of all five handlers before executing queue logic. Admin operations additionally require the admin claim.
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- H-2 -->
+  <div class="finding high" id="H-2">
+    <div class="finding-header" onclick="toggle('H-2')">
+      <div>
+        <div class="finding-id">H-2 · A01 Broken Access Control</div>
+        <div class="finding-title">guests node (+ 8 others) readable by any authenticated user — cross-tenant PII leak</div>
+      </div>
+      <div class="finding-tags">
+        <span class="tag tag-owasp">A01</span>
+        <span class="tag tag-file">database.rules.json:13</span>
+        <span class="toggle-icon">▼</span>
+      </div>
+    </div>
+    <div class="finding-body">
+      <div class="finding-section">
+        <div class="finding-section-label">What it is</div>
+        <p>The root <code>guests</code> node has <code>.read: "auth != null"</code>. Any authenticated user — including a patron who authenticated via WiFi login — can read the entire guest database across all tenants: names, phone numbers, emails, marketing consent flags. Same issue affects <code>users</code>, <code>subscriptions</code>, <code>receipts</code>, <code>salesData</code>, <code>salesDataIndex</code>, <code>forecasts</code>, <code>forecastIndex</code>, and <code>queue</code>.</p>
+      </div>
+      <div class="finding-section">
+        <div class="finding-section-label">Evidence</div>
+        <pre><code>// database.rules.json:13
+"guests": {
+  ".read": "auth != null",  // ALL authenticated users — no tenant scoping
+  ...
+}</code></pre>
+      </div>
+      <div class="finding-section">
+        <div class="finding-section-label">Fix</div>
+        <div class="fix-box">
+          Scope root reads to <code>"auth.token.admin === true"</code>. Grant per-record reads to the owning tenant only (via location claim or <code>userLocations</code> cross-reference). Apply consistently to all 9 affected nodes.
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- H-3 -->
+  <div class="finding high" id="H-3">
+    <div class="finding-header" onclick="toggle('H-3')">
+      <div>
+        <div class="finding-id">H-3 · A02 Cryptographic Failures</div>
+        <div class="finding-title">Duplicate / mismatched Firebase project config in admin-claims.js</div>
+      </div>
+      <div class="finding-tags">
+        <span class="tag tag-owasp">A02</span>
+        <span class="tag tag-file">public/js/auth/admin-claims.js:6</span>
+        <span class="toggle-icon">▼</span>
+      </div>
+    </div>
+    <div class="finding-body">
+      <div class="finding-section">
+        <div class="finding-section-label">What it is</div>
+        <p>A second distinct <code>firebaseConfig</code> object in <code>admin-claims.js</code> has a different <code>messagingSenderId</code> (<code>854311920907</code>) and <code>apiKey</code> from the main config (<code>899985637961</code>). This indicates a stale configuration from a different Firebase project. If that secondary project has weaker security rules, it could be exploited.</p>
+      </div>
+      <div class="finding-section">
+        <div class="finding-section-label">Evidence</div>
+        <pre><code>// public/js/auth/admin-claims.js:6
+const firebaseConfig = {
+    apiKey: "AIzaSyBqXVRPtq-DGbXMUAhxHH8B10MOV5OZkzI",  // different key
+    messagingSenderId: "854311920907"  // different project
+};
+
+// public/js/config/firebase-config.js:11
+apiKey: "AIzaSyBf96GNLhtz6FDdbLxIW9efh98WG__eQmk",
+// messagingSenderId: "899985637961"</code></pre>
+      </div>
+      <div class="finding-section">
+        <div class="finding-section-label">Fix</div>
+        <div class="fix-box">
+          Remove the inline config from <code>admin-claims.js</code> and import from the shared <code>firebase-config.js</code>. Verify that all client pages use a single Firebase project.
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- H-4 -->
+  <div class="finding high" id="H-4">
+    <div class="finding-header" onclick="toggle('H-4')">
+      <div>
+        <div class="finding-id">H-4 · A02 Cryptographic Failures</div>
+        <div class="finding-title">Math.random() used for temporary password generation (non-CSPRNG)</div>
+      </div>
+      <div class="finding-tags">
+        <span class="tag tag-owasp">A02</span>
+        <span class="tag tag-file">functions/index.js:1157</span>
+        <span class="toggle-icon">▼</span>
+      </div>
+    </div>
+    <div class="finding-body">
+      <div class="finding-section">
+        <div class="finding-section-label">What it is</div>
+        <p>Temporary passwords are generated using <code>Math.random()</code> in two places. <code>Math.random()</code> is not a cryptographically secure PRNG — its output can be predicted if the seed state is known.</p>
+      </div>
+      <div class="finding-section">
+        <div class="finding-section-label">Evidence</div>
+        <pre><code>// functions/index.js:1157
+tempPassword += chars.charAt(Math.floor(Math.random() * chars.length));
+
+// enhanced-user-subscription-manager.js:886
+password += chars.charAt(Math.floor(Math.random() * chars.length));</code></pre>
+      </div>
+      <div class="finding-section">
+        <div class="finding-section-label">Fix</div>
+        <div class="fix-box">
+          <strong>In Cloud Functions (Node.js):</strong> <code>const { randomInt } = require('crypto'); randomInt(0, chars.length)</code><br/>
+          <strong>In client-side JS:</strong> <code>window.crypto.getRandomValues(new Uint32Array(1))[0] % chars.length</code>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- H-5 -->
+  <div class="finding high" id="H-5">
+    <div class="finding-header" onclick="toggle('H-5')">
+      <div>
+        <div class="finding-id">H-5 · A05 Security Misconfiguration</div>
+        <div class="finding-title">CORS allows any origin on all ROSS Cloud Function endpoints</div>
+      </div>
+      <div class="finding-tags">
+        <span class="tag tag-owasp">A05</span>
+        <span class="tag tag-file">functions/ross.js:15</span>
+        <span class="toggle-icon">▼</span>
+      </div>
+    </div>
+    <div class="finding-body">
+      <div class="finding-section">
+        <div class="finding-section-label">What it is</div>
+        <p>All ROSS Cloud Functions use <code>cors({ origin: true })</code>, which reflects any origin. Any website can make cross-origin requests to ROSS endpoints (workflow templates, staff data, audit logs, run records) while using the victim admin's browser credentials. <code>functions/index.js</code> already has an <code>isAllowedOrigin</code> allowlist — <code>ross.js</code> doesn't use it.</p>
+      </div>
+      <div class="finding-section">
+        <div class="finding-section-label">Evidence</div>
+        <pre><code>// functions/ross.js:15
+const cors = require('cors')({ origin: true });  // reflects ANY origin</code></pre>
+      </div>
+      <div class="finding-section">
+        <div class="finding-section-label">Fix</div>
+        <div class="fix-box">
+          Import and reuse the <code>isAllowedOrigin</code> function from <code>index.js</code>:<br/>
+          <code>const cors = require('cors')({ origin: isAllowedOrigin });</code>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- H-6 -->
+  <div class="finding high" id="H-6">
+    <div class="finding-header" onclick="toggle('H-6')">
+      <div>
+        <div class="finding-id">H-6 · A07 Authentication Failures</div>
+        <div class="finding-title">setAdminClaim endpoint missing CORS middleware</div>
+      </div>
+      <div class="finding-tags">
+        <span class="tag tag-owasp">A07</span>
+        <span class="tag tag-file">functions/index.js:694</span>
+        <span class="toggle-icon">▼</span>
+      </div>
+    </div>
+    <div class="finding-body">
+      <div class="finding-section">
+        <div class="finding-section-label">What it is</div>
+        <p><code>setAdminClaim</code> is an <code>onRequest</code> function that does not apply the <code>cors</code> middleware, unlike other state-changing endpoints. Combined with C-1's broken admin check, this endpoint can be called from any origin without CORS preflight restrictions.</p>
+      </div>
+      <div class="finding-section">
+        <div class="finding-section-label">Fix</div>
+        <div class="fix-box">
+          Wrap the handler body in <code>cors(req, res, async () => { ... })</code> using the same <code>isAllowedOrigin</code> configuration as other endpoints.
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- H-7 -->
+  <div class="finding high" id="H-7">
+    <div class="finding-header" onclick="toggle('H-7')">
+      <div>
+        <div class="finding-id">H-7 · A09 Security Logging</div>
+        <div class="finding-title">Full request headers (including Authorization JWT) logged to Cloud Logging</div>
+      </div>
+      <div class="finding-tags">
+        <span class="tag tag-owasp">A09</span>
+        <span class="tag tag-file">functions/index.js:697,770,858</span>
+        <span class="toggle-icon">▼</span>
+      </div>
+    </div>
+    <div class="finding-body">
+      <div class="finding-section">
+        <div class="finding-section-label">What it is</div>
+        <p>Three functions log <code>headers: req.headers</code> in their entirety. The <code>req.headers</code> object includes the <code>Authorization: Bearer &lt;JWT&gt;</code> header. Firebase ID tokens logged in cleartext can be extracted and used to impersonate users during the token's up-to-1-hour validity window.</p>
+      </div>
+      <div class="finding-section">
+        <div class="finding-section-label">Evidence</div>
+        <pre><code>// functions/index.js:858 (createUserAccount)
+console.log('[createUserAccount] Received request:', {
+    method: req.method,
+    headers: req.headers   // ← includes Authorization: Bearer &lt;JWT&gt;
+});
+// Same pattern at lines 697 (setAdminClaim) and 770 (setupInitialAdmin)</code></pre>
+      </div>
+      <div class="finding-section">
+        <div class="finding-section-label">Fix</div>
+        <div class="fix-box">
+          Never log <code>req.headers</code>. Log only <code>req.method</code>, <code>req.headers['content-type']</code>, and the caller's UID after token verification.
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- H-8 -->
+  <div class="finding high" id="H-8">
+    <div class="finding-header" onclick="toggle('H-8')">
+      <div>
+        <div class="finding-id">H-8 · A02 Cryptographic Failures</div>
+        <div class="finding-title">Firebase Storage /receipts/ path has public unauthenticated write access</div>
+      </div>
+      <div class="finding-tags">
+        <span class="tag tag-owasp">A02</span>
+        <span class="tag tag-file">storage.rules:17</span>
+        <span class="toggle-icon">▼</span>
+      </div>
+    </div>
+    <div class="finding-body">
+      <div class="finding-section">
+        <div class="finding-section-label">What it is</div>
+        <p>The Storage rule for <code>/receipts/{receiptFile}</code> has <code>allow write: if true</code> — unconditional public write. Any unauthenticated actor can upload arbitrary files. Cloud Functions writing to Storage use the Admin SDK which bypasses rules entirely, so this <code>if true</code> is unnecessary and dangerous.</p>
+      </div>
+      <div class="finding-section">
+        <div class="finding-section-label">Evidence</div>
+        <pre><code>// storage.rules:15
+match /receipts/{receiptFile} {
+  allow read: if request.auth != null;
+  allow write: if true;  // ← unauthenticated public write
+}</code></pre>
+      </div>
+      <div class="finding-section">
+        <div class="finding-section-label">Fix</div>
+        <div class="fix-box">
+          Change to <code>allow write: if false;</code> — Cloud Functions use the Admin SDK and are unaffected.
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- H-9 -->
+  <div class="finding high" id="H-9">
+    <div class="finding-header" onclick="toggle('H-9')">
+      <div>
+        <div class="finding-id">H-9 · A06 Vulnerable Components</div>
+        <div class="finding-title">2 critical + 11 high severity npm vulnerabilities in dependencies</div>
+      </div>
+      <div class="finding-tags">
+        <span class="tag tag-owasp">A06</span>
+        <span class="tag tag-file">package.json, functions/package.json</span>
+        <span class="toggle-icon">▼</span>
+      </div>
+    </div>
+    <div class="finding-body">
+      <div class="finding-section">
+        <div class="finding-section-label">What it is</div>
+        <p><code>npm audit</code> reports 30 vulnerabilities in the root package (2 critical, 11 high) and 22 in the functions package (1 critical, 6 high).</p>
+        <p style="margin-top:8px"><strong>Critical:</strong> <code>fast-xml-parser &lt;= 5.6.0</code> (XML injection, via firebase-admin), <code>protobufjs &lt;= 7.5.7</code> (prototype pollution, via @google-cloud/vision). <strong>High:</strong> <code>axios</code>, <code>express</code>, <code>flatted</code>.</p>
+      </div>
+      <div class="finding-section">
+        <div class="finding-section-label">Fix</div>
+        <div class="fix-box">
+          <code>npm audit fix</code> in both <code>/</code> and <code>/functions</code>. Manually upgrade <code>axios</code> and <code>express</code> to latest patch versions where auto-fix fails due to breaking changes. Pin <code>firebase-admin</code> to a version that transitively resolves <code>protobufjs &gt;= 7.5.8</code>.
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- H-10 -->
+  <div class="finding high" id="H-10">
+    <div class="finding-header" onclick="toggle('H-10')">
+      <div>
+        <div class="finding-id">H-10 · A09 Security Logging</div>
+        <div class="finding-title">WhatsApp webhook logs full Twilio POST body including guest phone numbers (POPIA violation)</div>
+      </div>
+      <div class="finding-tags">
+        <span class="tag tag-owasp">A09</span>
+        <span class="tag tag-file">receiveWhatsappMessageEnhanced.js:1004</span>
+        <span class="toggle-icon">▼</span>
+      </div>
+    </div>
+    <div class="finding-body">
+      <div class="finding-section">
+        <div class="finding-section-label">What it is</div>
+        <p>The production webhook handler logs the complete Twilio POST body. This includes guest phone numbers (<code>From</code>), message text (<code>Body</code>), and destination number — all PII under POPIA (South Africa's data protection law).</p>
+      </div>
+      <div class="finding-section">
+        <div class="finding-section-label">Evidence</div>
+        <pre><code>// receiveWhatsappMessageEnhanced.js:1004
+console.log('Received payload:', JSON.stringify(req.body, null, 2));
+// Logs: From, To, Body, MessageSid, NumMedia, MediaUrl0, etc.</code></pre>
+      </div>
+      <div class="finding-section">
+        <div class="finding-section-label">Fix</div>
+        <div class="fix-box">
+          Remove or redact. Log only non-PII fields: <code>{ MessageSid: req.body.MessageSid, To: req.body.To, NumMedia: req.body.NumMedia }</code>. Never log <code>From</code>, <code>Body</code>, or <code>MediaUrl</code>.
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ══════════════ MEDIUM ══════════════ -->
+  <div class="section-header">
+    <span class="section-badge badge-medium">Medium</span>
+    <h2>Medium Severity Findings</h2>
+  </div>
+
+  <!-- M-1 -->
+  <div class="finding medium" id="M-1">
+    <div class="finding-header" onclick="toggle('M-1')">
+      <div>
+        <div class="finding-id">M-1 · A04 Insecure Design</div>
+        <div class="finding-title">Location creation allows arbitrary ownerId — no server-side ownership validation</div>
+      </div>
+      <div class="finding-tags"><span class="tag tag-owasp">A04</span><span class="tag tag-file">database.rules.json:43</span><span class="toggle-icon">▼</span></div>
+    </div>
+    <div class="finding-body">
+      <div class="finding-section">
+        <div class="finding-section-label">What it is</div>
+        <p>The <code>!data.exists()</code> creation path on <code>$locationId</code> permits any authenticated user to create a location record with <code>ownerId</code> set to any UID. No <code>.validate</code> rule enforces <code>newData.child('ownerId').val() === auth.uid</code>.</p>
+      </div>
+      <div class="finding-section">
+        <div class="finding-section-label">Fix</div>
+        <div class="fix-box">
+          Add: <code>".validate": "newData.child('ownerId').val() === auth.uid"</code> on the <code>$locationId</code> node, or gate all location creation through a Cloud Function that stamps <code>ownerId</code> server-side.
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- M-2 -->
+  <div class="finding medium" id="M-2">
+    <div class="finding-header" onclick="toggle('M-2')">
+      <div>
+        <div class="finding-id">M-2 · A05 Security Misconfiguration</div>
+        <div class="finding-title">Missing security headers — CSP, X-Frame-Options, HSTS, X-Content-Type-Options</div>
+      </div>
+      <div class="finding-tags"><span class="tag tag-owasp">A05</span><span class="tag tag-file">firebase.json</span><span class="toggle-icon">▼</span></div>
+    </div>
+    <div class="finding-body">
+      <div class="finding-section">
+        <div class="finding-section-label">What it is</div>
+        <p>Firebase Hosting only sets <code>Content-Type</code> and <code>Cache-Control</code>. The admin dashboard is frameable from any domain (<code>clickjacking</code>), MIME sniffing is unrestricted, and HTTPS is not enforced via HSTS.</p>
+      </div>
+      <div class="finding-section">
+        <div class="finding-section-label">Fix</div>
+        <div class="fix-box">
+          Add a <code>headers</code> block in <code>firebase.json</code> for <code>"source": "**"</code>:<br/>
+          <code>X-Frame-Options: DENY</code> · <code>X-Content-Type-Options: nosniff</code> · <code>Referrer-Policy: strict-origin-when-cross-origin</code> · <code>Strict-Transport-Security: max-age=31536000; includeSubDomains</code> · <code>Content-Security-Policy</code> (scoped to known CDNs).
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- M-3 -->
+  <div class="finding medium" id="M-3">
+    <div class="finding-header" onclick="toggle('M-3')">
+      <div>
+        <div class="finding-id">M-3 · A08 Software and Data Integrity</div>
+        <div class="finding-title">No Subresource Integrity (SRI) on CDN-loaded scripts across all HTML pages</div>
+      </div>
+      <div class="finding-tags"><span class="tag tag-owasp">A08</span><span class="tag tag-file">All HTML pages</span><span class="toggle-icon">▼</span></div>
+    </div>
+    <div class="finding-body">
+      <div class="finding-section">
+        <div class="finding-section-label">What it is</div>
+        <p>Every HTML page loads Bootstrap, Vue 3, SweetAlert2, Font Awesome, Chart.js, Lodash, and PapaParse from public CDNs without <code>integrity=</code> attributes. A CDN compromise or BGP hijack would result in arbitrary JS execution on every page including the admin dashboard.</p>
+      </div>
+      <div class="finding-section">
+        <div class="finding-section-label">Fix</div>
+        <div class="fix-box">
+          Generate SRI hashes: <code>openssl dgst -sha384 -binary &lt;file&gt; | openssl base64 -A</code><br/>
+          Add <code>integrity="sha384-..."</code> and <code>crossorigin="anonymous"</code> to every external <code>&lt;script&gt;</code> and <code>&lt;link&gt;</code>. Pin exact versions (e.g., <code>sweetalert2@11.14.5</code> not <code>@11</code>).
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- M-4 -->
+  <div class="finding medium" id="M-4">
+    <div class="finding-header" onclick="toggle('M-4')">
+      <div>
+        <div class="finding-id">M-4 · A03 Injection</div>
+        <div class="finding-title">googleReviews.js renders unescaped review data directly into innerHTML (stored XSS)</div>
+      </div>
+      <div class="finding-tags"><span class="tag tag-owasp">A03</span><span class="tag tag-file">public/js/googleReviews.js:231</span><span class="toggle-icon">▼</span></div>
+    </div>
+    <div class="finding-body">
+      <div class="finding-section">
+        <div class="finding-section-label">What it is</div>
+        <p>The <code>tableBody.innerHTML</code> assignment interpolates <code>review.reviewerName</code>, <code>review.text</code>, <code>review.response</code>, <code>review.authorUrl</code> directly without calling <code>escapeHtml()</code>. If any review from RTDB or Google Places API contains <code>&lt;script&gt;</code> tags or event handler attributes, it will execute in the admin's browser.</p>
+      </div>
+      <div class="finding-section">
+        <div class="finding-section-label">Evidence</div>
+        <pre><code>// public/js/googleReviews.js:231
+tableBody.innerHTML = this.state.reviews.map(review => `
+    &lt;div class="fw-bold"&gt;${review.reviewerName}&lt;/div&gt;  &lt;!-- unescaped --&gt;
+    &lt;p class="mb-1"&gt;${review.text}&lt;/p&gt;                 &lt;!-- unescaped --&gt;
+    &lt;p class="mb-0"&gt;${review.response}&lt;/p&gt;              &lt;!-- unescaped --&gt;
+    &lt;a href="${review.authorUrl}"&gt;...&lt;/a&gt;               &lt;!-- unescaped URL --&gt;
+`);</code></pre>
+      </div>
+      <div class="finding-section">
+        <div class="finding-section-label">Fix</div>
+        <div class="fix-box">
+          Wrap every interpolated value with <code>escapeHtml()</code> (already defined in the codebase). For URL fields, additionally validate they start with <code>https://</code> before use in <code>href</code>.
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- M-5 -->
+  <div class="finding medium" id="M-5">
+    <div class="finding-header" onclick="toggle('M-5')">
+      <div>
+        <div class="finding-id">M-5 · A01 Broken Access Control</div>
+        <div class="finding-title">whatsapp-numbers and location-whatsapp-mapping broadly readable/writable</div>
+      </div>
+      <div class="finding-tags"><span class="tag tag-owasp">A01</span><span class="tag tag-file">database.rules.json:316</span><span class="toggle-icon">▼</span></div>
+    </div>
+    <div class="finding-body">
+      <div class="finding-section">
+        <div class="finding-section-label">What it is</div>
+        <p>Both nodes have root-level <code>.read: "auth != null"</code> and <code>.write: "auth != null"</code>. Any authenticated user can enumerate all WhatsApp numbers registered to the platform and create new records without ownership checks.</p>
+      </div>
+      <div class="finding-section">
+        <div class="finding-section-label">Fix</div>
+        <div class="fix-box">
+          Restrict root reads to <code>"auth.token.admin === true"</code>. Add <code>.validate</code> on creation to enforce <code>newData.child('userId').val() === auth.uid</code>.
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- M-6 -->
+  <div class="finding medium" id="M-6">
+    <div class="finding-header" onclick="toggle('M-6')">
+      <div>
+        <div class="finding-id">M-6 · A09 Security Logging</div>
+        <div class="finding-title">twilioClient.js logs Twilio credential availability on every cold start</div>
+      </div>
+      <div class="finding-tags"><span class="tag tag-owasp">A09</span><span class="tag tag-file">functions/twilioClient.js:8</span><span class="toggle-icon">▼</span></div>
+    </div>
+    <div class="finding-body">
+      <div class="finding-section">
+        <div class="finding-section-label">Evidence</div>
+        <pre><code>// functions/twilioClient.js:8
+console.log('TWILIO_SID:', accountSid || 'Not set');
+console.log('TWILIO_TOKEN:', authToken || 'Not set');</code></pre>
+      </div>
+      <div class="finding-section">
+        <div class="finding-section-label">Fix</div>
+        <div class="fix-box">
+          Remove these log lines. If a startup health check is needed, log only boolean presence: <code>console.log('Twilio configured:', { hasSid: !!accountSid, hasToken: !!authToken })</code>.
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- M-7 -->
+  <div class="finding medium" id="M-7">
+    <div class="finding-header" onclick="toggle('M-7')">
+      <div>
+        <div class="finding-id">M-7 · A04 Insecure Design</div>
+        <div class="finding-title">admin-claims node (all admin UIDs) readable by any authenticated user</div>
+      </div>
+      <div class="finding-tags"><span class="tag tag-owasp">A04</span><span class="tag tag-file">database.rules.json:61</span><span class="toggle-icon">▼</span></div>
+    </div>
+    <div class="finding-body">
+      <div class="finding-section">
+        <div class="finding-section-label">What it is</div>
+        <p><code>.read: "auth != null"</code> on <code>admin-claims</code> means any authenticated user (including anonymous WiFi-login users) can enumerate the UIDs of all platform administrators. This assists targeted attacks.</p>
+      </div>
+      <div class="finding-section">
+        <div class="finding-section-label">Fix</div>
+        <div class="fix-box">
+          Change to: <code>".read": "auth != null &amp;&amp; auth.token.admin === true"</code>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- M-8 -->
+  <div class="finding medium" id="M-8">
+    <div class="finding-header" onclick="toggle('M-8')">
+      <div>
+        <div class="finding-id">M-8 · A04 Insecure Design</div>
+        <div class="finding-title">POPIA data deletion incomplete — wifiLogins, bookings, queue, WhatsApp history not deleted</div>
+      </div>
+      <div class="finding-tags"><span class="tag tag-owasp">A04</span><span class="tag tag-file">functions/dataManagement.js:48</span><span class="toggle-icon">▼</span></div>
+    </div>
+    <div class="finding-body">
+      <div class="finding-section">
+        <div class="finding-section-label">What it is</div>
+        <p>The <code>deleteUserData()</code> function deletes <code>guests/</code>, <code>guest-receipts/</code>, <code>guest-rewards/</code>, but does not delete <code>wifiLogins/</code>, <code>activeUsers/</code>, <code>bookings/</code>, <code>queue/</code> entries, or <code>whatsapp-message-history/</code> — all of which contain guest PII. Under POPIA (mandatory for this platform's South African market), all personal data must be deleted on request.</p>
+      </div>
+      <div class="finding-section">
+        <div class="finding-section-label">Fix</div>
+        <div class="fix-box">
+          Extend <code>deleteUserData()</code> to null out or delete entries in <code>wifiLogins</code>, <code>bookings</code>, <code>whatsapp-message-history</code>, and <code>queue</code> nodes matching the guest's phone number.
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- M-9 -->
+  <div class="finding medium" id="M-9">
+    <div class="finding-header" onclick="toggle('M-9')">
+      <div>
+        <div class="finding-id">M-9 · A07 Authentication Failures</div>
+        <div class="finding-title">No MFA enforcement for admin accounts</div>
+      </div>
+      <div class="finding-tags"><span class="tag tag-owasp">A07</span><span class="tag tag-file">Admin auth config</span><span class="toggle-icon">▼</span></div>
+    </div>
+    <div class="finding-body">
+      <div class="finding-section">
+        <div class="finding-section-label">What it is</div>
+        <p>Admin accounts controlling multi-tenant restaurant data, campaign management, and user account creation use standard email/password with no MFA enforcement. Firebase supports phone-based or TOTP-based MFA as a custom claim gate.</p>
+      </div>
+      <div class="finding-section">
+        <div class="finding-section-label">Fix</div>
+        <div class="fix-box">
+          Enable and enforce MFA for accounts with <code>auth.token.admin === true</code>. Gate admin page access on <code>user.multiFactor.enrolledFactors.length > 0</code> in the page guard.
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- M-10 -->
+  <div class="finding medium" id="M-10">
+    <div class="finding-header" onclick="toggle('M-10')">
+      <div>
+        <div class="finding-id">M-10 · A05 Security Misconfiguration</div>
+        <div class="finding-title">createTestData endpoint deployed to production with wildcard CORS and no authentication</div>
+      </div>
+      <div class="finding-tags"><span class="tag tag-owasp">A05</span><span class="tag tag-file">functions/index.js:150</span><span class="toggle-icon">▼</span></div>
+    </div>
+    <div class="finding-body">
+      <div class="finding-section">
+        <div class="finding-section-label">What it is</div>
+        <p>The <code>createTestData</code> endpoint sets <code>Access-Control-Allow-Origin: *</code> and accepts POST/GET/DELETE from any origin with no authentication token check. It is deployed to production.</p>
+      </div>
+      <div class="finding-section">
+        <div class="finding-section-label">Fix</div>
+        <div class="fix-box">
+          Gate with <code>if (process.env.NODE_ENV !== 'development') return res.status(404).end();</code> at the top of the handler, or remove the function from production deployment entirely.
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ══════════════ LOW ══════════════ -->
+  <div class="section-header">
+    <span class="section-badge badge-low">Low</span>
+    <h2>Low Severity Findings</h2>
+  </div>
+
+  <!-- Low table -->
+  <div style="background:var(--surface);border-radius:10px;border:1px solid var(--border);overflow:hidden;box-shadow:0 1px 3px rgba(0,0,0,.05)">
+    <table style="width:100%;border-collapse:collapse;font-size:13px">
+      <thead>
+        <tr style="background:#f8fafc;border-bottom:2px solid var(--border)">
+          <th style="padding:12px 16px;text-align:left;font-size:11px;letter-spacing:.06em;text-transform:uppercase;color:var(--muted);width:60px">ID</th>
+          <th style="padding:12px 16px;text-align:left;font-size:11px;letter-spacing:.06em;text-transform:uppercase;color:var(--muted)">Description</th>
+          <th style="padding:12px 16px;text-align:left;font-size:11px;letter-spacing:.06em;text-transform:uppercase;color:var(--muted);width:220px">Location</th>
+          <th style="padding:12px 16px;text-align:left;font-size:11px;letter-spacing:.06em;text-transform:uppercase;color:var(--muted);width:60px">OWASP</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr style="border-bottom:1px solid var(--border)">
+          <td style="padding:12px 16px;font-weight:700;color:var(--low)">L-1</td>
+          <td style="padding:12px 16px"><code>verifyAdminStatus</code> logs full decoded JWT token object (including email, custom claims)</td>
+          <td style="padding:12px 16px"><code style="font-size:11px">functions/index.js:800</code></td>
+          <td style="padding:12px 16px"><span class="tag tag-owasp">A09</span></td>
+        </tr>
+        <tr style="border-bottom:1px solid var(--border)">
+          <td style="padding:12px 16px;font-weight:700;color:var(--low)">L-2</td>
+          <td style="padding:12px 16px">JWT token prefix (50 chars) logged in OCR receipt function — aids token structure analysis</td>
+          <td style="padding:12px 16px"><code style="font-size:11px">functions/index.js:3499</code></td>
+          <td style="padding:12px 16px"><span class="tag tag-owasp">A09</span></td>
+        </tr>
+        <tr style="border-bottom:1px solid var(--border)">
+          <td style="padding:12px 16px;font-weight:700;color:var(--low)">L-3</td>
+          <td style="padding:12px 16px"><code>rewards</code> root node readable by any authenticated user — cross-tenant enumeration</td>
+          <td style="padding:12px 16px"><code style="font-size:11px">database.rules.json:69</code></td>
+          <td style="padding:12px 16px"><span class="tag tag-owasp">A01</span></td>
+        </tr>
+        <tr style="border-bottom:1px solid var(--border)">
+          <td style="padding:12px 16px;font-weight:700;color:var(--low)">L-4</td>
+          <td style="padding:12px 16px">Minimum password length is Firebase's default 6 characters — NIST SP 800-63B recommends 8+</td>
+          <td style="padding:12px 16px"><code style="font-size:11px">functions/index.js:1098</code></td>
+          <td style="padding:12px 16px"><span class="tag tag-owasp">A07</span></td>
+        </tr>
+        <tr style="border-bottom:1px solid var(--border)">
+          <td style="padding:12px 16px;font-weight:700;color:var(--low)">L-5</td>
+          <td style="padding:12px 16px">Emulator config (including port assignments) committed in production <code>firebase.json</code></td>
+          <td style="padding:12px 16px"><code style="font-size:11px">firebase.json:111</code></td>
+          <td style="padding:12px 16px"><span class="tag tag-owasp">A05</span></td>
+        </tr>
+        <tr>
+          <td style="padding:12px 16px;font-weight:700;color:var(--low)">L-6</td>
+          <td style="padding:12px 16px">Build script does not use <code>npm ci</code> — lockfile integrity not enforced, dependency versions may drift</td>
+          <td style="padding:12px 16px"><code style="font-size:11px">scripts/build.js</code></td>
+          <td style="padding:12px 16px"><span class="tag tag-owasp">A08</span></td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+
+  <p style="text-align:center;color:var(--muted);font-size:12px;margin-top:40px">
+    Generated by Claude Code security-auditor · Sparks Hospitality · 2026-05-30
+  </p>
+
+</div>
+
+<script>
+  function toggle(id) {
+    const el = document.getElementById(id);
+    el.classList.toggle('open');
+  }
+  // Open critical by default
+  ['C-1','C-2','C-3','C-4','C-5'].forEach(id => {
+    document.getElementById(id)?.classList.add('open');
+  });
+</script>
+</body>
+</html>
