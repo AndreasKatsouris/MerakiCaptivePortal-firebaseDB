@@ -16,6 +16,7 @@ import { showToast } from '../../../utils/toast.js';
 import AccessControl from '../services/access-control-service.js';
 import { getSubscriptionTiers } from '../services/subscription-service.js';
 import { safeSubscriptionUpdate } from '../../../utils/subscription-validation.js';
+import { setUserTier } from '../services/set-user-tier.js';
 
 let enhancedUserSubManagerApp = null;
 
@@ -745,13 +746,12 @@ const EnhancedUserSubscriptionManager = {
               break;
 
             case 'tier':
+              // features/limits materialized server-side via setUserTier (loop below).
               const tierData = this.availableTiers[actionValue];
               updates[`${basePath}/tier`] = actionValue;
               updates[`${basePath}/tierId`] = actionValue;
               updates[`${basePath}/lastUpdated`] = timestamp;
               if (tierData) {
-                updates[`${basePath}/features`] = tierData.features || {};
-                updates[`${basePath}/limits`] = tierData.limits || {};
                 updates[`${basePath}/monthlyPrice`] = tierData.monthlyPrice || 0;
               }
               updates[`${basePath}/history/${timestamp}`] = {
@@ -795,8 +795,16 @@ const EnhancedUserSubscriptionManager = {
         });
         
         await update(ref(rtdb, '/'), updates);
+
+        // Materialize features/limits server-side for tier changes (resolver = sole writer).
+        if (actionType === 'tier') {
+          for (const user of this.selectedUsers) {
+            await setUserTier(user.id, actionValue);
+          }
+        }
+
         showToast(`Successfully updated ${this.selectedUsers.length} subscriptions`, 'success');
-        
+
         // Reset and reload
         this.selectedUsers = [];
         this.quickAction = '';
@@ -863,12 +871,12 @@ const EnhancedUserSubscriptionManager = {
         };
         
         if (tierData) {
-          updates[`subscriptions/${user.id}/features`] = tierData.features || {};
-          updates[`subscriptions/${user.id}/limits`] = tierData.limits || {};
+          // features/limits materialized server-side via setUserTier below.
           updates[`subscriptions/${user.id}/monthlyPrice`] = tierData.monthlyPrice || 0;
         }
-        
+
         await update(ref(rtdb, '/'), updates);
+        await setUserTier(user.id, newTier);
         showToast('Tier updated successfully', 'success');
         await this.loadAllSubscriptions();
         
@@ -1402,11 +1410,10 @@ const EnhancedUserSubscriptionManager = {
         const timestamp = Date.now();
         
         usersToMigrate.forEach(user => {
+          // features/limits materialized server-side via setUserTier (loop below).
           updates[`subscriptions/${user.id}/tier`] = toTier;
           updates[`subscriptions/${user.id}/lastUpdated`] = timestamp;
           if (toTierData) {
-            updates[`subscriptions/${user.id}/features`] = toTierData.features || {};
-            updates[`subscriptions/${user.id}/limits`] = toTierData.limits || {};
             updates[`subscriptions/${user.id}/monthlyPrice`] = toTierData.monthlyPrice || 0;
           }
           updates[`subscriptions/${user.id}/history/${timestamp}`] = {
@@ -1417,9 +1424,13 @@ const EnhancedUserSubscriptionManager = {
             adminUser: auth.currentUser?.uid || 'admin'
           };
         });
-        
+
         await update(ref(rtdb, '/'), updates);
-        
+
+        for (const user of usersToMigrate) {
+          await setUserTier(user.id, toTier);
+        }
+
         showToast(`Successfully migrated ${usersToMigrate.length} users`, 'success');
         
         // Reset and reload

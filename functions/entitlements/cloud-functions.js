@@ -23,7 +23,7 @@ const cors = require('cors')(corsOptions);
 
 const resolver = require('./resolver');
 const { ADDON_CATALOG, subPath, addOnsPath } = require('./constants');
-const { authError, verifyAuthToken, verifySuperAdmin, isAdmin } = require('./auth');
+const { authError, verifyAuthToken, verifySuperAdmin, verifyAdmin, isAdmin } = require('./auth');
 
 function badRequest(message) {
     const err = new Error(message);
@@ -37,14 +37,18 @@ function statusFor(err) {
 const db = () => admin.database();
 
 /**
- * entitlementSetTier — superAdmin sets a user's base tier, then recomputes.
+ * entitlementSetTier — admin sets a user's base tier, then recomputes.
  * Body: { uid, tierId }.
+ *
+ * Admin-gated (PR4 Q3, relaxed from superAdmin): the admin tier-change UIs route
+ * here so the resolver stays the sole writer of features/limits once the
+ * subscriptions/$uid rule lock lands. Owners cannot reach this (no userOrAdmin).
  */
 exports.entitlementSetTier = onRequest(async (req, res) => cors(req, res, async () => {
     if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' });
     try {
         const decoded = await verifyAuthToken(req);
-        await verifySuperAdmin(decoded);
+        await verifyAdmin(decoded);
 
         const data = req.body.data || req.body || {};
         const { uid, tierId } = data;

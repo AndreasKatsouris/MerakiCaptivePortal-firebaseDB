@@ -49,4 +49,23 @@ async function verifySuperAdmin(decodedToken) {
     return uid;
 }
 
-module.exports = { authError, verifyAuthToken, verifySuperAdmin, isAdmin };
+/**
+ * Require Admin (`admins/{uid}` present). Returns the uid.
+ *
+ * Looser than verifySuperAdmin by design (PR4 Q3): the admin tier-change UIs
+ * (subscription-status-manager / enhanced-user-subscription-manager) sit behind
+ * plain admin-dashboard access, not a superAdmin gate. An admin changing ANOTHER
+ * user's tier is a trusted-operator action, not owner self-service — so admin-claim
+ * is the correct posture for entitlementSetTier. Owners still cannot self-mutate
+ * (that needs ③ Payment Rail). Add-on grant/cancel stay superAdmin.
+ */
+async function verifyAdmin(decodedToken) {
+    const uid = decodedToken.uid;
+    const snap = await admin.database().ref(`admins/${uid}`).once('value');
+    if (!snap.val()) {
+        throw authError('Admin access required');
+    }
+    return uid;
+}
+
+module.exports = { authError, verifyAuthToken, verifySuperAdmin, verifyAdmin, isAdmin };

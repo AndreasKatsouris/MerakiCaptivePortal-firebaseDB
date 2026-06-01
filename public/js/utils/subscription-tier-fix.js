@@ -238,9 +238,13 @@ export async function fixUserSubscriptionData(userId) {
         const userSubscriptionRef = ref(rtdb, `subscriptions/${userId}`);
         const subscriptionSnapshot = await get(userSubscriptionRef);
         
+        // PR4: read-only normalization. Owners may no longer write subscriptions/$uid
+        // from the browser (rule lock — the server-side resolver owns canonical
+        // shape + entitlements). This utility now normalizes in-memory for DISPLAY
+        // only and never persists; provisioning is server-side (registerUser).
         if (!subscriptionSnapshot.exists()) {
-            console.log('[TierFix] No subscription found for user, creating default free subscription');
-            const defaultSubscription = {
+            console.log('[TierFix] No subscription found; returning in-memory Free default (not persisted)');
+            return {
                 tierId: 'free',
                 status: 'active',
                 paymentStatus: 'none',
@@ -248,83 +252,22 @@ export async function fixUserSubscriptionData(userId) {
                 createdAt: Date.now(),
                 updatedAt: Date.now()
             };
-            
-            await set(userSubscriptionRef, defaultSubscription);
-            console.log('[TierFix] Created default subscription for user');
-            return defaultSubscription;
         } else {
             const subscription = subscriptionSnapshot.val();
-            console.log('[TierFix] Existing subscription:', subscription);
-            
-            // Normalize subscription data - standardize on tierId
-            const updates = {};
-            let needsUpdate = false;
 
-            // Ensure tierId field exists (standardized field)
-            if (!subscription.tierId) {
-                if (subscription.tier) {
-                    updates[`subscriptions/${userId}/tierId`] = subscription.tier;
-                    updates[`subscriptions/${userId}/tier`] = null; // Remove conflicting field
-                    needsUpdate = true;
-                    console.log('[TierFix] Converting tier field to tierId:', subscription.tier);
-                } else if (subscription.metadata?.initialTier) {
-                    // CRITICAL FIX: For old subscriptions, use metadata.initialTier
-                    updates[`subscriptions/${userId}/tierId`] = subscription.metadata.initialTier;
-                    needsUpdate = true;
-                    console.log('[TierFix] No tierId/tier found, using metadata.initialTier:', subscription.metadata.initialTier);
-                } else {
-                    updates[`subscriptions/${userId}/tierId`] = 'free';
-                    needsUpdate = true;
-                    console.log('[TierFix] No tier information found, defaulting to free');
-                }
-            } else if (subscription.tier && subscription.tier !== subscription.tierId) {
-                // Remove conflicting tier field if it exists and conflicts
-                updates[`subscriptions/${userId}/tier`] = null;
-                needsUpdate = true;
-                console.log('[TierFix] Removing conflicting tier field, keeping tierId:', subscription.tierId);
+            // Standardize on tierId in-memory (no write).
+            const normalized = { ...subscription };
+            if (!normalized.tierId) {
+                normalized.tierId = normalized.tier || normalized.metadata?.initialTier || 'free';
             }
-            
-            // Ensure status field exists
-            if (!subscription.status) {
-                updates[`subscriptions/${userId}/status`] = 'active';
-                needsUpdate = true;
+            // tierId is canonical; drop a conflicting legacy tier field from the view.
+            if (normalized.tier && normalized.tier !== normalized.tierId) {
+                delete normalized.tier;
             }
-            
-            // Ensure updatedAt field exists
-            if (!subscription.updatedAt) {
-                updates[`subscriptions/${userId}/updatedAt`] = Date.now();
-                needsUpdate = true;
+            if (!normalized.status) {
+                normalized.status = 'active';
             }
-            
-            if (needsUpdate) {
-                await update(ref(rtdb, '/'), updates);
-                console.log('[TierFix] Updated subscription data for user');
-
-                // Re-fetch to get the clean data after updates
-                const updatedSnapshot = await get(userSubscriptionRef);
-                const updatedSubscription = updatedSnapshot.val();
-
-                // Safety check: Ensure tierId exists in returned object
-                if (!updatedSubscription.tierId) {
-                    console.warn('[TierFix] WARNING: Updated subscription still missing tierId, adding fallback');
-                    updatedSubscription.tierId = updatedSubscription.tier
-                                               || updatedSubscription.metadata?.initialTier
-                                               || 'free';
-                }
-
-                return updatedSubscription;
-            }
-
-            // Safety check: Ensure tierId exists in returned object even if no update needed
-            if (!subscription.tierId) {
-                console.log('[TierFix] Adding tierId to return object from fallback sources');
-                return {
-                    ...subscription,
-                    tierId: subscription.tier || subscription.metadata?.initialTier || 'free'
-                };
-            }
-
-            return subscription;
+            return normalized;
         }
         
     } catch (error) {

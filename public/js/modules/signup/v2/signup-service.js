@@ -18,7 +18,7 @@
 
 import {
   auth, rtdb, functions, httpsCallable,
-  ref, get, set, update, push, onAuthStateChanged,
+  ref, get, onAuthStateChanged,
 } from '/js/config/firebase-config.js'
 import {
   createUserWithEmailAndPassword, updateProfile,
@@ -141,7 +141,16 @@ export async function createAccount({ formData, tier, tierData = {} }) {
       registrationSuccessful = true
     }
   } catch (functionError) {
-    console.warn('[Signup] Cloud function failed:', functionError)
+    // PR4 (Q2): the Path-B client-side RTDB fallback was removed. The
+    // subscriptions/$uid rule lock blocks a non-admin user from writing their
+    // own subscription record (incl. features/limits), so registerUser is now
+    // the SOLE provisioning path. Surface the failure loudly rather than
+    // silently mis-provisioning (2026-05-12 silent-swallow anti-pattern).
+    console.error('[Signup] registerUser callable failed:', functionError)
+    throw new Error(
+      'We could not finish setting up your account. Please try again in a moment. '
+      + 'If the problem persists, please contact support.'
+    )
   }
 
   if (registrationSuccessful) {
@@ -149,119 +158,9 @@ export async function createAccount({ formData, tier, tierData = {} }) {
     return { user: freshUser }
   }
 
-  // Path B: direct RTDB writes. Verbatim port of signup.js fallback,
-  // with `tier` added to userData and the dual subscription field write
-  // (tier + tierId) for compat with existing readers.
-  console.log('[Signup] Using fallback database write')
-
-  const userData = {
-    uid:        freshUser.uid,
-    email:      freshUser.email,
-    firstName:  formData.firstName,
-    lastName:   formData.lastName,
-    displayName:`${formData.firstName} ${formData.lastName}`,
-    tier,
-    businessInfo: {
-      name:    formData.businessName,
-      address: formData.businessAddress,
-      phone:   formData.businessPhone,
-      type:    formData.businessType,
-    },
-    isFranchise:   formData.isFranchise,
-    franchiseName: formData.franchiseName,
-    brandName:     formData.brandName,
-    createdAt:     Date.now(),
-    updatedAt:     Date.now(),
-    status:        'active',
-    role:          'user',
-  }
-
-  const subscriptionData = {
-    userId:       freshUser.uid,
-    tier,
-    tierId:       tier,
-    status:       'trial',
-    startDate:    Date.now(),
-    trialEndDate: Date.now() + (14 * 24 * 60 * 60 * 1000),
-    features:     tierData.features || {},
-    limits:       tierData.limits || {},
-    metadata:     { signupSource: 'web', initialTier: tier },
-  }
-
-  const locationData = {
-    name:          formData.businessName,
-    address:       formData.businessAddress,
-    phone:         formData.businessPhone,
-    type:          formData.businessType,
-    ownerId:       freshUser.uid,
-    isFranchise:   formData.isFranchise,
-    franchiseName: formData.franchiseName,
-    brandName:     formData.brandName || formData.businessName,
-    createdAt:     Date.now(),
-    status:        'active',
-  }
-
-  // PR 2 review (Minor #4): atomic multi-path write. Read existing
-  // state to preserve the merge-vs-overwrite race-condition guards from
-  // the original signup.js, then commit users/subs/onboarding-progress
-  // in a single root `update()` so a mid-sequence failure can't leave
-  // the account half-initialised. The locations + userLocations writes
-  // stay separate because they need a `push()` key.
-  const userRef         = ref(rtdb, `users/${freshUser.uid}`)
-  const subscriptionRef = ref(rtdb, `subscriptions/${freshUser.uid}`)
-  const onboardingRef   = ref(rtdb, `onboarding-progress/${freshUser.uid}`)
-
-  const [existingUserSnap, existingSubSnap, existingOnboardingSnap] = await Promise.all([
-    get(userRef), get(subscriptionRef), get(onboardingRef),
-  ])
-
-  let userPayload = userData
-  if (existingUserSnap.exists()) {
-    console.log(`⚠️ [Signup] User ${freshUser.uid} already exists, merging data instead of overwriting`)
-    const existingUserData = existingUserSnap.val()
-    userPayload = {
-      ...existingUserData,
-      ...userData,
-      phoneNumber:   existingUserData.phoneNumber   || userData.phoneNumber,
-      phone:         existingUserData.phone         || userData.phone,
-      businessPhone: existingUserData.businessPhone || userData.businessPhone,
-      updatedAt:     Date.now(),
-    }
-  }
-
-  let subPayload = subscriptionData
-  if (existingSubSnap.exists()) {
-    console.log(`⚠️ [Signup] Subscription ${freshUser.uid} already exists, merging data`)
-    subPayload = {
-      ...existingSubSnap.val(),
-      ...subscriptionData,
-      updatedAt: Date.now(),
-    }
-  }
-
-  const multiWrite = {
-    [`users/${freshUser.uid}`]:         userPayload,
-    [`subscriptions/${freshUser.uid}`]: subPayload,
-  }
-  // Initialise onboarding-progress only when absent so we don't stomp a
-  // wizard that has already advanced past helloSeen on a re-entry.
-  if (!existingOnboardingSnap.exists()) {
-    multiWrite[`onboarding-progress/${freshUser.uid}`] = {
-      completed: false,
-      helloSeen: false,
-      createdAt: Date.now(),
-    }
-  }
-  await update(ref(rtdb), multiWrite)
-
-  // Locations needs its own push() key, so it lives outside the atomic
-  // write above. Ordering: location node first, then the userLocations
-  // pointer — never the other way (a dangling pointer is worse than a
-  // detached location).
-  const newLocationRef = push(ref(rtdb, 'locations'))
-  await set(newLocationRef, locationData)
-  await set(ref(rtdb, `userLocations/${freshUser.uid}/${newLocationRef.key}`), true)
-
-  await seedFirstWorkflow(freshUser)
-  return { user: freshUser }
+  // PR4 (Q2): if the callable returned without success:true (but did not throw),
+  // treat it as a hard failure. The Path-B client-side RTDB fallback was removed
+  // because the subscriptions/$uid rule lock blocks a non-admin user from writing
+  // their own subscription record. registerUser is the sole provisioning path.
+  throw new Error('Account setup did not complete. Please try again.')
 }
