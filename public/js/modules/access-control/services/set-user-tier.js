@@ -8,9 +8,11 @@
  * child-level `.validate: false` on those nodes rejects it. This helper calls the
  * server, which sets `tier`/`tierId` and recomputes entitlements atomically.
  *
- * Non-entitlement audit fields (history, monthlyPrice, lastUpdated) are still
- * written client-side by the caller AFTER this resolves — admin-token browser
- * writes to those fields remain allowed (they carry no features/limits).
+ * Non-entitlement audit fields (history, monthlyPrice, lastUpdated) are written
+ * client-side by the caller (typically the multi-path `update()` BEFORE calling
+ * this) — admin-token browser writes to those fields remain allowed (they carry
+ * no features/limits). Ordering doesn't matter for correctness: features/limits
+ * come ONLY from this CF's server-side recompute.
  *
  * Auth: the CF is admin-gated (PR4 Q3). The current user must be an admin.
  * Throws on non-OK response with the server's error message.

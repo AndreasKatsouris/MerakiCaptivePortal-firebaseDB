@@ -61,6 +61,13 @@ async function verifySuperAdmin(decodedToken) {
  */
 async function verifyAdmin(decodedToken) {
     const uid = decodedToken.uid;
+    // Dual verification (PR #91 requireAdmin pattern): the custom claim
+    // (`admin === true`, which is also what database.rules.json gates on) AND
+    // the RTDB `admins/{uid}` record must both agree. Checking only one allows a
+    // claim-vs-RTDB divergence to slip through; require both.
+    if (decodedToken.admin !== true) {
+        throw authError('Admin access required');
+    }
     const snap = await admin.database().ref(`admins/${uid}`).once('value');
     if (!snap.val()) {
         throw authError('Admin access required');

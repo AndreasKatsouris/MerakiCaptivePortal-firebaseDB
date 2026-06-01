@@ -798,9 +798,7 @@ const EnhancedUserSubscriptionManager = {
 
         // Materialize features/limits server-side for tier changes (resolver = sole writer).
         if (actionType === 'tier') {
-          for (const user of this.selectedUsers) {
-            await setUserTier(user.id, actionValue);
-          }
+          await Promise.all(this.selectedUsers.map(u => setUserTier(u.id, actionValue)));
         }
 
         showToast(`Successfully updated ${this.selectedUsers.length} subscriptions`, 'success');
@@ -1427,9 +1425,7 @@ const EnhancedUserSubscriptionManager = {
 
         await update(ref(rtdb, '/'), updates);
 
-        for (const user of usersToMigrate) {
-          await setUserTier(user.id, toTier);
-        }
+        await Promise.all(usersToMigrate.map(u => setUserTier(u.id, toTier)));
 
         showToast(`Successfully migrated ${usersToMigrate.length} users`, 'success');
         

@@ -381,9 +381,7 @@ const SubscriptionStatusManager = {
         // Materialize features/limits server-side for tier changes (resolver is the
         // sole writer; client may not write features/limits once the rule lock lands).
         if (actionType === 'tier') {
-          for (const user of this.selectedUsers) {
-            await setUserTier(user.id, actionValue);
-          }
+          await Promise.all(this.selectedUsers.map(u => setUserTier(u.id, actionValue)));
         }
 
         showToast(`Successfully updated ${this.selectedUsers.length} subscriptions`, 'success');
@@ -484,9 +482,7 @@ const SubscriptionStatusManager = {
 
         await update(ref(rtdb, '/'), updates);
 
-        for (const user of affectedUsers) {
-          await setUserTier(user.id, targetValue);
-        }
+        await Promise.all(affectedUsers.map(u => setUserTier(u.id, targetValue)));
 
         showToast('Tier updated successfully', 'success');
         this.showTierMigrationModal = false;
