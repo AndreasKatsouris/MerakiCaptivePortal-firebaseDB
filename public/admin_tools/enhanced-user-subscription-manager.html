@@ -325,6 +325,7 @@
     <script type="module">
         import { auth, rtdb, ref, get, set, update, onAuthStateChanged, signOut, query, orderByChild, equalTo, onValue } from '../js/config/firebase-config.js';
         import { AdminClaims } from '../js/auth/admin-claims.js';
+        import { setUserTier } from '../js/modules/access-control/services/set-user-tier.js';
 
         const { createApp } = Vue;
 
@@ -469,12 +470,13 @@
                         };
 
                         if (tierData) {
-                            updates[`subscriptions/${user.id}/features`] = tierData.features || {};
-                            updates[`subscriptions/${user.id}/limits`] = tierData.limits || {};
+                            // features/limits materialized server-side via setUserTier
+                            // (resolver is the sole writer once the rule lock lands).
                             updates[`subscriptions/${user.id}/monthlyPrice`] = tierData.monthlyPrice || 0;
                         }
 
                         await update(ref(rtdb, '/'), updates);
+                        await setUserTier(user.id, newTier);
 
                         Swal.fire({
                             title: 'Success!',
