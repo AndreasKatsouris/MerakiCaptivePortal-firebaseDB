@@ -3692,6 +3692,16 @@ exports.billingGetBalance = billing.billingGetBalance;
 exports.billingGetUsage = billing.billingGetUsage;
 
 // ============================================
+// ENTITLEMENTS — resolver + add-on layer (Phase 7 ④a)
+// ============================================
+const entitlements = require('./entitlements/cloud-functions');
+exports.entitlementSetTier = entitlements.entitlementSetTier;
+exports.entitlementGrantAddOn = entitlements.entitlementGrantAddOn;
+exports.entitlementCancelAddOn = entitlements.entitlementCancelAddOn;
+exports.entitlementGetEffective = entitlements.entitlementGetEffective;
+exports.recomputeExpiringEntitlements = entitlements.recomputeExpiringEntitlements;
+
+// ============================================
 // SUBSCRIPTION STATUS MANAGEMENT
 // ============================================
 const subscriptionStatusManager = require('./subscriptionStatusManager');
