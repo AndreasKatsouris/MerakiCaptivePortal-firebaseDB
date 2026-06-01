@@ -31,6 +31,20 @@ Shared, USD-denominated prepaid credit ledger (`functions/billing/`). Meters pai
 
 ---
 
+### Entitlements — resolver + add-on layer (Phase 7 ④a)
+
+Server-side entitlement resolver (`functions/entitlements/`) — the **sole writer** of materialized `subscriptions/{uid}/features` + `limits`. CFs set only the INPUTS (base tier, add-on records) then call `recomputeEntitlements(uid)`; the resolver merges base-tier + active add-ons and writes the materialized result atomically. Closes the client self-grant vector once the `subscriptions/$uid` `.write` rule-lock slice lands (deploy order: CFs → client → rules). See `docs/plans/2026-05-31-entitlements-addon-layer-design.md`.
+
+| Function | Trigger | Auth | Purpose |
+|----------|---------|------|---------|
+| `entitlementSetTier` | HTTP (v2 onRequest) | Super Admin | Set a user's base tier (validates against `subscriptionTiers/{tierId}`), then recompute. Body `{ uid, tierId }` |
+| `entitlementGrantAddOn` | HTTP (v2 onRequest) | Super Admin | Attach an active catalog add-on (validates against `ADDON_CATALOG/{addOnId}`), then recompute. Body `{ uid, addOnId, expiresAt? }` (expiresAt epoch ms) |
+| `entitlementCancelAddOn` | HTTP (v2 onRequest) | Super Admin | Cancel an add-on (status → `cancelled`), then recompute. Body `{ uid, addOnId }` |
+| `entitlementGetEffective` | HTTP (v2 onRequest) | Authenticated (self-scoped; **any** admin may read any uid) | Read materialized `features`/`limits`/`addOns`. Non-admins restricted to own uid. Body `{ uid? }` |
+| `recomputeExpiringEntitlements` | Scheduled (daily 03:00 SAST) | N/A (server-side) | Daily sweep — re-materializes every subscription so expired add-ons / subscriptions drop on schedule. Idempotent |
+
+---
+
 ### Authentication & User Management
 
 | Function | Trigger | Auth | Purpose |
