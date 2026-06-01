@@ -4,7 +4,7 @@
 **Spec:** `docs/plans/2026-05-31-entitlements-addon-layer-design.md` §1, §6, §10
 **Build plan parent:** `docs/plans/2026-06-01-phase7-entitlements-build-plan.md` (slices 5–7)
 **Predecessors merged:** #116 (resolver + CFs), #118 (catalog), #120 (PR3 server-writer consolidation)
-**Status:** DRAFT — depends on #120's CFs being **deployed** first. Security-reviewer mandatory.
+**Status:** READY — #120's CFs deployed 2026-06-01 (prerequisite met); Q1–Q3 settled (§9). Security-reviewer mandatory before merge.
 
 ---
 
@@ -77,7 +77,7 @@ Spec §10 says `.write` admin/server-only + `.validate` rejects client `features
 - Owners can no longer write ANY part of `subscriptions/$uid` from the browser (incl. `locationIds`, `history`) → writers E, F, and admin `history` appends must all move server-side.
 - Admins can write non-entitlement fields (tier, status, history, locationIds) from the browser, but NOT features/limits (resolver-only).
 
-**Open decision Q1:** is "admins write tier/status/history from the browser" acceptable, or do we want ALL subscription mutation server-side? Recommend: keep admin browser writes for non-entitlement fields (smaller blast radius), route only the entitlement-bearing writes (A–D) through the CF. The admin history appends stay (admin-token allowed).
+**Q1 RESOLVED (§9): Option A.** Admins keep browser writes for non-entitlement fields (tier/status/history/locationIds); only the entitlement-bearing writes (A–D) route through the CF. Admin history appends stay (admin-token allowed).
 
 ---
 
@@ -92,9 +92,7 @@ History (2026-05-12 LESSON): `registerUser` callable was throwing `unauthenticat
 2. **Keep a fallback, but make it a server CF** — a thin `registerUserFallback` CF, or make the client retry the callable. Adds infra.
 3. **Verify the callable is reliable first** (`firebase functions:log --only registerUser` for recent successful invocations — the 2026-05-12 "verify CF actually executes" lesson), then do (1).
 
-**Recommend:** (3) → (1). Before locking, confirm `registerUser` has been succeeding in prod since #67; then remove the client fallback's subscription write and let the callable own it. **This is the riskiest single change in PR4 and may warrant its own sub-PR + preview signup test.**
-
-**Open decision Q2:** drop the fallback vs server-CF-ify it. Needs operator input + a prod signup smoke test.
+**Q2 RESOLVED (§9): drop the fallback.** `firebase functions:log --only registerUser` showed no recent invocations (near-zero signup traffic) and #67 already validated the callable end-to-end on prod. PR4 removes the client subscription-write fallback, surfaces callable errors loudly (no silent swallow), and gates merge on a preview-channel signup smoke test. Still the riskiest single change in PR4 — keep it as its own commit with the preview test.
 
 ---
 
@@ -118,7 +116,7 @@ One-off `recomputeEntitlements` sweep over all users (idempotent) AFTER the rule
 ## 6. Slices (TDD where applicable; deploy order is the spine)
 
 1. **Pre-flight verification** — `firebase functions:log --only registerUser` confirm recent successes (gates §3); grep live callers of writers A–F.
-2. **Route admin writers A–D** through `entitlementSetTier` (per user; loop for bulk). Confirm admin tier-management UIs are used by **superAdmins** (entitlementSetTier is superAdmin-only) — if used by plain admins, decide: relax the CF to admin, or add an admin-scoped variant. **Open decision Q3.**
+2. **Route admin writers A–D** through `entitlementSetTier` (per user; loop for bulk). **Q3 RESOLVED (§9): relax `entitlementSetTier` superAdmin → admin** (`token.admin === true`), since the admin tier UIs sit behind plain admin access. Keep it NOT `userOrAdmin` (owners can't self-mutate). Add a bulk variant or loop per user for B/D.
 3. **Resolve signup fallback (E)** per §3 decision.
 4. **Resolve locationIds (F)** per §4.
 5. **Deploy CFs** (any new/changed) + **hosting** (client writers gone). Verify each via log sentinel (2026-05-15 lesson).
@@ -143,9 +141,10 @@ ROSS `maxWorkflows` cap = **PR5** (separate, spec §8); not in PR4.
 - **history/locationIds owner writes** blocked by the blanket lock (§2/§4) — must be routed or confirmed-dead.
 - **`.validate` reject-features/limits must reject admins too** (else the hole stays open for admin-token browser writes) — the dead-rule trap (Option B) does NOT achieve this; Option A does.
 
-## 9. Open decisions for the operator
-- **Q1:** Blanket admin-write at `$uid` (admins keep browser writes for non-entitlement fields) vs all-subscription-mutation-server-side. *Recommend blanket admin-write + strict features/limits `.validate`.*
-- **Q2:** Signup Path-B fallback — drop (rely on fixed callable) vs server-CF-ify. *Recommend drop after a callable-reliability check + preview signup test.*
-- **Q3:** `entitlementSetTier` is superAdmin-only — are the admin tier-management UIs used by superAdmins? If not, relax to admin or add an admin variant.
+## 9. Decisions — SETTLED 2026-06-01 (operator delegated "you decide")
+
+- **Q1 — rule shape: LOCKED → Option A.** `.write` admin-only + `.validate` rejecting any client write carrying `features`/`limits` (admins included; resolver/Admin SDK bypasses `.validate`). Admins keep browser writes for non-entitlement fields (tier/status/history/locationIds); only entitlements are resolver-only. Field-level Option B rejected (dead-rule trap).
+- **Q2 — signup Path-B fallback: LOCKED → drop it.** Evidence: `firebase functions:log --only registerUser` shows NO recent invocations (only deploy/startup events) → near-zero live signup traffic, nothing to regress; and #67 already validated the callable end-to-end on prod (fresh signup + invalid-tier negative test). PR4 removes the client subscription-write fallback, surfaces callable errors properly (no silent `console.warn` swallow — 2026-05-12 lesson), and gates merge on a **preview-channel signup smoke test** (golden path). If the callable ever fails post-lock, signup hard-fails loudly rather than silently mis-provisioning.
+- **Q3 — `entitlementSetTier` auth: LOCKED → relax superAdmin → admin (`token.admin === true`), NOT `userOrAdmin`.** Evidence: the two admin tier UIs (`subscription-status-manager.js`, `enhanced-user-subscription-manager.js`) have no superAdmin gate — they sit behind plain admin-dashboard access. The spec's superAdmin default (§7/§12 Q3) existed to block *owner self-upgrade* (`userOrAdmin` with no payment gate); an **admin** changing another user's tier is a trusted-operator action, not self-service, so admin-claim is the correct posture. Owners still cannot self-mutate (that needs ③ Payment Rail). `GrantAddOn`/`CancelAddOn` stay superAdmin. Add a bulk variant or loop `entitlementSetTier` per user for the bulk-migration UIs (B, D).
 
 ## Complexity: HIGH. The rule lock is one line; making it safe (route 6 writer classes, rework the signup fallback, get the deploy order right) is the work. Security-reviewer mandatory.
