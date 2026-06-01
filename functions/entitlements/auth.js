@@ -49,4 +49,4 @@ async function verifySuperAdmin(decodedToken) {
     return uid;
 }
 
-module.exports = { verifyAuthToken, verifySuperAdmin, isAdmin };
+module.exports = { authError, verifyAuthToken, verifySuperAdmin, isAdmin };

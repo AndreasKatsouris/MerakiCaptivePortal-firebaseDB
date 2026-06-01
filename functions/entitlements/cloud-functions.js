@@ -23,7 +23,7 @@ const cors = require('cors')(corsOptions);
 
 const resolver = require('./resolver');
 const { ADDON_CATALOG, subPath, addOnsPath } = require('./constants');
-const { verifyAuthToken, verifySuperAdmin, isAdmin } = require('./auth');
+const { authError, verifyAuthToken, verifySuperAdmin, isAdmin } = require('./auth');
 
 function badRequest(message) {
     const err = new Error(message);
@@ -123,8 +123,14 @@ exports.entitlementCancelAddOn = onRequest(async (req, res) => cors(req, res, as
 }));
 
 /**
- * entitlementGetEffective — read effective entitlements. Self-scoped: a non-admin
- * may only read their OWN uid; an admin may read any uid. Body: { uid? }.
+ * entitlementGetEffective — read effective entitlements. Body: { uid? }.
+ *
+ * Authorization policy (intentional): a non-admin may only read their OWN uid;
+ * ANY admin (`admins/{uid}` present, NOT only superAdmin) may read ANY uid. This
+ * is wider than the mutator CFs (which are superAdmin-only) by design — support
+ * staff need to look up a user's entitlements without tier-mutation rights, and
+ * the payload (feature flags / limits) is non-sensitive. If this should ever
+ * tighten to superAdmin-only, swap `isAdmin` for `verifySuperAdmin` here.
  */
 exports.entitlementGetEffective = onRequest(async (req, res) => cors(req, res, async () => {
     if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' });
@@ -133,16 +139,15 @@ exports.entitlementGetEffective = onRequest(async (req, res) => cors(req, res, a
         const data = req.body.data || req.body || {};
         const targetUid = (data.uid && typeof data.uid === 'string') ? data.uid : decoded.uid;
         if (targetUid !== decoded.uid && !(await isAdmin(decoded.uid))) {
-            throw badRequest('Forbidden: cannot read another user\'s entitlements');
+            // authError carries statusCode 403 — no message-substring re-mapping needed
+            throw authError('Forbidden: cannot read another user\'s entitlements');
         }
         const snap = await db().ref(subPath(targetUid)).once('value');
         const sub = snap.val() || {};
         res.json({ result: { success: true, uid: targetUid, features: sub.features || {}, limits: sub.limits || {}, addOns: sub.addOns || {} } });
     } catch (error) {
         console.error('[entitlementGetEffective] Error:', error.message);
-        // a "Forbidden" badRequest is logically a 403; map it explicitly
-        const code = /Forbidden/.test(error.message) ? 403 : statusFor(error);
-        res.status(code).json({ error: error.message });
+        res.status(statusFor(error)).json({ error: error.message });
     }
 }));
 
