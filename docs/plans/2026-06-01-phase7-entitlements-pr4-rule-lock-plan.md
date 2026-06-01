@@ -58,9 +58,9 @@ Spec §10 says `.write` admin/server-only + `.validate` rejects client `features
 ```
 - Simple. Admin-token browser writes still allowed for non-entitlement fields, BUT the `.validate` above still lets an admin write features/limits from the browser — so to truly force the resolver, the `.validate` must reject features/limits **even for admins** (since admin tier-changes route through the CF/Admin SDK which bypasses `.validate`). Stricter `.validate`:
   ```json
-  ".validate": "!newData.hasChild('features') && !newData.hasChild('limits')"
+  ".validate": "(!newData.hasChild('tier') || root.child('subscriptionTiers').child(newData.child('tier').val()).exists()) && !newData.hasChild('features') && !newData.hasChild('limits')"
   ```
-  This rejects ANY client write (admin or not) that carries features/limits; the resolver (Admin SDK) bypasses it. **Recommended** — it's the real enforcement of "resolver is sole writer."
+  This rejects ANY client write (admin or not) that carries features/limits; the resolver (Admin SDK) bypasses it. **Recommended** — it's the real enforcement of "resolver is sole writer." **⚠ MUST preserve the existing tier-existence check** (the first clause) — the current `database.rules.json:38` `.validate` already validates `tier` against `subscriptionTiers`; a naïve replacement that only checks features/limits would silently drop that protection (PR #122 review 🟡). Compose both, as above.
 
 **Option B — field-level lock:**
 ```json
@@ -129,6 +129,8 @@ ROSS `maxWorkflows` cap = **PR5** (separate, spec §8); not in PR4.
 
 ## 7. Testing
 - Rule-rejection: simulated client write to `subscriptions/$uid/features` is **rejected** (emulator or preview).
+- **Deep-path `update()` rejection (PR #122 review 🔵):** explicitly emulator-verify that a browser-SDK admin-token `update(ref(db, 'subscriptions/$uid/features'), {k:true})` is rejected. Theory says the ancestor `$uid` `.validate` fires against the merged `newData` and catches it — but confirm empirically. **If the ancestor `.validate` does NOT fire for the deep-path case, add child-level `"features": { ".validate": false }` + `"limits": { ".validate": false }`** as the fallback enforcement (note: `.validate:false` on a child IS effective — unlike `.write:false`, it's not the dead-rule trap).
+- Tier-existence still enforced: a client write with a bogus `tier` is rejected by the composed `.validate` (regression guard for the 🟡 finding).
 - Each routed writer (A–F) verified server-side BEFORE the lock deploys.
 - Signup smoke (golden path + simulated callable failure) on a preview channel.
 - Admin tier-change smoke (single + bulk).
@@ -143,7 +145,7 @@ ROSS `maxWorkflows` cap = **PR5** (separate, spec §8); not in PR4.
 
 ## 9. Decisions — SETTLED 2026-06-01 (operator delegated "you decide")
 
-- **Q1 — rule shape: LOCKED → Option A.** `.write` admin-only + `.validate` rejecting any client write carrying `features`/`limits` (admins included; resolver/Admin SDK bypasses `.validate`). Admins keep browser writes for non-entitlement fields (tier/status/history/locationIds); only entitlements are resolver-only. Field-level Option B rejected (dead-rule trap).
+- **Q1 — rule shape: LOCKED → Option A.** `.write` admin-only + `.validate` that **composes** the existing tier-existence check with the new features/limits rejection (see §2 snippet — do NOT drop the tier check; PR #122 review 🟡). Rejects any client write carrying `features`/`limits` (admins included; resolver/Admin SDK bypasses `.validate`). Admins keep browser writes for non-entitlement fields (tier/status/history/locationIds); only entitlements are resolver-only. Field-level Option B rejected for `.write` (dead-rule trap) — but child-level `.validate:false` IS valid as the deep-path fallback (§7).
 - **Q2 — signup Path-B fallback: LOCKED → drop it.** Evidence: `firebase functions:log --only registerUser` shows NO recent invocations (only deploy/startup events) → near-zero live signup traffic, nothing to regress; and #67 already validated the callable end-to-end on prod (fresh signup + invalid-tier negative test). PR4 removes the client subscription-write fallback, surfaces callable errors properly (no silent `console.warn` swallow — 2026-05-12 lesson), and gates merge on a **preview-channel signup smoke test** (golden path). If the callable ever fails post-lock, signup hard-fails loudly rather than silently mis-provisioning.
 - **Q3 — `entitlementSetTier` auth: LOCKED → relax superAdmin → admin (`token.admin === true`), NOT `userOrAdmin`.** Evidence: the two admin tier UIs (`subscription-status-manager.js`, `enhanced-user-subscription-manager.js`) have no superAdmin gate — they sit behind plain admin-dashboard access. The spec's superAdmin default (§7/§12 Q3) existed to block *owner self-upgrade* (`userOrAdmin` with no payment gate); an **admin** changing another user's tier is a trusted-operator action, not self-service, so admin-claim is the correct posture. Owners still cannot self-mutate (that needs ③ Payment Rail). `GrantAddOn`/`CancelAddOn` stay superAdmin. Add a bulk variant or loop `entitlementSetTier` per user for the bulk-migration UIs (B, D).
 
