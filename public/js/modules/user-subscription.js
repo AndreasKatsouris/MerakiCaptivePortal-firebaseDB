@@ -3,8 +3,7 @@
  * Handles subscription viewing, upgrades, and usage tracking
  */
 
-import { auth, rtdb, ref, get, set, update } from '../config/firebase-config.js';
-import { featureAccessControl } from './access-control/services/feature-access-control.js';
+import { auth, rtdb, ref, get, set } from '../config/firebase-config.js';
 import { PLATFORM_FEATURES } from './access-control/services/platform-features.js';
 
 class UserSubscriptionManager {
@@ -662,50 +661,30 @@ class UserSubscriptionManager {
     async upgradeToPlan(tierId) {
         const tier = this.tiers.find(t => t.id === tierId);
         if (!tier) return;
-        
+
+        // Phase 7 ④a: tier changes are server-managed. The old flow wrote `tierId`
+        // straight to subscriptions/{uid} from the browser and showed a fake
+        // "you'll be charged immediately" message with NO payment integration —
+        // i.e. a free self-upgrade (the same entitlement-escalation class the ④a
+        // resolver/rule-lock work closes). Until ③ Payment Rail lands, route the
+        // operator to the upgrade comparison page (which carries the contact CTA)
+        // rather than self-mutating the tier.
         const result = await Swal.fire({
             title: `Upgrade to ${tier.name}?`,
             html: `
                 <p>${tier.description}</p>
                 <h4>$${tier.pricing?.monthly || 0}/month</h4>
-                <p class="text-muted">You'll be charged immediately and your new features will be available right away.</p>
+                <p class="text-muted">Upgrades are handled by our team. Continue to see plan details and get in touch.</p>
             `,
             icon: 'question',
             showCancelButton: true,
-            confirmButtonText: 'Upgrade Now',
+            confirmButtonText: 'See upgrade options',
             confirmButtonColor: '#667eea'
         });
-        
+
         if (result.isConfirmed) {
-            try {
-                // Update subscription
-                await update(ref(rtdb, `subscriptions/${this.currentUser.uid}`), {
-                    tierId: tierId,
-                    updatedAt: Date.now(),
-                    previousTier: this.getTierId()
-                });
-                
-                // Clear feature access cache
-                featureAccessControl.clearCache();
-                
-                await Swal.fire({
-                    title: 'Success!',
-                    text: `You've been upgraded to the ${tier.name} plan.`,
-                    icon: 'success',
-                    confirmButtonColor: '#667eea'
-                });
-                
-                // Reload page to show new plan
-                window.location.reload();
-            } catch (error) {
-                console.error('Upgrade error:', error);
-                Swal.fire({
-                    title: 'Error',
-                    text: 'Failed to upgrade your plan. Please try again.',
-                    icon: 'error',
-                    confirmButtonColor: '#667eea'
-                });
-            }
+            // Hand off to the upgrade comparison page with context for the prefilled CTA.
+            window.location.href = `/upgrade.html?from=account&tier=${encodeURIComponent(tierId)}`;
         }
     }
 

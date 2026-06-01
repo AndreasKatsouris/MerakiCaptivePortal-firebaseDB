@@ -6,6 +6,9 @@
 const functions = require('firebase-functions/v2');
 const { onValueWritten } = require('firebase-functions/v2/database');
 const admin = require('firebase-admin');
+// Phase 7 ④a: re-materialize entitlements the moment a subscription expires,
+// so premium features/limits drop at expiry (not up to 24h later via the daily cron).
+const { recomputeEntitlements } = require('./entitlements/resolver');
 
 // Get database reference (will be initialized when admin is ready)
 function getDb() {
@@ -58,6 +61,15 @@ async function checkAndUpdateSubscriptionStatus(userId, subscription) {
   // Apply updates if needed
   if (needsUpdate) {
     await getDb().ref(`subscriptions/${userId}`).update(updates);
+    // Phase 7 ④a: status is now 'expired' — re-materialize entitlements so the
+    // resolver strips premium features/limits to Free immediately. Best-effort:
+    // a recompute failure must not abort the status sweep (the daily cron is the
+    // safety net), so log and continue rather than throw.
+    try {
+      await recomputeEntitlements(userId);
+    } catch (recomputeErr) {
+      console.error(`[subscriptionStatusManager] recomputeEntitlements failed for ${userId}:`, recomputeErr.message);
+    }
     console.log(`Updated status to expired for user ${userId}`);
     return { userId, updated: true, newStatus: 'expired' };
   }

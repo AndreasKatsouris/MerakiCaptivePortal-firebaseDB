@@ -176,8 +176,10 @@ export async function createSubscription(tierId, billingCycle = 'monthly', payme
     renewalDate,
     billingCycle,
     paymentStatus: 'active',
-    features: { ...SUBSCRIPTION_TIERS[tierId].features },
-    limits: { ...SUBSCRIPTION_TIERS[tierId].limits },
+    // ⚠ DEAD — no live callers (pre-flight grep, 2026-06-01). Do NOT call without a
+    // server-side route that invokes recomputeEntitlements(): until the PR4 rule lock,
+    // a direct client write here produces a subscription with NO materialized
+    // features/limits (readers fall back to tier constants; the resolver is the sole writer).
     history: {
       [now]: {
         action: 'created',
@@ -245,8 +247,9 @@ export async function updateSubscription(tierId, billingCycle = null) {
     const now = Date.now();
     const updates = {
       tierId: tierId,
-      features: { ...SUBSCRIPTION_TIERS[tierId].features },
-      limits: { ...SUBSCRIPTION_TIERS[tierId].limits },
+      // ⚠ DEAD — no live callers. Do NOT call without a server-side route that
+      // invokes recomputeEntitlements(): a direct client write leaves features/limits
+      // unmaterialized until the daily cron (resolver = sole writer; PR4 locks .write).
       [`history/${now}`]: {
         action: 'updated',
         previousTier: currentSubscription.tierId,
@@ -403,8 +406,9 @@ export async function startFreeTrial(tierId, trialDays = 14) {
       isTrial: true,
       trialEndDate,
       paymentStatus: 'trial',
-      features: { ...SUBSCRIPTION_TIERS[tierId].features },
-      limits: { ...SUBSCRIPTION_TIERS[tierId].limits },
+      // ⚠ DEAD — no live callers. Do NOT call without a server-side route that
+      // invokes recomputeEntitlements(): a direct client write leaves features/limits
+      // unmaterialized until the daily cron (resolver = sole writer; PR4 locks .write).
       history: {
         [now]: {
           action: 'trial_started',

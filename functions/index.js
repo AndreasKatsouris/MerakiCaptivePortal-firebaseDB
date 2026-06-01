@@ -3,6 +3,10 @@ const { defineSecret } = require('firebase-functions/params');
 const functions = require('firebase-functions');
 const admin = require('firebase-admin');
 const crypto = require('crypto');
+// Phase 7 ④a: the entitlement resolver is the sole writer of materialized
+// subscriptions/{uid}/features + limits. Server writers below call it instead
+// of inline-copying tier data (see docs/plans/2026-05-31-entitlements-addon-layer-design.md §6).
+const { recomputeEntitlements } = require('./entitlements/resolver');
 
 // Secrets — provisioned via Firebase Secrets Manager, never hardcoded.
 //   firebase functions:secrets:set MERAKI_SHARED_SECRET
@@ -590,8 +594,9 @@ exports.registerUser = onCall(async (request) => {
             status: 'trial', // Start with trial
             startDate: admin.database.ServerValue.TIMESTAMP,
             trialEndDate: Date.now() + (14 * 24 * 60 * 60 * 1000), // 14-day trial
-            features: canonicalTierData.features || {},
-            limits: canonicalTierData.limits || {},
+            // Phase 7 ④a: features/limits are NO LONGER written inline here.
+            // The resolver materializes them from the tier (+ any add-ons) below,
+            // as the sole writer — see recomputeEntitlements() call after the write.
             metadata: {
                 signupSource: 'web',
                 initialTier: tierId
@@ -656,6 +661,18 @@ exports.registerUser = onCall(async (request) => {
             };
         }
         await admin.database().ref().update(multiWrite);
+
+        // Phase 7 ④a: materialize features/limits via the resolver (sole writer).
+        // The subscription record (with tier + status) is already written above,
+        // so recompute reads it back, merges base tier + add-ons, and writes the
+        // canonical features/limits. Best-effort: the account is already created, and
+        // readers fall back to tier constants when features is absent (audit finding B),
+        // so a recompute hiccup is self-healing via the daily cron — log, don't fail signup.
+        try {
+            await recomputeEntitlements(userId);
+        } catch (recomputeErr) {
+            console.error(`[registerUser] recomputeEntitlements failed for ${userId}:`, recomputeErr.message);
+        }
 
         // Create initial location for the user
         const locationData = {
@@ -1008,8 +1025,8 @@ exports.createUserAccount = onRequest({ invoker: 'public' }, async (req, res) =>
                 status: 'active',
                 paymentStatus: 'active',
                 startDate: admin.database.ServerValue.TIMESTAMP,
-                features: tierData?.features || {},
-                limits: tierData?.limits || {},
+                // Phase 7 ④a: features/limits materialized by the resolver below,
+                // not inline-copied here (resolver = sole writer).
                 locationIds: assignedLocations,
                 metadata: {
                     signupSource: 'admin',
@@ -1019,6 +1036,14 @@ exports.createUserAccount = onRequest({ invoker: 'public' }, async (req, res) =>
             };
 
             await admin.database().ref(`subscriptions/${userRecord.uid}`).set(subscriptionData);
+            // Phase 7 ④a: materialize features/limits via the resolver (sole writer)
+            // after the subscription record exists. Best-effort (self-heals via the
+            // daily cron; readers fall back to tier constants meanwhile) — log, don't fail.
+            try {
+                await recomputeEntitlements(userRecord.uid);
+            } catch (recomputeErr) {
+                console.error(`[createUserAccount] recomputeEntitlements failed for ${userRecord.uid}:`, recomputeErr.message);
+            }
             console.log('[createUserAccount] Subscription created with', assignedLocations.length, 'locations');
 
             // Create userLocations entries for each assigned location
