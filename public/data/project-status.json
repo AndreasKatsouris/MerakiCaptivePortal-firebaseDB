@@ -1,6 +1,6 @@
 {
-  "lastUpdated": "2026-05-31",
-  "lastUpdatedNote": "Phase 7 ① Credit Ledger BUILT + MERGED (#113): functions/billing/ ledger + 3 CFs + server-only rules + seed, 27 TDD tests, code-reviewed. build-ledger task done; deploy pending (npm install, deploy functions:billing* + database, run seed). Next: ④a Entitlements build. ——— Prior: Dashboard synced to the Phase 7 plan: Phase 7 flipped deferred → in-progress, sprint summary + 6 Phase 7 tasks added. ——— Phase 7 (askRoss) DESIGN PHASE COMPLETE: all 3 near-term specs MERGED — ① ledger (#106/#108), ④a entitlements (#107), ② askRoss Agent (#110). Logged a High bug — entitlement self-grant (database.rules.json:33), fix scoped into the ④a build. Agent §3.1 measurement-gates submitResponse (no fabricated compliance records). Next: /plan → build in order ① → ④a → ②. ——— Prior: Synced to PROJECT_BACKLOG.md: recentlyCompleted now includes the OWASP remediation (14 PRs #89–#102), bug triage queue mirrors the backlog's operational items (OWASP follow-ups live in the new Security panel), and the Security panel summarises the audit. ——— Prior: added the Security panel; before that, cleanup-mode evening (PR #86 + #87).",
+  "lastUpdated": "2026-06-01",
+  "lastUpdatedNote": "Phase 7 ① Credit Ledger DEPLOYED to prod (2026-06-01): 3 billing CFs + billing/* rules live, price table seeded (Sonnet/Haiku USD rates, markup 1.30). The full deploy also flushed the previously-undeployed OWASP hardening (#89–#102) — admin-bypass fix, secrets (MERAKI_SHARED_SECRET + INITIAL_ADMIN_SETUP_SECRET now provisioned), SSRF, H-2 rules, headers, POPIA — all now in prod. Logged a Medium bug: cleanupOldQueuesScheduled cron never deployed (export clobbered by module.exports reassignment in queueAnalytics.js). Next: ④a Entitlements build. ——— Prior: Phase 7 ① Credit Ledger BUILT + MERGED (#113). ——— Prior: Dashboard synced to the Phase 7 plan: Phase 7 flipped deferred → in-progress, sprint summary + 6 Phase 7 tasks added. ——— Phase 7 (askRoss) DESIGN PHASE COMPLETE: all 3 near-term specs MERGED — ① ledger (#106/#108), ④a entitlements (#107), ② askRoss Agent (#110). Logged a High bug — entitlement self-grant (database.rules.json:33), fix scoped into the ④a build. Agent §3.1 measurement-gates submitResponse (no fabricated compliance records). Next: /plan → build in order ① → ④a → ②. ——— Prior: Synced to PROJECT_BACKLOG.md: recentlyCompleted now includes the OWASP remediation (14 PRs #89–#102), bug triage queue mirrors the backlog's operational items (OWASP follow-ups live in the new Security panel), and the Security panel summarises the audit. ——— Prior: added the Security panel; before that, cleanup-mode evening (PR #86 + #87).",
   "sprint": {
     "goal": "Effective implementation of Hi-Fi v2, with ROSS as the central post-login surface for every subscribed user",
     "started": "2026-04-30",
@@ -289,6 +289,14 @@
     }
   ],
   "bugs": [
+    {
+      "title": "cleanupOldQueuesScheduled cron has never deployed — export clobbered by module.exports reassignment",
+      "severity": "medium",
+      "discoveredAt": "2026-06-01",
+      "discoveredOn": "Phase 7 ① ledger deploy",
+      "blockingSprint": false,
+      "notes": "queueAnalytics.js:343 does exports.cleanupOldQueuesScheduled = onSchedule('every 24 hours', ...), but line 357's module.exports = {...} replaces the whole exports object (CommonJS), dropping that assignment. So require('./queueAnalytics').cleanupOldQueuesScheduled is undefined, index.js:2243 exports undefined, and firebase reports 'No function matches the filter' — never a deployable function. Consequence: automated daily queue pruning is NOT running (only the manual cleanupOldQueues HTTP fn works), compounding the unbounded-node retention bug. Found during the ledger deploy (106 deployed vs 107 exports). Fix: include cleanupOldQueuesScheduled in the module.exports object (or move the assignment after it). One-line merge + redeploy."
+    },
     {
       "title": "salesData .write root still auth != null (any authed user can create new salesData records)",
       "severity": "low",
