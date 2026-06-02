@@ -23,7 +23,8 @@ const DEFAULT_SUBSCRIPTION_TIERS = {
         limits: {
             locations: 1,
             sessionTime: 30,
-            guestRecords: 100
+            guestRecords: 100,
+            maxWorkflows: 5
         },
         createdAt: Date.now(),
         updatedAt: Date.now()

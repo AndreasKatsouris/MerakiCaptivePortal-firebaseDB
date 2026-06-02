@@ -27,7 +27,13 @@ async function callFunction(functionName, data = {}) {
   })
   if (!res.ok) {
     const text = await res.text().catch(() => '')
-    throw new Error(`${functionName} failed (${res.status}): ${text}`)
+    let body = null
+    try { body = JSON.parse(text) } catch (_) { /* non-JSON error body */ }
+    const err = new Error(body?.error || `${functionName} failed (${res.status})`)
+    err.status = res.status
+    if (body?.code) err.code = body.code           // e.g. WORKFLOW_LIMIT_REACHED
+    if (body?.upgradeUrl) err.upgradeUrl = body.upgradeUrl
+    throw err
   }
   const json = await res.json()
   return json.result || json

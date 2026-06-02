@@ -16,6 +16,7 @@ const { corsOptions } = require('./cors-allowlist');
 const cors = require('cors')(corsOptions);
 const { validateTier, userCanActivate, filterTemplatesByTier } = require('./ross-tier');
 const { buildWorkflowRecord, buildTaskFromSubtask } = require('./ross-workflow-builder');
+const { countActiveWorkflows, workflowCapStatus } = require('./ross-workflow-cap');
 
 // Lazy db accessor — deferred so unit tests can require this module without a
 // live Firebase app being initialised at load time.  All CF handlers are
@@ -148,6 +149,54 @@ async function verifyLocationAccess(uid, locationIds, isSuperAdmin) {
         if (!allowed[locId]) {
             throw new Error(`Location access denied: ${locId}`);
         }
+    }
+}
+
+/**
+ * Read the materialized maxWorkflows limit for a user (Phase 7 ④a §8).
+ * The resolver is the sole writer of subscriptions/{uid}/limits. Absent/null
+ * ⇒ unlimited (cap inert until a tier defines it). Fails open (unlimited) on
+ * read error — a transient read must never wrongly block a legitimate create.
+ */
+async function readUserMaxWorkflows(uid) {
+    try {
+        const snap = await db.ref(`subscriptions/${uid}/limits/maxWorkflows`).once('value');
+        const val = snap.val();
+        return (typeof val === 'number') ? val : null;
+    } catch (_err) {
+        return null; // fail open — unlimited
+    }
+}
+
+/**
+ * Enforce the active-workflow cap before a create/activate. SuperAdmin bypasses.
+ * Returns the workflowCapStatus result ({ allowed, limit, current, unlimited }).
+ */
+async function checkWorkflowCap(uid, isSuperAdmin) {
+    if (isSuperAdmin) return { allowed: true, unlimited: true };
+    const [maxWorkflows, workflowsSnap] = await Promise.all([
+        readUserMaxWorkflows(uid),
+        db.ref(`ross/workflows/${uid}`).once('value'),
+    ]);
+    const activeCount = countActiveWorkflows(workflowsSnap.val());
+    return workflowCapStatus({ maxWorkflows, activeCount, isSuperAdmin });
+}
+
+/**
+ * Audit-log a workflow-cap denial. Best-effort (never blocks the 403).
+ * Mirrors logActivationDenial.
+ */
+async function logWorkflowCapDenial({ uid, email, limit, current }) {
+    try {
+        await db.ref('ross/auditLog/workflowCapDenials').push({
+            uid,
+            email: email || null,
+            limit,
+            current,
+            timestamp: admin.database.ServerValue.TIMESTAMP,
+        });
+    } catch (err) {
+        console.warn('[logWorkflowCapDenial] audit write failed (non-blocking):', err.message);
     }
 }
 
@@ -634,6 +683,21 @@ exports.rossActivateWorkflow = onRequest(async (req, res) => {
                 });
             }
 
+            // Workflow-cap gate — Phase 7 ④a §8. SuperAdmin bypasses; unlimited
+            // when no tier defines maxWorkflows. Never yanks existing workflows —
+            // only blocks new ones at cap (mirrors the downgrade policy).
+            const activateCap = await checkWorkflowCap(uid, isSuperAdmin);
+            if (!activateCap.allowed) {
+                await logWorkflowCapDenial({ uid, email: decodedToken.email, limit: activateCap.limit, current: activateCap.current });
+                return res.status(403).json({
+                    error: `You've reached your plan's limit of ${activateCap.limit} active workflows. Upgrade or pause a workflow to add more.`,
+                    code: 'WORKFLOW_LIMIT_REACHED',
+                    limit: activateCap.limit,
+                    current: activateCap.current,
+                    upgradeUrl: '/upgrade.html',
+                });
+            }
+
             const { workflowId, workflowData, atomicWrite } = buildWorkflowRecord({
                 template,
                 locationIds,
@@ -800,6 +864,20 @@ exports.rossCreateWorkflow = onRequest(async (req, res) => {
             if (subtaskTypeError) return res.status(400).json({ error: subtaskTypeError });
 
             await verifyLocationAccess(uid, locationIds, isSuperAdmin);
+
+            // Workflow-cap gate — Phase 7 ④a §8. SuperAdmin bypasses; unlimited
+            // when no tier defines maxWorkflows. Only blocks new creates at cap.
+            const createCap = await checkWorkflowCap(uid, isSuperAdmin);
+            if (!createCap.allowed) {
+                await logWorkflowCapDenial({ uid, email: decodedToken.email, limit: createCap.limit, current: createCap.current });
+                return res.status(403).json({
+                    error: `You've reached your plan's limit of ${createCap.limit} active workflows. Upgrade or pause a workflow to add more.`,
+                    code: 'WORKFLOW_LIMIT_REACHED',
+                    limit: createCap.limit,
+                    current: createCap.current,
+                    upgradeUrl: '/upgrade.html',
+                });
+            }
 
             const workflowId = generateId();
             const now = Date.now();
