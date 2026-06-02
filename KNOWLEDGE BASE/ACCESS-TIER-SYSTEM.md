@@ -339,3 +339,13 @@ Materialized `subscriptions/{uid}/features` + `limits` are now written **only** 
 - **Rule lock:** `subscriptions/$uid` `.write` is admin-only and `features`/`limits` carry a child `.validate: false`, so a client (owner *or* admin browser) cannot write entitlements directly — only the Admin SDK resolver can. This closes the prior self-grant vuln (any authed owner could grant themselves premium flags from the console). See `security/DATABASE_RULES_GUIDE.md` → "subscriptions/$uid entitlement lock".
 - **Admin tier-change UIs** (`subscription-status-manager.js`, `enhanced-user-subscription-manager.js`) route every tier change through `entitlementSetTier`; they no longer write `features`/`limits` client-side.
 - **Owners** can no longer write their subscription record at all; provisioning is server-side (`registerUser`), and the user-subscription page is display-only.
+
+### First limit enforced — `maxWorkflows` cap (PR5, 2026-06-02)
+
+`rossActivateWorkflow` + `rossCreateWorkflow` enforce `subscriptions/{uid}/limits/maxWorkflows` (resolver-materialized) against the owner's **active** workflow count (`ross/workflows/{uid}` where `status !== 'paused'`). At cap → **HTTP 403** `{ code: 'WORKFLOW_LIMIT_REACHED', limit, current, upgradeUrl }`; the v2 Playbook editor renders an "Upgrade plan" link. SuperAdmin bypasses.
+
+- **Absent / `-1` ⇒ unlimited** — the cap is inert for any tier until its `maxWorkflows` limit is set, so All-in (no limit) is unlimited by absence.
+- **Free = 5** (live 2026-06-02: `subscriptionTiers/free/limits/maxWorkflows = 5` + recompute). Default fallback also in `subscription-tier-fix.js`.
+- **Never yanks** existing workflows — only blocks new creates at cap (mirrors the downgrade policy). A user over cap must pause/delete to create more.
+- This is the limit the future **workflow add-on packs** sell against (`addOnCatalog` `deltas.limits.maxWorkflows: +N` — added additively by the resolver).
+- Pure logic in `functions/ross-workflow-cap.js` (`workflowCapStatus` / `countActiveWorkflows`), unit-tested.

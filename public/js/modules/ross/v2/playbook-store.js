@@ -62,6 +62,9 @@ export const usePlaybookStore = defineStore('rossPlaybook', {
 
     saving: false,
     saveError: null,
+    // When a create/activate is blocked by the workflow cap (Phase 7 ④a §8),
+    // this holds the upgrade URL so the editor can render an upsell link.
+    capUpsellUrl: null,
 
     // Location picker — lazily loaded when the editor opens.
     locations: [],
@@ -255,12 +258,14 @@ export const usePlaybookStore = defineStore('rossPlaybook', {
     async createWorkflow(payload) {
       this.saving = true
       this.saveError = null
+      this.capUpsellUrl = null
       try {
         await createWorkflow(payload)
         await this.load()
         this.closeEditor()
       } catch (e) {
         this.saveError = e.message || String(e)
+        this.capUpsellUrl = e.code === 'WORKFLOW_LIMIT_REACHED' ? (e.upgradeUrl || '/upgrade.html') : null
         throw e
       } finally {
         this.saving = false
@@ -438,12 +443,14 @@ export const usePlaybookStore = defineStore('rossPlaybook', {
       //            customInterval? }
       this.saving = true
       this.saveError = null
+      this.capUpsellUrl = null
       try {
         await activateWorkflow(payload)
         await this.load()
         this.closeEditor()
       } catch (e) {
         this.saveError = e.message || String(e)
+        this.capUpsellUrl = e.code === 'WORKFLOW_LIMIT_REACHED' ? (e.upgradeUrl || '/upgrade.html') : null
         throw e
       } finally {
         this.saving = false

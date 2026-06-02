@@ -534,6 +534,7 @@ const categoryOptions = [
     <div v-if="store.saveError" class="wfeditor__error">
       <HfIcon name="x" :size="12" />
       <span>{{ store.saveError }}</span>
+      <a v-if="store.capUpsellUrl" :href="store.capUpsellUrl" class="wfeditor__upsell-link">Upgrade plan →</a>
     </div>
 
     <!-- Actions -->
@@ -759,6 +760,13 @@ const categoryOptions = [
   font-family: var(--hf-font-mono);
   font-size: 12px;
   display: flex; align-items: center; gap: 8px;
+}
+.wfeditor__upsell-link {
+  margin-left: auto;
+  color: var(--hf-warn);
+  font-weight: 600;
+  text-decoration: underline;
+  white-space: nowrap;
 }
 
 .wfeditor__actions {
