@@ -427,12 +427,12 @@ All ROSS functions are defined in `functions/ross.js` and exported from `functio
 | Function | Auth | Description |
 |---|---|---|
 | `rossGetWorkflows` | `verifyAdmin` | List all workflows for the current user, flattened with location data |
-| `rossCreateWorkflow` | `verifyAdmin` | Create a new workflow, attach to `locationIds[]`, write `ownerIndex`; enum-validates `inputType` on subtasks |
+| `rossCreateWorkflow` | `verifyAdmin` | Create a new workflow, attach to `locationIds[]`, write `ownerIndex`; enum-validates `inputType` on subtasks. **Workflow-cap gated (④a §8):** active count vs `subscriptions/{uid}/limits/maxWorkflows` (active = `status !== 'paused'`) → 403 `WORKFLOW_LIMIT_REACHED` + `upgradeUrl`; superAdmin bypasses; absent/`-1` ⇒ unlimited. Add-on packs sell against it (`deltas.limits.maxWorkflows: +N`) |
 | `rossUpdateWorkflow` | `verifyAdmin` | Update workflow metadata; null guard on `updates`; `status` field validated against `['active','paused']`; `daysBeforeAlert` validated to positive integers |
 | `rossDeleteWorkflow` | `verifyAdmin` | Delete a workflow (404 if not found); clean up `ownerIndex` when last workflow removed |
 | `rossManageTask` | `verifyAdmin` | Create / update / delete a task; `taskData` guard scoped to `create` and `update` only -- delete works without `taskData`; enum-validates `inputType` on update |
 | `rossCompleteTask` | `verifyAdmin` | Mark a task complete using RTDB transaction (atomic); returns 404 if task not found; writes history record when all tasks in a location are done |
-| `rossActivateWorkflow` | `verifyAdmin` | Attach an existing workflow to additional locations; write `ownerIndex`. Tier-gated (Phase 6 PR 1A): All-in template activation by a Free user returns 403 + audit-log entry |
+| `rossActivateWorkflow` | `verifyAdmin` | Attach an existing workflow to additional locations; write `ownerIndex`. Tier-gated (Phase 6 PR 1A): All-in template activation by a Free user returns 403 + audit-log entry. **Workflow-cap gated (④a §8):** same `maxWorkflows` check as `rossCreateWorkflow` → 403 `WORKFLOW_LIMIT_REACHED` |
 | `rossSeedFirstWorkflow` | `verifyUserOrAdmin` | Day-zero auto-activation (PR #58). Resolves location from `userLocations/{uid}` and templateId from `ross/config/firstWorkflowTemplateId`; idempotent via `onboarding-progress/{uid}/firstWorkflowSeededAt` marker. Returns `{ skipped: true, reason: 'already_seeded'\|'no_locations' }` or `{ created: true, workflowId, locationId }` |
 | `rossGetTemplates` | `verifyAdmin` | List all templates (public + own); filters by user tier (Phase 6 PR 1A); opt-in `includeLocked:true` returns locked All-in templates with `locked:true` for upgrade UI (Phase 6 PR 1C) |
 | `rossCreateTemplate` | `verifySuperAdmin` | Create a new template; enum-validates `inputType` on subtasks |

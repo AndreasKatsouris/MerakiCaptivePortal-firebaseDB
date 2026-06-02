@@ -171,6 +171,15 @@ async function readUserMaxWorkflows(uid) {
 /**
  * Enforce the active-workflow cap before a create/activate. SuperAdmin bypasses.
  * Returns the workflowCapStatus result ({ allowed, limit, current, unlimited }).
+ *
+ * NOTE — non-atomic (TOCTOU): the count read here and the subsequent workflow
+ * write in the CF are separate operations, so two concurrent creates from the
+ * same user could both pass and land one over the cap. Accepted: ROSS is a
+ * single-operator-session product, so concurrent creates are near-zero, and the
+ * cap is a soft entitlement gate (over-by-one self-heals on the next create +
+ * the daily recompute). Strict enforcement would need a Firebase transaction on
+ * a per-user counter — deliberately not added for this low-stakes limit. Do NOT
+ * copy this pattern to a hard/billing limit without a transaction.
  */
 async function checkWorkflowCap(uid, isSuperAdmin) {
     if (isSuperAdmin) return { allowed: true, unlimited: true };

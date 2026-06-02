@@ -32,7 +32,12 @@ async function callFunction(functionName, data = {}) {
     const err = new Error(body?.error || `${functionName} failed (${res.status})`)
     err.status = res.status
     if (body?.code) err.code = body.code           // e.g. WORKFLOW_LIMIT_REACHED
-    if (body?.upgradeUrl) err.upgradeUrl = body.upgradeUrl
+    // Accept only a server-relative path (starts with '/') — this value flows into
+    // an <a :href> and Vue does NOT strip javascript: URIs. Guards against a future
+    // dynamic upgradeUrl (add-on packs) or a tampered response.
+    if (typeof body?.upgradeUrl === 'string' && body.upgradeUrl.startsWith('/')) {
+      err.upgradeUrl = body.upgradeUrl
+    }
     throw err
   }
   const json = await res.json()
