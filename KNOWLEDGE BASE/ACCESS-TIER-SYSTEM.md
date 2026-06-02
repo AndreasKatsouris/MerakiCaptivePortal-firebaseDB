@@ -328,3 +328,14 @@ async function initializePurchaseOrderModal() {
 This phased implementation plan provides a structured approach to introducing monetization through tiered access levels while maintaining the existing architecture and user experience. Each phase builds upon the previous, allowing for incremental deployment and testing.
 
 The Access Tier System will be implemented using established patterns for Firebase Realtime Database operations and will follow the modular architecture with global namespacing that characterizes the current codebase.
+
+---
+
+## Update — Entitlement resolver is the sole writer (Phase 7 ④a, 2026-06-01)
+
+Materialized `subscriptions/{uid}/features` + `limits` are now written **only** by the server-side entitlement resolver (`functions/entitlements/resolver.js` → `recomputeEntitlements`, Admin SDK). No browser code writes them.
+
+- **Inputs** an admin sets: `tier` (via `entitlementSetTier` CF — admin-gated, PR4 Q3) and add-ons (`entitlementGrantAddOn`/`CancelAddOn` — superAdmin). The resolver merges tier defaults + active add-ons and materializes `features`/`limits` atomically.
+- **Rule lock:** `subscriptions/$uid` `.write` is admin-only and `features`/`limits` carry a child `.validate: false`, so a client (owner *or* admin browser) cannot write entitlements directly — only the Admin SDK resolver can. This closes the prior self-grant vuln (any authed owner could grant themselves premium flags from the console). See `security/DATABASE_RULES_GUIDE.md` → "subscriptions/$uid entitlement lock".
+- **Admin tier-change UIs** (`subscription-status-manager.js`, `enhanced-user-subscription-manager.js`) route every tier change through `entitlementSetTier`; they no longer write `features`/`limits` client-side.
+- **Owners** can no longer write their subscription record at all; provisioning is server-side (`registerUser`), and the user-subscription page is display-only.

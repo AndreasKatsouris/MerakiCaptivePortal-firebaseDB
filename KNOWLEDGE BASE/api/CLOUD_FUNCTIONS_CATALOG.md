@@ -37,7 +37,7 @@ Server-side entitlement resolver (`functions/entitlements/`) — the **sole writ
 
 | Function | Trigger | Auth | Purpose |
 |----------|---------|------|---------|
-| `entitlementSetTier` | HTTP (v2 onRequest) | Super Admin | Set a user's base tier (validates against `subscriptionTiers/{tierId}`), then recompute. Body `{ uid, tierId }` |
+| `entitlementSetTier` | HTTP (v2 onRequest) | Admin | Set a user's base tier (validates against `subscriptionTiers/{tierId}`), then recompute. Body `{ uid, tierId }`. Admin-gated (PR4 Q3, relaxed from superAdmin — the admin tier-change UIs route here); owners cannot reach it |
 | `entitlementGrantAddOn` | HTTP (v2 onRequest) | Super Admin | Attach an active catalog add-on (validates against `ADDON_CATALOG/{addOnId}`), then recompute. Body `{ uid, addOnId, expiresAt? }` (expiresAt epoch ms) |
 | `entitlementCancelAddOn` | HTTP (v2 onRequest) | Super Admin | Cancel an add-on (status → `cancelled`), then recompute. Body `{ uid, addOnId }` |
 | `entitlementGetEffective` | HTTP (v2 onRequest) | Authenticated (self-scoped; **any** admin may read any uid) | Read materialized `features`/`limits`/`addOns`. Non-admins restricted to own uid. Body `{ uid? }` |

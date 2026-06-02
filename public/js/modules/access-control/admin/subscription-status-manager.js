@@ -11,6 +11,7 @@
 
 import { auth, rtdb, ref, get, set, update, push, query, orderByChild, equalTo, onValue, off } from '../../../config/firebase-config.js';
 import { showToast } from '../../../utils/toast.js';
+import { setUserTier } from '../services/set-user-tier.js';
 
 let subscriptionStatusManagerApp = null;
 
@@ -343,16 +344,11 @@ const SubscriptionStatusManager = {
               break;
               
             case 'tier':
+              // features/limits are materialized server-side by entitlementSetTier
+              // (the resolver is the sole writer once the rule lock lands). The
+              // client only writes the tier marker + audit history below.
               updates[`subscriptions/${user.id}/tier`] = actionValue;
               updates[`subscriptions/${user.id}/lastUpdated`] = timestamp;
-              
-              // Update features and limits
-              const tierData = this.availableTiers[actionValue];
-              if (tierData) {
-                updates[`subscriptions/${user.id}/features`] = tierData.features || {};
-                updates[`subscriptions/${user.id}/limits`] = tierData.limits || {};
-              }
-              
               updates[`subscriptions/${user.id}/history/${timestamp}`] = {
                 action: 'tier_change',
                 from: user.subscription?.tier,
@@ -381,9 +377,15 @@ const SubscriptionStatusManager = {
         });
         
         await update(ref(rtdb, '/'), updates);
-        
+
+        // Materialize features/limits server-side for tier changes (resolver is the
+        // sole writer; client may not write features/limits once the rule lock lands).
+        if (actionType === 'tier') {
+          await Promise.all(this.selectedUsers.map(u => setUserTier(u.id, actionValue)));
+        }
+
         showToast(`Successfully updated ${this.selectedUsers.length} subscriptions`, 'success');
-        
+
         // Reset selection and reload
         this.selectedUsers = [];
         this.quickAction = '';
@@ -461,15 +463,14 @@ const SubscriptionStatusManager = {
         const tierData = this.availableTiers[targetValue];
         
         affectedUsers.forEach(user => {
+          // features/limits materialized server-side (see setUserTier loop below).
           updates[`subscriptions/${user.id}/tier`] = targetValue;
           updates[`subscriptions/${user.id}/lastUpdated`] = timestamp;
-          
+
           if (tierData) {
-            updates[`subscriptions/${user.id}/features`] = tierData.features || {};
-            updates[`subscriptions/${user.id}/limits`] = tierData.limits || {};
             updates[`subscriptions/${user.id}/monthlyPrice`] = tierData.monthlyPrice || 0;
           }
-          
+
           updates[`subscriptions/${user.id}/history/${timestamp}`] = {
             action: 'tier_migration',
             from: user.subscription?.tier,
@@ -478,9 +479,11 @@ const SubscriptionStatusManager = {
             adminUser: auth.currentUser?.uid
           };
         });
-        
+
         await update(ref(rtdb, '/'), updates);
-        
+
+        await Promise.all(affectedUsers.map(u => setUserTier(u.id, targetValue)));
+
         showToast('Tier updated successfully', 'success');
         this.showTierMigrationModal = false;
         await this.loadAllSubscriptions();

@@ -733,3 +733,33 @@ Ensure all code paths normalize phone numbers before writing to the database. Th
 **Worked example — `wifiLogins`** (see `submitWifiLogin` in `functions/index.js` + `database.rules.json:199-218`).
 
 **Common mistake to avoid:** assuming `.validate` rules on a CF-only write path provide active defense in depth. They don't — the Admin SDK bypasses `.validate`. The CF's own input-validation code is the load-bearing check. Treat `.validate` as documentation + a guardrail for *non-CF* writes that might land on the same node later.
+
+---
+
+## Worked example — `subscriptions/$uid` entitlement lock (Phase 7 ④a PR4)
+
+**Goal:** make the server-side entitlement *resolver* (Admin SDK) the SOLE writer of materialized `features`/`limits`, closing the self-grant vuln where any authed owner could write `subscriptions/{uid}/features/<anyFlag>: true` from the browser console.
+
+**Rule shape:**
+```json
+"$uid": {
+  ".read": "auth != null && (auth.uid === $uid || auth.token.admin === true)",
+  ".write": "auth != null && auth.token.admin === true",
+  ".validate": "!newData.hasChild('tier') || root.child('subscriptionTiers').child(newData.child('tier').val()).exists()",
+  "features": { ".validate": false },
+  "limits": { ".validate": false }
+}
+```
+
+**Why this exact shape (two non-obvious points):**
+
+1. **Child-level `.validate: false` — NOT a parent-level `!newData.hasChild('features')`.** A naïve `".validate": "... && !newData.hasChild('features') && !newData.hasChild('limits')"` at `$uid` is **buggy for multi-path `update()`**: `newData` at `$uid` reflects the *post-write merged* state, so `newData.hasChild('features')` is TRUE whenever `features` already exists in the DB — even for a write that only touches `status`. That would reject every admin status/extend write on an already-materialized subscription. The child rule `"features": { ".validate": false }` only fires when the write tree actually includes data at/under `features`, so admin writes to *other* fields pass cleanly while any client write to `features`/`limits` is rejected.
+
+2. **Child `.validate: false` IS effective — unlike `.write: false`.** A child `".write": false` under a permissive parent `.write` is the dead-rule trap (a parent grant can't be revoked by a child `.write:false`). `.validate` does NOT cascade that way: a child `.validate: false` genuinely rejects any write whose data reaches that node. So `.validate:false` is the correct tool for "this subtree must never be written by a client," while `.write:false` is not.
+
+**Who can still write what:**
+- **Resolver (Admin SDK `recomputeEntitlements`)** — bypasses ALL rules, so it freely materializes `features`/`limits`. The sole legitimate writer.
+- **Admins (browser, admin claim)** — may write non-entitlement fields (`tier`, `status`, `history`, `monthlyPrice`) but NOT `features`/`limits` (child `.validate:false` blocks them, claim or not). Admin tier changes route through `entitlementSetTier` (Admin SDK) instead.
+- **Owners (browser)** — can no longer write `subscriptions/$uid` at all (`.write` admin-only). Provisioning is server-side (`registerUser`); the user-subscription page is display-only.
+
+**Deploy order is load-bearing** (same class as the 2026-05-19 deploy-sequencing lesson): every client writer must be routed server-side / removed and deployed (CFs first, then hosting) BEFORE the rules deploy — otherwise the old client's now-blocked writes fail the moment the rule lands. Rules deploy LAST.

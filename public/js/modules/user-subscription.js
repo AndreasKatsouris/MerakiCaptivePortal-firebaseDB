@@ -75,14 +75,16 @@ class UserSubscriptionManager {
         this.subscription = snapshot.val();
         
         if (!this.subscription) {
-            // Create a free tier subscription if none exists
+            // No subscription record yet — show a Free default in-memory ONLY.
+            // PR4: owners may no longer write subscriptions/$uid from the browser
+            // (rule lock). Provisioning is server-side (registerUser); this page
+            // is display-only, so we never persist this fallback.
             this.subscription = {
                 tierId: 'free',
                 status: 'active',
                 startDate: Date.now(),
                 billingCycle: 'free'
             };
-            await set(subscriptionRef, this.subscription);
         }
     }
 

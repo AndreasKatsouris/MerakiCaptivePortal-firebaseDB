@@ -34,8 +34,10 @@
       ".indexOn": ["userId", "tier", "status", "expirationDate"],
       "$uid": {
         ".read": "auth != null && (auth.uid === $uid || auth.token.admin === true)",
-        ".write": "auth != null && (auth.uid === $uid || auth.token.admin === true)",
-        ".validate": "!newData.hasChild('tier') || root.child('subscriptionTiers').child(newData.child('tier').val()).exists()"
+        ".write": "auth != null && auth.token.admin === true",
+        ".validate": "!newData.hasChild('tier') || root.child('subscriptionTiers').child(newData.child('tier').val()).exists()",
+        "features": { ".validate": false },
+        "limits": { ".validate": false }
       }
     },
     "locations": {
