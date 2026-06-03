@@ -268,6 +268,17 @@ async function runAgentLoop({ ctx, system, tools, messages, ownerConfig, emit, m
 
 // --- orchestration (one chat turn, transport-agnostic) ------------------------
 
+/**
+ * True only for a real calendar date in strict YYYY-MM-DD form (review O-2 — the bare
+ * regex admits `2026-13-45`). Used only for the display date in the prompt; a malformed
+ * value is harmless, but rejecting it keeps the owner-context honest.
+ */
+function isValidClientToday(s) {
+    if (typeof s !== 'string' || !CLIENT_TODAY_RE.test(s)) return false;
+    const d = new Date(`${s}T00:00:00Z`);
+    return !Number.isNaN(d.getTime()) && d.toISOString().slice(0, 10) === s;
+}
+
 /** Format an epoch-ms instant as a South African date (SAST = UTC+2, no DST). */
 function formatSADate(now) {
     const d = new Date(now + 2 * 60 * 60 * 1000);
@@ -386,8 +397,8 @@ const rossChat = onRequest({ secrets: [ANTHROPIC_API_KEY] }, (req, res) => cors(
         res.status(400).json({ error: 'threadId must be a key-safe string ([A-Za-z0-9_-])' });
         return;
     }
-    if (clientToday !== undefined && (typeof clientToday !== 'string' || !CLIENT_TODAY_RE.test(clientToday))) {
-        res.status(400).json({ error: 'clientToday must be a YYYY-MM-DD string' });
+    if (clientToday !== undefined && !isValidClientToday(clientToday)) {
+        res.status(400).json({ error: 'clientToday must be a valid YYYY-MM-DD date' });
         return;
     }
 
@@ -398,14 +409,19 @@ const rossChat = onRequest({ secrets: [ANTHROPIC_API_KEY] }, (req, res) => cors(
         const decoded = await verifyAuthToken(req);
         principal = await verifyRossAgentAccess(decoded);
     } catch (err) {
-        const code = /authorization|token/i.test(err.message || '') ? 401 : 403;
-        res.status(code).json({ error: err.message });
+        // Normalise the client-facing message (review O-3): Firebase's verifyIdToken emits
+        // verbose implementation detail ("Firebase ID token has expired…"). Log the real
+        // message server-side; return a generic one.
+        const isAuthErr = /authorization|token/i.test(err.message || '');
+        console.warn('[rossChat] auth rejected:', err && err.message);
+        res.status(isAuthErr ? 401 : 403).json({ error: isAuthErr ? 'Authentication failed' : 'Access denied' });
         return;
     }
 
-    // Configure the LLM client from the secret (never in code/client).
-    const { configureClient } = require('./llm-client');
-    configureClient(process.env.ANTHROPIC_API_KEY);
+    // Configure the LLM client from the secret (never in code/client). ensureClient reuses
+    // the instance across warm invocations (review O-1) — the secret is deployment-stable.
+    const { ensureClient } = require('./llm-client');
+    ensureClient(process.env.ANTHROPIC_API_KEY);
 
     // SSE headers + emitter.
     res.set('Content-Type', 'text/event-stream');

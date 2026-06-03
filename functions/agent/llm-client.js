@@ -36,6 +36,16 @@ function getClient() {
     return _client;
 }
 
+/**
+ * Configure the client ONCE, reusing it across warm invocations. The Firebase secret is
+ * stable for the deployment's lifetime, so rebuilding the Anthropic instance every warm
+ * request would needlessly discard its connection pool (review O-1). Returns the client.
+ */
+function ensureClient(apiKey) {
+    if (!_client) configureClient(apiKey);
+    return _client;
+}
+
 /** Test-only: inject a fake Anthropic client ({ messages: { stream, create } }). */
 function __setClientForTests(fake) { _client = fake; }
 
@@ -95,6 +105,7 @@ async function createTurn({ model, system, messages, maxTokens = 1024 }) {
 module.exports = {
     MODELS,
     configureClient,
+    ensureClient,
     getClient,
     toLedgerUnits,
     streamTurn,
