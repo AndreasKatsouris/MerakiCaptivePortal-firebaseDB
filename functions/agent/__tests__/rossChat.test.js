@@ -602,4 +602,14 @@ describe('runChatRequest (orchestration)', () => {
         expect(r).toMatchObject({ terminated: true, reason: 'not-found' });
         expect(db._dump().ross.workflows.u1.wf1.status).toBe('active'); // u1's workflow untouched
     });
+
+    it('resume is gated: a kill-switch flipped after the pause blocks it, pending left intact (review H-1)', async () => {
+        setup({ ...ENTITLED, ...WF });
+        const turnId = await pauseFirst();
+        await db.ref('ross/config/agentKillSwitch').set(true); // emergency stop after the pause
+        const r = await rossChat.resumeChatRequest({ uid: 'u1', isSuperAdmin: false, resumeTurnId: turnId, decision: 'approve', requestId: 'reqB', emit, now: T + 1000 });
+        expect(r).toMatchObject({ terminated: true, reason: 'disabled' });
+        expect(db._dump().ross.workflows.u1.wf1.status).toBe('active');     // NOT executed
+        expect(db._dump().ross.agentPending.u1[turnId]).toBeDefined();      // NOT consumed → retryable
+    });
 });

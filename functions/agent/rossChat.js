@@ -33,6 +33,13 @@ const ANTHROPIC_API_KEY = defineSecret('ANTHROPIC_API_KEY');
 const MAX_MESSAGE_CHARS = 4000;
 const MAX_AGENT_ROUNDS = 5;      // hard cap on tool round-trips per turn (spend guard, §2.1)
 const MAX_OUTPUT_TOKENS = 4096;  // per round-trip output cap
+const MAX_PENDING_CHARS = 64000; // cap on a persisted pending-action payload (review M-2)
+
+/** True if a pending action's conversation is too large to safely persist (review M-2). */
+function pendingTooLarge(messages) {
+    try { return JSON.stringify(messages).length > MAX_PENDING_CHARS; }
+    catch { return true; }
+}
 const THREAD_ID_RE = /^[a-zA-Z0-9_-]+$/;   // RTDB-key-safe (no `/ . # $ [ ]`)
 const CLIENT_TODAY_RE = /^\d{4}-\d{2}-\d{2}$/;
 
@@ -411,6 +418,10 @@ async function runChatRequest({ uid, isSuperAdmin, message, threadId, clientToda
     //     spent reaching the pause (§2.1 pt 2), so an abandoned confirm is never free.
     if (loop.paused) {
         const { name, args, toolUseId } = loop.pendingTool;
+        if (pendingTooLarge(loop.messages)) {
+            emit({ type: 'terminal', reason: 'too-long', message: 'That conversation got too long to hold for confirmation — start a fresh request.' });
+            return { terminated: false, threadId: thread, turnId, costCents: debit.costCents };
+        }
         const expiresAt = now + PENDING_TTL_MS;
         await getDb().ref(agentPendingPath(uid, turnId)).set({
             tool: name, args, toolUseId, messages: loop.messages, threadId: thread,
@@ -447,9 +458,21 @@ async function resumeChatRequest({ uid, isSuperAdmin, resumeTurnId, decision, cl
         emit({ type: 'terminal', reason: 'not-found', message: 'That confirmation has already been handled or no longer exists.' });
         return { terminated: true, reason: 'not-found' };
     }
-    if (now > pending.expiresAt) {
+    // Fail CLOSED on a missing/non-numeric expiry (review M-1) — the expiry is a security
+    // control; never treat an absent value as "not expired".
+    if (typeof pending.expiresAt !== 'number' || now > pending.expiresAt) {
         emit({ type: 'terminal', reason: 'expired', message: 'That confirmation expired — ask Ross again if you still want it.' });
         return { terminated: true, reason: 'expired' };
+    }
+
+    // Re-run the pre-flight gates on resume (review H-1): the kill-switch / per-owner enable
+    // / rossAgent entitlement / balance must hold for the resume's tool write + continuation
+    // LLM turn — not just the original turn. Checked BEFORE the consume, so a blocked resume
+    // leaves the pending intact to retry once re-enabled/topped-up (until it expires).
+    const gates = await runGates({ uid, isSuperAdmin });
+    if (!gates.ok) {
+        emit({ type: 'terminal', reason: gates.terminal, gate: gates.gate, message: gates.message });
+        return { terminated: true, reason: gates.terminal };
     }
 
     // Atomic one-time-consume BEFORE executing: a concurrent/double resume sees a null
@@ -504,8 +527,13 @@ async function resumeChatRequest({ uid, isSuperAdmin, resumeTurnId, decision, cl
 
     // The continuation may itself hit ANOTHER confirm tool → persist a fresh pending.
     if (loop.paused) {
-        const newTurnId = getDb().ref(`ross/agentChats/${uid}/${threadId}/turns`).push().key;
         const { name, args, toolUseId } = loop.pendingTool;
+        if (pendingTooLarge(loop.messages)) {
+            await turnRef.update({ resolvedDecision: decision, resolvedAt: now, pending: null, resumeCostCents: debit.costCents });
+            emit({ type: 'terminal', reason: 'too-long', message: 'That conversation got too long to continue — start a fresh request.' });
+            return { terminated: false, threadId, turnId: resumeTurnId, costCents: debit.costCents };
+        }
+        const newTurnId = getDb().ref(`ross/agentChats/${uid}/${threadId}/turns`).push().key;
         const expiresAt = now + PENDING_TTL_MS;
         await getDb().ref(agentPendingPath(uid, newTurnId)).set({
             tool: name, args, toolUseId, messages: loop.messages, threadId, createdAt: now, expiresAt,
