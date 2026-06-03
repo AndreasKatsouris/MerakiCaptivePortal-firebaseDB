@@ -581,6 +581,22 @@
       "auditLog": {
         ".read": "auth != null && root.child('admins').child(auth.uid).child('superAdmin').val() === true",
         ".write": false
+      },
+      "agentChats": {
+        ".read": false,
+        ".write": false
+      },
+      "agentAudit": {
+        ".read": false,
+        ".write": false
+      },
+      "agentConfig": {
+        ".read": false,
+        ".write": false
+      },
+      "agentPending": {
+        ".read": false,
+        ".write": false
       }
     }
   }
