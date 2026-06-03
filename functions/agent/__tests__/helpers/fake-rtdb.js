@@ -75,7 +75,13 @@ function makeFakeRtdb(seed = {}) {
                 return snapshotOf(val, key);
             },
             child(childPath) { return makeRef(`${path}/${childPath}`); },
-            push() { return makeRef(`${path}/${pushKey()}`); },
+            // push() → ref with a generated key; push(value) ALSO writes (RTDB semantics).
+            // setNode runs synchronously, so the write lands without awaiting the ref.
+            push(value) {
+                const child = makeRef(`${path}/${pushKey()}`);
+                if (value !== undefined) setNode(`${path}/${child.key}`, value);
+                return child;
+            },
             async set(value) { setNode(path, value === undefined ? null : value); },
             async update(obj) {
                 for (const k of Object.keys(obj)) {
