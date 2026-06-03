@@ -1,7 +1,7 @@
 'use strict';
 
 const {
-    REGISTRY, AdapterPendingError, enabledToolNames, catalogForPrompt,
+    REGISTRY, AdapterPendingError, enabledToolNames, autoAllowlist, catalogForPrompt,
     toAnthropicTools, toSdkMcpServer, __setDbForTests, __setSdkForTests,
 } = require('../tools');
 const { TIER, STATUS, isAgentSubmittable } = require('../constants');
@@ -24,6 +24,14 @@ describe('registry integrity', () => {
 
     it('exposes exactly the 4 ready tools to the engine', () => {
         expect(enabledToolNames().sort()).toEqual([...READY].sort());
+    });
+
+    it('autoAllowlist (proactive) = the ready tools that resolve to auto', () => {
+        // all 4 ready tools are auto-tier with no owner override
+        expect(autoAllowlist().sort()).toEqual([...READY].sort());
+        // an owner who tightens snoozeCard to confirm drops it from the proactive set
+        expect(autoAllowlist({ policy: { snoozeCard: 'confirm' } }).sort())
+            .toEqual(['getRunHistory', 'getStaff', 'getWorkflowDigest']);
     });
 
     it('marks every playbook-authoring tool confirm-tier', () => {

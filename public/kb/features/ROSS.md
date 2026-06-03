@@ -66,7 +66,25 @@ The v1 admin remains reachable at `admin-dashboard.html#rossContent` for the ent
 | Per-task `inputType` / `inputConfig` editor | ✅ Phase 4e.1 (PR #32) + 4e.2 (PR #35) |
 | Phase 5 spec — central-funnel cleanup | ✅ PR #37 |
 | Onboarding wired (router + auth gate + helloSeen) | ⏳ Phase 5 PR 1 of 5 |
-| `askRoss` LLM | 🔮 separate sprint (Phase 7) |
+| `askRoss` LLM | 🔧 building (Phase 7 ②) — ledger ① + entitlements ④a live; agent **core (slice 2)** shipped, see below |
+
+### Agent module — `functions/agent/` (Phase 7 ② slice 2)
+
+The askRoss agent is built as **one engine-agnostic core, two engines** (spec `docs/plans/2026-05-31-askross-agent-design.md` §1.1): v1 reactive on the raw Anthropic Messages API, v2 proactive (later) on the Claude Agent SDK. Slice 2 shipped the core; it has **zero hard dependency on either engine**.
+
+| File | Role |
+|------|------|
+| `constants.js` | tier ranks, MODE/STATUS enums, `NO_UNDO_TOOLS`, `MEASUREMENT_INPUT_TYPES` + `isAgentSubmittable` (§3.1 gate) |
+| `policy.js` | `effectivePolicy` / `clampToCeiling` — owner may tighten autonomy, never loosen past a tool's ceiling |
+| `prompt.js` | `systemBlocks()` — two `cache_control:ephemeral` breakpoints, mode-aware identity |
+| `tools.js` | one Zod tool registry → `toAnthropicTools` (JSON schema) + `toSdkMcpServer` (lazy/seamed) projections |
+| `execute.js` | `executeTool` — audit-wraps every run, captures no-undo `prev` value |
+
+**Tool catalog:** 4 **ready** (model-exposed) — `getWorkflowDigest`, `getStaff`, `getRunHistory`, `snoozeCard`; 12 **pending** (`status:'pending'`, defined but not exposed; `run` throws `AdapterPendingError`) — light up as their CF logic lands.
+
+**§3.1 measurement gate:** `isAgentSubmittable(inputType, inputConfig)` refuses every measurement/attestation type (`temperature`/`number`/`rating`/`yes_no`/`photo`) and any `requiredNote` task — the agent has no sensors, so auto-submitting a value would fabricate a compliance record. Enforced server-side, not left to the model.
+
+**New RTDB nodes (server-only writes; CF-mediated owner reads — spec §9):** `ross/agentConfig/{uid}`, `ross/agentAudit/{uid}`, `ross/agentPending/{uid}`, `ross/agentChats/{uid}`, `ross/config/agentKillSwitch`. **Rules for these land in slice 7 and must deploy before the client slice (5) reads them** — per §9 their writes stay server-only and reads are CF-mediated (NOT direct client writes).
 
 ### Onboarding handoff — `helloSeen` field (Phase 5 PR 1)
 

@@ -187,6 +187,22 @@ function enabledToolNames() {
     return Object.keys(REGISTRY).filter((n) => REGISTRY[n].status === STATUS.READY);
 }
 
+/**
+ * The proactive engine's static allowlist (§1.1): the enabled tools whose effective
+ * policy is `auto`. Proactive has no human to confirm to, so `confirm`/`off` tools are
+ * never handed to the SDK — a tool that doesn't exist can't be called. The reactive
+ * engine does NOT use this; it enforces tri-state policy in-loop instead.
+ *
+ * @param {{policy?:Object<string,string>}} [ownerConfig]
+ * @returns {string[]}
+ */
+function autoAllowlist(ownerConfig) {
+    const { effectivePolicy } = require('./policy');
+    return enabledToolNames().filter(
+        (n) => effectivePolicy(n, REGISTRY[n], ownerConfig) === TIER.AUTO,
+    );
+}
+
 /** Compact catalog (name/description/tier) for the system prompt (§5). */
 function catalogForPrompt(names = enabledToolNames()) {
     return names.map((n) => ({ name: n, description: REGISTRY[n].description, tier: REGISTRY[n].tier }));
@@ -219,6 +235,7 @@ module.exports = {
     REGISTRY,
     AdapterPendingError,
     enabledToolNames,
+    autoAllowlist,
     catalogForPrompt,
     toAnthropicTools,
     toSdkMcpServer,

@@ -28,6 +28,10 @@ function __setDbForTests(fake) { _db = fake; }
 /**
  * Capture the prior value for a no-undo tool so the audit row can restore it (§4,
  * review #9). v1: only advanceDueDate (rolls nextDueDate, no native undo).
+ *
+ * NOTE: this is a hardcoded per-tool dispatch. Add a `case` here for EVERY entry in
+ * `NO_UNDO_TOOLS` (constants.js) — a no-undo tool without a matching case silently
+ * loses its `prev` snapshot from the audit row (no error). Keep the two in lockstep.
  * @returns {object|undefined}
  */
 async function snapshotPrev(uid, name, args) {
@@ -42,6 +46,12 @@ async function snapshotPrev(uid, name, args) {
 
 /**
  * Run a tool as the owner and audit it.
+ *
+ * SECURITY (slice 3 ctx builder): `ctx.now` is the authoritative timestamp for audit
+ * rows and time-based tool effects (e.g. snooze expiry). The `rossChat` CF MUST set
+ * `now: Date.now()` server-side and NEVER pass a client-supplied value through — a
+ * spoofed `now` would forge audit times and snooze windows.
+ *
  * @param {{uid:string, turnId:string, turnSource:string, confirmedBy?:string, now:number}} ctx
  * @param {string} name
  * @param {object} args
