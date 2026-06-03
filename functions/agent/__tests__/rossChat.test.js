@@ -13,7 +13,52 @@
 
 const rossChat = require('../rossChat');
 const ledger = require('../../billing/ledger');
+const llmClient = require('../llm-client');
+const tools = require('../tools');
+const execute = require('../execute');
 const { makeFakeRtdb } = require('./helpers/fake-rtdb');
+
+// Fake Anthropic stream (mirrors llm-client.test.js): fires text deltas on
+// finalMessage(), then resolves to the scripted final message.
+function makeFakeStream({ deltas = [], final }) {
+    const handlers = {};
+    return {
+        on(event, cb) { handlers[event] = cb; return this; },
+        async finalMessage() {
+            for (const d of deltas) if (handlers.text) handlers.text(d);
+            return final;
+        },
+    };
+}
+
+// A client whose messages.stream() returns the next scripted turn each call, so the
+// loop can be driven through multiple round-trips (tool_use → … → end_turn).
+function scriptedClient(scripts) {
+    let i = 0;
+    return {
+        messages: {
+            stream: () => {
+                const s = scripts[i++] || { final: { content: [], usage: {}, stop_reason: 'end_turn' } };
+                return makeFakeStream(s);
+            },
+        },
+    };
+}
+
+// Verbatim Anthropic usage block with prompt caching (server-shape-mock lesson;
+// copied from llm-client.test.js:25 / a real message_stop usage block).
+const USAGE = {
+    input_tokens: 10,
+    output_tokens: 50,
+    cache_creation_input_tokens: 200,
+    cache_read_input_tokens: 1000,
+};
+const textMsg = (text) => ({ content: [{ type: 'text', text }], usage: USAGE, stop_reason: 'end_turn' });
+const toolMsg = (name, input, id = 'toolu_1') => ({
+    content: [{ type: 'tool_use', id, name, input }],
+    usage: USAGE,
+    stop_reason: 'tool_use',
+});
 
 function seedGates(extra = {}) {
     const db = makeFakeRtdb(extra);
@@ -203,5 +248,106 @@ describe('buildHistoryMessages', () => {
             { role: 'user', content: 'q1' },
             { role: 'user', content: 'q2' },
         ]);
+    });
+});
+
+// ---------------------------------------------------------------------------
+describe('runAgentLoop', () => {
+    const CTX = { uid: 'u1', turnId: 'turn1', turnSource: 'chat', now: 1_700_000_000_000 };
+    const SYSTEM = [{ type: 'text', text: 'sys', cache_control: { type: 'ephemeral' } }];
+    const TOOLS = tools.toAnthropicTools(); // the 4 READY auto tools
+
+    let db;
+    let events;
+    function run(scripts, opts = {}) {
+        db = makeFakeRtdb({});
+        tools.__setDbForTests(db);
+        execute.__setDbForTests(db);
+        llmClient.__setClientForTests(scriptedClient(scripts));
+        events = [];
+        return rossChat.runAgentLoop({
+            ctx: CTX, system: SYSTEM, tools: TOOLS,
+            messages: [{ role: 'user', content: 'hi' }],
+            ownerConfig: opts.ownerConfig || null,
+            emit: (e) => events.push(e),
+            maxTurns: opts.maxTurns || 5,
+        });
+    }
+
+    afterEach(() => {
+        tools.__setDbForTests(null);
+        execute.__setDbForTests(null);
+        llmClient.__setClientForTests(null);
+    });
+
+    it('text-only answer: one round, no tool execution, usage mapped', async () => {
+        const res = await run([{ deltas: ['Hel', 'lo'], final: textMsg('Hello') }]);
+        expect(res.rounds).toBe(1);
+        expect(res.assistantBlocks).toEqual([{ type: 'text', text: 'Hello' }]);
+        expect(res.units).toEqual({ inputTokens: 10, outputTokens: 50, cacheWriteTokens: 200, cacheReadTokens: 1000 });
+        expect(events.filter((e) => e.type === 'text').map((e) => e.delta)).toEqual(['Hel', 'lo']);
+        expect(events.some((e) => e.type === 'action')).toBe(false);
+    });
+
+    it('auto tool then answer: executes the tool, audits it, feeds tool_result, emits an action', async () => {
+        const res = await run([
+            { final: toolMsg('snoozeCard', { cardId: 'food-cost', hours: 4 }) },
+            { final: textMsg('Snoozed it.') },
+        ]);
+        expect(res.rounds).toBe(2);
+        // tool ran → snooze node written + audit row
+        const dump = db._dump();
+        expect(dump.ross.v2Snoozes.u1['food-cost']).toBeDefined();
+        expect(Object.values(dump.ross.agentAudit.u1.turn1)[0]).toMatchObject({ tool: 'snoozeCard' });
+        // an action event was emitted
+        expect(events.some((e) => e.type === 'action' && /snoozeCard/.test(JSON.stringify(e)))).toBe(true);
+        // a tool_result was fed back into the conversation
+        const toolResults = res.messages.flatMap((m) => (Array.isArray(m.content) ? m.content : []))
+            .filter((b) => b.type === 'tool_result');
+        expect(toolResults).toHaveLength(1);
+        expect(toolResults[0].tool_use_id).toBe('toolu_1');
+        expect(res.assistantBlocks).toEqual([{ type: 'text', text: 'Snoozed it.' }]);
+    });
+
+    it('defensively REFUSES a non-auto (confirm-tier) tool without executing it', async () => {
+        const res = await run([
+            { final: toolMsg('activateTemplate', { templateId: 't1', locationIds: ['l1'] }) },
+            { final: textMsg('That one is yours to confirm.') },
+        ]);
+        // No audit row (executeTool never ran) and no AdapterPendingError thrown.
+        const dump = db._dump();
+        expect(dump.ross && dump.ross.agentAudit).toBeUndefined();
+        const toolResults = res.messages.flatMap((m) => (Array.isArray(m.content) ? m.content : []))
+            .filter((b) => b.type === 'tool_result');
+        expect(toolResults).toHaveLength(1);
+        expect(toolResults[0].is_error).toBe(true);
+        expect(res.rounds).toBe(2);
+    });
+
+    it('accumulates usage across multiple round-trips', async () => {
+        const res = await run([
+            { final: toolMsg('snoozeCard', { cardId: 'c1', hours: 2 }) },
+            { final: textMsg('done') },
+        ]);
+        // two round-trips, each carrying USAGE → summed then mapped
+        expect(res.units).toEqual({ inputTokens: 20, outputTokens: 100, cacheWriteTokens: 400, cacheReadTokens: 2000 });
+    });
+
+    it('caps at maxTurns even if the model keeps requesting tools (no runaway)', async () => {
+        // every scripted turn requests a tool; loop must stop at maxTurns.
+        const scripts = Array.from({ length: 10 }, (_, i) => ({ final: toolMsg('snoozeCard', { cardId: `c${i}`, hours: 1 }, `toolu_${i}`) }));
+        const res = await run(scripts, { maxTurns: 2 });
+        expect(res.rounds).toBe(2);
+    });
+
+    it('a tool execution error becomes an is_error tool_result and the loop continues', async () => {
+        const res = await run([
+            { final: toolMsg('snoozeCard', { cardId: 'c1', hours: -5 }) }, // invalid hours → adapter throws
+            { final: textMsg('recovered') },
+        ]);
+        const toolResults = res.messages.flatMap((m) => (Array.isArray(m.content) ? m.content : []))
+            .filter((b) => b.type === 'tool_result');
+        expect(toolResults[0].is_error).toBe(true);
+        expect(res.assistantBlocks).toEqual([{ type: 'text', text: 'recovered' }]);
     });
 });

@@ -16,7 +16,7 @@
 
 const admin = require('firebase-admin');
 const ledger = require('../billing/ledger');
-const { agentKillSwitchPath, agentEnabledPath } = require('./constants');
+const { TIER, agentKillSwitchPath, agentEnabledPath } = require('./constants');
 
 // --- DB seam (matches billing/agent/entitlements) -----------------------------
 let _db = null;
@@ -148,10 +148,97 @@ function buildHistoryMessages(turnsObj, newMessage, { maxTurns = 10, maxChars = 
     return messages;
 }
 
+// --- the agent loop (§2 step 3) -----------------------------------------------
+
+/** A tool_result block carrying an error/refusal the model can read and recover from. */
+function errorResult(toolUseId, payload) {
+    return { type: 'tool_result', tool_use_id: toolUseId, content: JSON.stringify(payload), is_error: true };
+}
+
+/**
+ * Run the reactive streaming agent loop (§2 step 3). OWNS the loop (§1.1): each
+ * round-trip streams assistant text to `emit`, then for every tool_use block it
+ * checks policy and either auto-executes (via the audit-wrapped executeTool) and feeds
+ * a tool_result, or — for any non-`auto` tool (none are exposed in slice 3, but defend
+ * regardless) — feeds a refusal tool_result without executing. Usage is accumulated per
+ * round-trip from the complete `usage` block and returned both raw and ledger-mapped;
+ * the caller does the single debit. Bounded by `maxTurns` to prevent runaway spend.
+ *
+ * PURE of HTTP/SSE: `emit(event)` is the only output side-channel, so this is fully
+ * unit-testable with a fake client + fake-rtdb. Does NOT mutate the caller's `messages`.
+ *
+ * @param {{ctx:object, system:Array, tools:Array, messages:Array, ownerConfig?:object,
+ *          emit:function, maxTurns?:number}} opts
+ * @returns {Promise<{assistantBlocks:Array, usage:object, units:object, rounds:number, messages:Array}>}
+ */
+async function runAgentLoop({ ctx, system, tools, messages, ownerConfig, emit, maxTurns = 5 }) {
+    const { effectivePolicy } = require('./policy');
+    const { executeTool } = require('./execute');
+    const { REGISTRY } = require('./tools');
+    const { streamTurn, toLedgerUnits, MODELS } = require('./llm-client');
+
+    const convo = messages.slice();
+    const acc = { input_tokens: 0, output_tokens: 0, cache_creation_input_tokens: 0, cache_read_input_tokens: 0 };
+    let assistantBlocks = [];
+    let rounds = 0;
+
+    for (let i = 0; i < maxTurns; i++) {
+        rounds++;
+        const res = await streamTurn({
+            model: MODELS.AGENT,
+            system,
+            tools,
+            messages: convo,
+            maxTokens: 4096,
+            onText: (delta) => emit({ type: 'text', delta }),
+        });
+
+        const u = res.usage || {};
+        acc.input_tokens += u.input_tokens || 0;
+        acc.output_tokens += u.output_tokens || 0;
+        acc.cache_creation_input_tokens += u.cache_creation_input_tokens || 0;
+        acc.cache_read_input_tokens += u.cache_read_input_tokens || 0;
+
+        assistantBlocks = res.content || [];
+        const toolUses = assistantBlocks.filter((b) => b && b.type === 'tool_use');
+        if (toolUses.length === 0) break; // no tool calls → the turn is done
+
+        convo.push({ role: 'assistant', content: assistantBlocks });
+
+        const toolResults = [];
+        for (const tu of toolUses) {
+            const def = REGISTRY[tu.name];
+            if (!def) {
+                toolResults.push(errorResult(tu.id, { error: `Unknown tool '${tu.name}'.` }));
+                continue;
+            }
+            const policy = effectivePolicy(tu.name, def, ownerConfig);
+            if (policy !== TIER.AUTO) {
+                // confirm/off — slice 3 exposes no such tools, but a model could still
+                // emit one; refuse server-side rather than execute (confirm-flow = slice 4).
+                emit({ type: 'action', tool: tu.name, refused: true, text: `${tu.name} needs the owner` });
+                toolResults.push(errorResult(tu.id, { refused: `'${tu.name}' needs the owner to confirm — not available to Ross here.` }));
+                continue;
+            }
+            try {
+                const out = await executeTool(ctx, tu.name, tu.input || {});
+                emit({ type: 'action', tool: tu.name, text: `✓ ${tu.name}` });
+                toolResults.push({ type: 'tool_result', tool_use_id: tu.id, content: JSON.stringify(out) });
+            } catch (err) {
+                toolResults.push(errorResult(tu.id, { error: err.message }));
+            }
+        }
+        convo.push({ role: 'user', content: toolResults });
+    }
+
+    return { assistantBlocks, usage: acc, units: toLedgerUnits(acc), rounds, messages: convo };
+}
+
 module.exports = {
     runGates,
     buildOwnerContext,
     buildHistoryMessages,
+    runAgentLoop,
     TERMINAL_MESSAGES,
     __setDbForTests,
 };
