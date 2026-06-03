@@ -67,7 +67,10 @@ tool.
 
 `ctx = { uid, turnId, turnSource: 'chat' | 'scheduled', confirmedBy?, now }` is the
 data contract the core consumes; everything engine-specific lives in `ctx`, so the
-core never imports either engine.
+core never imports either engine. **Convention (review #4):** an absent `confirmedBy`
+means the tool ran in `auto` tier (no human approval needed, or already granted); a
+present value names the owner/admin who approved a `confirm`-tier action — `execute.js`
+stamps it into the audit row without tracing back here.
 
 ---
 
@@ -146,9 +149,15 @@ that billing is not identical**:
 | Concern | v1 reactive (`rossChat`) | v2 proactive (`rossSweep`) |
 |---------|--------------------------|----------------------------|
 | Debit granularity | Per **HTTP response** — sum `usage` across every API round-trip in the loop within that response, debit once before returning | Per **run** — debit once at the end from the Agent SDK `result` message's aggregate usage |
-| Pre-flight threshold | Small buffer (`DEFAULT_MIN_BALANCE_CENTS`); turns are bounded (`maxTurns ~5`) | Worst-case **sweep estimate** (`maxTurns × typical-turn`) — it can't pause for low balance interactively, so gate high up front |
+| Pre-flight threshold | Small buffer (`DEFAULT_MIN_BALANCE_CENTS`); turns are bounded (`maxTurns ~5`) | Worst-case **sweep estimate** (`maxTurns × SWEEP_TYPICAL_TURN_COST_CENTS`) — it can't pause for low balance interactively, so gate high up front |
 | In-run exhaustion | Covered by the min-balance buffer; optionally re-check between loop iterations | A **PreToolUse hook** checks balance before each tool call and **aborts the query** when exhausted — the proactive analog of the reactive between-iteration check; bound by `maxTurns` + a per-day budget cap |
 | Who initiated the spend | Owner clicked "Ask Ross" — **explicit consent** | **Ross spends unattended** — needs explicit proactive opt-in + a daily spend cap, or it can drain the wallet overnight |
+
+> **`SWEEP_TYPICAL_TURN_COST_CENTS` (review #3):** the proactive pre-flight estimate
+> needs a concrete per-turn cost or the gate is unimplementable. Seed a tunable
+> constant (~50¢ ≈ Sonnet 4.6 @ ~800 input + ~200 output tokens with the cache-read
+> discount); promote it into the price table / config when the proactive engine
+> launches so it tracks real rates.
 
 **Cross-cutting requirements (both engines):**
 
@@ -171,6 +180,11 @@ that billing is not identical**:
    is what makes the economics real. The first proactive run of the day pays the
    cache-*write* premium once (cold owner-context cache), then cache-reads across its
    internal turns.
+   **Accumulation point (review #1):** in the streaming loop, call `toLedgerUnits` once
+   **per API round-trip on the `message_stop` event's complete `usage` block** — *not*
+   the incremental `message_delta` token counts — and accumulate `costCents` across the
+   loop's round-trips. The unit-test mock copies a verbatim `message_stop` `usage`
+   block, not an assembled one.
 
 2. **Confirm-pause is billed twice.** Request A (up to the pause) already spent
    input+output tokens **even if the owner never confirms** — so **debit at pause**,
@@ -180,6 +194,17 @@ that billing is not identical**:
 3. **Idempotent debits.** Key each debit by the HTTP-request / run id so a
    `confirm`-resume retry (reactive) or an `onSchedule` retry (proactive) can't
    double-bill. The §2 atomic one-time-consume guards the *tool*, not the *debit*.
+   **Ledger-API gap (review #2):** this idempotency is **not achievable today** —
+   `recordUsageAndDebit` generates its own `push().key` and runs the balance
+   `transaction()` unconditionally (`functions/billing/ledger.js:148,162`); its internal
+   `setWithRetry` only guards the *audit record* write, not the debit. So a billing-module
+   extension must land **before the slice-3 debit call**: give `recordUsageAndDebit` an
+   optional `requestId` that, when supplied, writes a one-time-consume guard at
+   `billing/debitGuard/{uid}/{requestId}` **before** the balance transaction and
+   short-circuits (returning the cached `{ costCents, balanceAfterCents }`) if it already
+   exists — the same guard pattern as the §2 tool-consume. `rossChat` passes its Cloud
+   Run request id; `rossSweep` passes the scheduler invocation id. Highest-value for v2
+   proactive, where `onSchedule` auto-retries a crashed run.
 
 4. **Attributable spend.** Tag `meta.turnSource` (`chat` vs `scheduled`) — ideally a
    distinct service label (`askRoss:chat` / `askRoss:sweep`) — so the wallet ledger
@@ -359,6 +384,8 @@ on `/ross.html`, replacing the scripted `askRoss()` stub in `ross-service.js`.
    browser-blocked without it; review #6). **+ update `CLOUD_FUNCTIONS_CATALOG.md`**
    (both copies) — `rossChat` is the project's first AI-inference CF (review #8).
    **+ the `rossAgent`-aware auth helper** (review #4).
+   **+ extend `recordUsageAndDebit` with the optional `requestId` debit-guard**
+   (§2.1 Point 3, review #2) — billing-module prerequisite for the debit call.
 4. Confirm-flow (pending action + resume) — **incl. `expiresAt` 410 check + atomic
    one-time-use consume** (review #2/#3).
 5. Client: Ask Ross surface (SSE consumer, confirm-cards, terminal states).
@@ -368,7 +395,8 @@ on `/ross.html`, replacing the scripted `askRoss()` stub in `ross-service.js`.
 *(v2, later)* `rossSweep` proactive engine — Agent SDK consuming the **same core**
 (slice 2); adds a PreToolUse balance-abort hook + per-day budget cap (§2.1) + the
 `proposeToOwner` digest tool (§1.1). Validates the engine-agnostic seam: if slice 2
-was built clean, this is additive with no core changes.
+was built clean, this is additive with no core changes. *(+ update
+`CLOUD_FUNCTIONS_CATALOG.md` (both copies) when shipped — review #5.)*
 
 ---
 
