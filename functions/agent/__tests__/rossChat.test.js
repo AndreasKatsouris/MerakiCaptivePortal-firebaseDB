@@ -351,3 +351,104 @@ describe('runAgentLoop', () => {
         expect(res.assistantBlocks).toEqual([{ type: 'text', text: 'recovered' }]);
     });
 });
+
+// ---------------------------------------------------------------------------
+describe('runChatRequest (orchestration)', () => {
+    const PRICE = {
+        markup: 1.30,
+        models: { 'claude-sonnet-4-6': { usdPerMtokInput: 3, usdPerMtokOutput: 15, cacheWriteMult: 1.25, cacheReadMult: 0.10 } },
+    };
+    const ENTITLED = {
+        subscriptions: { u1: { features: { rossAgent: true } } },
+        users: { u1: { tier: 'all-in' } },
+        billing: { priceTable: PRICE, credits: { u1: { balanceCents: 100000 } } },
+    };
+
+    // A realistic usage block so the integer-cent debit is non-zero (the shared tiny
+    // USAGE rounds to 0 cents — correct for sub-cent turns, but vacuous for a debit test).
+    const BIG_USAGE = { input_tokens: 5000, output_tokens: 1000, cache_creation_input_tokens: 0, cache_read_input_tokens: 0 };
+    const bigTextMsg = (text) => ({ content: [{ type: 'text', text }], usage: BIG_USAGE, stop_reason: 'end_turn' });
+
+    let db;
+    let events;
+    function setup(seed) {
+        db = makeFakeRtdb(seed);
+        rossChat.__setDbForTests(db);
+        tools.__setDbForTests(db);
+        execute.__setDbForTests(db);
+        ledger.__setDbForTests(db);
+        events = [];
+    }
+    const emit = (e) => events.push(e);
+
+    afterEach(() => {
+        rossChat.__setDbForTests(null);
+        tools.__setDbForTests(null);
+        execute.__setDbForTests(null);
+        ledger.__setDbForTests(null);
+        llmClient.__setClientForTests(null);
+    });
+
+    it('gate-blocked (unentitled): emits terminal, no LLM call, no debit, nothing persisted', async () => {
+        setup({}); // no entitlement, no credit
+        let streamed = false;
+        llmClient.__setClientForTests({ messages: { stream: () => { streamed = true; return makeFakeStream({ final: textMsg('x') }); } } });
+        const r = await rossChat.runChatRequest({ uid: 'u1', isSuperAdmin: false, message: 'hi', requestId: 'req1', emit, now: 1_700_000_000_000 });
+        expect(r.terminated).toBe(true);
+        expect(events.find((e) => e.type === 'terminal').reason).toBe('not-entitled');
+        expect(streamed).toBe(false);              // no LLM spend
+        expect(db._dump().ross).toBeUndefined();   // no thread persisted
+    });
+
+    it('happy text turn: streams, debits once, persists the turn, returns ids + cost', async () => {
+        setup(ENTITLED);
+        llmClient.__setClientForTests(scriptedClient([{ deltas: ['Hi'], final: bigTextMsg('Hello!') }]));
+        const r = await rossChat.runChatRequest({ uid: 'u1', isSuperAdmin: false, message: 'howzit', requestId: 'req1', emit, now: 1_700_000_000_000 });
+
+        expect(r.terminated).toBe(false);
+        expect(r.threadId).toBeTruthy();
+        expect(r.turnId).toBeTruthy();
+        expect(r.costCents).toBeGreaterThan(0);
+        expect(events.find((e) => e.type === 'done')).toMatchObject({ threadId: r.threadId, turnId: r.turnId });
+        // debited exactly the returned cost
+        expect(await ledger.getBalanceCents('u1')).toBe(100000 - r.costCents);
+        // turn persisted with the user message + assistant answer
+        const turn = db._dump().ross.agentChats.u1[r.threadId].turns[r.turnId];
+        expect(turn).toMatchObject({ userMessage: 'howzit', costCents: r.costCents, at: 1_700_000_000_000 });
+        expect(turn.assistantBlocks).toEqual([{ type: 'text', text: 'Hello!' }]);
+    });
+
+    it('continues an existing thread: prior history reaches the model, new turn appended', async () => {
+        setup({
+            ...ENTITLED,
+            // Non-`kNNNNNN` key so the fake's push counter can't regenerate (collide with) it.
+            ross: { agentChats: { u1: { TH1: { turns: { t_earlier: { userMessage: 'earlier', assistantBlocks: [{ type: 'text', text: 'prior' }] } } } } } },
+        });
+        let captured;
+        llmClient.__setClientForTests({ messages: { stream: (p) => { captured = p; return makeFakeStream({ final: textMsg('again') }); } } });
+        const r = await rossChat.runChatRequest({ uid: 'u1', isSuperAdmin: false, message: 'next', threadId: 'TH1', requestId: 'req2', emit, now: 1_700_000_000_000 });
+
+        expect(r.threadId).toBe('TH1');
+        const userContents = captured.messages.filter((m) => m.role === 'user').map((m) => m.content);
+        expect(userContents).toContain('earlier'); // history included
+        expect(userContents).toContain('next');     // new message last
+        expect(Object.keys(db._dump().ross.agentChats.u1.TH1.turns)).toHaveLength(2);
+    });
+
+    it('same requestId twice: the loop runs again but the debit is guarded (charged once)', async () => {
+        setup(ENTITLED);
+        llmClient.__setClientForTests(scriptedClient([{ final: bigTextMsg('a') }, { final: bigTextMsg('b') }]));
+        const r1 = await rossChat.runChatRequest({ uid: 'u1', isSuperAdmin: false, message: 'hi', requestId: 'dup', emit, now: 1_700_000_000_000 });
+        const r2 = await rossChat.runChatRequest({ uid: 'u1', isSuperAdmin: false, message: 'hi2', requestId: 'dup', emit, now: 1_700_000_000_001 });
+        expect(await ledger.getBalanceCents('u1')).toBe(100000 - r1.costCents); // charged once
+        expect(r2.costCents).toBe(r1.costCents); // cached debit
+    });
+
+    it('super-admin with no entitlement and zero balance still completes a turn', async () => {
+        setup({ billing: { priceTable: PRICE, credits: { admin1: { balanceCents: 0 } } } });
+        llmClient.__setClientForTests(scriptedClient([{ final: textMsg('hi admin') }]));
+        const r = await rossChat.runChatRequest({ uid: 'admin1', isSuperAdmin: true, message: 'test', requestId: 'a1', emit, now: 1_700_000_000_000 });
+        expect(r.terminated).toBe(false);
+        expect(events.find((e) => e.type === 'done')).toBeDefined();
+    });
+});

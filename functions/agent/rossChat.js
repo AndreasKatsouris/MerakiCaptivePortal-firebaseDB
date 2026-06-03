@@ -15,8 +15,20 @@
  */
 
 const admin = require('firebase-admin');
+const { onRequest } = require('firebase-functions/v2/https');
+const { defineSecret } = require('firebase-functions/params');
 const ledger = require('../billing/ledger');
-const { TIER, agentKillSwitchPath, agentEnabledPath } = require('./constants');
+const { corsOptions } = require('../cors-allowlist');
+const cors = require('cors')(corsOptions);
+const {
+    TIER, MODE, agentKillSwitchPath, agentEnabledPath, agentConfigPath,
+} = require('./constants');
+
+// Anthropic key — provisioned via `firebase functions:secrets:set ANTHROPIC_API_KEY`
+// BEFORE any deploy (an unprovisioned defineSecret blocks ALL function deploys).
+const ANTHROPIC_API_KEY = defineSecret('ANTHROPIC_API_KEY');
+
+const MAX_MESSAGE_CHARS = 4000;
 
 // --- DB seam (matches billing/agent/entitlements) -----------------------------
 let _db = null;
@@ -234,11 +246,168 @@ async function runAgentLoop({ ctx, system, tools, messages, ownerConfig, emit, m
     return { assistantBlocks, usage: acc, units: toLedgerUnits(acc), rounds, messages: convo };
 }
 
+// --- orchestration (one chat turn, transport-agnostic) ------------------------
+
+/** Format an epoch-ms instant as a South African date (SAST = UTC+2, no DST). */
+function formatSADate(now) {
+    const d = new Date(now + 2 * 60 * 60 * 1000);
+    const dd = String(d.getUTCDate()).padStart(2, '0');
+    const mm = String(d.getUTCMonth() + 1).padStart(2, '0');
+    return `${dd}/${mm}/${d.getUTCFullYear()}`;
+}
+
+/** Distinct location names present in the digest (covers locations that have workflows). */
+function deriveLocationNames(digest) {
+    const names = new Set();
+    for (const bucket of ['overdue', 'today', 'recentCompletions']) {
+        (digest[bucket] || []).forEach((e) => { if (e.locationName) names.add(e.locationName); });
+    }
+    if (digest.upcoming && digest.upcoming.locationName) names.add(digest.upcoming.locationName);
+    return [...names];
+}
+
+/**
+ * Orchestrate ONE chat turn (§2), transport-agnostic: gates → owner context + bounded
+ * history → agent loop → single ledger debit → persist → done. `emit(event)` is the
+ * only output channel (the SSE handler wires it to res.write); fully unit-testable.
+ *
+ * `now` MUST be a server timestamp (the handler passes Date.now()) — never client-supplied
+ * (it stamps audit rows + snooze windows; a spoofed value would forge them).
+ *
+ * @returns {Promise<{terminated:true}|{terminated:false, threadId, turnId, costCents}>}
+ */
+async function runChatRequest({ uid, isSuperAdmin, message, threadId, clientToday, requestId, emit, now }) {
+    // 1. Pre-flight gates (no LLM spend if any fail).
+    const gates = await runGates({ uid, isSuperAdmin });
+    if (!gates.ok) {
+        emit({ type: 'terminal', reason: gates.terminal, gate: gates.gate, message: gates.message });
+        return { terminated: true };
+    }
+
+    const { REGISTRY, toAnthropicTools, catalogForPrompt } = require('./tools');
+    const { systemBlocks } = require('./prompt');
+    const { MODELS } = require('./llm-client');
+    const { SERVICES } = require('../billing/constants');
+
+    // 2. Thread + turn ids (server-generated).
+    const thread = threadId || getDb().ref(`ross/agentChats/${uid}`).push().key;
+    const turnId = getDb().ref(`ross/agentChats/${uid}/${thread}/turns`).push().key;
+    const ctx = { uid, turnId, turnSource: 'chat', now };
+
+    // 3. Owner config (policy overrides) + tier.
+    const cfgSnap = await getDb().ref(agentConfigPath(uid)).once('value');
+    const ownerConfig = cfgSnap.val() || null;
+    const tierSnap = await getDb().ref(`users/${uid}/tier`).once('value');
+    const tier = typeof tierSnap.val() === 'string' ? tierSnap.val() : null;
+
+    // 4. Owner context (digest via the READ adapter directly — not an audited action).
+    const digest = await REGISTRY.getWorkflowDigest.run(ctx, { clientToday });
+    const ownerContext = buildOwnerContext({
+        dateStr: formatSADate(now), tier, locationNames: deriveLocationNames(digest), digest,
+    });
+    const system = systemBlocks({ mode: MODE.CHAT, tools: catalogForPrompt(), ownerContext });
+
+    // 5. Bounded history → messages.
+    const turnsSnap = await getDb().ref(`ross/agentChats/${uid}/${thread}/turns`).once('value');
+    const messages = buildHistoryMessages(turnsSnap.val(), message);
+
+    // 6. The streaming agent loop.
+    const loop = await runAgentLoop({ ctx, system, tools: toAnthropicTools(), messages, ownerConfig, emit });
+
+    // 7. Single debit (idempotent on requestId — §2.1 point 3).
+    const debit = await ledger.recordUsageAndDebit({
+        uid, service: SERVICES.ASK_ROSS, model: MODELS.AGENT,
+        units: loop.units, meta: { turnId, turnSource: 'chat' }, requestId,
+    });
+
+    // 8. Persist the turn (full assistant content array → resumable in slice 4).
+    await getDb().ref(`ross/agentChats/${uid}/${thread}/turns/${turnId}`).set({
+        userMessage: message,
+        assistantBlocks: loop.assistantBlocks,
+        usage: loop.usage,
+        costCents: debit.costCents,
+        at: now,
+    });
+
+    emit({ type: 'done', threadId: thread, turnId, costCents: debit.costCents });
+    return { terminated: false, threadId: thread, turnId, costCents: debit.costCents };
+}
+
+// --- the Cloud Function (thin SSE shell; orchestration lives in runChatRequest) -
+
+/**
+ * `rossChat` — onRequest SSE endpoint (§2, §10 slice 3). Thin: method/body validation,
+ * rossAgent-aware auth, secret-backed client config, SSE plumbing → runChatRequest.
+ * The HTTP/SSE/secret bits are deploy-smoke-tested (not unit-tested); the orchestration
+ * is covered by the runChatRequest unit tests.
+ */
+const rossChat = onRequest({ secrets: [ANTHROPIC_API_KEY] }, (req, res) => cors(req, res, async () => {
+    if (req.method !== 'POST') {
+        res.status(405).json({ error: 'Method not allowed' });
+        return;
+    }
+    const { message, threadId, clientToday } = req.body || {};
+    if (typeof message !== 'string' || !message.trim() || message.length > MAX_MESSAGE_CHARS) {
+        res.status(400).json({ error: `message must be a non-empty string up to ${MAX_MESSAGE_CHARS} chars` });
+        return;
+    }
+
+    // rossAgent-aware auth (recognises features.rossAgent — review #4).
+    let principal;
+    try {
+        const { verifyAuthToken, verifyRossAgentAccess } = require('../ross');
+        const decoded = await verifyAuthToken(req);
+        principal = await verifyRossAgentAccess(decoded);
+    } catch (err) {
+        const code = /authorization|token/i.test(err.message || '') ? 401 : 403;
+        res.status(code).json({ error: err.message });
+        return;
+    }
+
+    // Configure the LLM client from the secret (never in code/client).
+    const { configureClient } = require('./llm-client');
+    configureClient(process.env.ANTHROPIC_API_KEY);
+
+    // SSE headers + emitter.
+    res.set('Content-Type', 'text/event-stream');
+    res.set('Cache-Control', 'no-cache');
+    res.set('Connection', 'keep-alive');
+    if (typeof res.flushHeaders === 'function') res.flushHeaders();
+    const emit = (event) => {
+        res.write(`data: ${JSON.stringify(event)}\n\n`);
+        if (typeof res.flush === 'function') res.flush();
+    };
+
+    // Request-scoped id for the idempotent debit guard (one per Cloud Run invocation).
+    const requestId = req.headers['function-execution-id'] || req.headers['x-cloud-trace-context'] || `${principal.uid}:${Date.now()}`;
+
+    try {
+        await runChatRequest({
+            uid: principal.uid,
+            isSuperAdmin: principal.isSuperAdmin,
+            message,
+            threadId,
+            clientToday,
+            requestId,
+            emit,
+            now: Date.now(), // server-authoritative — never client-supplied
+        });
+    } catch (err) {
+        console.error('[rossChat] turn failed:', err);
+        emit({ type: 'error', message: 'Ross hit a problem completing that turn. Please try again.' });
+    }
+    res.end();
+}));
+
 module.exports = {
+    rossChat,
+    runChatRequest,
     runGates,
     buildOwnerContext,
     buildHistoryMessages,
     runAgentLoop,
+    formatSADate,
+    deriveLocationNames,
     TERMINAL_MESSAGES,
     __setDbForTests,
 };
