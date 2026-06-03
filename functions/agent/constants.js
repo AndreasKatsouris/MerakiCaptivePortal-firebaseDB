@@ -35,8 +35,15 @@ const MEASUREMENT_INPUT_TYPES = Object.freeze([
 ]);
 
 // Tools whose effect has no native undo — execute.js captures a `prev` snapshot into
-// the audit row so an admin can restore the prior value (§4, review #9).
-const NO_UNDO_TOOLS = Object.freeze(['advanceDueDate']);
+// the audit row so an admin can restore the prior value (§4, review #9). editWorkflow /
+// pauseWorkflow mutate existing workflow fields in place (slice 4); create/activate make
+// new records (reversible by delete) so they are NOT here. Keep this in lockstep with the
+// snapshotPrev dispatch in execute.js.
+const NO_UNDO_TOOLS = Object.freeze(['advanceDueDate', 'editWorkflow', 'pauseWorkflow']);
+
+// Pending confirm-action TTL (slice 4, spec §2 / §11 Q3). A pending action older than
+// this is rejected on resume (RTDB has no native TTL — enforced in code).
+const PENDING_TTL_MS = 10 * 60 * 1000;
 
 // RTDB path helpers for the agent's own nodes (server-only writes; §9).
 const agentConfigPath = (uid) => `ross/agentConfig/${uid}`;
@@ -69,6 +76,7 @@ module.exports = {
     STATUS,
     MEASUREMENT_INPUT_TYPES,
     NO_UNDO_TOOLS,
+    PENDING_TTL_MS,
     agentConfigPath,
     agentEnabledPath,
     agentPolicyPath,

@@ -64,4 +64,14 @@ describe('snapshotPrev (no-undo capture, §4)', () => {
         const prev = await snapshotPrev('owner1', 'snoozeCard', { cardId: 'x' });
         expect(prev).toBeUndefined();
     });
+
+    it('captures the prior mutable workflow fields for editWorkflow / pauseWorkflow (slice 4)', async () => {
+        const db2 = makeFakeRtdb({
+            ross: { workflows: { owner1: { wf2: { name: 'Old', status: 'active', notifyPhone: '+27', extra: 'ignored' } } } },
+        });
+        setExecDb(db2);
+        const expected = { name: 'Old', status: 'active', notifyPhone: '+27' }; // 'extra' is not a mutable field
+        await expect(snapshotPrev('owner1', 'pauseWorkflow', { workflowId: 'wf2' })).resolves.toEqual(expected);
+        await expect(snapshotPrev('owner1', 'editWorkflow', { workflowId: 'wf2' })).resolves.toEqual(expected);
+    });
 });

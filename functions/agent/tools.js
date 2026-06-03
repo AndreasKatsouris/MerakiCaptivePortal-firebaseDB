@@ -158,16 +158,60 @@ const REGISTRY = {
         }), TIER.AUTO, TIER.AUTO),
     advanceDueDate: pending("Roll a workflow's nextDueDate forward to the next cycle.",
         z.object({ workflowId: z.string(), locationId: z.string() }), TIER.AUTO, TIER.AUTO),
-    activateTemplate: pending('Activate a template as a new workflow (entitlement-gated on maxWorkflows).',
-        z.object({ templateId: z.string(), locationIds: z.array(z.string()) }), TIER.CONFIRM, TIER.CONFIRM),
-    createWorkflow: pending('Create a new workflow.',
-        z.object({ name: z.string(), category: z.string(), recurrence: z.string(), locationIds: z.array(z.string()) }),
-        TIER.CONFIRM, TIER.CONFIRM),
-    editWorkflow: pending('Edit an existing workflow.',
-        z.object({ workflowId: z.string(), updates: z.object({}).passthrough() }), TIER.CONFIRM, TIER.CONFIRM),
-    pauseWorkflow: pending('Pause a workflow.',
-        z.object({ workflowId: z.string() }), TIER.CONFIRM, TIER.CONFIRM),
+    // ---- READY confirm-tier (slice 4): pause/resume in rossChat gates execution -----
+    // Each lazy-requires the owner-callable core in ross.js (shared with the CF handler),
+    // passing ctx.uid + ctx.isSuperAdmin so tier/cap gates apply (super-admin bypasses).
+    // A gate failure throws an Error with a `.code` → runAgentLoop turns it into an
+    // is_error tool_result the model relays.
+    activateTemplate: {
+        description: 'Activate a template as a new workflow (entitlement-gated on maxWorkflows).',
+        args: z.object({ templateId: z.string(), locationIds: z.array(z.string()), nextDueDate: z.string().optional() }),
+        tier: TIER.CONFIRM, ceiling: TIER.CONFIRM, status: STATUS.READY,
+        run: (ctx, args) => require('../ross').activateWorkflowAsOwner({
+            uid: ctx.uid, isSuperAdmin: ctx.isSuperAdmin,
+            templateId: args.templateId, locationIds: args.locationIds,
+            nextDueDate: args.nextDueDate || defaultDueDate(ctx.now),
+        }),
+    },
+    createWorkflow: {
+        description: 'Create a new workflow.',
+        args: z.object({
+            name: z.string(), category: z.string(), recurrence: z.string(),
+            locationIds: z.array(z.string()),
+            nextDueDate: z.string().optional(),
+            subtasks: z.array(z.object({}).passthrough()).optional(),
+        }),
+        tier: TIER.CONFIRM, ceiling: TIER.CONFIRM, status: STATUS.READY,
+        run: (ctx, args) => require('../ross').createWorkflowAsOwner({
+            uid: ctx.uid, isSuperAdmin: ctx.isSuperAdmin,
+            name: args.name, category: args.category, recurrence: args.recurrence,
+            locationIds: args.locationIds, nextDueDate: args.nextDueDate || defaultDueDate(ctx.now),
+            subtasks: args.subtasks,
+        }),
+    },
+    editWorkflow: {
+        description: 'Edit an existing workflow (name, notifications, alert days, status).',
+        args: z.object({ workflowId: z.string(), updates: z.object({}).passthrough() }),
+        tier: TIER.CONFIRM, ceiling: TIER.CONFIRM, status: STATUS.READY,
+        run: (ctx, args) => require('../ross').updateWorkflowAsOwner({
+            uid: ctx.uid, workflowId: args.workflowId, updates: args.updates,
+        }),
+    },
+    pauseWorkflow: {
+        description: 'Pause a workflow (stops its reminders until resumed).',
+        args: z.object({ workflowId: z.string() }),
+        tier: TIER.CONFIRM, ceiling: TIER.CONFIRM, status: STATUS.READY,
+        run: (ctx, args) => require('../ross').updateWorkflowAsOwner({
+            uid: ctx.uid, workflowId: args.workflowId, updates: { status: 'paused' },
+        }),
+    },
 };
+
+// Default a workflow's nextDueDate to today (UTC YYYY-MM-DD) when the model omits it on
+// activate/create. ctx.now is the server timestamp (never client-supplied).
+function defaultDueDate(now) {
+    return new Date(now || 0).toISOString().slice(0, 10);
+}
 
 function pending(description, args, tier, ceiling) {
     return { description, args, tier, ceiling, status: STATUS.PENDING };
