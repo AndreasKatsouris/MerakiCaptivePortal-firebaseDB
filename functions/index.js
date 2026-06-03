@@ -3732,6 +3732,8 @@ exports.recomputeExpiringEntitlements = entitlements.recomputeExpiringEntitlemen
 // SSE onRequest; secret binding (ANTHROPIC_API_KEY) travels with the onRequest options
 // inside the module. Depends on ① ledger + ④a entitlements (both live).
 exports.rossChat = require('./agent/rossChat').rossChat;
+// Daily prune of expired pending confirm-actions + stale debit guards (slice 7, no RTDB TTL).
+exports.rossAgentPrune = require('./agent/prune').rossAgentPrune;
 
 // ============================================
 // SUBSCRIPTION STATUS MANAGEMENT
