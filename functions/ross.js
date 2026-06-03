@@ -1969,6 +1969,5 @@ module.exports.buildHomeWorkflowDigest = buildHomeWorkflowDigest;
 // Auth helpers — consumed by the askRoss rossChat CF (functions/agent/rossChat.js, slice 3).
 module.exports.verifyAuthToken = verifyAuthToken;
 module.exports.verifyRossAgentAccess = verifyRossAgentAccess;
-module.exports.readUserTier = readUserTier;
 // Test seam.
 module.exports.__setDbForTests = __setDbForTests;

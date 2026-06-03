@@ -398,6 +398,7 @@ describe('runChatRequest (orchestration)', () => {
         expect(events.find((e) => e.type === 'terminal').reason).toBe('not-entitled');
         expect(streamed).toBe(false);              // no LLM spend
         expect(db._dump().ross).toBeUndefined();   // no thread persisted
+        expect(db._dump().billing).toBeUndefined(); // no debit, no debitGuard node
     });
 
     it('happy text turn: streams, debits once, persists the turn, returns ids + cost', async () => {
@@ -416,6 +417,7 @@ describe('runChatRequest (orchestration)', () => {
         const turn = db._dump().ross.agentChats.u1[r.threadId].turns[r.turnId];
         expect(turn).toMatchObject({ userMessage: 'howzit', costCents: r.costCents, at: 1_700_000_000_000 });
         expect(turn.assistantBlocks).toEqual([{ type: 'text', text: 'Hello!' }]);
+        expect(turn.usage).toEqual(BIG_USAGE); // accumulated usage block persisted
     });
 
     it('continues an existing thread: prior history reaches the model, new turn appended', async () => {
@@ -450,5 +452,36 @@ describe('runChatRequest (orchestration)', () => {
         const r = await rossChat.runChatRequest({ uid: 'admin1', isSuperAdmin: true, message: 'test', requestId: 'a1', emit, now: 1_700_000_000_000 });
         expect(r.terminated).toBe(false);
         expect(events.find((e) => e.type === 'done')).toBeDefined();
+    });
+
+    it('an LLM error mid-loop still debits tokens already spent and emits error (no done) — review L-5', async () => {
+        setup(ENTITLED);
+        let call = 0;
+        llmClient.__setClientForTests({
+            messages: {
+                stream: () => {
+                    call += 1;
+                    // round 1: a real tool_use turn (accrues BIG_USAGE, executes snoozeCard)
+                    if (call === 1) {
+                        return makeFakeStream({
+                            final: { content: [{ type: 'tool_use', id: 't1', name: 'snoozeCard', input: { cardId: 'c1', hours: 2 } }], usage: BIG_USAGE, stop_reason: 'tool_use' },
+                        });
+                    }
+                    // round 2: the Anthropic call throws
+                    return { on() { return this; }, async finalMessage() { throw new Error('anthropic 529 overloaded'); } };
+                },
+            },
+        });
+        const r = await rossChat.runChatRequest({ uid: 'u1', isSuperAdmin: false, message: 'hi', requestId: 'err1', emit, now: 1_700_000_000_000 });
+
+        expect(r.error).toBe(true);
+        expect(events.find((e) => e.type === 'error')).toMatchObject({ code: 'agent_loop_failed' });
+        expect(events.find((e) => e.type === 'done')).toBeUndefined();
+        // round-1 tokens were spent at the API → still billed (no leak)
+        expect(r.costCents).toBeGreaterThan(0);
+        expect(await ledger.getBalanceCents('u1')).toBe(100000 - r.costCents);
+        // the partial turn is persisted and flagged
+        const turn = db._dump().ross.agentChats.u1[r.threadId].turns[r.turnId];
+        expect(turn.error).toBe(true);
     });
 });

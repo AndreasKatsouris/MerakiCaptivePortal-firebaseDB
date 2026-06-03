@@ -8,13 +8,15 @@
  * tools via execute.js → single ledger debit → SSE. It OWNS the loop (§1.1) so it can
  * gate before the first token and debit per HTTP response.
  *
- * This file (Phase 3) holds the pure-ish helpers (runGates / buildOwnerContext /
- * buildHistoryMessages). The streaming `onRequest` handler is added in Phase 4.
+ * Holds the SSE `onRequest` handler, the `runChatRequest` orchestration, the
+ * `runAgentLoop` streaming loop, and the pure helpers (runGates / buildOwnerContext /
+ * buildHistoryMessages). Confirm-flow pause/resume is slice 4.
  *
  * Spec: docs/plans/2026-05-31-askross-agent-design.md §2, §2.1, §5, §7, §9, §10 slice 3
  */
 
 const admin = require('firebase-admin');
+const crypto = require('crypto');
 const { onRequest } = require('firebase-functions/v2/https');
 const { defineSecret } = require('firebase-functions/params');
 const ledger = require('../billing/ledger');
@@ -29,6 +31,10 @@ const {
 const ANTHROPIC_API_KEY = defineSecret('ANTHROPIC_API_KEY');
 
 const MAX_MESSAGE_CHARS = 4000;
+const MAX_AGENT_ROUNDS = 5;      // hard cap on tool round-trips per turn (spend guard, §2.1)
+const MAX_OUTPUT_TOKENS = 4096;  // per round-trip output cap
+const THREAD_ID_RE = /^[a-zA-Z0-9_-]+$/;   // RTDB-key-safe (no `/ . # $ [ ]`)
+const CLIENT_TODAY_RE = /^\d{4}-\d{2}-\d{2}$/;
 
 // --- DB seam (matches billing/agent/entitlements) -----------------------------
 let _db = null;
@@ -179,11 +185,17 @@ function errorResult(toolUseId, payload) {
  * PURE of HTTP/SSE: `emit(event)` is the only output side-channel, so this is fully
  * unit-testable with a fake client + fake-rtdb. Does NOT mutate the caller's `messages`.
  *
+ * BEST-EFFORT ON LLM ERROR: if a streamTurn (Anthropic API) call throws mid-loop, the
+ * loop stops and returns what it accumulated with `error` set — it does NOT throw — so
+ * the caller can still debit the tokens already spent in completed round-trips (a thrown
+ * loop would leak that spend, security review L-5). Tool-execution errors do NOT stop the
+ * loop (they become is_error tool_results the model can recover from).
+ *
  * @param {{ctx:object, system:Array, tools:Array, messages:Array, ownerConfig?:object,
  *          emit:function, maxTurns?:number}} opts
- * @returns {Promise<{assistantBlocks:Array, usage:object, units:object, rounds:number, messages:Array}>}
+ * @returns {Promise<{assistantBlocks:Array, usage:object, units:object, rounds:number, messages:Array, error:Error|null}>}
  */
-async function runAgentLoop({ ctx, system, tools, messages, ownerConfig, emit, maxTurns = 5 }) {
+async function runAgentLoop({ ctx, system, tools, messages, ownerConfig, emit, maxTurns = MAX_AGENT_ROUNDS }) {
     const { effectivePolicy } = require('./policy');
     const { executeTool } = require('./execute');
     const { REGISTRY } = require('./tools');
@@ -193,17 +205,25 @@ async function runAgentLoop({ ctx, system, tools, messages, ownerConfig, emit, m
     const acc = { input_tokens: 0, output_tokens: 0, cache_creation_input_tokens: 0, cache_read_input_tokens: 0 };
     let assistantBlocks = [];
     let rounds = 0;
+    let error = null;
 
     for (let i = 0; i < maxTurns; i++) {
         rounds++;
-        const res = await streamTurn({
-            model: MODELS.AGENT,
-            system,
-            tools,
-            messages: convo,
-            maxTokens: 4096,
-            onText: (delta) => emit({ type: 'text', delta }),
-        });
+        let res;
+        try {
+            res = await streamTurn({
+                model: MODELS.AGENT,
+                system,
+                tools,
+                messages: convo,
+                maxTokens: MAX_OUTPUT_TOKENS,
+                onText: (delta) => emit({ type: 'text', delta }),
+            });
+        } catch (err) {
+            // LLM API failure: stop, but keep `acc` so the caller debits spent tokens.
+            error = err;
+            break;
+        }
 
         const u = res.usage || {};
         acc.input_tokens += u.input_tokens || 0;
@@ -228,13 +248,13 @@ async function runAgentLoop({ ctx, system, tools, messages, ownerConfig, emit, m
             if (policy !== TIER.AUTO) {
                 // confirm/off — slice 3 exposes no such tools, but a model could still
                 // emit one; refuse server-side rather than execute (confirm-flow = slice 4).
-                emit({ type: 'action', tool: tu.name, refused: true, text: `${tu.name} needs the owner` });
+                emit({ type: 'action', tool: tu.name, status: 'refused' });
                 toolResults.push(errorResult(tu.id, { refused: `'${tu.name}' needs the owner to confirm — not available to Ross here.` }));
                 continue;
             }
             try {
                 const out = await executeTool(ctx, tu.name, tu.input || {});
-                emit({ type: 'action', tool: tu.name, text: `✓ ${tu.name}` });
+                emit({ type: 'action', tool: tu.name, status: 'done' });
                 toolResults.push({ type: 'tool_result', tool_use_id: tu.id, content: JSON.stringify(out) });
             } catch (err) {
                 toolResults.push(errorResult(tu.id, { error: err.message }));
@@ -243,7 +263,7 @@ async function runAgentLoop({ ctx, system, tools, messages, ownerConfig, emit, m
         convo.push({ role: 'user', content: toolResults });
     }
 
-    return { assistantBlocks, usage: acc, units: toLedgerUnits(acc), rounds, messages: convo };
+    return { assistantBlocks, usage: acc, units: toLedgerUnits(acc), rounds, messages: convo, error };
 }
 
 // --- orchestration (one chat turn, transport-agnostic) ------------------------
@@ -311,10 +331,11 @@ async function runChatRequest({ uid, isSuperAdmin, message, threadId, clientToda
     const turnsSnap = await getDb().ref(`ross/agentChats/${uid}/${thread}/turns`).once('value');
     const messages = buildHistoryMessages(turnsSnap.val(), message);
 
-    // 6. The streaming agent loop.
+    // 6. The streaming agent loop (best-effort — never throws on an LLM error).
     const loop = await runAgentLoop({ ctx, system, tools: toAnthropicTools(), messages, ownerConfig, emit });
 
-    // 7. Single debit (idempotent on requestId — §2.1 point 3).
+    // 7. Single debit (idempotent on requestId — §2.1 point 3). Runs even if the loop
+    //    errored mid-way, so tokens already spent at the API are still billed (review L-5).
     const debit = await ledger.recordUsageAndDebit({
         uid, service: SERVICES.ASK_ROSS, model: MODELS.AGENT,
         units: loop.units, meta: { turnId, turnSource: 'chat' }, requestId,
@@ -327,7 +348,14 @@ async function runChatRequest({ uid, isSuperAdmin, message, threadId, clientToda
         usage: loop.usage,
         costCents: debit.costCents,
         at: now,
+        ...(loop.error ? { error: true } : {}),
     });
+
+    if (loop.error) {
+        console.error('[rossChat] agent loop failed mid-turn:', loop.error && loop.error.message);
+        emit({ type: 'error', code: 'agent_loop_failed', message: 'Ross hit a problem mid-answer. Please try again.' });
+        return { terminated: false, threadId: thread, turnId, costCents: debit.costCents, error: true };
+    }
 
     emit({ type: 'done', threadId: thread, turnId, costCents: debit.costCents });
     return { terminated: false, threadId: thread, turnId, costCents: debit.costCents };
@@ -349,6 +377,17 @@ const rossChat = onRequest({ secrets: [ANTHROPIC_API_KEY] }, (req, res) => cors(
     const { message, threadId, clientToday } = req.body || {};
     if (typeof message !== 'string' || !message.trim() || message.length > MAX_MESSAGE_CHARS) {
         res.status(400).json({ error: `message must be a non-empty string up to ${MAX_MESSAGE_CHARS} chars` });
+        return;
+    }
+    // threadId is caller-supplied and interpolated into RTDB paths — must be key-safe
+    // (review H-1). uid is always server-derived, so this only scopes within the caller's
+    // own subtree, but reject anything that isn't a clean push-key-shaped string.
+    if (threadId !== undefined && (typeof threadId !== 'string' || !THREAD_ID_RE.test(threadId))) {
+        res.status(400).json({ error: 'threadId must be a key-safe string ([A-Za-z0-9_-])' });
+        return;
+    }
+    if (clientToday !== undefined && (typeof clientToday !== 'string' || !CLIENT_TODAY_RE.test(clientToday))) {
+        res.status(400).json({ error: 'clientToday must be a YYYY-MM-DD string' });
         return;
     }
 
@@ -378,8 +417,12 @@ const rossChat = onRequest({ secrets: [ANTHROPIC_API_KEY] }, (req, res) => cors(
         if (typeof res.flush === 'function') res.flush();
     };
 
-    // Request-scoped id for the idempotent debit guard (one per Cloud Run invocation).
-    const requestId = req.headers['function-execution-id'] || req.headers['x-cloud-trace-context'] || `${principal.uid}:${Date.now()}`;
+    // Server-generated id for the idempotent debit guard. NOT derived from an inbound
+    // header (review L-7): a client can send arbitrary headers, so a header-keyed guard
+    // would let a caller reuse an id to short-circuit the debit and get free turns. A
+    // fresh per-invocation UUID is the safe choice for slice 3 (no retry path yet); a
+    // genuine retry/resume in slice 4 will thread a server-issued resume token instead.
+    const requestId = crypto.randomUUID();
 
     try {
         await runChatRequest({
@@ -393,8 +436,10 @@ const rossChat = onRequest({ secrets: [ANTHROPIC_API_KEY] }, (req, res) => cors(
             now: Date.now(), // server-authoritative — never client-supplied
         });
     } catch (err) {
-        console.error('[rossChat] turn failed:', err);
-        emit({ type: 'error', message: 'Ross hit a problem completing that turn. Please try again.' });
+        // NOTE: headers are already flushed, so this is an SSE error frame, not a 5xx —
+        // do not try to set a status code here (it would throw post-headers-sent).
+        console.error('[rossChat] turn failed:', err && err.message);
+        emit({ type: 'error', code: 'internal', message: 'Ross hit a problem completing that turn. Please try again.' });
     }
     res.end();
 }));
