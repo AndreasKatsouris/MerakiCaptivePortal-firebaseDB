@@ -2,6 +2,7 @@
 
 **Date:** 2026-05-31
 **Status:** Draft for review
+**Revised:** 2026-06-03 — engine-agnostic core (§1.1) + per-engine billing (§2.1)
 **Phase:** 7 (askRoss LLM program) — sub-project ② (the agent itself)
 **Author:** Session brainstorm (Andreas + Claude)
 **Sibling specs (merged):** `2026-05-31-metering-credit-ledger-design.md` (①),
@@ -27,13 +28,49 @@ destructive/config actions stay the human's — deferred to v2.
 
 | Decision | Choice |
 |----------|--------|
-| Interaction model | **Reactive v1** (owner invokes "Ask Ross"), **proactive-ready architecture** — the turn loop takes a `turnSource` so a v2 cron drives the same agent with no rewrite |
+| Interaction model | **Reactive v1** (owner invokes "Ask Ross"), **proactive-ready architecture** — refined to *one engine-agnostic core, two engines* (§1.1): v1 reactive on the raw Messages API, v2 proactive on the Agent SDK, sharing tools/policy/audit/prompt |
 | Tool catalog breadth | **Bands A + B** — read/grounding + workflow/run ops. Outward comms / money / destructive-config (C/D) deferred to v2 |
 | Trust model | Graduated-by-risk (`auto` / `confirm` / `off`) defaults + owner overrides clamped by hard ceilings; audit trail; global kill switch |
 | Models | **Sonnet 4.6** agent loop, **Haiku 4.5** for the eval judge (and future cheap tasks); behind one swappable `llm-client.js`; **prompt caching** on the stable prefix |
 | Transport | **Streaming (SSE)** via `onRequest` from v1 |
 | Eval scoring | **Programmatic assertions + Haiku-as-judge rubric** (20-prompt golden set, CI) |
-| Billing | Pre-flight `checkBalance`; post-turn `recordUsageAndDebit` with the response's exact `usage` |
+| Billing | Pre-flight `checkBalance`; post-spend `recordUsageAndDebit` with the response's exact `usage` (per-engine profile in §2.1) |
+
+---
+
+## 1.1 Engine-agnostic core (refinement, 2026-06-03)
+
+The original "one turn loop, two `turnSource`s" decision is sharpened to **one
+engine-agnostic core, two engines.** v1 reactive and v2 proactive want *different
+loop engines* — but share the valuable part, so the seam moves up a level.
+
+- **Shared core** (`functions/agent/`): the tool registry + adapters (`tools.js`),
+  the audit-wrapped runner (`execute.js`), the policy/tier engine (`policy.js`), and
+  the mode-aware system prompt (`prompt.js`). **Zero dependency on either engine.**
+  Zod is the single source of truth for each tool's args; `tools.js` projects the
+  registry into raw-API JSON schema (`toAnthropicTools`) **and** Agent-SDK in-process
+  MCP tools (`toSdkMcpServer`).
+- **v1 reactive engine** — `rossChat`, **raw Messages API**. *Owns the loop* because
+  it must pause mid-loop for the confirm-flow, debit per HTTP response, and gate
+  before the first token (§2).
+- **v2 proactive engine** (later) — `rossSweep`, **Claude Agent SDK**. *Rents the
+  loop* for an unattended, long-horizon (`maxTurns ~30`) morning sweep with automatic
+  context compaction.
+
+**Policy enforcement is the one place the engines diverge** (because proactive has no
+human to confirm to): reactive enforces tri-state in the loop
+(`auto` / `confirm`-pause / `off`-refuse); proactive **collapses policy to a static
+allowlist** — only `auto`-tier tools are handed to the SDK, `confirm`/`off` tools are
+physically absent (a tool that doesn't exist can't be called, §3), and a deferred
+suggestion is logged to the owner's morning digest via an `auto`-tier `proposeToOwner`
+tool.
+
+`ctx = { uid, turnId, turnSource: 'chat' | 'scheduled', confirmedBy?, now }` is the
+data contract the core consumes; everything engine-specific lives in `ctx`, so the
+core never imports either engine. **Convention (review #4):** an absent `confirmedBy`
+means the tool ran in `auto` tier (no human approval needed, or already granted); a
+present value names the owner/admin who approved a `confirm`-tier action — `execute.js`
+stamps it into the audit row without tracing back here.
 
 ---
 
@@ -77,7 +114,8 @@ rossChat(req) — one turn:
          off     → feed a refusal tool_result ("needs the owner"), continue
        loop until the model returns no tool_use
   4. POST-TURN:
-       ledger.recordUsageAndDebit({ uid, service:'askRoss', model, units:usage, meta:{turnId} })
+       ledger.recordUsageAndDebit({ uid, service:'askRoss', model,
+                                    units: toLedgerUnits(usage), meta:{turnId} })  // §2.1 req 1 — NOT raw `usage`
        write ross/agentAudit/{uid}/{turnId} for every executed tool
        persist the turn to ross/agentChats/{uid}/{threadId}
 ```
@@ -99,6 +137,79 @@ the agent never holds an open socket waiting for a human.)
    check-and-delete) *before* executing — so a double-click / replay can't fire the
    tool twice.
 Both are explicit acceptance criteria on build slice 4.
+
+---
+
+## 2.1 Billing across the two engines (reactive vs proactive)
+
+Both engines debit the same prepaid ZAR wallet via the ① ledger (`checkBalance`
+pre-flight, `recordUsageAndDebit` post-spend), but the **spend profile differs enough
+that billing is not identical**:
+
+| Concern | v1 reactive (`rossChat`) | v2 proactive (`rossSweep`) |
+|---------|--------------------------|----------------------------|
+| Debit granularity | Per **HTTP response** — sum `usage` across every API round-trip in the loop within that response, debit once before returning | Per **run** — debit once at the end from the Agent SDK `result` message's aggregate usage |
+| Pre-flight threshold | Small buffer (`DEFAULT_MIN_BALANCE_CENTS`); turns are bounded (`maxTurns ~5`) | Worst-case **sweep estimate** (`maxTurns × SWEEP_TYPICAL_TURN_COST_CENTS`) — it can't pause for low balance interactively, so gate high up front |
+| In-run exhaustion | Covered by the min-balance buffer; optionally re-check between loop iterations | A **PreToolUse hook** checks balance before each tool call and **aborts the query** when exhausted — the proactive analog of the reactive between-iteration check; bound by `maxTurns` + a per-day budget cap |
+| Who initiated the spend | Owner clicked "Ask Ross" — **explicit consent** | **Ross spends unattended** — needs explicit proactive opt-in + a daily spend cap, or it can drain the wallet overnight |
+
+> **`SWEEP_TYPICAL_TURN_COST_CENTS` (review #3):** the proactive pre-flight estimate
+> needs a concrete per-turn cost or the gate is unimplementable. Seed a tunable
+> constant (~50¢ ≈ Sonnet 4.6 @ ~800 input + ~200 output tokens with the cache-read
+> discount); promote it into the price table / config when the proactive engine
+> launches so it tracks real rates.
+
+**Cross-cutting requirements (both engines):**
+
+1. **Cache-aware pricing — already handled by ① ; the work is a field-shape map.**
+   ✅ **Verified 2026-06-03 against `functions/billing/ledger.js:50-69`:** the ledger's
+   `computeTokenCost` already prices four token classes —
+   `inputTokens` (100%), `outputTokens`, `cacheWriteTokens × cacheWriteMult` (~125%),
+   `cacheReadTokens × cacheReadMult` (~10%) — with multipliers from the price table.
+   No ledger amendment needed. **BUT** the ledger reads **camelCase `units`**
+   (`inputTokens`), while the Anthropic API returns **snake_case `usage`**
+   (`input_tokens`, `output_tokens`, `cache_creation_input_tokens`,
+   `cache_read_input_tokens`). The §2 shorthand `units: usage` would map every field to
+   `undefined → 0` → **a silent zero charge every turn.** So **slice 1 (`llm-client.js`)
+   must expose an explicit mapper** `toLedgerUnits(apiUsage)`:
+   `{ inputTokens: u.input_tokens, outputTokens: u.output_tokens,
+   cacheWriteTokens: u.cache_creation_input_tokens,
+   cacheReadTokens: u.cache_read_input_tokens }` — unit-tested against a verbatim copy
+   of a real Anthropic `usage` block (per the server-shape-mock lesson). With the §5
+   two-breakpoint cache, the bulk of input is *cache reads*, so getting this map right
+   is what makes the economics real. The first proactive run of the day pays the
+   cache-*write* premium once (cold owner-context cache), then cache-reads across its
+   internal turns.
+   **Accumulation point (review #1):** in the streaming loop, call `toLedgerUnits` once
+   **per API round-trip on the `message_stop` event's complete `usage` block** — *not*
+   the incremental `message_delta` token counts — and accumulate `costCents` across the
+   loop's round-trips. The unit-test mock copies a verbatim `message_stop` `usage`
+   block, not an assembled one.
+
+2. **Confirm-pause is billed twice.** Request A (up to the pause) already spent
+   input+output tokens **even if the owner never confirms** — so **debit at pause**,
+   not only at logical-turn-complete, or abandoned confirms are free. Request B (the
+   resume continuation) debits again. Both linked by `meta.turnId`.
+
+3. **Idempotent debits.** Key each debit by the HTTP-request / run id so a
+   `confirm`-resume retry (reactive) or an `onSchedule` retry (proactive) can't
+   double-bill. The §2 atomic one-time-consume guards the *tool*, not the *debit*.
+   **Ledger-API gap (review #2):** this idempotency is **not achievable today** —
+   `recordUsageAndDebit` generates its own `push().key` and runs the balance
+   `transaction()` unconditionally (`functions/billing/ledger.js:148,162`); its internal
+   `setWithRetry` only guards the *audit record* write, not the debit. So a billing-module
+   extension must land **before the slice-3 debit call**: give `recordUsageAndDebit` an
+   optional `requestId` that, when supplied, writes a one-time-consume guard at
+   `billing/debitGuard/{uid}/{requestId}` **before** the balance transaction and
+   short-circuits (returning the cached `{ costCents, balanceAfterCents }`) if it already
+   exists — the same guard pattern as the §2 tool-consume. `rossChat` passes its Cloud
+   Run request id; `rossSweep` passes the scheduler invocation id. Highest-value for v2
+   proactive, where `onSchedule` auto-retries a crashed run.
+
+4. **Attributable spend.** Tag `meta.turnSource` (`chat` vs `scheduled`) — ideally a
+   distinct service label (`askRoss:chat` / `askRoss:sweep`) — so the wallet ledger
+   shows the owner where their credit went, and surface the sweep's cost in the morning
+   digest. Transparency is the antidote to surprise-drain churn.
 
 ---
 
@@ -262,17 +373,30 @@ on `/ross.html`, replacing the scripted `askRoss()` stub in `ross-service.js`.
 ## 10. Build slices (for the implementation plan)
 
 1. `llm-client.js` (Anthropic SDK + prompt caching + streaming) — isolated, mockable.
-2. Tool registry + adapters (bands A+B) + policy engine + audit.
+2. **Engine-agnostic core** (`functions/agent/`, §1.1): `tools.js` (Zod registry +
+   `toAnthropicTools`/`toSdkMcpServer` projections), `execute.js` (audit-wrapped runner
+   + no-undo prev capture), `policy.js` (`effectivePolicy` + ceiling clamp),
+   `prompt.js` (mode-aware cached system blocks). Built standalone + unit-tested with
+   **zero engine dependency** — both v1 reactive and v2 proactive consume it. This is
+   the twice-paying investment; build the seam clean, don't weld it to the raw-API loop.
 3. `rossChat` CF: pre-flight gates → agent loop → ledger debit → SSE.
    **+ CORS** via the shared `cors-allowlist.js` (PR #94 pattern — `onRequest` SSE is
    browser-blocked without it; review #6). **+ update `CLOUD_FUNCTIONS_CATALOG.md`**
    (both copies) — `rossChat` is the project's first AI-inference CF (review #8).
    **+ the `rossAgent`-aware auth helper** (review #4).
+   **+ extend `recordUsageAndDebit` with the optional `requestId` debit-guard**
+   (§2.1 Point 3, review #2) — billing-module prerequisite for the debit call.
 4. Confirm-flow (pending action + resume) — **incl. `expiresAt` 410 check + atomic
    one-time-use consume** (review #2/#3).
 5. Client: Ask Ross surface (SSE consumer, confirm-cards, terminal states).
 6. Eval harness (20-prompt golden set, CI).
 7. RTDB rules for the new `ross/agent*` nodes.
+
+*(v2, later)* `rossSweep` proactive engine — Agent SDK consuming the **same core**
+(slice 2); adds a PreToolUse balance-abort hook + per-day budget cap (§2.1) + the
+`proposeToOwner` digest tool (§1.1). Validates the engine-agnostic seam: if slice 2
+was built clean, this is additive with no core changes. *(+ update
+`CLOUD_FUNCTIONS_CATALOG.md` (both copies) when shipped — review #5.)*
 
 ---
 
@@ -293,3 +417,16 @@ on `/ross.html`, replacing the scripted `askRoss()` stub in `ross-service.js`.
    block on a human mid-stream); the resume is a fresh request replaying context.
    Confirm this is acceptable UX vs a held connection (recommend the stateless
    resume — simpler, survives reconnects).
+6. **Proactive spend cap & consent (§2.1)** — proactive Ross spends the owner's
+   prepaid credit *unattended*. Recommend a separate
+   `ross/agentConfig/{uid}/proactiveEnabled` opt-in (**default OFF**) + a
+   `dailyBudgetCents` cap enforced by the PreToolUse balance-abort hook, with the
+   morning digest reporting the run's cost. **Open:** is the default daily cap
+   operator-global, or a per-tier entitlement (④a)? *(v2 decision — flagged now so the
+   slice-2 core carries the budget field from day one.)*
+7. **Cache-token pricing in the ① ledger (§2.1 req 1)** — ✅ **RESOLVED 2026-06-03.**
+   Ground-truth check of `functions/billing/ledger.js:50-69` confirms the ledger
+   already prices all four token classes (`cacheWrite`/`cacheRead`/`input`/`output`)
+   with price-table multipliers — **no ledger change needed.** The residual work moved
+   into slice 1: a `toLedgerUnits(apiUsage)` snake→camel mapper (the raw `units: usage`
+   shorthand would silently zero-charge). Not a blocker, just a must-not-forget map.
