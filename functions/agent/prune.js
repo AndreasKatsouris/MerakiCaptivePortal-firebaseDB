@@ -97,7 +97,7 @@ async function pruneAgentNodes(now) {
     return { removed: paths.length, total, capped };
 }
 
-// Daily at 03:30 SAST-ish (cron is UTC; off-peak either way).
+// Daily at 03:30 UTC (05:30 SAST) — off-peak for a SA deployment.
 const rossAgentPrune = onSchedule('30 3 * * *', async () => {
     const { removed, total } = await pruneAgentNodes(Date.now());
     console.log(`[rossAgentPrune] removed ${removed} of ${total} stale agent nodes`);

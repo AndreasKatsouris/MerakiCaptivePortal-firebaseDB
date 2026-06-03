@@ -87,5 +87,18 @@ describe('pruneAgentNodes (fake-rtdb integration)', () => {
         expect(db._dump().ross.agentPending.u1.keep).toBeDefined();
     });
 
+    it('caps a huge sweep at MAX_PRUNE_PATHS and reports the overflow (no silent truncation)', async () => {
+        const guards = {};
+        for (let i = 0; i < prune.MAX_PRUNE_PATHS + 50; i++) guards[`r${i}`] = { at: NOW - 30 * DAY };
+        const db = makeFakeRtdb({ billing: { debitGuard: { u1: guards } } });
+        prune.__setDbForTests(db);
+        const res = await prune.pruneAgentNodes(NOW);
+        expect(res.total).toBe(prune.MAX_PRUNE_PATHS + 50);
+        expect(res.removed).toBe(prune.MAX_PRUNE_PATHS);
+        expect(res.capped).toBe(true);
+        // some guards remain → cleared on the next run
+        expect(Object.keys(db._dump().billing.debitGuard.u1)).toHaveLength(50);
+    });
+
     afterEach(() => prune.__setDbForTests(null));
 });
