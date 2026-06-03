@@ -45,6 +45,16 @@ Server-side entitlement resolver (`functions/entitlements/`) — the **sole writ
 
 ---
 
+### askRoss Agent — reactive engine (Phase 7 ②)
+
+The project's **first AI-inference CF.** `rossChat` is the v1 reactive engine (raw Anthropic Messages API, streaming SSE): the owner asks Ross a question and Ross answers grounded in tool results, auto-executing only low-risk read/run tools (`functions/agent/`). **Four pre-flight gates** run before any LLM spend — global kill switch (`ross/config/agentKillSwitch`) → per-owner enable (`ross/agentConfig/{uid}/enabled`) → `features.rossAgent` entitlement → ledger balance; **super-admins skip the entitlement + balance gates** (still bound by the kill switch). Usage is debited once per turn via the ① ledger (`recordUsageAndDebit`, idempotent on the request id). Confirm-flow (pause/resume for playbook-authoring tools) is a later slice — **no `confirm`-tier tools are exposed yet**, so the loop only auto-runs the READY read/run tools. See `docs/plans/2026-05-31-askross-agent-design.md`.
+
+| Function | Trigger | Auth | Purpose |
+|----------|---------|------|---------|
+| `rossChat` | HTTP (v2 onRequest, **SSE**) | `verifyRossAgentAccess` — admin OR `features.rossAgent` (legacy `rossBasic`/`rossAdvanced` still admitted) | One streaming agent turn. Body `{ message, threadId?, clientToday? }`. Streams `text` / `action` / `terminal` / `error` / `done` SSE events. Secret `ANTHROPIC_API_KEY` (Sonnet 4.6). Persists turns to `ross/agentChats/{uid}/{threadId}`, audits every executed tool to `ross/agentAudit/{uid}/{turnId}` |
+
+---
+
 ### Authentication & User Management
 
 | Function | Trigger | Auth | Purpose |
@@ -294,6 +304,9 @@ All 22 ROSS functions live in `functions/ross.js`. Full catalog with auth, descr
 | `functions/ross.js` | All 22 ROSS functions — see `public/kb/features/ROSS.md#cloud-functions` for catalog |
 | `functions/ross-tier.js` | Tier-gating helpers (`readUserTier`, `filterTemplatesByTier`, audit logger) |
 | `functions/ross-workflow-builder.js` | `buildWorkflowRecord`, `buildLocationsFromTemplate`, `buildTaskFromSubtask` |
+| `functions/agent/*` | askRoss agent (Phase 7 ②) — `rossChat.js` reactive SSE engine + engine-agnostic core (`llm-client.js`, `tools.js`, `execute.js`, `policy.js`, `prompt.js`, `constants.js`) |
+| `functions/billing/*` | Credit ledger (Phase 7 ①) — `ledger.js` + `cloud-functions.js` (`billingGrantCredit`/`billingGetBalance`/`billingGetUsage`) |
+| `functions/entitlements/*` | Entitlement resolver (Phase 7 ④a) — `resolver.js` + `cloud-functions.js` (`entitlement*` CFs) |
 | `functions/guestSync.js` | `syncWifiToGuest`, `syncGuestToSendGrid` |
 | `functions/queueManagement.js` | QMS business logic |
 | `functions/queueWhatsAppIntegration.js` | Queue WhatsApp message processing |
