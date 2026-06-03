@@ -41,6 +41,16 @@ async function snapshotPrev(uid, name, args) {
             .once('value');
         return { nextDueDate: snap.val() };
     }
+    // editWorkflow / pauseWorkflow mutate workflow fields in place — capture the prior
+    // values of the mutable fields so an admin can restore from the audit row.
+    if ((name === 'editWorkflow' || name === 'pauseWorkflow') && args && args.workflowId) {
+        const snap = await getDb().ref(`ross/workflows/${uid}/${args.workflowId}`).once('value');
+        const wf = snap.val() || {};
+        const fields = ['name', 'notificationChannels', 'notifyPhone', 'notifyEmail', 'daysBeforeAlert', 'status'];
+        const prev = {};
+        for (const f of fields) { if (wf[f] !== undefined) prev[f] = wf[f]; }
+        return prev;
+    }
     return undefined;
 }
 

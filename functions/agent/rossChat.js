@@ -23,7 +23,7 @@ const ledger = require('../billing/ledger');
 const { corsOptions } = require('../cors-allowlist');
 const cors = require('cors')(corsOptions);
 const {
-    TIER, MODE, agentKillSwitchPath, agentEnabledPath, agentConfigPath,
+    TIER, MODE, agentKillSwitchPath, agentEnabledPath, agentConfigPath, agentPendingPath, PENDING_TTL_MS,
 } = require('./constants');
 
 // Anthropic key — provisioned via `firebase functions:secrets:set ANTHROPIC_API_KEY`
@@ -33,6 +33,13 @@ const ANTHROPIC_API_KEY = defineSecret('ANTHROPIC_API_KEY');
 const MAX_MESSAGE_CHARS = 4000;
 const MAX_AGENT_ROUNDS = 5;      // hard cap on tool round-trips per turn (spend guard, §2.1)
 const MAX_OUTPUT_TOKENS = 4096;  // per round-trip output cap
+const MAX_PENDING_CHARS = 64000; // cap on a persisted pending-action payload (review M-2)
+
+/** True if a pending action's conversation is too large to safely persist (review M-2). */
+function pendingTooLarge(messages) {
+    try { return JSON.stringify(messages).length > MAX_PENDING_CHARS; }
+    catch { return true; }
+}
 const THREAD_ID_RE = /^[a-zA-Z0-9_-]+$/;   // RTDB-key-safe (no `/ . # $ [ ]`)
 const CLIENT_TODAY_RE = /^\d{4}-\d{2}-\d{2}$/;
 
@@ -235,6 +242,26 @@ async function runAgentLoop({ ctx, system, tools, messages, ownerConfig, emit, m
         const toolUses = assistantBlocks.filter((b) => b && b.type === 'tool_use');
         if (toolUses.length === 0) break; // no tool calls → the turn is done
 
+        // Confirm-tier PAUSE (slice 4, §2): if any tool needs the owner, pause on the
+        // FIRST one. The persisted assistant turn is trimmed to its text blocks + that
+        // single confirm tool_use (any other tool_uses in the same turn are dropped — the
+        // model re-requests them after the owner resolves; this keeps every tool_use in the
+        // persisted turn resolvable on resume). The caller persists the pending action and
+        // debits the tokens spent so far (§2.1 pt 2 — an abandoned confirm is still billed).
+        const firstConfirm = toolUses.find((tu) => {
+            const d = REGISTRY[tu.name];
+            return d && effectivePolicy(tu.name, d, ownerConfig) === TIER.CONFIRM;
+        });
+        if (firstConfirm) {
+            const trimmed = assistantBlocks.filter((b) => b.type !== 'tool_use' || b.id === firstConfirm.id);
+            convo.push({ role: 'assistant', content: trimmed });
+            return {
+                paused: true,
+                pendingTool: { name: firstConfirm.name, args: firstConfirm.input || {}, toolUseId: firstConfirm.id },
+                assistantBlocks, usage: acc, units: toLedgerUnits(acc), rounds, messages: convo, error: null,
+            };
+        }
+
         convo.push({ role: 'assistant', content: assistantBlocks });
 
         const toolResults = [];
@@ -246,10 +273,9 @@ async function runAgentLoop({ ctx, system, tools, messages, ownerConfig, emit, m
             }
             const policy = effectivePolicy(tu.name, def, ownerConfig);
             if (policy !== TIER.AUTO) {
-                // confirm/off — slice 3 exposes no such tools, but a model could still
-                // emit one; refuse server-side rather than execute (confirm-flow = slice 4).
+                // off-tier (owner tightened this tool to off; confirm is handled above) → refuse.
                 emit({ type: 'action', tool: tu.name, status: 'refused' });
-                toolResults.push(errorResult(tu.id, { refused: `'${tu.name}' needs the owner to confirm — not available to Ross here.` }));
+                toolResults.push(errorResult(tu.id, { refused: `'${tu.name}' is switched off for Ross — that one stays with you.` }));
                 continue;
             }
             try {
@@ -263,7 +289,7 @@ async function runAgentLoop({ ctx, system, tools, messages, ownerConfig, emit, m
         convo.push({ role: 'user', content: toolResults });
     }
 
-    return { assistantBlocks, usage: acc, units: toLedgerUnits(acc), rounds, messages: convo, error };
+    return { paused: false, assistantBlocks, usage: acc, units: toLedgerUnits(acc), rounds, messages: convo, error };
 }
 
 // --- orchestration (one chat turn, transport-agnostic) ------------------------
@@ -277,6 +303,22 @@ function isValidClientToday(s) {
     if (typeof s !== 'string' || !CLIENT_TODAY_RE.test(s)) return false;
     const d = new Date(`${s}T00:00:00Z`);
     return !Number.isNaN(d.getTime()) && d.toISOString().slice(0, 10) === s;
+}
+
+/**
+ * Human-readable one-liner for a pending confirm action (§2 confirm-card). Pure; the
+ * client renders the full args, this is the headline the owner sees on the card.
+ */
+function confirmSummary(tool, args = {}) {
+    // Args are NOT yet validated (Zod runs at execute time) — fall back gracefully so the
+    // owner never reads "undefined/undefined" on the card (review M-3).
+    switch (tool) {
+        case 'activateTemplate': return `Activate template ${args.templateId || '(unknown)'} at ${(args.locationIds || []).join(', ') || 'a location'}`;
+        case 'createWorkflow': return `Create workflow “${args.name || '(unnamed)'}” (${args.category || '?'}/${args.recurrence || '?'})`;
+        case 'editWorkflow': return `Edit workflow ${args.workflowId || '(unknown)'}`;
+        case 'pauseWorkflow': return `Pause workflow ${args.workflowId || '(unknown)'}`;
+        default: return `Run ${tool}`;
+    }
 }
 
 /** Format an epoch-ms instant as a South African date (SAST = UTC+2, no DST). */
@@ -298,6 +340,23 @@ function deriveLocationNames(digest) {
 }
 
 /**
+ * Build the cached system blocks for an owner: digest (via the read adapter) + tier +
+ * locations + SA date. Shared by runChatRequest and resumeChatRequest so the prompt is
+ * identical across a turn and its resume continuation.
+ */
+async function buildSystemForOwner(ctx, clientToday) {
+    const { REGISTRY, catalogForPrompt } = require('./tools');
+    const { systemBlocks } = require('./prompt');
+    const tierSnap = await getDb().ref(`users/${ctx.uid}/tier`).once('value');
+    const tier = typeof tierSnap.val() === 'string' ? tierSnap.val() : null;
+    const digest = await REGISTRY.getWorkflowDigest.run(ctx, { clientToday });
+    const ownerContext = buildOwnerContext({
+        dateStr: formatSADate(ctx.now), tier, locationNames: deriveLocationNames(digest), digest,
+    });
+    return systemBlocks({ mode: MODE.CHAT, tools: catalogForPrompt(), ownerContext });
+}
+
+/**
  * Orchestrate ONE chat turn (§2), transport-agnostic: gates → owner context + bounded
  * history → agent loop → single ledger debit → persist → done. `emit(event)` is the
  * only output channel (the SSE handler wires it to res.write); fully unit-testable.
@@ -307,7 +366,7 @@ function deriveLocationNames(digest) {
  *
  * @returns {Promise<{terminated:true}|{terminated:false, threadId, turnId, costCents}>}
  */
-async function runChatRequest({ uid, isSuperAdmin, message, threadId, clientToday, requestId, emit, now }) {
+async function runChatRequest({ uid, isSuperAdmin, email, message, threadId, clientToday, requestId, emit, now }) {
     // 1. Pre-flight gates (no LLM spend if any fail).
     const gates = await runGates({ uid, isSuperAdmin });
     if (!gates.ok) {
@@ -315,28 +374,21 @@ async function runChatRequest({ uid, isSuperAdmin, message, threadId, clientToda
         return { terminated: true };
     }
 
-    const { REGISTRY, toAnthropicTools, catalogForPrompt } = require('./tools');
-    const { systemBlocks } = require('./prompt');
+    const { toAnthropicTools } = require('./tools');
     const { MODELS } = require('./llm-client');
     const { SERVICES } = require('../billing/constants');
 
     // 2. Thread + turn ids (server-generated).
     const thread = threadId || getDb().ref(`ross/agentChats/${uid}`).push().key;
     const turnId = getDb().ref(`ross/agentChats/${uid}/${thread}/turns`).push().key;
-    const ctx = { uid, turnId, turnSource: 'chat', now };
+    // isSuperAdmin flows into the confirm-tier adapters' gate checks (tier/cap bypass);
+    // email rides along for the denial-audit rows (review M-2).
+    const ctx = { uid, isSuperAdmin, email, turnId, turnSource: 'chat', now };
 
-    // 3. Owner config (policy overrides) + tier.
+    // 3. Owner config (policy overrides) + 4. cached system blocks (digest/tier/locations).
     const cfgSnap = await getDb().ref(agentConfigPath(uid)).once('value');
     const ownerConfig = cfgSnap.val() || null;
-    const tierSnap = await getDb().ref(`users/${uid}/tier`).once('value');
-    const tier = typeof tierSnap.val() === 'string' ? tierSnap.val() : null;
-
-    // 4. Owner context (digest via the READ adapter directly — not an audited action).
-    const digest = await REGISTRY.getWorkflowDigest.run(ctx, { clientToday });
-    const ownerContext = buildOwnerContext({
-        dateStr: formatSADate(now), tier, locationNames: deriveLocationNames(digest), digest,
-    });
-    const system = systemBlocks({ mode: MODE.CHAT, tools: catalogForPrompt(), ownerContext });
+    const system = await buildSystemForOwner(ctx, clientToday);
 
     // 5. Bounded history → messages.
     const turnsSnap = await getDb().ref(`ross/agentChats/${uid}/${thread}/turns`).once('value');
@@ -352,15 +404,38 @@ async function runChatRequest({ uid, isSuperAdmin, message, threadId, clientToda
         units: loop.units, meta: { turnId, turnSource: 'chat' }, requestId,
     });
 
-    // 8. Persist the turn (full assistant content array → resumable in slice 4).
+    // 8. Persist the turn (full assistant content array → resumable on confirm).
     await getDb().ref(`ross/agentChats/${uid}/${thread}/turns/${turnId}`).set({
         userMessage: message,
         assistantBlocks: loop.assistantBlocks,
         usage: loop.usage,
         costCents: debit.costCents,
         at: now,
+        ...(loop.paused ? { pending: true } : {}),
         ...(loop.error ? { error: true } : {}),
     });
+
+    // 9a. PAUSE (§2 confirm-flow): persist the pending action (server-keyed by turnId,
+    //     with an expiry) + emit a confirm card. The owner's resume — a SECOND request —
+    //     executes or declines it. The Request-A debit above already billed the tokens
+    //     spent reaching the pause (§2.1 pt 2), so an abandoned confirm is never free.
+    if (loop.paused) {
+        const { name, args, toolUseId } = loop.pendingTool;
+        if (pendingTooLarge(loop.messages)) {
+            // Clear the pending flag (review M-1) — no pending node is written, so the turn
+            // must not read as "awaiting confirmation" in history.
+            await getDb().ref(`ross/agentChats/${uid}/${thread}/turns/${turnId}`).update({ pending: null, error: true });
+            emit({ type: 'terminal', reason: 'too-long', message: 'That conversation got too long to hold for confirmation — start a fresh request.' });
+            return { terminated: false, threadId: thread, turnId, costCents: debit.costCents };
+        }
+        const expiresAt = now + PENDING_TTL_MS;
+        await getDb().ref(agentPendingPath(uid, turnId)).set({
+            tool: name, args, toolUseId, messages: loop.messages, threadId: thread,
+            createdAt: now, expiresAt,
+        });
+        emit({ type: 'confirm', turnId, tool: name, summary: confirmSummary(name, args), args, expiresAt });
+        return { terminated: false, paused: true, threadId: thread, turnId, costCents: debit.costCents };
+    }
 
     if (loop.error) {
         console.error('[rossChat] agent loop failed mid-turn:', loop.error && loop.error.message);
@@ -370,6 +445,127 @@ async function runChatRequest({ uid, isSuperAdmin, message, threadId, clientToda
 
     emit({ type: 'done', threadId: thread, turnId, costCents: debit.costCents });
     return { terminated: false, threadId: thread, turnId, costCents: debit.costCents };
+}
+
+/**
+ * Resume a paused confirm action (§2 confirm-flow) — a SECOND request from the owner's
+ * confirm-card click: `{ resumeTurnId, decision: 'approve'|'decline' }`. Reads the pending
+ * action (scoped to the caller's own uid — no cross-tenant resume), enforces the expiry
+ * (410-style terminal), atomically consumes it ONCE (a double-click can't fire twice), then
+ * executes-or-declines the tool, feeds the tool_result, and continues the agent loop. Its
+ * own requestId → a SEPARATE debit (Request B), linked to the turn by meta.turnId.
+ *
+ * `now` MUST be a server timestamp.
+ */
+async function resumeChatRequest({ uid, isSuperAdmin, email, resumeTurnId, decision, clientToday, requestId, emit, now }) {
+    const pendingRef = getDb().ref(agentPendingPath(uid, resumeTurnId));
+    const pending = (await pendingRef.once('value')).val();
+    if (!pending) {
+        emit({ type: 'terminal', reason: 'not-found', message: 'That confirmation has already been handled or no longer exists.' });
+        return { terminated: true, reason: 'not-found' };
+    }
+    // Fail CLOSED on a missing/non-numeric expiry (review M-1) — the expiry is a security
+    // control; never treat an absent value as "not expired".
+    if (typeof pending.expiresAt !== 'number' || now > pending.expiresAt) {
+        emit({ type: 'terminal', reason: 'expired', message: 'That confirmation expired — ask Ross again if you still want it.' });
+        return { terminated: true, reason: 'expired' };
+    }
+
+    // Re-run the pre-flight gates on resume (review H-1): the kill-switch / per-owner enable
+    // / rossAgent entitlement / balance must hold for the resume's tool write + continuation
+    // LLM turn — not just the original turn. Checked BEFORE the consume, so a blocked resume
+    // leaves the pending intact to retry once re-enabled/topped-up (until it expires).
+    const gates = await runGates({ uid, isSuperAdmin });
+    if (!gates.ok) {
+        emit({ type: 'terminal', reason: gates.terminal, gate: gates.gate, message: gates.message });
+        return { terminated: true, reason: gates.terminal };
+    }
+
+    // Atomic one-time-consume BEFORE executing: a concurrent/double resume sees a null
+    // current and loses the race (priorExisted=false), so the tool fires at most once.
+    let priorExisted = false;
+    await pendingRef.transaction((cur) => {
+        if (cur !== null && cur !== undefined) { priorExisted = true; return null; }
+        priorExisted = false;
+        return cur;
+    });
+    if (!priorExisted) {
+        emit({ type: 'terminal', reason: 'already-handled', message: 'That confirmation was already handled.' });
+        return { terminated: true, reason: 'already-handled' };
+    }
+
+    const ctx = { uid, isSuperAdmin, email, turnId: resumeTurnId, turnSource: 'chat', confirmedBy: uid, now };
+    const convo = Array.isArray(pending.messages) ? pending.messages.slice() : [];
+    const { executeTool } = require('./execute');
+
+    let toolResult;
+    if (decision === 'approve') {
+        try {
+            const out = await executeTool(ctx, pending.tool, pending.args || {});
+            emit({ type: 'action', tool: pending.tool, status: 'done' });
+            toolResult = { type: 'tool_result', tool_use_id: pending.toolUseId, content: JSON.stringify(out) };
+        } catch (err) {
+            emit({ type: 'action', tool: pending.tool, status: 'failed' });
+            toolResult = errorResult(pending.toolUseId, { error: err.message });
+        }
+    } else {
+        emit({ type: 'action', tool: pending.tool, status: 'declined' });
+        toolResult = errorResult(pending.toolUseId, { declined: 'The owner declined this action.' });
+    }
+    convo.push({ role: 'user', content: [toolResult] });
+
+    const { toAnthropicTools } = require('./tools');
+    const { MODELS } = require('./llm-client');
+    const { SERVICES } = require('../billing/constants');
+    const system = await buildSystemForOwner(ctx, clientToday);
+    const ownerConfig = (await getDb().ref(agentConfigPath(uid)).once('value')).val() || null;
+    const loop = await runAgentLoop({ ctx, system, tools: toAnthropicTools(), messages: convo, ownerConfig, emit });
+
+    // Request B — separate requestId (distinct from the pause's Request A, else the debit
+    // guard would suppress it); linked to the turn by meta.turnId.
+    const debit = await ledger.recordUsageAndDebit({
+        uid, service: SERVICES.ASK_ROSS, model: MODELS.AGENT,
+        units: loop.units, meta: { turnId: resumeTurnId, turnSource: 'chat' }, requestId,
+    });
+
+    const threadId = pending.threadId;
+    const turnRef = getDb().ref(`ross/agentChats/${uid}/${threadId}/turns/${resumeTurnId}`);
+
+    // The continuation may itself hit ANOTHER confirm tool → persist a fresh pending.
+    if (loop.paused) {
+        const { name, args, toolUseId } = loop.pendingTool;
+        if (pendingTooLarge(loop.messages)) {
+            await turnRef.update({ resolvedDecision: decision, resolvedAt: now, pending: null, resumeCostCents: debit.costCents });
+            emit({ type: 'terminal', reason: 'too-long', message: 'That conversation got too long to continue — start a fresh request.' });
+            return { terminated: false, threadId, turnId: resumeTurnId, costCents: debit.costCents };
+        }
+        const newTurnId = getDb().ref(`ross/agentChats/${uid}/${threadId}/turns`).push().key;
+        const expiresAt = now + PENDING_TTL_MS;
+        await getDb().ref(agentPendingPath(uid, newTurnId)).set({
+            tool: name, args, toolUseId, messages: loop.messages, threadId, createdAt: now, expiresAt,
+        });
+        await turnRef.update({ resolvedDecision: decision, resolvedAt: now, pending: null, resumeCostCents: debit.costCents });
+        emit({ type: 'confirm', turnId: newTurnId, tool: name, summary: confirmSummary(name, args), args, expiresAt });
+        return { terminated: false, paused: true, threadId, turnId: newTurnId, costCents: debit.costCents };
+    }
+
+    await turnRef.update({
+        assistantBlocks: loop.assistantBlocks,
+        resolvedDecision: decision,
+        resolvedAt: now,
+        pending: null,
+        resumeCostCents: debit.costCents,
+        ...(loop.error ? { error: true } : {}),
+    });
+
+    if (loop.error) {
+        console.error('[rossChat] resume continuation failed:', loop.error && loop.error.message);
+        emit({ type: 'error', code: 'agent_loop_failed', message: 'Ross hit a problem finishing that. Please try again.' });
+        return { terminated: false, threadId, turnId: resumeTurnId, costCents: debit.costCents, error: true };
+    }
+
+    emit({ type: 'done', threadId, turnId: resumeTurnId, costCents: debit.costCents, decision });
+    return { terminated: false, threadId, turnId: resumeTurnId, costCents: debit.costCents, decision };
 }
 
 // --- the Cloud Function (thin SSE shell; orchestration lives in runChatRequest) -
@@ -385,8 +581,22 @@ const rossChat = onRequest({ secrets: [ANTHROPIC_API_KEY] }, (req, res) => cors(
         res.status(405).json({ error: 'Method not allowed' });
         return;
     }
-    const { message, threadId, clientToday } = req.body || {};
-    if (typeof message !== 'string' || !message.trim() || message.length > MAX_MESSAGE_CHARS) {
+    const { message, threadId, clientToday, resumeTurnId, decision } = req.body || {};
+    // Two modes on one endpoint: a fresh turn (message) or a confirm RESUME (resumeTurnId).
+    const isResume = resumeTurnId !== undefined;
+
+    if (isResume) {
+        // resumeTurnId is the server-issued pending key; still validate it's key-safe before
+        // interpolating into the (uid-scoped) RTDB path.
+        if (typeof resumeTurnId !== 'string' || !THREAD_ID_RE.test(resumeTurnId)) {
+            res.status(400).json({ error: 'resumeTurnId must be a key-safe string' });
+            return;
+        }
+        if (decision !== 'approve' && decision !== 'decline') {
+            res.status(400).json({ error: "decision must be 'approve' or 'decline'" });
+            return;
+        }
+    } else if (typeof message !== 'string' || !message.trim() || message.length > MAX_MESSAGE_CHARS) {
         res.status(400).json({ error: `message must be a non-empty string up to ${MAX_MESSAGE_CHARS} chars` });
         return;
     }
@@ -408,6 +618,7 @@ const rossChat = onRequest({ secrets: [ANTHROPIC_API_KEY] }, (req, res) => cors(
         const { verifyAuthToken, verifyRossAgentAccess } = require('../ross');
         const decoded = await verifyAuthToken(req);
         principal = await verifyRossAgentAccess(decoded);
+        principal.email = decoded.email || null; // for denial-audit rows (review M-2)
     } catch (err) {
         // Normalise the client-facing message (review O-3): Firebase's verifyIdToken emits
         // verbose implementation detail ("Firebase ID token has expired…"). Log the real
@@ -441,16 +652,18 @@ const rossChat = onRequest({ secrets: [ANTHROPIC_API_KEY] }, (req, res) => cors(
     const requestId = crypto.randomUUID();
 
     try {
-        await runChatRequest({
-            uid: principal.uid,
-            isSuperAdmin: principal.isSuperAdmin,
-            message,
-            threadId,
-            clientToday,
-            requestId,
-            emit,
-            now: Date.now(), // server-authoritative — never client-supplied
-        });
+        const now = Date.now(); // server-authoritative — never client-supplied
+        if (isResume) {
+            await resumeChatRequest({
+                uid: principal.uid, isSuperAdmin: principal.isSuperAdmin, email: principal.email,
+                resumeTurnId, decision, clientToday, requestId, emit, now,
+            });
+        } else {
+            await runChatRequest({
+                uid: principal.uid, isSuperAdmin: principal.isSuperAdmin, email: principal.email,
+                message, threadId, clientToday, requestId, emit, now,
+            });
+        }
     } catch (err) {
         // NOTE: headers are already flushed, so this is an SSE error frame, not a 5xx —
         // do not try to set a status code here (it would throw post-headers-sent).
@@ -463,6 +676,8 @@ const rossChat = onRequest({ secrets: [ANTHROPIC_API_KEY] }, (req, res) => cors(
 module.exports = {
     rossChat,
     runChatRequest,
+    resumeChatRequest,
+    confirmSummary,
     runGates,
     buildOwnerContext,
     buildHistoryMessages,

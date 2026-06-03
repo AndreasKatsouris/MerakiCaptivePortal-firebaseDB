@@ -51,7 +51,7 @@ The project's **first AI-inference CF.** `rossChat` is the v1 reactive engine (r
 
 | Function | Trigger | Auth | Purpose |
 |----------|---------|------|---------|
-| `rossChat` | HTTP (v2 onRequest, **SSE**) | `verifyRossAgentAccess` — admin OR `features.rossAgent` (legacy `rossBasic`/`rossAdvanced` still admitted) | One streaming agent turn. Body `{ message, threadId?, clientToday? }`. Streams `text` / `action` / `terminal` / `error` / `done` SSE events. Secret `ANTHROPIC_API_KEY` (Sonnet 4.6). Persists turns to `ross/agentChats/{uid}/{threadId}`, audits every executed tool to `ross/agentAudit/{uid}/{turnId}` |
+| `rossChat` | HTTP (v2 onRequest, **SSE**) | `verifyRossAgentAccess` — admin OR `features.rossAgent` (legacy `rossBasic`/`rossAdvanced` still admitted) | One streaming agent turn OR a confirm **resume**. Body `{ message, threadId?, clientToday? }` for a turn, or `{ resumeTurnId, decision: 'approve'\|'decline' }` to resolve a paused confirm-tier action. Streams `text` / `action` / `confirm` / `terminal` / `error` / `done` SSE events. A confirm-tier tool (activate/create/edit/pause workflow) PAUSES the turn → persists a pending action at `ross/agentPending/{uid}/{turnId}` (10-min expiry, server-keyed, uid-scoped) + emits a `confirm` card; the owner's resume executes it (audited `confirmed:<uid>`, one-time-consume) or declines (pause + resume billed separately). Secret `ANTHROPIC_API_KEY` (Sonnet 4.6). Persists turns to `ross/agentChats/{uid}/{threadId}`, audits every executed tool to `ross/agentAudit/{uid}/{turnId}` |
 
 ---
 

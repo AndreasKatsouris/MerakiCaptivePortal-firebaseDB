@@ -7,7 +7,9 @@ const {
 const { TIER, STATUS, isAgentSubmittable } = require('../constants');
 const { makeFakeRtdb } = require('./helpers/fake-rtdb');
 
-const READY = ['getWorkflowDigest', 'getStaff', 'getRunHistory', 'snoozeCard'];
+const AUTO_READY = ['getWorkflowDigest', 'getStaff', 'getRunHistory', 'snoozeCard'];
+const CONFIRM_READY = ['activateTemplate', 'createWorkflow', 'editWorkflow', 'pauseWorkflow'];
+const READY = [...AUTO_READY, ...CONFIRM_READY]; // slice 4 promoted the 4 confirm tools
 
 describe('registry integrity', () => {
     it('every tool has description, args, valid tier+ceiling, status, run', () => {
@@ -22,14 +24,14 @@ describe('registry integrity', () => {
         }
     });
 
-    it('exposes exactly the 4 ready tools to the engine', () => {
+    it('exposes the 8 ready tools (4 auto + 4 confirm) to the engine', () => {
         expect(enabledToolNames().sort()).toEqual([...READY].sort());
     });
 
-    it('autoAllowlist (proactive) = the ready tools that resolve to auto', () => {
-        // all 4 ready tools are auto-tier with no owner override
-        expect(autoAllowlist().sort()).toEqual([...READY].sort());
-        // an owner who tightens snoozeCard to confirm drops it from the proactive set
+    it('autoAllowlist (proactive) = only the ready AUTO tools (confirm tools excluded)', () => {
+        // the 4 confirm-tier tools are READY but NOT auto → never in the proactive allowlist
+        expect(autoAllowlist().sort()).toEqual([...AUTO_READY].sort());
+        // an owner who tightens snoozeCard to confirm drops it from the proactive set too
         expect(autoAllowlist({ policy: { snoozeCard: 'confirm' } }).sort())
             .toEqual(['getRunHistory', 'getStaff', 'getWorkflowDigest']);
     });
@@ -44,8 +46,61 @@ describe('registry integrity', () => {
 
 describe('pending tools', () => {
     it('throw AdapterPendingError when run', async () => {
-        await expect(REGISTRY.activateTemplate.run({ uid: 'u' }, {})).rejects.toBeInstanceOf(AdapterPendingError);
-        await expect(REGISTRY.getWorkflows.run({ uid: 'u' }, {})).rejects.toThrow(/getWorkflows/);
+        await expect(REGISTRY.getWorkflows.run({ uid: 'u' }, {})).rejects.toBeInstanceOf(AdapterPendingError);
+        await expect(REGISTRY.startRun.run({ uid: 'u' }, {})).rejects.toThrow(/startRun/);
+    });
+});
+
+describe('promoted confirm-tier adapters (slice 4)', () => {
+    const ross = require('../../ross');
+    function seed(over = {}) {
+        const db = makeFakeRtdb({
+            userLocations: { u1: { loc1: true } },
+            users: { u1: { tier: 'all-in' } },
+            ross: { templates: { t1: { templateId: 't1', name: 'Sweep', category: 'compliance', recurrence: 'weekly', tier: 'free', subtasks: [] } } },
+            subscriptions: { u1: { limits: {} } },
+            ...over,
+        });
+        __setDbForTests(db);   // tools' own seam (unused by these adapters, set for safety)
+        ross.__setDbForTests(db); // the cores read/write through ross's seam
+        return db;
+    }
+    afterEach(() => { __setDbForTests(null); ross.__setDbForTests(null); });
+
+    const ctx = { uid: 'u1', isSuperAdmin: false, email: 'u1@x.co', now: 1_700_000_000_000 };
+
+    it('activateTemplate runs the core → writes a workflow (nextDueDate defaulted)', async () => {
+        const db = seed();
+        const out = await REGISTRY.activateTemplate.run(ctx, { templateId: 't1', locationIds: ['loc1'] });
+        expect(out.success).toBe(true);
+        expect(db._dump().ross.workflows.u1[out.workflowId]).toBeDefined();
+    });
+
+    it('createWorkflow runs the core → writes a workflow', async () => {
+        const db = seed();
+        const out = await REGISTRY.createWorkflow.run(ctx, { name: 'Daily', category: 'operations', recurrence: 'daily', locationIds: ['loc1'] });
+        expect(out.success).toBe(true);
+        expect(db._dump().ross.workflows.u1[out.workflowId].name).toBe('Daily');
+    });
+
+    it('pauseWorkflow runs the core → sets status:paused', async () => {
+        const db = seed({ ross: { workflows: { u1: { wf1: { name: 'X', status: 'active' } } } } });
+        await REGISTRY.pauseWorkflow.run(ctx, { workflowId: 'wf1' });
+        expect(db._dump().ross.workflows.u1.wf1.status).toBe('paused');
+    });
+
+    it('editWorkflow runs the core → updates allowed fields', async () => {
+        const db = seed({ ross: { workflows: { u1: { wf1: { name: 'Old', status: 'active' } } } } });
+        await REGISTRY.editWorkflow.run(ctx, { workflowId: 'wf1', updates: { name: 'New' } });
+        expect(db._dump().ross.workflows.u1.wf1.name).toBe('New');
+    });
+
+    it('surfaces a gate failure as a coded Error (tier-denied) + threads email into the denial audit (M-2)', async () => {
+        const db = seed({ users: { u1: { tier: 'free' } }, ross: { templates: { t1: { templateId: 't1', name: 'Sweep', tier: 'all-in', subtasks: [] } } } });
+        await expect(REGISTRY.activateTemplate.run(ctx, { templateId: 't1', locationIds: ['loc1'] }))
+            .rejects.toMatchObject({ code: 'TIER_DENIED' });
+        const denial = Object.values(db._dump().ross.auditLog.templateActivationDenials)[0];
+        expect(denial).toMatchObject({ uid: 'u1', email: 'u1@x.co' }); // email carried through the adapter
     });
 });
 

@@ -309,18 +309,32 @@ describe('runAgentLoop', () => {
         expect(res.assistantBlocks).toEqual([{ type: 'text', text: 'Snoozed it.' }]);
     });
 
-    it('defensively REFUSES a non-auto (confirm-tier) tool without executing it', async () => {
+    it('PAUSES on a confirm-tier tool without executing it (returns paused + pendingTool)', async () => {
         const res = await run([
             { final: toolMsg('activateTemplate', { templateId: 't1', locationIds: ['l1'] }) },
-            { final: textMsg('That one is yours to confirm.') },
         ]);
-        // No audit row (executeTool never ran) and no AdapterPendingError thrown.
-        const dump = db._dump();
-        expect(dump.ross && dump.ross.agentAudit).toBeUndefined();
+        expect(res.paused).toBe(true);
+        expect(res.pendingTool).toMatchObject({ name: 'activateTemplate', toolUseId: 'toolu_1' });
+        expect(res.pendingTool.args).toEqual({ templateId: 't1', locationIds: ['l1'] });
+        // NOT executed → no audit row; loop stopped after one round (no second stream call).
+        expect(db._dump().ross && db._dump().ross.agentAudit).toBeUndefined();
+        expect(res.rounds).toBe(1);
+        // the (trimmed) assistant turn carrying the confirm tool_use is persisted for resume.
+        const last = res.messages[res.messages.length - 1];
+        expect(last.role).toBe('assistant');
+        expect(last.content.some((b) => b.type === 'tool_use' && b.name === 'activateTemplate')).toBe(true);
+    });
+
+    it('refuses an OFF-tier tool (owner tightened it) without executing', async () => {
+        const res = await run([
+            { final: toolMsg('snoozeCard', { cardId: 'c1', hours: 1 }) },
+            { final: textMsg('ok') },
+        ], { ownerConfig: { policy: { snoozeCard: 'off' } } });
+        expect(res.paused).toBe(false);
         const toolResults = res.messages.flatMap((m) => (Array.isArray(m.content) ? m.content : []))
             .filter((b) => b.type === 'tool_result');
-        expect(toolResults).toHaveLength(1);
         expect(toolResults[0].is_error).toBe(true);
+        expect(db._dump().ross && db._dump().ross.v2Snoozes).toBeUndefined(); // not executed
         expect(res.rounds).toBe(2);
     });
 
@@ -369,6 +383,8 @@ describe('runChatRequest (orchestration)', () => {
     const BIG_USAGE = { input_tokens: 5000, output_tokens: 1000, cache_creation_input_tokens: 0, cache_read_input_tokens: 0 };
     const bigTextMsg = (text) => ({ content: [{ type: 'text', text }], usage: BIG_USAGE, stop_reason: 'end_turn' });
 
+    const ross = require('../../ross'); // confirm-tool adapters execute via ross's cores
+
     let db;
     let events;
     function setup(seed) {
@@ -377,6 +393,7 @@ describe('runChatRequest (orchestration)', () => {
         tools.__setDbForTests(db);
         execute.__setDbForTests(db);
         ledger.__setDbForTests(db);
+        ross.__setDbForTests(db);
         events = [];
     }
     const emit = (e) => events.push(e);
@@ -386,6 +403,7 @@ describe('runChatRequest (orchestration)', () => {
         tools.__setDbForTests(null);
         execute.__setDbForTests(null);
         ledger.__setDbForTests(null);
+        ross.__setDbForTests(null);
         llmClient.__setClientForTests(null);
     });
 
@@ -483,5 +501,115 @@ describe('runChatRequest (orchestration)', () => {
         // the partial turn is persisted and flagged
         const turn = db._dump().ross.agentChats.u1[r.threadId].turns[r.turnId];
         expect(turn.error).toBe(true);
+    });
+
+    // A confirm-tier tool_use carrying realistic usage (so the Request-A debit is non-zero).
+    const bigToolMsg = (name, input) => ({
+        content: [{ type: 'tool_use', id: 'tu1', name, input }],
+        usage: BIG_USAGE, stop_reason: 'tool_use',
+    });
+
+    it('confirm-tier tool → pauses: persists pending(+expiresAt) + flagged turn, emits confirm, debits Request A, no done', async () => {
+        setup(ENTITLED);
+        llmClient.__setClientForTests(scriptedClient([{ final: bigToolMsg('pauseWorkflow', { workflowId: 'wf1' }) }]));
+        const r = await rossChat.runChatRequest({ uid: 'u1', isSuperAdmin: false, message: 'pause my closing checklist', requestId: 'p1', emit, now: 1_700_000_000_000 });
+
+        expect(r).toMatchObject({ terminated: false, paused: true });
+        // confirm card emitted; NO done event
+        const card = events.find((e) => e.type === 'confirm');
+        expect(card).toMatchObject({ turnId: r.turnId, tool: 'pauseWorkflow', expiresAt: 1_700_000_000_000 + 600000 });
+        expect(card.summary).toContain('Pause workflow wf1');
+        expect(events.find((e) => e.type === 'done')).toBeUndefined();
+        // pending action persisted, server-keyed by turnId, with the convo for resume
+        const pending = db._dump().ross.agentPending.u1[r.turnId];
+        expect(pending).toMatchObject({ tool: 'pauseWorkflow', threadId: r.threadId, expiresAt: 1_700_000_000_000 + 600000 });
+        expect(pending.args).toEqual({ workflowId: 'wf1' });
+        expect(Array.isArray(pending.messages)).toBe(true);
+        // turn persisted + flagged pending; tool NOT executed (no audit row)
+        expect(db._dump().ross.agentChats.u1[r.threadId].turns[r.turnId].pending).toBe(true);
+        expect(db._dump().ross.agentAudit).toBeUndefined();
+        // Request A billed the tokens spent reaching the pause (abandoned-confirm billing)
+        expect(r.costCents).toBeGreaterThan(0);
+        expect(await ledger.getBalanceCents('u1')).toBe(100000 - r.costCents);
+    });
+
+    // --- resume (approve / decline / expiry / double / cross-user) -----------------
+    const T = 1_700_000_000_000;
+    const WF = { ross: { workflows: { u1: { wf1: { name: 'Closing', status: 'active' } } } } };
+
+    // Drive a pause first (creates the pending node), returning its turnId.
+    async function pauseFirst() {
+        llmClient.__setClientForTests(scriptedClient([{ final: bigToolMsg('pauseWorkflow', { workflowId: 'wf1' }) }]));
+        const p = await rossChat.runChatRequest({ uid: 'u1', isSuperAdmin: false, message: 'pause wf1', requestId: 'reqA', emit, now: T });
+        events = []; // clear so we inspect only resume events
+        return p.turnId;
+    }
+
+    it('resume approve: consumes pending, executes (confirmedBy audit), continues, debits Request B, done', async () => {
+        setup({ ...ENTITLED, ...WF });
+        const turnId = await pauseFirst();
+        llmClient.__setClientForTests(scriptedClient([{ final: bigTextMsg('Done — paused it.') }]));
+        const r = await rossChat.resumeChatRequest({ uid: 'u1', isSuperAdmin: false, resumeTurnId: turnId, decision: 'approve', requestId: 'reqB', emit, now: T + 1000 });
+
+        expect(r.decision).toBe('approve');
+        expect(db._dump().ross.workflows.u1.wf1.status).toBe('paused');          // executed
+        const audit = Object.values(db._dump().ross.agentAudit.u1[turnId]);
+        expect(audit[0]).toMatchObject({ tool: 'pauseWorkflow', via: 'confirmed:u1' }); // audited as confirmed
+        expect(db._dump().ross.agentPending?.u1?.[turnId]).toBeUndefined();        // consumed
+        expect(events.find((e) => e.type === 'done')).toBeDefined();
+        expect(r.costCents).toBeGreaterThan(0);                                    // Request B debited
+    });
+
+    it('resume decline: no execution, declined tool_result, continues, done', async () => {
+        setup({ ...ENTITLED, ...WF });
+        const turnId = await pauseFirst();
+        llmClient.__setClientForTests(scriptedClient([{ final: bigTextMsg('Okay, left it running.') }]));
+        const r = await rossChat.resumeChatRequest({ uid: 'u1', isSuperAdmin: false, resumeTurnId: turnId, decision: 'decline', requestId: 'reqB', emit, now: T + 1000 });
+
+        expect(r.decision).toBe('decline');
+        expect(db._dump().ross.workflows.u1.wf1.status).toBe('active');  // NOT paused
+        expect(db._dump().ross.agentAudit).toBeUndefined();              // nothing executed
+        expect(events.find((e) => e.type === 'done')).toBeDefined();
+    });
+
+    it('resume after expiry → terminal expired, no execution, no consume-then-run', async () => {
+        setup({ ...ENTITLED, ...WF });
+        const turnId = await pauseFirst();
+        const r = await rossChat.resumeChatRequest({ uid: 'u1', isSuperAdmin: false, resumeTurnId: turnId, decision: 'approve', requestId: 'reqB', emit, now: T + 11 * 60 * 1000 });
+        expect(r).toMatchObject({ terminated: true, reason: 'expired' });
+        expect(db._dump().ross.workflows.u1.wf1.status).toBe('active');
+        expect(events.find((e) => e.type === 'terminal').reason).toBe('expired');
+    });
+
+    it('double resume → second blocked by the one-time-consume (tool fires once)', async () => {
+        setup({ ...ENTITLED, ...WF });
+        const turnId = await pauseFirst();
+        llmClient.__setClientForTests(scriptedClient([{ final: bigTextMsg('done') }, { final: bigTextMsg('again') }]));
+        await rossChat.resumeChatRequest({ uid: 'u1', isSuperAdmin: false, resumeTurnId: turnId, decision: 'approve', requestId: 'rb1', emit, now: T + 1 });
+        const r2 = await rossChat.resumeChatRequest({ uid: 'u1', isSuperAdmin: false, resumeTurnId: turnId, decision: 'approve', requestId: 'rb2', emit, now: T + 2 });
+        // The pending node is consumed by the first resume, so the second is blocked
+        // (sequentially: not-found; under a true concurrent race: already-handled).
+        expect(r2.terminated).toBe(true);
+        expect(['not-found', 'already-handled']).toContain(r2.reason);
+        // the tool fired exactly once
+        expect(Object.keys(db._dump().ross.agentAudit.u1[turnId])).toHaveLength(1);
+    });
+
+    it('cross-user resume → not found (pending is uid-scoped, never trusts a client uid)', async () => {
+        setup({ ...ENTITLED, ...WF });
+        const turnId = await pauseFirst();
+        const r = await rossChat.resumeChatRequest({ uid: 'attacker', isSuperAdmin: false, resumeTurnId: turnId, decision: 'approve', requestId: 'reqB', emit, now: T + 1 });
+        expect(r).toMatchObject({ terminated: true, reason: 'not-found' });
+        expect(db._dump().ross.workflows.u1.wf1.status).toBe('active'); // u1's workflow untouched
+    });
+
+    it('resume is gated: a kill-switch flipped after the pause blocks it, pending left intact (review H-1)', async () => {
+        setup({ ...ENTITLED, ...WF });
+        const turnId = await pauseFirst();
+        await db.ref('ross/config/agentKillSwitch').set(true); // emergency stop after the pause
+        const r = await rossChat.resumeChatRequest({ uid: 'u1', isSuperAdmin: false, resumeTurnId: turnId, decision: 'approve', requestId: 'reqB', emit, now: T + 1000 });
+        expect(r).toMatchObject({ terminated: true, reason: 'disabled' });
+        expect(db._dump().ross.workflows.u1.wf1.status).toBe('active');     // NOT executed
+        expect(db._dump().ross.agentPending.u1[turnId]).toBeDefined();      // NOT consumed → retryable
     });
 });

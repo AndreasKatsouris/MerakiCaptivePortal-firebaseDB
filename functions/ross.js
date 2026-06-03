@@ -677,6 +677,193 @@ function validateSubtasksInputTypes(subtasks) {
 }
 
 // ============================================
+// WORKFLOW-OP CORES (askRoss slice 4) — owner-callable, HTTP-agnostic.
+// ============================================
+// The write-logic of rossActivateWorkflow / rossCreateWorkflow / rossUpdateWorkflow,
+// extracted so BOTH the CF handler AND the agent confirm-tier adapters (functions/agent)
+// call ONE implementation. Gate failures throw an Error with a `.code` the CF wrapper
+// maps to an HTTP status and the agent adapter maps to an is_error tool_result.
+// Codes: VALIDATION (400) / NOT_FOUND (404) / TIER_DENIED|LOCATION_DENIED|WORKFLOW_LIMIT_REACHED (403).
+
+function workflowOpError(code, message, extra) {
+    return Object.assign(new Error(message), { code, ...(extra || {}) });
+}
+
+function workflowOpStatus(code) {
+    switch (code) {
+        case 'VALIDATION': return 400;
+        case 'NOT_FOUND': return 404;
+        case 'TIER_DENIED':
+        case 'LOCATION_DENIED':
+        case 'WORKFLOW_LIMIT_REACHED': return 403;
+        default: return 500;
+    }
+}
+
+// Map a workflow-op error to the CF's HTTP response (preserves the pre-extraction
+// status codes + bodies byte-for-byte). Non-coded errors (auth etc.) fall through to
+// the original Admin/access-denied → 403, else 500 behaviour.
+function respondWorkflowOpError(res, error, tag) {
+    if (error.code) {
+        const body = { error: error.message };
+        if (error.code === 'WORKFLOW_LIMIT_REACHED') {
+            body.code = 'WORKFLOW_LIMIT_REACHED';
+            body.limit = error.limit;
+            body.current = error.current;
+            body.upgradeUrl = '/upgrade.html';
+        }
+        return res.status(workflowOpStatus(error.code)).json(body);
+    }
+    console.error(`[${tag}] Error:`, error.message);
+    const statusCode = (error.message.includes('Admin') || error.message.includes('Super Admin') || error.message.includes('access denied')) ? 403 : 500;
+    return res.status(statusCode).json({ error: error.message });
+}
+
+// Wrap the shared verifyLocationAccess (throws a plain Error) into a coded one.
+async function assertLocationAccess(uid, locationIds, isSuperAdmin) {
+    try {
+        await verifyLocationAccess(uid, locationIds, isSuperAdmin);
+    } catch (e) {
+        throw workflowOpError('LOCATION_DENIED', e.message);
+    }
+}
+
+async function createWorkflowAsOwner({ uid, isSuperAdmin, email, name, description, category, recurrence, customInterval, locationIds, locationNames, locationAssignedTo, nextDueDate, subtasks, daysBeforeAlert, notifyPhone, notifyEmail }) {
+    if (!name || !name.trim()) throw workflowOpError('VALIDATION', 'Workflow name is required');
+    if (!VALID_CATEGORIES.includes(category)) throw workflowOpError('VALIDATION', 'Invalid category');
+    if (!VALID_RECURRENCES.includes(recurrence)) throw workflowOpError('VALIDATION', 'Invalid recurrence');
+    if (!Array.isArray(locationIds) || locationIds.length === 0) throw workflowOpError('VALIDATION', 'At least one location ID is required');
+    if (!nextDueDate) throw workflowOpError('VALIDATION', 'Next due date is required');
+    const subtaskTypeError = validateSubtasksInputTypes(subtasks);
+    if (subtaskTypeError) throw workflowOpError('VALIDATION', subtaskTypeError);
+
+    await assertLocationAccess(uid, locationIds, isSuperAdmin);
+
+    const createCap = await checkWorkflowCap(uid, isSuperAdmin);
+    if (!createCap.allowed) {
+        await logWorkflowCapDenial({ uid, email, limit: createCap.limit, current: createCap.current });
+        throw workflowOpError('WORKFLOW_LIMIT_REACHED',
+            `You've reached your plan's limit of ${createCap.limit} active workflows. Upgrade or pause a workflow to add more.`,
+            { limit: createCap.limit, current: createCap.current });
+    }
+
+    const workflowId = generateId();
+    const now = Date.now();
+    const locations = {};
+    locationIds.forEach((locationId, idx) => {
+        const tasks = {};
+        if (Array.isArray(subtasks)) {
+            subtasks.forEach(subtask => {
+                const taskId = generateId();
+                tasks[taskId] = buildTaskFromSubtask(subtask, nextDueDate, VALID_INPUT_TYPES);
+            });
+        }
+        locations[locationId] = {
+            locationName: (locationNames && locationNames[idx]) || locationId,
+            locationAssignedTo: (locationAssignedTo && locationAssignedTo[locationId]) || null,
+            status: 'active',
+            nextDueDate,
+            activatedAt: now,
+            tasks
+        };
+    });
+
+    const workflowData = {
+        workflowId,
+        templateId: null,
+        ownerId: uid,
+        name: name.trim(),
+        description: (description || '').trim() || null,
+        category,
+        recurrence,
+        customInterval: (Number.isInteger(customInterval) && customInterval > 0) ? customInterval : null,
+        notificationChannels: ['in_app'],
+        notifyPhone: notifyPhone || null,
+        notifyEmail: notifyEmail || null,
+        daysBeforeAlert: Array.isArray(daysBeforeAlert)
+            ? daysBeforeAlert.filter(d => Number.isInteger(d) && d > 0)
+            : [30, 7],
+        createdAt: now,
+        updatedAt: now,
+        locations
+    };
+
+    const atomicWrite = {
+        [`ross/workflows/${uid}/${workflowId}`]: workflowData,
+        [`ross/ownerIndex/${uid}`]: true,
+        ...locationIndexUpdates(workflowId, uid, locationIds)
+    };
+    await db.ref().update(atomicWrite);
+    return { success: true, workflowId, workflow: workflowData };
+}
+
+async function activateWorkflowAsOwner({ uid, isSuperAdmin, email, templateId, locationIds, locationNames, locationAssignedTo, name, description, nextDueDate, daysBeforeAlert, notifyPhone, notifyEmail, customInterval }) {
+    if (!templateId) throw workflowOpError('VALIDATION', 'Template ID is required');
+    if (!Array.isArray(locationIds) || locationIds.length === 0) throw workflowOpError('VALIDATION', 'At least one location ID is required');
+    if (!nextDueDate) throw workflowOpError('VALIDATION', 'Next due date is required');
+
+    await assertLocationAccess(uid, locationIds, isSuperAdmin);
+
+    const templateSnap = await db.ref(`ross/templates/${templateId}`).once('value');
+    if (!templateSnap.exists()) throw workflowOpError('NOT_FOUND', 'Template not found');
+    const template = templateSnap.val();
+
+    const userTier = await readUserTier(uid);
+    if (!userCanActivate(userTier, template.tier, isSuperAdmin)) {
+        await logActivationDenial({ uid, email, templateId, templateName: template.name, userTier, templateTier: template.tier });
+        throw workflowOpError('TIER_DENIED', 'Template requires the All-in tier');
+    }
+
+    const activateCap = await checkWorkflowCap(uid, isSuperAdmin);
+    if (!activateCap.allowed) {
+        await logWorkflowCapDenial({ uid, email, limit: activateCap.limit, current: activateCap.current });
+        throw workflowOpError('WORKFLOW_LIMIT_REACHED',
+            `You've reached your plan's limit of ${activateCap.limit} active workflows. Upgrade or pause a workflow to add more.`,
+            { limit: activateCap.limit, current: activateCap.current });
+    }
+
+    const { workflowId, workflowData, atomicWrite } = buildWorkflowRecord({
+        template, locationIds, locationNames, locationAssignedTo, nextDueDate, uid,
+        name, description, customInterval, daysBeforeAlert, notifyPhone, notifyEmail,
+        workflowId: generateId(),
+        validInputTypes: VALID_INPUT_TYPES,
+        generateTaskId: generateId,
+        now: Date.now(),
+    });
+    await db.ref().update(atomicWrite);
+    return { success: true, workflowId, workflow: workflowData };
+}
+
+async function updateWorkflowAsOwner({ uid, workflowId, updates }) {
+    if (!workflowId) throw workflowOpError('VALIDATION', 'Workflow ID is required');
+    if (!updates || typeof updates !== 'object') throw workflowOpError('VALIDATION', 'updates object is required');
+
+    const workflowRef = db.ref(`ross/workflows/${uid}/${workflowId}`);
+    const snap = await workflowRef.once('value');
+    if (!snap.exists()) throw workflowOpError('NOT_FOUND', 'Workflow not found');
+
+    const allowedFields = ['name', 'notificationChannels', 'notifyPhone', 'notifyEmail', 'daysBeforeAlert', 'status'];
+    const sanitized = { updatedAt: Date.now() };
+    allowedFields.forEach(field => {
+        if (updates[field] !== undefined) sanitized[field] = updates[field];
+    });
+
+    if (sanitized.daysBeforeAlert !== undefined) {
+        if (!Array.isArray(sanitized.daysBeforeAlert)) {
+            throw workflowOpError('VALIDATION', 'daysBeforeAlert must be an array of positive integers');
+        }
+        sanitized.daysBeforeAlert = sanitized.daysBeforeAlert.filter(d => Number.isInteger(d) && d > 0);
+    }
+
+    if (sanitized.status !== undefined && !['active', 'paused'].includes(sanitized.status)) {
+        throw workflowOpError('VALIDATION', "Invalid status value. Use 'active' or 'paused'");
+    }
+
+    await workflowRef.update(sanitized);
+    return { success: true, workflowId };
+}
+
+// ============================================
 // WORKFLOW OPERATIONS
 // ============================================
 
@@ -692,74 +879,11 @@ exports.rossActivateWorkflow = onRequest(async (req, res) => {
             const { uid, isSuperAdmin } = await verifyUserOrAdmin(decodedToken);
 
             const data = req.body.data || req.body;
-            const { templateId, locationIds, locationNames, locationAssignedTo, name, description, nextDueDate, daysBeforeAlert, notifyPhone, notifyEmail, customInterval } = data;
-
-            if (!templateId) return res.status(400).json({ error: 'Template ID is required' });
-            if (!Array.isArray(locationIds) || locationIds.length === 0) return res.status(400).json({ error: 'At least one location ID is required' });
-            if (!nextDueDate) return res.status(400).json({ error: 'Next due date is required' });
-
-            await verifyLocationAccess(uid, locationIds, isSuperAdmin);
-
-            const templateSnap = await db.ref(`ross/templates/${templateId}`).once('value');
-            if (!templateSnap.exists()) return res.status(404).json({ error: 'Template not found' });
-            const template = templateSnap.val();
-
-            // Tier gate — Phase 6 PR 1A. SuperAdmin bypasses. Missing user tier
-            // fails closed (treated as 'free'). Audit-log denials regardless.
-            const userTier = await readUserTier(uid);
-            if (!userCanActivate(userTier, template.tier, isSuperAdmin)) {
-                await logActivationDenial({
-                    uid,
-                    email: decodedToken.email,
-                    templateId,
-                    templateName: template.name,
-                    userTier,
-                    templateTier: template.tier,
-                });
-                return res.status(403).json({
-                    error: 'Template requires the All-in tier',
-                });
-            }
-
-            // Workflow-cap gate — Phase 7 ④a §8. SuperAdmin bypasses; unlimited
-            // when no tier defines maxWorkflows. Never yanks existing workflows —
-            // only blocks new ones at cap (mirrors the downgrade policy).
-            const activateCap = await checkWorkflowCap(uid, isSuperAdmin);
-            if (!activateCap.allowed) {
-                await logWorkflowCapDenial({ uid, email: decodedToken.email, limit: activateCap.limit, current: activateCap.current });
-                return res.status(403).json({
-                    error: `You've reached your plan's limit of ${activateCap.limit} active workflows. Upgrade or pause a workflow to add more.`,
-                    code: 'WORKFLOW_LIMIT_REACHED',
-                    limit: activateCap.limit,
-                    current: activateCap.current,
-                    upgradeUrl: '/upgrade.html',
-                });
-            }
-
-            const { workflowId, workflowData, atomicWrite } = buildWorkflowRecord({
-                template,
-                locationIds,
-                locationNames,
-                locationAssignedTo,
-                nextDueDate,
-                uid,
-                name,
-                description,
-                customInterval,
-                daysBeforeAlert,
-                notifyPhone,
-                notifyEmail,
-                workflowId: generateId(),
-                validInputTypes: VALID_INPUT_TYPES,
-                generateTaskId: generateId,
-                now: Date.now(),
-            });
-            await db.ref().update(atomicWrite);
-            res.json({ result: { success: true, workflowId, workflow: workflowData } });
+            // Logic lives in activateWorkflowAsOwner (shared with the askRoss agent).
+            const result = await activateWorkflowAsOwner({ uid, isSuperAdmin, email: decodedToken.email, ...data });
+            res.json({ result });
         } catch (error) {
-            console.error('[rossActivateWorkflow] Error:', error.message);
-            const statusCode = (error.message.includes('Admin') || error.message.includes('Super Admin') || error.message.includes('access denied')) ? 403 : 500;
-            res.status(statusCode).json({ error: error.message });
+            respondWorkflowOpError(res, error, 'rossActivateWorkflow');
         }
     });
 });
@@ -889,87 +1013,11 @@ exports.rossCreateWorkflow = onRequest(async (req, res) => {
             const { uid, isSuperAdmin } = await verifyUserOrAdmin(decodedToken);
 
             const data = req.body.data || req.body;
-            const { name, description, category, recurrence, customInterval, locationIds, locationNames, locationAssignedTo, nextDueDate, subtasks, daysBeforeAlert, notifyPhone, notifyEmail } = data;
-
-            if (!name || !name.trim()) return res.status(400).json({ error: 'Workflow name is required' });
-            if (!VALID_CATEGORIES.includes(category)) return res.status(400).json({ error: 'Invalid category' });
-            if (!VALID_RECURRENCES.includes(recurrence)) return res.status(400).json({ error: 'Invalid recurrence' });
-            if (!Array.isArray(locationIds) || locationIds.length === 0) return res.status(400).json({ error: 'At least one location ID is required' });
-            if (!nextDueDate) return res.status(400).json({ error: 'Next due date is required' });
-
-            // Phase 4e.2: enforce inputType enum on incoming subtasks.
-            const subtaskTypeError = validateSubtasksInputTypes(subtasks);
-            if (subtaskTypeError) return res.status(400).json({ error: subtaskTypeError });
-
-            await verifyLocationAccess(uid, locationIds, isSuperAdmin);
-
-            // Workflow-cap gate — Phase 7 ④a §8. SuperAdmin bypasses; unlimited
-            // when no tier defines maxWorkflows. Only blocks new creates at cap.
-            const createCap = await checkWorkflowCap(uid, isSuperAdmin);
-            if (!createCap.allowed) {
-                await logWorkflowCapDenial({ uid, email: decodedToken.email, limit: createCap.limit, current: createCap.current });
-                return res.status(403).json({
-                    error: `You've reached your plan's limit of ${createCap.limit} active workflows. Upgrade or pause a workflow to add more.`,
-                    code: 'WORKFLOW_LIMIT_REACHED',
-                    limit: createCap.limit,
-                    current: createCap.current,
-                    upgradeUrl: '/upgrade.html',
-                });
-            }
-
-            const workflowId = generateId();
-            const now = Date.now();
-
-            const locations = {};
-            locationIds.forEach((locationId, idx) => {
-                const tasks = {};
-                if (Array.isArray(subtasks)) {
-                    subtasks.forEach(subtask => {
-                        const taskId = generateId();
-                        tasks[taskId] = buildTaskFromSubtask(subtask, nextDueDate, VALID_INPUT_TYPES);
-                    });
-                }
-                locations[locationId] = {
-                    locationName: (locationNames && locationNames[idx]) || locationId,
-                    locationAssignedTo: (locationAssignedTo && locationAssignedTo[locationId]) || null,
-                    status: 'active',
-                    nextDueDate,
-                    activatedAt: now,
-                    tasks
-                };
-            });
-
-            const workflowData = {
-                workflowId,
-                templateId: null,
-                ownerId: uid,
-                name: name.trim(),
-                description: (description || '').trim() || null,
-                category,
-                recurrence,
-                customInterval: (Number.isInteger(customInterval) && customInterval > 0) ? customInterval : null,
-                notificationChannels: ['in_app'],
-                notifyPhone: notifyPhone || null,
-                notifyEmail: notifyEmail || null,
-                daysBeforeAlert: Array.isArray(daysBeforeAlert)
-                    ? daysBeforeAlert.filter(d => Number.isInteger(d) && d > 0)
-                    : [30, 7],
-                createdAt: now,
-                updatedAt: now,
-                locations
-            };
-
-            const atomicWrite = {
-                [`ross/workflows/${uid}/${workflowId}`]: workflowData,
-                [`ross/ownerIndex/${uid}`]: true,
-                ...locationIndexUpdates(workflowId, uid, locationIds)
-            };
-            await db.ref().update(atomicWrite);
-            res.json({ result: { success: true, workflowId, workflow: workflowData } });
+            // Logic lives in createWorkflowAsOwner (shared with the askRoss agent).
+            const result = await createWorkflowAsOwner({ uid, isSuperAdmin, email: decodedToken.email, ...data });
+            res.json({ result });
         } catch (error) {
-            console.error('[rossCreateWorkflow] Error:', error.message);
-            const statusCode = (error.message.includes('Admin') || error.message.includes('Super Admin') || error.message.includes('access denied')) ? 403 : 500;
-            res.status(statusCode).json({ error: error.message });
+            respondWorkflowOpError(res, error, 'rossCreateWorkflow');
         }
     });
 });
@@ -987,38 +1035,11 @@ exports.rossUpdateWorkflow = onRequest(async (req, res) => {
 
             const data = req.body.data || req.body;
             const { workflowId, updates } = data;
-            if (!workflowId) return res.status(400).json({ error: 'Workflow ID is required' });
-            if (!updates || typeof updates !== 'object') {
-                return res.status(400).json({ error: 'updates object is required' });
-            }
-
-            const workflowRef = db.ref(`ross/workflows/${uid}/${workflowId}`);
-            const snap = await workflowRef.once('value');
-            if (!snap.exists()) return res.status(404).json({ error: 'Workflow not found' });
-
-            const allowedFields = ['name', 'notificationChannels', 'notifyPhone', 'notifyEmail', 'daysBeforeAlert', 'status'];
-            const sanitized = { updatedAt: Date.now() };
-            allowedFields.forEach(field => {
-                if (updates[field] !== undefined) sanitized[field] = updates[field];
-            });
-
-            if (sanitized.daysBeforeAlert !== undefined) {
-                if (!Array.isArray(sanitized.daysBeforeAlert)) {
-                    return res.status(400).json({ error: 'daysBeforeAlert must be an array of positive integers' });
-                }
-                sanitized.daysBeforeAlert = sanitized.daysBeforeAlert.filter(d => Number.isInteger(d) && d > 0);
-            }
-
-            if (sanitized.status !== undefined && !['active', 'paused'].includes(sanitized.status)) {
-                return res.status(400).json({ error: "Invalid status value. Use 'active' or 'paused'" });
-            }
-
-            await workflowRef.update(sanitized);
-            res.json({ result: { success: true, workflowId } });
+            // Logic lives in updateWorkflowAsOwner (shared with the askRoss agent).
+            const result = await updateWorkflowAsOwner({ uid, workflowId, updates });
+            res.json({ result });
         } catch (error) {
-            console.error('[rossUpdateWorkflow] Error:', error.message);
-            const statusCode = (error.message.includes('Admin') || error.message.includes('Super Admin') || error.message.includes('access denied')) ? 403 : 500;
-            res.status(statusCode).json({ error: error.message });
+            respondWorkflowOpError(res, error, 'rossUpdateWorkflow');
         }
     });
 });
@@ -1969,5 +1990,11 @@ module.exports.buildHomeWorkflowDigest = buildHomeWorkflowDigest;
 // Auth helpers — consumed by the askRoss rossChat CF (functions/agent/rossChat.js, slice 3).
 module.exports.verifyAuthToken = verifyAuthToken;
 module.exports.verifyRossAgentAccess = verifyRossAgentAccess;
+// Owner-callable workflow-op cores — shared by the CF handlers + the askRoss
+// confirm-tier adapters (functions/agent/tools.js, slice 4).
+module.exports.createWorkflowAsOwner = createWorkflowAsOwner;
+module.exports.activateWorkflowAsOwner = activateWorkflowAsOwner;
+module.exports.updateWorkflowAsOwner = updateWorkflowAsOwner;
+module.exports.workflowOpStatus = workflowOpStatus;
 // Test seam.
 module.exports.__setDbForTests = __setDbForTests;
