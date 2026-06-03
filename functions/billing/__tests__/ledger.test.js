@@ -152,6 +152,67 @@ describe('recordUsageAndDebit', () => {
     });
 });
 
+describe('recordUsageAndDebit — requestId idempotency guard (§2.1 point 3)', () => {
+    it('with requestId + guard absent: debits normally and writes a debitGuard node with the cached result', async () => {
+        await ledger.grantCredit({ uid: 'u1', amountCents: 1000, grantedBy: 'a', reason: 'seed' });
+        const res = await ledger.recordUsageAndDebit({
+            uid: 'u1', service: SERVICES.ASK_ROSS, model: MODEL,
+            units: { inputTokens: 1_000_000 }, meta: { turnId: 't1' }, requestId: 'req-abc',
+        });
+        expect(res.costCents).toBe(390);
+        expect(res.balanceAfterCents).toBe(610);
+        expect(await ledger.getBalanceCents('u1')).toBe(610);
+
+        const guard = db._dump().billing.debitGuard.u1['req-abc'];
+        expect(guard).toMatchObject({ costCents: 390, balanceAfterCents: 610, recordKey: res.recordKey });
+        expect(typeof guard.at).toBe('number');
+    });
+
+    it('same requestId twice: does NOT double-debit, returns the cached result, writes no second usage record', async () => {
+        await ledger.grantCredit({ uid: 'u1', amountCents: 1000, grantedBy: 'a', reason: 'seed' });
+        const first = await ledger.recordUsageAndDebit({
+            uid: 'u1', service: SERVICES.ASK_ROSS, model: MODEL,
+            units: { inputTokens: 1_000_000 }, meta: {}, requestId: 'req-x',
+        });
+        const second = await ledger.recordUsageAndDebit({
+            uid: 'u1', service: SERVICES.ASK_ROSS, model: MODEL,
+            units: { inputTokens: 1_000_000 }, meta: {}, requestId: 'req-x',
+        });
+        // Debited exactly once.
+        expect(await ledger.getBalanceCents('u1')).toBe(610);
+        // Second call returns the cached numbers, not a fresh debit.
+        expect(second).toMatchObject({
+            costCents: first.costCents,
+            balanceAfterCents: first.balanceAfterCents,
+            recordKey: first.recordKey,
+        });
+        // Only one immutable usage record exists.
+        expect(Object.keys(db._dump().billing.usage.u1)).toHaveLength(1);
+    });
+
+    it('without requestId: behaves exactly as legacy — no debitGuard node created', async () => {
+        await ledger.grantCredit({ uid: 'u1', amountCents: 1000, grantedBy: 'a', reason: 'seed' });
+        await ledger.recordUsageAndDebit({
+            uid: 'u1', service: SERVICES.ASK_ROSS, model: MODEL, units: { inputTokens: 1_000_000 }, meta: {},
+        });
+        expect(db._dump().billing.debitGuard).toBeUndefined();
+        expect(await ledger.getBalanceCents('u1')).toBe(610);
+    });
+
+    it('empty/unsafe requestId (sanitises to ""): treated as no-guard — debits every call, no guard node', async () => {
+        await ledger.grantCredit({ uid: 'u1', amountCents: 1000, grantedBy: 'a', reason: 'seed' });
+        const args = {
+            uid: 'u1', service: SERVICES.ASK_ROSS, model: MODEL,
+            units: { inputTokens: 1_000_000 }, meta: {}, requestId: '///',
+        };
+        await ledger.recordUsageAndDebit(args);
+        await ledger.recordUsageAndDebit(args);
+        // Both debited (no guard short-circuited the second).
+        expect(await ledger.getBalanceCents('u1')).toBe(220);
+        expect(db._dump().billing.debitGuard).toBeUndefined();
+    });
+});
+
 describe('getUsage — newest-first, paginated', () => {
     async function seedUsage(n) {
         await ledger.grantCredit({ uid: 'u1', amountCents: 100000, grantedBy: 'a', reason: 'seed' });
