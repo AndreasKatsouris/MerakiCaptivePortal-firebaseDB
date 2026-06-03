@@ -67,7 +67,7 @@ describe('promoted confirm-tier adapters (slice 4)', () => {
     }
     afterEach(() => { __setDbForTests(null); ross.__setDbForTests(null); });
 
-    const ctx = { uid: 'u1', isSuperAdmin: false, now: 1_700_000_000_000 };
+    const ctx = { uid: 'u1', isSuperAdmin: false, email: 'u1@x.co', now: 1_700_000_000_000 };
 
     it('activateTemplate runs the core → writes a workflow (nextDueDate defaulted)', async () => {
         const db = seed();
@@ -95,10 +95,12 @@ describe('promoted confirm-tier adapters (slice 4)', () => {
         expect(db._dump().ross.workflows.u1.wf1.name).toBe('New');
     });
 
-    it('surfaces a gate failure as a coded Error (tier-denied, free user + all-in template)', async () => {
-        seed({ users: { u1: { tier: 'free' } }, ross: { templates: { t1: { templateId: 't1', name: 'Sweep', tier: 'all-in', subtasks: [] } } } });
+    it('surfaces a gate failure as a coded Error (tier-denied) + threads email into the denial audit (M-2)', async () => {
+        const db = seed({ users: { u1: { tier: 'free' } }, ross: { templates: { t1: { templateId: 't1', name: 'Sweep', tier: 'all-in', subtasks: [] } } } });
         await expect(REGISTRY.activateTemplate.run(ctx, { templateId: 't1', locationIds: ['loc1'] }))
             .rejects.toMatchObject({ code: 'TIER_DENIED' });
+        const denial = Object.values(db._dump().ross.auditLog.templateActivationDenials)[0];
+        expect(denial).toMatchObject({ uid: 'u1', email: 'u1@x.co' }); // email carried through the adapter
     });
 });
 

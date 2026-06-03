@@ -168,7 +168,7 @@ const REGISTRY = {
         args: z.object({ templateId: z.string(), locationIds: z.array(z.string()), nextDueDate: z.string().optional() }),
         tier: TIER.CONFIRM, ceiling: TIER.CONFIRM, status: STATUS.READY,
         run: (ctx, args) => require('../ross').activateWorkflowAsOwner({
-            uid: ctx.uid, isSuperAdmin: ctx.isSuperAdmin,
+            uid: ctx.uid, isSuperAdmin: ctx.isSuperAdmin, email: ctx.email,
             templateId: args.templateId, locationIds: args.locationIds,
             nextDueDate: args.nextDueDate || defaultDueDate(ctx.now),
         }),
@@ -183,7 +183,7 @@ const REGISTRY = {
         }),
         tier: TIER.CONFIRM, ceiling: TIER.CONFIRM, status: STATUS.READY,
         run: (ctx, args) => require('../ross').createWorkflowAsOwner({
-            uid: ctx.uid, isSuperAdmin: ctx.isSuperAdmin,
+            uid: ctx.uid, isSuperAdmin: ctx.isSuperAdmin, email: ctx.email,
             name: args.name, category: args.category, recurrence: args.recurrence,
             locationIds: args.locationIds, nextDueDate: args.nextDueDate || defaultDueDate(ctx.now),
             subtasks: args.subtasks,

@@ -310,11 +310,13 @@ function isValidClientToday(s) {
  * client renders the full args, this is the headline the owner sees on the card.
  */
 function confirmSummary(tool, args = {}) {
+    // Args are NOT yet validated (Zod runs at execute time) — fall back gracefully so the
+    // owner never reads "undefined/undefined" on the card (review M-3).
     switch (tool) {
-        case 'activateTemplate': return `Activate template ${args.templateId} at ${(args.locationIds || []).join(', ') || 'a location'}`;
-        case 'createWorkflow': return `Create workflow “${args.name}” (${args.category}/${args.recurrence})`;
-        case 'editWorkflow': return `Edit workflow ${args.workflowId}`;
-        case 'pauseWorkflow': return `Pause workflow ${args.workflowId}`;
+        case 'activateTemplate': return `Activate template ${args.templateId || '(unknown)'} at ${(args.locationIds || []).join(', ') || 'a location'}`;
+        case 'createWorkflow': return `Create workflow “${args.name || '(unnamed)'}” (${args.category || '?'}/${args.recurrence || '?'})`;
+        case 'editWorkflow': return `Edit workflow ${args.workflowId || '(unknown)'}`;
+        case 'pauseWorkflow': return `Pause workflow ${args.workflowId || '(unknown)'}`;
         default: return `Run ${tool}`;
     }
 }
@@ -364,7 +366,7 @@ async function buildSystemForOwner(ctx, clientToday) {
  *
  * @returns {Promise<{terminated:true}|{terminated:false, threadId, turnId, costCents}>}
  */
-async function runChatRequest({ uid, isSuperAdmin, message, threadId, clientToday, requestId, emit, now }) {
+async function runChatRequest({ uid, isSuperAdmin, email, message, threadId, clientToday, requestId, emit, now }) {
     // 1. Pre-flight gates (no LLM spend if any fail).
     const gates = await runGates({ uid, isSuperAdmin });
     if (!gates.ok) {
@@ -379,8 +381,9 @@ async function runChatRequest({ uid, isSuperAdmin, message, threadId, clientToda
     // 2. Thread + turn ids (server-generated).
     const thread = threadId || getDb().ref(`ross/agentChats/${uid}`).push().key;
     const turnId = getDb().ref(`ross/agentChats/${uid}/${thread}/turns`).push().key;
-    // isSuperAdmin flows into the confirm-tier adapters' gate checks (tier/cap bypass).
-    const ctx = { uid, isSuperAdmin, turnId, turnSource: 'chat', now };
+    // isSuperAdmin flows into the confirm-tier adapters' gate checks (tier/cap bypass);
+    // email rides along for the denial-audit rows (review M-2).
+    const ctx = { uid, isSuperAdmin, email, turnId, turnSource: 'chat', now };
 
     // 3. Owner config (policy overrides) + 4. cached system blocks (digest/tier/locations).
     const cfgSnap = await getDb().ref(agentConfigPath(uid)).once('value');
@@ -419,6 +422,9 @@ async function runChatRequest({ uid, isSuperAdmin, message, threadId, clientToda
     if (loop.paused) {
         const { name, args, toolUseId } = loop.pendingTool;
         if (pendingTooLarge(loop.messages)) {
+            // Clear the pending flag (review M-1) — no pending node is written, so the turn
+            // must not read as "awaiting confirmation" in history.
+            await getDb().ref(`ross/agentChats/${uid}/${thread}/turns/${turnId}`).update({ pending: null, error: true });
             emit({ type: 'terminal', reason: 'too-long', message: 'That conversation got too long to hold for confirmation — start a fresh request.' });
             return { terminated: false, threadId: thread, turnId, costCents: debit.costCents };
         }
@@ -451,7 +457,7 @@ async function runChatRequest({ uid, isSuperAdmin, message, threadId, clientToda
  *
  * `now` MUST be a server timestamp.
  */
-async function resumeChatRequest({ uid, isSuperAdmin, resumeTurnId, decision, clientToday, requestId, emit, now }) {
+async function resumeChatRequest({ uid, isSuperAdmin, email, resumeTurnId, decision, clientToday, requestId, emit, now }) {
     const pendingRef = getDb().ref(agentPendingPath(uid, resumeTurnId));
     const pending = (await pendingRef.once('value')).val();
     if (!pending) {
@@ -488,7 +494,7 @@ async function resumeChatRequest({ uid, isSuperAdmin, resumeTurnId, decision, cl
         return { terminated: true, reason: 'already-handled' };
     }
 
-    const ctx = { uid, isSuperAdmin, turnId: resumeTurnId, turnSource: 'chat', confirmedBy: uid, now };
+    const ctx = { uid, isSuperAdmin, email, turnId: resumeTurnId, turnSource: 'chat', confirmedBy: uid, now };
     const convo = Array.isArray(pending.messages) ? pending.messages.slice() : [];
     const { executeTool } = require('./execute');
 
@@ -612,6 +618,7 @@ const rossChat = onRequest({ secrets: [ANTHROPIC_API_KEY] }, (req, res) => cors(
         const { verifyAuthToken, verifyRossAgentAccess } = require('../ross');
         const decoded = await verifyAuthToken(req);
         principal = await verifyRossAgentAccess(decoded);
+        principal.email = decoded.email || null; // for denial-audit rows (review M-2)
     } catch (err) {
         // Normalise the client-facing message (review O-3): Firebase's verifyIdToken emits
         // verbose implementation detail ("Firebase ID token has expired…"). Log the real
@@ -648,12 +655,12 @@ const rossChat = onRequest({ secrets: [ANTHROPIC_API_KEY] }, (req, res) => cors(
         const now = Date.now(); // server-authoritative — never client-supplied
         if (isResume) {
             await resumeChatRequest({
-                uid: principal.uid, isSuperAdmin: principal.isSuperAdmin,
+                uid: principal.uid, isSuperAdmin: principal.isSuperAdmin, email: principal.email,
                 resumeTurnId, decision, clientToday, requestId, emit, now,
             });
         } else {
             await runChatRequest({
-                uid: principal.uid, isSuperAdmin: principal.isSuperAdmin,
+                uid: principal.uid, isSuperAdmin: principal.isSuperAdmin, email: principal.email,
                 message, threadId, clientToday, requestId, emit, now,
             });
         }
