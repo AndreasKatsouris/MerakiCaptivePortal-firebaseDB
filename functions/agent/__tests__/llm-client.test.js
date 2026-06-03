@@ -1,7 +1,7 @@
 'use strict';
 
 const {
-    MODELS, toLedgerUnits, streamTurn, createTurn, getClient, __setClientForTests,
+    MODELS, toLedgerUnits, streamTurn, createTurn, getClient, ensureClient, __setClientForTests,
 } = require('../llm-client');
 
 // Fake Anthropic stream: registers handlers, then on finalMessage() fires the text
@@ -106,6 +106,21 @@ describe('createTurn (non-streaming, eval judge)', () => {
         expect(r.stopReason).toBe('end_turn');
         expect(params.system).toBe('judge');
         expect(params.max_tokens).toBe(1024);
+    });
+});
+
+describe('ensureClient (O-1 warm-client guard)', () => {
+    it('reuses an already-configured client instead of rebuilding it', () => {
+        const fake = { messages: {} };
+        __setClientForTests(fake);
+        expect(ensureClient('key-1')).toBe(fake); // singleton preserved across warm calls
+    });
+
+    it('builds a client when none is configured yet, and makes it the singleton', () => {
+        __setClientForTests(null);
+        const c = ensureClient('test-key');
+        expect(c).toBeTruthy();
+        expect(getClient()).toBe(c);
     });
 });
 

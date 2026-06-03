@@ -30,6 +30,8 @@ function getDb() {
 // Alias: keeps the rest of the file unchanged while individual call-sites are
 // migrated.  Any place that used `db.ref(...)` now calls `getDb().ref(...)`.
 const db = new Proxy({}, { get: (_t, prop) => getDb()[prop] });
+/** Test-only: inject an in-memory RTDB fake (matches billing/agent/entitlements). */
+function __setDbForTests(fake) { _db = fake; }
 
 // ============================================
 // CONSTANTS
@@ -88,6 +90,33 @@ async function verifySuperAdmin(decodedToken) {
     const { uid, isSuperAdmin } = await verifyAdmin(decodedToken);
     if (!isSuperAdmin) throw new Error('Super Admin access required');
     return uid;
+}
+
+/**
+ * Auth gate for the askRoss agent (rossChat CF, slice 3). Like verifyUserOrAdmin but
+ * ALSO recognises the ④a-materialized `features.rossAgent` flag — verifyUserOrAdmin
+ * admits non-admins only on the legacy rossBasic/rossAdvanced flags, so a rossAgent-only
+ * user would be wrongly denied at the auth step before reaching the entitlement gate
+ * (spec review #4). Admits admins + any Ross-entitled owner; denies the rest. The
+ * stricter `features.rossAgent === true` entitlement gate (with super-admin
+ * short-circuit) lives in rossChat's pre-flight — this only decides endpoint reach.
+ */
+async function verifyRossAgentAccess(decodedToken) {
+    const uid = decodedToken.uid;
+
+    const adminSnapshot = await db.ref(`admins/${uid}`).once('value');
+    const adminData = adminSnapshot.val();
+    if (adminData) {
+        return { uid, isAdmin: true, isSuperAdmin: !!adminData.superAdmin };
+    }
+
+    const subSnapshot = await db.ref(`subscriptions/${uid}/features`).once('value');
+    const features = subSnapshot.val();
+    if (features && (features.rossAgent || features.rossBasic || features.rossAdvanced)) {
+        return { uid, isAdmin: false, isSuperAdmin: false };
+    }
+
+    throw new Error('Access denied: Ross agent not available on your subscription');
 }
 
 function generateId() {
@@ -1937,3 +1966,8 @@ exports.rossGetHomeWorkflowDigest = onRequest(async (req, res) => {
 module.exports.VALID_INPUT_TYPES = VALID_INPUT_TYPES;
 // Pure helper — exported for unit tests and the rossGetHomeWorkflowDigest CF (Task 2)
 module.exports.buildHomeWorkflowDigest = buildHomeWorkflowDigest;
+// Auth helpers — consumed by the askRoss rossChat CF (functions/agent/rossChat.js, slice 3).
+module.exports.verifyAuthToken = verifyAuthToken;
+module.exports.verifyRossAgentAccess = verifyRossAgentAccess;
+// Test seam.
+module.exports.__setDbForTests = __setDbForTests;

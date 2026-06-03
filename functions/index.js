@@ -3727,6 +3727,13 @@ exports.entitlementGetEffective = entitlements.entitlementGetEffective;
 exports.recomputeExpiringEntitlements = entitlements.recomputeExpiringEntitlements;
 
 // ============================================
+// askRoss AGENT — reactive engine (Phase 7 ②)
+// ============================================
+// SSE onRequest; secret binding (ANTHROPIC_API_KEY) travels with the onRequest options
+// inside the module. Depends on ① ledger + ④a entitlements (both live).
+exports.rossChat = require('./agent/rossChat').rossChat;
+
+// ============================================
 // SUBSCRIPTION STATUS MANAGEMENT
 // ============================================
 const subscriptionStatusManager = require('./subscriptionStatusManager');

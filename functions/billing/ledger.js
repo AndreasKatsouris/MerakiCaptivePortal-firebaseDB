@@ -35,7 +35,17 @@ function __setDbForTests(fake) { _db = fake; }
 const creditsPath = (uid) => `billing/credits/${uid}`;
 const usagePath = (uid) => `billing/usage/${uid}`;
 const grantsPath = (uid) => `billing/grants/${uid}`;
+const debitGuardPath = (uid, requestId) => `billing/debitGuard/${uid}/${requestId}`;
 const PRICE_TABLE = 'billing/priceTable';
+
+/**
+ * Sanitise a caller-supplied requestId into a safe RTDB key, or null if it has no
+ * safe characters (→ treated as no-guard). Mirrors the snooze cardId sanitiser.
+ */
+function safeRequestId(requestId) {
+    const cleaned = String(requestId || '').replace(/[^a-zA-Z0-9_-]/g, '');
+    return cleaned || null;
+}
 
 // ---------------------------------------------------------------------------
 // Pure cost formula + service dispatch (no I/O).
@@ -141,9 +151,31 @@ async function setWithRetry(ref, value, attempts = 3) {
  * on retry; never a double charge, never a silent un-audited charge beyond the
  * retry budget.
  *
+ * IDEMPOTENCY GUARD (§2.1 point 3): when an optional `requestId` is supplied, a
+ * one-time-consume guard at billing/debitGuard/{uid}/{requestId} is read BEFORE the
+ * balance transaction; if present the call short-circuits and returns the cached
+ * result (no transaction, no second usage record). This neutralises *retries* of the
+ * same logical spend (a confirm-resume retry, or a future onSchedule retry) — which
+ * arrive sequentially. It is NOT a defence against genuinely concurrent double-fires
+ * of the same requestId (the guard read+write is not atomic against the balance
+ * transaction); RTDB single-doc serialisation + the request-scoped id make that
+ * vanishingly rare. Same caveat as setWithRetry above: true-concurrency fidelity is
+ * emulator-only.
+ *
+ * @param {{uid:string, service:string, model:string, units:object, meta?:object, requestId?:string}} args
  * @returns {{ costCents, balanceAfterCents, recordKey }}
  */
-async function recordUsageAndDebit({ uid, service, model, units, meta = {} }) {
+async function recordUsageAndDebit({ uid, service, model, units, meta = {}, requestId }) {
+    // 0. Idempotency guard: if this requestId already debited, return the cached result.
+    const guardId = safeRequestId(requestId);
+    if (guardId) {
+        const guardSnap = await getDb().ref(debitGuardPath(uid, guardId)).once('value');
+        if (guardSnap.exists()) {
+            const g = guardSnap.val();
+            return { costCents: g.costCents, balanceAfterCents: g.balanceAfterCents, recordKey: g.recordKey };
+        }
+    }
+
     // 1. Pre-generate the usage record key (local, no I/O).
     const recordKey = getDb().ref(usagePath(uid)).push().key;
 
@@ -179,6 +211,13 @@ async function recordUsageAndDebit({ uid, service, model, units, meta = {} }) {
         createdAt: Date.now(),
     };
     await setWithRetry(getDb().ref(`${usagePath(uid)}/${recordKey}`), record);
+
+    // 5. Stamp the idempotency guard so a retry of this requestId short-circuits (step 0).
+    if (guardId) {
+        await getDb().ref(debitGuardPath(uid, guardId)).set({
+            costCents, balanceAfterCents, recordKey, at: Date.now(),
+        });
+    }
 
     return { costCents, balanceAfterCents, recordKey };
 }
