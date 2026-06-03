@@ -15,8 +15,8 @@
 // Model IDs (§1). Named so a single swap re-points the agent / judge.
 // ⚠ VERIFY against current Anthropic model IDs at slice-3 deploy time.
 const MODELS = Object.freeze({
-    AGENT: 'claude-sonnet-4-6', // the agent loop (streaming)
-    JUDGE: 'claude-haiku-4-5',  // the eval-harness judge (§6) + future cheap tasks
+    AGENT: 'claude-sonnet-4-6',            // the agent loop (streaming)
+    JUDGE: 'claude-haiku-4-5-20251001',   // the eval-harness judge (§6) + future cheap tasks
 });
 
 // --- client seam (lazy + injectable → import-cheap, zero live calls in tests) ------
@@ -50,10 +50,10 @@ function __setClientForTests(fake) { _client = fake; }
 function toLedgerUnits(apiUsage) {
     const u = apiUsage || {};
     return {
-        inputTokens: u.input_tokens || 0,
-        outputTokens: u.output_tokens || 0,
-        cacheWriteTokens: u.cache_creation_input_tokens || 0,
-        cacheReadTokens: u.cache_read_input_tokens || 0,
+        inputTokens: u.input_tokens ?? 0,
+        outputTokens: u.output_tokens ?? 0,
+        cacheWriteTokens: u.cache_creation_input_tokens ?? 0,
+        cacheReadTokens: u.cache_read_input_tokens ?? 0,
     };
 }
 
@@ -66,7 +66,9 @@ function toLedgerUnits(apiUsage) {
  * @param {{model:string, system:Array, tools?:Array, messages:Array, maxTokens?:number, onText?:function}} opts
  * @returns {Promise<{content:Array, usage:object, stopReason:string}>}
  */
-async function streamTurn({ model, system, tools, messages, maxTokens = 1024, onText }) {
+// maxTokens default 4096: Sonnet reasoning + tool_use blocks can exceed 1024. Slice 3
+// always passes an explicit value; the default guards future callers from truncation.
+async function streamTurn({ model, system, tools, messages, maxTokens = 4096, onText }) {
     const params = { model, max_tokens: maxTokens, system, messages };
     if (tools && tools.length) params.tools = tools;
 

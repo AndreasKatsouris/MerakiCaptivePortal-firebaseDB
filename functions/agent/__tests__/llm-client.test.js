@@ -117,7 +117,7 @@ describe('client seam + MODELS', () => {
 
     it('MODELS is frozen and names the agent + judge models', () => {
         expect(MODELS.AGENT).toBe('claude-sonnet-4-6');
-        expect(MODELS.JUDGE).toBe('claude-haiku-4-5');
+        expect(MODELS.JUDGE).toBe('claude-haiku-4-5-20251001');
         expect(Object.isFrozen(MODELS)).toBe(true);
     });
 });
