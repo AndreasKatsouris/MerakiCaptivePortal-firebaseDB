@@ -69,20 +69,38 @@ describe('ross-agent-conversation', () => {
     expect(s.busy).toBe(false)
   })
 
-  test('startResume clears pendingConfirm, goes busy, and reuses the streaming assistant turn', () => {
-    let s = startUserTurn(initialConversation(), 'activate it')
+  test('startResume finalizes the paused turn and opens a fresh streaming assistant turn', () => {
+    let s = startUserTurn(initialConversation(), 'activate it')          // [user, assistant#1 streaming]
+    s = reduceEvent(s, { type: 'text', delta: 'Activating…' })            // assistant#1 has text
     s = reduceEvent(s, { type: 'confirm', turnId: 'p1', tool: 'activateWorkflow', summary: 'Activate', args: {}, expiresAt: 1 })
-    s = reduceEvent(s, { type: 'done', threadId: 'th1', turnId: 'u1', costCents: 1 })
+    const before = s.turns.length
     const r = startResume(s)
     expect(r.pendingConfirm).toBe(null)
     expect(r.busy).toBe(true)
-    expect(r.turns[r.turns.length - 1]).toMatchObject({ role: 'assistant', status: 'streaming' })
+    expect(r.turns.length).toBe(before + 1)                               // a fresh turn was pushed
+    expect(r.turns[before - 1]).toMatchObject({ role: 'assistant', text: 'Activating…', status: 'done' }) // old finalized
+    expect(r.turns[r.turns.length - 1]).toMatchObject({ role: 'assistant', text: '', status: 'streaming' }) // fresh
   })
 
   test('done preserves costCents of 0 (not lost via a falsy check)', () => {
     let s = startUserTurn(initialConversation(), 'hi')
     s = reduceEvent(s, { type: 'done', threadId: 'th1', turnId: 'u1', costCents: 0 })
     expect(s.lastCostCents).toBe(0)
+  })
+
+  test('terminal finalizes the empty streaming assistant turn (no lingering thinking state)', () => {
+    let s = startUserTurn(initialConversation(), 'hi')
+    s = reduceEvent(s, { type: 'terminal', reason: 'no-credit', message: 'Out of credit.' })
+    expect(s.turns[1].status).toBe('done')
+    expect(s.banner).toEqual({ kind: 'terminal', message: 'Out of credit.' })
+    expect(s.busy).toBe(false)
+  })
+
+  test('error finalizes the streaming assistant turn', () => {
+    let s = startUserTurn(initialConversation(), 'hi')
+    s = reduceEvent(s, { type: 'error', code: 'internal', message: 'oops' })
+    expect(s.turns[1].status).toBe('done')
+    expect(s.banner).toEqual({ kind: 'error', message: 'oops' })
   })
 
   test('done without a threadId keeps the existing threadId', () => {

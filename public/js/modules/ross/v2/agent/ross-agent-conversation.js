@@ -32,16 +32,20 @@ export function startUserTurn(state, message) {
   }
 }
 
-/** Resume after a confirm decision: continue the SAME assistant turn (re-open it for streaming). */
+/**
+ * Resume after a confirm decision. Finalize the paused assistant turn, then open
+ * a FRESH assistant turn for the post-decision continuation so the pre-confirm
+ * explanation and the post-approve result don't run together in one bubble.
+ */
 export function startResume(state) {
-  const turns = state.turns.slice()
-  const last = turns[turns.length - 1]
-  if (last && last.role === 'assistant') {
-    turns[turns.length - 1] = { ...last, status: 'streaming' }
-  } else {
-    turns.push({ role: 'assistant', text: '', actions: [], status: 'streaming' })
+  const finalized = patchLastAssistant(state, (t) => ({ ...t, status: 'done' }))
+  return {
+    ...finalized,
+    banner: null,
+    busy: true,
+    pendingConfirm: null,
+    turns: [...finalized.turns, { role: 'assistant', text: '', actions: [], status: 'streaming' }],
   }
-  return { ...state, banner: null, busy: true, pendingConfirm: null, turns }
 }
 
 function patchLastAssistant(state, patch) {
@@ -78,9 +82,17 @@ export function reduceEvent(state, event) {
         },
       }
     case 'terminal':
-      return { ...state, banner: { kind: 'terminal', message: event.message }, busy: false }
+      return {
+        ...patchLastAssistant(state, (t) => ({ ...t, status: 'done' })),
+        banner: { kind: 'terminal', message: event.message },
+        busy: false,
+      }
     case 'error':
-      return { ...state, banner: { kind: 'error', message: event.message }, busy: false }
+      return {
+        ...patchLastAssistant(state, (t) => ({ ...t, status: 'done' })),
+        banner: { kind: 'error', message: event.message },
+        busy: false,
+      }
     case 'done': {
       const finalized = patchLastAssistant(state, (t) => ({ ...t, status: 'done' }))
       return {
