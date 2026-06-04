@@ -65,4 +65,27 @@ describe('streamRossChat', () => {
 
     expect(events).toEqual([{ type: 'error', code: 'http_401', message: expect.any(String) }])
   })
+
+  test('synthesizes a truncated error when the stream closes with zero events (no busy hang)', async () => {
+    // 200 + SSE headers, but the body yields no frames before closing.
+    const fetchMock = vi.fn().mockResolvedValue(fakeStreamingResponse([]))
+    vi.stubGlobal('fetch', fetchMock)
+
+    const events = []
+    await streamRossChat({ message: 'yo' }, (e) => events.push(e))
+
+    expect(events).toEqual([{ type: 'error', code: 'truncated', message: expect.any(String) }])
+  })
+
+  test('does NOT synthesize an error when the stream ends with a done event', async () => {
+    const fetchMock = vi.fn().mockResolvedValue(fakeStreamingResponse([
+      'data: {"type":"done","threadId":"t1","turnId":"u1","costCents":1}\n\n',
+    ]))
+    vi.stubGlobal('fetch', fetchMock)
+
+    const events = []
+    await streamRossChat({ message: 'yo' }, (e) => events.push(e))
+
+    expect(events).toEqual([{ type: 'done', threadId: 't1', turnId: 'u1', costCents: 1 }])
+  })
 })

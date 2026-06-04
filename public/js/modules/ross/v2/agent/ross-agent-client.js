@@ -23,8 +23,19 @@ function saToday() {
  */
 async function pump(body, onEvent) {
   const user = auth.currentUser
+  // Track whether a turn-ENDING event (done/terminal/error) reached the caller.
+  // The reducer only clears `busy` on those; if the stream closes cleanly having
+  // emitted none (e.g. the CF returns 200 + SSE headers then drops the connection
+  // with zero frames on a cold-start timeout), we must synthesize one — otherwise
+  // the input stays disabled with no recovery short of a reload (review M-2).
+  let sawTerminal = false
+  const emit = (ev) => {
+    if (ev.type === 'done' || ev.type === 'terminal' || ev.type === 'error') sawTerminal = true
+    onEvent(ev)
+  }
+
   if (!user) {
-    onEvent({ type: 'error', code: 'no_auth', message: 'Please sign in to ask Ross.' })
+    emit({ type: 'error', code: 'no_auth', message: 'Please sign in to ask Ross.' })
     return
   }
   const controller = new AbortController()
@@ -44,12 +55,12 @@ async function pump(body, onEvent) {
     })
   } catch (err) {
     if (controller.signal.aborted) return
-    onEvent({ type: 'error', code: 'network', message: 'Could not reach Ross. Check your connection and try again.' })
+    emit({ type: 'error', code: 'network', message: 'Could not reach Ross. Check your connection and try again.' })
     return
   }
 
   if (!res.ok) {
-    onEvent({ type: 'error', code: `http_${res.status}`, message: 'Ross is unavailable right now. Please try again.' })
+    emit({ type: 'error', code: `http_${res.status}`, message: 'Ross is unavailable right now. Please try again.' })
     return
   }
 
@@ -60,12 +71,20 @@ async function pump(body, onEvent) {
     for (;;) {
       const { done, value } = await reader.read()
       if (done) break
-      for (const ev of parser.push(decoder.decode(value, { stream: true }))) onEvent(ev)
+      for (const ev of parser.push(decoder.decode(value, { stream: true }))) emit(ev)
     }
   } catch (err) {
     if (!controller.signal.aborted) {
-      onEvent({ type: 'error', code: 'stream', message: 'Ross’s reply was cut off. Please try again.' })
+      emit({ type: 'error', code: 'stream', message: 'Ross’s reply was cut off. Please try again.' })
     }
+    return
+  }
+
+  // Stream ended cleanly. If the server never sent a turn-ending event, synthesize
+  // one so the UI can't hang busy (review M-2). The abort guard avoids a spurious
+  // error when the caller intentionally cancelled.
+  if (!sawTerminal && !controller.signal.aborted) {
+    emit({ type: 'error', code: 'truncated', message: 'Ross didn’t finish that reply. Please try again.' })
   }
 }
 

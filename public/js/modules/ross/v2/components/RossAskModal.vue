@@ -1,6 +1,6 @@
 <!-- public/js/modules/ross/v2/components/RossAskModal.vue -->
 <script setup>
-import { ref, reactive, nextTick, onMounted, onUnmounted } from 'vue'
+import { ref, reactive, computed, nextTick, onMounted, onUnmounted } from 'vue'
 import RossAskMessage from './RossAskMessage.vue'
 import RossAskConfirmCard from './RossAskConfirmCard.vue'
 import {
@@ -67,6 +67,14 @@ function onKeydown(e) {
 onMounted(() => window.addEventListener('keydown', onKeydown))
 onUnmounted(() => window.removeEventListener('keydown', onKeydown))
 
+// SA-locale cost label (review N-2): sub-rand turns read "12c"; a rand or more
+// reads "R1.50" rather than a raw "150c".
+const costLabel = computed(() => {
+  const c = convo.lastCostCents
+  if (c === null || c === undefined) return ''
+  return c < 100 ? `${c}c` : `R${(c / 100).toFixed(2)}`
+})
+
 defineExpose({ open })
 </script>
 
@@ -112,7 +120,7 @@ defineExpose({ open })
           <button class="ross-ask-modal__send" :disabled="convo.busy || !input.trim()" @click="send">Send</button>
         </footer>
         <div v-if="convo.lastCostCents !== null" class="hf-mono ross-ask-modal__cost">
-          last turn · {{ convo.lastCostCents }}c
+          last turn · {{ costLabel }}
         </div>
       </div>
     </div>

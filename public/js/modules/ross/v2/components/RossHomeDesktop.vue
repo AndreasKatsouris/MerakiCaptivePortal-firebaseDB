@@ -30,7 +30,12 @@ onMounted(() => {
   // Honour an inbound #ask=<seed> deep-link: feed cards on other v2 pages
   // still navigate here with that hash, and Home is now the consumer.
   const m = window.location.hash.match(/^#ask=(.*)$/)
-  if (m) openAsk(decodeURIComponent(m[1]))
+  if (m) {
+    openAsk(decodeURIComponent(m[1]))
+    // Strip the consumed hash so a reload / bookmark doesn't re-open with a stale
+    // seed (review M-3). Keep path + query intact.
+    history.replaceState(null, '', window.location.pathname + window.location.search)
+  }
 })
 
 // Footer profile — reactive to auth state. Real /profile-settings.html
