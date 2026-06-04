@@ -19,7 +19,7 @@ function saToday() {
  *
  * Never throws to the caller: transport/HTTP failures are surfaced as a
  * synthetic { type:'error' } event so the reducer renders a banner uniformly.
- * Returns the AbortController so callers can cancel mid-stream.
+ * Aborts are swallowed silently; cancellation wiring is deferred (callers disable input while busy).
  */
 async function pump(body, onEvent) {
   const user = auth.currentUser
@@ -53,10 +53,10 @@ async function pump(body, onEvent) {
     return
   }
 
-  const reader = res.body.getReader()
   const decoder = new TextDecoder()
   const parser = createSSEParser()
   try {
+    const reader = res.body.getReader()
     for (;;) {
       const { done, value } = await reader.read()
       if (done) break
