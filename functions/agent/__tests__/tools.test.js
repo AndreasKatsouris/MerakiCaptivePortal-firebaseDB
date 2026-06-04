@@ -120,6 +120,37 @@ describe('toAnthropicTools projection', () => {
         expect(hist.input_schema.required).toEqual(expect.arrayContaining(['workflowId', 'locationId']));
         expect(hist.input_schema.required).not.toContain('limit'); // optional
     });
+
+    // The Anthropic Messages API requires tool input_schema to be valid JSON Schema
+    // draft 2020-12. The OpenAPI-3.0 / draft-4 dialect (boolean `exclusiveMinimum`,
+    // `nullable`) is REJECTED at runtime with a 400 — and it never surfaces in tests
+    // that mock the LLM client. Guard the generated dialect here.
+    it('emits draft-2020-12-valid numeric exclusiveMinimum (not the boolean draft-4 form)', () => {
+        const limit = toAnthropicTools(['getRunHistory'])[0].input_schema.properties.limit;
+        expect(limit.type).toBe('integer');
+        expect(typeof limit.exclusiveMinimum).toBe('number'); // draft-2020-12: a number, not `true`
+        expect(limit.exclusiveMinimum).toBe(0);
+
+        const hours = toAnthropicTools(['snoozeCard'])[0].input_schema.properties.hours;
+        expect(typeof hours.exclusiveMinimum).toBe('number');
+    });
+
+    it('produces NO draft-4-only constructs (boolean exclusive bounds / nullable) on any enabled tool', () => {
+        const offenders = [];
+        const scan = (node, path) => {
+            if (node && typeof node === 'object') {
+                for (const [k, v] of Object.entries(node)) {
+                    if ((k === 'exclusiveMinimum' || k === 'exclusiveMaximum') && typeof v === 'boolean') {
+                        offenders.push(`${path}.${k}=boolean`);
+                    }
+                    if (k === 'nullable') offenders.push(`${path}.nullable`);
+                    scan(v, `${path}.${k}`);
+                }
+            }
+        };
+        toAnthropicTools().forEach((t) => scan(t.input_schema, t.name));
+        expect(offenders).toEqual([]);
+    });
 });
 
 describe('toSdkMcpServer projection', () => {
