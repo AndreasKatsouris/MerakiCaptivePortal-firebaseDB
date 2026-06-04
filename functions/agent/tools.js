@@ -252,10 +252,23 @@ function catalogForPrompt(names = enabledToolNames()) {
     return names.map((n) => ({ name: n, description: REGISTRY[n].description, tier: REGISTRY[n].tier }));
 }
 
-/** Raw Messages API projection. */
+/**
+ * Raw Messages API projection.
+ *
+ * The Anthropic API validates tool `input_schema` against JSON Schema **draft
+ * 2020-12** and 400s on the OpenAPI-3.0 / draft-4 dialect. The `openApi3` target
+ * emitted boolean `exclusiveMinimum` (`{exclusiveMinimum:true, minimum:0}`) from
+ * `z.number().positive()` — invalid in 2020-12, which expects a NUMERIC
+ * `exclusiveMinimum`. The DEFAULT (jsonSchema7) target emits the numeric form
+ * (`exclusiveMinimum:0`); draft-7 and 2020-12 share these keywords identically,
+ * and with `$refStrategy:'none'` every ref is inlined (no `$defs`/`definitions`
+ * incompatibility). NB: the lib's `jsonSchema2020-12` target is itself buggy here
+ * and re-emits the boolean form — so the default is the correct choice, verified
+ * against the live API. See the draft-2020-12 guards in tools.test.js.
+ */
 function toAnthropicTools(names = enabledToolNames()) {
     return names.map((n) => {
-        const schema = zodToJsonSchema(REGISTRY[n].args, { target: 'openApi3', $refStrategy: 'none' });
+        const schema = zodToJsonSchema(REGISTRY[n].args, { $refStrategy: 'none' });
         delete schema.$schema;
         return { name: n, description: REGISTRY[n].description, input_schema: schema };
     });
