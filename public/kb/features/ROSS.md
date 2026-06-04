@@ -66,7 +66,7 @@ The v1 admin remains reachable at `admin-dashboard.html#rossContent` for the ent
 | Per-task `inputType` / `inputConfig` editor | ✅ Phase 4e.1 (PR #32) + 4e.2 (PR #35) |
 | Phase 5 spec — central-funnel cleanup | ✅ PR #37 |
 | Onboarding wired (router + auth gate + helloSeen) | ⏳ Phase 5 PR 1 of 5 |
-| `askRoss` LLM | 🔧 building (Phase 7 ②) — ledger ① + entitlements ④a live; agent **core (slice 2)** shipped, see below |
+| `askRoss` LLM | 🔧 building (Phase 7 ②) — ledger ① + entitlements ④a live; agent **core (2)** + `rossChat` SSE CF (3) + confirm-flow (4) + `ross/agent*` rules & prune (7) shipped; **Ask Ross client (5) — ⌘K modal, see below** |
 
 ### Agent module — `functions/agent/` (Phase 7 ② slice 2)
 
@@ -85,6 +85,20 @@ The askRoss agent is built as **one engine-agnostic core, two engines** (spec `d
 **§3.1 measurement gate:** `isAgentSubmittable(inputType, inputConfig)` refuses every measurement/attestation type (`temperature`/`number`/`rating`/`yes_no`/`photo`) and any `requiredNote` task — the agent has no sensors, so auto-submitting a value would fabricate a compliance record. Enforced server-side, not left to the model.
 
 **New RTDB nodes (server-only writes; CF-mediated owner reads — spec §9):** `ross/agentConfig/{uid}`, `ross/agentAudit/{uid}`, `ross/agentPending/{uid}`, `ross/agentChats/{uid}`, `ross/config/agentKillSwitch`. **Rules for these land in slice 7 and must deploy before the client slice (5) reads them** — per §9 their writes stay server-only and reads are CF-mediated (NOT direct client writes).
+
+### Ask Ross client — ⌘K modal (Phase 7 ② slice 5)
+
+The live consumer of `rossChat`. `public/js/modules/ross/v2/components/RossAskModal.vue` is a ⌘K command-palette modal (opened from the home rail panel, the header button, the ⌘K/Ctrl+K shortcut, or a card's `#ask=<seed>` deep-link) holding a multi-turn conversation. It retires the scripted `askRoss()` stub.
+
+| File | Role |
+|------|------|
+| `v2/agent/ross-agent-sse.js` | pure stateful SSE frame parser (`createSSEParser`) |
+| `v2/agent/ross-agent-conversation.js` | pure immutable reducer (`initialConversation`/`startUserTurn`/`startResume`/`reduceEvent`) folding SSE events into conversation state |
+| `v2/agent/ross-agent-client.js` | `fetch()`+`ReadableStream` SSE transport (`streamRossChat`/`resumeRossChat`); **FLAT body** (`{message,threadId,clientToday}` / `{resumeTurnId,decision,clientToday}` — rossChat reads `req.body` directly, NOT `req.body.data`); all failures surface as synthetic `{type:'error'}` events |
+| `v2/components/RossAskModal.vue` | the modal — owns state, wires transport↔reducer, focus + ESC/scrim dismiss |
+| `v2/components/RossAskMessage.vue` / `RossAskConfirmCard.vue` | turn bubble + inline confirm-card (text-interpolated, **never `v-html`**) |
+
+SSE events handled: `text`/`action`/`confirm`/`terminal`/`error`/`done`. Confirm decisions send `decision: 'approve'|'decline'` with `resumeTurnId` = the confirm event's `turnId`. **Desktop only — mobile pill wiring + fetch-cancellation are backlogged.**
 
 ### Onboarding handoff — `helloSeen` field (Phase 5 PR 1)
 

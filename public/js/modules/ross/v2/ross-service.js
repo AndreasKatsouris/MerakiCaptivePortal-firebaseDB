@@ -8,9 +8,11 @@
 //   - ROSS_HOME_REAL_DATA OFF: return the original scripted wireframe feed
 //     unchanged. Used for demos and QA against a known shape.
 //
-// getHomeSidebar(), getFirstRunFindings(), askRoss() remain scripted —
-// separate slices. Signatures match what an LLM-backed service would
-// eventually yield, so the swap is a body replacement.
+// getHomeSidebar() and getFirstRunFindings() remain scripted — separate
+// slices. Signatures match what an LLM-backed service would eventually
+// yield, so the swap is a body replacement. The Ask Ross command palette
+// now streams live via RossAskModal.vue (rossChat SSE), so the former
+// scripted askRoss() stub has been retired.
 
 import {
   FINDINGS_FIRST_RUN,
@@ -293,20 +295,3 @@ export async function getFirstRunFindings() {
   }
 }
 
-/**
- * Thin placeholder for the Ask Ross command palette. Real implementation
- * would stream from Anthropic; this returns a scripted canned reply so the
- * UI plumbing can be built against the eventual shape.
- */
-export async function askRoss(prompt) {
-  await wait()
-  return {
-    prompt,
-    answer: {
-      text:
-        "Scripted placeholder — this surface will stream a real Ross reply " +
-        "once the LLM integration lands. Your prompt: " + JSON.stringify(prompt),
-      citations: [],
-    },
-  }
-}

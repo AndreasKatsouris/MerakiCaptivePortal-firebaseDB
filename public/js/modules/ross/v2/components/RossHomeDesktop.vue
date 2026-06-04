@@ -11,14 +11,32 @@ import {
 import { seededLine } from '../content.js'
 import { snoozeCard } from '../ross-service.js'
 import { auth, onAuthStateChanged } from '/js/config/firebase-config.js'
+import RossAskModal from './RossAskModal.vue'
 
 const store = useRossStore()
+
+// Ask Ross command-palette modal. Mounted once at the template root; opened
+// from feed-card actions, the right-rail Ask Ross card, or an inbound
+// #ask=<seed> deep-link (cards on other pages navigate here with that hash).
+const askModal = ref(null)
+function openAsk(seed) { askModal.value && askModal.value.open(seed) }
 // Always reload on mount. The Pinia store survives across in-app tab
 // switches (Playbook ↔ Home ↔ Activity), so a `!store.feed` guard would
 // serve stale data when the operator returns to Home after starting,
 // completing, or activating a workflow elsewhere. Cold-start cost is
 // acceptable here — the home is the freshness-sensitive surface.
-onMounted(() => { store.loadHome() })
+onMounted(() => {
+  store.loadHome()
+  // Honour an inbound #ask=<seed> deep-link: feed cards on other v2 pages
+  // still navigate here with that hash, and Home is now the consumer.
+  const m = window.location.hash.match(/^#ask=(.*)$/)
+  if (m) {
+    openAsk(decodeURIComponent(m[1]))
+    // Strip the consumed hash so a reload / bookmark doesn't re-open with a stale
+    // seed (review M-3). Keep path + query intact.
+    history.replaceState(null, '', window.location.pathname + window.location.search)
+  }
+})
 
 // Footer profile — reactive to auth state. Real /profile-settings.html
 // destination is Phase 6; gear icon stays non-interactive for now.
@@ -50,7 +68,7 @@ const pending = ref({})
  *
  * Conventions (matches the action ids that detectors.js / content.js emit):
  *   - 'snooze'           → call rossV2Snooze for 24h, refresh the home
- *   - 'ask-why', 'ask-ross' → stub: route to /ross.html#ask (LLM in Phase 6)
+ *   - 'ask-why', 'ask-ross' → open the Ask Ross command-palette modal
  *   - any action.href     → window.location navigation
  *   - anything else       → console warn so we can see in QA which ids
  *                            still need wiring
@@ -76,7 +94,7 @@ async function dispatch(action, card) {
   }
   if (action.id === 'ask-why' || action.id === 'ask-ross') {
     const seed = card?._meta?.contextLine || card?.headline || ''
-    window.location.href = '/ross.html#ask=' + encodeURIComponent(seed)
+    openAsk(seed)
     return
   }
   if (action.href) {
@@ -154,7 +172,7 @@ const sidebar = computed(() => store.sidebar)
             <template #leading><HfIcon name="cal" :size="14" /></template>
             {{ new Intl.DateTimeFormat('en-ZA', { weekday: 'short', month: 'short', day: 'numeric' }).format(new Date()) }}
           </HfButton>
-          <HfButton>
+          <HfButton @click="openAsk('')">
             <template #leading><HfIcon name="sparkle" :size="14" /></template>
             Ask Ross
           </HfButton>
@@ -239,7 +257,13 @@ const sidebar = computed(() => store.sidebar)
 
     <!-- Right rail -->
     <aside class="ross-home__rail">
-      <section class="ross-home__ask">
+      <section
+        class="ross-home__ask"
+        role="button"
+        tabindex="0"
+        @click="openAsk('')"
+        @keydown.enter="openAsk('')"
+      >
         <div class="hf-grain" />
         <div class="ross-home__ask-head">
           <HfIcon name="sparkle" :size="14" color="var(--hf-accent)" />
@@ -291,6 +315,8 @@ const sidebar = computed(() => store.sidebar)
         </div>
       </section>
     </aside>
+
+    <RossAskModal ref="askModal" />
   </div>
 
   <div v-else class="ross-home__loading">
