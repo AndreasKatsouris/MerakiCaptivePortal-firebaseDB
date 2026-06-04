@@ -78,4 +78,18 @@ describe('ross-agent-conversation', () => {
     expect(r.busy).toBe(true)
     expect(r.turns[r.turns.length - 1]).toMatchObject({ role: 'assistant', status: 'streaming' })
   })
+
+  test('done preserves costCents of 0 (not lost via a falsy check)', () => {
+    let s = startUserTurn(initialConversation(), 'hi')
+    s = reduceEvent(s, { type: 'done', threadId: 'th1', turnId: 'u1', costCents: 0 })
+    expect(s.lastCostCents).toBe(0)
+  })
+
+  test('done without a threadId keeps the existing threadId', () => {
+    let s = startUserTurn(initialConversation(), 'first')
+    s = reduceEvent(s, { type: 'done', threadId: 'th1', turnId: 'u1', costCents: 1 })
+    s = startUserTurn(s, 'second')
+    s = reduceEvent(s, { type: 'done', turnId: 'u2', costCents: 2 }) // no threadId on this event
+    expect(s.threadId).toBe('th1')
+  })
 })
