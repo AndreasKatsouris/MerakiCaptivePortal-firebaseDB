@@ -108,6 +108,9 @@ Per case: `✓/✗ id [category] — assertions: tool ✓, tier ✓, judge 4/5`.
 - Summarising older conversation turns (parent spec §7, v2).
 - Expanding beyond 20 cases / adding the not-yet-ready pending tools (food-cost/guests/sales) once their reader CFs land.
 
-## 10. Production code touched (minimal)
+## 10. Production code touched (minimal, all backward-compatible)
 
-- `functions/agent/llm-client.js` — `streamTurn` gains an optional `temperature` param (default = current behavior; harness passes 0). One-line, backward-compatible. *(Everything else is new files under `evals/`.)*
+Three tiny edits; everything else is new files under `evals/`:
+1. `functions/agent/llm-client.js` — `streamTurn` gains an optional `temperature` param (omitted ⇒ current behavior). One line.
+2. `functions/agent/rossChat.js` — `runAgentLoop` gains an optional `temperature` param, forwarded to its `streamTurn` call (omitted ⇒ current behavior), so the eval driver can request temperature 0.
+3. `functions/agent/rossChat.js` — export the existing internal `buildSystemForOwner` so the eval driver builds the **exact** production system prompt (eval fidelity — don't reimplement the prompt).
