@@ -23,7 +23,7 @@ The cleanest proof is **PR #140**: Ask Ross 400'd on *every* prod turn despite 1
 (mocked) tests and every field-verify lesson loaded. The fix that actually sticks is a
 **test**, not a paragraph — and that guard already exists in-repo:
 
-- Guard: [`functions/agent/__tests__/tools.test.js:124-153`](../../functions/agent/__tests__/tools.test.js) — a numeric-`exclusiveMinimum` assertion + a full-tree scan rejecting any draft-4 boolean form.
+- Guard: [`functions/agent/__tests__/tools.test.js:128-153`](../../functions/agent/__tests__/tools.test.js) — a numeric-`exclusiveMinimum` assertion + a full-tree scan rejecting any draft-4 boolean form (the demoted lesson is the comment at lines 124-127 immediately above).
 - Lesson, demoted to a code comment: [`functions/agent/tools.js:255-267`](../../functions/agent/tools.js).
 
 So the mechanism is **already proven in this codebase**. The gap is *default + coverage*,
