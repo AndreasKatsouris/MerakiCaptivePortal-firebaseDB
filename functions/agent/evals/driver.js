@@ -33,7 +33,7 @@ async function runEvalCase(c, opts = {}) {
   rossChat.__setDbForTests(db);
   tools.__setDbForTests(db);
   if (typeof ledger.__setDbForTests === 'function') ledger.__setDbForTests(db); // balance gate reads via ledger's own db
-  llm.__setClientForTests(opts.client || null);
+  if ('client' in opts) llm.__setClientForTests(opts.client || null);
 
   const transcript = { terminal: null, toolsCalled: [], confirms: [], text: '', error: null, toolResults: [] };
 
