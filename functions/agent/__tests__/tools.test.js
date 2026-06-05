@@ -201,6 +201,8 @@ describe('ready adapters (via fake RTDB)', () => {
                     r3: { id: 'r3', completedAt: 300, startedAt: 30 },
                 } } } },
             },
+            // owner1 owns loc1; mgr1 is a delegated manager WITH access; attacker1 has none.
+            userLocations: { owner1: { loc1: true }, mgr1: { loc1: true } },
         });
         __setDbForTests(db);
     });
@@ -231,5 +233,25 @@ describe('ready adapters (via fake RTDB)', () => {
     it('getRunHistory returns empty when the workflow owner cannot be resolved', async () => {
         const out = await REGISTRY.getRunHistory.run({ uid: 'owner1' }, { workflowId: 'ghost', locationId: 'loc1' });
         expect(out.runs).toEqual([]);
+    });
+
+    // SECURITY (cross-tenant isolation): a caller who does NOT own/have-access-to the
+    // location must NOT read another tenant's run history, even with valid victim IDs.
+    // The global workflowsByLocation index resolves the OWNER; without a caller-access
+    // check the adapter would leak owner1's runs to attacker1 (cross-tenant IDOR).
+    it('getRunHistory refuses cross-tenant: caller without location access gets nothing', async () => {
+        const out = await REGISTRY.getRunHistory.run(
+            { uid: 'attacker1' },
+            { workflowId: 'wf1', locationId: 'loc1' }, // victim owner1's IDs
+        );
+        expect(out.runs).toEqual([]); // MUST NOT leak owner1's r3/r1
+    });
+
+    it('getRunHistory still serves a delegated manager who HAS location access', async () => {
+        const out = await REGISTRY.getRunHistory.run(
+            { uid: 'mgr1' }, // not the owner, but loc1 is in userLocations/mgr1
+            { workflowId: 'wf1', locationId: 'loc1' },
+        );
+        expect(out.runs.map((r) => r.id)).toEqual(['r3', 'r1']);
     });
 });
