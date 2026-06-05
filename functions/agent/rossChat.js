@@ -202,7 +202,7 @@ function errorResult(toolUseId, payload) {
  *          emit:function, maxTurns?:number}} opts
  * @returns {Promise<{assistantBlocks:Array, usage:object, units:object, rounds:number, messages:Array, error:Error|null}>}
  */
-async function runAgentLoop({ ctx, system, tools, messages, ownerConfig, emit, maxTurns = MAX_AGENT_ROUNDS }) {
+async function runAgentLoop({ ctx, system, tools, messages, ownerConfig, emit, maxTurns = MAX_AGENT_ROUNDS, temperature }) {
     const { effectivePolicy } = require('./policy');
     const { executeTool } = require('./execute');
     const { REGISTRY } = require('./tools');
@@ -224,6 +224,7 @@ async function runAgentLoop({ ctx, system, tools, messages, ownerConfig, emit, m
                 tools,
                 messages: convo,
                 maxTokens: MAX_OUTPUT_TOKENS,
+                temperature,
                 onText: (delta) => emit({ type: 'text', delta }),
             });
         } catch (err) {
@@ -681,6 +682,7 @@ module.exports = {
     runGates,
     buildOwnerContext,
     buildHistoryMessages,
+    buildSystemForOwner,
     runAgentLoop,
     formatSADate,
     deriveLocationNames,

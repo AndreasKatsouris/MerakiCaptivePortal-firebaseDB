@@ -95,6 +95,18 @@ describe('streamTurn', () => {
         __setClientForTests({ messages: { stream: () => makeFakeStream({ deltas: ['x'], final: { content: [], usage: {}, stop_reason: 'end_turn' } }) } });
         await expect(streamTurn({ model: 'm', system: [], messages: [] })).resolves.toMatchObject({ stopReason: 'end_turn' });
     });
+
+    it('forwards temperature to the SDK when provided, omits it otherwise', async () => {
+        const calls = [];
+        const fake = { messages: { stream: (params) => { calls.push(params); return {
+            on() {}, finalMessage: async () => ({ content: [], usage: {}, stop_reason: 'end_turn' }),
+        }; } } };
+        __setClientForTests(fake);
+        await streamTurn({ model: 'm', system: [], messages: [], temperature: 0 });
+        await streamTurn({ model: 'm', system: [], messages: [] });
+        expect(calls[0].temperature).toBe(0);
+        expect('temperature' in calls[1]).toBe(false);
+    });
 });
 
 describe('createTurn (non-streaming, eval judge)', () => {

@@ -78,9 +78,10 @@ function toLedgerUnits(apiUsage) {
  */
 // maxTokens default 4096: Sonnet reasoning + tool_use blocks can exceed 1024. Slice 3
 // always passes an explicit value; the default guards future callers from truncation.
-async function streamTurn({ model, system, tools, messages, maxTokens = 4096, onText }) {
+async function streamTurn({ model, system, tools, messages, maxTokens = 4096, temperature, onText }) {
     const params = { model, max_tokens: maxTokens, system, messages };
     if (tools && tools.length) params.tools = tools;
+    if (typeof temperature === 'number') params.temperature = temperature;
 
     const stream = getClient().messages.stream(params);
     if (typeof onText === 'function') {
