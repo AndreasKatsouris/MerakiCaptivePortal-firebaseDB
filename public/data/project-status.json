@@ -254,6 +254,11 @@
   "inProgress": [],
   "recentlyCompleted": [
     {
+      "title": "Reflect protocol — lesson→guard coverage audit + CLAUDE.md Step 11 guard-first flip. Classified all 20 LESSONS.md entries by whether a shipped/near-shipped defect is GUARDED / MECHANIZABLE-UNGUARDED / INHERENTLY-PROCESS, each with file:line evidence (docs/analysis/2026-06-05-lesson-guard-coverage.md). Ratio of the 17 defect-bearing entries: 6/6/5 → flipped the Step 11 default so a validated/shipped-defect lesson ships a mechanical guard (prose demoted to the guard's comment); unmechanizable lessons stay prose. Mechanism proven in-repo by #140's tools.test.js. Meta-finding: no CI workflow runs npm test/lint — guards exist but aren't enforced. Surgical one-bullet CLAUDE.md insert; no feature code. Review folded: doc line-number alignment, logged the live RossHomeDesktop.vue:203 v-html surface (triage queue), added backlog item 3c. Guard-backfill is item 3c; a 2026-06-05 pre-flight found the CI gate is NOT turnkey (152k lint errors; legacy suites not green) so it must be scoped.",
+      "pr": 143,
+      "mergedAt": "2026-06-05"
+    },
+    {
       "title": "Phase 7 ② askRoss tool-schema dialect fix — Ask Ross was 400ing every turn. toAnthropicTools emitted draft-4 boolean exclusiveMinimum; Anthropic requires JSON Schema draft 2020-12. Dropped {target:openApi3} for the default jsonSchema7 (numeric exclusiveMinimum); the jsonSchema2020-12 target is itself buggy. Found via prod logs (139 server tests all mocked the LLM client). +2 regression guards, 175/175 green, redeployed + verified live.",
       "pr": 140,
       "mergedAt": "2026-06-04"
