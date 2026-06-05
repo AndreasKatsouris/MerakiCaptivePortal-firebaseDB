@@ -52,9 +52,23 @@ class AdapterPendingError extends Error {
 // --- adapter-local helpers ----------------------------------------------------
 // Mirror of ross.js resolveWorkflowOwner using the agent's own getDb seam, so the
 // adapter is unit-testable without loading the heavy ross.js module.
+//
+// SECURITY (cross-tenant isolation): the workflowsByLocation index is GLOBAL and
+// maps any (location, workflow) → its owner uid, so the indexed branch must NOT
+// return that owner to an arbitrary caller. The agent runs via the Admin SDK
+// (rules bypassed), so this caller-access check is the ONLY tenant boundary for
+// the read it gates (getRunHistory). A caller may resolve a cross-owner workflow
+// ONLY when it actually has access to the location (userLocations/{caller}/{loc}),
+// matching the human-facing run CFs which gate with verifyLocationAccess first.
 async function resolveWorkflowOwner(workflowId, locationId, callerUid) {
     const indexed = await getDb().ref(`ross/workflowsByLocation/${locationId}/${workflowId}`).once('value');
-    if (indexed.exists()) return indexed.val();
+    if (indexed.exists()) {
+        const ownerUid = indexed.val();
+        if (ownerUid === callerUid) return ownerUid;
+        // Cross-owner (delegated/shared location): only if the caller has access.
+        const access = await getDb().ref(`userLocations/${callerUid}/${locationId}`).once('value');
+        return access.exists() ? ownerUid : null;
+    }
     const own = await getDb().ref(`ross/workflows/${callerUid}/${workflowId}/locations/${locationId}`).once('value');
     if (own.exists()) return callerUid;
     return null;
