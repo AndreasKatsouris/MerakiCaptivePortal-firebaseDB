@@ -29,7 +29,8 @@ function baselineFixture() {
     // Source: functions/billing/ledger.js:35 `creditsPath = billing/credits/${uid}`
     // -> getBalanceCents (ledger.js:114-116) reads `${creditsPath(uid)}/balanceCents`,
     // called from rossChat.js:94 runGates via ledger.checkBalance(uid).
-    // Seed `balanceCents: 0` here to trip the gate ('no-credit') in a future case.
+    // Real balance path (ledger.js:35/114-116, read by runGates gate (d) via ledger.checkBalance).
+    // Baseline is funded; a derived fixture/preflight override seeds balanceCents:0 to trip the no-credit gate.
     billing: { credits: { ownerA: { balanceCents: 5000 }, ownerB: { balanceCents: 5000 } } },
     ross: {
       config: { agentKillSwitch: false },

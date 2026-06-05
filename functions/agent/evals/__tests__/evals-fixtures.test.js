@@ -13,5 +13,9 @@ describe('baselineFixture', () => {
     expect(t.ross.workflowsByLocation.locA[wfA]).toBe('ownerA')
     const runsA = t.ross.runs.ownerA[wfA].locA
     expect(Object.values(runsA)[0]).toHaveProperty('completedAt')
+    // isolation holds both directions
+    expect(t.userLocations.ownerB.locA).toBeUndefined()
+    // balance path is the load-bearing one the real gate reads (ledger.js creditsPath)
+    expect(t.billing.credits.ownerA.balanceCents).toBe(5000)
   })
 })
