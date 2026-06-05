@@ -66,7 +66,7 @@ The v1 admin remains reachable at `admin-dashboard.html#rossContent` for the ent
 | Per-task `inputType` / `inputConfig` editor | ✅ Phase 4e.1 (PR #32) + 4e.2 (PR #35) |
 | Phase 5 spec — central-funnel cleanup | ✅ PR #37 |
 | Onboarding wired (router + auth gate + helloSeen) | ⏳ Phase 5 PR 1 of 5 |
-| `askRoss` LLM | 🔧 building (Phase 7 ②) — ledger ① + entitlements ④a live; agent **core (2)** + `rossChat` SSE CF (3) + confirm-flow (4) + `ross/agent*` rules & prune (7) shipped; **Ask Ross client (5) — ⌘K modal, see below** |
+| `askRoss` LLM | 🔧 building (Phase 7 ②) — ledger ① + entitlements ④a live; agent **core (2)** + `rossChat` SSE CF (3) + confirm-flow (4) + Ask Ross ⌘K client (5) + `ross/agent*` rules & prune (7) shipped; **eval harness (6) — `npm run eval`, see below.** All build slices complete. |
 
 ### Agent module — `functions/agent/` (Phase 7 ② slice 2)
 
@@ -99,6 +99,10 @@ The live consumer of `rossChat`. `public/js/modules/ross/v2/components/RossAskMo
 | `v2/components/RossAskMessage.vue` / `RossAskConfirmCard.vue` | turn bubble + inline confirm-card (text-interpolated, **never `v-html`**) |
 
 SSE events handled: `text`/`action`/`confirm`/`terminal`/`error`/`done`. Confirm decisions send `decision: 'approve'|'decline'` with `resumeTurnId` = the confirm event's `turnId`. **Desktop only — mobile pill wiring + fetch-cancellation are backlogged.**
+
+### Eval harness — `npm run eval` (Phase 7 ② slice 6)
+
+`functions/agent/evals/` — a **live** eval harness that drives the real agent loop against the real Anthropic API with a seeded **two-tenant** in-memory RTDB, grading Ross's *judgment* (not plumbing — the unit suite guards that). 21 cases (spec `docs/plans/2026-06-04-askross-slice6-evals-design.md` §5): grounded Q&A, propose-not-act (confirm tools pause), refusals, pre-flight gates (free — never hit the API), grounding/tone (Haiku-as-judge rubric), and a **cross-tenant isolation probe** (regression test for the #144 fix). Run manually: `ANTHROPIC_API_KEY=… npm run eval` (~cents/run; CI runs only the deterministic machinery tests under `evals/__tests__/`). Files: `fixtures` · `cases` · `assertions` · `judge` · `driver` (reuses the prod `runGates`/`runAgentLoop`/`buildSystemForOwner` — no debit, no persistence) · `run` + `scorecard`. The case set is the **seed**, grown from real `agentChats` traffic over time (with PII scrubbing) — see the spec §11 growth loop.
 
 ### Onboarding handoff — `helloSeen` field (Phase 5 PR 1)
 
