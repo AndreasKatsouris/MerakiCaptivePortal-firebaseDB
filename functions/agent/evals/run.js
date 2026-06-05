@@ -24,7 +24,7 @@ async function evalOne(c) {
     const missing = wants.filter((k) => !v[k]);
     checks.push({ name: `judge(${wants.join('/')}) score=${v.score}`, pass: missing.length === 0 && v.score >= 3, detail: missing.length ? `failed: ${missing.join(', ')} — ${v.reasons}` : v.reasons });
   }
-  return { id: c.id, checks, pass: checks.every((x) => x.pass) };
+  return { id: c.id, checks, pass: checks.length > 0 && checks.every((x) => x.pass) };
 }
 
 async function main() {

@@ -37,9 +37,10 @@ $env:ANTHROPIC_API_KEY="sk-..."; npm run eval
 ### Cost
 
 Roughly **a few cents per full run**: ~15 short Sonnet agent turns plus ~15 tiny
-Haiku judge calls. Pre-flight cases (cases 15–17 — kill-switch, not-enabled,
-not-entitled, low-balance) are **free**: they are gated before the LLM is ever
-called, so they never spend tokens.
+Haiku judge calls. The harness has **21 cases total** — ~18 live cases that hit
+the API, plus **3 free pre-flight cases** (pre-balance, pre-disabled,
+pre-entitlement) that are gated before the LLM is ever called, so they never
+spend tokens.
 
 ## Reading the scorecard
 
@@ -55,7 +56,7 @@ Each case prints one line:
 listed underneath with their detail. The run ends with a summary line:
 
 ```
-14/17 passed, 3 failed.
+18/21 passed, 3 failed.
 ```
 
 The process exits **non-zero (1)** if any case failed, **0** if all passed, and **2**
