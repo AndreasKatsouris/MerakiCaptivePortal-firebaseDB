@@ -33,7 +33,7 @@ async function runEvalCase(c, opts = {}) {
   rossChat.__setDbForTests(db);
   tools.__setDbForTests(db);
   if (typeof ledger.__setDbForTests === 'function') ledger.__setDbForTests(db); // balance gate reads via ledger's own db
-  if (opts.client) llm.__setClientForTests(opts.client);
+  llm.__setClientForTests(opts.client || null);
 
   const transcript = { terminal: null, toolsCalled: [], confirms: [], text: '', error: null, toolResults: [] };
 
@@ -54,10 +54,16 @@ async function runEvalCase(c, opts = {}) {
   };
 
   // 3. The agent loop (no debit, no persistence).
-  await rossChat.runAgentLoop({
+  const loop = await rossChat.runAgentLoop({
     ctx, system, tools: tools.toAnthropicTools(), messages,
     ownerConfig: tree.ross.agentConfig[uid] || null, emit, temperature: 0,
   });
+  // runAgentLoop RETURNS (not emits) a paused confirm or a mid-loop error.
+  if (loop && loop.paused && loop.pendingTool) {
+    const pt = loop.pendingTool;
+    transcript.confirms.push({ tool: pt.name, summary: rossChat.confirmSummary(pt.name, pt.args), args: pt.args });
+  }
+  if (loop && loop.error) transcript.error = 'agent_loop_failed';
   return transcript;
 }
 
