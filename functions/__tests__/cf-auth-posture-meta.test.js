@@ -37,11 +37,11 @@ const path = require('path');
 // Each entry is the exports.NAME string as it appears in the source file.
 // Add a CF here ONLY after confirming it calls requireAdmin in its body.
 const ADMIN_ONLY_CFS = [
-    'getGoogleConfig',          // line ~718: billable GCP key, requireAdmin at line ~723
-    'addGuestToQueue',          // line ~1744: queue mutator, requireAdmin at line ~1751
-    'removeGuestFromQueue',     // line ~1773: queue mutator, requireAdmin at line ~1780
-    'updateQueueEntryStatus',   // line ~1802: queue mutator, requireAdmin at line ~1809
-    'processQueueMessage',      // line ~1943: queue message, requireAdmin at line ~1950
+    'getGoogleConfig',          // billable GCP key
+    'addGuestToQueue',          // queue mutator
+    'removeGuestFromQueue',     // queue mutator
+    'updateQueueEntryStatus',   // queue mutator
+    'processQueueMessage',      // queue message
 ];
 
 // ── source parsing ─────────────────────────────────────────────────────────────

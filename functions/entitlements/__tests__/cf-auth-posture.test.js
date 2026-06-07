@@ -39,8 +39,8 @@ let authSource;
 let cfSource;
 
 beforeAll(() => {
-    authSource = fs.readFileSync(require.resolve(AUTH_JS) + '', 'utf8');
-    cfSource = fs.readFileSync(require.resolve(CLOUD_FUNCTIONS_JS) + '', 'utf8');
+    authSource = fs.readFileSync(require.resolve(AUTH_JS), 'utf8');
+    cfSource = fs.readFileSync(require.resolve(CLOUD_FUNCTIONS_JS), 'utf8');
 });
 
 // ─── verifyAdmin structural assertions ────────────────────────────────────────
@@ -119,11 +119,15 @@ describe('entitlements CFs — auth guard call-sites', () => {
             .toMatch(/verifySuperAdmin/);
     });
 
-    it('all three mutator CFs call verifyAuthToken (authentication before authorization)', () => {
+    it('all four CFs call verifyAuthToken (authentication before authorization)', () => {
         // verifyAuthToken is the first layer; verifyAdmin/verifySuperAdmin is the second.
         // Both must be present. If verifyAuthToken is removed, unauthenticated callers reach the authz check.
-        const verifyAuthTokenCalls = (cfSource.match(/verifyAuthToken/g) || []).length;
-        // At least 3 calls: one per mutator CF (SetTier, GrantAddOn, CancelAddOn) + GetEffective.
-        expect(verifyAuthTokenCalls).toBeGreaterThanOrEqual(3);
+        //
+        // Anchor on the CALL form (`await verifyAuthToken(`), NOT a bare `verifyAuthToken`
+        // substring — the latter also matches the `require('./auth')` import line, which
+        // inflates the count and lets the floor slip (a CF could drop its call and stay green).
+        const verifyAuthTokenCalls = (cfSource.match(/await verifyAuthToken\(/g) || []).length;
+        // Exactly one call-site per CF: SetTier + GrantAddOn + CancelAddOn + GetEffective.
+        expect(verifyAuthTokenCalls).toBeGreaterThanOrEqual(4);
     });
 });
