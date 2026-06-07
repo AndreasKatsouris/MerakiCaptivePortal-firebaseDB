@@ -1,13 +1,22 @@
 # Lessons Learned
 
-Rolling log of non-obvious discoveries. Max 20 entries — oldest dropped when full.
+Rolling log of non-obvious discoveries. **Soft cap ~20 entries — evict by REDUNDANCY, not age.**
 Updated by agents at session end when a session hits a gotcha, failed approach, or surprise.
+
+## Eviction policy (when at/over the cap)
+
+Pure FIFO-by-date is wrong: a lesson's age is a poor proxy for whether it's still worth keeping. Per the #143 guard-first flip, once a defect-bearing lesson becomes a mechanical guard (test/lint/CI), the *prose* is redundant — the guard enforces it regardless of who reads this file. So evict in this order:
+
+1. **Already-mechanized lessons first** — if a lesson's defect is now covered by a guard (and/or its class is obsolete), drop the prose; the code + git history are the durable record.
+2. **Then obsolete/superseded** entries.
+3. **NEVER FIFO out an INHERENTLY-PROCESS lesson** (discovery/workflow discipline that *can't* be mechanized — e.g. session-start freshness, writer-census judgment, "read `toolResults` not the model's prose") to make room for a newer one. Those are the only entries that truly vanish when dropped. Being short on slots is a signal to **mechanize more**, not to evict process wisdom.
 
 ## Entry Guidelines
 
 - Only log **non-obvious** lessons — skip things derivable from reading the code
 - Include the **module** and **source session** for traceability
 - If a lesson leads to a validated optimization pattern, note that in SELF_OPTIMIZATION.md
+- Prefer shipping a **guard** (per CLAUDE.md Step 11 guard-first default) and demoting the lesson to the guard's code comment — that's what lets it age out of here safely
 
 ## Lessons
 
