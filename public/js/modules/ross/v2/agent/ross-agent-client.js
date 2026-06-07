@@ -17,11 +17,14 @@ function saToday() {
  * req.body.data) with a Bearer ID token, then reads the event-stream and calls
  * onEvent(parsedEvent) for each frame.
  *
+ * Returns the AbortController so callers can cancel mid-stream (ESC / scrim-
+ * close). Aborts are swallowed silently on the stream side; the caller is
+ * responsible for resetting conversation state after calling abort().
+ *
  * Never throws to the caller: transport/HTTP failures are surfaced as a
  * synthetic { type:'error' } event so the reducer renders a banner uniformly.
- * Aborts are swallowed silently; cancellation wiring is deferred (callers disable input while busy).
  */
-async function pump(body, onEvent) {
+async function pump(body, onEvent, controller = new AbortController()) {
   const user = auth.currentUser
   // Track whether a turn-ENDING event (done/terminal/error) reached the caller.
   // The reducer only clears `busy` on those; if the stream closes cleanly having
@@ -38,7 +41,6 @@ async function pump(body, onEvent) {
     emit({ type: 'error', code: 'no_auth', message: 'Please sign in to ask Ross.' })
     return
   }
-  const controller = new AbortController()
 
   let res
   try {
@@ -88,12 +90,20 @@ async function pump(body, onEvent) {
   }
 }
 
-/** Start a fresh turn. body: { message, threadId? }. */
+/**
+ * Start a fresh turn. body: { message, threadId? }.
+ * Returns { promise, abort } — call abort() to cancel mid-stream.
+ */
 export function streamRossChat(body, onEvent) {
-  return pump(body, onEvent)
+  const controller = new AbortController()
+  return { promise: pump(body, onEvent, controller), abort: () => controller.abort() }
 }
 
-/** Resume a paused confirm turn. */
+/**
+ * Resume a paused confirm turn.
+ * Returns { promise, abort } — call abort() to cancel mid-stream.
+ */
 export function resumeRossChat({ resumeTurnId, decision }, onEvent) {
-  return pump({ resumeTurnId, decision }, onEvent)
+  const controller = new AbortController()
+  return { promise: pump({ resumeTurnId, decision }, onEvent, controller), abort: () => controller.abort() }
 }

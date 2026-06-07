@@ -5,7 +5,7 @@ vi.mock('../../public/js/config/firebase-config.js', () => ({
   auth: { currentUser: { getIdToken: vi.fn().mockResolvedValue('tok-123') } },
 }))
 
-import { streamRossChat } from '../../public/js/modules/ross/v2/agent/ross-agent-client.js'
+import { streamRossChat, resumeRossChat } from '../../public/js/modules/ross/v2/agent/ross-agent-client.js'
 
 /** Build a fake fetch Response whose body streams the given string chunks. */
 function fakeStreamingResponse(chunks) {
@@ -31,6 +31,13 @@ function fakeStreamingResponse(chunks) {
 describe('streamRossChat', () => {
   beforeEach(() => { vi.restoreAllMocks() })
 
+  test('returns { promise, abort } shape', () => {
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(fakeStreamingResponse([])))
+    const result = streamRossChat({ message: 'yo' }, () => {})
+    expect(typeof result.promise?.then).toBe('function')
+    expect(typeof result.abort).toBe('function')
+  })
+
   test('POSTs a FLAT body with a Bearer token and emits parsed events in order', async () => {
     const fetchMock = vi.fn().mockResolvedValue(fakeStreamingResponse([
       'data: {"type":"text","delta":"Hi"}\n\n',
@@ -39,7 +46,7 @@ describe('streamRossChat', () => {
     vi.stubGlobal('fetch', fetchMock)
 
     const events = []
-    await streamRossChat({ message: 'yo', threadId: 't1' }, (e) => events.push(e))
+    await streamRossChat({ message: 'yo', threadId: 't1' }, (e) => events.push(e)).promise
 
     expect(events).toEqual([
       { type: 'text', delta: 'Hi' },
@@ -61,7 +68,7 @@ describe('streamRossChat', () => {
     vi.stubGlobal('fetch', fetchMock)
 
     const events = []
-    await streamRossChat({ message: 'yo' }, (e) => events.push(e))
+    await streamRossChat({ message: 'yo' }, (e) => events.push(e)).promise
 
     expect(events).toEqual([{ type: 'error', code: 'http_401', message: expect.any(String) }])
   })
@@ -72,7 +79,7 @@ describe('streamRossChat', () => {
     vi.stubGlobal('fetch', fetchMock)
 
     const events = []
-    await streamRossChat({ message: 'yo' }, (e) => events.push(e))
+    await streamRossChat({ message: 'yo' }, (e) => events.push(e)).promise
 
     expect(events).toEqual([{ type: 'error', code: 'truncated', message: expect.any(String) }])
   })
@@ -84,8 +91,45 @@ describe('streamRossChat', () => {
     vi.stubGlobal('fetch', fetchMock)
 
     const events = []
-    await streamRossChat({ message: 'yo' }, (e) => events.push(e))
+    await streamRossChat({ message: 'yo' }, (e) => events.push(e)).promise
 
     expect(events).toEqual([{ type: 'done', threadId: 't1', turnId: 'u1', costCents: 1 }])
+  })
+
+  test('abort() is callable and does not throw', () => {
+    // Minimal contract: abort() must be a no-throw function that can be called
+    // at any point, including when no fetch is in flight yet.
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(fakeStreamingResponse([])))
+    const { abort } = streamRossChat({ message: 'test' }, () => {})
+    expect(() => abort()).not.toThrow()
+  })
+
+  test('abort() called before fetch resolves prevents onEvent from being called', async () => {
+    // fetch never resolves (simulates a genuinely stalled network request).
+    let rejectFetch
+    vi.stubGlobal('fetch', vi.fn().mockReturnValue(
+      new Promise((_, rej) => { rejectFetch = rej })
+    ))
+
+    const events = []
+    const { promise, abort } = streamRossChat({ message: 'stalled' }, (e) => events.push(e))
+
+    // Abort immediately — the fetch is still pending.
+    abort()
+    // Reject the fetch with an AbortError (what browsers do when the signal fires).
+    const abortErr = new DOMException('The user aborted a request.', 'AbortError')
+    rejectFetch(abortErr)
+
+    await promise
+
+    // Aborted before any frame was received — no events should have been emitted.
+    expect(events).toEqual([])
+  })
+
+  test('resumeRossChat returns { promise, abort } shape', () => {
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(fakeStreamingResponse([])))
+    const result = resumeRossChat({ resumeTurnId: 'p1', decision: 'approve' }, () => {})
+    expect(typeof result.promise?.then).toBe('function')
+    expect(typeof result.abort).toBe('function')
   })
 })

@@ -12,7 +12,12 @@ const visible = ref(false)
 const input = ref('')
 const inputEl = ref(null)
 const scrollEl = ref(null)
+// Incremented on every reset so v-for :key="turn-${resetCount}-${i}" ensures
+// a clean VDOM when the conversation is cleared between sessions.
+const resetCount = ref(0)
 let convo = reactive(initialConversation())
+// Holds the abort() fn of the in-flight pump (if any). Null when idle.
+let abortInFlight = null
 
 function replaceConvo(next) {
   // reactive() can't be reassigned; copy fields in so Vue tracks the change.
@@ -35,7 +40,10 @@ async function send() {
   input.value = ''
   replaceConvo(startUserTurn(convo, message))
   scrollToEnd()
-  await streamRossChat({ message, threadId: convo.threadId || undefined }, onEvent)
+  const { promise, abort } = streamRossChat({ message, threadId: convo.threadId || undefined }, onEvent)
+  abortInFlight = abort
+  await promise
+  abortInFlight = null
 }
 
 async function decide(decision) {
@@ -43,7 +51,20 @@ async function decide(decision) {
   if (!pending) return
   replaceConvo(startResume(convo))
   scrollToEnd()
-  await resumeRossChat({ resumeTurnId: pending.turnId, decision }, onEvent)
+  const { promise, abort } = resumeRossChat({ resumeTurnId: pending.turnId, decision }, onEvent)
+  abortInFlight = abort
+  await promise
+  abortInFlight = null
+}
+
+function resetConvo() {
+  // Abort any in-flight stream first so late onEvent() calls don't fold
+  // into the fresh conversation after it has been cleared.
+  if (abortInFlight) { abortInFlight(); abortInFlight = null }
+  replaceConvo(initialConversation())
+  resetCount.value += 1
+  input.value = ''
+  nextTick(() => inputEl.value && inputEl.value.focus())
 }
 
 function open(seed) {
@@ -52,7 +73,16 @@ function open(seed) {
   nextTick(() => inputEl.value && inputEl.value.focus())
 }
 
-function close() { visible.value = false }
+function close() {
+  // Abort any in-flight fetch so the stream doesn't continue running
+  // in the background and fold stale events into state when the modal reopens.
+  if (abortInFlight) { abortInFlight(); abortInFlight = null }
+  // Reset conversation so a reopened modal always starts clean.
+  replaceConvo(initialConversation())
+  resetCount.value += 1
+  input.value = ''
+  visible.value = false
+}
 
 function onKeydown(e) {
   // ⌘K / Ctrl+K toggles open.
@@ -85,6 +115,13 @@ defineExpose({ open })
         <header class="ross-ask-modal__head">
           <HfIcon name="sparkle" :size="16" color="var(--hf-accent)" />
           <span class="ross-ask-modal__title">Ask Ross</span>
+          <button
+            v-if="convo.turns.length"
+            class="ross-ask-modal__new-chat"
+            aria-label="New chat"
+            title="New chat"
+            @click="resetConvo"
+          >New chat</button>
           <button class="ross-ask-modal__close" aria-label="Close" @click="close">✕</button>
         </header>
 
@@ -92,7 +129,7 @@ defineExpose({ open })
           <p v-if="!convo.turns.length" class="ross-ask-modal__empty hf-mono">
             Ask about your workflows, staff, runs, or compliance.
           </p>
-          <RossAskMessage v-for="(t, i) in convo.turns" :key="i" :turn="t" />
+          <RossAskMessage v-for="(t, i) in convo.turns" :key="`${resetCount}-${i}`" :turn="t" />
 
           <RossAskConfirmCard
             v-if="convo.pendingConfirm"
@@ -141,6 +178,13 @@ defineExpose({ open })
 .ross-ask-modal__head { display: flex; align-items: center; gap: 0.5rem; padding: 0.75rem 1rem; border-bottom: 1px solid var(--hf-line); }
 .ross-ask-modal__title { font-family: var(--hf-font-display); color: var(--hf-ink); flex: 1; }
 .ross-ask-modal__close { background: none; border: none; color: var(--hf-muted); cursor: pointer; font-size: 0.9rem; }
+.ross-ask-modal__new-chat {
+  background: none; border: 1px solid var(--hf-line); color: var(--hf-muted);
+  border-radius: var(--hf-radius-sm); cursor: pointer;
+  font-family: var(--hf-font-body); font-size: 0.75rem; padding: 0.2rem 0.55rem;
+  margin-right: auto;
+}
+.ross-ask-modal__new-chat:hover { color: var(--hf-ink); border-color: var(--hf-ink); }
 .ross-ask-modal__body { flex: 1; overflow-y: auto; padding: 1rem; }
 .ross-ask-modal__empty { color: var(--hf-muted); font-size: 0.8rem; }
 .ross-ask-banner { margin-top: 0.6rem; padding: 0.6rem 0.8rem; border-radius: var(--hf-radius-sm); font-family: var(--hf-font-body); font-size: 0.85rem; }
