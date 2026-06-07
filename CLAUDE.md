@@ -150,7 +150,7 @@ Every non-trivial change follows these steps in order. No deviation without expl
 10. **Cleanup.** After merge: `git worktree remove .worktrees/<name>` and `git branch -d feature/<name>`. Promotion of v2 → v1 (or flag flip) is a separate PR once soaked.
 11. **Reflect.** After every PR merge (or significant code change), update the three feedback files and report findings to the user:
     - `KNOWLEDGE BASE/development/SELF_OPTIMIZATION.md` — did any new pattern emerge or get validated?
-    - `KNOWLEDGE BASE/development/LESSONS.md` — any non-obvious gotchas hit during this work?
+    - `KNOWLEDGE BASE/development/LESSONS.md` — any non-obvious gotchas hit during this work? **Eviction is by REDUNDANCY, not age** (see that file's header): at the ~20 soft cap, drop already-guarded / obsolete entries first; **never FIFO out an inherently-process lesson** to fit a newer one — being short on slots means *mechanize more*, not evict process wisdom.
     - **Guard-first default (validated 2026-06-05, `docs/analysis/2026-06-05-lesson-guard-coverage.md`):** a lesson or SELF_OPT pattern that describes a defect which *shipped or nearly shipped* should ship a **mechanical guard** (vitest test / eslint rule / hook / CI assertion) by default — the prose is demoted to the guard's code comment (proven template: `functions/agent/tools.js:255-267` lesson → `functions/agent/__tests__/tools.test.js:128-153` guard, PR #140). Prefer the cheapest already-wired shape (vitest dominates; `eslint-plugin-vue` is configured). If the lesson genuinely can't be mechanized — a discovery/workflow discipline like writer-census judgment, design-time audit, or session-start freshness — it **stays prose**: the default flips, it is not absolute. The audit found 6 of 17 defect-bearing lessons were mechanizable-but-unguarded; don't add to that pile.
     - `KNOWLEDGE BASE/development/SCORECARD.md` — score this session on the rubric, summarise out loud
     - `KNOWLEDGE BASE/PROJECT_BACKLOG.md` — mark sprint tasks done, move feature to Recently Completed, log any new bugs
@@ -195,7 +195,7 @@ Read at session start, update at session end.
 |------|------|---------|
 | `KNOWLEDGE BASE/PROJECT_BACKLOG.md` | **Start (read) + end (update)** | Sprint goal, task checklist, bug triage queue |
 | `KNOWLEDGE BASE/development/SELF_OPTIMIZATION.md` | Start (read) + end (update) | Workflow patterns, promoted after 3x validation |
-| `KNOWLEDGE BASE/development/LESSONS.md` | End (if gotchas found) | Rolling log of non-obvious discoveries (max 20) |
+| `KNOWLEDGE BASE/development/LESSONS.md` | End (if gotchas found) | Rolling log of non-obvious discoveries (~20 soft cap; evict by redundancy not age — guarded/obsolete first, never FIFO an inherently-process lesson) |
 | `KNOWLEDGE BASE/development/SCORECARD.md` | End | Self-evaluation against fixed rubric (max 10 entries) |
 | `public/data/project-status.json` | End (**same PR** as any backlog body change) | Parallel machine-readable copy powering `/project-status.html` — keep `recentlyCompleted` / `bugs` / `lastUpdated` in lockstep with the backlog (see Step 11). Drifts silently if skipped. |
 
