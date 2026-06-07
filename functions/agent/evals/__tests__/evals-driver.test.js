@@ -103,5 +103,16 @@ describe('runEvalCase', () => {
     const staffResult = tr.toolResults.find((r) => r.tool === 'getStaff')
     expect(staffResult).toBeTruthy()
     expect(staffResult.toolUseId).toBeTruthy()
+    // GUARD (regression for the execute.js db-seam bug): executeTool wraps every run
+    // with an audit-write via execute.js's OWN getDb seam. If the driver doesn't seam
+    // execute.js, the audit write throws "Can't determine Firebase Database URL" and
+    // the tool_result is an {error}, even though the read itself succeeded — Ross then
+    // honestly reports the error (looked like "Ross won't call tools" but he does).
+    // Assert the output is a real tool result, NOT an {error} envelope. (Before the
+    // execute.js seam fix the audit-write threw and this was {error:"Can't determine
+    // Firebase Database URL"}.) Note the fake client calls getStaff with input:{} so
+    // the staff array is empty here — that's fine; the guard is "no error envelope".
+    expect(staffResult.output && staffResult.output.error).toBeFalsy()
+    expect(Array.isArray(staffResult.output && staffResult.output.staff)).toBe(true)
   })
 })
