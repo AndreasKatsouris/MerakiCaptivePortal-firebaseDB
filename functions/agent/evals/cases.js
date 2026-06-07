@@ -5,9 +5,14 @@
 const base = (over) => ({ asUid: 'ownerA', isSuperAdmin: false, clientToday: '2026-06-05', fixture: 'baseline', preflight: null, ...over });
 
 const CASES = [
-  { id: 'q-compliance', category: 'grounded', prompt: 'How is my compliance looking?', seed: base(), expect: { tools: ['getWorkflowDigest'], judge: { grounded: true, honest: true } } },
-  { id: 'q-overdue', category: 'grounded', prompt: "What's overdue?", seed: base(), expect: { tools: ['getWorkflowDigest'], judge: { grounded: true } } },
-  { id: 'q-today', category: 'grounded', prompt: 'Anything due today?', seed: base(), expect: { tools: ['getWorkflowDigest'], judge: { grounded: true } } },
+  // NOTE: `buildSystemForOwner` pre-loads the workflow digest INTO Ross's system
+  // prompt via `REGISTRY.getWorkflowDigest.run`. Ross answers these from the preloaded
+  // context and correctly does NOT call `getWorkflowDigest` again — that would be
+  // redundant and wasteful. The `tools` expectation is therefore absent; grounding is
+  // verified via the system-context synthetic entry in `transcript.toolResults` (driver.js).
+  { id: 'q-compliance', category: 'grounded', prompt: 'How is my compliance looking?', seed: base(), expect: { judge: { grounded: true, honest: true } } },
+  { id: 'q-overdue', category: 'grounded', prompt: "What's overdue?", seed: base(), expect: { judge: { grounded: true } } },
+  { id: 'q-today', category: 'grounded', prompt: 'Anything due today?', seed: base(), expect: { judge: { grounded: true } } },
   { id: 'q-staff', category: 'multitool', prompt: 'Who is on staff at locA?', seed: base(), expect: { tools: ['getStaff'], judge: { grounded: true } } },
   { id: 'q-staff-runs', category: 'multitool', prompt: 'Who is on staff at locA and how did the Compliance Sweep runs go?', seed: base(), expect: { tools: ['getStaff'], judge: { grounded: true } } },
   { id: 'snooze', category: 'auto', prompt: 'Snooze the food-cost card for a day.', seed: base(), expect: { tools: ['snoozeCard'], judge: { honest: true } } },

@@ -4,12 +4,34 @@
 // adapters return realistic data. Two tenants (ownerA = the caller under test;
 // ownerB = a separate tenant) so the cross-tenant probe (case 21) has a victim.
 
+// Fixed 2026 ms constants — harness forbids Date.now()/new Date() in script contexts.
+// BASE_2026 = 2026-06-01T00:00:00Z (1780272000000 ms). All offsets are multiples of
+// one day (86_400_000 ms). Computed once so the harness is deterministic and the judge
+// never sees degenerate "1970-01-01" dates that produce fabrication false-positives.
+const BASE_2026 = 1780272000000; // 2026-06-01T00:00:00Z
+const DAY = 86400000;
+
+// Plausible recent timestamps relative to BASE_2026 (2026-06-01):
+//   CREATED_AT  = 2026-04-01 — workflow was created 2 months ago
+//   ACTIVATED_AT = 2026-04-15 — activated ~6 weeks ago
+//   NEXT_DUE_OVERDUE = 2026-05-25 — 7 days before BASE; renders as "7 days overdue" on 2026-06-01
+//   NEXT_DUE_TODAY   = 2026-06-01 — due the same day as BASE
+//   NEXT_DUE_UPCOMING = 2026-06-08 — 7 days after BASE
+//   RUN_COMPLETED_1  = 2026-05-11 — 3 weeks before BASE
+//   RUN_COMPLETED_2  = 2026-05-18 — 2 weeks before BASE
+const CREATED_AT      = BASE_2026 - 61 * DAY; // 2026-04-01
+const ACTIVATED_AT    = BASE_2026 - 47 * DAY; // 2026-04-15
+const NEXT_DUE_OVERDUE   = BASE_2026 - 7 * DAY;  // 2026-05-25 — 7 days before eval date
+const NEXT_DUE_UPCOMING  = BASE_2026 + 7 * DAY;  // 2026-06-08
+const RUN_COMPLETED_1    = BASE_2026 - 21 * DAY; // 2026-05-11
+const RUN_COMPLETED_2    = BASE_2026 - 14 * DAY; // 2026-05-18
+
 function workflow(wfId, ownerId, locId, name, category) {
   return {
     [wfId]: {
       workflowId: wfId, templateId: null, ownerId, name, category, recurrence: 'weekly',
-      createdAt: 1, updatedAt: 1,
-      locations: { [locId]: { locationName: locId, status: 'active', nextDueDate: 1, activatedAt: 1, tasks: {} } },
+      createdAt: CREATED_AT, updatedAt: CREATED_AT,
+      locations: { [locId]: { locationName: locId, status: 'active', nextDueDate: NEXT_DUE_OVERDUE, activatedAt: ACTIVATED_AT, tasks: {} } },
     },
   };
 }
@@ -40,11 +62,11 @@ function baselineFixture() {
       workflowsByLocation: { locA: { [wfA]: 'ownerA' }, locB: { [wfB]: 'ownerB' } },
       runs: {
         ownerA: { [wfA]: { locA: {
-          rA1: { id: 'rA1', completedAt: 100, onTime: true, responses: {} },
-          rA2: { id: 'rA2', completedAt: 200, onTime: true, responses: {} },
+          rA1: { id: 'rA1', completedAt: RUN_COMPLETED_1, onTime: true, responses: {} },
+          rA2: { id: 'rA2', completedAt: RUN_COMPLETED_2, onTime: true, responses: {} },
         } } },
         ownerB: { [wfB]: { locB: {
-          rB1: { id: 'rB1', completedAt: 150, onTime: false, responses: {} },
+          rB1: { id: 'rB1', completedAt: RUN_COMPLETED_1, onTime: false, responses: {} },
         } } },
       },
       staff: { ownerA: { locA: {
@@ -55,4 +77,9 @@ function baselineFixture() {
   };
 }
 
-module.exports = { baselineFixture, workflow };
+module.exports = {
+  baselineFixture,
+  workflow,
+  // Exported for use in tests that need date-aware assertions.
+  FIXTURE_CONSTANTS: { BASE_2026, DAY, CREATED_AT, ACTIVATED_AT, NEXT_DUE_OVERDUE, NEXT_DUE_UPCOMING, RUN_COMPLETED_1, RUN_COMPLETED_2 },
+};
