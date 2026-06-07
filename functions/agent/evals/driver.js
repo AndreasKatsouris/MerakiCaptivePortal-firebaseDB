@@ -3,6 +3,7 @@ const { makeFakeRtdb } = require('../__tests__/helpers/fake-rtdb');
 const { baselineFixture, FIXTURE_CONSTANTS } = require('./fixtures');
 const rossChat = require('../rossChat');
 const tools = require('../tools');
+const execute = require('../execute'); // executeTool has its OWN getDb seam (audit-write + no-undo capture)
 const llm = require('../llm-client');
 const ledger = require('../../billing/ledger'); // for the balance-gate db seam
 
@@ -32,6 +33,11 @@ async function runEvalCase(c, opts = {}) {
   const db = makeFakeRtdb(tree);
   rossChat.__setDbForTests(db);
   tools.__setDbForTests(db);
+  // executeTool (execute.js) writes an audit record + captures no-undo prev values via
+  // its OWN getDb seam — without this every tool execution throws "Can't determine
+  // Firebase Database URL" at the audit write, even pure reads, and Ross honestly
+  // reports the error (looked like "Ross won't call tools" but he does — harness bug).
+  if (typeof execute.__setDbForTests === 'function') execute.__setDbForTests(db);
   if (typeof ledger.__setDbForTests === 'function') ledger.__setDbForTests(db); // balance gate reads via ledger's own db
   if ('client' in opts) llm.__setClientForTests(opts.client || null);
 
