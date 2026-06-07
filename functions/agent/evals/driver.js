@@ -1,6 +1,6 @@
 'use strict';
 const { makeFakeRtdb } = require('../__tests__/helpers/fake-rtdb');
-const { baselineFixture } = require('./fixtures');
+const { baselineFixture, FIXTURE_CONSTANTS } = require('./fixtures');
 const rossChat = require('../rossChat');
 const tools = require('../tools');
 const llm = require('../llm-client');
@@ -46,7 +46,8 @@ async function runEvalCase(c, opts = {}) {
   // ('2026-06-05') so formatSADate in the system prompt shows the correct eval date.
   // The digest bucketing uses clientToday (not ctx.now) when provided, so these two
   // must be consistent: NEXT_DUE_OVERDUE = 2026-05-25 is 11 days before this date.
-  const EVAL_NOW = 1780617600000; // 2026-06-05T00:00:00Z (BASE_2026 + 4 days)
+  // Derived from the fixtures so it can't silently drift if BASE_2026 moves.
+  const EVAL_NOW = FIXTURE_CONSTANTS.BASE_2026 + 4 * FIXTURE_CONSTANTS.DAY; // 2026-06-05T00:00:00Z
   const ctx = { uid, isSuperAdmin: c.seed.isSuperAdmin, email: `${uid}@eval.test`, turnId: `eval-${c.id}`, turnSource: 'chat', now: EVAL_NOW };
   const system = await rossChat.buildSystemForOwner(ctx, c.seed.clientToday);
   const messages = rossChat.buildHistoryMessages(null, c.prompt);
@@ -86,14 +87,30 @@ async function runEvalCase(c, opts = {}) {
   // loop itself (CRITICAL LESSON #142: runAgentLoop RETURNS {paused,pendingTool}/{error},
   // signalling splits across emit AND return).
   if (loop && Array.isArray(loop.messages)) {
+    // Build a tool_use_id -> tool name map from the assistant turns so each captured
+    // tool_result carries its tool name (the judge shouldn't have to reverse-map by id).
+    // The `action` events on transcript.toolsCalled carry NO toolUseId (rossChat emits
+    // only {tool, status}), so we pair from the assistant tool_use blocks which DO have
+    // both `id` and `name` — field-verified against rossChat.runAgentLoop.
+    const toolNameById = {};
+    for (const msg of loop.messages) {
+      if (msg.role === 'assistant' && Array.isArray(msg.content)) {
+        for (const block of msg.content) {
+          if (block && block.type === 'tool_use' && block.id) toolNameById[block.id] = block.name;
+        }
+      }
+    }
     for (const msg of loop.messages) {
       if (msg.role === 'user' && Array.isArray(msg.content)) {
         for (const block of msg.content) {
           if (block && block.type === 'tool_result' && block.tool_use_id) {
-            // Pair with the tool name from transcript.toolsCalled if available.
             let parsedOutput;
             try { parsedOutput = JSON.parse(block.content); } catch { parsedOutput = block.content; }
-            transcript.toolResults.push({ toolUseId: block.tool_use_id, output: parsedOutput });
+            transcript.toolResults.push({
+              tool: toolNameById[block.tool_use_id] || null,
+              toolUseId: block.tool_use_id,
+              output: parsedOutput,
+            });
           }
         }
       }

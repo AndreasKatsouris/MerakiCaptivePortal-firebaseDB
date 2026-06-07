@@ -49,9 +49,11 @@ describe('baselineFixture', () => {
     }
   })
 
-  it('NEXT_DUE_OVERDUE is before BASE_2026 so the workflow appears overdue on 2026-06-01', () => {
+  it('NEXT_DUE_OVERDUE is before the eval date (clientToday 2026-06-05) so the workflow is overdue', () => {
     // The fixture's overdue workflow must be in the past relative to the eval date
     // so buildHomeWorkflowDigest puts it in the `overdue` bucket (not `upcoming`).
+    // The cases use clientToday '2026-06-05'; NEXT_DUE_OVERDUE (2026-05-25) is before
+    // both BASE_2026 (2026-06-01) and that eval date, so it lands in `overdue`.
     expect(NEXT_DUE_OVERDUE).toBeLessThan(BASE_2026)
     // Specifically 7 days before BASE_2026 (2026-05-25)
     expect(NEXT_DUE_OVERDUE).toBe(BASE_2026 - 7 * DAY)

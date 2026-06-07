@@ -88,14 +88,20 @@ describe('runEvalCase', () => {
   })
 
   it('tool outputs from auto-executed tools are captured in toolResults', async () => {
-    // Guard: when the model calls an auto-tier tool (e.g. getStaff), the output must
-    // land in transcript.toolResults so the judge can verify grounding.
+    // Guard: when the model calls an auto-tier tool (getStaff), the executeTool output
+    // must be folded into transcript.toolResults so the judge can verify grounding.
+    // The fakeClientWithTool path produces a REAL tool_result via executeTool, so we
+    // expect >= 2 entries: the __systemContext__ synthetic + at least one loop-captured
+    // tool_result. Asserting >= 1 would stay green on a step-4 regression (the system
+    // context alone satisfies it), so >= 2 is what actually exercises the capture loop.
     const tr = await runEvalCase(
       { id: 'q-staff', category: 'multitool', prompt: 'Who is on staff at locA?', seed: { asUid: 'ownerA', isSuperAdmin: false, clientToday: '2026-06-05', fixture: 'baseline', preflight: null }, expect: {} },
       { client: fakeClientWithTool('getStaff', { staff: [] }, 'Staff at locA: Abe (Waiter), Zara (Chef).') },
     )
-    // At least the system-context entry is present; tool_result entries from the loop may
-    // also appear depending on what the fake client returns.
-    expect(tr.toolResults.length).toBeGreaterThanOrEqual(1)
+    expect(tr.toolResults.length).toBeGreaterThanOrEqual(2)
+    // The loop-captured entry carries the paired tool name (not just a toolUseId).
+    const staffResult = tr.toolResults.find((r) => r.tool === 'getStaff')
+    expect(staffResult).toBeTruthy()
+    expect(staffResult.toolUseId).toBeTruthy()
   })
 })
