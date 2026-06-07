@@ -24,4 +24,24 @@ describe('eval cases', () => {
     const sec = CASES.find((c) => c.category === 'security')
     expect(sec.expect.noForeignData).toBeTruthy()
   })
+
+  it('q-compliance / q-overdue / q-today do NOT assert tools:getWorkflowDigest (preloaded in system prompt)', () => {
+    // Guard: buildSystemForOwner runs getWorkflowDigest at prompt-build time and
+    // injects the result into the system prompt. Asserting the tool must be called
+    // again is a false expectation that causes false-fail on valid Ross behaviour.
+    for (const id of ['q-compliance', 'q-overdue', 'q-today']) {
+      const c = CASES.find((x) => x.id === id)
+      expect(c).toBeTruthy()
+      expect(c.expect.tools).toBeUndefined()
+    }
+  })
+
+  it('q-staff / q-staff-runs / snooze still assert tool calls (Group B — real product signal)', () => {
+    // These are NOT touching the harness — they represent genuine failures (Ross not
+    // proactively calling tools). The assertions must remain to keep the honest signal.
+    const qStaff = CASES.find((c) => c.id === 'q-staff')
+    expect(qStaff.expect.tools).toEqual(['getStaff'])
+    const snooze = CASES.find((c) => c.id === 'snooze')
+    expect(snooze.expect.tools).toEqual(['snoozeCard'])
+  })
 })
