@@ -200,7 +200,7 @@ const sidebar = computed(() => store.sidebar)
               <span class="hf-mono ross-home__story-eyebrow">{{ c.eyebrow }}</span>
             </div>
             <h3 class="ross-home__story-headline">{{ c.headline }}</h3>
-            <p class="ross-home__story-detail" v-html="c.detail" />
+            <p class="ross-home__story-detail">{{ c.detail }}</p>
             <div class="ross-home__story-actions">
               <HfButton
                 v-for="a in c.actions" :key="a.id"
