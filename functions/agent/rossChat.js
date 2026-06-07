@@ -105,6 +105,15 @@ async function runGates({ uid, isSuperAdmin }) {
  * @param {{dateStr:string, tier?:string, locationNames?:string[], digest?:object}} opts
  * @returns {string}
  */
+// Reformat a normalised ISO date ('YYYY-MM-DD', as the digest stores nextDueDate) to
+// SA DD/MM/YYYY for the owner-context snapshot. String reformat (not Date parsing) to
+// avoid timezone shifts; falls back to the raw value for any unexpected shape.
+function isoToSADate(iso) {
+    if (typeof iso !== 'string') return String(iso);
+    const m = /^(\d{4})-(\d{2})-(\d{2})/.exec(iso);
+    return m ? `${m[3]}/${m[2]}/${m[1]}` : iso;
+}
+
 function buildOwnerContext({ dateStr, tier, locationNames, digest } = {}) {
     const d = digest || {};
     const overdue = Array.isArray(d.overdue) ? d.overdue : [];
@@ -120,14 +129,14 @@ function buildOwnerContext({ dateStr, tier, locationNames, digest } = {}) {
     ];
     if (overdue.length) {
         lines.push(`- Overdue: ${overdue.slice(0, 5)
-            .map((o) => `${o.name} @ ${o.locationName} (${o.daysLate}d late)`).join('; ')}.`);
+            .map((o) => `${o.name} @ ${o.locationName} (due ${isoToSADate(o.nextDueDate)}, ${o.daysLate}d late)`).join('; ')}.`);
     }
     if (today.length) {
         lines.push(`- Due today: ${today.slice(0, 5)
             .map((t) => `${t.name} @ ${t.locationName}`).join('; ')}.`);
     }
     if (d.upcoming) {
-        lines.push(`- Next up: ${d.upcoming.name} @ ${d.upcoming.locationName} (${d.upcoming.nextDueDate}).`);
+        lines.push(`- Next up: ${d.upcoming.name} @ ${d.upcoming.locationName} (due ${isoToSADate(d.upcoming.nextDueDate)}).`);
     }
     return lines.join('\n');
 }
