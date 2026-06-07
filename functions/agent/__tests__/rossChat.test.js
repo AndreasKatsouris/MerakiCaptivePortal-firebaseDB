@@ -180,6 +180,12 @@ describe('buildOwnerContext', () => {
         expect(ctx).toContain('1 due today');
         expect(ctx).toContain('Daily Opening Checklist');
         expect(ctx).toContain('Health & Safety Audit'); // upcoming
+        // Overdue + upcoming carry the LITERAL due date (SA DD/MM/YYYY) so Ross cites a
+        // grounded date rather than deriving today - daysLate (which the judge flagged as
+        // fabrication). nextDueDate is stored ISO 'YYYY-MM-DD' → reformatted here.
+        expect(ctx).toContain('due 31/05/2026'); // overdue item 1 (was 2026-05-31)
+        expect(ctx).toContain('3d late');
+        expect(ctx).toContain('due 05/06/2026'); // upcoming (was 2026-06-05)
     });
 
     it('is defensive with an empty digest + no locations', () => {
