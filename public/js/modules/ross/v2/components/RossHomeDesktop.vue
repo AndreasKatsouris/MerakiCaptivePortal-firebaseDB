@@ -316,12 +316,14 @@ const sidebar = computed(() => store.sidebar)
       </section>
     </aside>
 
-    <RossAskModal ref="askModal" />
   </div>
 
   <div v-else class="ross-home__loading">
     <div class="hf-eyebrow">Loading Ross…</div>
   </div>
+
+  <!-- Hoisted OUTSIDE the feed v-if so ⌘K is available during cold-start. -->
+  <RossAskModal ref="askModal" />
 </template>
 
 <style scoped>

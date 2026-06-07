@@ -8,10 +8,15 @@ import {
   HfIcon, HfChip, HfAvatar, HfLogo, HfSparkline,
 } from '/js/design-system/hifi/index.js'
 import { auth, onAuthStateChanged } from '/js/config/firebase-config.js'
+import RossAskModal from './RossAskModal.vue'
 
 const store = useRossStore()
 // Always reload on mount (see RossHomeDesktop.vue for rationale).
 onMounted(() => { store.loadHome() })
+
+// Ask Ross modal — same real modal as desktop, NOT a stub.
+const askModal = ref(null)
+function openAsk() { askModal.value && askModal.value.open('') }
 
 const feed = computed(() => store.feed)
 
@@ -121,7 +126,15 @@ function cardMeta(c) {
       </div>
     </div>
 
-    <div class="ross-mobile__ask">
+    <div
+      class="ross-mobile__ask"
+      role="button"
+      tabindex="0"
+      aria-label="Ask Ross"
+      @click="openAsk"
+      @keydown.enter="openAsk"
+      @keydown.space.prevent="openAsk"
+    >
       <HfIcon name="sparkle" :size="16" color="var(--hf-accent)" />
       <span class="ross-mobile__ask-placeholder">Ask Ross anything…</span>
       <HfIcon name="bolt" :size="14" color="var(--hf-accent)" />
@@ -143,6 +156,9 @@ function cardMeta(c) {
   <div v-else class="ross-mobile__loading">
     <div class="hf-eyebrow">Loading Ross…</div>
   </div>
+
+  <!-- Hoisted outside the feed v-if — modal must be available even during cold-start. -->
+  <RossAskModal ref="askModal" />
 </template>
 
 <style scoped>
@@ -206,7 +222,9 @@ function cardMeta(c) {
   color: var(--hf-bg);
   border-radius: 26px;
   display: flex; align-items: center; gap: 10px;
+  cursor: pointer;
 }
+.ross-mobile__ask:focus-visible { outline: 2px solid var(--hf-accent); outline-offset: 2px; }
 .ross-mobile__ask-placeholder { font-size: 13px; flex: 1; color: #aaa; }
 
 .ross-mobile__nav {

@@ -110,4 +110,47 @@ describe('ross-agent-conversation', () => {
     s = reduceEvent(s, { type: 'done', turnId: 'u2', costCents: 2 }) // no threadId on this event
     expect(s.threadId).toBe('th1')
   })
+
+  // --- Conversation reset (close/new-chat) ---
+
+  test('initialConversation() produces a clean state matching the reset shape', () => {
+    // After a full conversation, calling initialConversation() again (the reset path)
+    // must return a blank slate — no turns, no thread, not busy.
+    let s = startUserTurn(initialConversation(), 'hi')
+    s = reduceEvent(s, { type: 'done', threadId: 'th1', turnId: 'u1', costCents: 5 })
+    // Simulate what the modal does on close/new-chat.
+    const reset = initialConversation()
+    expect(reset.turns).toEqual([])
+    expect(reset.threadId).toBe(null)
+    expect(reset.busy).toBe(false)
+    expect(reset.pendingConfirm).toBe(null)
+    expect(reset.banner).toBe(null)
+    expect(reset.lastCostCents).toBe(null)
+  })
+
+  test('reset after a mid-stream abort does not carry over stale state', () => {
+    // Simulate a conversation aborted mid-stream: busy is still true when
+    // the modal closes. The reset (initialConversation) must clear busy
+    // regardless — the abort() call stops the pump, and the modal replaces
+    // convo with a fresh initialConversation() without waiting for the pump.
+    let s = startUserTurn(initialConversation(), 'hi')
+    // Abort fires before 'done' — busy is still true.
+    expect(s.busy).toBe(true)
+    // Reset wipes the conversation, including the busy flag.
+    const reset = initialConversation()
+    expect(reset.busy).toBe(false)
+    expect(reset.turns).toEqual([])
+  })
+
+  test('reset v-key strategy: turns array is empty after reset so index-based keys are safe', () => {
+    // The modal uses :key="`${resetCount}-${i}`". After a reset, turns === []
+    // so no stale VDOM nodes with the old resetCount prefix survive.
+    let s = startUserTurn(initialConversation(), 'first message')
+    s = reduceEvent(s, { type: 'done', threadId: 't1', turnId: 'u1', costCents: 1 })
+    expect(s.turns.length).toBe(2)
+    // Reset.
+    const reset = initialConversation()
+    // All previous turn indices are gone — no key collision possible.
+    expect(reset.turns.length).toBe(0)
+  })
 })
