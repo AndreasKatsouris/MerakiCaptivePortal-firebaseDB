@@ -13,6 +13,12 @@
 
 The askRoss agent is built, live, and eval-passing (21/21) but **cannot take money** — the old "Upgrade Now" was a fake-charge, replaced by a static `/upgrade.html` email CTA. This spec is the first real money path. North star unchanged: *Ross runs the paperwork, not the restaurant* — monetize the agent's usage without putting friction between an owner and trying it.
 
+## 1.1 Launch sequencing — **this ships DORMANT** (2026-06-08)
+
+ROSS is **not launched** (it's still founder-only). A 2026-06-08 effectiveness brainstorm concluded that **launch-readiness = two "wheels"** that are out of scope here: **(W1) capability breadth** — Ross can currently only see workflows/staff/runs; food-cost/guests/sales adapters are stubbed (`AdapterPendingError`) — and **(W2) proactive delivery** — the unattended sweep that reaches the owner unprompted (ideally via the existing Twilio **WhatsApp**), vs the reactive ⌘K chat that's all that's shipped. **Monetization is correctly built-but-dormant until both wheels are on.**
+
+Why build the rail now anyway: **the Paystack account (KYC/verification) is the real long-pole** — start it today, build the rail in parallel. **But the go-live switch stays OFF:** specifically, the **D2 `rossAgent` → Free flip is built but NOT deployed** until launch (deploying it would open Ross to all owners before the wheels exist). The rail code can land on master; the trial-grant, the `rossAgent`-Free recompute, and the live Paystack keys are flipped only at launch.
+
 ## 2. Locked decisions (from the 2026-06-07 brainstorm)
 
 | # | Decision | Rationale |
@@ -130,12 +136,12 @@ Deploy-smoke (test-mode Paystack keys): real init → Paystack test card → rea
 4. Run the `creditBundles` seed (operator sets the ZAR↔USD pairs) + the entitlements recompute for D2 (`rossAgent` → Free).
 5. Strict deploy order: CFs (secret-first) → rules → hosting → seed/recompute → test-mode smoke → flip to live keys.
 
-## 11. Open questions (resolve at plan time or with operator)
+## 11. Resolved decisions (2026-06-08)
 
-- Exact bundle set + prices (operator: e.g. R49/$2.50, R199/$11, R499/$30?).
-- `TRIAL_CENTS` value (default 100¢ proposed).
-- Trial placement: dedicated claim CF vs folded into signup/seed.
-- Whether `paymentsInitTopup` is an onCall or onRequest (match the Ask Ross client's transport conventions).
+- **Bundle set (USD grant):** **$20 / $99 / $200** → `usdGrantCents` 2000 / 9900 / 20000. (Substantial "stock the wallet" packs — ~1k / 5k / 10k+ Ross turns each.) The per-bundle `zarChargeCents` is operator-set at seed time (D5) — exact ZAR price points are a seed-config value, not code.
+- **`TRIAL_CENTS` = 100** (¢, = $1, ≈ 50–100 turns above the 50¢ floor).
+- **Trial placement:** dedicated `paymentsClaimTrial` CF, invoked once on first Ross access (clean + independently testable).
+- **`paymentsInitTopup` transport:** `onCall` (client only needs the `authorization_url` back).
 
 ## 12. Out of scope → Spec 2
 
