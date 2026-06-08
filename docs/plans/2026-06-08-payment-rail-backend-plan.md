@@ -437,6 +437,26 @@ describe('processChargeSuccess', () => {
         expect(out.status).toBe('failed');
         expect(ledger.grantCredit).not.toHaveBeenCalled();
     });
+
+    it('does NOT re-grant a reference stuck in `processing` (write-before-effect, review #1)', async () => {
+        // Simulate a crash between claim and grant: a 'processing' record already exists.
+        const tree = TREE();
+        tree.billing.paymentEvents = { ref_abc: { uid: 'u1', bundleId: 'usd20', status: 'processing', at: 1 } };
+        const db = makeFakeRtdb(tree);
+        const ledger = fakeLedger();
+        const out = await processChargeSuccess({ db, ledger, event: chargeEvent() });
+        expect(out.status).toBe('processing');
+        expect(ledger.grantCredit).not.toHaveBeenCalled();
+    });
+
+    it('propagates a grantCredit failure (so the webhook 500s and Paystack retries)', async () => {
+        const db = makeFakeRtdb(TREE());
+        const ledger = { grantCredit: vi.fn().mockRejectedValue(new Error('RTDB unreachable')) };
+        await expect(processChargeSuccess({ db, ledger, event: chargeEvent() })).rejects.toThrow('RTDB unreachable');
+        // The claim record remains 'processing' so the retry is safe (no double-grant).
+        const rec = (await db.ref('billing/paymentEvents/ref_abc').once('value')).val();
+        expect(rec.status).toBe('processing');
+    });
 });
 ```
 
@@ -455,11 +475,24 @@ const { paymentEventPath } = require('./constants');
 
 /**
  * Process a verified Paystack `charge.success` event into a one-time USD credit grant.
- * SOURCE OF TRUTH for grants. Idempotent on the Paystack `reference`. The grant amount
- * is ALWAYS re-derived server-side from the bundle (never the event amount).
+ * SOURCE OF TRUTH for grants. The grant amount is ALWAYS re-derived server-side from the
+ * bundle (never the event amount).
+ *
+ * WRITE-BEFORE-EFFECT idempotency (review #1): we CLAIM the reference via an RTDB
+ * transaction FIRST (atomic "create if absent"), then grant, then mark 'granted'. A
+ * webhook retry that finds a 'granted' record acks-and-stops; one that finds a
+ * 'processing' record (a crash between claim and grant) does NOT re-grant — it returns
+ * 'processing' for manual review. This favours never-double-grant over never-under-grant
+ * (an under-grant is a visible stuck 'processing' record an operator can reconcile; a
+ * double-grant is silent money loss). The `uid` is trusted because paymentsInitTopup
+ * wrote it from the verified Firebase Auth token — Paystack only echoes it back.
+ *
+ * On a grantCredit FAILURE we throw (the webhook returns 500 → Paystack retries; the
+ * 'processing' claim makes the retry safe). Validation failures (bad bundle / amount)
+ * are terminal — we mark 'failed' and return (200, no retry).
  *
  * @param {{db:object, ledger:object, event:object}} args  ledger = functions/billing/ledger
- * @returns {Promise<{status:'granted'|'ignored'|'failed', reason?:string}>}
+ * @returns {Promise<{status:'granted'|'ignored'|'processing'|'failed', reason?:string}>}
  */
 async function processChargeSuccess({ db, ledger, event }) {
     const data = (event && event.data) || {};
@@ -471,47 +504,56 @@ async function processChargeSuccess({ db, ledger, event }) {
         return { status: 'failed', reason: 'missing reference/uid/bundleId' };
     }
 
-    // Idempotency: one record per Paystack reference. Webhook retries land here again.
     const eventRef = db.ref(paymentEventPath(reference));
-    if ((await eventRef.once('value')).exists()) {
-        return { status: 'ignored', reason: 'duplicate reference' };
+
+    // 1. CLAIM the reference atomically (create-if-absent). transaction() returning
+    //    undefined ABORTS the write — so a second concurrent/retried webhook never
+    //    overwrites an existing record.
+    const claim = await eventRef.transaction((current) =>
+        (current === null ? { uid, bundleId, status: 'processing', event: 'charge.success', at: Date.now() } : undefined),
+    );
+    if (!claim.committed) {
+        const prior = claim.snapshot.val() || {};
+        if (prior.status === 'granted') return { status: 'ignored', reason: 'already granted' };
+        return { status: 'processing', reason: 'reference already claimed — manual review' };
     }
 
+    // 2. Validate the bundle + the amount actually paid (terminal failures — mark + stop).
     let bundle;
     try {
         bundle = await resolveBundle(db, bundleId);
     } catch (e) {
-        await eventRef.set({ uid, bundleId, status: 'failed', reason: e.message, event: 'charge.success', at: Date.now() });
+        await eventRef.update({ status: 'failed', reason: e.message });
         return { status: 'failed', reason: e.message };
     }
-
-    // Tamper guard: the ZAR actually paid must equal the bundle's configured price.
     if (Number(amount) !== Number(bundle.zarChargeCents)) {
-        await eventRef.set({ uid, bundleId, status: 'failed', reason: 'amount mismatch', paidZarCents: amount, expectedZarCents: bundle.zarChargeCents, event: 'charge.success', at: Date.now() });
+        await eventRef.update({ status: 'failed', reason: 'amount mismatch', paidZarCents: amount, expectedZarCents: bundle.zarChargeCents });
         return { status: 'failed', reason: 'amount mismatch' };
     }
 
+    // 3. Grant (a throw here propagates → webhook 500 → safe retry against the claim).
     await ledger.grantCredit({ uid, amountCents: bundle.usdGrantCents, grantedBy: 'paystack', reason: `topup:${reference}` });
-    await eventRef.set({
-        uid, bundleId, usdGrantCents: bundle.usdGrantCents, zarChargeCents: bundle.zarChargeCents,
-        status: 'granted', event: 'charge.success', at: Date.now(),
-    });
+
+    // 4. Mark granted.
+    await eventRef.update({ status: 'granted', usdGrantCents: bundle.usdGrantCents, zarChargeCents: bundle.zarChargeCents, grantedAt: Date.now() });
     return { status: 'granted' };
 }
 
 module.exports = { processChargeSuccess };
 ```
 
+> **Note (review #5):** the webhook CF (Task 7) lets a thrown `grantCredit` error become a **500** (Paystack retries — safe, per the write-before-effect claim), while a returned `'failed'` is a terminal 200 (don't retry an unresolvable bundle/amount forever).
+
 - [ ] **Step 4: Run test to verify it passes**
 
 Run: `npx vitest run functions/payments/__tests__/process-charge.test.js`
-Expected: PASS (4 tests).
+Expected: PASS (6 tests).
 
 - [ ] **Step 5: Commit**
 
 ```bash
 git add functions/payments/process-charge.js functions/payments/__tests__/process-charge.test.js
-git commit -m "feat(payments): idempotent charge.success → ledger grant core + tamper guard"
+git commit -m "feat(payments): write-before-effect idempotent charge->grant core + tamper guard"
 ```
 
 ---
@@ -568,18 +610,22 @@ const { TRIAL_CENTS, trialGrantedPath } = require('./constants');
 
 /**
  * One-time free-trial credit grant. Idempotent per uid via billing/trialGranted/{uid}.
- * NOTE: the pre-check is not transactional — a double-click could double-grant in a
- * race; the bounded amount (TRIAL_CENTS) makes this low-value. Tighten with a
- * transaction on the marker if abuse appears (mirrors the rossSeedFirstWorkflow note).
+ * CLAIM-FIRST (review #10): claim the marker via an RTDB transaction (create-if-absent)
+ * so two concurrent first-access events (double-click / two tabs) can't both grant — only
+ * the transaction winner proceeds to grant. A crash between claim and grant leaves the
+ * marker set without the $1 grant (a visible, low-stakes stuck state — never a double).
  * @returns {Promise<{granted:true, amountCents:number}|{granted:false, alreadyClaimed:true}>}
  */
 async function claimTrial({ db, ledger, uid }) {
     const markRef = db.ref(trialGrantedPath(uid));
-    if ((await markRef.once('value')).exists()) {
+    const claim = await markRef.transaction((current) =>
+        (current === null ? { status: 'claiming', at: Date.now() } : undefined),
+    );
+    if (!claim.committed) {
         return { granted: false, alreadyClaimed: true };
     }
     await ledger.grantCredit({ uid, amountCents: TRIAL_CENTS, grantedBy: 'trial', reason: 'first-run-trial' });
-    await markRef.set({ amountCents: TRIAL_CENTS, at: Date.now() });
+    await markRef.update({ status: 'granted', amountCents: TRIAL_CENTS, grantedAt: Date.now() });
     return { granted: true, amountCents: TRIAL_CENTS };
 }
 
@@ -889,7 +935,7 @@ git commit -m "docs(payments): catalog the 4 payment-rail CFs (both copies)"
 
 ## Final verification
 
-- [ ] **Run the full payments suite:** `npx vitest run functions/payments` → all green (webhook-verify 4, bundles 4, paystack-client 2, process-charge 4, trial 2 = 16 tests).
+- [ ] **Run the full payments suite:** `npx vitest run functions/payments` → all green (webhook-verify 4, bundles 4, paystack-client 2, process-charge 6, trial 2 = 18 tests).
 - [ ] **Build:** `npm run build` → green.
 - [ ] **Functions load:** `cd functions && node -e "require('./index.js')"` → no throw.
 
