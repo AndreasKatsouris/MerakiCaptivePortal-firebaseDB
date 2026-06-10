@@ -31,6 +31,19 @@ Shared, USD-denominated prepaid credit ledger (`functions/billing/`). Meters pai
 
 ---
 
+### Payments — ③ Payment Rail (Paystack top-ups + trial)
+
+Paystack credit top-ups (PAYG) + one-time free trial (`functions/payments/`). The **webhook is the sole grant source of truth**: signature-verified (HMAC-SHA512 over the RAW body), idempotent per Paystack `reference` (write-before-effect claim via RTDB transaction), and the grant amount is ALWAYS re-derived server-side from the bundle — never the event amount. USD is the unit of account (1:1 ledger grant); ZAR is the charge currency (Paystack-SA). **DORMANT until launch** — needs `PAYSTACK_SECRET_KEY` (secret-first deploy), the bundle seed, and the `rossAgent→Free` flip, none of which run before the two wheels land. See `docs/plans/2026-06-08-payment-rail-backend-plan.md`.
+
+| Function | Trigger | Auth | Purpose |
+|----------|---------|------|---------|
+| `paymentsListBundles` | HTTP (v2 onRequest) | Authenticated | List active credit bundles (`billing/creditBundles`, server-priced) for the top-up UI |
+| `paymentsInitTopup` | HTTP (v2 onRequest) | Authenticated (self-scoped) | Create a Paystack transaction for a bundle; returns `{ authorizationUrl, reference }`. Price comes from the bundle (server-side); `metadata.uid` is taken from the verified token |
+| `paymentsClaimTrial` | HTTP (v2 onRequest) | Authenticated (self-scoped) | One-time free-trial credit grant ($1), idempotent per uid via `billing/trialGranted/{uid}` claim-first transaction |
+| `paystackWebhook` | HTTP (v2 onRequest) | **None — `x-paystack-signature` HMAC gate** | `charge.success` → idempotent ledger grant. Verified events always 200 (dupes ignored); a grant failure 500s so Paystack retries safely against the claim |
+
+---
+
 ### Entitlements — resolver + add-on layer (Phase 7 ④a)
 
 Server-side entitlement resolver (`functions/entitlements/`) — the **sole writer** of materialized `subscriptions/{uid}/features` + `limits`. CFs set only the INPUTS (base tier, add-on records) then call `recomputeEntitlements(uid)`; the resolver merges base-tier + active add-ons and writes the materialized result atomically. Closes the client self-grant vector once the `subscriptions/$uid` `.write` rule-lock slice lands (deploy order: CFs → client → rules). See `docs/plans/2026-05-31-entitlements-addon-layer-design.md`.
