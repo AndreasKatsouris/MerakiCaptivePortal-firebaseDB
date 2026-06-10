@@ -11,6 +11,7 @@ const crypto = require('node:crypto');
  * @returns {boolean}
  */
 function verifyPaystackSignature(rawBody, signature, secret) {
+    if (rawBody == null) return false; // e.g. non-POST probe with no body — reject, don't throw
     if (!signature || typeof signature !== 'string' || !secret) return false;
     const expected = crypto.createHmac('sha512', secret)
         .update(rawBody)

@@ -87,4 +87,26 @@ describe('processChargeSuccess', () => {
         expect(out.status).toBe('failed');
         expect(ledger.grantCredit).not.toHaveBeenCalled();
     });
+
+    it('rejects an unsafe reference/bundleId before any RTDB path use (key injection)', async () => {
+        const db = makeFakeRtdb(TREE());
+        const ledger = fakeLedger();
+        for (const bad of ['ref/evil', 'ref.evil', 'ref#1', 'ref$1', 'ref[1]']) {
+            const out = await processChargeSuccess({ db, ledger, event: chargeEvent({ reference: bad }) });
+            expect(out).toMatchObject({ status: 'failed', reason: 'unsafe reference/bundleId' });
+        }
+        const out2 = await processChargeSuccess({ db, ledger, event: chargeEvent({ metadata: { uid: 'u1', bundleId: 'usd20/active' } }) });
+        expect(out2.status).toBe('failed');
+        expect(ledger.grantCredit).not.toHaveBeenCalled();
+    });
+
+    it('rejects a non-success status or non-ZAR currency (terminal, no grant)', async () => {
+        const db = makeFakeRtdb(TREE());
+        const ledger = fakeLedger();
+        const out1 = await processChargeSuccess({ db, ledger, event: chargeEvent({ status: 'failed' }) });
+        expect(out1).toMatchObject({ status: 'failed', reason: 'unexpected charge status/currency' });
+        const out2 = await processChargeSuccess({ db, ledger, event: chargeEvent({ currency: 'NGN', reference: 'ref_ngn' }) });
+        expect(out2).toMatchObject({ status: 'failed', reason: 'unexpected charge status/currency' });
+        expect(ledger.grantCredit).not.toHaveBeenCalled();
+    });
 });

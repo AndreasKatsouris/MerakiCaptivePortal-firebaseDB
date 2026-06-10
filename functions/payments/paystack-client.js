@@ -26,7 +26,13 @@ async function initializeTransaction({ secret, email, amountZarCents, metadata }
     return { authorizationUrl: json.data.authorization_url, reference: json.data.reference };
 }
 
-/** Defensive re-check of a transaction by reference (status 'success' = paid). */
+/**
+ * Defensive re-check of a transaction by reference (status 'success' = paid).
+ * Not wired into the webhook grant path (the HMAC signature + server-side amount
+ * re-check cover it) — this is the OPERATOR tool for reconciling a stuck
+ * 'processing' payment event (see process-charge.js reconciliation notes), and a
+ * candidate pre-launch hardening step (verify-before-grant) if we want belt-and-braces.
+ */
 async function verifyTransaction({ secret, reference }) {
     const res = await getFetch()(`${PAYSTACK_API_BASE}/transaction/verify/${encodeURIComponent(reference)}`, {
         headers: { Authorization: `Bearer ${secret}` },

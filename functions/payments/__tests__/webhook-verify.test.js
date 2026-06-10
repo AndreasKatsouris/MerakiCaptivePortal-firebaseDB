@@ -20,4 +20,8 @@ describe('verifyPaystackSignature', () => {
         expect(verifyPaystackSignature(rawBody, '', SECRET)).toBe(false);
         expect(verifyPaystackSignature(rawBody, undefined, SECRET)).toBe(false);
     });
+    it('rejects a missing rawBody without throwing (non-POST probe)', () => {
+        expect(verifyPaystackSignature(undefined, validSig, SECRET)).toBe(false);
+        expect(verifyPaystackSignature(null, validSig, SECRET)).toBe(false);
+    });
 });

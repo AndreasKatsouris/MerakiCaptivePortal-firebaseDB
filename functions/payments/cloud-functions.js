@@ -33,6 +33,11 @@ function __setDbForTests(fake) { _db = fake; }
 
 function badRequest(message) { const e = new Error(message); e.statusCode = 400; return e; }
 function statusFor(err) { return (err && Number.isInteger(err.statusCode)) ? err.statusCode : 500; }
+// Errors WITH a statusCode (badRequest / auth 401s) carry intentional client messages;
+// anything else is an internal failure — log the detail, return a generic string.
+function clientMessage(err) {
+    return (err && Number.isInteger(err.statusCode)) ? err.message : 'Internal error';
+}
 
 exports.paymentsListBundles = onRequest(async (req, res) => cors(req, res, async () => {
     if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' });
@@ -42,7 +47,7 @@ exports.paymentsListBundles = onRequest(async (req, res) => cors(req, res, async
         res.json({ result: { success: true, bundles } });
     } catch (error) {
         console.error('[paymentsListBundles] Error:', error.message);
-        res.status(statusFor(error)).json({ error: error.message });
+        res.status(statusFor(error)).json({ error: clientMessage(error) });
     }
 }));
 
@@ -52,11 +57,18 @@ exports.paymentsInitTopup = onRequest({ secrets: [PAYSTACK_SECRET_KEY] }, async 
         const decoded = await verifyAuthToken(req);
         const uid = decoded.uid;
         const email = decoded.email || `${uid}@noemail.local`;
+        if (!decoded.email) console.warn(`[paymentsInitTopup] No email on token for ${uid} — using synthetic fallback`);
         const data = req.body.data || req.body || {};
         const { bundleId } = data;
         if (!bundleId || typeof bundleId !== 'string') throw badRequest('Invalid request: bundleId is required');
 
-        const bundle = await resolveBundle(getDb(), bundleId); // server-derived price; throws if unknown/inactive
+        // Server-derived price; unknown/inactive → 400 with a safe client message.
+        let bundle;
+        try {
+            bundle = await resolveBundle(getDb(), bundleId);
+        } catch (e) {
+            throw badRequest('Invalid or inactive bundle');
+        }
         const { authorizationUrl, reference } = await paystack.initializeTransaction({
             secret: PAYSTACK_SECRET_KEY.value(), email, amountZarCents: bundle.zarChargeCents,
             metadata: { uid, bundleId },
@@ -64,7 +76,7 @@ exports.paymentsInitTopup = onRequest({ secrets: [PAYSTACK_SECRET_KEY] }, async 
         res.json({ result: { success: true, authorizationUrl, reference } });
     } catch (error) {
         console.error('[paymentsInitTopup] Error:', error.message);
-        res.status(statusFor(error)).json({ error: error.message });
+        res.status(statusFor(error)).json({ error: clientMessage(error) });
     }
 }));
 
@@ -76,12 +88,15 @@ exports.paymentsClaimTrial = onRequest(async (req, res) => cors(req, res, async 
         res.json({ result: { success: true, ...out } });
     } catch (error) {
         console.error('[paymentsClaimTrial] Error:', error.message);
-        res.status(statusFor(error)).json({ error: error.message });
+        res.status(statusFor(error)).json({ error: clientMessage(error) });
     }
 }));
 
 // Webhook: NO Bearer auth — gated by the HMAC signature over the RAW body instead.
+// Deliberately NO cors() wrapper: this is server-to-server (Paystack → us); a browser
+// origin never calls it, and adding CORS preflight handling would only widen the surface.
 exports.paystackWebhook = onRequest({ secrets: [PAYSTACK_SECRET_KEY] }, async (req, res) => {
+    if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' });
     try {
         const raw = req.rawBody; // Firebase provides the unparsed body Buffer
         const sig = req.get('x-paystack-signature');
