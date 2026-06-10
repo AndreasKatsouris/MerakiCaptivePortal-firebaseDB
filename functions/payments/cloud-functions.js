@@ -58,6 +58,8 @@ exports.paymentsInitTopup = onRequest({ secrets: [PAYSTACK_SECRET_KEY] }, async 
         const uid = decoded.uid;
         const email = decoded.email || `${uid}@noemail.local`;
         if (!decoded.email) console.warn(`[paymentsInitTopup] No email on token for ${uid} — using synthetic fallback`);
+        // Dual parse mirrors billing/cloud-functions.js — tolerates both callable-style
+        // `{ data: { bundleId } }` envelopes and flat `{ bundleId }` bodies.
         const data = req.body.data || req.body || {};
         const { bundleId } = data;
         if (!bundleId || typeof bundleId !== 'string') throw badRequest('Invalid request: bundleId is required');

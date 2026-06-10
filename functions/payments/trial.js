@@ -7,6 +7,12 @@ const { TRIAL_CENTS, trialGrantedPath } = require('./constants');
  * so two concurrent first-access events (double-click / two tabs) can't both grant — only
  * the transaction winner proceeds to grant. A crash between claim and grant leaves the
  * marker set without the $1 grant (a visible, low-stakes stuck state — never a double).
+ *
+ * OPERATOR RECONCILIATION of a uid stuck at status 'claiming': check billing/grants/{uid}
+ * for a row with reason 'first-run-trial' FIRST. If it exists, the credit landed and only
+ * the marker update was lost — set the marker to status 'granted' (do NOT clear it;
+ * clearing re-opens the claim and double-grants). If no grants row exists, the grant was
+ * lost — clear the marker and the user can re-claim.
  * @returns {Promise<{granted:true, amountCents:number}|{granted:false, alreadyClaimed:true}>}
  */
 async function claimTrial({ db, ledger, uid }) {

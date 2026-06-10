@@ -88,15 +88,17 @@ describe('processChargeSuccess', () => {
         expect(ledger.grantCredit).not.toHaveBeenCalled();
     });
 
-    it('rejects an unsafe reference/bundleId before any RTDB path use (key injection)', async () => {
+    it('rejects an unsafe reference/bundleId/uid before any RTDB path use (key injection)', async () => {
         const db = makeFakeRtdb(TREE());
         const ledger = fakeLedger();
         for (const bad of ['ref/evil', 'ref.evil', 'ref#1', 'ref$1', 'ref[1]']) {
             const out = await processChargeSuccess({ db, ledger, event: chargeEvent({ reference: bad }) });
-            expect(out).toMatchObject({ status: 'failed', reason: 'unsafe reference/bundleId' });
+            expect(out).toMatchObject({ status: 'failed', reason: 'unsafe reference/bundleId/uid' });
         }
         const out2 = await processChargeSuccess({ db, ledger, event: chargeEvent({ metadata: { uid: 'u1', bundleId: 'usd20/active' } }) });
         expect(out2.status).toBe('failed');
+        const out3 = await processChargeSuccess({ db, ledger, event: chargeEvent({ metadata: { uid: 'u1/../u2', bundleId: 'usd20' } }) });
+        expect(out3).toMatchObject({ status: 'failed', reason: 'unsafe reference/bundleId/uid' });
         expect(ledger.grantCredit).not.toHaveBeenCalled();
     });
 

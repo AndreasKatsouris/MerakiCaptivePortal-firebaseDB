@@ -43,8 +43,8 @@ async function processChargeSuccess({ db, ledger, event }) {
     if (!reference || !uid || !bundleId) {
         return { status: 'failed', reason: 'missing reference/uid/bundleId' };
     }
-    if (!SAFE_KEY.test(reference) || !SAFE_KEY.test(bundleId)) {
-        return { status: 'failed', reason: 'unsafe reference/bundleId' };
+    if (!SAFE_KEY.test(reference) || !SAFE_KEY.test(bundleId) || !SAFE_KEY.test(uid)) {
+        return { status: 'failed', reason: 'unsafe reference/bundleId/uid' };
     }
     if (data.status !== 'success' || data.currency !== 'ZAR') {
         return { status: 'failed', reason: 'unexpected charge status/currency' };
