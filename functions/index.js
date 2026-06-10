@@ -3717,6 +3717,15 @@ exports.billingGetBalance = billing.billingGetBalance;
 exports.billingGetUsage = billing.billingGetUsage;
 
 // ============================================
+// PAYMENT RAIL (Phase 7 ③) — Paystack credit top-ups + free trial. DORMANT until launch.
+// ============================================
+const payments = require('./payments/cloud-functions');
+exports.paymentsListBundles = payments.paymentsListBundles;
+exports.paymentsInitTopup = payments.paymentsInitTopup;
+exports.paymentsClaimTrial = payments.paymentsClaimTrial;
+exports.paystackWebhook = payments.paystackWebhook;
+
+// ============================================
 // ENTITLEMENTS — resolver + add-on layer (Phase 7 ④a)
 // ============================================
 const entitlements = require('./entitlements/cloud-functions');
