@@ -118,6 +118,42 @@ describe('sweepOwner / sweepAllOwners', () => {
         expect((await db.ref(`ross/proactiveLog/u1/${TODAY}`).once('value')).val()).toBeNull();
     });
 
+    it('at-least-once contract: deliver succeeds but marker write throws → error today, re-send next sweep', async () => {
+        seed();
+        let deliverCalls = 0;
+        channels.whatsapp.deliver = async () => {
+            deliverCalls += 1;
+            return { ok: true, messageSid: 'SM1' };
+        };
+        // Wrap the fake db: proactiveLog refs get a rejecting .set on the FIRST sweep only
+        // (reads via .once stay intact so the dedup gate still works).
+        const realDb = db;
+        let failMarkerWrite = true;
+        sweep.__setDbForTests({
+            ref(path) {
+                const real = realDb.ref(path);
+                if (String(path).startsWith('ross/proactiveLog') && failMarkerWrite) {
+                    return { ...real, set: async () => { throw new Error('rtdb down'); } };
+                }
+                return real;
+            },
+        });
+
+        const first = await sweep.sweepAllOwners(NOW);
+        // throw happens AFTER deliver but BEFORE 'sent' returns → counted as error, not sent
+        expect(first).toMatchObject({ sent: 0, errors: 1 });
+        expect(deliverCalls).toBe(1);
+        expect((await realDb.ref(`ross/proactiveLog/u1/${TODAY}`).once('value')).val()).toBeNull();
+
+        // marker write recovers → next sweep delivers AGAIN (at-least-once by design, not accident)
+        failMarkerWrite = false;
+        const second = await sweep.sweepAllOwners(NOW);
+        expect(second).toMatchObject({ sent: 1, errors: 0 });
+        expect(deliverCalls).toBe(2);
+        expect((await realDb.ref(`ross/proactiveLog/u1/${TODAY}`).once('value')).val())
+            .toMatchObject({ status: 'sent', messageSid: 'SM1' });
+    });
+
     it('unknown channel → skip with error count, no throw', async () => {
         seed();
         await db.ref('ross/agentConfig/u1/proactive/channel').set('telegram');

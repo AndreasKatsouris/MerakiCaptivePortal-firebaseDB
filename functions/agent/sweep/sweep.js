@@ -89,8 +89,8 @@ function __setDigestForTests(fn) { _digest = fn; }
 
 /**
  * Sweep ONE owner. Returns a disposition string for the summary.
- * Gates mirror rossChat.runGates minus balance (no LLM spend):
- *   killswitch is checked once globally in sweepAllOwners.
+ * Gates follow rossChat.runGates (minus balance), with the dedup check folded in
+ * after the enable gate. Killswitch is checked once globally in sweepAllOwners.
  */
 async function sweepOwner(uid, cfg, now) {
     const db = getDb();
@@ -127,6 +127,8 @@ async function sweepOwner(uid, cfg, now) {
 
     const result = await adapter.deliver({ uid, phone }, payload);
 
+    // NOTE: if the send succeeds but this .set() throws, no marker persists → tomorrow
+    // re-sends (at-least-once). Acceptable at daily cadence; revisit if cadence tightens.
     await db.ref(`ross/proactiveLog/${uid}/${dateKey}`).set({
         sentAt: now,
         findingCount: selection.findings.length,
