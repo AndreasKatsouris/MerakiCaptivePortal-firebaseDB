@@ -3734,6 +3734,8 @@ exports.recomputeExpiringEntitlements = entitlements.recomputeExpiringEntitlemen
 exports.rossChat = require('./agent/rossChat').rossChat;
 // Daily prune of expired pending confirm-actions + stale debit guards (slice 7, no RTDB TTL).
 exports.rossAgentPrune = require('./agent/prune').rossAgentPrune;
+// W2 proactive nudge: daily 07:00 SAST WhatsApp digest per opted-in owner.
+exports.rossProactiveSweep = require('./agent/sweep/sweep').rossProactiveSweep;
 
 // ============================================
 // SUBSCRIPTION STATUS MANAGEMENT

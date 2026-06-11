@@ -161,3 +161,9 @@ describe('sweepOwner / sweepAllOwners', () => {
         expect(summary).toMatchObject({ sent: 0, errors: 1 });
     });
 });
+
+describe('scheduled CF', () => {
+    it('exports rossProactiveSweep', () => {
+        expect(require('../sweep/sweep').rossProactiveSweep).toBeTruthy();
+    });
+});

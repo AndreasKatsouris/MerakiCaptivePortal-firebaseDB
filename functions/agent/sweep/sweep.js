@@ -10,6 +10,7 @@
  */
 
 const admin = require('firebase-admin');
+const { onSchedule } = require('firebase-functions/v2/scheduler');
 
 // SAST is UTC+2 year-round (no DST) — fixed offset is safe and avoids Intl cost.
 const SAST_OFFSET_MS = 2 * 60 * 60 * 1000;
@@ -170,7 +171,17 @@ async function sweepAllOwners(now) {
     return summary;
 }
 
+// Daily 07:00 SAST — morning digest before service prep (spec §2 cadence).
+const rossProactiveSweep = onSchedule(
+    { schedule: '0 7 * * *', timeZone: 'Africa/Johannesburg' },
+    async () => {
+        const s = await sweepAllOwners(Date.now());
+        console.log(`[rossProactiveSweep] done: ${JSON.stringify(s)}`);
+    },
+);
+
 module.exports = {
+    rossProactiveSweep,
     dateKeySAST,
     resolveOwnerPhone,
     resolveFirstName,
