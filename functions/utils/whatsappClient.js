@@ -108,7 +108,9 @@ async function sendWhatsAppTemplate(to, templateType, contentVariables, options 
         }
 
         try {
-            console.log(`📋 Sending Twilio template ${templateType} (${config.contentSid}) to ${to}`);
+            // Mask the recipient — full numbers are PII and this line fires on every
+            // template send, including the daily unattended sweep (PR #158 review).
+            console.log(`📋 Sending Twilio template ${templateType} (${config.contentSid}) to ${String(to).slice(0, 4)}***`);
             const message = await client.messages.create({
                 contentSid: config.contentSid,
                 contentVariables: JSON.stringify(contentVariables),

@@ -104,6 +104,18 @@ SSE events handled: `text`/`action`/`confirm`/`terminal`/`error`/`done`. Confirm
 
 `functions/agent/evals/` — a **live** eval harness that drives the real agent loop against the real Anthropic API with a seeded **two-tenant** in-memory RTDB, grading Ross's *judgment* (not plumbing — the unit suite guards that). 21 cases (spec `docs/plans/2026-06-04-askross-slice6-evals-design.md` §5): grounded Q&A, propose-not-act (confirm tools pause), refusals, pre-flight gates (free — never hit the API), grounding/tone (Haiku-as-judge rubric), and a **cross-tenant isolation probe** (regression test for the #144 fix). Run manually: `ANTHROPIC_API_KEY=… npm run eval` (~cents/run; CI runs only the deterministic machinery tests under `evals/__tests__/`). Files: `fixtures` · `cases` · `assertions` · `judge` · `driver` (reuses the prod `runGates`/`runAgentLoop`/`buildSystemForOwner` — no debit, no persistence) · `run` + `scorecard`. The case set is the **seed**, grown from real `agentChats` traffic over time (with PII scrubbing) — see the spec §11 growth loop.
 
+### Proactive delivery (W2 MVP) — daily WhatsApp nudge
+
+`rossProactiveSweep` (`functions/agent/sweep/`) is the first **unattended** Ross touchpoint: a scheduled CF (daily **07:00 SAST**, `Africa/Johannesburg`) that, per opted-in owner, reads the workflow digest, picks the worst findings (overdue sorted by days late, then due-today — capped at 3), and sends one WhatsApp `ross_daily_digest` template with a deep link to the top finding's run page. **Silent when nothing is actionable** — no message, no marker. Deterministic MVP: no LLM, no billing; the future LLM sweep engine replaces only the selector module (`nudge-selector.js`) — orchestrator, formatter and channel adapters stay.
+
+- **Opt-in:** `ross/agentConfig/{uid}/proactive = { enabled: true, channel: 'whatsapp' }`. Server-only writes (the `agentConfig` node is `.read:false/.write:false` — seeded via Admin SDK/REST for the soak; an owner-facing toggle CF is a later slice).
+- **Gates (rossChat parity, minus balance):** global kill switch (`ross/config/agentKillSwitch`) → per-owner agent enable → `features.rossAgent` entitlement, with an RTDB `admins/{uid}/superAdmin` bypass (no caller token on a schedule).
+- **Idempotency marker:** `ross/proactiveLog/{uid}/{YYYY-MM-DD}` (`{ sentAt, findingCount, channel, messageSid, status }`, server-only rules) — checked before sending, stamped after; at-least-once at daily cadence.
+- **Channel-adapter seam:** the orchestrator emits a channel-neutral payload (`{ name, countPhrase, findingsLine, linkQuery }`); `channels/whatsapp.js` maps it to the template's content variables. Telegram/SMS/email later = one new adapter file each, zero orchestrator changes.
+- **Rollout:** founder-only soak (single seeded opt-in) before widening.
+
+Spec: `docs/plans/2026-06-10-w2-proactive-whatsapp-nudge-design.md`.
+
 ### Onboarding handoff — `helloSeen` field (Phase 5 PR 1)
 
 The Ross v2 first-run hello (`/onboarding-ross-hello.html`) sits between signup and the business-data wizard. To prevent re-showing it on every login, `RossOnboardingHello.vue.onContinue` writes `helloSeen: true` to `onboarding-progress/{uid}` before redirecting to the wizard. The post-login router (`public/js/auth/post-login-router.js`) reads this field to decide between hello / wizard / ross / legacy-dashboard destinations.

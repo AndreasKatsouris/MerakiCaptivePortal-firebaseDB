@@ -21,7 +21,8 @@ const TEMPLATE_TYPES = {
     REWARD_NOTIFICATION: 'reward_notification',
     POINTS_UPDATE: 'points_update',
     QUEUE_MANUAL_ADDITION: 'queue_manual_addition',
-    ADMIN_NEW_BOOKING_NOTIFICATION: 'admin_new_booking_notification'
+    ADMIN_NEW_BOOKING_NOTIFICATION: 'admin_new_booking_notification',
+    ROSS_DAILY_DIGEST: 'ross_daily_digest'
 };
 
 // Twilio WhatsApp Template Definitions
@@ -343,6 +344,9 @@ function buildFallbackMessage(templateType, params) {
 
         case TEMPLATE_TYPES.POINTS_UPDATE:
             return `🎯 *Points Update*\n\nHi ${params[0]},\n\nYour points balance has been updated:\n\n➕ *Points Earned:* ${params[1]}\n🏅 *Total Points:* ${params[2]}\n📋 *Transaction:* ${params[3]}\n\nReply "check my points" to see your balance anytime!\n\n🤖 Keep earning points with every visit!`;
+
+        case TEMPLATE_TYPES.ROSS_DAILY_DIGEST:
+            return `☀️ Morning ${params[0]} — ${params[1]}:\n\n${params[2]}\n\nTap to sort the most urgent:\nhttps://merakicaptiveportal-firebasedb.web.app/ross.html?${params[3]}\n\n— Ross`;
 
         default:
             return `🤖 System notification\n\nThank you for using our service. If you have any questions, please reply to this message.`;
