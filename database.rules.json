@@ -597,6 +597,10 @@
       "agentPending": {
         ".read": false,
         ".write": false
+      },
+      "proactiveLog": {
+        ".read": false,
+        ".write": false
       }
     }
   }
