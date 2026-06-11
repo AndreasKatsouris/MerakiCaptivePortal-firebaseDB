@@ -165,7 +165,11 @@ async function sweepAllOwners(now) {
             console.log(`[rossProactiveSweep] ${uid}: ${disposition}`);
         } catch (err) {
             summary.errors += 1;
-            console.error(`[rossProactiveSweep] ${uid}: error at sweep — ${err.message}`);
+            // Prefer err.code: a Twilio error's .message can embed the recipient
+            // phone number (PII) — its .code is a safe numeric id. Non-Twilio
+            // errors here (RTDB, unknown channel) have PII-free messages.
+            const detail = err.code != null ? `code=${err.code}` : err.message;
+            console.error(`[rossProactiveSweep] ${uid}: error at sweep — ${detail}`);
         }
     }
     return summary;
