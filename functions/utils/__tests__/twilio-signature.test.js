@@ -1,5 +1,3 @@
-'use strict';
-
 /**
  * CRIT-07 guard — Twilio webhook signature validation.
  * Tests exercise the REAL `twilio.validateRequest` (HMAC-SHA1) by generating a

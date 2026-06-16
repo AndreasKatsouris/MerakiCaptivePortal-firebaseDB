@@ -824,12 +824,14 @@ async function cleanupTestData(phoneNumbers) {
 - Twilio webhook URL configuration
 - Firebase Function deployment issues
 - Network connectivity problems
+- **Signature enforcement rejecting requests** (see "Webhook signature verification" below) — `403 Invalid Twilio signature.` in logs
 
 **Diagnostic Steps**:
 1. Check Twilio webhook logs
 2. Verify Firebase Function deployment status
 3. Test webhook URL accessibility
 4. Check Twilio account status
+5. Check function logs for `🔐 Twilio signature INVALID` — if present in `enforce` mode, the reconstructed URL or token is wrong (see below)
 
 **Solutions**:
 ```bash
@@ -842,6 +844,25 @@ firebase functions:log
 # Test webhook endpoint
 curl -X POST [webhook-url] -d "test=1"
 ```
+
+#### Webhook signature verification (CRIT-07)
+
+The inbound webhook verifies Twilio's `X-Twilio-Signature` (HMAC-SHA1, via the
+account `TWILIO_TOKEN`) before processing — closing a forged-message vector. It is
+staged via the `TWILIO_SIGNATURE_MODE` env var in `functions/.env` (see
+`functions/.env.template`):
+
+| Mode | Behaviour |
+|------|-----------|
+| `monitor` (default) | Validate + log `🔐 Twilio signature OK`/`INVALID`, but still process requests |
+| `enforce` | Reject (`403`) on invalid/missing signature — the secure end-state |
+| `off` | Skip the check entirely (escape hatch) |
+
+**Promotion procedure (`monitor` → `enforce`):**
+1. Deploy with `TWILIO_SIGNATURE_MODE=monitor`. Send real WhatsApp traffic.
+2. In `firebase functions:log`, confirm every genuine message logs `🔐 Twilio signature OK` with `valid:true`, `hasToken:true`, and a reconstructed `url` that byte-matches the Twilio console webhook URL.
+3. ⚠️ **Confirm `TWILIO_TOKEN` is populated in the function runtime BEFORE setting `enforce`** — a missing token makes `enforce` reject *all* traffic (`403`). The `hasToken:true` log field in step 2 is the check.
+4. Set `TWILIO_SIGNATURE_MODE=enforce` and redeploy. If legitimate messages start 403ing, set it back to `monitor` and re-diff the logged `url`.
 
 #### 2. Receipt Processing Failures
 
