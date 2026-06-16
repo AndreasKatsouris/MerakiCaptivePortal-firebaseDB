@@ -110,6 +110,54 @@ describe('verifyTwilioSignature', () => {
   });
 });
 
+describe('verifyTwilioSignature — configured webhook URL (gen2 path-strip fix)', () => {
+  // On gen2 the function-name path is stripped, so the request arrives with
+  // originalUrl='/' even though Twilio signed the full '.../receiveWhatsAppMessage'.
+  const FULL_URL = 'https://us-central1-merakicaptiveportal-firebasedb.cloudfunctions.net/receiveWhatsAppMessage';
+  const gen2Req = (sig) => makeReq({
+    host: 'us-central1-merakicaptiveportal-firebasedb.cloudfunctions.net',
+    path: '/', // <-- gen2 strips the function-name prefix
+    body: VALID_BODY,
+    signature: sig,
+  });
+
+  it('reproduces the bug: reconstruction (no configured URL) REJECTS a genuine gen2 request', () => {
+    const sig = signTwilio(AUTH_TOKEN, FULL_URL, VALID_BODY); // Twilio signs the FULL url
+    const out = verifyTwilioSignature(gen2Req(sig), { authToken: AUTH_TOKEN });
+    expect(out.valid).toBe(false); // reconstructs '.../' → mismatch
+    expect(out.url).toBe('https://us-central1-merakicaptiveportal-firebasedb.cloudfunctions.net/');
+  });
+
+  it('fix: a configured webhookUrl makes the same genuine gen2 request VALID', () => {
+    const sig = signTwilio(AUTH_TOKEN, FULL_URL, VALID_BODY);
+    const out = verifyTwilioSignature(gen2Req(sig), { authToken: AUTH_TOKEN, webhookUrl: FULL_URL });
+    expect(out.valid).toBe(true);
+    expect(out.url).toBe(FULL_URL);
+  });
+
+  it('accepts a comma/space-separated list — valid if ANY candidate matches', () => {
+    const sig = signTwilio(AUTH_TOKEN, FULL_URL, VALID_BODY);
+    const list = `https://wrong.example.com/x , ${FULL_URL}`;
+    const out = verifyTwilioSignature(gen2Req(sig), { authToken: AUTH_TOKEN, webhookUrl: list });
+    expect(out.valid).toBe(true);
+    expect(out.url).toBe(FULL_URL);
+  });
+
+  it('a wrong configured URL still rejects (no false-accept)', () => {
+    const sig = signTwilio(AUTH_TOKEN, FULL_URL, VALID_BODY);
+    const out = verifyTwilioSignature(gen2Req(sig), { authToken: AUTH_TOKEN, webhookUrl: 'https://attacker.example.com/receiveWhatsAppMessage' });
+    expect(out.valid).toBe(false);
+  });
+
+  it('blank/whitespace configured URL falls back to reconstruction', () => {
+    const url = 'https://h.example.com/receiveWhatsAppMessage';
+    const sig = signTwilio(AUTH_TOKEN, url, VALID_BODY);
+    const req = makeReq({ host: 'h.example.com', path: '/receiveWhatsAppMessage', body: VALID_BODY, signature: sig });
+    const out = verifyTwilioSignature(req, { authToken: AUTH_TOKEN, webhookUrl: '   ' });
+    expect(out.valid).toBe(true); // reconstruction path still works
+  });
+});
+
 describe('evaluateTwilioRequest', () => {
   let warnSpy, logSpy;
   beforeEach(() => {
