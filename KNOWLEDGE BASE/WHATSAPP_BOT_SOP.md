@@ -858,9 +858,19 @@ staged via the `TWILIO_SIGNATURE_MODE` env var in `functions/.env` (see
 | `enforce` | Reject (`403`) on invalid/missing signature — the secure end-state |
 | `off` | Skip the check entirely (escape hatch) |
 
+⚠️ **`TWILIO_WEBHOOK_URL` is REQUIRED on gen2 Cloud Functions.** These webhooks deploy
+as gen2, where Google strips the function-name path before the request reaches the
+handler (`req.originalUrl` is only `/`), so the full URL Twilio signed can't be
+reconstructed. Set `TWILIO_WEBHOOK_URL` in `functions/.env` to the **exact** URL from
+the Twilio console (Messaging → your WhatsApp sender → "when a message comes in") —
+e.g. `https://us-central1-merakicaptiveportal-firebasedb.cloudfunctions.net/receiveWhatsAppMessage`.
+Accepts one URL or a comma-separated list (valid if any matches). Without it, every
+genuine request logs `valid:false` and `enforce` would `403` the whole bot. Format in
+`functions/.env.template`.
+
 **Promotion procedure (`monitor` → `enforce`):**
-1. Deploy with `TWILIO_SIGNATURE_MODE=monitor`. Send real WhatsApp traffic.
-2. In `firebase functions:log`, confirm every genuine message logs `🔐 Twilio signature OK` with `valid:true`, `hasToken:true`, and a reconstructed `url` that byte-matches the Twilio console webhook URL.
+1. Deploy with `TWILIO_SIGNATURE_MODE=monitor` **and `TWILIO_WEBHOOK_URL` set** (see above). Send real WhatsApp traffic.
+2. In `firebase functions:log`, confirm every genuine message logs `🔐 Twilio signature OK` with `valid:true`, `hasToken:true`, and a `url` matching the Twilio console webhook URL.
 3. ⚠️ **Confirm `TWILIO_TOKEN` is populated in the function runtime BEFORE setting `enforce`** — a missing token makes `enforce` reject *all* traffic (`403`). The `hasToken:true` log field in step 2 is the check.
 4. Set `TWILIO_SIGNATURE_MODE=enforce` and redeploy. If legitimate messages start 403ing, set it back to `monitor` and re-diff the logged `url`.
 

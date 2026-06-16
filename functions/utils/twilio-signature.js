@@ -101,6 +101,7 @@ function verifyTwilioSignature(req, opts = {}) {
 
   let valid = false;
   let matchedUrl = candidates[0]; // for logging when none match, show the first (configured) URL
+  let firstError = null;
   for (const candidate of candidates) {
     try {
       if (validate(authToken, signature, candidate, (req && req.body) || {}) === true) {
@@ -109,9 +110,12 @@ function verifyTwilioSignature(req, opts = {}) {
         break;
       }
     } catch (err) {
-      // POPIA: log only an error code/name, never the payload.
-      console.error('Twilio signature validation error:', (err && (err.code || err.name)) || 'error');
+      if (!firstError) firstError = err; // keep at most one line per call regardless of candidate count
     }
+  }
+  if (!valid && firstError) {
+    // POPIA: log only an error code/name, never the payload.
+    console.error('Twilio signature validation error:', (firstError.code || firstError.name) || 'error');
   }
   return { valid, hasSignature, hasToken, url: matchedUrl };
 }
