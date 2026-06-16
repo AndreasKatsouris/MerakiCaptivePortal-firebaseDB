@@ -18,6 +18,7 @@ const {
 } = require('./config/firebase-admin');
 require('dotenv').config();
 const { client, twilioPhone } = require('./twilioClient');
+const { evaluateTwilioRequest } = require('./utils/twilio-signature');
 const { processReceipt } = require('./receiptProcessor');
 const { matchReceiptToCampaign } = require('./guardRail');
 const { processReward } = require('./rewardsProcessor');
@@ -1013,7 +1014,14 @@ async function receiveWhatsAppMessageEnhanced(req, res) {
         console.error('❌ Invalid request method:', req.method);
         return res.status(405).send('Method not allowed. Please use POST.');
     }
-    
+
+    // CRIT-07: verify the request genuinely came from Twilio (HMAC-SHA1 signature).
+    // Staged via TWILIO_SIGNATURE_MODE (monitor → enforce); see utils/twilio-signature.js.
+    const signatureCheck = evaluateTwilioRequest(req);
+    if (!signatureCheck.allow) {
+        return res.status(signatureCheck.rejection.status).send(signatureCheck.rejection.body);
+    }
+
     // Immediate safety catch for any initialization issues
     if (!rtdb) {
         console.error('❌ CRITICAL: Firebase Realtime Database not initialized!');
