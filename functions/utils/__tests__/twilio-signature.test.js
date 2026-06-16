@@ -129,6 +129,21 @@ describe('evaluateTwilioRequest', () => {
     expect(out.rejection.status).toBe(403);
   });
 
+  it('ENFORCE + no signature header → rejects 403 with a non-empty body (the forged-POST shape)', () => {
+    const req = makeReq({ body: VALID_BODY }); // no x-twilio-signature at all
+    const out = evaluateTwilioRequest(req, { env: { TWILIO_SIGNATURE_MODE: 'enforce' }, authToken: AUTH_TOKEN });
+    expect(out.allow).toBe(false);
+    expect(out.rejection.status).toBe(403);
+    // Lock the contract the handler relies on (res.status(...).send(rejection.body)).
+    expect(typeof out.rejection.body).toBe('string');
+    expect(out.rejection.body.length).toBeGreaterThan(0);
+  });
+
+  it('reconstructUrl tolerates a comma-list x-forwarded-host (chained proxies)', () => {
+    expect(reconstructUrl(makeReq({ host: 'raw.net', path: '/x', forwardedHost: 'app.web.app, internal.proxy' })))
+      .toBe('https://app.web.app/x');
+  });
+
   it('ENFORCE + valid → allows', () => {
     const signature = signTwilio(AUTH_TOKEN, url, VALID_BODY);
     const req = makeReq({ body: VALID_BODY, signature });

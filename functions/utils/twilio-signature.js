@@ -51,7 +51,8 @@ function getSignatureMode(env = process.env) {
  */
 function reconstructUrl(req) {
   const headers = (req && req.headers) || {};
-  const host = headers['x-forwarded-host'] || headers.host || '';
+  // x-forwarded-host can be a comma-list under chained proxies — take the first.
+  const host = String(headers['x-forwarded-host'] || headers.host || '').split(',')[0].trim();
   const path = (req && (req.originalUrl || req.url)) || '';
   return `https://${host}${path}`;
 }
