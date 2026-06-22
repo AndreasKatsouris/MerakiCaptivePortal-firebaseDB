@@ -74,6 +74,18 @@ async function resolveWorkflowOwner(workflowId, locationId, callerUid) {
     return null;
 }
 
+// Caller→location access check for location-scoped readers (C-1, IDOR-safe).
+// The agent runs via the Admin SDK (RTDB rules bypassed), so this is the ONLY tenant
+// boundary. `userLocations/{caller}/{loc}` is the canonical access map; the
+// `locations/{loc}/ownerId` match is a defensive fallback. Mirrors the human CFs'
+// verifyLocationAccess. locationId is model-supplied → treated as attacker-controlled.
+async function callerHasLocationAccess(locationId, callerUid) {
+    const access = await getDb().ref(`userLocations/${callerUid}/${locationId}`).once('value');
+    if (access.exists()) return true;
+    const owner = await getDb().ref(`locations/${locationId}/ownerId`).once('value');
+    return owner.exists() && owner.val() === callerUid;
+}
+
 // --- the registry -------------------------------------------------------------
 const REGISTRY = {
     // ---- READY: self-contained owner-scoped adapters (slice 2) ----------------
@@ -157,8 +169,19 @@ const REGISTRY = {
         TIER.AUTO, TIER.AUTO),
     getReports: pending('Read workflow completion statistics.',
         z.object({ locationId: z.string().optional() }), TIER.AUTO, TIER.AUTO),
-    getFoodCostSummary: pending('Read a food-cost summary for a location.',
-        z.object({ locationId: z.string() }), TIER.AUTO, TIER.AUTO),
+    getFoodCostSummary: {
+        description: "Read a food-cost summary for a location — cost %, trend vs the previous period, and which stock items are running low. Read-only.",
+        args: z.object({ locationId: z.string() }),
+        tier: TIER.AUTO, ceiling: TIER.AUTO, status: STATUS.READY,
+        run: async (ctx, args) => {
+            // C-1: gate the model-supplied locationId against the caller's access first.
+            if (!(await callerHasLocationAccess(args.locationId, ctx.uid))) return { hasData: false };
+            const snap = await getDb().ref(`locations/${args.locationId}/stockUsage`).once('value');
+            const records = snap.exists() ? Object.values(snap.val()) : [];
+            const { summariseFoodCost } = require('./food-cost-summary'); // lazy: keep core import-cheap
+            return summariseFoodCost(records, { now: ctx.now });
+        },
+    },
     getGuestsSummary: pending('Read aggregate guest counts for a location (no PII).',
         z.object({ locationId: z.string() }), TIER.AUTO, TIER.AUTO),
     getSalesSummary: pending('Read a sales / forecast summary for a location.',
@@ -311,6 +334,7 @@ module.exports = {
     toAnthropicTools,
     toSdkMcpServer,
     resolveWorkflowOwner,
+    callerHasLocationAccess,
     __setDbForTests,
     __setSdkForTests,
 };

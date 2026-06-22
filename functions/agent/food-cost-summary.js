@@ -72,4 +72,4 @@ function summariseFoodCost(records, opts = {}) {
   };
 }
 
-export { summariseFoodCost };
+module.exports = { summariseFoodCost };

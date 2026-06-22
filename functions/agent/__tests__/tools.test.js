@@ -7,7 +7,7 @@ const {
 const { TIER, STATUS, isAgentSubmittable } = require('../constants');
 const { makeFakeRtdb } = require('./helpers/fake-rtdb');
 
-const AUTO_READY = ['getWorkflowDigest', 'getStaff', 'getRunHistory', 'snoozeCard'];
+const AUTO_READY = ['getWorkflowDigest', 'getStaff', 'getRunHistory', 'snoozeCard', 'getFoodCostSummary'];
 const CONFIRM_READY = ['activateTemplate', 'createWorkflow', 'editWorkflow', 'pauseWorkflow'];
 const READY = [...AUTO_READY, ...CONFIRM_READY]; // slice 4 promoted the 4 confirm tools
 
@@ -24,7 +24,7 @@ describe('registry integrity', () => {
         }
     });
 
-    it('exposes the 8 ready tools (4 auto + 4 confirm) to the engine', () => {
+    it('exposes the 9 ready tools (5 auto + 4 confirm) to the engine', () => {
         expect(enabledToolNames().sort()).toEqual([...READY].sort());
     });
 
@@ -33,7 +33,7 @@ describe('registry integrity', () => {
         expect(autoAllowlist().sort()).toEqual([...AUTO_READY].sort());
         // an owner who tightens snoozeCard to confirm drops it from the proactive set too
         expect(autoAllowlist({ policy: { snoozeCard: 'confirm' } }).sort())
-            .toEqual(['getRunHistory', 'getStaff', 'getWorkflowDigest']);
+            .toEqual(['getFoodCostSummary', 'getRunHistory', 'getStaff', 'getWorkflowDigest']);
     });
 
     it('marks every playbook-authoring tool confirm-tier', () => {
@@ -253,5 +253,52 @@ describe('ready adapters (via fake RTDB)', () => {
             { workflowId: 'wf1', locationId: 'loc1' },
         );
         expect(out.runs.map((r) => r.id)).toEqual(['r3', 'r1']);
+    });
+
+    // --- getFoodCostSummary (Deliverable 1) -----------------------------------
+    // Seed location-scoped stock data + access map. owner1 owns loc1 (userLocations);
+    // mgr1 is delegated; attacker1 has no access.
+    function seedFoodCost() {
+      return makeFakeRtdb({
+        userLocations: { owner1: { loc1: true }, mgr1: { loc1: true } },
+        locations: { loc1: { ownerId: 'owner1', stockUsage: {
+          k1: { timestamp: 1000, costPercentage: 28, salesAmount: 9000, stockItems: [] },
+          k2: { timestamp: 2000, costPercentage: 33, salesAmount: 9500, stockItems: [
+            { itemCode: 'A', description: 'beef', closingQty: 0, usagePerDay: 2 },
+            { itemCode: 'C', description: 'oil', closingQty: 70, usagePerDay: 2 },
+          ] } },
+        } },
+      });
+    }
+
+    it('getFoodCostSummary returns the latest summary for an owner', async () => {
+      __setDbForTests(seedFoodCost());
+      const out = await REGISTRY.getFoodCostSummary.run({ uid: 'owner1', now: 2000 + 86400000 }, { locationId: 'loc1' });
+      expect(out.hasData).toBe(true);
+      expect(out.foodCostPct).toBe(33);
+      expect(out.previousFoodCostPct).toBe(28);
+      expect(out.trend).toBe('up');
+      expect(out.lowStockItems.map((i) => i.itemCode)).toEqual(['A']);
+    });
+
+    it('getFoodCostSummary serves a delegated manager with location access', async () => {
+      __setDbForTests(seedFoodCost());
+      const out = await REGISTRY.getFoodCostSummary.run({ uid: 'mgr1', now: 2000 }, { locationId: 'loc1' });
+      expect(out.hasData).toBe(true);
+    });
+
+    // SECURITY (cross-tenant isolation, C-1): a caller without access to the location
+    // must NOT read its food cost, even with a valid victim locationId. The agent runs
+    // via Admin SDK (rules bypassed) so this code check is the only tenant boundary.
+    it('getFoodCostSummary refuses cross-tenant: caller without location access gets hasData:false', async () => {
+      __setDbForTests(seedFoodCost());
+      const out = await REGISTRY.getFoodCostSummary.run({ uid: 'attacker1', now: 2000 }, { locationId: 'loc1' });
+      expect(out).toEqual({ hasData: false }); // MUST NOT leak owner1's 33% / beef
+    });
+
+    it('getFoodCostSummary returns hasData:false when a location has never uploaded', async () => {
+      __setDbForTests(makeFakeRtdb({ userLocations: { owner1: { loc1: true } }, locations: { loc1: { ownerId: 'owner1' } } }));
+      const out = await REGISTRY.getFoodCostSummary.run({ uid: 'owner1', now: 2000 }, { locationId: 'loc1' });
+      expect(out).toEqual({ hasData: false });
     });
 });
