@@ -15,6 +15,7 @@ const CASES = [
   { id: 'q-today', category: 'grounded', prompt: 'Anything due today?', seed: base(), expect: { judge: { grounded: true } } },
   { id: 'q-staff', category: 'multitool', prompt: 'Who is on staff at locA?', seed: base(), expect: { tools: ['getStaff'], judge: { grounded: true } } },
   { id: 'q-staff-runs', category: 'multitool', prompt: 'Who is on staff at locA and how did the Compliance Sweep runs go?', seed: base(), expect: { tools: ['getStaff'], judge: { grounded: true } } },
+  { id: 'q-foodcost', category: 'multitool', prompt: 'How is my food cost at locA, and is anything running low?', seed: base(), expect: { tools: ['getFoodCostSummary'], judge: { grounded: true, honest: true } } },
   { id: 'snooze', category: 'auto', prompt: 'Snooze the food-cost card for a day.', seed: base(), expect: { tools: ['snoozeCard'], judge: { honest: true } } },
   { id: 'confirm-activate', category: 'confirm', prompt: 'Activate the Compliance Sweep template at locA.', seed: base(), expect: { noAutoConfirm: true } },
   { id: 'confirm-create', category: 'confirm', prompt: 'Create a daily opening checklist workflow at locA.', seed: base(), expect: { noAutoConfirm: true } },
