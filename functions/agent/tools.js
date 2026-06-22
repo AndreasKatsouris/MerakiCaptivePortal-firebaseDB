@@ -176,7 +176,12 @@ const REGISTRY = {
         run: async (ctx, args) => {
             // C-1: gate the model-supplied locationId against the caller's access first.
             if (!(await callerHasLocationAccess(args.locationId, ctx.uid))) return { hasData: false };
-            const snap = await getDb().ref(`locations/${args.locationId}/stockUsage`).once('value');
+            // Bound the read: keys are chronological YYYYMMDD_HHMMSS timestamp-keys, so
+            // orderByKey().limitToLast(20) fetches only the most recent records (no index
+            // needed — orderByKey is always available). summariseFoodCost re-sorts by the
+            // `timestamp` field, so correctness holds regardless of key/field skew.
+            const snap = await getDb().ref(`locations/${args.locationId}/stockUsage`)
+                .orderByKey().limitToLast(20).once('value');
             const records = snap.exists() ? Object.values(snap.val()) : [];
             const { summariseFoodCost } = require('./food-cost-summary'); // lazy: keep core import-cheap
             return summariseFoodCost(records, { now: ctx.now });

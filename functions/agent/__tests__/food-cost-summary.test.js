@@ -1,5 +1,5 @@
-import { describe, it, expect } from 'vitest';
-import { summariseFoodCost } from '../food-cost-summary.js';
+'use strict';
+const { summariseFoodCost } = require('../food-cost-summary');
 
 const DAY = 86400000;
 const NOW = 1_780_000_000_000;
