@@ -285,3 +285,14 @@ This is where the CSV ingestion core gets extracted + hardened.
 ## 10. What ships first
 
 Deliverable 1 only. Everything else is sequenced behind it and gets its own spec/plan/PR.
+
+### Locked decisions (2026-06-22, operator delegated "you decide")
+
+- **D-1 — upload hand-off:** W1 has Ross point the owner to the food-cost surface
+  **conversationally**. NO task-level `action`/deep-link button, NO `dataset` task type in
+  W1 — both deferred (§8). Cheapest path that ships.
+- **D-2 — W1 bar:** Deliverable 1 is **read-only, no `suggestedOrder` quantities**, but
+  MUST include the **low/critical-items signal** from the persisted `stockItems[]`
+  (closing qty / flags) so the answer is "cost% + trend + what's running low" — not a single
+  number. `suggestedOrder` (reorder quantities) stays Deliverable 2. Revisit if it
+  underwhelms on first live use.
