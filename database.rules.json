@@ -42,7 +42,7 @@
     },
     "locations": {
       ".read": "auth != null",
-      ".write": "auth != null",
+      ".write": false,
       ".indexOn": ["userId", "ownerId", "isActive", "createdAt", "name"],
       "$locationId": {
         ".read": "auth != null",
@@ -65,7 +65,7 @@
       }
     },
     "admin-claims": {
-      ".read": "auth != null",
+      ".read": "auth != null && auth.token.admin === true",
       ".write": "auth != null && auth.token.admin === true"
     },
     "whatsapp-template-config": {
@@ -106,9 +106,9 @@
     },
     "scanningData": {
       ".read": "auth != null",
-      ".write": "auth != null",
+      ".write": "auth != null && auth.token.admin === true",
       "$dataId": {
-        ".write": "auth != null"
+        ".write": "auth != null && auth.token.admin === true"
       }
     },
     "customization": {
@@ -348,11 +348,11 @@
     },
     "whatsapp-message-history": {
       ".read": "auth != null",
-      ".write": "auth != null",
+      ".write": "auth != null && auth.token.admin === true",
       ".indexOn": ["locationId", "messageType", "timestamp", "phoneNumber"],
       "$messageId": {
         ".read": "auth != null && (auth.token.admin === true || auth.token.phone_number === data.child('phoneNumber').val())",
-        ".write": "auth != null",
+        ".write": "auth != null && auth.token.admin === true",
         ".validate": "newData.hasChildren(['locationId', 'messageType', 'direction', 'timestamp', 'phoneNumber'])"
       }
     },
