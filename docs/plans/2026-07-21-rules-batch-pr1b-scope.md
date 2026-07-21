@@ -97,6 +97,36 @@ that passed both the old `.write` and the old `.validate`. Both live create site
 Child `.read` rules are left intact, so a non-admin owner can still read their own record by direct
 path if a future surface needs it.
 
+### Field immutability — the hijack that survived the first draft
+
+Locking the root and the create path is **not sufficient**, because non-admins legitimately *own*
+mappings: `assignWhatsAppToLocationFunction` (`functions/whatsappManagement.js:210-235`) has no
+admin check — only a tier check — and stamps the mapping with `userId = req.user.uid`. It writes via
+the Admin SDK, so it bypasses rules and remains the sanctioned create path.
+
+An owner could therefore keep ownership and simply **rewrite the routing field**: `PATCH` their own
+mapping with `{"phoneNumber": "<victim tenant's WhatsApp number>", "isActive": true}`. The `.write`
+rule reads `data` (the *old* value), so the ownership test still passes; the parent `.validate` only
+asserts the five keys are *present*, never that their values are unchanged. Routing resolves by
+first phone match in RTDB key order (`functions/utils/whatsappDatabaseSchema.js:384-395`), so a
+lexicographically-earlier location id wins and the victim's inbound WhatsApp traffic is handed the
+attacker's location context.
+
+Closed by making the two identity fields immutable to non-admins on both nodes:
+
+```jsonc
+"phoneNumber": { ".validate": "auth.token.admin === true || newData.val() === data.val()" },
+"userId":      { ".validate": "auth.token.admin === true || newData.val() === data.val()" }
+```
+
+Child `.validate` is only evaluated for nodes actually present in the written data, so the live
+non-admin update paths are untouched — `whatsapp-management.js:671` writes
+`{isActive, active, updatedAt, locationName}` and `:990` writes `{displayName}`, neither of which
+touches these two fields. Admin full-node `set()`/`push()` passes on the first disjunct.
+
+> Note the asymmetry, since §2's table reads as "creation is admin-only" full stop: creation is
+> admin-only **in the rules**, while the CF create path stays open to any entitled user by design.
+
 ---
 
 ## 3. CRIT-11 — `rewards` → **MITIGATED, NOT CLOSED**
@@ -124,16 +154,39 @@ scope against.
 
 ### What this PR does change
 
-`$rewardId .validate` drops its `!data.exists()` escape hatch:
+`$rewardId .validate` drops its `!data.exists()` escape hatch **and adds an explicit existence test
+on the non-admin branch**:
 
 ```diff
-- "newData.hasChildren([…]) && (!data.exists() || auth.token.admin === true || (…))"
-+ "newData.hasChildren([…]) && (auth.token.admin === true || (…))"
+- "newData.hasChildren([…]) && (!data.exists() || auth.token.admin === true || (…ownership…))"
++ "newData.hasChildren([…]) && (auth.token.admin === true || (data.exists() && …ownership…))"
 ```
 
-A create now has no existing `guestPhone` to match, so the clause is false for a non-admin and the
-**create is blocked** — closing the headline fraud path (a guest self-issuing a reward with
-`status: 'approved'`). Admin creation still passes on the `admin === true` clause.
+Non-admin creation is blocked by `data.exists()`. Admin creation still passes on the
+`admin === true` branch. This closes the headline fraud path — a guest self-issuing a reward with
+`status: 'approved'`.
+
+> #### ⚠️ The `data.exists()` term is load-bearing. This PR got it wrong once.
+>
+> The first draft simply deleted `!data.exists() ||` and asserted that "a create now has no existing
+> `guestPhone` to match, so the clause is false for a non-admin." **That was wrong, and it blocked
+> nothing.** On a create, `data.child('guestPhone').val()` is `null` — and
+> `auth.token.phone_number` is `null` too, for *every* user of this application:
+>
+> - there is no phone-based sign-in anywhere in the client (`rg "signInWithPhoneNumber|
+>   RecaptchaVerifier|PhoneAuthProvider" public` → zero hits; the only paths are
+>   `createUserWithEmailAndPassword` / `signInWithEmailAndPassword`);
+> - every `setCustomUserClaims` call writes only `{ admin }` and overwrites the whole claims object
+>   (`functions/index.js:782,987,992,1321`).
+>
+> **RTDB rules evaluate `null === null` as true**, so the ownership clause *granted* on every create.
+> The self-issued-voucher path stayed wide open behind a rule that looked tightened.
+>
+> Caught by security review before deploy. It is recorded here rather than quietly fixed because it
+> is precisely the failure this document warns about two paragraphs below — and because the same
+> null-equality trap disarms the `guest-rewards` rule (`database.rules.json:88`) and any future rule
+> written against `auth.token.phone_number`. **Never rely on a null mismatch to deny; test existence
+> explicitly.**
 
 **Zero regression risk on the cascade**, because the cascade is an *update*: `data.exists()` is
 true, so the old and new `.validate` reduce to the *identical* expression on that path. The only
@@ -183,6 +236,12 @@ rules bug, and bundling it would blur a security PR.
 console for a permission-denied on `rewards/…`; or check whether any `rewards` record exists with a
 `receiptId` field.
 
+**It is worse than step one.** The two follow-on writes in the same function fail as well:
+`campaign-rewards/{cid}/{rid}` requires admin (`database.rules.json:93,96`), and
+`guest-rewards/{phone}/{rid}` requires `auth.token.phone_number === $phoneNumber` (`:88`) — which,
+per §3, is `null` for every user. So whichever surface calls `processRewards` has been silently
+broken **end to end**, not merely at the first write.
+
 This is the second live bug a rules census has turned up (after the `locations` `ownerId` bug in
 PR-1 §2), both hidden behind the same thing: **a client-side `catch` that only `console.error`s.**
 
@@ -219,6 +278,17 @@ Checklist:
       the decision not to lock `rewards .write`.**
 - [ ] Smoke, non-admin owner: user dashboard still shows WhatsApp status per location (served by
       `getUserWhatsAppNumbers`, so unaffected — confirms the CF path assumption).
+- [ ] Smoke, **non-admin owner with an existing mapping**: toggle WhatsApp on/off from
+      `tools/admin/whatsapp-management.html` (that page is *not* admin-gated —
+      `whatsapp-management.js:83`). It must still work: it writes `isActive`/`active`/`updatedAt`/
+      `locationName`, none of which are the immutable fields.
+
+**Not covered by the probe, deliberately:** the field-immutability rules need a *pre-existing
+mapping owned by the probe user*, which the probe cannot create (creation is now admin-only). Rather
+than have it mint fixture data in production, that boundary is the manual smoke step above plus its
+negative twin — an owner attempting `PATCH location-whatsapp-mapping/{their-own-id}` with a changed
+`phoneNumber` must be rejected. Stating this explicitly so the gap is visible rather than implied:
+an uncovered case named is worth more than a green run that quietly skipped it.
 
 ---
 
@@ -227,6 +297,8 @@ Checklist:
 | Item | Status |
 |---|---|
 | CRIT-11 `rewards` `.write` lock | **Open** — needs CF-mediated cascade or a `rewards` ownership field (§3) |
+| **NEW — `whatsapp-message-history` root `.read`** | **Open, Medium/POPIA.** Same cascade pathology this PR just fixed one node over: root `.read: "auth != null"` (`database.rules.json:349`) makes the per-child rule at `:354` dead, so any authenticated user reads every tenant's `{locationId, phoneNumber, content, …}` — guest phone numbers and **full message bodies**, cross-tenant. PR-1a locked this node's `.write` only. Not a NEW-CRIT-01 bypass (the `phoneNumber` here is the *guest's*, not the routing number), so it is out of scope for this PR, but it needs a read census of its own. Surfaced by the PR-1b security review. |
+| **NEW — null-equality audit of `auth.token.phone_number` rules** | **Open.** No user carries a `phone_number` claim (§3), so every rule comparing it to a possibly-null `data` value grants instead of denies. `guest-rewards/$phoneNumber` (`database.rules.json:88`) is written against the same claim and should be re-derived under this light. |
 | `locations` `!data.exists()` create hole | Open — folds into CRIT-10 (forgeable `userLocations`) |
 | `receipt-management` reward-create payload | Open — live bug, §4 |
 | PR-2 | CRIT-05 receipts, HIGH-05 queue, MED-06b, displaced MED-01a — all need client refactors first |

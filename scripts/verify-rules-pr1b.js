@@ -85,8 +85,16 @@ function uidFromToken(token) {
 const USER_UID = USER ? uidFromToken(USER) : null;
 
 // A reward body that satisfies the .validate hasChildren() list, so that a
-// rejection is unambiguously the .write rule and not a malformed payload.
-const REWARD_BODY = { metadata: { probe: true }, status: 'approved', value: 1, expiresAt: 0 };
+// rejection is unambiguously a rule decision and not a malformed payload.
+//
+// `guestPhone` is present to make this a REALISTIC fraud payload. It does not
+// change the rule's evaluation — the ownership clause reads `data.child(...)`,
+// i.e. the OLD data, which is null on a create no matter what the body says.
+// That null is the whole point: see the note on the create check below.
+const REWARD_BODY = {
+  metadata: { probe: true }, status: 'approved', value: 1, expiresAt: 0,
+  guestPhone: '+27000000000',
+};
 
 /**
  * @typedef {{name:string, run:() => Promise<number>, expect:'allow'|'deny',
@@ -99,10 +107,21 @@ const CHECKS = [
   //
   // ⚠️ CRIT-11 is MITIGATED BY THIS PR, NOT CLOSED. Read this before ticking it off.
   //
-  // What is fixed: `$rewardId .validate` no longer carries a `!data.exists()`
-  // escape hatch, so an authenticated non-admin can no longer CREATE a reward
+  // What is fixed: `$rewardId .validate` now requires `data.exists()` on the
+  // non-admin branch, so an authenticated non-admin can no longer CREATE a reward
   // (and therefore cannot self-issue one with `status: 'approved'`). That is the
   // headline fraud path and it is what these two checks prove.
+  //
+  // ⚠️ THE `data.exists()` TERM IS LOAD-BEARING — DO NOT "SIMPLIFY" IT AWAY.
+  // The first draft of this PR merely deleted the `!data.exists() ||` escape
+  // hatch and assumed the remaining ownership clause would fail on a create.
+  // It does not. On a create `data.child('guestPhone').val()` is null, and
+  // `auth.token.phone_number` is ALSO null for every user of this app (there is
+  // no phone-based sign-in anywhere, and every setCustomUserClaims call writes
+  // only `{admin}` — functions/index.js:782,987,992,1321). RTDB rules compare
+  // null === null as TRUE, so the clause GRANTED and the "fix" blocked nothing.
+  // Caught by security review before deploy. Any future edit here must keep an
+  // explicit existence test rather than relying on a null mismatch.
   //
   // What is NOT fixed: `rewards .write` is still `"auth != null"`. That grant
   // cascades, and a write to a DESCENDANT path (e.g. `rewards/{id}/status`) does
@@ -209,9 +228,20 @@ async function cleanup(path, token) {
  *     deny-check "PASS" and print a triumphant, meaningless ALL CHECKS PASSED.
  *     `rewards` .read is "auth != null" and PR-1b does NOT change it, so a valid
  *     token must be able to read it.
- * (b) RULES-DEPLOYED — pre-PR-1b a non-admin reward CREATE succeeded (the
- *     `!data.exists()` clause). If it still does, the tightening is not live and
- *     every remaining reject-check would write junk into production.
+ * (b) RULES-DEPLOYED — a READ, deliberately. `whatsapp-numbers` root `.read` goes
+ *     from "auth != null" to admin-only in this PR, so a non-admin GET flips
+ *     200 → 401 at deploy. That makes it an exact, side-effect-free deployment
+ *     detector: this preflight writes NOTHING to production.
+ *
+ * WHY NOT A WRITE PROBE (the original design, corrected after review): using a
+ * reward CREATE as the deployment detector conflates two states that demand
+ * opposite responses — "rules not deployed" (deploy, then re-run) and "rules
+ * deployed but INEFFECTIVE" (the rule is broken; escalate). Both present as a
+ * 2xx. The first draft printed "rules are NOT deployed yet" for both, so an
+ * ineffective rule would have sent the operator into a redeploy loop, never
+ * learning the rule did not work. Separating the two is the whole point: the
+ * read-based preflight establishes deployment, after which a 2xx on the create
+ * check below can only mean INEFFECTIVE.
  */
 async function preflight(token) {
   let readStatus;
@@ -229,24 +259,19 @@ async function preflight(token) {
     return false;
   }
 
-  const path = `rewards/${PROBE_KEY}`;
   let status;
   try {
-    status = await attempt('PATCH', 'rewards', token, { [PROBE_KEY]: REWARD_BODY });
+    status = await attempt('GET', 'whatsapp-numbers', token);
   } catch (err) {
     console.error(`PREFLIGHT could not reach the database (${err.code || err.name}). Aborting.`);
     return false;
   }
-  // 400 included for the same reason as verdict(): this probe is a CREATE, which
-  // PR-1b blocks via `.validate`, not `.write`.
-  if (status === 400 || status === 401 || status === 403) return true; // rules live — safe to proceed
+  if (status === 401 || status === 403) return true; // rules live — safe to proceed
 
   if (status >= 200 && status < 300) {
-    const removed = await cleanup(path, token);
     console.error('PREFLIGHT FAILED — the PR-1b rules are NOT deployed yet.');
-    console.error(`  A probe reward CREATE at ${path} SUCCEEDED, which it must not once the rules are live.`);
-    console.error(`  Cleanup of that write: ${removed ? 'OK (removed)' : 'FAILED — delete it manually'}.`);
-    console.error('  Aborting before the remaining checks write junk into production.');
+    console.error('  A non-admin GET of `whatsapp-numbers` SUCCEEDED; once the rules are live it is 401.');
+    console.error('  Nothing was written. Aborting before the remaining checks write junk into production.');
     console.error('  Run `firebase deploy --only database` first, then re-run this probe.');
     return false;
   }
