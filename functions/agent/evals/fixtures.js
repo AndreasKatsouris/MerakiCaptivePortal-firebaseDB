@@ -54,6 +54,20 @@ function baselineFixture() {
     // Real balance path (ledger.js:35/114-116, read by runGates gate (d) via ledger.checkBalance).
     // Baseline is funded; a derived fixture/preflight override seeds balanceCents:0 to trip the no-credit gate.
     billing: { credits: { ownerA: { balanceCents: 5000 }, ownerB: { balanceCents: 5000 } } },
+    // locA food-cost history for the getFoodCostSummary reader (Deliverable 1).
+    // Two records so trend is defined; latest shows cost rising + one item out of stock.
+    locations: {
+      locA: {
+        ownerId: 'ownerA',
+        stockUsage: {
+          fcA1: { timestamp: BASE_2026 - 8 * DAY, costPercentage: 28, salesAmount: 42000, totalCostOfUsage: 11760, stockItems: [] },
+          fcA2: { timestamp: BASE_2026 - 1 * DAY, costPercentage: 33, salesAmount: 45000, totalCostOfUsage: 14850, stockItems: [
+            { itemCode: '10127', description: 'water sparkling large', closingQty: 0, usagePerDay: 9 },
+            { itemCode: '11413', description: 'coffee espresso beans', closingQty: 2, usagePerDay: 2 },
+          ] },
+        },
+      },
+    },
     ross: {
       config: { agentKillSwitch: false },
       agentConfig: {},
