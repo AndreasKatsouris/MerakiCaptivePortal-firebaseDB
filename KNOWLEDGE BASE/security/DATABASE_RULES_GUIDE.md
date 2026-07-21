@@ -236,13 +236,30 @@ This is critical to understand: a permissive parent rule cannot be overridden by
 }
 ```
 
+> ⚠️ **Updated by PR #176 (2026-07-21).** The `.validate` shown above is the PRE-#176 shape. It now
+> reads `newData.hasChildren([…]) && (auth.token.admin === true || (data.exists() && …ownership…))`.
+
 | Access | Who | Notes |
 |--------|-----|-------|
-| Read | Any authenticated user | |
-| Write (new) | Any authenticated user | Can create new rewards |
-| Write (existing) | Admin, or own phone AND not approved | Guests can modify non-approved rewards |
+| Read | Any authenticated user | **Not fixed.** Root-level *queries* read this node, and a query is authorised at the queried node — rules cannot filter results — so locking it needs a client read-path refactor (Bucket-C / PR-2). |
+| Write (new) | **Admin only** | Was "any authenticated user" — that was CRIT-11, letting a guest self-issue a reward with `status: 'approved'`. Closed in #176 via `.validate`. |
+| Write (existing) | Admin, in practice | The ownership clause names `auth.token.phone_number`, which **no user in this app carries** (see 3 below), so for real users this is admin-only. |
 
-**Assessment:** Good validation and nuanced write rules. The status check prevents guests from modifying approved rewards. The `.validate` rule ensures required fields.
+**Assessment: NOT "good" — partially remediated, with a known open hole.**
+
+1. **`rewards .write` is still `"auth != null"` at the root.** Write grants cascade permissively, so
+   the per-child `$rewardId .write` rule is **dead code** — it can never deny. All effective
+   protection on this node comes from `.validate`.
+2. **`.validate` does not fire for descendant writes.** A write to `rewards/{id}/status` is
+   authorised by the root grant and never evaluates `$rewardId .validate`, so **mutating an existing
+   reward remains open**. CRIT-11 is *mitigated, not closed* — creation blocked, mutation not.
+   Tracked in the Bug Triage Queue; the fix needs a CF-mediated guest-rename cascade or an ownership
+   field on `rewards` (the records carry no `ownerId`/`locationId` to scope a rule against).
+3. **⚠️ `auth.token.phone_number` is `null` for every user.** There is no phone-based sign-in
+   anywhere, and every `setCustomUserClaims` call writes only `{admin}` (and *overwrites* the whole
+   claims object). Since RTDB evaluates **`null === null` as true**, any rule comparing this claim to
+   an absent `data` value *grants* rather than denies. This silently defeated the first draft of
+   #176's fix. Never rely on a null mismatch to deny — test existence explicitly.
 
 ---
 
@@ -395,7 +412,28 @@ This is the gold standard for rules in this project.
 
 **Lines:** 218-237 | **Purpose:** WhatsApp number management and location assignment
 
-**Assessment:** Good. Owner-based access with validation for required fields. The `!data.exists()` clause allows creating new records.
+> ⚠️ **Rewritten by PR #176 (2026-07-21) — NEW-CRIT-01.** The previous assessment ("Good. Owner-based
+> access… The `!data.exists()` clause allows creating new records.") described the vulnerability as a
+> feature.
+
+**Assessment: was CRITICAL, now closed.** Both nodes carried `".read"`/`".write": "auth != null"` at
+the **root**. Read and write grants cascade permissively downward, so the owner-based per-child rules
+underneath were **dead code**: any authenticated user could enumerate every tenant's WhatsApp numbers
+and overwrite any location's routing mapping.
+
+The `!data.exists()` clause was not a convenience either — it let any authenticated user create a
+record naming a **victim's** `phoneNumber` under their **own** `userId`.
+
+Current shape after #176:
+
+| Rule | Value | Why |
+|---|---|---|
+| root `.read` / `.write` | admin-only | Kills the cascade so the per-child rules are live. Safe because every client consumer is an admin surface; the non-admin path (user dashboard) reads via the `getUserWhatsAppNumbers` CF on the Admin SDK. |
+| `$id .write` | `admin \|\| (data.exists() && userId === auth.uid)` | Update-only for owners; creation is admin-only in the rules. |
+| `$id/phoneNumber`, `$id/userId` | `.validate: admin \|\| newData.val() === data.val()` | **Immutable to non-admins.** Non-admins legitimately own mappings (`assignWhatsAppToLocationFunction` has no admin check), and could otherwise keep ownership while rewriting the routing field — routing resolves by first phone match, so an earlier-sorting location id captures a victim's inbound traffic. |
+
+Note the asymmetry: creation is admin-only **in the rules**, while the CF create path stays open to
+any entitled user by design (Admin SDK bypasses rules).
 
 ---
 
