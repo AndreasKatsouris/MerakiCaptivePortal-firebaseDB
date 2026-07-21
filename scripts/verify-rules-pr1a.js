@@ -74,11 +74,34 @@ const CHECKS = [
   { name: 'scanningData child write rejected for non-admin', needs: 'user', expect: 'deny',
     run: () => attempt('PUT', `scanningData/${PROBE_KEY}`, USER, 1), cleanup: `scanningData/${PROBE_KEY}` },
 
-  // --- HIGH-04 locations: root write removed, child ownership preserved ------
-  { name: 'locations ROOT write rejected for non-admin', needs: 'user', expect: 'deny',
+  // --- HIGH-04 locations ----------------------------------------------------
+  //
+  // ⚠️ HIGH-04's actual fix (root `.write: false`) is NOT LIVE-PROBEABLE. A true
+  // root write is `PUT /locations.json`, which REPLACES THE ENTIRE NODE — if the
+  // rule were broken, the probe would destroy every location. That is not a test
+  // worth running against production.
+  //
+  // The assurance is static instead, and it is sound: `.write: false` is
+  // unconditional, and RTDB write rules cascade PERMISSIVELY DOWNWARD ONLY —
+  // a child grant can never re-grant its parent. So root writes are closed by
+  // construction.
+  //
+  // The original two checks here were MISLABELLED. A REST PATCH with child keys
+  // is evaluated at the CHILD path (`$locationId`), never at the root, so
+  // neither ever exercised `.write: false`:
+  //   - the admin one FAILED (HTTP 200) — correct behaviour, wrong expectation:
+  //     admins legitimately manage locations via the child rule.
+  //   - the non-admin one PASSED, but via the `ownerId` `.validate`, not via
+  //     `.write: false` — a green check that was not measuring its own name,
+  //     which is the more dangerous of the two mistakes.
+  //
+  // What remains genuinely worth probing is the CHILD ownership boundary, so
+  // that is what these now claim to be:
+  { name: 'locations CHILD write rejected for non-admin without ownerId (.validate)', needs: 'user', expect: 'deny',
     run: () => attempt('PATCH', 'locations', USER, { [PROBE_KEY]: { name: 'probe' } }), cleanup: `locations/${PROBE_KEY}` },
-  { name: 'locations ROOT write rejected even for admin (.write:false)', needs: 'admin', expect: 'deny',
-    run: () => attempt('PATCH', 'locations', ADMIN, { [PROBE_KEY]: { name: 'probe' } }), cleanup: `locations/${PROBE_KEY}` },
+  { name: 'locations CHILD write rejected for non-admin claiming ANOTHER uid as ownerId', needs: 'user', expect: 'deny',
+    run: () => attempt('PATCH', 'locations', USER, { [PROBE_KEY]: { name: 'probe', ownerId: 'some-other-uid' } }),
+    cleanup: `locations/${PROBE_KEY}` },
 
   // --- MED-06a whatsapp-message-history: writes are now admin-only ----------
   { name: 'whatsapp-message-history root write rejected for non-admin', needs: 'user', expect: 'deny',
