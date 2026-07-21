@@ -49,7 +49,14 @@ export async function createLocation(uid, locationData) {
     status: 'active',
     createdAt: Date.now(),
     createdBy: uid,
-    userId: uid
+    userId: uid,
+    // REQUIRED by database.rules.json `locations/$locationId` .validate:
+    //   "auth.token.admin === true || newData.child('ownerId').val() === auth.uid"
+    // Omitting it made every non-admin create fail from 2026-05-31 (PR #100)
+    // until 2026-07-21 — silently, behind a generic error toast. Keep it AFTER
+    // the spread so a caller-supplied ownerId can never override the
+    // authenticated uid. Guarded by tests/location-service.test.js.
+    ownerId: uid
   }
 
   await set(newLocationRef, fullLocationData)

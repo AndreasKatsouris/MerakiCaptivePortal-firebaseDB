@@ -671,7 +671,11 @@ class UserDashboard {
                 status: 'active',
                 createdAt: Date.now(),
                 createdBy: this.currentUser.uid,
-                userId: this.currentUser.uid
+                userId: this.currentUser.uid,
+                // REQUIRED by database.rules.json `locations/$locationId` .validate
+                // ("ownerId === auth.uid"); without it every non-admin create is
+                // rejected. See public/js/modules/user-dashboard/tests/location-service.test.js.
+                ownerId: this.currentUser.uid
             };
 
             // Save to database - following the same pattern as signup
