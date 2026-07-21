@@ -667,9 +667,19 @@
   },
   "security": {
     "audit": "OWASP Top 10 (2021)",
-    "auditedAt": "2026-07-05",
-    "summary": "Third+ re-verification (2026-07-05, scheduled scan) of the 2026-07-04 standalone audit, which found 1 NEW Critical (whatsapp-numbers/location-whatsapp-mapping RTDB write-cascade bypass, no compensating .validate) and raised the pre-existing salesData/forecasts Low finding to High (overwrite of existing tenant records). 2026-07-05 formally closed HIGH-08 (@grpc/grpc-js — resolved via transitive lockfile drift, verified twice) and confirmed CRIT-06's downgraded severity. All other findings from the 2026-06-15 audit (29 total) + the 2026-05-30 audit's deferred items independently re-verified still open, no regressions. Full reports: docs/security/owasp-audit-2026-07-04.md, docs/security/owasp-audit-2026-07-05.md. CRIT-07 (Twilio webhook HMAC forgery) remains CLOSED + LIVE-ENFORCED in prod (#162/#164). Prior audit (2026-05-30) fully remediated across 14 PRs (#89–#102): all prior Criticals + Highs closed. RTDB rules batch (CRIT-04/05 + HIGH-04/05 + MED-01/06 + LOW-03 + the new whatsapp-numbers finding + the salesData/forecasts severity-raise) requires one coordinated writer census before deployment — plan drafted in PR #166 (open, not yet merged).",
+    "auditedAt": "2026-07-19",
+    "summary": "Third automated audit (2026-07-19) re-verified all 29 findings from 2026-06-15 against live code — all remain open except CRIT-07 (closed+enforced) — and surfaced 11 NEW findings (5 Critical, 3 High, 1 Medium, 2 informational/low): CRIT-08 guests RTDB cross-tenant PII leak, CRIT-09 receipts Storage exposure (extends CRIT-05), CRIT-10 forgeable userLocations breaking ROSS tenant isolation, CRIT-11 rewards self-approval bypass on creation, CRIT-12 Meraki shared secret logged in plaintext (supersedes MED-09), plus HIGH-09/10/11 and MED-10. Logged only — read-only audit, no code changes. CRIT-07 (Twilio webhook HMAC forgery) remains CLOSED + LIVE-ENFORCED in prod. Prior audit (2026-05-30) fully remediated across 14 PRs (#89–#102). RTDB rules batch now also covers CRIT-08/09/10/11 + HIGH-09 + MED-10 — full writer census required before any rule tightening ships.",
     "audits": [
+      {
+        "date": "2026-07-19",
+        "type": "automated",
+        "severities": [
+          { "level": "Critical", "resolved": 0, "total": 5 },
+          { "level": "High", "resolved": 0, "total": 3 },
+          { "level": "Medium", "resolved": 0, "total": 1 },
+          { "level": "Low", "resolved": 0, "total": 2 }
+        ]
+      },
       {
         "date": "2026-06-15",
         "type": "automated",
@@ -750,6 +760,16 @@
       }
     ],
     "remaining": [
+      "CRIT-08 — guests RTDB parent .read: auth != null cascades past the $phoneNumber-scoped child rule — any authenticated user (incl. a WiFi guest) can read every tenant's full guest list (database.rules.json:16-24) — assigned: claude-opus-4-8",
+      "CRIT-09 — receipts Storage path /receipts/{file} read: auth != null with no ownership scoping, extends CRIT-05 to raw receipt images (storage.rules:15-17) — assigned: claude-opus-4-8",
+      "CRIT-10 — userLocations self-writable with no ownership .validate — forges the sole trust primitive behind ROSS's verifyLocationAccess, enabling cross-tenant IDOR on all location-scoped ROSS CFs (database.rules.json:53-58, functions/ross.js:164-182) — assigned: claude-opus-4-8",
+      "CRIT-11 — rewards .write/.validate only enforce ownership/status on updates, not creation — any authenticated user can self-create a pre-approved arbitrary-value reward (database.rules.json:75-82) — assigned: claude-sonnet-4-6",
+      "CRIT-12 — Meraki webhook logs full req.body including the live shared secret in plaintext to Cloud Logging, supersedes MED-09 (functions/index.js:473) — assigned: claude-haiku-4-5",
+      "HIGH-09 — whatsapp-numbers/location-whatsapp-mapping parent write cascades past child ownership check, any authenticated user can hijack WhatsApp number-to-location routing (database.rules.json:325-344) — assigned: claude-sonnet-4-6",
+      "HIGH-10 — triggerSubscriptionStatusCheck has no auth check at all (functions/subscriptionStatusManager.js:136-198) — assigned: claude-haiku-4-5",
+      "HIGH-11 — voucherService.js has no runTransaction() around pool assignment/fraud-check — double-spend race on concurrent redemption (functions/voucherService.js:21-99,337-383) — assigned: claude-sonnet-4-6",
+      "MED-10 — queues/queue-history/queue-states (the actual live QMS write paths) have no explicit RTDB rules at all, relies on implicit default-deny (database.rules.json, absent) — assigned: claude-haiku-4-5",
+      "INFO — Meraki secret comparison not constant-time (functions/index.js:467); FoodCostApp.vue:102 v-html on currently-static content, latent only (public/js/modules/food-cost/.../FoodCostApp.vue:102)",
       "CRIT-07 — ✅ CLOSED + LIVE-ENFORCED in prod 2026-06-16 (#162 + #164). Both webhook functions deployed with TWILIO_SIGNATURE_MODE=enforce; real message verified (mode:'enforce', valid:true); forged requests now 403. #164 added TWILIO_WEBHOOK_URL for the gen2 path-strip. Zero downtime across the rollout.",
       "CRIT-01/02 — Unauthenticated CFs: sendGuestBookingNotification (index.js:298), sendGuestStatusNotification (index.js:344), getRealtimeQueueMetrics (index.js:2237) — assigned: claude-haiku-4-5",
       "CRIT-03 — Migration endpoints token-only auth: startMigration, rollbackMigration, checkMigrationStatus, initializeWhatsAppSchema (index.js:2863+) — assigned: claude-sonnet-4-6",
@@ -786,6 +806,7 @@
     ],
     "deployPrereqs": [
       "RTDB rules batch (CRIT-04/05 + HIGH-04/05 + MED-01/06 + LOW-03) requires full writer census first: rg --include=*.js --include=*.html --include=*.vue for every tightened node",
+      "2026-07-19 follow-up: CRIT-08/09/10/11 + HIGH-09 + MED-10 must be folded into that same writer-census rules batch before any RTDB rule ships (guests/receipts-storage/userLocations/rewards/whatsapp-numbers/queues all touch live production writers)",
       "CRIT-06: rotate the Meraki validator in the Meraki dashboard BEFORE removing from source",
       "CRIT-07: TWILIO_TOKEN must be confirmed available in functions/twilioClient.js before adding HMAC validation",
       "Prior audit deploy prereqs: firebase functions:secrets:set MERAKI_SHARED_SECRET + INITIAL_ADMIN_SETUP_SECRET; GCP referrer restriction on Google Places API key"
