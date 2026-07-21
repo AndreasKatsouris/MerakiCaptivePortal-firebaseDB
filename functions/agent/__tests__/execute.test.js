@@ -7,8 +7,12 @@ const { makeFakeRtdb } = require('./helpers/fake-rtdb');
 function seed() {
     return makeFakeRtdb({
         ross: {
-            v2Snoozes: {},
             agentAudit: {},
+            // getStaff is the generic AUTO-tier ready tool these audit-wrapper
+            // tests drive. It replaced snoozeCard when that was removed from the
+            // registry (2026-07-21, snoozing is a user action) — the wrapper
+            // behaviour under test is tool-agnostic.
+            staff: { owner1: { loc1: { s1: { name: 'Abe' } } } },
             workflows: { owner1: { wf1: { locations: { loc1: { nextDueDate: 1717200000000 } } } } },
         },
     });
@@ -24,23 +28,22 @@ describe('executeTool', () => {
 
     it('runs a ready tool and returns its result', async () => {
         const ctx = { uid: 'owner1', turnId: 't1', turnSource: 'chat', now: 5000 };
-        const out = await executeTool(ctx, 'snoozeCard', { cardId: 'abc', hours: 1 });
-        expect(out.cardId).toBe('abc');
-        expect(out.expiresAt).toBe(5000 + 3600000);
+        const out = await executeTool(ctx, 'getStaff', { locationId: 'loc1' });
+        expect(out.staff.map((s) => s.name)).toEqual(['Abe']);
     });
 
     it('writes one audit row per execution with via=auto:<turnSource>', async () => {
         const ctx = { uid: 'owner1', turnId: 't1', turnSource: 'chat', now: 5000 };
-        await executeTool(ctx, 'snoozeCard', { cardId: 'abc', hours: 1 });
+        await executeTool(ctx, 'getStaff', { locationId: 'loc1' });
         const rows = Object.values(db._dump().ross.agentAudit.owner1.t1);
         expect(rows).toHaveLength(1);
-        expect(rows[0]).toMatchObject({ tool: 'snoozeCard', tier: 'auto', via: 'auto:chat', at: 5000 });
-        expect(rows[0].result.cardId).toBe('abc');
+        expect(rows[0]).toMatchObject({ tool: 'getStaff', tier: 'auto', via: 'auto:chat', at: 5000 });
+        expect(rows[0].result.staff).toHaveLength(1);
     });
 
     it('records who confirmed when ctx.confirmedBy is set', async () => {
         const ctx = { uid: 'owner1', turnId: 't2', turnSource: 'chat', confirmedBy: 'owner1', now: 7000 };
-        await executeTool(ctx, 'snoozeCard', { cardId: 'z', hours: 1 });
+        await executeTool(ctx, 'getStaff', { locationId: 'loc1' });
         const rows = Object.values(db._dump().ross.agentAudit.owner1.t2);
         expect(rows[0].via).toBe('confirmed:owner1');
     });
@@ -60,8 +63,8 @@ describe('snapshotPrev (no-undo capture, §4)', () => {
         expect(prev).toEqual({ nextDueDate: 1717200000000 });
     });
 
-    it('returns undefined for tools with native undo', async () => {
-        const prev = await snapshotPrev('owner1', 'snoozeCard', { cardId: 'x' });
+    it('returns undefined for tools that need no prev capture', async () => {
+        const prev = await snapshotPrev('owner1', 'getStaff', { locationId: 'loc1' });
         expect(prev).toBeUndefined();
     });
 

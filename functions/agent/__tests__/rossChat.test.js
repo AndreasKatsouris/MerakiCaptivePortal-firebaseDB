@@ -297,22 +297,21 @@ describe('runAgentLoop', () => {
 
     it('auto tool then answer: executes the tool, audits it, feeds tool_result, emits an action', async () => {
         const res = await run([
-            { final: toolMsg('snoozeCard', { cardId: 'food-cost', hours: 4 }) },
-            { final: textMsg('Snoozed it.') },
+            { final: toolMsg('getStaff', { locationId: 'loc1' }) },
+            { final: textMsg('Here is your staff list.') },
         ]);
         expect(res.rounds).toBe(2);
-        // tool ran → snooze node written + audit row
+        // tool ran → audit row written
         const dump = db._dump();
-        expect(dump.ross.v2Snoozes.u1['food-cost']).toBeDefined();
-        expect(Object.values(dump.ross.agentAudit.u1.turn1)[0]).toMatchObject({ tool: 'snoozeCard' });
+        expect(Object.values(dump.ross.agentAudit.u1.turn1)[0]).toMatchObject({ tool: 'getStaff' });
         // an action event was emitted
-        expect(events.some((e) => e.type === 'action' && /snoozeCard/.test(JSON.stringify(e)))).toBe(true);
+        expect(events.some((e) => e.type === 'action' && /getStaff/.test(JSON.stringify(e)))).toBe(true);
         // a tool_result was fed back into the conversation
         const toolResults = res.messages.flatMap((m) => (Array.isArray(m.content) ? m.content : []))
             .filter((b) => b.type === 'tool_result');
         expect(toolResults).toHaveLength(1);
         expect(toolResults[0].tool_use_id).toBe('toolu_1');
-        expect(res.assistantBlocks).toEqual([{ type: 'text', text: 'Snoozed it.' }]);
+        expect(res.assistantBlocks).toEqual([{ type: 'text', text: 'Here is your staff list.' }]);
     });
 
     it('PAUSES on a confirm-tier tool without executing it (returns paused + pendingTool)', async () => {
@@ -333,20 +332,22 @@ describe('runAgentLoop', () => {
 
     it('refuses an OFF-tier tool (owner tightened it) without executing', async () => {
         const res = await run([
-            { final: toolMsg('snoozeCard', { cardId: 'c1', hours: 1 }) },
+            { final: toolMsg('getStaff', { locationId: 'loc1' }) },
             { final: textMsg('ok') },
-        ], { ownerConfig: { policy: { snoozeCard: 'off' } } });
+        ], { ownerConfig: { policy: { getStaff: 'off' } } });
         expect(res.paused).toBe(false);
         const toolResults = res.messages.flatMap((m) => (Array.isArray(m.content) ? m.content : []))
             .filter((b) => b.type === 'tool_result');
         expect(toolResults[0].is_error).toBe(true);
-        expect(db._dump().ross && db._dump().ross.v2Snoozes).toBeUndefined(); // not executed
+        // not executed → no audit row (getStaff is a read, so absence of a write
+        // is not evidence; the audit row is what proves execution either way)
+        expect(db._dump().ross && db._dump().ross.agentAudit).toBeUndefined();
         expect(res.rounds).toBe(2);
     });
 
     it('accumulates usage across multiple round-trips', async () => {
         const res = await run([
-            { final: toolMsg('snoozeCard', { cardId: 'c1', hours: 2 }) },
+            { final: toolMsg('getStaff', { locationId: 'loc1' }) },
             { final: textMsg('done') },
         ]);
         // two round-trips, each carrying USAGE → summed then mapped
@@ -355,14 +356,16 @@ describe('runAgentLoop', () => {
 
     it('caps at maxTurns even if the model keeps requesting tools (no runaway)', async () => {
         // every scripted turn requests a tool; loop must stop at maxTurns.
-        const scripts = Array.from({ length: 10 }, (_, i) => ({ final: toolMsg('snoozeCard', { cardId: `c${i}`, hours: 1 }, `toolu_${i}`) }));
+        const scripts = Array.from({ length: 10 }, (_, i) => ({ final: toolMsg('getStaff', { locationId: `loc${i}` }, `toolu_${i}`) }));
         const res = await run(scripts, { maxTurns: 2 });
         expect(res.rounds).toBe(2);
     });
 
     it('a tool execution error becomes an is_error tool_result and the loop continues', async () => {
         const res = await run([
-            { final: toolMsg('snoozeCard', { cardId: 'c1', hours: -5 }) }, // invalid hours → adapter throws
+            // an unknown tool makes executeTool throw — tool-agnostic, so this test
+            // no longer depends on one adapter's argument validation
+            { final: toolMsg('noSuchTool', {}) },
             { final: textMsg('recovered') },
         ]);
         const toolResults = res.messages.flatMap((m) => (Array.isArray(m.content) ? m.content : []))
@@ -485,10 +488,10 @@ describe('runChatRequest (orchestration)', () => {
             messages: {
                 stream: () => {
                     call += 1;
-                    // round 1: a real tool_use turn (accrues BIG_USAGE, executes snoozeCard)
+                    // round 1: a real tool_use turn (accrues BIG_USAGE, executes getStaff)
                     if (call === 1) {
                         return makeFakeStream({
-                            final: { content: [{ type: 'tool_use', id: 't1', name: 'snoozeCard', input: { cardId: 'c1', hours: 2 } }], usage: BIG_USAGE, stop_reason: 'tool_use' },
+                            final: { content: [{ type: 'tool_use', id: 't1', name: 'getStaff', input: { locationId: 'loc1' } }], usage: BIG_USAGE, stop_reason: 'tool_use' },
                         });
                     }
                     // round 2: the Anthropic call throws

@@ -36,12 +36,20 @@ describe('eval cases', () => {
     }
   })
 
-  it('q-staff / q-staff-runs / snooze still assert tool calls (Group B — real product signal)', () => {
+  it('q-staff / q-staff-runs still assert tool calls (Group B — real product signal)', () => {
     // These are NOT touching the harness — they represent genuine failures (Ross not
     // proactively calling tools). The assertions must remain to keep the honest signal.
     const qStaff = CASES.find((c) => c.id === 'q-staff')
     expect(qStaff.expect.tools).toEqual(['getStaff'])
+  })
+
+  it('snooze guards the REFUSAL — snoozing is a user action, not an agent capability', () => {
+    // Inverted 2026-07-21 with the removal of the snoozeCard tool. The old
+    // expectation (tools: ['snoozeCard']) rewarded the model for inventing a
+    // cardId, because nothing in the agent's context ever supplied one.
     const snooze = CASES.find((c) => c.id === 'snooze')
-    expect(snooze.expect.tools).toEqual(['snoozeCard'])
+    expect(snooze.expect.tools).toBeUndefined()
+    expect(snooze.expect.refuse).toBe(true)
+    expect(snooze.expect.judge.honest).toBe(true)
   })
 })
