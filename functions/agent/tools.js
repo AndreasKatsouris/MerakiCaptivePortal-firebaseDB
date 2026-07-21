@@ -146,22 +146,30 @@ const REGISTRY = {
         },
     },
 
-    snoozeCard: {
-        description: 'Snooze a home insight card for the owner for a number of hours.',
-        args: z.object({ cardId: z.string(), hours: z.number().positive() }),
-        tier: TIER.AUTO, ceiling: TIER.AUTO, status: STATUS.READY,
-        run: async (ctx, args) => {
-            const safeId = String(args.cardId).replace(/[^a-zA-Z0-9_-]/g, '');
-            if (!safeId) throw new Error('cardId must contain at least one safe character');
-            const hrs = Number(args.hours);
-            if (!Number.isFinite(hrs) || hrs <= 0 || hrs > 720) {
-                throw new Error('hours must be a positive number ≤ 720 (30 days)');
-            }
-            const expiresAt = ctx.now + Math.round(hrs * 3600000);
-            await getDb().ref(`ross/v2Snoozes/${ctx.uid}/${safeId}`).set({ expiresAt, snoozedAt: ctx.now });
-            return { cardId: safeId, expiresAt };
-        },
-    },
+    // snoozeCard: REMOVED 2026-07-21 — snoozing is a USER action, not an agent one.
+    //
+    // Two independent reasons, either sufficient on its own:
+    //
+    // 1. PRODUCT. Snooze is the only action that makes information DISAPPEAR.
+    //    Ross's job — especially the W2 proactive sweep — is surfacing what the
+    //    owner would otherwise miss. An agent holding auto-tier power to silently
+    //    hide its own findings works against its own purpose. The owner snoozes a
+    //    card they can SEE, from the UI that rendered it:
+    //      ross-service.js snoozeCard() -> rossV2Snooze CF -> ross/v2Snoozes/{uid}
+    //    read back by detectors.js. That path is untouched by this removal.
+    //
+    // 2. IT WAS NEVER GROUNDED. snoozeCard required a `cardId`, and NOTHING in the
+    //    agent's world supplies card ids — no tool returns them, and the owner
+    //    context carries none. So the only way the model could ever call it was by
+    //    INVENTING an identifier, which the old run() then sanitised and wrote to
+    //    ross/v2Snoozes/{uid}/{madeUpId}, reporting success. The 2026-06-07 eval
+    //    scored that as a PASS. The live 2026-07-21 run showed the model now
+    //    correctly declines to guess and explains instead — better behaviour that
+    //    the stale eval marked as a regression. The eval case is now inverted to
+    //    expect the honest decline.
+    //
+    // Capability-absence > prompt-guarding (LESSONS 2026-06-05, #144): a model
+    // cannot misuse a tool that is not in the registry.
 
     // ---- PENDING: defined for catalog completeness; run is patched below ------
     getWorkflows: pending("List the owner's workflows.",

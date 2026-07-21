@@ -7,7 +7,7 @@ const {
 const { TIER, STATUS, isAgentSubmittable } = require('../constants');
 const { makeFakeRtdb } = require('./helpers/fake-rtdb');
 
-const AUTO_READY = ['getWorkflowDigest', 'getStaff', 'getRunHistory', 'snoozeCard', 'getFoodCostSummary'];
+const AUTO_READY = ['getWorkflowDigest', 'getStaff', 'getRunHistory', 'getFoodCostSummary'];
 const CONFIRM_READY = ['activateTemplate', 'createWorkflow', 'editWorkflow', 'pauseWorkflow'];
 const READY = [...AUTO_READY, ...CONFIRM_READY]; // slice 4 promoted the 4 confirm tools
 
@@ -31,9 +31,9 @@ describe('registry integrity', () => {
     it('autoAllowlist (proactive) = only the ready AUTO tools (confirm tools excluded)', () => {
         // the 4 confirm-tier tools are READY but NOT auto → never in the proactive allowlist
         expect(autoAllowlist().sort()).toEqual([...AUTO_READY].sort());
-        // an owner who tightens snoozeCard to confirm drops it from the proactive set too
-        expect(autoAllowlist({ policy: { snoozeCard: 'confirm' } }).sort())
-            .toEqual(['getFoodCostSummary', 'getRunHistory', 'getStaff', 'getWorkflowDigest']);
+        // an owner who tightens getStaff to confirm drops it from the proactive set too
+        expect(autoAllowlist({ policy: { getStaff: 'confirm' } }).sort())
+            .toEqual(['getFoodCostSummary', 'getRunHistory', 'getWorkflowDigest']);
     });
 
     it('marks every playbook-authoring tool confirm-tier', () => {
@@ -131,8 +131,6 @@ describe('toAnthropicTools projection', () => {
         expect(typeof limit.exclusiveMinimum).toBe('number'); // draft-2020-12: a number, not `true`
         expect(limit.exclusiveMinimum).toBe(0);
 
-        const hours = toAnthropicTools(['snoozeCard'])[0].input_schema.properties.hours;
-        expect(typeof hours.exclusiveMinimum).toBe('number');
     });
 
     it('produces NO draft-4-only constructs (boolean exclusive bounds / nullable) on any enabled tool', () => {
@@ -212,18 +210,6 @@ describe('ready adapters (via fake RTDB)', () => {
         expect(out.staff.map((s) => s.name)).toEqual(['Abe', 'Zara']);
     });
 
-    it('snoozeCard sanitises cardId and writes an expiry', async () => {
-        const now = 1_000_000;
-        const out = await REGISTRY.snoozeCard.run({ uid: 'owner1', now }, { cardId: 'food/../cost!', hours: 2 });
-        expect(out.cardId).toBe('foodcost'); // slashes, dots and bang all stripped (path-injection safe)
-        expect(out.expiresAt).toBe(now + 2 * 3600000);
-        expect(db._dump().ross.v2Snoozes.owner1.foodcost.expiresAt).toBe(out.expiresAt);
-    });
-
-    it('snoozeCard rejects out-of-range hours', async () => {
-        await expect(REGISTRY.snoozeCard.run({ uid: 'owner1', now: 1 }, { cardId: 'x', hours: 1000 }))
-            .rejects.toThrow(/720/);
-    });
 
     it('getRunHistory returns only completed runs, newest first', async () => {
         const out = await REGISTRY.getRunHistory.run({ uid: 'owner1' }, { workflowId: 'wf1', locationId: 'loc1' });
