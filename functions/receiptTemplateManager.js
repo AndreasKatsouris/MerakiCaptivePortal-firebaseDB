@@ -357,11 +357,19 @@ async function getTemplateLogs(templateId = null, limit = 100) {
 }
 
 /**
- * Upload receipt image to Firebase Storage
+ * Upload receipt image to Firebase Storage (PRIVATE — served via signed URL).
+ * NOTE: exported but currently UNWIRED (no caller in functions/ or public/) —
+ * fixed in place per CRIT-09 spec fork F3 so the security property holds if it
+ * is ever wired: no public ACL (the old makePublic() variant is the CRIT-09
+ * exposure class), signed URL bounded to 7 days.
+ * ⚠ WIRING CONTRACT (review F5): PERSIST `storagePath`, never `signedUrl` —
+ * the URL expires; a stored copy becomes a dead link with no regeneration
+ * path. Mint a fresh short-TTL signed URL at read time from the path.
  * @param {Buffer} imageBuffer - Image file buffer
  * @param {string} filename - Original filename
  * @param {string} templateId - Template ID
- * @returns {Promise<string>} Public URL of uploaded image
+ * @returns {Promise<{signedUrl: string, storagePath: string}>} time-limited
+ *   read URL + the durable object path (persist the path, not the URL)
  */
 async function uploadTemplateImage(imageBuffer, filename, templateId) {
     try {
@@ -372,6 +380,7 @@ async function uploadTemplateImage(imageBuffer, filename, templateId) {
         const file = bucket.file(storagePath);
 
         await file.save(imageBuffer, {
+            predefinedAcl: 'private',
             metadata: {
                 contentType: 'image/jpeg',
                 metadata: {
@@ -382,13 +391,13 @@ async function uploadTemplateImage(imageBuffer, filename, templateId) {
             }
         });
 
-        // Make file publicly readable
-        await file.makePublic();
+        const [signedUrl] = await file.getSignedUrl({
+            action: 'read',
+            expires: Date.now() + 7 * 24 * 60 * 60 * 1000
+        });
+        console.log('Template image uploaded (private):', storagePath);
 
-        const publicUrl = `https://storage.googleapis.com/${bucket.name}/${storagePath}`;
-        console.log('Template image uploaded:', publicUrl);
-
-        return publicUrl;
+        return { signedUrl, storagePath };
 
     } catch (error) {
         console.error('Error uploading template image:', error);
