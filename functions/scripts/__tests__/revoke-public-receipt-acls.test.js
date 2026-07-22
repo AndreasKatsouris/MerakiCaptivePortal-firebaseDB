@@ -5,7 +5,6 @@ const {
     PAGE_SIZE,
     parseArgs,
     isNotFound,
-    listAllFiles,
     sweepPrefix,
     sweepBucket,
     checkBucketPublicAccess,
@@ -106,15 +105,16 @@ describe('isNotFound', () => {
     });
 });
 
-describe('listAllFiles — explicit pagination', () => {
+describe('sweepPrefix — explicit pagination', () => {
     it('follows nextQuery to exhaustion instead of trusting one page', async () => {
         const files = manyFiles('receipts/', PAGE_SIZE + 3, { isPublic: false });
         const bucket = fakeBucket({ 'receipts/': files });
 
-        const listed = await listAllFiles(bucket, 'receipts/');
+        const r = await sweepPrefix({ bucket, prefix: 'receipts/', execute: false, log: () => {} });
 
-        expect(listed).toHaveLength(PAGE_SIZE + 3);
-        expect(bucket.getFiles).toHaveBeenCalledTimes(2); // two pages
+        expect(r.scanned).toBe(PAGE_SIZE + 3);
+        expect(r.alreadyPrivate).toBe(PAGE_SIZE + 3);
+        expect(bucket.getFiles).toHaveBeenCalledTimes(2); // two pages, processed per-page
     });
 });
 
@@ -267,6 +267,13 @@ describe('run — exit-code closure contract', () => {
         const bucket = fakeBucket({ 'receipts/': [zombie], 'receipt-templates/': [fakeFile('receipt-templates/x.png', { isPublic: false })] });
         const code = await run({ argv: ['--execute'], bucket, bucketName: 'test-bucket', log: () => {}, requester: okRequester });
         expect(code).toBe(1);
+    });
+
+    it('fast-fails (exit 1, no sweep) when uniformBucketLevelAccess is enabled — object ACLs do not apply', async () => {
+        const bucket = fakeBucket({ 'receipts/': [fakeFile('receipts/1.jpg', { isPublic: true })] }, { ubla: true });
+        const code = await run({ argv: ['--execute'], bucket, bucketName: 'test-bucket', log: () => {}, requester: okRequester });
+        expect(code).toBe(1);
+        expect(bucket.getFiles).not.toHaveBeenCalled(); // clear single message instead of a wall of per-object errors
     });
 
     it('exits 1 when the bucket carries a public IAM binding the sweep cannot fix', async () => {

@@ -64,27 +64,13 @@ function isNotFound(err) {
     return err && err.code === 404;
 }
 
-/** Iterate every object under a prefix via explicit pagination (default-independent). */
-async function listAllFiles(bucket, prefix) {
-    const all = [];
-    let query = { prefix, autoPaginate: false, maxResults: PAGE_SIZE };
-    while (query) {
-        // With autoPaginate:false the promise resolves [files, nextQuery, apiResponse];
-        // nextQuery is null on the last page.
-        const [files, nextQuery] = await bucket.getFiles(query);
-        all.push(...files);
-        query = nextQuery || null;
-    }
-    return all;
-}
-
 /**
- * Sweep one prefix. Dry-run probes the ACL (`acl.get`); execute deletes it
- * (`acl.delete`) — both treat 404 as "already private" so re-runs are idempotent.
- * Captures the first public object name as the prefix's probe sample.
+ * Sweep one prefix, processing PAGE-BY-PAGE (never materialising the corpus —
+ * the object set is unbounded). Dry-run probes the ACL (`acl.get`); execute
+ * deletes it (`acl.delete`) — both treat 404 as "already private" so re-runs
+ * are idempotent. Captures the first public object name as the prefix's probe sample.
  */
 async function sweepPrefix({ bucket, prefix, execute, log }) {
-    const files = await listAllFiles(bucket, prefix);
     const result = {
         prefix,
         scanned: 0,
@@ -96,29 +82,36 @@ async function sweepPrefix({ bucket, prefix, execute, log }) {
         samplePublicName: null,
     };
 
-    for (const file of files) {
-        result.scanned += 1;
-        try {
-            if (execute) {
-                await file.acl.delete({ entity: ALL_USERS });
-                result.revoked += 1;
-                result.revokedNames.push(file.name);
-                if (!result.samplePublicName) result.samplePublicName = file.name;
-                log(`  revoked  ${file.name}`);
-            } else {
-                await file.acl.get({ entity: ALL_USERS });
-                result.publicFound += 1;
-                if (!result.samplePublicName) result.samplePublicName = file.name;
-                log(`  PUBLIC   ${file.name}`);
-            }
-        } catch (err) {
-            if (isNotFound(err)) {
-                result.alreadyPrivate += 1;
-            } else {
-                result.errors.push(file.name);
-                log(`  ERROR    ${file.name}: ${err.message}`);
+    let query = { prefix, autoPaginate: false, maxResults: PAGE_SIZE };
+    while (query) {
+        // With autoPaginate:false the promise resolves [files, nextQuery, apiResponse];
+        // nextQuery is null on the last page.
+        const [files, nextQuery] = await bucket.getFiles(query);
+        for (const file of files) {
+            result.scanned += 1;
+            try {
+                if (execute) {
+                    await file.acl.delete({ entity: ALL_USERS });
+                    result.revoked += 1;
+                    result.revokedNames.push(file.name);
+                    if (!result.samplePublicName) result.samplePublicName = file.name;
+                    log(`  revoked  ${file.name}`);
+                } else {
+                    await file.acl.get({ entity: ALL_USERS });
+                    result.publicFound += 1;
+                    if (!result.samplePublicName) result.samplePublicName = file.name;
+                    log(`  PUBLIC   ${file.name}`);
+                }
+            } catch (err) {
+                if (isNotFound(err)) {
+                    result.alreadyPrivate += 1;
+                } else {
+                    result.errors.push(file.name);
+                    log(`  ERROR    ${file.name}: ${err.message}`);
+                }
             }
         }
+        query = nextQuery || null;
     }
     return result;
 }
@@ -226,6 +219,13 @@ async function run({ argv, bucket, bucketName, log, requester }) {
         for (const b of iam.publicBindings) log(`  ⚠ PUBLIC IAM BINDING: ${b.role} -> ${b.members.join(', ')}`);
         log('An object-ACL sweep CANNOT close bucket-level public access — remove these bindings first.');
     }
+    if (iam.uniformBucketLevelAccess) {
+        log(
+            'FAIL: uniformBucketLevelAccess is ENABLED — object ACLs do not apply on this bucket, so this ' +
+                'sweep is the wrong tool. Any public exposure is governed by the bucket IAM bindings above.'
+        );
+        return 1;
+    }
 
     const result = await sweepBucket({ bucket, prefixes, execute, log });
     log(formatSummary(result, { execute }));
@@ -289,7 +289,6 @@ module.exports = {
     PAGE_SIZE,
     parseArgs,
     isNotFound,
-    listAllFiles,
     sweepPrefix,
     sweepBucket,
     checkBucketPublicAccess,
