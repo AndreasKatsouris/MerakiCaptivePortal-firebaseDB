@@ -1,6 +1,6 @@
 {
-  "lastUpdated": "2026-07-21",
-  "lastUpdatedNote": "PR-1b opened (#176): NEW-CRIT-01 WhatsApp routing hijack CLOSED (root read+write cascade killed, create locked to admin, phoneNumber/userId made immutable to non-admins); CRIT-11 rewards MITIGATED, NOT CLOSED - creation blocked via .validate, mutation via descendant path still open because locking .write would break the non-admin guest-rename cascade and rewards records carry no ownership field. Security review caught that the first draft blocked nothing: auth.token.phone_number is null for every user and RTDB evaluates null === null as true, so the ownership clause granted on create. Four new bug rows: the phone_number null-equality class, whatsapp-message-history root read, receipt-management reward creation broken end-to-end, and CRIT-09 receipts escalated - makePublic() puts every receipt image on the open internet with enumerable names, and a public GCS ACL bypasses Storage rules so the audited fix would not work.",
+  "lastUpdated": "2026-07-22",
+  "lastUpdatedNote": "Framework housecleaning: history archived to BACKLOG_HISTORY.md, automation queue added, project-status.json now synced via `npm run status:sync`.",
   "sprint": {
     "goal": "Effective implementation of Hi-Fi v2, with ROSS as the central post-login surface for every subscribed user",
     "started": "2026-04-30",
@@ -290,34 +290,9 @@
   "inProgress": [],
   "recentlyCompleted": [
     {
-      "title": "snoozeCard removed from the agent registry (#175) - snoozing is a user action, not an agent one. Found via the live eval: the case failed 3/3 with no tools called because snoozeCard required a cardId nothing ever supplied, so the model could only call it by inventing one - which the 2026-06-07 eval had scored as a pass. User path (UI -> rossV2Snooze CF) untouched. Ready tools 9 -> 8. Eval case inverted to guard the refusal; tests re-homed onto getStaff; 164/164 green.",
-      "pr": 175,
-      "mergedAt": "2026-07-21"
-    },
-    {
-      "title": "Probe correction + PR-1a closure record (#173). Replaced two mislabelled locations checks - a REST PATCH with child keys is evaluated at the child path, so neither ever tested root .write:false; one failed on a wrong expectation and the other passed for the wrong reason. Replaced with genuine child-ownership checks including a cross-tenant ownerId-forgery probe. Marks CRIT-04/HIGH-04/MED-06a/LOW-03 closed, deployed and verified.",
-      "pr": 173,
-      "mergedAt": "2026-07-21"
-    },
-    {
-      "title": "RTDB rules-batch PR-1a - the first actual security remediation since the 2026-06-15 audit. Four rule tightenings (scanningData write, locations root write, whatsapp-message-history write, admin-claims read), all census-verified with zero affected client writers. MED-01a subscriptionTiers dropped from the plan's PR-1 because signup reads it pre-auth. Emulator gate pre-flighted and found unrunnable (no Java, no rules-unit-testing) - replaced with a post-deploy REST probe (scripts/verify-rules-pr1a.js) that asserts reject/allow against the real deployed rules plus unauthenticated-read canaries. Deploy operator-gated: rules last, probe immediately.",
-      "pr": 171,
-      "mergedAt": "2026-07-21"
-    },
-    {
       "title": "OWASP scan consolidation (#168). Landed four orphaned scheduled scans (2026-07-02/07-04/07-05/07-19) that had committed findings to PR-less branches for up to 19 days. RETRACTED the false HIGH-08 closure (@grpc/grpc-js 1.12.6 is the last VULNERABLE version, not a patched one - advisory range >=1.12.0 <1.12.7; verified still open by live npm audit). Folded in the 2026-07-19 follow-up's 11 new findings (5 Critical incl. guests cross-tenant PII, receipts Storage exposure, forgeable userLocations, self-approvable rewards, Meraki secret in Cloud Logging). Reconciled a cross-scan duplicate (HIGH-09 = NEW-CRIT-01). Reconciled totals: 11 Criticals + 11 Highs open. Docs/data only.",
       "pr": 168,
       "mergedAt": "2026-07-21"
-    },
-    {
-      "title": "OWASP RTDB rules-batch remediation plan (#166). Splits 7 write-cascade findings into a lockable-now rules-only tier (scanningData, locations, subscriptionTiers, admin-claims, whatsapp-message-history - every affected writer is Admin-SDK or already admin-gated) and a Bucket-C tier needing client refactor first (receipts root read, queue root listener, whatsapp-message-history root read). Backed by a full client-SDK writer census. Plan doc only - no code or rules changed.",
-      "pr": 166,
-      "mergedAt": "2026-07-21"
-    },
-    {
-      "title": "ROSS-FoodCost-v2 Deliverable 1 — Ross food-cost reader (#167). W1 capability-breadth first slice: getFoodCostSummary promoted pending→READY (now 9 ready agent tools = 5 AUTO + 4 CONFIRM; guests/sales still pending). Read-only, access-checked adapter (C-1 caller→location gate via userLocations/{uid}/{loc} or locations/{loc}/ownerId, fail-closed — a cross-tenant unit test proves an attacker gets {hasData:false}) reads the denormalised summary already persisted at locations/{loc}/stockUsage (no calculator extraction) → pure summariseFoodCost returns cost%, trend, low-stock-by-days-of-cover. Built brainstorm → 3-agent adversarial review (caught base order-calculator is LIVE not dead; calc-purity overstated — UI entry does an async RTDB read; O4 already answered by code → zero extraction; 2 CRITICAL security reqs) → spec v2 → subagent-driven TDD (4 tasks). 165/165 + build green; review folded (orderByKey().limitToLast(20) read bound; ESM→CJS test fix). Bundles the design + plan docs. Operator: live npm run eval q-foodcost. Deferred: D2 calculator → suggestedOrder; D3 v2 UI + CSV mapping-memory; D4 strip-and-harden sweep.",
-      "pr": 167,
-      "mergedAt": "2026-06-22"
     },
     {
       "title": "CRIT-07 gen2 fix + LIVE-ENFORCED in prod (#164). The #162 monitor soak caught a real valid:false on prod traffic: gen2 Cloud Functions strip the function-name path (req.originalUrl='/'), so reconstruction yielded '.../' while Twilio signs the full '.../receiveWhatsAppMessage' -> HMAC mismatch. Fix: verifyTwilioSignature validates against an explicit TWILIO_WEBHOOK_URL (env or comma/space list, valid-if-any; multi-URL accept is safe since forging needs the token), falling back to reconstruction only when unset. +5 tests reproducing the exact gen2 failure (22/22); review folded (TWILIO_WEBHOOK_URL in WHATSAPP_BOT_SOP.md, single error-log per call). Then deployed + verified live: monitor -> valid:true -> TWILIO_SIGNATURE_MODE=enforce -> real message processed under mode:'enforce'. CRIT-07 fully closed in prod with ZERO downtime across the whole rollout.",
@@ -365,16 +340,6 @@
       "mergedAt": "2026-06-07"
     },
     {
-      "title": "askRoss slice-5 client polish — the deferred Ask Ross ⌘K follow-ups: (a) RossHomeMobile.vue Ask-Ross pill wired to the real modal (was decorative debris); (b) fetch cancellation — streamRossChat/resumeRossChat return {promise, abort}, modal aborts on close/new-chat + resets state so late SSE events can't fold into a reopened conversation; (c) ⌘K cold-start — RossAskModal hoisted outside the .ross-home v-if so the palette is live before the feed loads; (d) :key now ${resetCount}-${i} + a New-chat affordance. 24 tests, build green, no new v-html. Review: no must-fix, 2 🔵 (cosmetic + reflect-reminder).",
-      "pr": 148,
-      "mergedAt": "2026-06-07"
-    },
-    {
-      "title": "askRoss eval-harness Group-A fairness fixes (3aa) — made the live eval grade Ross honestly: realistic 2026 fixture dates (BASE_2026 anchor — kills the epoch-1970 20,609-days-overdue false-fail), transcript.toolResults capture seam (pairs each tool_result to its tool name via a tool_use.id→name map from loop.messages), and judge grounding (inject system[1] owner-context as a synthetic __systemContext__ entry + drop the redundant getWorkflowDigest tool expectation on the 3 preloaded-digest cases). Group B (q-staff/q-staff-runs/snooze) left failing — a real product signal, not loosened. 24 tests (stricter capture guard). Operator re-runs npm run eval post-merge for ~18/21. Review: LGTM, 🟡+3🔵 folded — incl. catching that the reviewer's suggested toolUseId match referenced a field that doesn't exist on toolsCalled.",
-      "pr": 149,
-      "mergedAt": "2026-06-07"
-    },
-    {
       "title": "Ross home card v-html → stored-XSS fix — RossHomeDesktop.vue:203 rendered agent/detector-derived c.detail via v-html; swapped to {{ c.detail }} (Vue auto-escaping) after verifying detail is plain text across content.js+detectors.js. Latent stored-XSS closed (any HTML in interpolated names/labels would have executed). Added tests/unit/ross-home-desktop-no-vhtml.test.js forward guard. Security review: LGTM. Tiny single-purpose PR; merged first (shared file with #148, non-overlapping lines).",
       "pr": 147,
       "mergedAt": "2026-06-07"
@@ -405,11 +370,6 @@
       "mergedAt": "2026-06-04 (PR open)"
     },
     {
-      "title": "Phase 7 ② askRoss slice 7 — ross/agent* RTDB rules (agentChats/agentAudit/agentConfig/agentPending: server-only writes, CF-mediated reads) + rossAgentPrune scheduled CF (daily 03:30, prunes expired agentPending + stale debitGuard). The launch-blocker that had to land before the client slice.",
-      "pr": 138,
-      "mergedAt": "2026-06-03"
-    },
-    {
       "title": "Phase 7 ② askRoss slice 4 — confirm-flow pause/resume + 4 confirm-tier tools. The agent now authors the playbook with the owner in the loop: a confirm-tier tool (activate/create/edit/pause workflow) PAUSES → persists a pending action at ross/agentPending/{uid}/{turnId} (10-min expiry, server-keyed, uid-scoped) + debits Request A (abandoned confirms still bill, §2.1) + emits a confirm card → the owner's resume ({resumeTurnId, decision}) re-runs the pre-flight gates (kill-switch holds), checks expiry (fail-closed), atomically one-time-consumes the pending (no double-fire), executes (audited confirmed:<uid>) or declines, then continues the loop (Request B, distinct requestId). HALF B: extracted rossActivateWorkflow/rossCreateWorkflow/rossUpdateWorkflow write-logic into owner-callable *AsOwner cores in ross.js shared by BOTH the CF handler and the agent adapters (byte-for-byte handler parity; coded errors → HTTP status or tool_result); promoted the 4 confirm tools pending→READY. Those 3 handlers had ZERO prior tests → ross-workflow-ops.test.js is the regression net. 8 commits / 7 TDD phases; two review rounds — local security-reviewer (H-1 gate-on-resume, M-1 fail-closed expiry, M-2 payload guard) + automated (M-1 pending-flag symmetry, M-2 email-in-audit, M-3 confirm-summary fallbacks), all folded. 166/166 functions tests + build green. ⚠ rossChat is LIVE — redeploy needed (ANTHROPIC_API_KEY provisioned; cd functions && npm install first). NEXT = slice 7 ross/agent* RTDB rules + prune (launch-blocker before slice 5 per the security review).",
       "pr": 136,
       "mergedAt": "2026-06-03"
@@ -417,21 +377,6 @@
     {
       "title": "Phase 7 ② askRoss slice 3 — rossChat reactive SSE Cloud Function (the project's first AI-inference CF). functions/agent/rossChat.js: the v1 reactive engine over the raw Anthropic Messages API. Four pre-flight gates (kill switch → per-owner enable → features.rossAgent → ledger balance; super-admins skip entitlement+balance, not the kill switch) → cached two-breakpoint prompt + bounded history → runAgentLoop (streams text; auto tools via the audit-wrapped executeTool; non-auto refused server-side — confirm-flow is slice 4) → single idempotent ledger debit (recordUsageAndDebit gained an optional requestId guard) → persist turn + SSE. New verifyRossAgentAccess (recognises rossAgent; verifyUserOrAdmin untouched) + ross.js __setDbForTests seam. Built in 6 TDD phases; two review rounds (local security+code, then automated — no blockers) folded: server-generated requestId (closed a free-turn vector), threadId/clientToday validation, best-effort loop debits partial spend on LLM error, structured SSE events, warm-client reuse. 139/139 functions tests + build green; catalog updated (both copies). ⚠ Deploy secret-first (functions:secrets:set ANTHROPIC_API_KEY); server-only, no client yet. T-1 (ross/agent* RTDB rules) → slice 7; T-2 (debitGuard retention) → bug queue.",
       "pr": 134,
-      "mergedAt": "2026-06-03"
-    },
-    {
-      "title": "Phase 7 ② askRoss Agent — llm-client (slice 1). functions/agent/llm-client.js: the swappable wrapper over the raw Anthropic Messages API for the v1 reactive engine. streamTurn (pipes text deltas to onText, returns {content,usage,stopReason} — final carries tool_use + complete usage); createTurn (non-streaming, eval judge); toLedgerUnits(apiUsage) snake→camel mapper (closes #129 §2.1 zero-charge trap — ledger reads camelCase units); MODELS (AGENT claude-sonnet-4-6 / JUDGE claude-haiku-4-5-20251001); lazy/injectable client seam (configureClient/getClient/__setClientForTests — SDK lazy-required, zero live calls in tests). 9 tests (incl. verbatim usage-block mapping + anti-pattern proof). API surface verified vs /anthropics/anthropic-sdk-typescript (context7); deliberately NOT using beta.toolRunner (reactive v1 owns its loop). Adds @anthropic-ai/sdk. Review 1 🔴 (Haiku model ID needed date suffix → would 404 at runtime) + 2 nits (?? vs ||, maxTokens 4096) all folded. 48 agent tests + build green.",
-      "pr": 132,
-      "mergedAt": "2026-06-03"
-    },
-    {
-      "title": "Phase 7 ② askRoss Agent — engine-agnostic core (slice 2). functions/agent/: constants (tier ranks, MODE/STATUS, NO_UNDO, MEASUREMENT_INPUT_TYPES + isAgentSubmittable §3.1 gate), policy (effectivePolicy tighten-only + clampToCeiling), prompt (systemBlocks 2 cache_control:ephemeral breakpoints, mode-aware identity), tools (ONE Zod registry → toAnthropicTools + toSdkMcpServer lazy/seamed; enabledToolNames/autoAllowlist/catalogForPrompt), execute (executeTool audit-wraps every run + no-undo prev capture). 4 ready adapters + 12 pending (run throws AdapterPendingError). Zero hard engine dep (Agent SDK lazy-required behind a test seam). Adds zod + zod-to-json-schema. 39 agent + 87 functions tests; build green. Review 0 must-fix, 5 folded (KB drift, autoAllowlist plan-vs-code divergence, snapshotPrev/NO_UNDO coupling comment, ctx.now server-time comment, rules-timing) — caught + rejected a reviewer-suggested agentConfig client-write rule as contradicting §9. Deferred: 3 ross.js extraction refactors, 3 reader CFs, advanceDueDate recurrence, slice-7 rules.",
-      "pr": 130,
-      "mergedAt": "2026-06-03"
-    },
-    {
-      "title": "Phase 7 ② askRoss Agent — spec revision (engine-agnostic core + per-engine billing). After a design session on the Claude Agent SDK vs the raw Anthropic Messages API: §1.1 'one engine-agnostic core, two engines' (v1 reactive owns the loop on the raw API for the confirm-pause + per-turn billing; v2 proactive rents the loop on the Agent SDK for the unattended sweep) + §2.1 per-engine billing (debit granularity, pre-flight thresholds, PreToolUse balance-abort hook, confirm-pause billed twice, idempotent debits). Ground-truth check of functions/billing/ledger.js confirmed it already prices the 4 cache-token classes (no ledger change) but caught a snake_case API usage → camelCase ledger units silent zero-charge trap (slice-1 toLedgerUnits mapper). Review 0 must-fix, 5 folded.",
-      "pr": 129,
       "mergedAt": "2026-06-03"
     },
     {
@@ -460,33 +405,13 @@
       "mergedAt": "2026-06-01"
     },
     {
-      "title": "Phase 7 ④a — entitlement resolver core + 5 CFs (additive half). functions/entitlements/: pure mergeEntitlements (feature OR, additive limits, -1 unlimited, expiry/cancel filtering) + recomputeEntitlements (eventual SOLE writer of materialized features/limits; expiry strips to Free; atomic materialization into canonical paths) + 5 CFs (entitlementSetTier/GrantAddOn/CancelAddOn superAdmin; entitlementGetEffective self-scoped; recomputeExpiringEntitlements daily cron). 22 TDD tests; extended in-memory RTDB fake (root multi-path update). No behavior change yet — writer consolidation + rule lock (closes the High self-grant vuln) is the next risky slice.",
-      "pr": 116,
-      "mergedAt": "2026-06-01"
-    },
-    {
-      "title": "Phase 7 ① Credit Ledger DEPLOYED to prod + OWASP backlog flush. Deployed billing CFs + billing/* rules + seeded price table (Sonnet/Haiku USD rates, markup 1.30). Same deploy flushed the entire previously-undeployed OWASP hardening (#89-#102) live — MERAKI_SHARED_SECRET/INITIAL_ADMIN_SETUP_SECRET provisioned by operator, 106 functions deployed, live rules verified. Surfaced + logged a Medium bug (cleanupOldQueuesScheduled phantom export, #115). Deploy was operationally bumpy (secrets-block, firebase-tools post-deploy hang, 429 quota retries, MSYS/BOM CLI-write retries on the seed) — all lessoned.",
-      "pr": "113 (deploy)",
-      "mergedAt": "2026-06-01"
-    },
-    {
-      "title": "Phase 7 ① Credit Ledger build — shared USD-denominated prepaid credit ledger (functions/billing/): ledger.js (pure cost formula USD cents + service dispatch; atomic debit via pre-gen-key + transaction + retry-safe no-double-debit; grant+audit; checkBalance gate; getUsage newest-first pagination), 3 CFs (billingGrantCredit superAdmin / billingGetBalance+billingGetUsage self-scoped), billing/* server-only rules (same change-set), price-table seed (markup 1.30, no FX). Operator pivoted unit-of-account ZAR->USD post-spec-merge (global-ready) — spec+plan amended before coding. 27 TDD tests (golden vectors + x.5 rounding pin, unknown-model NaN guard, pagination); in-memory RTDB fake. Code-reviewed. DEPLOY PENDING (npm install in worktree, deploy functions:billing* + database together, run seed).",
-      "pr": 113,
-      "mergedAt": "2026-05-31"
-    },
-    {
-      "title": "Phase 7 askRoss — design phase COMPLETE (all 3 near-term specs). Decomposed Phase 7 into a 4-component program (ledger → entitlements → agent → payment rail), each its own spec. Shipped 3 design docs: ① prepaid-ZAR Credit Ledger (modelled on Anthropic's prepaid wallet); ④a Entitlement resolver/add-on layer; ② askRoss Agent (reactive-v1/proactive-ready tool-use agent, bands A+B, graduated-risk policy engine + kill switch + audit, Sonnet 4.6/streaming SSE/prompt caching, ledger+entitlement pre-flight gates, 20-prompt eval harness). The ④a design audit caught a live entitlement self-grant vuln (logged High; fix scoped into the ④a build); the ② review caught a compliance-fabrication risk → spec §3.1 measurement-gates submitResponse. Next: /plan → build in order ① → ④a → ②.",
-      "pr": "106, 107, 108, 110",
-      "mergedAt": "2026-05-31"
-    },
-    {
       "title": "OWASP remediation — all Highs + most Mediums/Lows (10 PRs #93–#102). H-4/H-7/H-10 logging+CSPRNG, H-5/H-6 CORS (new shared functions/cors-allowlist.js), H-3/H-4b, H-2 Bucket A/B (6 RTDB root reads locked to admin + userLocations child rules + design doc), H-9 npm audit (lockfile-only, all crit+high cleared), M-1 location ownerId, M-2 security headers, M-4 stored XSS in googleReviews.js, M-6/M-10/L-1/L-2 logging+createTestData gate, M-8 POPIA deletion. Every PR auto-reviewed; 2 must-fixes caught + fixed pre-merge (#96 ownerId fallback, #102 phoneNumber indexes). Consumer-mapping via 3 parallel agents drove the H-2 bucket split.",
       "pr": "93–102",
       "mergedAt": "2026-05-31"
     },
     {
-      "title": "OWASP Top-10 audit remediation — 5/5 Criticals + first Highs (#89/#90/#91). C-1 operator-precedence admin-bypass across 12 CFs (every admin guard was a no-op), C-2 hardcoded secrets → Secrets Manager + gate, C-3 getGoogleConfig admin-gate (+ shared requireAdmin), C-4 public-writable RTDB nodes, C-5 OCR SSRF allowlist, H-1 queue mutators, H-8 Storage write. #91 caught a real auth≠authz must-fix (token-only insufficient for a billable-key endpoint).",
-      "pr": "89–91",
+      "title": "OWASP Top-10 audit remediation (3 PRs) — 5/5 Criticals + 3 Highs closed from operator-supplied audit. #89: C-1 operator-precedence admin-bypass (!token.admin === true → token.admin !== true, 12 CFs — every admin guard was a no-op), C-2 hardcoded secrets → defineSecret + INITIAL_SETUP_ENABLED gate + dropped header logging, C-4 public-writable receiptPatternLogs/debug RTDB nodes. #90: C-5 OCR SSRF allowlist (new URL().hostname parse, both call paths), H-8 Storage /receipts/ public write closed. #91: C-3 getGoogleConfig admin-gated + new shared requireAdmin(req,res) helper, H-1 four queue mutators gated. All reviewed; #91 caught a real auth≠authz must-fix (token-only insufficient for a billable-key endpoint). Non-regressive: grepped all 12 C-1 functions — zero non-admin frontend callers. Deploy needs secret provisioning + rotation.",
+      "pr": "89, 90, 91",
       "mergedAt": "2026-05-30"
     },
     {
@@ -503,205 +428,237 @@
       "title": "Phase 6 stretch — Weekly Compliance Sweep starter template — first end-to-end curated ROSS template exercising Phase 4e.2 per-subtask inputType + inputConfig: 5 subtasks × 4 input types (2× temperature with auto-flag + requiredNote on out-of-range, yes_no, checkbox, text/maxLength 500); tier:free, weekly recurrence, daysBeforeAlert [2,1]; two files (updated seed for fresh deploys + idempotent ross-templates-add-compliance-sweep.js for live prod RTDB matching the PR #51/#58 one-off-script pattern); no CF or client changes — existing rossActivateWorkflow + rossCreateRun paths already honour the contract",
       "pr": 83,
       "mergedAt": "2026-05-20"
+    },
+    {
+      "title": "7-callable v2-signature sweep — mechanical migration of the 7 remaining v1 (data, context) onCall handlers in functions/index.js to v2 (request) signature following PR #67's canonical pattern: getQMSTierInfo, getQMSUsageStats, validateQMSFeatureAccess, validateQMSWhatsAppIntegration, performanceTest, runSystemOptimization, getSystemMetrics. Each callable: signature swap + context.auth → auth + functions.https.HttpsError → HttpsError + outer-catch re-throw guard (included from the start per the 2026-05-15 scope-discipline-inverse lesson — fix-X makes previously-dead validation paths newly reachable). KB catalog synced (both copies). Build green, 0 residual v1 references. None on user-facing critical path per the PR #67 audit.",
+      "pr": 82,
+      "mergedAt": "2026-05-20"
+    },
+    {
+      "title": "WiFi login Hi-Fi v2 (PR 2 of 2) — wifi-login.html rewritten in Hi-Fi tokens with Sparks-only branding. Adds single marketingConsent: boolean field to wifiLogins. Meraki redirect flow preserved byte-for-byte (operator guardrail). Closes deferred audit findings #5-8 + #11 from PR #73 + offline-queue retry-path gap from the PR #73 review.",
+      "pr": 81,
+      "mergedAt": "2026-05-19"
+    },
+    {
+      "title": "Bug-knock-off bundle — three small backlog fixes shipped sequentially: PR #77 deleted dead public/tools/archive/temp-setup.html (called tempClearData CF removed in PR #70); PR #78 dropped ?v=${Date.now()} Vite-breaking cache-busters at feature-access-control.js:64 + queue-management.js:1646; PR #79 fixed mobile bottom-nav (decorative <button> with no href → real <a> with destinations) AND folded mobile card-footer hardcoded mock strings (\"Target 28% · 3 days running\" etc.) replaced with dynamic cardMeta(c) helper reading c.sidecar fields. Second occurrence of the prototype-debris-on-v2-surfaces pattern (PR #48 was the first).",
+      "pr": "77, 78, 79",
+      "mergedAt": "2026-05-19"
+    },
+    {
+      "title": "Concierge home active-run surfacing (Phase 6 PR 4) — new rossGetHomeWorkflowDigest CF (onRequest + verifyUserOrAdmin, read-only) + thin client detector detectActiveWorkflows slot 1 on /ross.html. Hybrid card mix: workflow card wins slot 1, food-cost/VIP/revenue detectors keep slots 2-3. 5 card variants (Overdue / In progress / Due today / Recently completed / All clear) + LEARNING_MODE fallback. 38 unit tests. Two preview-driven defects folded in (numeric-nextDueDate normalisation + canonical run schema with no status field). Operator design call mid-PR: \"Missed\" framing at daysLate >= 4. Home feed auto-reload on every mount. Same root-cause pattern as PR #28 — KB doc shape ≠ CF write-path shape, second occurrence of the validated 2026-05-01 SELF_OPT.",
+      "pr": 72,
+      "mergedAt": "2026-05-19"
+    },
+    {
+      "title": "WiFi login security hardening (PR 1 of 2) — closed 4 highest-severity audit findings on wifi-login.html flow. New submitWifiLogin v2 onCall CF: anonymous Firebase Auth + per-UID 5s debounce + shape validation + server-generated push-key sessionID + atomic multi-path write to wifiLogins/{sessionID} + activeUsers/{client_mac|sessionID} + rateLimitsWifi/{uid}. Rules tightened: .write and .read on wifiLogins/activeUsers/userPreferences flipped from auth != null to admin-only (read scope expansion justified — guest PII was readable by any signed-in user). Added rateLimitsWifi node. Open-redirect guard: host-pattern whitelist (n##.meraki.com / .network-auth.com) on base_grant_url before redirect. Adjacent cleanup: storeUserPreferences + logUserDisconnection → no-op stubs (preferences were dead code; disconnect is now admin-only, deferred to backlog). Plan in docs/plans/2026-05-19-wifi-login-security-plan.md. Deployed CF + rules pre-merge per 2026-05-01 lesson; hosting closes the brief data-capture gap. Automated review caught one self-inflicted 🔴 (DATABASE_RULES_GUIDE doc claimed .validate fires on Admin SDK writes — contradicts 2026-05-12 LESSON I had loaded); fixed in fold-in commit da527973 before merge.",
+      "pr": 73,
+      "mergedAt": "2026-05-19"
+    },
+    {
+      "title": "clearScanningData chunked-delete + WRITE_TOO_BIG fix (mid-session bug-triage pivot) — admin dashboard \"Clear Scanning Data\" button hit RTDB's ~16 MB single-write ceiling on grown /scanningData node. Migrated CF from onRequest (+ broken httpsCallable client shape that has been silently failing in try/catch) to v2 onCall + chunked delete via orderByKey().limitToFirst(500) + multi-path null update(). Hard cap of 200 batches (100K records) per invocation; CF returns { done } so client loops across calls for larger nodes. Folded tempClearData deletion (hardcoded MerakiSetup2024! secret, same WRITE_TOO_BIG bug, same file/concern). Operator pre-unblocked via firebase database:remove /scanningData CLI (CLI bypasses per-write limit via own chunking). Deployed + smoke-tested before merge.",
+      "pr": 70,
+      "mergedAt": "2026-05-19"
+    },
+    {
+      "title": "registerUser callable Gen-2 signature fix (HIGH-sev bug-triage) — migrated v1 (data, context) => to v2 (request) => with auth/data destructured. Closed silent prod degradation that had been masking the Path A code path since the firebase-functions v7 upgrade. Pre-merge review fold-in: re-throw HttpsError from outer catch (preserves invalid-argument codes; previously rewrapped as internal), KB doc sync (CLOUD_FUNCTIONS_CATALOG.md), comment-block trim. Validated end-to-end on prod via fresh signup + invalid-tier negative test.",
+      "pr": 67,
+      "mergedAt": "2026-05-15"
+    },
+    {
+      "title": "ROSS Run execution UI (Phase 6 PR 3) — ?tab=run page covering all 10 inputTypes (checkbox / text / number / temperature with auto-flag + client pre-flight requiredNote + server-422 safety net via store.pendingNoteTaskId + card watcher / yes_no / dropdown / timestamp / rating / photo / signature placeholders), auto-save on commit, sticky summary bar, inline completion banner. 40 unit tests across 4 new suites. Pre-merge fold-in resolved 6 of 7 automated-review items (1 🔴 must-fix + 1 🟡 + 4 🔵 NITs).",
+      "pr": 65,
+      "mergedAt": "2026-05-15"
+    },
+    {
+      "title": "Housekeeping — gitignore local agent/editor state + Session Opening Protocol clarification + dead-worktree cleanup",
+      "pr": "62, 63",
+      "mergedAt": "2026-05-13"
     }
   ],
   "bugs": [
     {
-      "title": "CRIT-09 ESCALATED - every WhatsApp receipt image is world-readable on the public internet, and the audited fix would not work",
-      "severity": "critical",
-      "discoveredAt": "2026-07-21",
-      "discoveredOn": "PR-2 receipts scoping",
-      "blockingSprint": "False",
-      "notes": "receiptProcessor.js:440 calls file.makePublic() on every receipt image and stores https://storage.googleapis.com/{bucket}/receipts/{timestamp}_receipt.jpg. (1) storage.rules is IRRELEVANT for these objects - makePublic() writes an allUsers:READ ACL and storage.googleapis.com requests never evaluate Firebase Storage rules, so the audit proposed remediation (tighten allow read on /receipts) would neither break nor fix anything - a false closure of the same shape retracted in #168. (2) Exposure is UNAUTHENTICATED, not cross-tenant-authenticated: guest names, phone numbers, purchase data on the open web. POPIA-relevant. (3) Filenames are enumerable millisecond timestamps, walkable with cheap HEAD requests. receiptTemplateManager.js:386 does the same for templates (lower sensitivity). Fix is 4 parts: drop makePublic; serve via short-TTL signed URLs or a CF proxy (touches every client rendering a receipt); REVOKE allUsers on existing objects via a one-off bucket sweep (this is what closes the live exposure, and is independent so it can ship first); unguessable names going forward. Recommend two PRs, sweep first."
-    },
-    {
-      "title": "Every RTDB rule written against auth.token.phone_number grants instead of denying - no user has that claim",
+      "title": "Every RTDB rule written against auth.token.phone_number GRANTS instead of denying — no user in this app has that claim.",
       "severity": "high",
       "discoveredAt": "2026-07-21",
       "discoveredOn": "PR #176 security review",
       "blockingSprint": "False",
-      "notes": "No phone-based sign-in exists in the client (zero hits for signInWithPhoneNumber/RecaptchaVerifier/PhoneAuthProvider) and every setCustomUserClaims call writes only {admin}, overwriting the whole claims object (functions/index.js:782,987,992,1321). So auth.token.phone_number is null for everyone, and RTDB evaluates null === null as TRUE - any rule comparing it to a data.child() value that is also null (i.e. on a CREATE) grants rather than denies. Not theoretical: it silently defeated the first draft of PR #176 rewards fix, caught by security review pre-deploy. Still to re-derive: guest-rewards/ (database.rules.json:88) is effectively admin-only in practice. Audit every remaining phone_number rule; replace null-mismatch reliance with explicit existence tests."
+      "notes": "There is no phone-based sign-in anywhere in the client (rg \"signInWithPhoneNumber|RecaptchaVerifier|PhoneAuthProvider\" public → zero hits; the only paths are createUserWithEmailAndPassword/signInWithEmailAndPassword), and every setCustomUserClaims call writes only {admin} and overwrites the whole claims object (functions/index.js:782,987,992,1321). So auth.token.phone_number is null for everyone — and RTDB evaluates null === null as TRUE, so any rule comparing it against a data.child(...) value that is also null (i.e. on a CREATE) grants rather than denies. This is not theoretical: it silently defeated the first draft of PR #176's rewards fix, caught by security review before deploy. Still to re-derive under this light: guest-rewards/$phoneNumber (database.rules.json:88) — its .write is admin || auth.token.phone_number === $phoneNumber, which is never true for a real user, so that node is effectively admin-only in practice (and is one reason receipt-management's reward flow is broken end-to-end, see the row below). Audit every remaining phone_number rule and replace null-mismatch reliance with explicit existence tests. Found 2026-07-21 via the PR #176 security review."
     },
     {
-      "title": "receipt-management.js reward creation is rejected by rules - the flow is broken end to end",
-      "severity": "high",
-      "discoveredAt": "2026-07-21",
-      "discoveredOn": "rules-batch PR-1b census",
-      "blockingSprint": "False",
-      "notes": "processRewards (public/js/receipt-management.js:952-964) writes {receiptId, campaignId, guestPhoneNumber, totalAmount, status, createdAt, createdBy} but rewards/$rewardId .validate requires hasChildren([metadata,status,value,expiresAt]) - an unconditional AND that not even an admin bypasses. The two follow-on writes fail too: campaign-rewards requires admin (rules:93,96) and guest-rewards requires auth.token.phone_number === $phoneNumber (rules:88), null for everyone. Sibling reward-management.js:661 supplies all four keys and works, which is why this went unnoticed. Fix: add the missing fields (mirror reward-management.js:661) or route creation through a CF. Third live bug a rules census has surfaced, all three hidden behind a catch that only console.errors."
-    },
-    {
-      "title": "whatsapp-message-history root .read carries the same cascade pathology PR #176 fixes one node over",
+      "title": "whatsapp-message-history root .read has the identical cascade pathology PR #176 fixes one node over",
       "severity": "medium",
       "discoveredAt": "2026-07-21",
       "discoveredOn": "PR #176 security review",
       "blockingSprint": "False",
-      "notes": "database.rules.json:349 is .read: auth != null, which cascades and makes the per-child per-tenant rule at :354 dead code. Any authenticated user reads every tenant locationId, guest phoneNumber and FULL message content, cross-tenant. POPIA-relevant. PR-1a locked this node .write only (MED-06a); the read side was never in scope. Not a NEW-CRIT-01 routing bypass (phoneNumber here is the guest, not the routing number), so correctly out of scope for #176, but needs its own read census (direct-path vs root-query consumers) before the root can be locked."
+      "notes": "database.rules.json:349 is \".read\": \"auth != null\", which cascades and makes the per-child per-tenant rule at :354 dead code. Any authenticated user reads every tenant's {locationId, phoneNumber, content, …} — guest phone numbers and full message bodies, cross-tenant. POPIA-relevant. PR-1a locked this node's .write only (MED-06a); the read side was never in scope. Not a NEW-CRIT-01 routing bypass (the phoneNumber here is the *guest's*, not the routing number), so it was correctly left out of PR #176 — but it needs its own read census (direct-path vs root-query consumers) before the root can be locked. Found 2026-07-21 via the PR #176 security review."
     },
     {
-      "title": "FIXED (#170) - Client-side location creation broken for non-admin users (was live 2026-05-31 to 2026-07-21)",
-      "severity": "fixed",
+      "title": "receipt-management.js reward creation is rejected by rules and has been for a long time — the flow is broken END TO END.",
+      "severity": "high",
       "discoveredAt": "2026-07-21",
-      "discoveredOn": "RTDB rules-batch PR-1 re-census",
+      "discoveredOn": "rules-batch PR-1b census",
       "blockingSprint": "False",
-      "notes": "Both client payloads (location-service.js createLocation, user-dashboard.js) now write ownerId: uid after the spread, so a caller-supplied ownerId cannot override the authenticated uid. Guarded by 5 vitest cases in public/js/modules/user-dashboard/tests/location-service.test.js - confirmed empirically, the guards failed RED against pre-fix code. Still open separately: the !data.exists() any-authed-user-can-create hole, and the admin tool creates unassigned locations with no ownerId by design (admin bypasses .validate) - both fold into CRIT-10."
+      "notes": "processRewards (public/js/receipt-management.js:952-964) writes a reward payload of {receiptId, campaignId, guestPhoneNumber, totalAmount, status, createdAt, createdBy}, but rewards/$rewardId .validate requires newData.hasChildren(['metadata','status','value','expiresAt']) — the payload has status only, and the hasChildren term is an unconditional AND that not even an admin bypasses. The two follow-on writes fail as well: campaign-rewards/{cid}/{rid} requires admin (database.rules.json:93,96) and guest-rewards/{phone}/{rid} requires auth.token.phone_number === $phoneNumber (:88), which per the row above is null for every user. Sibling reward-management.js:661 (manual reward issue) supplies all four keys and works — presumably why this went unnoticed. Fix: add the missing fields to the payload (mirror reward-management.js:661), or route reward creation through a CF. Not bundled into PR #176 — it is a client payload bug, not a rules bug. Third live bug a rules census has surfaced (after locations/ownerId and this), all three hidden behind a client catch that only console.errors. Found 2026-07-21 during the PR-1b census, independently confirmed by security review."
     },
     {
-      "title": "v-html=\"data.diagnosis.detail\" in FoodCostApp.vue — same latent stored-XSS class as the closed #147",
-      "severity": "low",
-      "discoveredAt": "2026-07-02",
-      "discoveredOn": "scheduled OWASP security scan",
-      "blockingSprint": false,
-      "notes": "public/js/modules/food-cost/v2/components/FoodCostApp.vue:102 renders diagnosis.detail via v-html. Currently safe: diagnosis is sourced only from static public/js/modules/food-cost/v2/content.js (ROSS_DIAGNOSIS). Checked 2026-07-05: PR #167 (the food-cost reader, open) does NOT touch FoodCostApp.vue or diagnosis — it's a backend-only agent adapter, so this finding is not yet triggered by that PR, but the underlying W1 risk (live/agent-derived diagnosis text routed into this field later) remains. Fix: swap to {{ data.diagnosis.detail }} now (same discipline as #147); the not-yet-enabled vue/no-v-html eslint guard (backlog item 3c) would catch this automatically."
-    },
-    {
-      "title": "✅ CLOSED 2026-06-07 (#147) — v-html=\"c.detail\" on the Ross home story card — latent stored-XSS surface",
-      "severity": "low",
-      "discoveredAt": "2026-06-05",
-      "discoveredOn": "PR #143 review",
-      "blockingSprint": false,
-      "notes": "FIXED in #147: RossHomeDesktop.vue:203 now renders {{ c.detail }} (Vue auto-escapes); verified c.detail is plain text across content.js+detectors.js (no intentional markup); added tests/unit/ross-home-desktop-no-vhtml.test.js forward guard. Original: public/js/modules/ross/v2/components/RossHomeDesktop.vue:203 renders the card detail via v-html (presumably for <strong> emphasis). Today detail is sourced only from static copy (v2/content.js) and detector template strings built from server-derived numbers/labels (v2/detectors.js — requiredTaskCount, nextDueLabel, aggSuffix), so it is NOT currently exploitable. But it violates the 'zero v-html on agent/server content' discipline (LESSON 2026-06-04 vue/escaping, #139); the moment detail carries richer/free-text/agent-authored data it becomes a stored-XSS vector. Fix: render via {{ }}, sanitize, or move emphasis to structured fields. The vue/no-v-html eslint rule (guard-backfill seed item #2, docs/analysis/2026-06-05-lesson-guard-coverage.md) flags this automatically once enabled. Confirmed live by the #143 automated review."
+      "title": "CRIT-09 IS WORSE THAN AUDITED, AND THE AUDITED FIX WOULD NOT WORK — every WhatsApp receipt image is world-readable on the public internet, no account required.",
+      "severity": "critical",
+      "discoveredAt": "2026-07-21",
+      "discoveredOn": "PR-2 receipts scoping",
+      "blockingSprint": "False",
+      "notes": "functions/receiptProcessor.js:440 calls await file.makePublic() on every receipt image, then stores the URL as https://storage.googleapis.com/{bucket}/receipts/{timestamp}_receipt.jpg (:421,:443). Three consequences: (1) storage.rules is IRRELEVANT for these objects — makePublic() writes an allUsers:READ ACL onto the GCS object, and requests to storage.googleapis.com are served by GCS directly and never evaluate Firebase Storage rules. So the audit's proposed remediation (tighten allow read on /receipts/{receiptFile}) would neither break anything nor fix anything — a false closure waiting to happen, exactly the HIGH-08 shape retracted in #168. (2) The exposure is UNAUTHENTICATED, not cross-tenant-authenticated: guest names, phone numbers and purchase data readable by anyone on the web. POPIA-relevant. (3) Filenames are ENUMERABLE — {millisecond-epoch}_receipt.jpg is walkable with cheap HEAD requests over a plausible window; no other secret is needed. functions/receiptTemplateManager.js:386 does the same for receipt templates (lower sensitivity — operator-authored, not guest PII). The real fix is four parts, and only the first is small: (a) drop makePublic(); (b) serve via short-TTL signed URLs minted server-side, or a CF proxy — touches every client surface rendering a receipt image; (c) revoke allUsers on existing objects via a one-off bucket sweep — this is the part that actually closes the CURRENT exposure, and it is independent of the code change, so it can go first; (d) unguessable object names going forward. Recommend two PRs: ACL sweep first (fastest exposure closure), then the code/client change. Found 2026-07-21 while scoping PR-2 receipts."
     },
     {
       "title": "cleanupOldQueuesScheduled cron has never deployed — export clobbered by module.exports reassignment",
       "severity": "medium",
       "discoveredAt": "2026-06-01",
-      "discoveredOn": "Phase 7 ① ledger deploy",
-      "blockingSprint": false,
-      "notes": "queueAnalytics.js:343 does exports.cleanupOldQueuesScheduled = onSchedule('every 24 hours', ...), but line 357's module.exports = {...} replaces the whole exports object (CommonJS), dropping that assignment. So require('./queueAnalytics').cleanupOldQueuesScheduled is undefined, index.js:2243 exports undefined, and firebase reports 'No function matches the filter' — never a deployable function. Consequence: automated daily queue pruning is NOT running (only the manual cleanupOldQueues HTTP fn works), compounding the unbounded-node retention bug. Found during the ledger deploy (106 deployed vs 107 exports). Fix: include cleanupOldQueuesScheduled in the module.exports object (or move the assignment after it). One-line merge + redeploy."
+      "discoveredOn": "ledger deploy",
+      "blockingSprint": "False",
+      "notes": "functions/queueAnalytics.js:343 does exports.cleanupOldQueuesScheduled = onSchedule('every 24 hours', …), but line 357's module.exports = { … } REPLACES the whole exports object (CommonJS), dropping that assignment. So require('./queueAnalytics').cleanupOldQueuesScheduled is undefined, functions/index.js:2243 exports undefined, and firebase reports No function matches the filter: cleanupOldQueuesScheduled — it's never been a deployable function. Consequence: automated daily queue pruning is NOT running (only the manual cleanupOldQueues HTTP fn works), compounding the unbounded-node retention bug below. Found 2026-06-01 during the Phase 7 ① ledger deploy (106 deployed vs 107 exports → traced to this phantom). Fix: include cleanupOldQueuesScheduled in the module.exports = {…} object (or move the assignment after it). One-line merge + redeploy."
     },
     {
-      "title": "salesData .write root still auth != null (any authed user can create new salesData records)",
+      "title": "SEVERITY RAISED to High 2026-07-04",
+      "severity": "unspecified",
+      "discoveredOn": "auth.token.admin === true",
+      "blockingSprint": "",
+      "notes": "salesData/forecasts .write root cascade bypass — any authed tenant can OVERWRITE another tenant's EXISTING record, not just create new ones — database.rules.json:495-521. RTDB write-rule cascades are permissive-only: the collection-level .write: \"auth != null\" already grants access before the child ownership check runs, and there is no .validate reasserting newData.child('userId').val() === auth.uid independent of write path — so the child check is dead code for existing records. Original 2026-05-31 finding (preserved below) only caught the create-new-record case; the 2026-07-04 fresh OWASP scan (docs/security/owasp-audit-2026-07-04.md) traced the full cascade and found the more serious overwrite-existing-record variant (financial data corruption/fabrication across tenants), independently re-confirmed 2026-07-05. Bundle into the same coordinated RTDB-rules PR as whatsapp-numbers/location-whatsapp-mapping (new finding, below) and the existing HIGH-04/HIGH-05/MED-06 write-cascade items — full writer census first (CLAUDE.md step 5e; plan already drafted in PR #166). _Original 2026-05-31 text:_ the H-2 work (PR #96) tightened salesData *reads* to admin + per-child owner, but the root .write remains auth != null. The per-child .validate guards *overwriting* an existing record (owner check), but any authenticated user can still create NEW salesData records under arbitrary keys (no userId-match enforced on create). Fix: add a .validate mirroring the rewards node's pattern — `!data.exists()"
+    },
+    {
+      "title": "v-html=\"data.diagnosis.detail\" in FoodCostApp.vue — same latent stored-XSS class as the closed #147",
       "severity": "low",
-      "discoveredAt": "2026-05-31",
-      "discoveredOn": "PR #111 auto-review (pre-existing)",
-      "blockingSprint": false,
-      "notes": "The H-2 work (PR #96) tightened salesData reads to admin + per-child owner, but the root .write remains auth != null. The per-child .validate guards overwriting an existing record, but any authenticated user can still CREATE new salesData records under arbitrary keys (no userId-match enforced on create). Low-impact (data pollution, not exfiltration) but inconsistent with the read lockdown. Fix: create-path .validate/.write requiring newData.child('userId').val() === auth.uid || admin. Surfaced as a NIT on already-merged code."
+      "discoveredAt": "2026-07-02",
+      "discoveredOn": "scheduled security scan",
+      "blockingSprint": "False",
+      "notes": "public/js/modules/food-cost/v2/components/FoodCostApp.vue:102 renders diagnosis.detail via v-html. Currently safe: diagnosis is sourced only from static public/js/modules/food-cost/v2/content.js (ROSS_DIAGNOSIS). But the queued W1 work (High Priority item — wiring the food-cost reader CF so Ross can see real food-cost data) will plausibly route live/agent-derived diagnosis text into this same field, at which point it becomes exploitable. Checked 2026-07-05: PR #167 (the food-cost reader, currently open) does NOT touch FoodCostApp.vue or diagnosis — it's a backend-only agent adapter (functions/agent/food-cost-summary.js + tools.js), so this finding is not yet triggered by that PR. Still worth fixing proactively: swap to {{ data.diagnosis.detail }} now (the same discipline applied in #147); the not-yet-enabled vue/no-v-html eslint guard (backlog item 3c) would catch this automatically. Found by the 2026-07-02 scheduled OWASP scan, re-confirmed 2026-07-05."
     },
     {
       "title": "rewardsProcessor.js:646 modulo bias in generateFallbackCode",
       "severity": "low",
       "discoveredAt": "2026-05-31",
-      "discoveredOn": "PR #111 auto-review (pre-existing)",
-      "blockingSprint": false,
-      "notes": "crypto.randomBytes(6) then byte % 36 over-represents chars 0-3 by ~14% (256 % 36 = 4). Far better than the old Math.random() but not uniform for a security-relevant voucher fallback code. Fix: rejection sampling (while code.length<6: b=randomBytes(1)[0]; if b<252 code += chars[b%36]). ~0.09 extra bytes/code. Surfaced as a 🟡 on already-merged OWASP-era code."
+      "discoveredOn": "PR #111 review, pre-existing",
+      "blockingSprint": "False",
+      "notes": "crypto.randomBytes(6) then byte % 36 over-represents chars 0–3 by ~14% (256 % 36 = 4). Vastly better than the old Math.random(), but not uniform for a security-relevant voucher fallback code. Fix: rejection sampling (while (code.length < 6) { const b = randomBytes(1)[0]; if (b < 252) code += chars[b % 36]; }). ~0.09 extra bytes/code. Surfaced by the #111 auto-review (🟡, on already-merged OWASP-era code)."
     },
     {
-      "title": "Entitlement self-grant — clients can write their own subscriptions/{uid}/features+limits [✅ CLOSED + DEPLOYED 2026-06-02 (#125): subscriptions/$uid .write admin-only + child .validate:false on features/limits, verified live via rules readback; gated deploy ran CFs→hosting→rules→backfill (recompute swept 42/42). No longer live.]",
-      "severity": "high",
-      "discoveredAt": "2026-05-31",
-      "discoveredOn": "Phase 7 entitlements design audit",
-      "blockingSprint": false,
-      "notes": "database.rules.json:28 allows $uid/.write for auth.uid === $uid, with a .validate that only checks tier exists in subscriptionTiers. Any authed owner can write features/<anyPremiumFlag>: true or limits/maxWorkflows: 99999 from the browser console — broken access control / privilege escalation. Actively exercised by client subscription-service.js (createSubscription/updateSubscription/startFreeTrial write features/limits from a hardcoded RTDB-unsynced constant). OWASP follow-on the 2026-05-30 audit missed. Fix is structural and scoped into Phase 7 sub-project 4a (docs/plans/2026-05-31-entitlements-addon-layer-design.md): a server-side entitlement resolver becomes the sole writer of materialized features/limits, the 7 divergent writers route through CFs, then subscriptions/$uid .write locks to admin/server-only. No (fixed by Phase 7 4a build)."
+      "title": "OWASP audit — remaining findings (updated 2026-05-31)",
+      "severity": "medium",
+      "discoveredOn": "OWASP audit 2026-05-30",
+      "blockingSprint": "False",
+      "notes": "All Criticals + all Highs done (#89–#97), plus H-4b, and Mediums M-1/M-2/M-4/M-6/M-8/M-10 + Lows L-1/L-2 (#98–#102); L-6 already satisfied (CI uses npm ci); L-5 is a non-issue (emulator config is standard). Still open: H-2 Bucket C — guests, queue/queues, receipts root reads still auth != null; non-admin readers use root *location-queries* so can't be locked without a refactor — decide: location-indexed restructure (mirror salesDataIndex) vs CF-mediated reads vs accept residual (see design doc docs/plans/2026-05-30-h2-cross-tenant-rtdb-design.md); receipts may be lockable immediately (verify readers are admin-only). M-3 SRI on all CDN <script>/<link> across every HTML page (mechanical but hash-generation + breakage-prone — own session). M-5 whatsapp-numbers/location-whatsapp-mapping root reads + M-7 admin-claims root read + L-3 rewards root read — all Bucket-C-class (root-read tightening needs consumer mapping; fold into Bucket C). M-9 MFA enforcement for admins (ops/config + auth-flow work). L-4 min password 6→8 (needs a validation point in the password-input path). CSP (deferred from M-2 — per-page CDN/inline-source audit needed). firebase-admin@13 major upgrade (clears the last 8 moderate uuid npm advisories from #97; needs deploy testing). Source: owaspaudit20260530.html."
+    },
+    {
+      "title": "OWASP operator decisions (2026-05-30)",
+      "severity": "n/a",
+      "discoveredOn": "PR #91",
+      "blockingSprint": "False",
+      "notes": "(a) GCP console: add HTTP-referrer restriction to Google Places API key (C-3 defence-in-depth, can't be done in code); (b) getQueueStatus auth posture — left unauthenticated in #91 (possible guest position-check); decide: lock to admin, add per-location token, or leave open."
     },
     {
       "title": "Recurrence-engine gap: nextDueDate never advances when daily workflow goes uncompleted",
       "severity": "medium",
-      "discoveredAt": "2026-05-19",
-      "discoveredOn": "PR #72 preview test",
-      "blockingSprint": false,
-      "notes": "Operator noted on PR #72 preview: 'I see one workflow that hasn't been completed daily since it was created.' rossSubmitResponse auto-completes the run when all required tasks are done but does NOT advance the workflow's nextDueDate for the next cycle. A daily workflow created 10 days ago with no run completed reads as daysLate: 10 instead of rolling forward. Fix needs: (a) on run completion, advance nextDueDate by recurrence period; (b) decide policy when a cycle is fully missed (advance on next 'create run' attempt OR scheduled CF walks every workflow nightly). Touches rossSubmitResponse + possibly rossScheduledReminder. Backlog candidate for a dedicated sprint — recurrence semantics need product input."
+      "discoveredOn": "PR #72 preview",
+      "blockingSprint": "False",
+      "notes": "Operator noted on PR #72 preview: \"I see one workflow that hasn't been completed daily since it was created.\" rossSubmitResponse auto-completes the run when all required tasks are done, but does NOT advance the workflow's nextDueDate for the next cycle. A daily workflow created 10 days ago with no run completed reads as daysLate: 10 instead of rolling forward. Fix needs: (a) on run completion, advance nextDueDate by recurrence period (daily/weekly/...); (b) decide policy when a cycle is fully missed (e.g. nextDueDate advances on the next \"create run\" attempt OR via a scheduled CF that walks every workflow nightly). Touches rossSubmitResponse + possibly rossScheduledReminder (already scheduled). Backlog candidate for a dedicated sprint — recurrence semantics need product input."
     },
     {
-      "title": "Double-seed race on signup retry — rossSeedFirstWorkflow idempotency pre-check is not transactional",
-      "severity": "low",
-      "discoveredAt": "2026-05-12",
-      "discoveredOn": "PR #58 final review",
-      "blockingSprint": false,
-      "notes": "A user double-clicking signup or hitting a network retry could pass the firstWorkflowSeededAt pre-check in both invocations and produce two seeded workflows. Mitigation options: (a) RTDB transaction() on the marker, OR (b) deterministic workflow ID per uid (e.g. seed_{uid}) so duplicate write is overwrite. Exposure small; consequence mild (duplicate workflow, no corruption)."
-    },
-    {
-      "title": "Unbounded-node retention policy — in-app 'Clear X' buttons are time-bombs without scheduled pruning",
+      "title": "Unbounded-node retention policy ticket",
       "severity": "medium",
-      "discoveredOn": "PR #70 + #73",
-      "blockingSprint": false,
-      "notes": "Covers /scanningData, /wifiLogins, /activeUsers, /userPreferences, /rateLimitsWifi, /billing/debitGuard (per-request UUID never dedupes, ~1/turn forever), /ross/agentPending (orphaned expired confirms), /billing/paymentEvents (#156 — real-money audit trail, likely keep ≥1y or archive), and /ross/proactiveLog (#158 review — daily nudge dedup markers, ~365 nodes/user/year; rossAgentPrune is the natural home for a 90-day sweep, add before opt-in widens). Options: scheduled prune CF (chunked-delete pattern), TTL-on-write, or rollups. Needs product call on retention window per node."
+      "discoveredOn": "PR #70 + PR #73",
+      "blockingSprint": "False",
+      "notes": "same root cause: in-app \"Clear X\" buttons are time-bombs without scheduled pruning. Now covers /scanningData (PR #70), /wifiLogins, /activeUsers, /userPreferences, /rateLimitsWifi (all per PR #73), and /billing/debitGuard/{uid}/{requestId} (PR #134 review T-2 — the slice-3 requestId is a fresh UUID per request, so guard nodes never dedupe and accumulate ~1/turn forever; a TTL/expiresAt sweep or 90-day prune closes it), and /ross/agentPending/{uid}/{turnId} (PR #136 review M-3 — abandoned/expired confirm actions are never consumed, so they orphan; a scheduled prune of expiresAt < now − grace closes it — bundle into the slice 7 ross/agent* rules work), and /ross/proactiveLog/{uid}/{YYYY-MM-DD} (PR #158 review — daily nudge dedup markers, ~365 nodes/user/year; rossAgentPrune is the natural home for a 90-day sweep; add before opt-in widens past the founder). Options: (a) scheduled prune CF (onSchedule('every 24 hours')) using the chunked-delete pattern from clearScanningData, prune records older than 30/90 days; (b) TTL-on-write with expiresAt; (c) aggregate-then-discard to hourly/daily rollups. Needs product conversation on retention window per node (different windows likely OK — guest analytics may want 90d, rate-limits only need 1h)."
     },
     {
-      "title": "database.rules.json fails strict JSON.parse (bookings block literal newlines)",
+      "title": "updateWifiDisconnect CF for disconnect-status tracking",
+      "severity": "low",
+      "discoveredOn": "PR #73",
+      "blockingSprint": "False",
+      "notes": "PR #73 made logUserDisconnection a no-op stub because the previous direct RTDB write to /activeUsers/{sessionID} is now blocked by admin-only rules. The disconnect signal is best-effort browser-unload (already unreliable on mobile) so the loss is minor, but admin analytics that filtered by status === 'disconnected' will see all records stuck at active: true indefinitely. Proper fix: small CF that takes a sessionID + anon-UID and updates the status server-side, called from the existing beforeunload handler. Anonymous auth UID must match the record's anonUid to authorize the update."
+    },
+    {
+      "title": "Walled-garden audit at every deployed Meraki venue",
+      "severity": "medium",
+      "discoveredOn": "PR #73",
+      "blockingSprint": "False",
+      "notes": "PR #73's submitWifiLogin CF lives at *.cloudfunctions.net. If a venue's Meraki captive-portal walled garden doesn't include that hostname, the CF call fails silently → fallback to localStorage offline-queue → guest still gets WiFi but no data captured. Audit each venue's walled-garden config (or document the canonical config IT teams should match). PR #73's fallback chain absorbs the failure so it's not user-visible, but it IS silent data loss for any venue with an incomplete whitelist."
+    },
+    {
+      "title": "Phone normalization to E.164 in submitWifiLogin",
+      "severity": "low",
+      "discoveredOn": "PR #73",
+      "blockingSprint": "False",
+      "notes": "KNOWLEDGE BASE/PHONE_NUMBER_NORMALIZATION_AUDIT.md documents the canonical normalization path. PR #73 stores raw phoneNumber as-received from intlTelInput's getNumber(). Adding libphonenumber server-side would normalize on write. Deferred from PR #73 to avoid the dep + audit-trail effort."
+    },
+    {
+      "title": "Open-redirect refusal log monitoring",
+      "severity": "low",
+      "discoveredOn": "PR #73",
+      "blockingSprint": "False",
+      "notes": "PR #73 added a host-pattern whitelist on base_grant_url before redirect. Refusals emit console.error(\"WiFi LOGIN: refused to redirect…\") but stay on the client. If a new legitimate Meraki host family surfaces (whitepaper says hosts are dynamic), we won't know until a guest reports being blocked. Fix: forward the error to Cloud Logging via a tiny logRefusedRedirect CF, or include in PR 2's general telemetry layer."
+    },
+    {
+      "title": "/scanningData .write: auth != null audit",
+      "severity": "low",
+      "discoveredOn": "PR #70",
+      "blockingSprint": "False",
+      "notes": "separate from retention. PR #70 noted the rule is permissive (any authed user can write). The Meraki scanner POST flow writes here continuously; tightening without breaking that flow needs a parallel audit + CF pattern like submitWifiLogin. Defer until after Meraki scanner write path is fully mapped."
+    },
+    {
+      "title": "PR 2 — Hi-Fi v2 wifi-login rewrite",
+      "severity": "medium",
+      "discoveredOn": "PR #73",
+      "blockingSprint": "False",
+      "notes": "closes deferred findings from PR #73 audit: #5 dual activeUsers schemas, #6 ipinfo.io no consent disclosure, #7 weak email/name regex, #8 localStorage PII unencrypted, #11 footer \"v2.0\" cosmetic. PLUS the automated review surfaced an offline-queue retry-path gap: checkAndUploadOfflineData only fires on captive-portal page load, but post-Meraki-redirect users won't return to that page in the same session — so queued records may be permanently lost for that session. PR 2 spec needs a different retry surface. Flag-gated via customization/useV2WifiLogin."
+    },
+    {
+      "title": "Double-seed race on signup retry",
+      "severity": "low",
+      "discoveredOn": "PR #58 final review",
+      "blockingSprint": "False",
+      "notes": "rossSeedFirstWorkflow's idempotency pre-check is not transactional. A user double-clicking signup or hitting a network retry could pass the pre-check in both invocations and produce two seeded workflows. Mitigation options: (a) RTDB transaction() on the firstWorkflowSeededAt marker, OR (b) deterministic workflow ID per uid (e.g. seed_{uid} rather than push key) so duplicate write is overwrite. Exposure small; consequence mild (duplicate workflow, no corruption)."
+    },
+    {
+      "title": "Workflow task edit not reflected in restarted run",
+      "severity": "medium",
+      "discoveredOn": "PR #65 preview",
+      "blockingSprint": "False",
+      "notes": "operator changed a task's inputType (temperature → photo) via the Phase 4e.1 task editor, hit save, then started a new run on the workflow. The run UI still showed the old inputType. Could be (a) the task editor not actually persisting inputType despite the allowedFields list including it; (b) rossManageTask server-side update not landing; (c) getPlaybookWorkflows caching or stale-read; (d) the operator hit the server's \"Run is already completed\" 409 case and was viewing the OLD completed run's task snapshot, not a fresh workflow read. Investigation needed before fix."
+    },
+    {
+      "title": "Task editor UX needs single-Save + success feedback + auto-exit",
+      "severity": "low",
+      "discoveredOn": "PR #65 preview",
+      "blockingSprint": "False",
+      "notes": "operator feedback on the Phase 4e.1 task editor (RossPlaybookWorkflowTasksEditor.vue): currently has a Save button per task row, and saving doesn't exit edit mode or confirm to the user. Desired: one Save button at the bottom that commits all dirty tasks, a success message, then auto-exit back to the workflow card view. Pre-existing scope from PR #32; not a Run-UI bug."
+    },
+    {
+      "title": "Subscription resolves \"enterprise\" tier for the operator's test account",
+      "severity": "medium",
+      "discoveredOn": "PR #65 preview",
+      "blockingSprint": "False",
+      "notes": "feature-access-control log on PR #65 preview shows Resolved tier ID: enterprise (from: tierId). Tier system is supposed to be free / all-in only (PR #51). The operator's account has a legacy tierId: 'enterprise' value somewhere in subscriptions/{uid}. Unclear whether enterprise is treated as super-tier (all-in equivalent) downstream — likely silently falls through. Fix: audit operator's subscription record + decide whether to backfill to all-in or formalize enterprise as a third tier."
+    },
+    {
+      "title": "Server auto-completes runs after a single response if workflow has small required-task count",
+      "severity": "medium",
+      "discoveredOn": "PR #65 preview",
+      "blockingSprint": "False",
+      "notes": "surfaced indirectly via PR #65 preview. Auto-completion check (functions/ross.js:1311-1314) treats all tasks with required !== false as required. The seeded Daily Opening Checklist has 4 subtasks but none carry an explicit required field — so all 4 are required, and auto-completion only fires when all 4 are responded. NOT actually a bug in the server logic per se, but: the operator hit \"Run is already completed\" 409, which implies SOMETHING auto-completed the run prematurely. Could be a separate run from an earlier test, OR a workflow with only 1 effective task. Worth a focused repro session before judging."
+    },
+    {
+      "title": "database.rules.json fails STRICT JSON.parse",
       "severity": "low",
       "discoveredAt": "2026-06-11",
       "discoveredOn": "PR #158 build",
-      "blockingSprint": false,
-      "notes": "The bookings block (~line 302) embeds literal newlines inside rule-expression strings; the Firebase CLI's lenient parser accepts it (deployed as-is for months) but JSON.parse / jq / most tooling reject the file. Fix: normalize the multi-line rule strings to single-line (pure formatting), then a strict-parse vitest becomes a usable pre-deploy guard (guard-backfill 3c candidate)."
+      "blockingSprint": "False",
+      "notes": "the bookings block (~line 302) embeds literal newlines inside rule-expression strings; Firebase CLI's lenient parser accepts it (deployed as-is for months) but JSON.parse, jq, and most tooling reject the file. Bit the PR #158 verification step (plan's parse check failed on a clean edit). Fix: normalize the multi-line rule strings to single-line (pure formatting, no semantic change), then strict-parse becomes a usable pre-deploy guard — candidate for guard-backfill 3c (a tiny vitest that JSON.parses the rules file)."
     },
     {
       "title": "WhatsApp client PII log scrub (remainder)",
       "severity": "low",
       "discoveredAt": "2026-06-11",
       "discoveredOn": "PR #158 review",
-      "blockingSprint": false,
-      "notes": "#158 masked the recipient phone in whatsappClient's template-send log (the daily unattended path). Remaining unmasked phone logs in the same family: whatsappClient.js:60 sendWhatsAppMessage (booking/queue flows) and adjacent inbound logs partially addressed in #93. One small scrub PR: mask or drop 'to' across utils/whatsappClient.js."
-    },
-    {
-      "title": "updateWifiDisconnect CF for disconnect-status tracking",
-      "severity": "low",
-      "discoveredOn": "PR #73",
-      "blockingSprint": false,
-      "notes": "logUserDisconnection is now a no-op stub since the direct /activeUsers write is admin-only. Disconnect signal is best-effort browser-unload anyway; analytics filtering by status==='disconnected' see records stuck at active:true. Proper fix: small CF taking sessionID + anonUid."
-    },
-    {
-      "title": "Walled-garden audit at every deployed Meraki venue",
-      "severity": "medium",
-      "discoveredOn": "PR #73",
-      "blockingSprint": false,
-      "notes": "submitWifiLogin CF lives at *.cloudfunctions.net. If a venue's captive-portal walled garden doesn't include that host, the CF call fails silently → offline-queue fallback → guest gets WiFi but no data captured. Audit each venue's whitelist."
-    },
-    {
-      "title": "Phone normalization to E.164 in submitWifiLogin",
-      "severity": "low",
-      "discoveredOn": "PR #73",
-      "blockingSprint": false,
-      "notes": "Stores raw phoneNumber as received from intlTelInput getNumber(). libphonenumber server-side would normalize on write. Deferred to avoid the dep + audit-trail effort."
-    },
-    {
-      "title": "Open-redirect refusal log monitoring",
-      "severity": "low",
-      "discoveredOn": "PR #73",
-      "blockingSprint": false,
-      "notes": "Host-pattern whitelist on base_grant_url emits console.error on refusal but stays client-side. If a new legitimate Meraki host family appears we won't know until a guest reports a block. Fix: forward to Cloud Logging via a tiny CF."
-    },
-    {
-      "title": "/scanningData .write: auth != null audit",
-      "severity": "low",
-      "discoveredOn": "PR #70",
-      "blockingSprint": false,
-      "notes": "Permissive rule — any authed user can write. The Meraki scanner POST flow writes here continuously; tightening without breaking it needs a parallel audit + CF pattern like submitWifiLogin."
-    },
-    {
-      "title": "PR 2 — Hi-Fi v2 wifi-login rewrite (deferred findings)",
-      "severity": "medium",
-      "discoveredOn": "PR #73",
-      "blockingSprint": false,
-      "notes": "Closes deferred audit findings: dual activeUsers schemas, ipinfo.io no consent disclosure, weak email/name regex, localStorage PII unencrypted, footer cosmetic — plus offline-queue retry-path gap (post-Meraki-redirect users won't return to the captive page in-session). Flag-gated via customization/useV2WifiLogin."
-    },
-    {
-      "title": "Workflow task edit not reflected in restarted run",
-      "severity": "medium",
-      "discoveredOn": "PR #65 preview",
-      "blockingSprint": false,
-      "notes": "Operator changed a task's inputType (temperature → photo), saved, started a new run — run UI still showed the old inputType. Could be editor not persisting inputType, rossManageTask not landing, stale read, or viewing an old completed run's snapshot. Needs repro before fix."
-    },
-    {
-      "title": "Task editor UX needs single-Save + success feedback + auto-exit",
-      "severity": "low",
-      "discoveredOn": "PR #65 preview",
-      "blockingSprint": false,
-      "notes": "RossPlaybookWorkflowTasksEditor currently has a Save per row and saving doesn't exit or confirm. Desired: one bottom Save committing all dirty tasks + success message + auto-exit."
-    },
-    {
-      "title": "Subscription resolves 'enterprise' tier for the operator's test account",
-      "severity": "medium",
-      "discoveredOn": "PR #65 preview",
-      "blockingSprint": false,
-      "notes": "feature-access-control log shows Resolved tier ID: enterprise (from tierId). Tier system is free/all-in only. Operator account has legacy tierId:'enterprise'. Decide: backfill to all-in or formalize enterprise as a third tier."
-    },
-    {
-      "title": "Server auto-completes runs after a single response when required-task count is small",
-      "severity": "medium",
-      "discoveredOn": "PR #65 preview",
-      "blockingSprint": false,
-      "notes": "Auto-completion treats all tasks with required!==false as required. Seeded Daily Opening Checklist has 4 subtasks with no explicit required field → all 4 required. Operator hit 'Run is already completed' 409 implying something auto-completed prematurely. Needs focused repro."
+      "blockingSprint": "False",
+      "notes": "PR #158 masked the recipient phone at whatsappClient.js template-send (the daily unattended path). Remaining unmasked phone logs in the same family: whatsappClient.js:60 (sendWhatsAppMessage, used by booking/queue flows + the sweep's options.fallbackMessage path — currently unused by the sweep) and the OWASP H-10-adjacent inbound logs already partially addressed in #93. One small scrub PR: mask or drop to across utils/whatsappClient.js."
     }
   ],
   "backlog": {
