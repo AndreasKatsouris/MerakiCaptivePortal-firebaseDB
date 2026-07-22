@@ -1,6 +1,6 @@
 {
   "lastUpdated": "2026-07-22",
-  "lastUpdatedNote": "Framework housecleaning: history archived to BACKLOG_HISTORY.md, automation queue added, project-status.json now synced via `npm run status:sync`.",
+  "lastUpdatedNote": "Weekly groom: #166–#178 reconciled into Recently Completed, In Progress cleared, automation queue (Q1–Q6) re-verified still-unmet, no invisible work found.",
   "sprint": {
     "goal": "Effective implementation of Hi-Fi v2, with ROSS as the central post-login surface for every subscribed user",
     "started": "2026-04-30",
@@ -289,6 +289,41 @@
   ],
   "inProgress": [],
   "recentlyCompleted": [
+    {
+      "title": "Framework housecleaning + backlog automation — session-start reads −38% (narrative note archived to BACKLOG_HISTORY.md; SELF_OPTIMIZATION 101→13 observed rows; LESSONS corrupted row fixed + guarded entries compressed; SCORECARD capped at 10 × ≤100 words). New npm run status:sync generator (scripts/generate-project-status.js, 18 fixture tests) replaces the hand-maintained project-status.json lockstep, with -- --check for the pre-push self-review. Added the 🤖 Next Up — Automation Queue (cards Q1–Q6) plus two scheduled tasks: backlog-runner (weekday mornings, one card per run, never deploys, never self-merges) and backlog-groomer (weekly reconcile + refill). Dedup is merge-atomic — the runner's PR strikes its own card row.",
+      "pr": 178,
+      "mergedAt": "2026-07-22"
+    },
+    {
+      "title": "PR-1b rules + reflect — NEW-CRIT-01 closed, CRIT-11 mitigated — closed the cross-tenant WhatsApp routing hijack (whatsapp-numbers / location-whatsapp-mapping write cascade) and mitigated the self-approvable rewards node. The first rewards draft was silently defeated by the auth.token.phone_number null-equality pathology (no user in this app has that claim → null === null GRANTS on create) — caught by security review pre-deploy and logged as its own High bug row. #177 folded the session's 4 new security findings + the CRIT-09 escalation into the triage queue.",
+      "pr": "176, 177",
+      "mergedAt": "2026-07-21"
+    },
+    {
+      "title": "askRoss — snoozeCard removed from the agent registry — npm run eval -- --only=snooze --repeat=3 returned 0/3 with no tools called, and the finding inverted: Ross was right, the test was wrong. snoozeCard required a cardId that nothing in the agent's world supplies, so the only way to call it was to invent one — which the adapter sanitised and wrote as a real snooze. The 2026-06-07 eval had scored that fabrication as a PASS. Removed rather than re-grounded on two independent grounds: snooze is the only agent action that makes information *disappear* (works against Ross's own purpose, especially the W2 proactive sweep), and capability-absence beats prompt-guarding. User-facing snooze path (rossV2Snooze) untouched. Ready agent tools 9 → 8.",
+      "pr": 175,
+      "mergedAt": "2026-07-21"
+    },
+    {
+      "title": "Eval harness ergonomics — surface the tools Ross actually invoked on a failing case (so a judgment failure can be told apart from a harness failure without re-reading transcripts) + --only / --repeat flags for isolating and repeat-running a single case. This is what made the #175 snoozeCard diagnosis possible.",
+      "pr": 174,
+      "mergedAt": "2026-07-21"
+    },
+    {
+      "title": "PR-1a rules — scanningData, locations root, whatsapp-history, admin-claims LOCKED + LIVE-VERIFIED — first tranche of the OWASP RTDB rules batch, deployed and probed in prod: CRIT-04 (non-admin write 401 at root and $dataId), HIGH-04 (locations root .write → false, closed by construction), MED-06 (whatsapp-message-history write 401), LOW-03 (admin-claims non-admin read 401 / admin read 200). #172 made the probe script safe to run in the wrong order; #173 corrected two mislabelled locations checks and recorded the closures.",
+      "pr": "171, 172, 173",
+      "mergedAt": "2026-07-21"
+    },
+    {
+      "title": "Live location-creation bug fixed (ownerId) — client-side location creation had been broken for every non-admin user since 2026-05-31 (PR #100): database.rules.json:49 requires ownerId === auth.uid on create, but location-service.js (the live Vue dashboard path) wrote userId/createdBy and no ownerId. Hidden for ~7 weeks because onboarding writes ownerId, admins bypass via the token clause, and the failure surfaced only as a generic toast with the real reason in console.error. Both client payloads now write ownerId: uid after the spread (a caller-supplied value can't override the authenticated uid), guarded by 5 vitest cases that fail RED against the pre-fix code. #169 re-censused the rules batch and logged the bug.",
+      "pr": "169, 170",
+      "mergedAt": "2026-07-21"
+    },
+    {
+      "title": "ROSS-FoodCost-v2 — design + Deliverable 1 (Ross food-cost reader) — getFoodCostSummary promoted pending→READY: a read-only, access-checked (C-1 caller→location gate, fail-closed cross-tenant test) adapter over the denormalised summary already persisted at locations/{loc}/stockUsage — no calculator — returning cost %, trend, and low-stock items. Brainstorm → 3-agent adversarial review → spec v2 → subagent-driven TDD across 4 tasks; 165/165 + build green; review folded (orderByKey().limitToLast(20) read bound, ESM→CJS test). Design + plan in docs/plans/2026-06-22-ross-foodcost-v2-{design,reader-plan}.md. Sequenced next: D2 calculator → \"what to order\"; D3 v2 UI + CSV mapping-memory; D4 strip-and-harden. #166 landed the OWASP RTDB rules-batch remediation plan in the same window.",
+      "pr": "166, 167",
+      "mergedAt": "2026-07-21"
+    },
     {
       "title": "OWASP scan consolidation (#168). Landed four orphaned scheduled scans (2026-07-02/07-04/07-05/07-19) that had committed findings to PR-less branches for up to 19 days. RETRACTED the false HIGH-08 closure (@grpc/grpc-js 1.12.6 is the last VULNERABLE version, not a patched one - advisory range >=1.12.0 <1.12.7; verified still open by live npm audit). Folded in the 2026-07-19 follow-up's 11 new findings (5 Critical incl. guests cross-tenant PII, receipts Storage exposure, forgeable userLocations, self-approvable rewards, Meraki secret in Cloud Logging). Reconciled a cross-scan duplicate (HIGH-09 = NEW-CRIT-01). Reconciled totals: 11 Criticals + 11 Highs open. Docs/data only.",
       "pr": 168,
