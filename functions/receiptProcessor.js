@@ -1,4 +1,5 @@
 const vision = require('@google-cloud/vision');
+const crypto = require('crypto');
 const functions = require('firebase-functions');
 const {
     rtdb,
@@ -29,8 +30,12 @@ async function processReceiptWithoutSaving(imageUrl, phoneNumber) {
     try {
         console.log('Starting receipt processing for:', { imageUrl, phoneNumber });
 
-        // Detect text in image
-        const [result] = await detectReceiptText(imageUrl);
+        // Detect text in image. `ocrMeta` carries side-channel facts from the
+        // OCR path — currently the private archival object's storagePath
+        // (CRIT-09 review F6: an archived object nothing references cannot be
+        // served, audited, or deleted — record the path on the receipt).
+        const ocrMeta = {};
+        const [result] = await detectReceiptText(imageUrl, ocrMeta);
 
         // Enhanced validation for OCR results
         if (!result) {
@@ -92,6 +97,7 @@ async function processReceiptWithoutSaving(imageUrl, phoneNumber) {
                 const receiptData = {
                     ...templateResult.extractedData,
                     imageUrl: imageUrl,
+                    storagePath: ocrMeta.storagePath || null,
                     processedAt: Date.now(),
                     guestPhoneNumber: phoneNumber,
                     status: 'pending_validation',
@@ -231,6 +237,7 @@ async function processReceiptWithoutSaving(imageUrl, phoneNumber) {
             vatAmount: details.vatAmount,
             totalAmount: details.totalAmount,
             imageUrl: imageUrl,
+            storagePath: ocrMeta.storagePath || null,
             processedAt: Date.now(),
             guestPhoneNumber: phoneNumber,
             status: 'pending_validation',
@@ -301,7 +308,7 @@ async function processReceipt(imageUrl, phoneNumber) {
  * @param {string} imageUrl - URL of the receipt image
  * @returns {Promise<Array>} - Vision API detection result
  */
-async function detectReceiptText(imageUrl) {
+async function detectReceiptText(imageUrl, ocrMeta = {}) {
     try {
         console.log('Starting text detection for URL:', imageUrl);
 
@@ -331,12 +338,20 @@ async function detectReceiptText(imageUrl) {
 
         const client = new vision.ImageAnnotatorClient();
 
-        // Twilio Media URLs need authentication — download and re-host first.
+        // Twilio Media URLs need authentication — download the bytes and feed
+        // them to Vision DIRECTLY (`image.content` accepts a Node Buffer;
+        // protobuf serializes it as a bytes field — verified against vendored
+        // @google-cloud/vision@4.3.2 helpers). CRIT-09: the old flow re-hosted
+        // the image to GCS with makePublic() purely to hand Vision a URL,
+        // leaving every receipt image world-readable at an enumerable name. No
+        // public object, no public URL, no enumerable name — the archival copy
+        // kept below is PRIVATE (predefinedAcl pinned).
+        // Spec: docs/plans/2026-07-22-crit09-receipts-remediation-design.md.
         if (isTwilio) {
-            console.log('Detected Twilio media URL, downloading and uploading to Firebase Storage first');
-            const processedImageUrl = await downloadAndStoreImage(imageUrl);
-            console.log('Using processed image URL:', processedImageUrl);
-            return await client.textDetection(processedImageUrl);
+            console.log('Detected Twilio media URL, downloading for direct Vision processing');
+            const { buffer, storagePath } = await downloadAndStoreImage(imageUrl);
+            ocrMeta.storagePath = storagePath;
+            return await client.textDetection({ image: { content: buffer } });
         } else {
             // Direct processing — guaranteed Firebase Storage by the allowlist above.
             console.log('Processing image URL directly');
@@ -361,9 +376,19 @@ async function detectReceiptText(imageUrl) {
 }
 
 /**
- * Download image from Twilio and store in Firebase Storage
+ * Download image from Twilio and archive a PRIVATE copy in Firebase Storage.
  * @param {string} twilioUrl - Twilio media URL
- * @returns {Promise<string>} - Public Firebase Storage URL
+ * @returns {Promise<{buffer: Buffer, storagePath: string}>} - image bytes (for
+ *   direct Vision processing) + the private archival object path.
+ *
+ * CRIT-09 invariants (do not regress — guarded by functions/__tests__/no-make-public.test.js):
+ * - NEVER makePublic()/public ACL — the stored copy is private; the only
+ *   consumer of the bytes is Vision, which gets them in-process.
+ * - Object name is a random UUID (not a timestamp) — public or not,
+ *   enumerable names were half the original exposure.
+ * - The archival copy exists because the RTDB record's imageUrl is a Twilio
+ *   URL with Twilio-side retention (spec fork F2); serving it to admin
+ *   surfaces via short-TTL signed URLs is the F2 follow-up slice.
  */
 async function downloadAndStoreImage(twilioUrl) {
     try {
@@ -416,14 +441,17 @@ async function downloadAndStoreImage(twilioUrl) {
             isValidSize: buffer.length > 0
         });
 
-        // Generate unique filename
-        const timestamp = Date.now();
-        const filename = `receipts/${timestamp}_receipt.jpg`;
+        // Unguessable object name (see CRIT-09 invariants in the docstring)
+        const filename = `receipts/${crypto.randomUUID()}.jpg`;
 
-        // Upload to Firebase Storage
-        console.log('☁️ Uploading to Firebase Storage:', filename);
+        // Archive a PRIVATE copy. predefinedAcl is PINNED (review F3): without
+        // it, privacy would silently depend on the bucket's mutable
+        // defaultObjectAcl — one `gsutil defacl` away from recreating CRIT-09
+        // with zero code signal. Verified supported in @google-cloud/storage@7.21.0.
+        console.log('☁️ Archiving private copy to Firebase Storage:', filename);
         const file = bucket.file(filename);
         await file.save(buffer, {
+            predefinedAcl: 'private',
             metadata: {
                 contentType: 'image/jpeg',
                 metadata: {
@@ -433,17 +461,9 @@ async function downloadAndStoreImage(twilioUrl) {
                 }
             }
         });
+        console.log('📤 Private archive complete');
 
-        console.log('📤 Upload complete, making file public...');
-
-        // Make file publicly readable
-        await file.makePublic();
-
-        // Get public URL
-        const publicUrl = `https://storage.googleapis.com/${bucket.name}/${filename}`;
-        console.log('🌐 Public URL generated:', publicUrl);
-
-        return publicUrl;
+        return { buffer, storagePath: filename };
 
     } catch (error) {
         console.error('💥 Error in downloadAndStoreImage:', error);
