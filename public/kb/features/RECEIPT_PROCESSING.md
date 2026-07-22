@@ -24,7 +24,8 @@ Processed receipt records (auto-generated push key):
 
 ```json
 {
-  "imageUrl": "https://storage.googleapis.com/...",
+  "imageUrl": "https://api.twilio.com/2010-04-01/Accounts/.../Media/... (the original Twilio MediaUrl0 — NOT a storage.googleapis.com URL; corrected 2026-07-22, CRIT-09 census)",
+  "storagePath": "receipts/{uuid}.jpg (private GCS archival copy, predefinedAcl:'private', unguessable name — since CRIT-09 PR-B; null for pre-PR-B records. Serving via short-TTL signed URLs = F2 follow-up)",
   "guestPhoneNumber": "+27827001116",
   "processedAt": 1721234567890,
   "status": "validated",
