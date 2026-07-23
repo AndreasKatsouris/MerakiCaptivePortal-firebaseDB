@@ -99,7 +99,7 @@ function barWidth(days) {
               {{ data.diagnosis.eyebrow }}
             </div>
             <h3 class="food-cost__diagnosis-headline">{{ data.diagnosis.headline }}</h3>
-            <p class="food-cost__diagnosis-detail" v-html="data.diagnosis.detail" />
+            <p class="food-cost__diagnosis-detail">{{ data.diagnosis.detail }}</p>
             <div class="food-cost__diagnosis-actions">
               <HfButton
                 v-for="a in data.diagnosis.actions" :key="a.id"
@@ -274,7 +274,6 @@ function barWidth(days) {
 .food-cost__diagnosis-detail {
   font-size: 14px; line-height: 1.6; color: #c9c4b3; margin: 0;
 }
-.food-cost__diagnosis-detail :deep(b) { color: #e8e3d5; }
 .food-cost__diagnosis-actions { display: flex; gap: 8px; margin-top: 18px; flex-wrap: wrap; }
 .food-cost__diagnosis-chart-eyebrow { color: #888; }
 .food-cost__diagnosis-chart-caption { font-size: 11px; color: #888; margin-top: 4px; }
