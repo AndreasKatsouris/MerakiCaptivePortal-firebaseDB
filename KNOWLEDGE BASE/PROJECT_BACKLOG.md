@@ -3,11 +3,11 @@
 > Claude reads this file at the start of every session and updates it at the end.
 > The Sprint Goal is the contract for the session — don't deviate without explicit user confirmation.
 
-Last updated: 2026-07-22 — Weekly groom: #166–#178 reconciled into Recently Completed, In Progress cleared, automation queue (Q1–Q6) re-verified still-unmet, no invisible work found.
+Last updated: 2026-07-23 — Scheduled OWASP scan: all previously tracked findings re-verified still open (nothing fixed since #178); 1 new Critical (`websocket-driver` 0.7.4) + 2 new Highs logged — see 🔐 2026-07-23 section.
 
 > **Note discipline:** this note is CURRENT STATE ONLY (≤10 lines, first line always `Last updated: YYYY-MM-DD — <one-line note>`). At each update, move the outgoing narrative to `KNOWLEDGE BASE/BACKLOG_HISTORY.md` (newest first). Per-session detail lives in SCORECARD.md and PR bodies — never here.
 
-**State right now:** Nothing in flight — zero open PRs, all 30 remote branches are squash-merged. PR-1b (#176/#177) merged — NEW-CRIT-01 closed, CRIT-11 mitigated-not-closed. Next security headline: CRIT-09 receipts (unauthenticated public GCS ACLs; ACL revocation sweep ships first, own spec). Next product step: W1 food-cost D2 calculator (`docs/plans/2026-06-22-ross-foodcost-v2-design.md`). Launch gate unchanged: the two wheels (W1 breadth + W2 soak). Payment rail dormant until launch.
+**State right now:** Nothing in flight — zero open PRs. Reconciled security debt: 11 Criticals + 11 Highs (dated OWASP sections) + 1 new Critical/2 new Highs from today's dependency re-scan, all still open — nothing fixed since #178 (2026-07-22). Next security headline unchanged: CRIT-09 receipts (unauthenticated public GCS ACLs; ACL revocation sweep ships first, own spec). Next product step: W1 food-cost D2 calculator (`docs/plans/2026-06-22-ross-foodcost-v2-design.md`). Launch gate unchanged: the two wheels (W1 breadth + W2 soak). Payment rail dormant until launch.
 
 ---
 
@@ -281,6 +281,23 @@ Read-only automated re-audit, 2026-07-19. Independently re-verified nearly all 2
 | INFO-02 | `FoodCostApp.vue:102` uses `v-html="data.diagnosis.detail"` — traced to a currently-static, hardcoded content source (`service.js`'s `ROSS_DIAGNOSIS` constant), **not currently exploitable**. Flagging only so that if this field is ever wired to live Ross-generated or user-editable text, it must switch to `{{ }}` interpolation first (same discipline as the CLOSED #147 RossHomeDesktop.vue finding) | Low (latent) | A03 | `public/js/modules/food-cost/.../FoodCostApp.vue:102` | n/a — informational | No |
 
 **Checked and came back clean this pass:** SSRF (receipt OCR fetch is allowlisted to Twilio/Firebase Storage hosts), injection (no `eval`/`new Function`/`child_process` in `functions/` or `public/js/`), hardcoded secrets (all via `process.env`/`defineSecret()`), Twilio webhook HMAC verification (confirmed live-enforced), `axios` version (patched), manual XSS sweep of `googleReviews.js`/`whatsapp-message-history.js`/`guest-management.js`/`receipt-management.js`/`reward-management.js`/`queue-management.js`/`campaigns.js` (all properly `escapeHtml()`'d or non-interpolating), `post-login-router.js` (pure navigation, no auth enforcement of its own), and the dual-factor admin check on `bulkQueueOperations`/`markVoucherRedeemed`/voucher-pool CFs.
+
+### 🔐 OWASP Security Audit — 2026-07-23 Findings (scheduled scan)
+
+Scheduled automated re-scan, read-only (no code/branches touched, docs-only per the Bug Triage Rule). Re-verified the reconciled **11 Criticals + 11 Highs** from the 2026-06-15/07-04/07-19 sections — all still open, nothing fixed since #178 (2026-07-22). Also re-checked the `getQueueStatus` unauthenticated-PII-leak item (Operator design questions table below, "left unauthenticated in #91") — still the same open, undecided item. New findings below are dependency-only, confirmed live via `npm audit` + `package-lock.json` inspection (not a re-read of a stale report).
+
+| ID | Finding | Severity | OWASP | Installed → Fixed | Sprint-blocking? |
+|----|---------|----------|-------|-----------|-----------------|
+| CRIT-13 | `websocket-driver` (root `package-lock.json`, transitive via `faye-websocket`, dev/build tooling only — not a runtime path) — known DoS via crafted WS frame | Critical | A06 | `0.7.4` → `>0.7.4` (`fixAvailable:true`) | No |
+| HIGH-12 | **Correction to the 2026-07-19 scan's "axios version (patched)" clean-check (line 283 of this file) — that call was wrong.** Root `axios` is a **direct runtime dependency** (`^1.7.8`) resolving to `1.16.1`, inside the vulnerable `1.0.0–1.17.0` range (prototype pollution / DoS / proxy-bypass / `maxBodyLength` bypass) | High | A06 | `1.16.1` → `>1.17.0` (`fixAvailable:true`) | No |
+| HIGH-13 | **HIGH-08's grpc-js fix only covers `functions/` — root has its own separate, still-vulnerable copy.** Root `package.json` pulls `@grpc/grpc-js` transitively via `@google-cloud/vision` (a runtime dep), pinned at `1.12.4` — inside the same `1.12.0–1.12.6` advisory range HIGH-08 closed in `functions/` only (#180) | High | A06 | `1.12.4` → `≥1.14.4` | No |
+| MED-11 | Root `npm audit` (2026-07-23) also flags `form-data` (`2.5.5` root / `4.0.5` nested under axios), `js-yaml` (`4.1.1`), `brace-expansion` (`1.1.15`), `ws` (`8.20.1`) — all transitive, all `fixAvailable:true` lockfile-only. **Root total: 1 critical + 7 high + 9 moderate + 1 low = 18** (vs. `functions/`'s already-tracked 10 moderate, firebase-admin@14 bump) | Medium (bundle with HIGH-12/13) | A06 | see cells above | No |
+
+Two minor code-level re-opens surfaced alongside the dependency sweep (not previously itemized under their own ID):
+- **L-2 from the 2026-05-30 audit was claimed closed by #98 (line 189 of this file: "Lows L-1/L-2 (#98–#102)") but is NOT closed** — `functions/index.js:3550` still logs a 20-char bearer-token prefix (`Authorization header received: Bearer ${authHeader.substring(7,27)}...`). Needs re-verification of what #98 actually shipped vs. what the summary claimed.
+- `public/js/modules/food-cost/analytics-dashboard.js:162,292,1166` interpolates `error.message` into a `v-html` sink — not yet exploitable (no attacker-controlled text reaches `error.message` today), but the same anti-pattern class as the already-tracked `FoodCostApp.vue`/INFO-02 finding above. The fixed pattern (`escapeHtml()`) already exists next door in `food-cost/components/flags/FlagBadge.js:8-10` — same-file copy-paste fix.
+
+**Recommend:** one small `npm audit fix` PR (lockfile-only, root + functions/ residuals) to clear CRIT-13/HIGH-12/HIGH-13/MED-11 — same low-risk shape as the already-merged HIGH-08 fix (#180). Everything else in this section folds into the existing open remediation plan (PR #166 rules batch + the deferred firebase-admin@14 bump); no new remediation track needed.
 
 ### Operator design questions (PR #65 preview — for next-sprint design, not bugs)
 

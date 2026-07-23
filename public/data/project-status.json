@@ -1,6 +1,6 @@
 {
-  "lastUpdated": "2026-07-22",
-  "lastUpdatedNote": "Weekly groom: #166–#178 reconciled into Recently Completed, In Progress cleared, automation queue (Q1–Q6) re-verified still-unmet, no invisible work found.",
+  "lastUpdated": "2026-07-23",
+  "lastUpdatedNote": "Scheduled OWASP scan: all previously tracked findings re-verified still open (nothing fixed since #178); 1 new Critical (`websocket-driver` 0.7.4) + 2 new Highs logged — see 🔐 2026-07-23 section.",
   "sprint": {
     "goal": "Effective implementation of Hi-Fi v2, with ROSS as the central post-login surface for every subscribed user",
     "started": "2026-04-30",
