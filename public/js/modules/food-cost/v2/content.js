@@ -39,7 +39,7 @@ export const ROSS_DIAGNOSIS = {
   headline: 'Your protein supplier raised prices Apr 18.',
   detail:
     "Ribeye +12%, duck breast +8%, short rib +6%. Three menu items absorb " +
-    "<b>78%</b> of the impact. Adjusting prices by R35–R70 recovers " +
+    "78% of the impact. Adjusting prices by R35–R70 recovers " +
     "R37,800/week without hurting volume (Ross' elasticity model).",
   actions: [
     { id: 'menu-pricing', label: 'Open menu pricing', variant: 'accent' },
