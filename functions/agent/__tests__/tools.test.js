@@ -24,7 +24,7 @@ describe('registry integrity', () => {
         }
     });
 
-    it('exposes the 10 ready tools (6 auto + 4 confirm) to the engine', () => {
+    it('exposes the 9 ready tools (5 auto + 4 confirm) to the engine', () => {
         expect(enabledToolNames().sort()).toEqual([...READY].sort());
     });
 
