@@ -195,6 +195,35 @@ const REGISTRY = {
             return summariseFoodCost(records, { now: ctx.now });
         },
     },
+    getSuggestedOrder: {
+        description: 'Suggest a purchase order for a location, computed from its stock-usage history. Read-only: quantities are recommendations, not placed orders. unitCost/estimatedCost are null when the uploads carry no usable unit cost for that item — say the cost is unknown, never invent a figure.',
+        args: z.object({
+            locationId: z.string(),
+            daysToNextDelivery: z.number().int().min(1).max(30).optional(),
+            supplierFilter: z.string().max(100).optional(),
+        }),
+        tier: TIER.AUTO, ceiling: TIER.AUTO, status: STATUS.READY,
+        run: async (ctx, args) => {
+            // C-1: locationId is model-supplied → attacker-controlled. The agent runs
+            // via the Admin SDK (RTDB rules bypassed), so this adapter is the ONLY
+            // tenant boundary — gate before any read; bare {hasData:false} on failure
+            // is deep-equal to the no-data return (anti-enumeration).
+            if (!(await callerHasLocationAccess(args.locationId, ctx.uid))) return { hasData: false };
+            // Bound the read: keys are chronological YYYYMMDD_HHMMSS timestamp-keys, so
+            // orderByKey().limitToLast(30) fetches only the most recent records (~6 months
+            // of weekly uploads; no index needed). suggestOrder re-sorts by the `timestamp`
+            // field, so correctness holds regardless of key/field skew.
+            const snap = await getDb().ref(`locations/${args.locationId}/stockUsage`)
+                .orderByKey().limitToLast(30).once('value');
+            const records = snap.exists() ? Object.values(snap.val()) : [];
+            const { suggestOrder } = require('./food-cost/suggest'); // lazy: keep core import-cheap
+            return suggestOrder(records, {
+                now: ctx.now,
+                daysToNextDelivery: args.daysToNextDelivery,
+                supplierFilter: args.supplierFilter,
+            });
+        },
+    },
     getGuestsSummary: pending('Read aggregate guest counts for a location (no PII).',
         z.object({ locationId: z.string() }), TIER.AUTO, TIER.AUTO),
     getSalesSummary: pending('Read a sales / forecast summary for a location.',

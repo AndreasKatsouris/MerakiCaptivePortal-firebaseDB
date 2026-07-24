@@ -7,7 +7,7 @@ const {
 const { TIER, STATUS, isAgentSubmittable } = require('../constants');
 const { makeFakeRtdb } = require('./helpers/fake-rtdb');
 
-const AUTO_READY = ['getWorkflowDigest', 'getStaff', 'getRunHistory', 'getFoodCostSummary'];
+const AUTO_READY = ['getWorkflowDigest', 'getStaff', 'getRunHistory', 'getFoodCostSummary', 'getSuggestedOrder'];
 const CONFIRM_READY = ['activateTemplate', 'createWorkflow', 'editWorkflow', 'pauseWorkflow'];
 const READY = [...AUTO_READY, ...CONFIRM_READY]; // slice 4 promoted the 4 confirm tools
 
@@ -24,7 +24,7 @@ describe('registry integrity', () => {
         }
     });
 
-    it('exposes the 9 ready tools (5 auto + 4 confirm) to the engine', () => {
+    it('exposes the 10 ready tools (6 auto + 4 confirm) to the engine', () => {
         expect(enabledToolNames().sort()).toEqual([...READY].sort());
     });
 
@@ -33,7 +33,7 @@ describe('registry integrity', () => {
         expect(autoAllowlist().sort()).toEqual([...AUTO_READY].sort());
         // an owner who tightens getStaff to confirm drops it from the proactive set too
         expect(autoAllowlist({ policy: { getStaff: 'confirm' } }).sort())
-            .toEqual(['getFoodCostSummary', 'getRunHistory', 'getWorkflowDigest']);
+            .toEqual(['getFoodCostSummary', 'getRunHistory', 'getSuggestedOrder', 'getWorkflowDigest']);
     });
 
     it('marks every playbook-authoring tool confirm-tier', () => {
@@ -286,5 +286,166 @@ describe('ready adapters (via fake RTDB)', () => {
       __setDbForTests(makeFakeRtdb({ userLocations: { owner1: { loc1: true } }, locations: { loc1: { ownerId: 'owner1' } } }));
       const out = await REGISTRY.getFoodCostSummary.run({ uid: 'owner1', now: 2000 }, { locationId: 'loc1' });
       expect(out).toEqual({ hasData: false });
+    });
+});
+
+// --- getSuggestedOrder adapter (Deliverable 2, design §5.1/§8) -------------------
+// Same C-1 posture as getFoodCostSummary: the agent runs via the Admin SDK (RTDB
+// rules bypassed), so this adapter is the ONLY tenant boundary for the read it
+// gates. locationId is model-supplied → treated as attacker-controlled.
+describe('getSuggestedOrder adapter', () => {
+    const { suggestOrder } = require('../food-cost/suggest');
+    const DAY = 86400000;
+    const NOW = 2000 + 3 * DAY;
+
+    // Two clearly-orderable records: item A is stocked out with steady usage, so
+    // the suggestion loop always yields at least one orderable item.
+    function usageRecords() {
+        return {
+            k1: { timestamp: 1000, stockItems: [
+                { itemCode: 'A', description: 'beef', supplierName: 'Meat Co', closingQty: 10, usagePerDay: 5, unitCost: 10 },
+            ] },
+            k2: { timestamp: 2000, stockItems: [
+                { itemCode: 'A', description: 'beef', supplierName: 'Meat Co', closingQty: 0, usagePerDay: 5, unitCost: 10 },
+            ] },
+        };
+    }
+
+    // owner1 owns loc1 (locations/{loc}/ownerId fallback path); mgr1 is a delegated
+    // manager via userLocations; attacker1 has neither. loc2 is accessible to owner1
+    // but has never uploaded (the anti-enumeration twin).
+    function seedSuggest() {
+        return makeFakeRtdb({
+            userLocations: { mgr1: { loc1: true }, owner1: { loc2: true } },
+            locations: {
+                loc1: { ownerId: 'owner1', stockUsage: usageRecords() },
+                loc2: { ownerId: 'owner1' },
+            },
+        });
+    }
+    afterEach(() => __setDbForTests(null));
+
+    // ---- C-1 trio ---------------------------------------------------------------
+    it('refuses cross-tenant: caller without location access gets bare hasData:false', async () => {
+        __setDbForTests(seedSuggest());
+        const out = await REGISTRY.getSuggestedOrder.run({ uid: 'attacker1', now: NOW }, { locationId: 'loc1' });
+        expect(out).toEqual({ hasData: false }); // MUST NOT leak owner1's stock/order data
+    });
+
+    it('serves the owner (locations/{loc}/ownerId match)', async () => {
+        __setDbForTests(seedSuggest());
+        const out = await REGISTRY.getSuggestedOrder.run({ uid: 'owner1', now: NOW }, { locationId: 'loc1' });
+        expect(out.hasData).toBe(true);
+        expect(out.items.length).toBeGreaterThan(0);
+        expect(out.items[0].itemCode).toBe('A');
+    });
+
+    it('serves a delegated manager (userLocations entry, not the owner)', async () => {
+        __setDbForTests(seedSuggest());
+        const out = await REGISTRY.getSuggestedOrder.run({ uid: 'mgr1', now: NOW }, { locationId: 'loc1' });
+        expect(out.hasData).toBe(true);
+    });
+
+    // ---- anti-enumeration (design §7.3) -----------------------------------------
+    // The no-access return must be DEEP-EQUAL to the accessible-but-empty return —
+    // any extra field (e.g. a `reason`) would rebuild the locationId oracle.
+    it('no-access and accessible-but-empty returns are byte-identical', async () => {
+        __setDbForTests(seedSuggest());
+        const noAccess = await REGISTRY.getSuggestedOrder.run({ uid: 'attacker1', now: NOW }, { locationId: 'loc1' });
+        const noData = await REGISTRY.getSuggestedOrder.run({ uid: 'owner1', now: NOW }, { locationId: 'loc2' });
+        expect(noData).toEqual({ hasData: false });
+        expect(noAccess).toEqual(noData);
+    });
+
+    // ---- Zod arg boundary --------------------------------------------------------
+    // execute.js does not safeParse — args are validated at the engine boundary
+    // (Anthropic API validates input_schema; the SDK validates the Zod shape), so
+    // the guarantee under test IS the schema itself.
+    it('rejects out-of-bounds daysToNextDelivery at the Zod boundary', () => {
+        const schema = REGISTRY.getSuggestedOrder.args;
+        for (const bad of [0, 31, -1, 1.5, '5', NaN]) {
+            const res = schema.safeParse({ locationId: 'loc1', daysToNextDelivery: bad });
+            expect(res.success, `daysToNextDelivery=${String(bad)}`).toBe(false);
+        }
+        expect(schema.safeParse({ locationId: 'loc1', daysToNextDelivery: 1 }).success).toBe(true);
+        expect(schema.safeParse({ locationId: 'loc1', daysToNextDelivery: 30 }).success).toBe(true);
+    });
+
+    it('rejects a >100-char supplierFilter at the Zod boundary (F2 CPU/audit bound)', () => {
+        const schema = REGISTRY.getSuggestedOrder.args;
+        expect(schema.safeParse({ locationId: 'loc1', supplierFilter: 'x'.repeat(101) }).success).toBe(false);
+        expect(schema.safeParse({ locationId: 'loc1', supplierFilter: 'x'.repeat(100) }).success).toBe(true);
+    });
+
+    // ---- two-location bleed (F1, the #144 vuln class) ----------------------------
+    // A and B share itemCode '10127' with wildly different usage; the caller has
+    // access to BOTH. The result for A must deep-equal a direct suggestOrder() run
+    // over A's records ONLY — B's records must never influence A's numbers.
+    it('two locations sharing an itemCode never bleed into each other', async () => {
+        const recsA = {
+            k1: { timestamp: 1000, stockItems: [{ itemCode: '10127', description: 'flour', closingQty: 4, usagePerDay: 2, unitCost: 5 }] },
+            k2: { timestamp: 2000, stockItems: [{ itemCode: '10127', description: 'flour', closingQty: 0, usagePerDay: 2, unitCost: 5 }] },
+        };
+        const recsB = {
+            k1: { timestamp: 1000, stockItems: [{ itemCode: '10127', description: 'flour', closingQty: 900, usagePerDay: 400, unitCost: 99 }] },
+            k2: { timestamp: 2000, stockItems: [{ itemCode: '10127', description: 'flour', closingQty: 0, usagePerDay: 400, unitCost: 99 }] },
+        };
+        __setDbForTests(makeFakeRtdb({
+            userLocations: { u1: { locA: true, locB: true } },
+            locations: {
+                locA: { ownerId: 'u1', stockUsage: recsA },
+                locB: { ownerId: 'u1', stockUsage: recsB },
+            },
+        }));
+        const out = await REGISTRY.getSuggestedOrder.run({ uid: 'u1', now: NOW }, { locationId: 'locA' });
+        const expected = suggestOrder(Object.values(recsA), { now: NOW });
+        expect(out).toEqual(expected); // full deep-compare: numbers computed from A only
+        expect(out.items[0].unitCost).toBe(5); // and definitely not B's 99
+    });
+
+    // ---- oversized record (F7 / P5) ----------------------------------------------
+    it('caps an oversized record and emits the items-truncated-for-size caveat', async () => {
+        const bigItems = Array.from({ length: 2001 }, (_, i) => (
+            { itemCode: `I${i}`, description: 'bulk', closingQty: 0, usagePerDay: 1, unitCost: 1 }
+        ));
+        __setDbForTests(makeFakeRtdb({
+            userLocations: { u1: { loc1: true } },
+            locations: { loc1: { ownerId: 'u1', stockUsage: { k1: { timestamp: 2000, stockItems: bigItems } } } },
+        }));
+        const out = await REGISTRY.getSuggestedOrder.run({ uid: 'u1', now: NOW }, { locationId: 'loc1' });
+        expect(out.hasData).toBe(true);
+        expect(out.caveats).toContain('items-truncated-for-size');
+        expect(out.items.length).toBeLessThanOrEqual(30); // output cap holds too
+    });
+
+    // ---- bounded read ------------------------------------------------------------
+    // BEHAVIOURAL assertion style: the fake RTDB honours limitToLast (applyQuery
+    // sorts keys and slices the last N), so seeding 35 chronologically-keyed records
+    // and observing historyDepth.records === 30 proves the adapter passed
+    // orderByKey().limitToLast(30) — without it the count would be 35.
+    it('reads at most the newest 30 records (orderByKey().limitToLast(30))', async () => {
+        const stockUsage = {};
+        for (let i = 1; i <= 35; i++) {
+            stockUsage[`r${String(i).padStart(2, '0')}`] = {
+                timestamp: i * 1000,
+                stockItems: [{ itemCode: 'X', description: 'x', closingQty: 0, usagePerDay: 1, unitCost: 2 }],
+            };
+        }
+        __setDbForTests(makeFakeRtdb({
+            userLocations: { u1: { loc1: true } },
+            locations: { loc1: { ownerId: 'u1', stockUsage } },
+        }));
+        const out = await REGISTRY.getSuggestedOrder.run({ uid: 'u1', now: 35000 + DAY }, { locationId: 'loc1' });
+        expect(out.hasData).toBe(true);
+        expect(out.historyDepth.records).toBe(30); // not 35 — oldest 5 never fetched
+        expect(out.asOf).toBe(35000); // and the NEWEST records were kept
+    });
+
+    // ---- ctx.now threading -------------------------------------------------------
+    it('threads ctx.now into asOf/dataAgeDays', async () => {
+        __setDbForTests(seedSuggest());
+        const out = await REGISTRY.getSuggestedOrder.run({ uid: 'owner1', now: NOW }, { locationId: 'loc1' });
+        expect(out.asOf).toBe(2000); // latest record's timestamp
+        expect(out.dataAgeDays).toBe(3); // floor((NOW - 2000) / DAY)
     });
 });
