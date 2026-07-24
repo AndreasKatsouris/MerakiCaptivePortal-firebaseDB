@@ -48,7 +48,9 @@ const SAST_OFFSET_MS = 2 * 3600e3; // P8: UTC+2, South Africa has no DST
  * @param {Array} historicalRecords - Array of historical stock records
  * @param {string} itemCode - Item code to calculate statistics for
  * @param {{now?: number}} [opts] - now: epoch ms used as the timestamp
- *   fallback for records missing timestamp/recordDate (P2)
+ *   fallback for records missing timestamp/recordDate (P2). REQUIRED whenever
+ *   any record may lack both fields — omitting it there yields an Invalid Date
+ *   (the adapter always injects ctx.now; review NIT 2026-07-24)
  * @returns {Object} - Statistical metrics for the specified item
  */
 function calculateItemStatistics(historicalRecords, itemCode, opts = {}) {
