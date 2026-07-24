@@ -25,12 +25,16 @@
  *
  * Security envelope (design §8):
  *   P5 — input caps: max 2,000 stockItems per record, 10,000 across all
- *        records (attacker-controlled dimension, security F3). The budget is
+ *        ARRAY-shaped records (attacker-controlled dimension, security F3).
+ *        Object-shaped stockItems bypass the budget — they are only ever
+ *        O(1) keyed lookups in stats.js, never iterated, so they are not a
+ *        work bound (T4 spec review, judgment call 8). The budget is
  *        allocated NEWEST-first so truncation removes the OLDEST history —
  *        the current items list is the last thing to be cut.
- *   P6 — tenant strings (description, supplierName, criticalityReason)
- *        control-stripped + truncated to 120 chars before they can enter the
- *        model conversation (security F4).
+ *   P6 — EVERY tenant string reaching output (itemCode, description,
+ *        supplierName, criticalityReason) control-stripped + truncated to
+ *        120 chars before it can enter the model conversation (security F4;
+ *        itemCode added by the T4 spec review — it is a CSV field too).
  *   F2 — supplierFilter is case-insensitive SUBSTRING matching via
  *        String.prototype.includes — never new RegExp (ReDoS).
  *   Output capped at 30 items + truncation marker; empty/no-data input
@@ -230,7 +234,7 @@ function suggestOrder(records, opts = {}) {
       rawUnitCost > 0;
 
     const out = {
-      itemCode: item.itemCode,
+      itemCode: sanitizeText(item.itemCode), // P6 (spec-review SHOULD-FIX: CSV field too)
       description: sanitizeText(item.description), // P6
       supplierName: sanitizeText(item.supplierName), // P6
       currentStock,

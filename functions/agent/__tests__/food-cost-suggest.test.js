@@ -406,6 +406,17 @@ describe('suggestOrder — P6 output string hygiene', () => {
     // eslint-disable-next-line no-control-regex
     expect(res.items[0].criticalityReason).not.toMatch(/[\x00-\x1F\x7F]/);
   });
+
+  it('itemCode is P6-treated (spec-review SHOULD-FIX — it is a tenant CSV field too)', () => {
+    const res = suggestOrder(
+      [rec({ stockItems: [item({ itemCode: `X\x00${'9'.repeat(200)}` })] })],
+      { now: NOW }
+    );
+    expect(res.items[0].itemCode).toBe(`X${'9'.repeat(119)}`);
+    expect(res.items[0].itemCode).toHaveLength(120);
+    // eslint-disable-next-line no-control-regex
+    expect(res.items[0].itemCode).not.toMatch(/[\x00-\x1F\x7F]/);
+  });
 });
 
 describe('suggestOrder — supplierFilter substring semantics (F2/F7)', () => {
@@ -459,6 +470,16 @@ describe('suggestOrder — supplierFilter substring semantics (F2/F7)', () => {
     const res = suggestOrder([rec({ stockItems: [noSupplier] })], { now: NOW });
     expect(res.items.map((i) => i.itemCode)).toEqual(['N1']);
     expect(res.items[0].supplierName).toBe('');
+  });
+
+  it("supplierFilter '' behaves as NO filter (judgment call 2 — '' ≡ omitted)", () => {
+    const noSupplier = item({ itemCode: 'N1' });
+    delete noSupplier.supplierName;
+    const records = [rec({ stockItems: [noSupplier, item({ itemCode: 'A1' })] })];
+    const empty = suggestOrder(records, { now: NOW, supplierFilter: '' });
+    const none = suggestOrder(records, { now: NOW });
+    expect(empty).toEqual(none);
+    expect(empty.items.map((i) => i.itemCode).sort()).toEqual(['A1', 'N1']);
   });
 });
 
