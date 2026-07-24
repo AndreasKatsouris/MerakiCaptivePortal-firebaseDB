@@ -6,6 +6,12 @@
 
 ---
 
+## 2026-07-24
+
+Last updated: 2026-07-22 — Weekly groom: #166–#178 reconciled into Recently Completed, In Progress cleared, automation queue (Q1–Q6) re-verified still-unmet, no invisible work found.
+
+**State right now:** Nothing in flight — zero open PRs, all 30 remote branches are squash-merged. PR-1b (#176/#177) merged — NEW-CRIT-01 closed, CRIT-11 mitigated-not-closed. Next security headline: CRIT-09 receipts (unauthenticated public GCS ACLs; ACL revocation sweep ships first, own spec). Next product step: W1 food-cost D2 calculator (`docs/plans/2026-06-22-ross-foodcost-v2-design.md`). Launch gate unchanged: the two wheels (W1 breadth + W2 soak). Payment rail dormant until launch.
+
 ## 2026-07-22
 
 Last updated: 2026-07-22 — Framework housecleaning: history archived to BACKLOG_HISTORY.md, automation queue added, project-status.json now synced via `npm run status:sync`.

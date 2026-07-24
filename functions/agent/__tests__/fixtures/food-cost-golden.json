@@ -1,0 +1,1889 @@
+{
+  "noHistory": {
+    "stats": {
+      "itemCode": "",
+      "dataPoints": 0,
+      "avgDailyUsage": 0,
+      "stdDevUsage": 0,
+      "volatility": 0,
+      "trend": {
+        "slope": 0,
+        "direction": "stable"
+      },
+      "dowPatterns": null,
+      "firstDate": null,
+      "lastDate": null,
+      "raw": []
+    },
+    "orderDetails": {
+      "itemDetails": {
+        "itemCode": "10001",
+        "description": "Tomato Sauce 5L",
+        "category": "Dry Goods",
+        "supplier": "Bidfood SA"
+      },
+      "stockDetails": {
+        "currentStock": "12.00",
+        "usagePerDay": "3.50",
+        "daysToNextDelivery": 3,
+        "coveringDays": 2
+      },
+      "calculationDetails": {
+        "reOrderPoint": "1.50",
+        "baseUsage": "17.50",
+        "safetyStock": "3.50",
+        "criticalStock": "0.00",
+        "forecastedDemand": "21.00"
+      },
+      "orderResults": {
+        "needsReordering": true,
+        "recommendedOrderQty": "20.00",
+        "requiredStock": "21.00"
+      }
+    },
+    "criticality": {
+      "isCritical": false,
+      "isManuallyMarked": false,
+      "isInCriticalCategory": false,
+      "hasCriticalScore": false,
+      "criticalityScore": 46,
+      "criticalityReason": "",
+      "criticalityDetails": {
+        "volatility": {
+          "factor": 0,
+          "score": 20,
+          "maxPossible": 40
+        },
+        "stockLevel": {
+          "factor": 0.5571428571428572,
+          "score": 17,
+          "maxPossible": 30,
+          "daysRemaining": "3.4"
+        },
+        "supplierReliability": {
+          "factor": 0.3,
+          "score": 9,
+          "maxPossible": 30,
+          "supplierName": "Bidfood SA"
+        }
+      }
+    },
+    "advanced": {
+      "itemDetails": {
+        "itemCode": "10001",
+        "description": "Tomato Sauce 5L",
+        "category": "Dry Goods",
+        "supplier": "Bidfood SA"
+      },
+      "stockDetails": {
+        "currentStock": "12.00",
+        "usagePerDay": "3.50",
+        "daysToNextDelivery": 3,
+        "coveringDays": 2
+      },
+      "calculationDetails": {
+        "reOrderPoint": "1.50",
+        "baseUsage": "17.50",
+        "safetyStock": "3.50",
+        "criticalStock": "0.00",
+        "forecastedDemand": "21.00"
+      },
+      "orderResults": {
+        "needsReordering": true,
+        "recommendedOrderQty": "20.00",
+        "requiredStock": "21.00"
+      }
+    }
+  },
+  "thinHistory2": {
+    "stats": {
+      "itemCode": "10245",
+      "dataPoints": 2,
+      "avgDailyUsage": 4.5,
+      "stdDevUsage": 0.5,
+      "volatility": 0.1111111111111111,
+      "trend": {
+        "slope": 0,
+        "direction": "stable"
+      },
+      "dowPatterns": null,
+      "firstDate": "2026-07-06T08:00:00.000Z",
+      "lastDate": "2026-07-13T08:00:00.000Z",
+      "raw": [
+        {
+          "date": "2026-07-06T08:00:00.000Z",
+          "usage": 28,
+          "usagePerDay": 4,
+          "periodDays": 7
+        },
+        {
+          "date": "2026-07-13T08:00:00.000Z",
+          "usage": 35,
+          "usagePerDay": 5,
+          "periodDays": 7
+        }
+      ]
+    },
+    "orderDetails": {
+      "itemDetails": {
+        "itemCode": "10245",
+        "description": "Chicken Wings 2kg",
+        "category": "Frozen Foods",
+        "supplier": "Chilled Distributors"
+      },
+      "stockDetails": {
+        "currentStock": "10.00",
+        "usagePerDay": "4.50",
+        "daysToNextDelivery": 3,
+        "coveringDays": 2
+      },
+      "calculationDetails": {
+        "reOrderPoint": "-3.50",
+        "baseUsage": "22.50",
+        "safetyStock": "4.50",
+        "criticalStock": "0.00",
+        "forecastedDemand": "27.00"
+      },
+      "orderResults": {
+        "needsReordering": true,
+        "recommendedOrderQty": "31.00",
+        "requiredStock": "27.00"
+      }
+    },
+    "criticality": {
+      "isCritical": false,
+      "isManuallyMarked": false,
+      "isInCriticalCategory": false,
+      "hasCriticalScore": false,
+      "criticalityScore": 36,
+      "criticalityReason": "",
+      "criticalityDetails": {
+        "volatility": {
+          "factor": 0.1111111111111111,
+          "score": 4,
+          "maxPossible": 40
+        },
+        "stockLevel": {
+          "factor": 0.7777777777777778,
+          "score": 23,
+          "maxPossible": 30,
+          "daysRemaining": "2.2"
+        },
+        "supplierReliability": {
+          "factor": 0.3,
+          "score": 9,
+          "maxPossible": 30,
+          "supplierName": "Chilled Distributors"
+        }
+      }
+    },
+    "advanced": {
+      "itemDetails": {
+        "itemCode": "10245",
+        "description": "Chicken Wings 2kg",
+        "category": "Frozen Foods",
+        "supplier": "Chilled Distributors"
+      },
+      "stockDetails": {
+        "currentStock": "10.00",
+        "usagePerDay": "4.51",
+        "daysToNextDelivery": 3,
+        "coveringDays": 2
+      },
+      "calculationDetails": {
+        "reOrderPoint": "-3.54",
+        "baseUsage": "22.56",
+        "safetyStock": 5.01,
+        "criticalStock": "0.00",
+        "forecastedDemand": "22.565.010.00"
+      },
+      "orderResults": {
+        "needsReordering": true,
+        "recommendedOrderQty": "28.00",
+        "requiredStock": "27.57"
+      },
+      "historicalInsights": {
+        "avgDailyUsage": 4.5,
+        "stdDevUsage": 0.5,
+        "volatility": 0.1111111111111111,
+        "trend": {
+          "slope": 0,
+          "direction": "stable"
+        },
+        "dataPoints": 2,
+        "rawData": [
+          {
+            "date": "2026-07-06T08:00:00.000Z",
+            "usage": 28,
+            "usagePerDay": 4,
+            "periodDays": 7
+          },
+          {
+            "date": "2026-07-13T08:00:00.000Z",
+            "usage": 35,
+            "usagePerDay": 5,
+            "periodDays": 7
+          }
+        ],
+        "adjustments": {
+          "currentUsage": 4.5,
+          "blendedUsage": 4.51248959373947,
+          "finalUsage": 4.51248959373947,
+          "volatilityAdjustment": 0.5,
+          "trendAdjustment": 0,
+          "seasonalAdjustment": true
+        }
+      },
+      "stockStatus": {
+        "isStockout": false,
+        "isNearStockout": false,
+        "currentStock": 10
+      }
+    }
+  },
+  "confidence5plus": {
+    "stats": {
+      "itemCode": "11413",
+      "dataPoints": 6,
+      "avgDailyUsage": 22.61904761904762,
+      "stdDevUsage": 1.3569339855976201,
+      "volatility": 0.05999076567905268,
+      "trend": {
+        "slope": 0.0163265306122449,
+        "direction": "stable"
+      },
+      "dowPatterns": null,
+      "firstDate": "2026-06-08T08:00:00.000Z",
+      "lastDate": "2026-07-13T08:00:00.000Z",
+      "raw": [
+        {
+          "date": "2026-06-08T08:00:00.000Z",
+          "usage": 150,
+          "usagePerDay": 21.428571428571427,
+          "periodDays": 7
+        },
+        {
+          "date": "2026-06-15T08:00:00.000Z",
+          "usage": 168,
+          "usagePerDay": 24,
+          "periodDays": 7
+        },
+        {
+          "date": "2026-06-22T08:00:00.000Z",
+          "usage": 145,
+          "usagePerDay": 20.714285714285715,
+          "periodDays": 7
+        },
+        {
+          "date": "2026-06-29T08:00:00.000Z",
+          "usage": 172,
+          "usagePerDay": 24.571428571428573,
+          "periodDays": 7
+        },
+        {
+          "date": "2026-07-06T08:00:00.000Z",
+          "usage": 160,
+          "usagePerDay": 22.857142857142858,
+          "periodDays": 7
+        },
+        {
+          "date": "2026-07-13T08:00:00.000Z",
+          "usage": 155,
+          "usagePerDay": 22.142857142857142,
+          "periodDays": 7
+        }
+      ]
+    },
+    "orderDetails": {
+      "itemDetails": {
+        "itemCode": "11413",
+        "description": "Lager 330ml",
+        "category": "Beverages",
+        "supplier": "SAB Distribution"
+      },
+      "stockDetails": {
+        "currentStock": "60.00",
+        "usagePerDay": "23.00",
+        "daysToNextDelivery": 3,
+        "coveringDays": 2
+      },
+      "calculationDetails": {
+        "reOrderPoint": "-9.00",
+        "baseUsage": "115.00",
+        "safetyStock": "23.00",
+        "criticalStock": "0.00",
+        "forecastedDemand": "138.00"
+      },
+      "orderResults": {
+        "needsReordering": true,
+        "recommendedOrderQty": "147.00",
+        "requiredStock": "138.00"
+      }
+    },
+    "criticality": {
+      "isCritical": false,
+      "isManuallyMarked": false,
+      "isInCriticalCategory": false,
+      "hasCriticalScore": false,
+      "criticalityScore": 33,
+      "criticalityReason": "",
+      "criticalityDetails": {
+        "volatility": {
+          "factor": 0.05999076567905268,
+          "score": 2,
+          "maxPossible": 40
+        },
+        "stockLevel": {
+          "factor": 0.7391304347826086,
+          "score": 22,
+          "maxPossible": 30,
+          "daysRemaining": "2.6"
+        },
+        "supplierReliability": {
+          "factor": 0.3,
+          "score": 9,
+          "maxPossible": 30,
+          "supplierName": "SAB Distribution"
+        }
+      }
+    },
+    "advanced": {
+      "itemDetails": {
+        "itemCode": "11413",
+        "description": "Lager 330ml",
+        "category": "Beverages",
+        "supplier": "SAB Distribution"
+      },
+      "stockDetails": {
+        "currentStock": "60.00",
+        "usagePerDay": "22.79",
+        "daysToNextDelivery": 3,
+        "coveringDays": 2
+      },
+      "calculationDetails": {
+        "reOrderPoint": "-8.37",
+        "baseUsage": "113.96",
+        "safetyStock": 24.14693398559762,
+        "criticalStock": "0.00",
+        "forecastedDemand": "113.9624.146933985597620.00"
+      },
+      "orderResults": {
+        "needsReordering": true,
+        "recommendedOrderQty": "139.00",
+        "requiredStock": "138.10"
+      },
+      "historicalInsights": {
+        "avgDailyUsage": 22.61904761904762,
+        "stdDevUsage": 1.3569339855976201,
+        "volatility": 0.05999076567905268,
+        "trend": {
+          "slope": 0.0163265306122449,
+          "direction": "stable"
+        },
+        "dataPoints": 6,
+        "rawData": [
+          {
+            "date": "2026-06-08T08:00:00.000Z",
+            "usage": 150,
+            "usagePerDay": 21.428571428571427,
+            "periodDays": 7
+          },
+          {
+            "date": "2026-06-15T08:00:00.000Z",
+            "usage": 168,
+            "usagePerDay": 24,
+            "periodDays": 7
+          },
+          {
+            "date": "2026-06-22T08:00:00.000Z",
+            "usage": 145,
+            "usagePerDay": 20.714285714285715,
+            "periodDays": 7
+          },
+          {
+            "date": "2026-06-29T08:00:00.000Z",
+            "usage": 172,
+            "usagePerDay": 24.571428571428573,
+            "periodDays": 7
+          },
+          {
+            "date": "2026-07-06T08:00:00.000Z",
+            "usage": 160,
+            "usagePerDay": 22.857142857142858,
+            "periodDays": 7
+          },
+          {
+            "date": "2026-07-13T08:00:00.000Z",
+            "usage": 155,
+            "usagePerDay": 22.142857142857142,
+            "periodDays": 7
+          }
+        ],
+        "adjustments": {
+          "currentUsage": 23,
+          "blendedUsage": 22.79138627562107,
+          "finalUsage": 22.79138627562107,
+          "volatilityAdjustment": 1.3569339855976201,
+          "trendAdjustment": 0,
+          "seasonalAdjustment": true
+        }
+      },
+      "stockStatus": {
+        "isStockout": false,
+        "isNearStockout": false,
+        "currentStock": 60
+      }
+    }
+  },
+  "dow22daily": {
+    "stats": {
+      "itemCode": "20031",
+      "dataPoints": 22,
+      "avgDailyUsage": 7.818181818181818,
+      "stdDevUsage": 5.077905470461433,
+      "volatility": 0.6494995369194856,
+      "trend": {
+        "slope": 0.11180124223602485,
+        "direction": "increasing"
+      },
+      "dowPatterns": {
+        "sunday": {
+          "average": 4,
+          "index": 0.5116279069767442,
+          "dataPoints": 4
+        },
+        "monday": {
+          "average": 5,
+          "index": 0.6395348837209303,
+          "dataPoints": 3
+        },
+        "tuesday": {
+          "average": 5,
+          "index": 0.6395348837209303,
+          "dataPoints": 3
+        },
+        "wednesday": {
+          "average": 6,
+          "index": 0.7674418604651163,
+          "dataPoints": 3
+        },
+        "thursday": {
+          "average": 7,
+          "index": 0.8953488372093024,
+          "dataPoints": 3
+        },
+        "friday": {
+          "average": 20,
+          "index": 2.558139534883721,
+          "dataPoints": 3
+        },
+        "saturday": {
+          "average": 9,
+          "index": 1.1511627906976745,
+          "dataPoints": 3
+        }
+      },
+      "firstDate": "2026-06-28T08:00:00.000Z",
+      "lastDate": "2026-07-19T08:00:00.000Z",
+      "raw": [
+        {
+          "date": "2026-06-28T08:00:00.000Z",
+          "usage": 4,
+          "usagePerDay": 4,
+          "periodDays": 1
+        },
+        {
+          "date": "2026-06-29T08:00:00.000Z",
+          "usage": 5,
+          "usagePerDay": 5,
+          "periodDays": 1
+        },
+        {
+          "date": "2026-06-30T08:00:00.000Z",
+          "usage": 5,
+          "usagePerDay": 5,
+          "periodDays": 1
+        },
+        {
+          "date": "2026-07-01T08:00:00.000Z",
+          "usage": 6,
+          "usagePerDay": 6,
+          "periodDays": 1
+        },
+        {
+          "date": "2026-07-02T08:00:00.000Z",
+          "usage": 7,
+          "usagePerDay": 7,
+          "periodDays": 1
+        },
+        {
+          "date": "2026-07-03T08:00:00.000Z",
+          "usage": 20,
+          "usagePerDay": 20,
+          "periodDays": 1
+        },
+        {
+          "date": "2026-07-04T08:00:00.000Z",
+          "usage": 9,
+          "usagePerDay": 9,
+          "periodDays": 1
+        },
+        {
+          "date": "2026-07-05T08:00:00.000Z",
+          "usage": 4,
+          "usagePerDay": 4,
+          "periodDays": 1
+        },
+        {
+          "date": "2026-07-06T08:00:00.000Z",
+          "usage": 5,
+          "usagePerDay": 5,
+          "periodDays": 1
+        },
+        {
+          "date": "2026-07-07T08:00:00.000Z",
+          "usage": 5,
+          "usagePerDay": 5,
+          "periodDays": 1
+        },
+        {
+          "date": "2026-07-08T08:00:00.000Z",
+          "usage": 6,
+          "usagePerDay": 6,
+          "periodDays": 1
+        },
+        {
+          "date": "2026-07-09T08:00:00.000Z",
+          "usage": 7,
+          "usagePerDay": 7,
+          "periodDays": 1
+        },
+        {
+          "date": "2026-07-10T08:00:00.000Z",
+          "usage": 20,
+          "usagePerDay": 20,
+          "periodDays": 1
+        },
+        {
+          "date": "2026-07-11T08:00:00.000Z",
+          "usage": 9,
+          "usagePerDay": 9,
+          "periodDays": 1
+        },
+        {
+          "date": "2026-07-12T08:00:00.000Z",
+          "usage": 4,
+          "usagePerDay": 4,
+          "periodDays": 1
+        },
+        {
+          "date": "2026-07-13T08:00:00.000Z",
+          "usage": 5,
+          "usagePerDay": 5,
+          "periodDays": 1
+        },
+        {
+          "date": "2026-07-14T08:00:00.000Z",
+          "usage": 5,
+          "usagePerDay": 5,
+          "periodDays": 1
+        },
+        {
+          "date": "2026-07-15T08:00:00.000Z",
+          "usage": 6,
+          "usagePerDay": 6,
+          "periodDays": 1
+        },
+        {
+          "date": "2026-07-16T08:00:00.000Z",
+          "usage": 7,
+          "usagePerDay": 7,
+          "periodDays": 1
+        },
+        {
+          "date": "2026-07-17T08:00:00.000Z",
+          "usage": 20,
+          "usagePerDay": 20,
+          "periodDays": 1
+        },
+        {
+          "date": "2026-07-18T08:00:00.000Z",
+          "usage": 9,
+          "usagePerDay": 9,
+          "periodDays": 1
+        },
+        {
+          "date": "2026-07-19T08:00:00.000Z",
+          "usage": 4,
+          "usagePerDay": 4,
+          "periodDays": 1
+        }
+      ]
+    },
+    "orderDetails": {
+      "itemDetails": {
+        "itemCode": "20031",
+        "description": "Fresh Hake Fillet 1kg",
+        "category": "Seafood",
+        "supplier": "Ocean Fresh SA"
+      },
+      "stockDetails": {
+        "currentStock": "30.00",
+        "usagePerDay": "8.00",
+        "daysToNextDelivery": 4,
+        "coveringDays": 2
+      },
+      "calculationDetails": {
+        "reOrderPoint": "-2.00",
+        "baseUsage": "48.00",
+        "safetyStock": "9.60",
+        "criticalStock": "0.00",
+        "forecastedDemand": "57.60"
+      },
+      "orderResults": {
+        "needsReordering": true,
+        "recommendedOrderQty": "60.00",
+        "requiredStock": "57.60"
+      }
+    },
+    "criticality": {
+      "isCritical": false,
+      "isManuallyMarked": false,
+      "isInCriticalCategory": false,
+      "hasCriticalScore": false,
+      "criticalityScore": 51,
+      "criticalityReason": "",
+      "criticalityDetails": {
+        "volatility": {
+          "factor": 0.6494995369194856,
+          "score": 26,
+          "maxPossible": 40
+        },
+        "stockLevel": {
+          "factor": 0.525,
+          "score": 16,
+          "maxPossible": 30,
+          "daysRemaining": "3.8"
+        },
+        "supplierReliability": {
+          "factor": 0.3,
+          "score": 9,
+          "maxPossible": 30,
+          "supplierName": "Ocean Fresh SA"
+        }
+      }
+    },
+    "advanced": {
+      "itemDetails": {
+        "itemCode": "20031",
+        "description": "Fresh Hake Fillet 1kg",
+        "category": "Seafood",
+        "supplier": "Ocean Fresh SA"
+      },
+      "stockDetails": {
+        "currentStock": "30.00",
+        "usagePerDay": "21.76",
+        "daysToNextDelivery": 4,
+        "coveringDays": 2
+      },
+      "calculationDetails": {
+        "reOrderPoint": "-57.05",
+        "baseUsage": "130.58",
+        "safetyStock": 31.197905470461436,
+        "criticalStock": "0.00",
+        "forecastedDemand": "130.5831.1979054704614360.00"
+      },
+      "orderResults": {
+        "needsReordering": true,
+        "recommendedOrderQty": "162.00",
+        "requiredStock": "161.78"
+      },
+      "historicalInsights": {
+        "avgDailyUsage": 7.818181818181818,
+        "stdDevUsage": 5.077905470461433,
+        "volatility": 0.6494995369194856,
+        "trend": {
+          "slope": 0.11180124223602485,
+          "direction": "increasing"
+        },
+        "dataPoints": 22,
+        "rawData": [
+          {
+            "date": "2026-06-28T08:00:00.000Z",
+            "usage": 4,
+            "usagePerDay": 4,
+            "periodDays": 1
+          },
+          {
+            "date": "2026-06-29T08:00:00.000Z",
+            "usage": 5,
+            "usagePerDay": 5,
+            "periodDays": 1
+          },
+          {
+            "date": "2026-06-30T08:00:00.000Z",
+            "usage": 5,
+            "usagePerDay": 5,
+            "periodDays": 1
+          },
+          {
+            "date": "2026-07-01T08:00:00.000Z",
+            "usage": 6,
+            "usagePerDay": 6,
+            "periodDays": 1
+          },
+          {
+            "date": "2026-07-02T08:00:00.000Z",
+            "usage": 7,
+            "usagePerDay": 7,
+            "periodDays": 1
+          },
+          {
+            "date": "2026-07-03T08:00:00.000Z",
+            "usage": 20,
+            "usagePerDay": 20,
+            "periodDays": 1
+          },
+          {
+            "date": "2026-07-04T08:00:00.000Z",
+            "usage": 9,
+            "usagePerDay": 9,
+            "periodDays": 1
+          },
+          {
+            "date": "2026-07-05T08:00:00.000Z",
+            "usage": 4,
+            "usagePerDay": 4,
+            "periodDays": 1
+          },
+          {
+            "date": "2026-07-06T08:00:00.000Z",
+            "usage": 5,
+            "usagePerDay": 5,
+            "periodDays": 1
+          },
+          {
+            "date": "2026-07-07T08:00:00.000Z",
+            "usage": 5,
+            "usagePerDay": 5,
+            "periodDays": 1
+          },
+          {
+            "date": "2026-07-08T08:00:00.000Z",
+            "usage": 6,
+            "usagePerDay": 6,
+            "periodDays": 1
+          },
+          {
+            "date": "2026-07-09T08:00:00.000Z",
+            "usage": 7,
+            "usagePerDay": 7,
+            "periodDays": 1
+          },
+          {
+            "date": "2026-07-10T08:00:00.000Z",
+            "usage": 20,
+            "usagePerDay": 20,
+            "periodDays": 1
+          },
+          {
+            "date": "2026-07-11T08:00:00.000Z",
+            "usage": 9,
+            "usagePerDay": 9,
+            "periodDays": 1
+          },
+          {
+            "date": "2026-07-12T08:00:00.000Z",
+            "usage": 4,
+            "usagePerDay": 4,
+            "periodDays": 1
+          },
+          {
+            "date": "2026-07-13T08:00:00.000Z",
+            "usage": 5,
+            "usagePerDay": 5,
+            "periodDays": 1
+          },
+          {
+            "date": "2026-07-14T08:00:00.000Z",
+            "usage": 5,
+            "usagePerDay": 5,
+            "periodDays": 1
+          },
+          {
+            "date": "2026-07-15T08:00:00.000Z",
+            "usage": 6,
+            "usagePerDay": 6,
+            "periodDays": 1
+          },
+          {
+            "date": "2026-07-16T08:00:00.000Z",
+            "usage": 7,
+            "usagePerDay": 7,
+            "periodDays": 1
+          },
+          {
+            "date": "2026-07-17T08:00:00.000Z",
+            "usage": 20,
+            "usagePerDay": 20,
+            "periodDays": 1
+          },
+          {
+            "date": "2026-07-18T08:00:00.000Z",
+            "usage": 9,
+            "usagePerDay": 9,
+            "periodDays": 1
+          },
+          {
+            "date": "2026-07-19T08:00:00.000Z",
+            "usage": 4,
+            "usagePerDay": 4,
+            "periodDays": 1
+          }
+        ],
+        "adjustments": {
+          "currentUsage": 8,
+          "blendedUsage": 8.102229333643962,
+          "finalUsage": 21.762964838043665,
+          "volatilityAdjustment": 5.077905470461433,
+          "trendAdjustment": 0.05,
+          "seasonalAdjustment": true
+        }
+      },
+      "stockStatus": {
+        "isStockout": false,
+        "isNearStockout": true,
+        "currentStock": 30
+      }
+    }
+  },
+  "stockout": {
+    "stats": {
+      "itemCode": "10127",
+      "dataPoints": 6,
+      "avgDailyUsage": 12.5,
+      "stdDevUsage": 2.5671260301009315,
+      "volatility": 0.20537008240807453,
+      "trend": {
+        "slope": 0.11370262390670553,
+        "direction": "increasing"
+      },
+      "dowPatterns": null,
+      "firstDate": "2026-06-08T08:00:00.000Z",
+      "lastDate": "2026-07-13T08:00:00.000Z",
+      "raw": [
+        {
+          "date": "2026-06-08T08:00:00.000Z",
+          "usage": 70,
+          "usagePerDay": 10,
+          "periodDays": 7
+        },
+        {
+          "date": "2026-06-15T08:00:00.000Z",
+          "usage": 95,
+          "usagePerDay": 13.571428571428571,
+          "periodDays": 7
+        },
+        {
+          "date": "2026-06-22T08:00:00.000Z",
+          "usage": 60,
+          "usagePerDay": 8.571428571428571,
+          "periodDays": 7
+        },
+        {
+          "date": "2026-06-29T08:00:00.000Z",
+          "usage": 110,
+          "usagePerDay": 15.714285714285714,
+          "periodDays": 7
+        },
+        {
+          "date": "2026-07-06T08:00:00.000Z",
+          "usage": 85,
+          "usagePerDay": 12.142857142857142,
+          "periodDays": 7
+        },
+        {
+          "date": "2026-07-13T08:00:00.000Z",
+          "usage": 105,
+          "usagePerDay": 15,
+          "periodDays": 7
+        }
+      ]
+    },
+    "orderDetails": {
+      "itemDetails": {
+        "itemCode": "10127",
+        "description": "Beef Burger Patty 150g",
+        "category": "Frozen Foods",
+        "supplier": "Meat Wholesalers SA"
+      },
+      "stockDetails": {
+        "currentStock": "0.00",
+        "usagePerDay": "12.00",
+        "daysToNextDelivery": 3,
+        "coveringDays": 2
+      },
+      "calculationDetails": {
+        "reOrderPoint": "-36.00",
+        "baseUsage": "60.00",
+        "safetyStock": "12.00",
+        "criticalStock": "0.00",
+        "forecastedDemand": "72.00"
+      },
+      "orderResults": {
+        "needsReordering": true,
+        "recommendedOrderQty": "108.00",
+        "requiredStock": "72.00"
+      }
+    },
+    "criticality": {
+      "isCritical": false,
+      "isManuallyMarked": false,
+      "isInCriticalCategory": false,
+      "hasCriticalScore": false,
+      "criticalityScore": 47,
+      "criticalityReason": "",
+      "criticalityDetails": {
+        "volatility": {
+          "factor": 0.20537008240807453,
+          "score": 8,
+          "maxPossible": 40
+        },
+        "stockLevel": {
+          "factor": 1,
+          "score": 30,
+          "maxPossible": 30,
+          "daysRemaining": "0.0"
+        },
+        "supplierReliability": {
+          "factor": 0.3,
+          "score": 9,
+          "maxPossible": 30,
+          "supplierName": "Meat Wholesalers SA"
+        }
+      }
+    },
+    "advanced": {
+      "itemDetails": {
+        "itemCode": "10127",
+        "description": "Beef Burger Patty 150g",
+        "category": "Frozen Foods",
+        "supplier": "Meat Wholesalers SA"
+      },
+      "stockDetails": {
+        "currentStock": "0.00",
+        "usagePerDay": "13.04",
+        "daysToNextDelivery": 3,
+        "coveringDays": 7
+      },
+      "calculationDetails": {
+        "reOrderPoint": "-39.11",
+        "baseUsage": "130.36",
+        "safetyStock": 41.67712603010093,
+        "criticalStock": "0.00",
+        "forecastedDemand": "130.3641.677126030100930.00"
+      },
+      "orderResults": {
+        "needsReordering": true,
+        "recommendedOrderQty": "173.00",
+        "requiredStock": "172.04"
+      },
+      "historicalInsights": {
+        "avgDailyUsage": 12.5,
+        "stdDevUsage": 2.5671260301009315,
+        "volatility": 0.20537008240807453,
+        "trend": {
+          "slope": 0.11370262390670553,
+          "direction": "increasing"
+        },
+        "dataPoints": 6,
+        "rawData": [
+          {
+            "date": "2026-06-08T08:00:00.000Z",
+            "usage": 70,
+            "usagePerDay": 10,
+            "periodDays": 7
+          },
+          {
+            "date": "2026-06-15T08:00:00.000Z",
+            "usage": 95,
+            "usagePerDay": 13.571428571428571,
+            "periodDays": 7
+          },
+          {
+            "date": "2026-06-22T08:00:00.000Z",
+            "usage": 60,
+            "usagePerDay": 8.571428571428571,
+            "periodDays": 7
+          },
+          {
+            "date": "2026-06-29T08:00:00.000Z",
+            "usage": 110,
+            "usagePerDay": 15.714285714285714,
+            "periodDays": 7
+          },
+          {
+            "date": "2026-07-06T08:00:00.000Z",
+            "usage": 85,
+            "usagePerDay": 12.142857142857142,
+            "periodDays": 7
+          },
+          {
+            "date": "2026-07-13T08:00:00.000Z",
+            "usage": 105,
+            "usagePerDay": 15,
+            "periodDays": 7
+          }
+        ],
+        "adjustments": {
+          "currentUsage": 12,
+          "blendedUsage": 12.41518964767402,
+          "finalUsage": 13.035949130057721,
+          "volatilityAdjustment": 2.5671260301009315,
+          "trendAdjustment": 0.05,
+          "seasonalAdjustment": true
+        }
+      },
+      "stockStatus": {
+        "isStockout": true,
+        "isNearStockout": true,
+        "currentStock": 0
+      }
+    }
+  },
+  "missingCost": {
+    "stats": {
+      "itemCode": "30017",
+      "dataPoints": 3,
+      "avgDailyUsage": 0.7142857142857143,
+      "stdDevUsage": 0.11664236870396084,
+      "volatility": 0.1632993161855452,
+      "trend": {
+        "slope": 0.02040816326530612,
+        "direction": "stable"
+      },
+      "dowPatterns": null,
+      "firstDate": "2026-06-29T08:00:00.000Z",
+      "lastDate": "2026-07-13T08:00:00.000Z",
+      "raw": [
+        {
+          "date": "2026-06-29T08:00:00.000Z",
+          "usage": 4,
+          "usagePerDay": 0.5714285714285714,
+          "periodDays": 7
+        },
+        {
+          "date": "2026-07-06T08:00:00.000Z",
+          "usage": 5,
+          "usagePerDay": 0.7142857142857143,
+          "periodDays": 7
+        },
+        {
+          "date": "2026-07-13T08:00:00.000Z",
+          "usage": 6,
+          "usagePerDay": 0.8571428571428571,
+          "periodDays": 7
+        }
+      ]
+    },
+    "orderDetails": {
+      "itemDetails": {
+        "itemCode": "30017",
+        "description": "Truffle Oil 250ml",
+        "category": "Condiments",
+        "supplier": "Gourmet Imports"
+      },
+      "stockDetails": {
+        "currentStock": "2.00",
+        "usagePerDay": "0.71",
+        "daysToNextDelivery": 3,
+        "coveringDays": 2
+      },
+      "calculationDetails": {
+        "reOrderPoint": "-0.14",
+        "baseUsage": "3.57",
+        "safetyStock": "0.71",
+        "criticalStock": "0.00",
+        "forecastedDemand": "4.29"
+      },
+      "orderResults": {
+        "needsReordering": true,
+        "recommendedOrderQty": "5.00",
+        "requiredStock": "4.29"
+      }
+    },
+    "criticality": {
+      "isCritical": false,
+      "isManuallyMarked": false,
+      "isInCriticalCategory": false,
+      "hasCriticalScore": false,
+      "criticalityScore": 38,
+      "criticalityReason": "",
+      "criticalityDetails": {
+        "volatility": {
+          "factor": 0.1632993161855452,
+          "score": 7,
+          "maxPossible": 40
+        },
+        "stockLevel": {
+          "factor": 0.72,
+          "score": 22,
+          "maxPossible": 30,
+          "daysRemaining": "2.8"
+        },
+        "supplierReliability": {
+          "factor": 0.3,
+          "score": 9,
+          "maxPossible": 30,
+          "supplierName": "Gourmet Imports"
+        }
+      }
+    },
+    "advanced": {
+      "itemDetails": {
+        "itemCode": "30017",
+        "description": "Truffle Oil 250ml",
+        "category": "Condiments",
+        "supplier": "Gourmet Imports"
+      },
+      "stockDetails": {
+        "currentStock": "2.00",
+        "usagePerDay": "0.72",
+        "daysToNextDelivery": 3,
+        "coveringDays": 2
+      },
+      "calculationDetails": {
+        "reOrderPoint": "-0.16",
+        "baseUsage": "3.60",
+        "safetyStock": 0.8366423687039608,
+        "criticalStock": "0.00",
+        "forecastedDemand": "3.600.83664236870396080.00"
+      },
+      "orderResults": {
+        "needsReordering": true,
+        "recommendedOrderQty": "5.00",
+        "requiredStock": "4.43"
+      },
+      "historicalInsights": {
+        "avgDailyUsage": 0.7142857142857143,
+        "stdDevUsage": 0.11664236870396084,
+        "volatility": 0.1632993161855452,
+        "trend": {
+          "slope": 0.02040816326530612,
+          "direction": "stable"
+        },
+        "dataPoints": 3,
+        "rawData": [
+          {
+            "date": "2026-06-29T08:00:00.000Z",
+            "usage": 4,
+            "usagePerDay": 0.5714285714285714,
+            "periodDays": 7
+          },
+          {
+            "date": "2026-07-06T08:00:00.000Z",
+            "usage": 5,
+            "usagePerDay": 0.7142857142857143,
+            "periodDays": 7
+          },
+          {
+            "date": "2026-07-13T08:00:00.000Z",
+            "usage": 6,
+            "usagePerDay": 0.8571428571428571,
+            "periodDays": 7
+          }
+        ],
+        "adjustments": {
+          "currentUsage": 0.7142857142857143,
+          "blendedUsage": 0.7190396996967998,
+          "finalUsage": 0.7190396996967998,
+          "volatilityAdjustment": 0.11664236870396084,
+          "trendAdjustment": 0,
+          "seasonalAdjustment": true
+        }
+      },
+      "stockStatus": {
+        "isStockout": false,
+        "isNearStockout": false,
+        "currentStock": 2
+      }
+    },
+    "noCostFieldItem": {
+      "stats": {
+        "itemCode": "30022",
+        "dataPoints": 3,
+        "avgDailyUsage": 1.5714285714285714,
+        "stdDevUsage": 0.1166423687039608,
+        "volatility": 0.07422696190252051,
+        "trend": {
+          "slope": 0.01020408163265306,
+          "direction": "stable"
+        },
+        "dowPatterns": null,
+        "firstDate": "2026-06-29T08:00:00.000Z",
+        "lastDate": "2026-07-13T08:00:00.000Z",
+        "raw": [
+          {
+            "date": "2026-06-29T08:00:00.000Z",
+            "usage": 10,
+            "usagePerDay": 1.4285714285714286,
+            "periodDays": 7
+          },
+          {
+            "date": "2026-07-06T08:00:00.000Z",
+            "usage": 12,
+            "usagePerDay": 1.7142857142857142,
+            "periodDays": 7
+          },
+          {
+            "date": "2026-07-13T08:00:00.000Z",
+            "usage": 11,
+            "usagePerDay": 1.5714285714285714,
+            "periodDays": 7
+          }
+        ]
+      },
+      "orderDetails": {
+        "itemDetails": {
+          "itemCode": "30022",
+          "description": "House Spice Blend 1kg",
+          "category": "Condiments",
+          "supplier": "Internal Kitchen"
+        },
+        "stockDetails": {
+          "currentStock": "4.00",
+          "usagePerDay": "1.57",
+          "daysToNextDelivery": 3,
+          "coveringDays": 2
+        },
+        "calculationDetails": {
+          "reOrderPoint": "-0.71",
+          "baseUsage": "7.86",
+          "safetyStock": "1.57",
+          "criticalStock": "0.00",
+          "forecastedDemand": "9.43"
+        },
+        "orderResults": {
+          "needsReordering": true,
+          "recommendedOrderQty": "11.00",
+          "requiredStock": "9.43"
+        }
+      },
+      "criticality": {
+        "isCritical": false,
+        "isManuallyMarked": false,
+        "isInCriticalCategory": false,
+        "hasCriticalScore": false,
+        "criticalityScore": 34,
+        "criticalityReason": "",
+        "criticalityDetails": {
+          "volatility": {
+            "factor": 0.07422696190252051,
+            "score": 3,
+            "maxPossible": 40
+          },
+          "stockLevel": {
+            "factor": 0.7454545454545455,
+            "score": 22,
+            "maxPossible": 30,
+            "daysRemaining": "2.5"
+          },
+          "supplierReliability": {
+            "factor": 0.3,
+            "score": 9,
+            "maxPossible": 30,
+            "supplierName": "Internal Kitchen"
+          }
+        }
+      },
+      "advanced": {
+        "itemDetails": {
+          "itemCode": "30022",
+          "description": "House Spice Blend 1kg",
+          "category": "Condiments",
+          "supplier": "Internal Kitchen"
+        },
+        "stockDetails": {
+          "currentStock": "4.00",
+          "usagePerDay": "1.57",
+          "daysToNextDelivery": 3,
+          "coveringDays": 2
+        },
+        "calculationDetails": {
+          "reOrderPoint": "-0.72",
+          "baseUsage": "7.87",
+          "safetyStock": 1.686642368703961,
+          "criticalStock": "0.00",
+          "forecastedDemand": "7.871.6866423687039610.00"
+        },
+        "orderResults": {
+          "needsReordering": true,
+          "recommendedOrderQty": "10.00",
+          "requiredStock": "9.56"
+        },
+        "historicalInsights": {
+          "avgDailyUsage": 1.5714285714285714,
+          "stdDevUsage": 0.1166423687039608,
+          "volatility": 0.07422696190252051,
+          "trend": {
+            "slope": 0.01020408163265306,
+            "direction": "stable"
+          },
+          "dataPoints": 3,
+          "rawData": [
+            {
+              "date": "2026-06-29T08:00:00.000Z",
+              "usage": 10,
+              "usagePerDay": 1.4285714285714286,
+              "periodDays": 7
+            },
+            {
+              "date": "2026-07-06T08:00:00.000Z",
+              "usage": 12,
+              "usagePerDay": 1.7142857142857142,
+              "periodDays": 7
+            },
+            {
+              "date": "2026-07-13T08:00:00.000Z",
+              "usage": 11,
+              "usagePerDay": 1.5714285714285714,
+              "periodDays": 7
+            }
+          ],
+          "adjustments": {
+            "currentUsage": 1.5714285714285714,
+            "blendedUsage": 1.5736868134412585,
+            "finalUsage": 1.5736868134412585,
+            "volatilityAdjustment": 0.1166423687039608,
+            "trendAdjustment": 0,
+            "seasonalAdjustment": true
+          }
+        },
+        "stockStatus": {
+          "isStockout": false,
+          "isNearStockout": false,
+          "currentStock": 4
+        }
+      }
+    }
+  },
+  "negativeUsage": {
+    "stats": {
+      "itemCode": "40088",
+      "dataPoints": 5,
+      "avgDailyUsage": 0.6857142857142857,
+      "stdDevUsage": 1.6840185175190143,
+      "volatility": 2.4558603380485624,
+      "trend": {
+        "slope": 0.07959183673469386,
+        "direction": "increasing"
+      },
+      "dowPatterns": null,
+      "firstDate": "2026-06-15T08:00:00.000Z",
+      "lastDate": "2026-07-13T08:00:00.000Z",
+      "raw": [
+        {
+          "date": "2026-06-15T08:00:00.000Z",
+          "usage": -12,
+          "usagePerDay": -1.7142857142857142,
+          "periodDays": 7
+        },
+        {
+          "date": "2026-06-22T08:00:00.000Z",
+          "usage": 18,
+          "usagePerDay": 2.5714285714285716,
+          "periodDays": 7
+        },
+        {
+          "date": "2026-06-29T08:00:00.000Z",
+          "usage": -6,
+          "usagePerDay": -0.8571428571428571,
+          "periodDays": 7
+        },
+        {
+          "date": "2026-07-06T08:00:00.000Z",
+          "usage": 15,
+          "usagePerDay": 2.142857142857143,
+          "periodDays": 7
+        },
+        {
+          "date": "2026-07-13T08:00:00.000Z",
+          "usage": 9,
+          "usagePerDay": 1.2857142857142858,
+          "periodDays": 7
+        }
+      ]
+    },
+    "orderDetails": {
+      "itemDetails": {
+        "itemCode": "40088",
+        "description": "Sunflower Oil 20L",
+        "category": "Dry Goods",
+        "supplier": "Bulk Oils SA"
+      },
+      "stockDetails": {
+        "currentStock": "6.00",
+        "usagePerDay": "1.80",
+        "daysToNextDelivery": 3,
+        "coveringDays": 2
+      },
+      "calculationDetails": {
+        "reOrderPoint": "0.60",
+        "baseUsage": "9.00",
+        "safetyStock": "1.80",
+        "criticalStock": "0.00",
+        "forecastedDemand": "10.80"
+      },
+      "orderResults": {
+        "needsReordering": true,
+        "recommendedOrderQty": "11.00",
+        "requiredStock": "10.80"
+      }
+    },
+    "criticality": {
+      "isCritical": false,
+      "isManuallyMarked": false,
+      "isInCriticalCategory": false,
+      "hasCriticalScore": false,
+      "criticalityScore": 66,
+      "criticalityReason": "",
+      "criticalityDetails": {
+        "volatility": {
+          "factor": 1,
+          "score": 40,
+          "maxPossible": 40
+        },
+        "stockLevel": {
+          "factor": 0.5666666666666667,
+          "score": 17,
+          "maxPossible": 30,
+          "daysRemaining": "3.3"
+        },
+        "supplierReliability": {
+          "factor": 0.3,
+          "score": 9,
+          "maxPossible": 30,
+          "supplierName": "Bulk Oils SA"
+        }
+      }
+    },
+    "advanced": {
+      "itemDetails": {
+        "itemCode": "40088",
+        "description": "Sunflower Oil 20L",
+        "category": "Dry Goods",
+        "supplier": "Bulk Oils SA"
+      },
+      "stockDetails": {
+        "currentStock": "6.00",
+        "usagePerDay": "1.95",
+        "daysToNextDelivery": 3,
+        "coveringDays": 2
+      },
+      "calculationDetails": {
+        "reOrderPoint": "0.15",
+        "baseUsage": "9.75",
+        "safetyStock": 3.6340185175190145,
+        "criticalStock": "0.00",
+        "forecastedDemand": "9.753.63401851751901450.00"
+      },
+      "orderResults": {
+        "needsReordering": true,
+        "recommendedOrderQty": "14.00",
+        "requiredStock": "13.38"
+      },
+      "historicalInsights": {
+        "avgDailyUsage": 0.6857142857142857,
+        "stdDevUsage": 1.6840185175190143,
+        "volatility": 2.4558603380485624,
+        "trend": {
+          "slope": 0.07959183673469386,
+          "direction": "increasing"
+        },
+        "dataPoints": 5,
+        "rawData": [
+          {
+            "date": "2026-06-15T08:00:00.000Z",
+            "usage": -12,
+            "usagePerDay": -1.7142857142857142,
+            "periodDays": 7
+          },
+          {
+            "date": "2026-06-22T08:00:00.000Z",
+            "usage": 18,
+            "usagePerDay": 2.5714285714285716,
+            "periodDays": 7
+          },
+          {
+            "date": "2026-06-29T08:00:00.000Z",
+            "usage": -6,
+            "usagePerDay": -0.8571428571428571,
+            "periodDays": 7
+          },
+          {
+            "date": "2026-07-06T08:00:00.000Z",
+            "usage": 15,
+            "usagePerDay": 2.142857142857143,
+            "periodDays": 7
+          },
+          {
+            "date": "2026-07-13T08:00:00.000Z",
+            "usage": 9,
+            "usagePerDay": 1.2857142857142858,
+            "periodDays": 7
+          }
+        ],
+        "adjustments": {
+          "currentUsage": 1.8,
+          "blendedUsage": 1.8572720814492634,
+          "finalUsage": 1.9501356855217267,
+          "volatilityAdjustment": 1.6840185175190143,
+          "trendAdjustment": 0.05,
+          "seasonalAdjustment": true
+        }
+      },
+      "stockStatus": {
+        "isStockout": false,
+        "isNearStockout": false,
+        "currentStock": 6
+      }
+    }
+  },
+  "volatilityOff": {
+    "stats": {
+      "itemCode": "50010",
+      "dataPoints": 4,
+      "avgDailyUsage": 3,
+      "stdDevUsage": 0,
+      "volatility": 0,
+      "trend": {
+        "slope": 0,
+        "direction": "stable"
+      },
+      "dowPatterns": null,
+      "firstDate": "2026-06-22T08:00:00.000Z",
+      "lastDate": "2026-07-13T08:00:00.000Z",
+      "raw": [
+        {
+          "date": "2026-06-22T08:00:00.000Z",
+          "usage": 21,
+          "usagePerDay": 3,
+          "periodDays": 7
+        },
+        {
+          "date": "2026-06-29T08:00:00.000Z",
+          "usage": 21,
+          "usagePerDay": 3,
+          "periodDays": 7
+        },
+        {
+          "date": "2026-07-06T08:00:00.000Z",
+          "usage": 21,
+          "usagePerDay": 3,
+          "periodDays": 7
+        },
+        {
+          "date": "2026-07-13T08:00:00.000Z",
+          "usage": 21,
+          "usagePerDay": 3,
+          "periodDays": 7
+        }
+      ]
+    },
+    "orderDetails": {
+      "itemDetails": {
+        "itemCode": "50010",
+        "description": "Serviettes 500pk",
+        "category": "Packaging",
+        "supplier": "PaperCo SA"
+      },
+      "stockDetails": {
+        "currentStock": "9.00",
+        "usagePerDay": "3.00",
+        "daysToNextDelivery": 3,
+        "coveringDays": 2
+      },
+      "calculationDetails": {
+        "reOrderPoint": "0.00",
+        "baseUsage": "15.00",
+        "safetyStock": "3.00",
+        "criticalStock": "0.00",
+        "forecastedDemand": "18.00"
+      },
+      "orderResults": {
+        "needsReordering": true,
+        "recommendedOrderQty": "18.00",
+        "requiredStock": "18.00"
+      }
+    },
+    "criticality": {
+      "isCritical": false,
+      "isManuallyMarked": false,
+      "isInCriticalCategory": false,
+      "hasCriticalScore": false,
+      "criticalityScore": 50,
+      "criticalityReason": "",
+      "criticalityDetails": {
+        "volatility": {
+          "factor": 0,
+          "score": 20,
+          "maxPossible": 40
+        },
+        "stockLevel": {
+          "factor": 0.7,
+          "score": 21,
+          "maxPossible": 30,
+          "daysRemaining": "3.0"
+        },
+        "supplierReliability": {
+          "factor": 0.3,
+          "score": 9,
+          "maxPossible": 30,
+          "supplierName": "PaperCo SA"
+        }
+      }
+    },
+    "advanced": {
+      "itemDetails": {
+        "itemCode": "50010",
+        "description": "Serviettes 500pk",
+        "category": "Packaging",
+        "supplier": "PaperCo SA"
+      },
+      "stockDetails": {
+        "currentStock": "9.00",
+        "usagePerDay": "3.00",
+        "daysToNextDelivery": 3,
+        "coveringDays": 2
+      },
+      "calculationDetails": {
+        "reOrderPoint": "0.00",
+        "baseUsage": "15.00",
+        "safetyStock": "3.00",
+        "criticalStock": "0.00",
+        "forecastedDemand": "18.00"
+      },
+      "orderResults": {
+        "needsReordering": true,
+        "recommendedOrderQty": "18.00",
+        "requiredStock": "18.00"
+      },
+      "historicalInsights": {
+        "avgDailyUsage": 3,
+        "stdDevUsage": 0,
+        "volatility": 0,
+        "trend": {
+          "slope": 0,
+          "direction": "stable"
+        },
+        "dataPoints": 4,
+        "adjustments": {
+          "blendedUsage": 3,
+          "finalUsage": 3,
+          "volatilityAdjustment": 0,
+          "trendAdjustment": false,
+          "seasonalAdjustment": true
+        }
+      },
+      "stockStatus": {
+        "isStockout": false,
+        "isNearStockout": false,
+        "currentStock": 9
+      }
+    }
+  },
+  "criticalItem": {
+    "stats": {
+      "itemCode": "60001",
+      "dataPoints": 6,
+      "avgDailyUsage": 15.61904761904762,
+      "stdDevUsage": 1.9994330262111446,
+      "volatility": 0.12801248033668913,
+      "trend": {
+        "slope": 0.0478134110787172,
+        "direction": "stable"
+      },
+      "dowPatterns": null,
+      "firstDate": "2026-06-08T08:00:00.000Z",
+      "lastDate": "2026-07-13T08:00:00.000Z",
+      "raw": [
+        {
+          "date": "2026-06-08T08:00:00.000Z",
+          "usage": 98,
+          "usagePerDay": 14,
+          "periodDays": 7
+        },
+        {
+          "date": "2026-06-15T08:00:00.000Z",
+          "usage": 120,
+          "usagePerDay": 17.142857142857142,
+          "periodDays": 7
+        },
+        {
+          "date": "2026-06-22T08:00:00.000Z",
+          "usage": 88,
+          "usagePerDay": 12.571428571428571,
+          "periodDays": 7
+        },
+        {
+          "date": "2026-06-29T08:00:00.000Z",
+          "usage": 130,
+          "usagePerDay": 18.571428571428573,
+          "periodDays": 7
+        },
+        {
+          "date": "2026-07-06T08:00:00.000Z",
+          "usage": 105,
+          "usagePerDay": 15,
+          "periodDays": 7
+        },
+        {
+          "date": "2026-07-13T08:00:00.000Z",
+          "usage": 115,
+          "usagePerDay": 16.428571428571427,
+          "periodDays": 7
+        }
+      ]
+    },
+    "orderDetails": {
+      "itemDetails": {
+        "itemCode": "60001",
+        "description": "Full Cream Milk 2L",
+        "category": "Dairy",
+        "supplier": "Clover SA"
+      },
+      "stockDetails": {
+        "currentStock": "20.00",
+        "usagePerDay": "15.70",
+        "daysToNextDelivery": 3,
+        "coveringDays": 2
+      },
+      "calculationDetails": {
+        "reOrderPoint": "-27.10",
+        "baseUsage": "78.50",
+        "safetyStock": "15.70",
+        "criticalStock": "23.55",
+        "forecastedDemand": "117.75"
+      },
+      "orderResults": {
+        "needsReordering": true,
+        "recommendedOrderQty": "145.00",
+        "requiredStock": "94.20"
+      }
+    },
+    "criticality": {
+      "isCritical": true,
+      "isManuallyMarked": true,
+      "isInCriticalCategory": true,
+      "hasCriticalScore": false,
+      "criticalityScore": 40,
+      "criticalityReason": "Manually marked as critical",
+      "criticalityDetails": {
+        "volatility": {
+          "factor": 0.12801248033668913,
+          "score": 5,
+          "maxPossible": 40
+        },
+        "stockLevel": {
+          "factor": 0.8726114649681529,
+          "score": 26,
+          "maxPossible": 30,
+          "daysRemaining": "1.3"
+        },
+        "supplierReliability": {
+          "factor": 0.3,
+          "score": 9,
+          "maxPossible": 30,
+          "supplierName": "Clover SA"
+        }
+      }
+    },
+    "advanced": {
+      "itemDetails": {
+        "itemCode": "60001",
+        "description": "Full Cream Milk 2L",
+        "category": "Dairy",
+        "supplier": "Clover SA"
+      },
+      "stockDetails": {
+        "currentStock": "20.00",
+        "usagePerDay": "15.71",
+        "daysToNextDelivery": 3,
+        "coveringDays": 2
+      },
+      "calculationDetails": {
+        "reOrderPoint": "-27.12",
+        "baseUsage": "78.54",
+        "safetyStock": 17.709433026211144,
+        "criticalStock": "23.56",
+        "forecastedDemand": "78.5417.70943302621114423.56"
+      },
+      "orderResults": {
+        "needsReordering": true,
+        "recommendedOrderQty": "97.00",
+        "requiredStock": "96.25"
+      },
+      "historicalInsights": {
+        "avgDailyUsage": 15.61904761904762,
+        "stdDevUsage": 1.9994330262111446,
+        "volatility": 0.12801248033668913,
+        "trend": {
+          "slope": 0.0478134110787172,
+          "direction": "stable"
+        },
+        "dataPoints": 6,
+        "rawData": [
+          {
+            "date": "2026-06-08T08:00:00.000Z",
+            "usage": 98,
+            "usagePerDay": 14,
+            "periodDays": 7
+          },
+          {
+            "date": "2026-06-15T08:00:00.000Z",
+            "usage": 120,
+            "usagePerDay": 17.142857142857142,
+            "periodDays": 7
+          },
+          {
+            "date": "2026-06-22T08:00:00.000Z",
+            "usage": 88,
+            "usagePerDay": 12.571428571428571,
+            "periodDays": 7
+          },
+          {
+            "date": "2026-06-29T08:00:00.000Z",
+            "usage": 130,
+            "usagePerDay": 18.571428571428573,
+            "periodDays": 7
+          },
+          {
+            "date": "2026-07-06T08:00:00.000Z",
+            "usage": 105,
+            "usagePerDay": 15,
+            "periodDays": 7
+          },
+          {
+            "date": "2026-07-13T08:00:00.000Z",
+            "usage": 115,
+            "usagePerDay": 16.428571428571427,
+            "periodDays": 7
+          }
+        ],
+        "adjustments": {
+          "currentUsage": 15.7,
+          "blendedUsage": 15.707895656153287,
+          "finalUsage": 15.707895656153287,
+          "volatilityAdjustment": 1.9994330262111446,
+          "trendAdjustment": 0,
+          "seasonalAdjustment": true
+        }
+      },
+      "stockStatus": {
+        "isStockout": false,
+        "isNearStockout": true,
+        "currentStock": 20
+      }
+    }
+  }
+}
