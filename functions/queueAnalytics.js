@@ -359,5 +359,6 @@ module.exports = {
     generateHourlyStats,
     cleanupOldQueues,
     getQueueAnalytics,
-    getRealtimeQueueMetrics
+    getRealtimeQueueMetrics,
+    cleanupOldQueuesScheduled: exports.cleanupOldQueuesScheduled
 };
