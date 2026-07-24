@@ -96,6 +96,26 @@ describe('fingerprintHeaders', () => {
     const b = await fingerprintHeaders(['description', 'item code'])
     expect(a).not.toBe(b)
   })
+
+  test('N2: JSON framing prevents delimiter-injection collisions', async () => {
+    const a = await fingerprintHeaders(['a","b'])
+    const b = await fingerprintHeaders(['a', 'b'])
+    expect(a).not.toBe(b)
+  })
+
+  test('S1 round-trip: a >120-char header survives build → validate (canonical cap)', async () => {
+    const long = 'x'.repeat(200) + ' Qty'
+    const norm = normalizeHeaders([long, 'Description'])
+    const record = buildMappingRecord(norm, { itemCode: 0, description: 1 }, 'L', 1)
+    expect(validateStoredMapping(record, normalizeHeaders([long, 'Description'])).valid).toBe(true)
+  })
+
+  test('N1: composed vs combining-accent headers fingerprint identically (NFC)', async () => {
+    const composed = normalizeHeaders(['Café stock'])       // e-acute, single codepoint
+    const combining = normalizeHeaders(['Café stock'])     // e + combining acute
+    expect(composed).toEqual(combining)
+    expect(await fingerprintHeaders(composed)).toBe(await fingerprintHeaders(combining))
+  })
 })
 
 // ---------------------------------------------------------------------------
@@ -111,6 +131,31 @@ describe('validateStoredMapping', () => {
     const stored = validStored()
     delete stored.label
     expect(validateStoredMapping(stored, HEADERS_NORM).valid).toBe(true)
+  })
+
+  test('S3: NaN and Infinity mapping values are rejected', () => {
+    for (const bad of [NaN, Infinity, -Infinity]) {
+      const stored = validStored()
+      stored.mapping.unit = bad
+      expect(validateStoredMapping(stored, HEADERS_NORM).valid).toBe(false)
+    }
+  })
+
+  test('S2: an unknown mapping field is rejected (whitelist)', () => {
+    const stored = validStored()
+    stored.mapping.evilField = 0
+    const res = validateStoredMapping(stored, HEADERS_NORM)
+    expect(res.valid).toBe(false)
+    expect(res.reason).toMatch(/unknown field/)
+  })
+
+  test('S2: an own-enumerable __proto__ mapping key is rejected', () => {
+    const stored = validStored()
+    // JSON.parse yields __proto__ as an OWN key (as Firebase reads do)
+    stored.mapping = JSON.parse('{"itemCode":0,"description":1,"__proto__":5}')
+    const res = validateStoredMapping(stored, HEADERS_NORM)
+    expect(res.valid).toBe(false)
+    expect(res.reason).toMatch(/unknown field/)
   })
 
   test('accepts a label of exactly 100 chars', () => {

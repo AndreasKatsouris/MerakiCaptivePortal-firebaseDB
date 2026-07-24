@@ -17,22 +17,49 @@
 const MAX_LABEL_CHARS = 100
 const MAX_HEADER_CHARS = 120
 
+// The 18 fields detectAndMapHeaders can produce (data-processor.js:97-116).
+// validateStoredMapping rejects any other key (T1 review S2): this bounds the
+// mapping's cardinality (§4c's load-bearing-control duty) AND blocks
+// __proto__/constructor keys from flowing to the applier in one move.
+export const KNOWN_MAPPING_FIELDS = Object.freeze([
+  'itemCode', 'description', 'category', 'unit', 'costCenter',
+  'openingQty', 'openingValue', 'purchaseQty', 'purchases',
+  'closingQty', 'closingValue', 'unitCost', 'supplierName',
+  'stockLevel', 'totalCost', 'openingStockValue', 'closingStockValue',
+  'purchaseValue',
+])
+const KNOWN_FIELD_SET = new Set(KNOWN_MAPPING_FIELDS)
+
 /**
  * Normalize a raw CSV header row for fingerprinting and comparison.
- * String()s each entry, trims, lowercases, and collapses internal whitespace
- * runs to single spaces. ORDER IS PRESERVED — column indexes are positional,
- * so order is part of the fingerprint identity.
+ * String()s each entry, NFC-normalizes (composed vs combining accents
+ * fingerprint identically — T1 review N1), trims, lowercases, collapses
+ * internal whitespace runs to single spaces, and caps each entry to 120 chars.
+ * The cap lives HERE so fingerprint, storage, and comparison all share ONE
+ * canonical representation (T1 review S1 — a cap applied only at storage time
+ * made >120-char headers permanently miss re-validation). ORDER IS PRESERVED —
+ * column indexes are positional, so order is part of the fingerprint identity.
  *
  * @param {Array} headers - raw header row
  * @returns {string[]} normalized headers (new array; input untouched)
  */
 export function normalizeHeaders(headers) {
   if (!Array.isArray(headers)) return []
-  return headers.map((h) => String(h).trim().toLowerCase().replace(/\s+/g, ' '))
+  return headers.map((h) =>
+    String(h).normalize('NFC').trim().toLowerCase().replace(/\s+/g, ' ').slice(0, MAX_HEADER_CHARS)
+  )
 }
 
 /**
  * SHA-256 fingerprint of a normalized header array.
+ *
+ * JSON.stringify (not join) prevents delimiter-injection collisions —
+ * ['a","b'] and ['a','b'] digest differently.
+ *
+ * CONSUMER CONTRACT: crypto.subtle is undefined in insecure contexts
+ * (plain-http non-localhost) and this function will REJECT there. The wizard
+ * must try/catch the await and degrade to detect+confirm — never let a
+ * fingerprint failure break the whole upload (T1 review).
  *
  * @param {string[]} headersNorm - output of normalizeHeaders
  * @returns {Promise<string>} lowercase hex digest (64 chars)
@@ -82,6 +109,10 @@ export function validateStoredMapping(stored, headersNorm) {
   }
   const headerCount = headersNorm.length
   for (const [field, colIndex] of Object.entries(stored.mapping)) {
+    if (!KNOWN_FIELD_SET.has(field)) {
+      // S2: whitelist bounds cardinality to ≤18 AND blocks __proto__/constructor
+      return { valid: false, reason: `mapping contains unknown field "${field}"` }
+    }
     if (typeof colIndex !== 'number' || !Number.isInteger(colIndex)) {
       return { valid: false, reason: `mapping value for "${field}" is not an integer` }
     }
@@ -108,9 +139,14 @@ export function validateStoredMapping(stored, headersNorm) {
  * @returns {object} new record (inputs are not aliased)
  */
 export function buildMappingRecord(headersNorm, mapping, label, now) {
+  // Keep only the 18 known fields (S2 defensive symmetry with validate).
+  const cleanMapping = {}
+  for (const field of KNOWN_MAPPING_FIELDS) {
+    if (mapping && typeof mapping[field] === 'number') cleanMapping[field] = mapping[field]
+  }
   return {
-    headersNorm: capHeaderEntries(headersNorm),
-    mapping: { ...mapping },
+    headersNorm: capHeaderEntries(headersNorm), // belt-and-braces; normalize already caps (S1)
+    mapping: cleanMapping,
     label: String(label || '').slice(0, MAX_LABEL_CHARS),
     savedAt: now,
     useCount: 0,
