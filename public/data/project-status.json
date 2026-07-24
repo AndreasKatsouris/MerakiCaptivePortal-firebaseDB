@@ -512,6 +512,14 @@
   ],
   "bugs": [
     {
+      "title": "No monitoring on the WhatsApp channel — it can die upstream with ZERO server-side signal.",
+      "severity": "medium",
+      "discoveredAt": "2026-07-23",
+      "discoveredOn": "Twilio dormancy incident",
+      "blockingSprint": "False",
+      "notes": "2026-07-23: the Twilio account went dormant and the entire WhatsApp channel (guest receipts, booking notifications, Ross proactive nudges) was dead for an unknown period. Nothing alerted: dead-at-Twilio means requests never reach our functions, so there is no error to log — GCF showed healthy, configured, reachable functions with silent zero traffic. Found only by the operator manually testing. Fix candidate (well-scoped queue card): a small scheduled CF (or a branch in rossAgentPrune/rossProactiveSweep's schedule family) that (a) calls Twilio's account/sender status API daily and logs loudly (ERROR severity) on non-active status, and/or (b) alerts after N days of zero inbound whatsapp-message-history writes (baseline-dependent — pick N from real traffic). Groomer: card this."
+    },
+    {
       "title": "Every RTDB rule written against auth.token.phone_number GRANTS instead of denying — no user in this app has that claim.",
       "severity": "high",
       "discoveredAt": "2026-07-21",
