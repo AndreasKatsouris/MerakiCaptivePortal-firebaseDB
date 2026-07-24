@@ -2,10 +2,10 @@ import { describe, it, expect } from 'vitest'
 import { CASES } from '../cases.js'
 
 describe('eval cases', () => {
-  it('has 22 well-formed cases with unique ids', () => {
-    expect(CASES.length).toBe(22)
+  it('has 23 well-formed cases with unique ids', () => {
+    expect(CASES.length).toBe(23)
     const ids = CASES.map((c) => c.id)
-    expect(new Set(ids).size).toBe(22)
+    expect(new Set(ids).size).toBe(23)
     for (const c of CASES) {
       expect(typeof c.prompt === 'string' && c.prompt.length).toBeTruthy()
       expect(c.seed && typeof c.seed.asUid === 'string').toBeTruthy()

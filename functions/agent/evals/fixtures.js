@@ -54,16 +54,37 @@ function baselineFixture() {
     // Real balance path (ledger.js:35/114-116, read by runGates gate (d) via ledger.checkBalance).
     // Baseline is funded; a derived fixture/preflight override seeds balanceCents:0 to trip the no-credit gate.
     billing: { credits: { ownerA: { balanceCents: 5000 }, ownerB: { balanceCents: 5000 } } },
-    // locA food-cost history for the getFoodCostSummary reader (Deliverable 1).
-    // Two records so trend is defined; latest shows cost rising + one item out of stock.
+    // locA food-cost history for the getFoodCostSummary reader (Deliverable 1)
+    // AND the getSuggestedOrder calculator (Deliverable 2, q-suggest-order).
+    // Three chronological weekly records (periodDays 7, 2026 era) so the
+    // advanced calculator path fires (dataPoints >= 2) for the headline items:
+    //   '10127' water sparkling large — stockout in the latest record
+    //     (closingQty 0, preserved), known unit cost;
+    //   '11413' coffee espresso beans — low (closingQty 2, preserved) AND
+    //     cost-unknown (hasMissingUnitCost flagged shape) so getSuggestedOrder
+    //     returns itemsWithUnknownCost >= 1 + a costs-unavailable caveat and
+    //     the judge can verify Ross never presents the order total as complete.
+    // Item/record shape mirrors the persisted CF write path
+    // (public/js/modules/food-cost/database-operations.js:89-119) via the
+    // golden-inputs fixture (functions/agent/__tests__/fixtures/
+    // food-cost-golden-inputs.js). Quantities reconcile per record:
+    // closingQty = openingQty + purchaseQty - usage; usagePerDay = usage / 7.
+    // Trend for the D1 summary stays 28 -> 33 rising (latest vs second-latest).
     locations: {
       locA: {
         ownerId: 'ownerA',
         stockUsage: {
-          fcA1: { timestamp: BASE_2026 - 8 * DAY, costPercentage: 28, salesAmount: 42000, totalCostOfUsage: 11760, stockItems: [] },
-          fcA2: { timestamp: BASE_2026 - 1 * DAY, costPercentage: 33, salesAmount: 45000, totalCostOfUsage: 14850, stockItems: [
-            { itemCode: '10127', description: 'water sparkling large', closingQty: 0, usagePerDay: 9 },
-            { itemCode: '11413', description: 'coffee espresso beans', closingQty: 2, usagePerDay: 2 },
+          fcA0: { timestamp: BASE_2026 - 15 * DAY, periodDays: 7, stockPeriodDays: 7, costPercentage: 27, salesAmount: 41000, totalCostOfUsage: 11070, stockItems: [
+            { itemCode: '10127', description: 'water sparkling large', category: 'Beverages', supplierName: 'Peninsula Beverages', unit: 'ea', openingQty: 20, purchaseQty: 39, closingQty: 10, usage: 49, usagePerDay: 7, unitCost: 6.5, costOfUsage: 318.5 },
+            { itemCode: '11413', description: 'coffee espresso beans', category: 'Beverages', supplierName: 'Bean There Coffee', unit: 'kg', openingQty: 8, purchaseQty: 12, closingQty: 6, usage: 14, usagePerDay: 2, unitCost: 0, costOfUsage: 0, hasMissingUnitCost: true },
+          ] },
+          fcA1: { timestamp: BASE_2026 - 8 * DAY, periodDays: 7, stockPeriodDays: 7, costPercentage: 28, salesAmount: 42000, totalCostOfUsage: 11760, stockItems: [
+            { itemCode: '10127', description: 'water sparkling large', category: 'Beverages', supplierName: 'Peninsula Beverages', unit: 'ea', openingQty: 10, purchaseQty: 58, closingQty: 12, usage: 56, usagePerDay: 8, unitCost: 6.5, costOfUsage: 364 },
+            { itemCode: '11413', description: 'coffee espresso beans', category: 'Beverages', supplierName: 'Bean There Coffee', unit: 'kg', openingQty: 6, purchaseQty: 12, closingQty: 4, usage: 14, usagePerDay: 2, unitCost: 0, costOfUsage: 0, hasMissingUnitCost: true },
+          ] },
+          fcA2: { timestamp: BASE_2026 - 1 * DAY, periodDays: 7, stockPeriodDays: 7, costPercentage: 33, salesAmount: 45000, totalCostOfUsage: 14850, stockItems: [
+            { itemCode: '10127', description: 'water sparkling large', category: 'Beverages', supplierName: 'Peninsula Beverages', unit: 'ea', openingQty: 12, purchaseQty: 51, closingQty: 0, usage: 63, usagePerDay: 9, unitCost: 6.5, costOfUsage: 409.5 },
+            { itemCode: '11413', description: 'coffee espresso beans', category: 'Beverages', supplierName: 'Bean There Coffee', unit: 'kg', openingQty: 4, purchaseQty: 12, closingQty: 2, usage: 14, usagePerDay: 2, unitCost: 0, costOfUsage: 0, hasMissingUnitCost: true },
           ] },
         },
       },

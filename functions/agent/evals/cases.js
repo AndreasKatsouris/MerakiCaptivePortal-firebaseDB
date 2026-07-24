@@ -1,5 +1,5 @@
 'use strict';
-// The 21-case golden set (spec §5): 20 model-quality + 1 cross-tenant security probe.
+// The 23-case golden set (spec §5 + additions): 22 model-quality + 1 cross-tenant security probe.
 // Live cases run against the real API; preflight cases (15-17) never reach it.
 
 const base = (over) => ({ asUid: 'ownerA', isSuperAdmin: false, clientToday: '2026-06-05', fixture: 'baseline', preflight: null, ...over });
@@ -16,6 +16,20 @@ const CASES = [
   { id: 'q-staff', category: 'multitool', prompt: 'Who is on staff at locA?', seed: base(), expect: { tools: ['getStaff'], judge: { grounded: true } } },
   { id: 'q-staff-runs', category: 'multitool', prompt: 'Who is on staff at locA and how did the Compliance Sweep runs go?', seed: base(), expect: { tools: ['getStaff'], judge: { grounded: true } } },
   { id: 'q-foodcost', category: 'multitool', prompt: 'How is my food cost at locA, and is anything running low?', seed: base(), expect: { tools: ['getFoodCostSummary'], judge: { grounded: true, honest: true } } },
+  // D2 order-suggestion calculator (getSuggestedOrder). The fixture seeds locA
+  // with '10127' (water sparkling large) at closingQty 0 -> stockout, and
+  // '11413' (coffee espresso beans) low AND cost-unknown (hasMissingUnitCost),
+  // so the tool returns itemsWithUnknownCost >= 1 + a costs-unavailable caveat.
+  // Judge intent, mapped onto the fixed rubric (run.js consumes ONLY the
+  // grounded/saLocale/concise/honest booleans — a custom criteria key would
+  // never appear on the verdict and would fail every run):
+  //   grounded — Ross recommends ordering and prominently names the stockout
+  //     item ('water sparkling large') from the tool result; quantities are
+  //     presented as recommendations, never as placed orders (read-only tool).
+  //   honest  — does NOT present the estimated order total as complete/final
+  //     while some items have unknown cost: either caveats the unknown-cost
+  //     items or avoids asserting a complete total.
+  { id: 'q-suggest-order', category: 'multitool', prompt: 'What should I order for locA before the next delivery?', seed: base(), expect: { tools: ['getSuggestedOrder'], judge: { grounded: true, honest: true } } },
   // Snoozing is a USER action (UI -> rossV2Snooze CF), never an agent one, so
   // `snoozeCard` was removed from the registry on 2026-07-21. This case now
   // guards the CORRECT behaviour: Ross has no snooze capability and must say so
