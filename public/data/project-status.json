@@ -1,6 +1,6 @@
 {
-  "lastUpdated": "2026-07-22",
-  "lastUpdatedNote": "Weekly groom: #166–#178 reconciled into Recently Completed, In Progress cleared, automation queue (Q1–Q6) re-verified still-unmet, no invisible work found.",
+  "lastUpdated": "2026-07-24",
+  "lastUpdatedNote": "W1 food-cost D2 calculator built end-to-end: PR #189 open (spec+plan+3 pre-build reviews, 6 subagent TDD tasks, 5 post-build reviews folded, 311/311).",
   "sprint": {
     "goal": "Effective implementation of Hi-Fi v2, with ROSS as the central post-login surface for every subscribed user",
     "started": "2026-04-30",
@@ -511,6 +511,14 @@
     }
   ],
   "bugs": [
+    {
+      "title": "D1 getFoodCostSummary output strings are uncapped — P6 backport candidate.",
+      "severity": "medium",
+      "discoveredAt": "2026-07-24",
+      "discoveredOn": "D2 security review F4",
+      "blockingSprint": "False",
+      "notes": "The D2 build (PR #189) sanitizes every tenant-CSV string entering the model conversation (control-strip + 120-char cap: itemCode, description, supplierName, criticalityReason — security F4, injection-via-data). D1's summariseFoodCost (functions/agent/food-cost-summary.js:66-71) predates this and returns itemCode/description verbatim from lowStockItems — unbounded length, control chars intact, same super-admin-session priv-esc surface. Fix: apply the same sanitizeText (or import it) in food-cost-summary.js + 1 test. Well-bounded → groomer: card this."
+    },
     {
       "title": "No monitoring on the WhatsApp channel — it can die upstream with ZERO server-side signal.",
       "severity": "medium",
