@@ -363,7 +363,7 @@ describe('getSuggestedOrder adapter', () => {
     // the guarantee under test IS the schema itself.
     it('rejects out-of-bounds daysToNextDelivery at the Zod boundary', () => {
         const schema = REGISTRY.getSuggestedOrder.args;
-        for (const bad of [0, 31, -1, 1.5, '5', NaN]) {
+        for (const bad of [0, 31, -1, 1.5, '5', NaN, Infinity, -Infinity]) {
             const res = schema.safeParse({ locationId: 'loc1', daysToNextDelivery: bad });
             expect(res.success, `daysToNextDelivery=${String(bad)}`).toBe(false);
         }
@@ -405,7 +405,7 @@ describe('getSuggestedOrder adapter', () => {
 
     // ---- oversized record (F7 / P5) ----------------------------------------------
     it('caps an oversized record and emits the items-truncated-for-size caveat', async () => {
-        const bigItems = Array.from({ length: 2001 }, (_, i) => (
+        const bigItems = Array.from({ length: 2001 }, (_, i) => ( // MAX_ITEMS_PER_RECORD (2000) + 1
             { itemCode: `I${i}`, description: 'bulk', closingQty: 0, usagePerDay: 1, unitCost: 1 }
         ));
         __setDbForTests(makeFakeRtdb({

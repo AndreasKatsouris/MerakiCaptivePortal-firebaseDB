@@ -59,7 +59,8 @@ const MINIMUM_HISTORY_REQUIRED = 2; // live advanced:453 minimumHistoryRequired
 const CONFIDENCE_MIN_DATA_POINTS = 5; // Q14 — confidence only exists on the >=5 branch
 
 function num(v) {
-  return Number(v) || 0;
+  const n = Number(v) || 0;
+  return Number.isFinite(n) ? n : 0; // honest "→ 0" contract: Infinity too (quality-review NIT)
 }
 
 /** P6: strip control chars FIRST, then truncate — output is always <= 120 visible chars. */
@@ -161,6 +162,7 @@ function suggestOrder(records, opts = {}) {
   for (const item of currentItems) {
     if (!item || typeof item !== 'object') continue; // live :510 skips invalid items
 
+    try {
     if (filter !== null) {
       // Live advanced:513-515 — when a filter is active, items with a
       // missing/empty supplierName are excluded.
@@ -259,6 +261,16 @@ function suggestOrder(records, opts = {}) {
     }
 
     orderable.push(out);
+    } catch (_err) {
+      // T4 quality-review MUST-FIX: a malformed CURRENT item (e.g. a truthy
+      // non-string `category` throwing inside calculateCriticalityScore) must
+      // degrade like every other bad-data path — skip the item — instead of
+      // throwing out of suggestOrder. An uncaught throw reaches the model as
+      // an error envelope, which (a) breaks the anti-enumeration guarantee
+      // (bare {hasData:false} is the only failure shape) and (b) lets one bad
+      // row nuke the whole suggestion. Mirrors stats.js's GT5 posture.
+      continue;
+    }
   }
 
   // Sort: critical first, then estimatedCost desc with nulls last, then

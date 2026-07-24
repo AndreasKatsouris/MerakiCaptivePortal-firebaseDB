@@ -696,4 +696,42 @@ describe('suggestOrder — determinism + purity', () => {
     expect(res.historyDepth.records).toBe(5);
     expect(res.items).toHaveLength(1);
   });
+
+  it('malformed CURRENT item (numeric category → criticality throw) is SKIPPED, never thrown (quality-review MUST-FIX)', () => {
+    // calculateCriticalityScore calls item.category.toLowerCase(); a truthy
+    // non-string category throws. That throw must not escape suggestOrder —
+    // an error envelope to the model would break the bare-{hasData:false}
+    // anti-enumeration contract and nuke the whole suggestion for one bad row.
+    const records = [
+      rec({
+        stockItems: [
+          item({ itemCode: 'BAD1', category: 123 }),
+          item({ itemCode: 'BAD2', category: { nested: true } }),
+          item({ itemCode: 'OK1' }),
+        ],
+      }),
+    ];
+    const res = suggestOrder(records, { now: NOW });
+    expect(res.hasData).toBe(true);
+    expect(res.items.map((i) => i.itemCode)).toEqual(['OK1']);
+  });
+
+  it('exactly 30 orderable items → no truncated marker (fencepost)', () => {
+    const items30 = Array.from({ length: 30 }, (_, i) =>
+      item({ itemCode: `F${String(i).padStart(2, '0')}` })
+    );
+    const res = suggestOrder([rec({ stockItems: items30 })], { now: NOW });
+    expect(res.items).toHaveLength(30);
+    expect(res.truncated).toBeNull();
+    expect(res.totals.itemsToOrder).toBe(30);
+  });
+
+  it('exactly 2000 items in a record → no items-truncated-for-size caveat (fencepost)', () => {
+    const items2000 = Array.from({ length: 2000 }, (_, i) =>
+      item({ itemCode: `G${i}` })
+    );
+    const res = suggestOrder([rec({ stockItems: items2000 })], { now: NOW });
+    expect(res.hasData).toBe(true);
+    expect(res.caveats).not.toContain('items-truncated-for-size');
+  });
 });

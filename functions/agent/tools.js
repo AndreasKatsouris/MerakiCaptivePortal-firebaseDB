@@ -196,7 +196,7 @@ const REGISTRY = {
         },
     },
     getSuggestedOrder: {
-        description: 'Suggest a purchase order for a location, computed from its stock-usage history. Read-only: quantities are recommendations, not placed orders. unitCost/estimatedCost are null when the uploads carry no usable unit cost for that item — say the cost is unknown, never invent a figure.',
+        description: 'Suggest a purchase order for a location from its stock-usage history. Read-only; quantities are recommendations. Null unitCost/estimatedCost = cost unknown — never invent a figure.',
         args: z.object({
             locationId: z.string(),
             daysToNextDelivery: z.number().int().min(1).max(30).optional(),
