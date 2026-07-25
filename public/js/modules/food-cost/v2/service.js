@@ -123,6 +123,13 @@ export async function saveMapping(fingerprint, record) {
  * @param {string} fingerprint
  * @param {number} currentUseCount - from the stored record read this session
  * @returns {Promise<{ok: boolean}>}
+ *
+ * KNOWN RACE (T4 review N2, accepted): read-modify-write, not a transaction —
+ * two concurrent uploads sharing a fingerprint can lose an increment. useCount
+ * is a soft popularity counter, never load-bearing; switch to runTransaction
+ * if that ever changes. Silent-degradation catches here and in loadMapping log
+ * via console.error BECAUSE their failures are otherwise invisible; saveMapping
+ * doesn't log — its failure surfaces in the save-failed banner (N1 rationale).
  */
 export async function bumpMappingUseCount(fingerprint, currentUseCount) {
   try {

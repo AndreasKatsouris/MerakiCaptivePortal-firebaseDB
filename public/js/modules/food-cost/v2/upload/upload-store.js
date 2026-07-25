@@ -79,6 +79,7 @@ export const useFoodCostUploadStore = defineStore('foodCostUpload', {
     previewParams: null,  // { stockPeriodDays, daysToNextDelivery, salesAmount }
     saveResult: null,
     _fingerprintFn: null, // test seam; null → real fingerprintHeaders
+    _gen: 0,              // S1 generation guard — resetUpload() bumps; in-flight actions bail
   }),
 
   getters: {
@@ -97,6 +98,11 @@ export const useFoodCostUploadStore = defineStore('foodCostUpload', {
 
   actions: {
     resetUpload() {
+      // Generation guard (T4 review S1, mirrors overview's _token): any async
+      // action still in flight when the wizard resets must NOT write state when
+      // it resolves — without this, a save resolving after reset resurrects
+      // the success screen with a stale saveResult.
+      this._gen += 1
       // _fingerprintFn deliberately survives (test seam, set before ingest)
       this.status = 'idle'
       this.banner = null
@@ -119,6 +125,7 @@ export const useFoodCostUploadStore = defineStore('foodCostUpload', {
      */
     async ingestFile(file) {
       this.resetUpload()
+      const gen = this._gen // S1: bail if reset/another ingest supersedes us
 
       const sizeCheck = checkFileSize(file)
       if (!sizeCheck.ok) {
@@ -130,9 +137,10 @@ export const useFoodCostUploadStore = defineStore('foodCostUpload', {
       try {
         text = await file.text()
       } catch {
-        this.banner = { code: 'read-failed' }
+        if (gen === this._gen) this.banner = { code: 'read-failed' }
         return
       }
+      if (gen !== this._gen) return
 
       // parseCSVData returns {headers, data:{headers, rows}} — `data` is the
       // whole parse object; checkParsedShape wants {headers, rows} (N3).
@@ -154,7 +162,7 @@ export const useFoodCostUploadStore = defineStore('foodCostUpload', {
       this.parsed = { headers, rows }
       this.status = 'parsed'
 
-      await this._resolveMapping(headers)
+      await this._resolveMapping(headers, gen)
     },
 
     /**
@@ -164,7 +172,7 @@ export const useFoodCostUploadStore = defineStore('foodCostUpload', {
      * including fingerprintHeaders rejecting in insecure contexts (the T1
      * CONSUMER CONTRACT) — degrades to detect+confirm.
      */
-    async _resolveMapping(headers) {
+    async _resolveMapping(headers, gen) {
       this.headersNorm = normalizeHeaders(headers)
 
       let fingerprint = null
@@ -173,10 +181,12 @@ export const useFoodCostUploadStore = defineStore('foodCostUpload', {
       } catch {
         fingerprint = null // degrade: MISS path, upload continues
       }
+      if (gen !== undefined && gen !== this._gen) return // S1
       this.fingerprint = fingerprint
 
       if (fingerprint) {
         const stored = await loadMapping(fingerprint)
+        if (gen !== undefined && gen !== this._gen) return // S1
         if (stored && validateStoredMapping(stored, this.headersNorm).valid) {
           this.storedMapping = stored
           this.mapping = { ...stored.mapping }
@@ -239,6 +249,7 @@ export const useFoodCostUploadStore = defineStore('foodCostUpload', {
       const overview = useFoodCostStore()
       const locationId = meta.locationId || overview.locationId
       const totals = this.preview.totals
+      const gen = this._gen // S1: a reset during the save must win
 
       this.banner = null
       this.status = 'saving'
@@ -261,6 +272,8 @@ export const useFoodCostUploadStore = defineStore('foodCostUpload', {
         costPercentage: totals.costPercentage,
         stockItems: this.preview.items,
       })
+
+      if (gen !== this._gen) return // S1: wizard was reset mid-save
 
       if (!saveRes || !saveRes.ok) {
         this.status = 'error'

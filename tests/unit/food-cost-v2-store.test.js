@@ -484,6 +484,52 @@ describe('upload: save failure', () => {
     expect(up.status).toBe('idle')
   })
 
+  test('S1: resetUpload MID-SAVE wins — the resolving save must not resurrect the wizard', async () => {
+    mockParse()
+    svc.loadMapping.mockResolvedValue(null)
+    svc.detectMapping.mockReturnValue(detectedMapping())
+    svc.processWithMapping.mockReturnValue([{ usage: 1, unitCost: 1, costOfUsage: 1 }])
+    let resolveSave
+    svc.saveStockUsage.mockReturnValue(new Promise((r) => { resolveSave = r }))
+
+    const up = useFoodCostUploadStore()
+    await up.ingestFile(makeFile())
+    up.buildPreview()
+    const savePromise = up.saveUpload({ locationId: 'loc-1' })
+    expect(up.status).toBe('saving')
+
+    up.resetUpload() // user clicks "start over" while the save is in flight
+    resolveSave({ ok: true, result: { timestamp: 'k1' } })
+    await savePromise
+
+    expect(up.status).toBe('idle') // NOT resurrected to 'saved'
+    expect(up.saveResult).toBeNull()
+    expect(svc.saveMapping).not.toHaveBeenCalled()
+    expect(svc.getFoodCostOverview).not.toHaveBeenCalled()
+  })
+
+  test('S1: a second ingestFile supersedes a slower first one (no interleaved state)', async () => {
+    svc.detectMapping.mockReturnValue(detectedMapping())
+    svc.loadMapping.mockResolvedValue(null)
+    let resolveFirstText
+    const slowFile = {
+      name: 'slow.csv', size: 100,
+      text: () => new Promise((r) => { resolveFirstText = r }),
+    }
+    const up = useFoodCostUploadStore()
+    const first = up.ingestFile(slowFile)
+
+    mockParse()
+    await up.ingestFile(makeFile()) // second upload wins
+    expect(up.status).toBe('mapped-manual')
+    const winnerParsed = up.parsed
+
+    resolveFirstText('a,b\n1,2') // slow first file finally reads
+    await first
+    expect(up.parsed).toBe(winnerParsed) // first ingest bailed, wrote nothing
+    expect(up.status).toBe('mapped-manual')
+  })
+
   test('resetUpload returns the wizard to idle', async () => {
     mockParse()
     svc.loadMapping.mockResolvedValue(null)
