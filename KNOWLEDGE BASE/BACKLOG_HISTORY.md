@@ -6,6 +6,12 @@
 
 ---
 
+## 2026-07-24 (later — D3 session)
+
+Last updated: 2026-07-24 — W1 food-cost D2 calculator built end-to-end: PR #189 open (spec+plan+3 pre-build reviews, 6 subagent TDD tasks, 5 post-build reviews folded, 311/311).
+
+**State right now:** **PR #189 open (awaiting operator review) — W1 food-cost D2**: advanced order calculator ported to a pure CJS core (`functions/agent/food-cost/`) + new `getSuggestedOrder` AUTO-tier agent tool; golden-master parity vs the live browser calculator; 16-quirk register preserved-not-fixed; ships dormant until the next functions deploy. CRIT-09 receipts closed end-to-end 2026-07-23 (#181–#186, smoke PASSED). Next after #189 merges: D3 (v2 UI consuming the same core via a CF + CSV mapping-memory) or the next W1 reader (guests/sales, smallest-high-value). Launch gate unchanged: the two wheels (W1 breadth + W2 soak). Payment rail dormant until launch.
+
 ## 2026-07-24
 
 Last updated: 2026-07-22 — Weekly groom: #166–#178 reconciled into Recently Completed, In Progress cleared, automation queue (Q1–Q6) re-verified still-unmet, no invisible work found.

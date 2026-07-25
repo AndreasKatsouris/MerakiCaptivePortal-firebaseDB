@@ -3,11 +3,11 @@
 > Claude reads this file at the start of every session and updates it at the end.
 > The Sprint Goal is the contract for the session — don't deviate without explicit user confirmation.
 
-Last updated: 2026-07-24 — W1 food-cost D2 calculator built end-to-end: PR #189 open (spec+plan+3 pre-build reviews, 6 subagent TDD tasks, 5 post-build reviews folded, 311/311).
+Last updated: 2026-07-24 — D2 MERGED (#189) + deployed (getSuggestedOrder live); D3 v2 UI built end-to-end same day: PR pending (CF + rules + upload wizard + real-cards dashboard, 6 reviews folded).
 
 > **Note discipline:** this note is CURRENT STATE ONLY (≤10 lines, first line always `Last updated: YYYY-MM-DD — <one-line note>`). At each update, move the outgoing narrative to `KNOWLEDGE BASE/BACKLOG_HISTORY.md` (newest first). Per-session detail lives in SCORECARD.md and PR bodies — never here.
 
-**State right now:** **PR #189 open (awaiting operator review) — W1 food-cost D2**: advanced order calculator ported to a pure CJS core (`functions/agent/food-cost/`) + new `getSuggestedOrder` AUTO-tier agent tool; golden-master parity vs the live browser calculator; 16-quirk register preserved-not-fixed; ships dormant until the next functions deploy. CRIT-09 receipts closed end-to-end 2026-07-23 (#181–#186, smoke PASSED). Next after #189 merges: D3 (v2 UI consuming the same core via a CF + CSV mapping-memory) or the next W1 reader (guests/sales, smallest-high-value). Launch gate unchanged: the two wheels (W1 breadth + W2 soak). Payment rail dormant until launch.
+**State right now:** **D2 MERGED (#189) + `rossChat` redeployed — `getSuggestedOrder` is LIVE** (operator live `npm run eval` still pending, key is operator-held). **D3 built end-to-end, PR pending on `feature/ross-foodcost-d3-ui`:** new `foodCostOverview` CF (access+entitlement+bounds+sanitization, 24 tests), additive `foodCostMappings` rules node + post-deploy REST probe script, v2 service/stores (upload state machine + generation guard, 26 tests), real-cards `FoodCostApp` + 4-step CSV upload wizard with mapping-memory (45 util tests). **Deploy-gated before the preview click-through:** `functions:foodCostOverview`, `database` rules (then run `scripts/verify-rules-foodcost-mappings.js` — the POSITIVE check is the fails-closed guard), hosting preview channel. Next: D4 strip-and-harden, or the next W1 reader (guests/sales). Launch gate unchanged: the two wheels. Payment rail dormant until launch.
 
 ---
 
