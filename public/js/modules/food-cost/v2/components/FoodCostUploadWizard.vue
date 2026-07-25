@@ -15,6 +15,7 @@ import UploadPreviewStep from './UploadPreviewStep.vue'
 
 const props = defineProps({
   locationId: { type: String, default: '' },
+  venueName: { type: String, default: '' },
 })
 const emit = defineEmits(['close'])
 const upload = useFoodCostUploadStore()
@@ -133,6 +134,7 @@ onBeforeUnmount(() => {
         <UploadPreviewStep
           v-else-if="step === 'preview'"
           :location-id="locationId"
+          :venue-name="venueName"
           @back="forceMapping = true"
         />
 

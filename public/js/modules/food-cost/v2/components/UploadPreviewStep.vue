@@ -11,6 +11,7 @@ import { zar } from '../content.js'
 
 const props = defineProps({
   locationId: { type: String, default: '' },
+  venueName: { type: String, default: '' },
 })
 const emit = defineEmits(['back'])
 const upload = useFoodCostUploadStore()
@@ -21,8 +22,9 @@ const PREVIEW_ROWS = 15
 const stockPeriodDays = ref(7)
 const daysToNextDelivery = ref(5)
 const salesAmount = ref(0)
-// Save meta (used at save time only).
-const storeName = ref('')
+// Save meta (used at save time only). storeName is NOT asked for — data is
+// saved per location, so the venue name IS the store name (operator preview
+// feedback 2026-07-25); it auto-fills from the selected location.
 const openingDate = ref('')
 const closingDate = ref('')
 const mappingLabel = ref('')
@@ -54,7 +56,7 @@ function save() {
   const label = String(mappingLabel.value || '').trim()
   upload.saveUpload({
     locationId: props.locationId,
-    storeName: String(storeName.value || '').trim(),
+    storeName: String(props.venueName || '').trim(),
     openingDate: openingDate.value || '',
     closingDate: closingDate.value || '',
     ...(label ? { mappingLabel: label } : {}),
@@ -155,12 +157,8 @@ function zarCents(v) {
       </span>
     </div>
 
-    <!-- Save meta -->
+    <!-- Save meta (store name auto-fills from the selected venue — saved per location) -->
     <div class="upload-preview__meta">
-      <label class="upload-preview__param">
-        <span>Store name (optional)</span>
-        <HfInput v-model="storeName" placeholder="e.g. Main kitchen" />
-      </label>
       <label class="upload-preview__param">
         <span>Opening date</span>
         <HfInput v-model="openingDate" type="date" />

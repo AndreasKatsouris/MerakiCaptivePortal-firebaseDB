@@ -3,14 +3,14 @@
 //   - Fingerprint HIT (mappingSource 'memory'): compact confirmation with a
 //     mandatory preview button (F10 — preview is never skipped) + an
 //     "Adjust mapping" escape hatch into the editor.
-//   - MISS / adjusted: 18-field editor (KNOWN_MAPPING_FIELDS), one HfSelect
-//     per field, options = file headers + "Not mapped" (-1).
+//   - MISS / adjusted: 12-field editor (VISIBLE_MAPPING_FIELDS — the 6 legacy
+//     alias/never-read fields are hidden; see upload-labels.js for the ground
+//     truth), one HfSelect per field, options = file headers + "Not mapped".
 // The §4d value-columns warning renders prominently when neither
 // openingValue nor closingValue is mapped (store.warnCostsUnavailable).
 import { ref, computed } from 'vue'
 import { useFoodCostUploadStore } from '../upload/upload-store.js'
-import { KNOWN_MAPPING_FIELDS } from '../upload/mapping-memory.js'
-import { MAPPING_FIELD_LABELS } from './upload-labels.js'
+import { MAPPING_FIELD_LABELS, VISIBLE_MAPPING_FIELDS } from './upload-labels.js'
 import { HfButton, HfIcon, HfSelect } from '/js/design-system/hifi/index.js'
 
 const emit = defineEmits(['preview'])
@@ -32,7 +32,7 @@ const headerOptions = computed(() => {
   ]
 })
 
-const fields = KNOWN_MAPPING_FIELDS.map((key) => ({
+const fields = VISIBLE_MAPPING_FIELDS.map((key) => ({
   key,
   label: MAPPING_FIELD_LABELS[key] || key,
 }))

@@ -427,6 +427,7 @@ const nav = [
     <FoodCostUploadWizard
       v-if="wizardOpen"
       :location-id="store.locationId || ''"
+      :venue-name="venueName || ''"
       @close="wizardOpen = false"
     />
   </div>

@@ -25,6 +25,22 @@ export const MAPPING_FIELD_LABELS = Object.freeze({
   purchaseValue: 'Purchase value (R)',
 })
 
+// The mapping editor shows ONLY these 12 fields (operator preview feedback,
+// 2026-07-25: the full 18 read as duplicates). Ground truth from
+// data-processor.js processStockData:
+//   - `unitCost` and `totalCost` are NEVER READ by the processor (unit cost is
+//     always derived from value/qty — the GT1/O5 quirk); showing them misleads.
+//   - `purchases` is only a FALLBACK alias for `purchaseQty` (:337-341).
+//   - `openingStockValue`/`closingStockValue`/`purchaseValue` are optional
+//     direct-value overrides, auto-derived when unmapped (:404-414).
+// Hidden fields keep whatever auto-detection assigned (validated, harmless) —
+// they are just not shown or user-editable.
+export const VISIBLE_MAPPING_FIELDS = Object.freeze([
+  'itemCode', 'description', 'category', 'unit', 'costCenter', 'supplierName',
+  'openingQty', 'openingValue', 'purchaseQty', 'closingQty', 'closingValue',
+  'stockLevel',
+])
+
 function mb(bytes) {
   if (!Number.isFinite(bytes)) return null
   const v = bytes / (1024 * 1024)
