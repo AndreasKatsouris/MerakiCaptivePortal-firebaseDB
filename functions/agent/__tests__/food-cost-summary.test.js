@@ -65,4 +65,15 @@ describe('summariseFoodCost', () => {
     expect(out.itemsAnalysed).toBe(0);
     expect(out.lowStockItems).toEqual([]);
   });
+
+  it('P6 backport (D4): lowStockItems strings are control-stripped and capped at 120 chars', () => {
+    const out = summariseFoodCost([rec({
+      stockItems: [{ itemCode: `X\x00${'9'.repeat(200)}`, description: 'Bad\x01\x1FName\x7F!', closingQty: 0, usagePerDay: 1 }],
+    })], { now: NOW });
+    expect(out.lowStockItems[0].itemCode).toBe(`X${'9'.repeat(119)}`);
+    expect(out.lowStockItems[0].itemCode).toHaveLength(120);
+    expect(out.lowStockItems[0].description).toBe('BadName!');
+    // eslint-disable-next-line no-control-regex
+    expect(JSON.stringify(out.lowStockItems)).not.toMatch(/\\u00[01][0-9a-f]/);
+  });
 });

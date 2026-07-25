@@ -53,15 +53,10 @@ export function parseCSVData(csvContent) {
  */
 export function processDataWithMapping(parsedData, headerMapping, params = {}) {
     try {
-        console.log('DATA SERVICE - processDataWithMapping START', { 
-            dataRows: parsedData?.rows?.length || 0,
-            params
-        });
         
         // IMPORTANT: We receive a COPY of the mapping from the app component
         // but need to ensure we don't modify it further during processing
         const mappingForProcessor = JSON.parse(JSON.stringify(headerMapping));
-        console.log('DATA SERVICE - Using mapping:', JSON.stringify(mappingForProcessor));
         
         // EXPLICIT DEBUG: Check item code mapping before processing
         if (parsedData.headers && parsedData.headers.length > 0) {
@@ -69,31 +64,19 @@ export function processDataWithMapping(parsedData, headerMapping, params = {}) {
             const headerName = itemCodeCol >= 0 && itemCodeCol < parsedData.headers.length 
                 ? parsedData.headers[itemCodeCol] 
                 : 'N/A';
-            console.log(`🔑 DATA SERVICE - ITEM CODE mapped to column ${itemCodeCol} ("${headerName}")`);
         }
-        
-        // Save original mapping for comparison
-        const originalMapping = JSON.parse(JSON.stringify(headerMapping));
         
         // Process stock data with the data processor - pass our COPY to avoid mutations
+        // (D4: the mapping-drift diagnostic that lived here was console-only — removed
+        // with the console strip; the COPY passed below is what actually prevents drift.)
         const stockData = processStockData(parsedData, mappingForProcessor);
-        
-        // Check if mapping was modified during processing
-        const currentMapping = JSON.stringify(headerMapping);
-        if (JSON.stringify(originalMapping) !== currentMapping) {
-            console.warn('⚠️ MAPPING CHANGED in data-service.js!');
-            console.log('BEFORE calling processStockData:', JSON.stringify(originalMapping));
-            console.log('AFTER calling processStockData:', currentMapping);
-        }
-        
+
         if (!stockData || stockData.length === 0) {
-            console.log('No stock data processed - this is normal before data is uploaded');
             return [];
         }
         
         // Calculate derived values
         const { stockPeriodDays = 7, daysToNextDelivery = 5 } = params;
-        console.log(`Calculating derived values with: stockPeriodDays=${stockPeriodDays}, daysToNextDelivery=${daysToNextDelivery}`);
         
         // Apply usage per day calculation first
         let processedData = stockData;
@@ -126,7 +109,6 @@ export function processDataWithMapping(parsedData, headerMapping, params = {}) {
             });
         }
         
-        console.log(`Processed ${processedData.length} items successfully`);
         return processedData;
     } catch (error) {
         console.error('Error processing data with header mapping:', error);

@@ -6,6 +6,12 @@
 
 ---
 
+## 2026-07-25 (later — D2 close-out + D4)
+
+Last updated: 2026-07-25 — D3 MERGED (#190): food-cost v2 UI live-ready (CF + rules deployed + probed 8/8, 2 preview-feedback rounds folded). W1 food-cost track: D1+D2+D3 done, D4 strip-and-harden remains.
+
+**State right now:** **D3 MERGED (#190) — the food-cost v2 surface is real end-to-end.** `foodCostOverview` CF + `foodCostMappings` rules are DEPLOYED and probed (8/8 incl. the positive fails-closed check); the operator click-through drove 2 feedback rounds (13-field paired mapping editor; read-only preview locked; store-name auto-filled from venue), both folded pre-merge. Prod hosting deployed same day — the new UI serves from production. W1 food-cost track: D1 (#167) + D2 (#189, `getSuggestedOrder` live) + D3 (#190) done — D4 strip-and-harden remained.
+
 ## 2026-07-25 (D3 merge)
 
 Last updated: 2026-07-24 — D2 MERGED (#189) + deployed (getSuggestedOrder live); D3 v2 UI built end-to-end same day: PR pending (CF + rules + upload wizard + real-cards dashboard, 6 reviews folded).
