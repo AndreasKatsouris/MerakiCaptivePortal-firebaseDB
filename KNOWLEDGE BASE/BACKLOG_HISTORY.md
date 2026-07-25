@@ -6,6 +6,12 @@
 
 ---
 
+## 2026-07-25 (D3 merge)
+
+Last updated: 2026-07-24 — D2 MERGED (#189) + deployed (getSuggestedOrder live); D3 v2 UI built end-to-end same day: PR pending (CF + rules + upload wizard + real-cards dashboard, 6 reviews folded).
+
+**State right now:** **D2 MERGED (#189) + `rossChat` redeployed — `getSuggestedOrder` is LIVE** (operator live `npm run eval` still pending, key is operator-held). **D3 built end-to-end, PR pending on `feature/ross-foodcost-d3-ui`:** new `foodCostOverview` CF (access+entitlement+bounds+sanitization, 24 tests), additive `foodCostMappings` rules node + post-deploy REST probe script, v2 service/stores (upload state machine + generation guard, 26 tests), real-cards `FoodCostApp` + 4-step CSV upload wizard with mapping-memory (45 util tests). **Deploy-gated before the preview click-through:** `functions:foodCostOverview`, `database` rules (then run `scripts/verify-rules-foodcost-mappings.js` — the POSITIVE check is the fails-closed guard), hosting preview channel. Next: D4 strip-and-harden, or the next W1 reader (guests/sales). Launch gate unchanged: the two wheels. Payment rail dormant until launch.
+
 ## 2026-07-24 (later — D3 session)
 
 Last updated: 2026-07-24 — W1 food-cost D2 calculator built end-to-end: PR #189 open (spec+plan+3 pre-build reviews, 6 subagent TDD tasks, 5 post-build reviews folded, 311/311).
