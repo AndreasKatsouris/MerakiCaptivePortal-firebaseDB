@@ -3,9 +3,10 @@
 //   - Fingerprint HIT (mappingSource 'memory'): compact confirmation with a
 //     mandatory preview button (F10 — preview is never skipped) + an
 //     "Adjust mapping" escape hatch into the editor.
-//   - MISS / adjusted: 12-field editor (VISIBLE_MAPPING_FIELDS — the 6 legacy
+//   - MISS / adjusted: 13-field editor (VISIBLE_MAPPING_FIELDS — the 5 legacy
 //     alias/never-read fields are hidden; see upload-labels.js for the ground
 //     truth), one HfSelect per field, options = file headers + "Not mapped".
+//     Ordered so the Opening/Purchases/Closing "Value & Quantity" pairs group.
 // The §4d value-columns warning renders prominently when neither
 // openingValue nor closingValue is mapped (store.warnCostsUnavailable).
 import { ref, computed } from 'vue'
