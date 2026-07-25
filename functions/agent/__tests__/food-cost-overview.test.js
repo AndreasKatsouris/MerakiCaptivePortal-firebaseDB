@@ -148,6 +148,17 @@ describe('buildOverview — access + entitlement gates', () => {
         expect(out.hasData).toBe(true);
     });
 
+    it('admin WITHOUT location access → bare {hasData:false} (bypass covers entitlement, NOT the tenant boundary)', async () => {
+        // Spec-review S1: pins the access-gate-precedes-admin ordering. Fails
+        // only if someone moves the admin check ahead of callerHasLocationAccess.
+        const db = seed({
+            admins: { adm1: { superAdmin: false } }, // admin row, no userLocations/ownerId link
+            subscriptions: {},
+        });
+        const out = await buildOverview(db, 'adm1', { locationId: LOC }, NOW);
+        expect(out).toEqual(NO_DATA);
+    });
+
     it('ALL failure shapes are deep-equal to the no-data return (anti-enumeration)', async () => {
         // no access
         const db1 = seed();

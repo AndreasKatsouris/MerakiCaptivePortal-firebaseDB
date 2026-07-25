@@ -43,7 +43,11 @@ const { callerHasLocationAccess } = require('./agent/tools');
 
 const DAY_MS = 86400000;
 const MAX_RECORDS = 30;          // single bounded read; also the trend-point cap (§5)
-const MAX_SUMMARY_ITEMS = 2000;  // reuse of suggest.js MAX_ITEMS_PER_RECORD (P5) for the D1 branch
+const MAX_SUMMARY_ITEMS = 2000;  // reuse of suggest.js MAX_ITEMS_PER_RECORD (P5) for the D1 branch.
+                                 // MUST STAY EQUAL to suggest.js's constant: D1-branch truncation is
+                                 // signalled ONLY via order.caveats ('items-truncated-for-size'),
+                                 // which holds because both branches cap the same latest record at
+                                 // the same size (spec-review N2 — divergence breaks the signal).
 const MAX_STRING_LEN = 120;      // P6 cap, matching suggest.js
 const MIN_DAYS_TO_DELIVERY = 1;
 const MAX_DAYS_TO_DELIVERY = 30; // same bounds as the getSuggestedOrder tool's Zod schema
