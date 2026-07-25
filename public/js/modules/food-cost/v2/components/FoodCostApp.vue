@@ -64,10 +64,18 @@ function retry() {
 // --- Ask-Ross deep-link (G7): short sanitized seed, venue name only, no
 // tenant item strings; consumed by /ross.html#ask= (RossHomeDesktop.vue:32).
 const askHref = computed(() => {
-  const seed = (venueName.value
+  const raw = venueName.value
     ? `How's my food cost at ${venueName.value}?`
-    : "How's my food cost looking?").slice(0, 120)
-  return '/ross.html#ask=' + encodeURIComponent(seed)
+    : "How's my food cost looking?"
+  // Code-point-safe cap (T5 review N4): a naive .slice can split a surrogate
+  // pair at the boundary and encodeURIComponent THROWS on a lone surrogate —
+  // a throwing computed would break the whole component render.
+  const seed = Array.from(raw).slice(0, 120).join('')
+  try {
+    return '/ross.html#ask=' + encodeURIComponent(seed)
+  } catch {
+    return '/ross.html'
+  }
 })
 
 // --- Header chips ------------------------------------------------------------
@@ -447,6 +455,9 @@ const nav = [
   font-family: var(--hf-font-display);
   font-size: 40px; letter-spacing: -0.015em;
   margin: 4px 0 0; font-weight: 400;
+  /* Venue name is a tenant string (T5 review S2): bound it so a long name
+     truncates instead of wrapping the whole header. */
+  max-width: 640px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
 }
 .food-cost__actions { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
 .food-cost__loc-select { min-width: 180px; }

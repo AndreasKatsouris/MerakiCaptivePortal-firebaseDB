@@ -20,8 +20,10 @@ const emit = defineEmits(['close'])
 const upload = useFoodCostUploadStore()
 
 // "Back to mapping" from the preview: status stays 'previewed' (the store has
-// no backward transition); this local flag re-shows the editor, and the next
-// buildPreview clears it.
+// no backward transition); this local flag re-shows the editor. Cleared
+// IMPERATIVELY in onPreview (T5 review MUST-FIX: a status watcher never fires
+// on the re-preview because buildPreview re-sets 'previewed' to the same
+// value — the flag would stick and the preview never re-display).
 const forceMapping = ref(false)
 
 const step = computed(() => {
@@ -48,9 +50,12 @@ const isSaveFailed = computed(() => upload.banner && upload.banner.code === 'sav
 function onPreview() {
   // First preview uses the store defaults; the preview step re-runs it with
   // edited params. Preview is mandatory on BOTH mapping paths (F10).
+  forceMapping.value = false
   upload.buildPreview(upload.previewParams || {})
 }
 
+// Backup for the first mapped-* → previewed transition (onPreview is the
+// authoritative clear — see the forceMapping comment).
 watch(() => upload.status, (s) => {
   if (s === 'previewed') forceMapping.value = false
 })

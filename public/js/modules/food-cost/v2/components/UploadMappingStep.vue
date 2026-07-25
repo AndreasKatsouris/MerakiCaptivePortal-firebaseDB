@@ -47,6 +47,22 @@ function fieldValue(key) {
   <div class="upload-map">
     <div class="hf-mono upload-map__file">{{ upload.fileName }}</div>
 
+    <!-- §4d value-columns warning — rendered ABOVE both branches (T5 review S3:
+         a stored mapping lacking value columns must warn on the one-click
+         memory path too, not only in the manual editor). -->
+    <div
+      v-if="upload.warnCostsUnavailable"
+      class="upload-map__warn"
+      role="alert"
+    >
+      <HfIcon name="alert" :size="14" color="var(--hf-warn)" />
+      <span>
+        No value columns are mapped — costs can't be derived from this file,
+        so cost KPIs and order Rand values will be unavailable. Map
+        "Opening value (R)" and "Closing value (R)" if your file has them.
+      </span>
+    </div>
+
     <!-- One-click confirmation (fingerprint hit) -->
     <div v-if="isAutoConfirm" class="upload-map__auto">
       <div class="upload-map__auto-head">
@@ -69,19 +85,6 @@ function fieldValue(key) {
         Match each field to a column from your file. Leave fields your file
         doesn't have as "Not mapped".
       </p>
-
-      <div
-        v-if="upload.warnCostsUnavailable"
-        class="upload-map__warn"
-        role="alert"
-      >
-        <HfIcon name="alert" :size="14" color="var(--hf-warn)" />
-        <span>
-          No value columns are mapped — costs can't be derived from this file,
-          so cost KPIs and order Rand values will be unavailable. Map
-          "Opening value (R)" and "Closing value (R)" if your file has them.
-        </span>
-      </div>
 
       <div class="upload-map__grid">
         <div v-for="f in fields" :key="f.key" class="upload-map__row">
