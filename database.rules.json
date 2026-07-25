@@ -294,6 +294,25 @@
         }
       }
     },
+    "foodCostMappings": {
+      "$uid": {
+        ".read": "auth != null && auth.uid === $uid",
+        ".write": "auth != null && auth.uid === $uid",
+        "$fingerprint": {
+          ".validate": "newData.hasChildren(['headersNorm', 'mapping', 'savedAt'])",
+          "label": { ".validate": "newData.isString() && newData.val().length <= 100" },
+          "savedAt": { ".validate": "newData.isNumber()" },
+          "useCount": { ".validate": "newData.isNumber() && newData.val() >= 0" },
+          "headersNorm": {
+            "$i": { ".validate": "newData.isString() && newData.val().length <= 120" }
+          },
+          "mapping": {
+            "$field": { ".validate": "newData.isNumber() && newData.val() >= -1 && newData.val() < 60" }
+          },
+          "$other": { ".validate": false }
+        }
+      }
+    },
     "bookings": {
       ".read": "auth != null && (auth.token.admin === true || root.child('admin-claims').child(auth.uid).exists())",
       ".write": "auth != null && (auth.token.admin === true || root.child('admin-claims').child(auth.uid).exists())",
