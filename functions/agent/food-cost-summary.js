@@ -12,8 +12,17 @@
  */
 
 const DAY_MS = 86400000;
+const MAX_STRING_LEN = 120;
 
 function num(v) { return Number(v) || 0; }
+
+// P6 backport (D4, security F4 — bug-queue row 2026-07-24): tenant-CSV strings
+// flow into the model conversation; control-strip + cap them at the boundary.
+// Byte-identical to suggest.js's sanitizeText (functions/agent/food-cost/suggest.js).
+function sanitizeText(v) {
+  // eslint-disable-next-line no-control-regex
+  return String(v == null ? '' : v).replace(/[\x00-\x1F\x7F]/g, '').slice(0, MAX_STRING_LEN);
+}
 
 /**
  * @param {object[]} records  raw stockUsage records (Object.values of the node)
@@ -64,8 +73,8 @@ function summariseFoodCost(records, opts = {}) {
     itemsAnalysed: items.length,
     lowStockCount: low.length,
     lowStockItems: low.slice(0, topN).map((it) => ({
-      itemCode: it.itemCode,
-      description: it.description,
+      itemCode: sanitizeText(it.itemCode), // P6 backport (D4)
+      description: sanitizeText(it.description), // P6 backport (D4)
       closingQty: it.closingQty,
       daysOfCover: it.daysOfCover === Infinity ? null : Math.round(it.daysOfCover * 10) / 10,
     })),
