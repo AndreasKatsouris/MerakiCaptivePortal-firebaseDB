@@ -1,6 +1,6 @@
 {
   "lastUpdated": "2026-07-24",
-  "lastUpdatedNote": "W1 food-cost D2 calculator built end-to-end: PR #189 open (spec+plan+3 pre-build reviews, 6 subagent TDD tasks, 5 post-build reviews folded, 311/311).",
+  "lastUpdatedNote": "D2 MERGED (#189) + deployed (getSuggestedOrder live); D3 v2 UI built end-to-end same day: PR pending (CF + rules + upload wizard + real-cards dashboard, 6 reviews folded).",
   "sprint": {
     "goal": "Effective implementation of Hi-Fi v2, with ROSS as the central post-login surface for every subscribed user",
     "started": "2026-04-30",
