@@ -11,9 +11,6 @@
 //     summary, order, runway} — functions/food-cost-overview.js:178-197).
 //   - `empty` is a NEW flag: the CF returned bare {hasData:false} (no data /
 //     no access / not entitled — indistinguishable by design). NOT an error.
-//   - `filter` / `setFilter` / `filteredMenu` are TRANSITIONAL shims for the
-//     pre-T5 scripted component (menu card is CUT per D3-1); filteredMenu is
-//     null-safe against the new payload. T5 deletes all three.
 
 import { defineStore } from 'pinia'
 import { getFoodCostOverview } from './service.js'
@@ -26,19 +23,8 @@ export const useFoodCostStore = defineStore('foodCost', {
     empty: false,             // CF said {hasData:false} without an error
     loading: false,
     error: null,
-    filter: 'drifting',       // transitional shim (T5 removes)
     _token: 0,
   }),
-  getters: {
-    // Transitional shim: real payloads carry no `menu` (D3-1 cut). T5 removes.
-    filteredMenu(state) {
-      const rows = state.data?.menu?.rows
-      if (!rows) return []
-      if (state.filter === 'drifting') return rows.filter(r => r.drift < -1.5)
-      if (state.filter === 'stable')   return rows.filter(r => r.drift >= -1.5)
-      return rows
-    },
-  },
   actions: {
     async load({ locationId, daysToNextDelivery } = {}) {
       if (locationId) this.locationId = locationId
@@ -77,6 +63,5 @@ export const useFoodCostStore = defineStore('foodCost', {
         if (token === this._token) this.loading = false
       }
     },
-    setFilter(f) { this.filter = f }, // transitional shim (T5 removes)
   },
 })

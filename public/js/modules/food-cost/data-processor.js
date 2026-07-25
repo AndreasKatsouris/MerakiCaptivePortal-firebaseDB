@@ -158,39 +158,33 @@ export function autoDetectHeaders(headers) {
     };
     
     // Check each header against patterns
-    console.log('All headers:', headers);
     headers.forEach((header, index) => {
         if (!header) return;
         const normalizedHeader = header.toLowerCase().trim();
         
         // Debug logging to see what headers we're processing
-        console.log(`Detecting header: "${header}" (normalized: "${normalizedHeader}") at index ${index}`);
         
         // Exact matches for common header formats
         // Special case for header formats seen in the logs
         if (normalizedHeader === 'item' || normalizedHeader === 'item code' || normalizedHeader === 'itemcode' || 
             normalizedHeader === 'item_code' || normalizedHeader === 'code') {
             mapping.itemCode = index;
-            console.log(`Exact match for item code at index ${index}`);
         }
         else if (normalizedHeader === 'purchase' || normalizedHeader === 'purchase qty' || 
                 normalizedHeader === 'purchaseqty' || normalizedHeader === 'purchase_qty' || 
                 normalizedHeader === 'purchased' || normalizedHeader === 'purchases') {
             mapping.purchaseQty = index;
-            console.log(`Exact match for purchase qty at index ${index}`);
         }
         else if (normalizedHeader === 'food' || normalizedHeader === 'cost center' || 
                 normalizedHeader === 'costcenter' || normalizedHeader === 'cost_center' || 
                 normalizedHeader === 'department') {
             mapping.costCenter = index;
-            console.log(`Exact match for cost center at index ${index}`);
         }
         else {
             // If no exact match, try pattern matching
             Object.keys(patterns).forEach(field => {
                 if (patterns[field].test(normalizedHeader)) {
                     mapping[field] = index;
-                    console.log(`Pattern match for ${field} at index ${index}`);
                 }
             });
         }
@@ -201,11 +195,9 @@ export function autoDetectHeaders(headers) {
         // Search for "item" in any position
         const itemIndex = headers.findIndex(h => h && h.toLowerCase().includes('item'));
         if (itemIndex !== -1) {
-            console.log(`Found 'item' in header: ${headers[itemIndex]} at index ${itemIndex}`);
             mapping.itemCode = itemIndex;
         } else {
             // If we didn't find item code but have headers, use the first column as a fallback
-            console.log('Using first column as fallback for item code');
             mapping.itemCode = 0;
         }
     }
@@ -214,7 +206,6 @@ export function autoDetectHeaders(headers) {
     if (mapping.purchaseQty === -1) {
         const purchaseIndex = headers.findIndex(h => h && h.toLowerCase().includes('purchase'));
         if (purchaseIndex !== -1) {
-            console.log(`Found 'purchase' in header: ${headers[purchaseIndex]} at index ${purchaseIndex}`);
             mapping.purchaseQty = purchaseIndex;
         }
     }
@@ -223,7 +214,6 @@ export function autoDetectHeaders(headers) {
     if (mapping.costCenter === -1) {
         const centerIndex = headers.findIndex(h => h && (h.toLowerCase() === 'food' || h.toLowerCase().includes('dept')));
         if (centerIndex !== -1) {
-            console.log(`Found cost center indicator in header: ${headers[centerIndex]} at index ${centerIndex}`);
             mapping.costCenter = centerIndex;
         }
     }
@@ -239,15 +229,12 @@ export function autoDetectHeaders(headers) {
  */
 export function processStockData(parsedData, headerMapping) {
     // Make a copy of mapping at entry point for debugging
-    console.log('processStockData ENTRY - headerMapping:', JSON.stringify(headerMapping));
     
     if (!parsedData || !parsedData.rows || parsedData.rows.length === 0) {
         // This is an expected case when the app first starts, so use a more informative message
-        console.log('No data to process - waiting for CSV upload');
     }
     // Skip if missing required indices
     if (headerMapping.itemCode === undefined || headerMapping.description === undefined) {
-        console.warn('Header mapping missing required fields');
         return [];
     }
 
@@ -256,35 +243,25 @@ export function processStockData(parsedData, headerMapping) {
     const localHeaderMapping = JSON.parse(JSON.stringify(headerMapping));
 
     // Log the exact mapping we'll use for processing
-    console.log('Using LOCAL COPY of header mapping for processing:', JSON.stringify(localHeaderMapping));
 
     // Print all headers for debugging
     if (parsedData.headers && parsedData.headers.length > 0) {
-        console.log('CSV headers:', parsedData.headers);
-        console.log('USING LOCAL HEADER MAPPING:', localHeaderMapping);
         
         // Log mapping in user-friendly format
-        console.log('===== HEADER MAPPING BEING USED =====');
         Object.keys(localHeaderMapping).forEach(field => {
             const index = localHeaderMapping[field];
             const headerValue = index >= 0 && index < parsedData.headers.length ? parsedData.headers[index] : 'N/A';
-            console.log(`${field}: Column ${index} ("${headerValue}")`);
         });
-        console.log('===== END HEADER MAPPING =====');
         
         // DIAGNOSTIC - Log sample data for verification
-        console.log('--- SAMPLE DATA FOR VERIFICATION ---');
         // Log first 2 rows with mapped fields
         for (let i = 0; i < Math.min(parsedData.rows.length, 2); i++) {
             const row = parsedData.rows[i];
-            console.log(`Row ${i} mapped values:`);
             Object.keys(localHeaderMapping).forEach(field => {
                 const index = localHeaderMapping[field];
                 const value = index >= 0 && index < row.length ? row[index] : 'N/A';
-                console.log(`  ${field}: "${value}"`); 
             });
         }
-        console.log('--- END SAMPLE DATA ---');
     }
     
     const stockData = [];
@@ -315,7 +292,6 @@ export function processStockData(parsedData, headerMapping) {
                 if (costCenter.toUpperCase() === 'FOOD') {
                     costCenter = 'Food Department';
                 }
-                console.log(`Extracted cost center: "${costCenter}"`);
             }
         }
         
@@ -323,7 +299,6 @@ export function processStockData(parsedData, headerMapping) {
         const unit = row[localHeaderMapping.unit] || 'ea';
         
         // Log extracted fields for debugging
-        console.log(`Processing row: Item Code=${itemCode}, Description=${description}, Category=${category}, Cost Center=${costCenter}`);
         
         // Get numeric values with better error handling
         const openingQty = extractNumericValue(row[localHeaderMapping.openingQty]);
@@ -333,11 +308,9 @@ export function processStockData(parsedData, headerMapping) {
         let purchaseQty = 0;
         if (localHeaderMapping.purchaseQty !== undefined && localHeaderMapping.purchaseQty !== -1) {
             purchaseQty = extractNumericValue(row[localHeaderMapping.purchaseQty]);
-            console.log(`Extracted purchase qty: ${row[localHeaderMapping.purchaseQty]} -> ${purchaseQty}`);
         } else if (localHeaderMapping.purchases !== undefined && localHeaderMapping.purchases !== -1) {
             // Fall back to 'purchases' field if purchaseQty is not found
             purchaseQty = extractNumericValue(row[localHeaderMapping.purchases]);
-            console.log(`Using purchases as fallback for purchase qty: ${purchaseQty}`);
         }
         
         const purchases = extractNumericValue(row[headerMapping.purchases]);
@@ -345,7 +318,6 @@ export function processStockData(parsedData, headerMapping) {
         const closingValue = extractNumericValue(row[headerMapping.closingValue]);
         
         // Additional log for debugging
-        console.log(`Numeric values: Opening Qty=${openingQty}, Purchase Qty=${purchaseQty}, Closing Qty=${closingQty}`);
         
         // Calculate derived values
         const usage = openingQty + purchaseQty - closingQty;
@@ -364,35 +336,30 @@ export function processStockData(parsedData, headerMapping) {
         if (openingQty > 0 && openingValue > 0) {
             openingUnitCost = openingValue / openingQty;
             validCalculations++;
-            console.log(`Opening unit cost for ${description}: ${openingUnitCost}`);
         }
         
         // Calculate from closing values
         if (closingQty > 0 && closingValue > 0) {
             closingUnitCost = closingValue / closingQty;
             validCalculations++;
-            console.log(`Closing unit cost for ${description}: ${closingUnitCost}`);
         }
             
         // Average of valid calculations
         if (validCalculations > 0) {
             const totalUnitCost = openingUnitCost + closingUnitCost;
             calculatedUnitCost = totalUnitCost / validCalculations;
-            console.log(`Calculated unit cost for ${description}: ${calculatedUnitCost}`);
             
             // Check for suspicious unit cost (negative or zero)
             const minReasonableUnitCost = 0.01; // Minimum reasonable unit cost
             
             if (calculatedUnitCost <= minReasonableUnitCost) {
                 hasNegativeUnitCost = true;
-                console.log(`Suspicious unit cost detected for ${description}: ${calculatedUnitCost}. This may need manual verification.`);
             }
         } else {
             // No valid calculations were possible
             calculatedUnitCost = 0;
             unitCostCalculationMethod = 'missing';
             hasMissingUnitCost = true;
-            console.log(`Unable to calculate unit cost for ${description}. Using 0.`);
         }
         
         // Calculate cost of usage with the proper unit cost
@@ -420,11 +387,6 @@ export function processStockData(parsedData, headerMapping) {
             
         // Create stock item object - ULTRA FIXED IMPLEMENTATION
         // Log values before creating the object
-        console.log('Creating stock item with these properties:');
-        console.log(`- itemCode: "${itemCode}"`);
-        console.log(`- description: "${description}"`);
-        console.log(`- category: "${category}"`);
-        console.log(`- costCenter: "${costCenter}"`);
         
         const stockItem = {
             // CRITICAL: Use the EXACT values from the row with NO substitution
@@ -469,16 +431,6 @@ export function processStockData(parsedData, headerMapping) {
         };
         
         // DIAGNOSTIC: Print the entire object
-        console.log('FINAL STOCK ITEM CREATED:', {
-            itemCode: stockItem.itemCode,
-            description: stockItem.description,
-            category: stockItem.category,
-            costCenter: stockItem.costCenter,
-            '__raw_itemCode': stockItem.__raw_itemCode,
-            '__raw_description': stockItem.__raw_description,
-            '__raw_category': stockItem.__raw_category,
-            '__raw_costCenter': stockItem.__raw_costCenter
-        });
         
         // Force key properties to ensure filtering works
         if (!stockItem.category) stockItem.category = 'Uncategorized';
@@ -925,7 +877,6 @@ export function filterStockData(stockData, filters) {
     }
 
     if (!filters) {
-        console.warn('No filters provided to filterStockData, returning all data');
         return [...stockData];
     }
 
@@ -995,7 +946,6 @@ export function verifyDataConsistency(stockData, sampleSize = 0) {
         return { propertyIssues: 0, dataIssues: 0 };
     }
 
-    console.log(`Verifying data consistency for ${stockData.length} items...`);
 
     const issues = {
         propertyIssues: 0,
@@ -1016,32 +966,9 @@ export function verifyDataConsistency(stockData, sampleSize = 0) {
 
     // Log sample items for diagnostic purposes
     if (sampleSize > 0) {
-        console.log('--- DATA CONSISTENCY SAMPLE DIAGNOSTICS ---');
         for (let i = 0; i < Math.min(stockData.length, sampleSize); i++) {
             const item = stockData[i];
-            console.log(`Sample Item ${i}:`, {
-                // Core properties
-                itemCode: item.itemCode,
-                description: item.description,
-                category: item.category,
-                costCenter: item.costCenter,
-
-                // Alternative formats
-                CATEGORY: item.CATEGORY,
-                COST_CENTER: item.COST_CENTER,
-                cost_center: item.cost_center,
-
-                // Raw versions
-                __raw_itemCode: item.__raw_itemCode,
-                __raw_description: item.__raw_description,
-                __raw_category: item.__raw_category,
-                __raw_costCenter: item.__raw_costCenter,
-
-                // Property keys list
-                propertyKeys: Object.keys(item)
-            });
         }
-        console.log('--- END SAMPLE DIAGNOSTICS ---');
     }
 
     // Verify and harmonize each item
@@ -1093,7 +1020,6 @@ export function verifyDataConsistency(stockData, sampleSize = 0) {
         });
     });
 
-    console.log(`Data consistency check complete. Found ${issues.propertyIssues} property issues and ${issues.dataIssues} data type issues.`);
     return issues;
 }
 
