@@ -371,5 +371,18 @@ describe('handleOverviewRequest — envelope', () => {
         expect(res.statusCode).toBe(200);
         expect(res.body).toEqual(NO_DATA);
     });
+
+    it('mid-flight throw → stable 500 envelope, no internal detail leaked (quality-review S1)', async () => {
+        // The one previously-untested security property (§6): a db failure must
+        // produce the fixed error string — never err.message, never tenant data.
+        __setDbForTests({
+            ref: () => { throw new Error('SECRET internal path /locations/x and a tenant string'); },
+        });
+        __setVerifyAuthForTests(async () => ({ uid: 'mgr1' }));
+        const res = makeRes();
+        await handleOverviewRequest({ method: 'POST', body: { locationId: LOC } }, res);
+        expect(res.statusCode).toBe(500);
+        expect(res.body).toEqual({ error: 'Failed to load the food-cost overview' });
+    });
 });
 

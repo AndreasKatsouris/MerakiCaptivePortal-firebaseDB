@@ -41,7 +41,6 @@ const { corsOptions } = require('./cors-allowlist');
 const cors = require('cors')(corsOptions);
 const { callerHasLocationAccess } = require('./agent/tools');
 
-const DAY_MS = 86400000;
 const MAX_RECORDS = 30;          // single bounded read; also the trend-point cap (§5)
 const MAX_SUMMARY_ITEMS = 2000;  // reuse of suggest.js MAX_ITEMS_PER_RECORD (P5) for the D1 branch.
                                  // MUST STAY EQUAL to suggest.js's constant: D1-branch truncation is
@@ -161,6 +160,9 @@ async function buildOverview(db, uid, { locationId, daysToNextDelivery }, now) {
 
     // recs is non-empty → summariseFoodCost always returns hasData:true here.
     // Trend arrays: oldest→newest from record history, max 30 points (§5).
+    // A record with an absent/NaN field renders as 0 BY DESIGN (quality-review
+    // N4): the write path always persists both fields (database-operations.js
+    // `|| 0`), so a genuine gap is not expressible in real data.
     const trendRecs = recs.slice(-MAX_RECORDS);
     const costPctTrend = trendRecs.map((r) => num(r.costPercentage));
     const spendTrend = trendRecs.map((r) => num(r.totalCostOfUsage));
@@ -196,6 +198,11 @@ async function buildOverview(db, uid, { locationId, daysToNextDelivery }, now) {
             lowStockItems,
             itemsAnalysed: summary.itemsAnalysed,
         },
+        // NOTE (quality-review S2): `order` is POLYMORPHIC — when the latest
+        // record has no orderable items suggestOrder returns bare
+        // {hasData:false}, embedded verbatim while top-level hasData stays
+        // true. The client must branch on order.hasData before touching
+        // order.items/order.totals.
         order,
         runway,
     };
