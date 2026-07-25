@@ -1,10 +1,6 @@
 {
   "lastUpdated": "2026-07-25",
-<<<<<<< HEAD
   "lastUpdatedNote": "D2 eval 23/23 LIVE + D4 strip-and-harden BUILT (PR pending): 3 dead files deleted, firebase-service stripped, non-admin root-stockUsage writes closed (deployed + probed), console strip, shims out. **W1 food-cost track COMPLETE pending D4 merge.**",
-=======
-  "lastUpdatedNote": "D3 MERGED (#190): food-cost v2 UI live-ready (CF + rules deployed + probed 8/8, 2 preview-feedback rounds folded). W1 food-cost track: D1+D2+D3 done, D4 strip-and-harden remains.",
->>>>>>> origin/master
   "sprint": {
     "goal": "Effective implementation of Hi-Fi v2, with ROSS as the central post-login surface for every subscribed user",
     "started": "2026-04-30",
