@@ -3,11 +3,11 @@
 > Claude reads this file at the start of every session and updates it at the end.
 > The Sprint Goal is the contract for the session — don't deviate without explicit user confirmation.
 
-Last updated: 2026-07-26 — Weekly groom **+** a W2 trace that turned up two live guest-facing failures. **Groom:** struck queue card Q3 (PR #188, unstruck since 07-24), recovered a 4th orphaned scan branch (2026-07-23, never a PR — 1 Critical + 2 High root-`package-lock.json` findings + 2 reopens), refilled the queue to Q4–Q11 (8 cards). **Same day, merged:** W1 food-cost D1–D4 complete and live (#192); WhatsApp silent-non-delivery observability (#194).
+Last updated: 2026-07-26 — Four PRs merged (#192/#193/#194/#195). **W1 food-cost D1–D4 is complete and live.** A W2 trace found the nudge rail healthy but **silent by construction** (`nextDueDate` unset) and turned up **two live guest-facing WhatsApp failures** (booking confirmations + queue "Table is Ready" going out as freeform and silently dropped) — observability shipped in #194, but both need Meta template approval to actually fix. Groom recovered a 4th orphaned scan branch (1 Critical + 2 High on root `package-lock.json`) and refilled the queue to Q4–Q11.
 
 > **Note discipline:** this note is CURRENT STATE ONLY (≤10 lines, first line always `Last updated: YYYY-MM-DD — <one-line note>`). At each update, move the outgoing narrative to `KNOWLEDGE BASE/BACKLOG_HISTORY.md` (newest first). Per-session detail lives in SCORECARD.md and PR bodies — never here.
 
-**State right now:** W1 food-cost is DONE (D1–D4, #167/#189/#190/#192, all merged + live). #194 merged after this groom branched (hence its conflict) — it makes silent WhatsApp template→freeform degradation visible and adds a delivery-status callback CF, both **inert until the operator sets `TWILIO_STATUS_CALLBACK_URL`**. Nothing else in flight.
+**State right now:** Nothing in flight, zero open PRs. Today merged #192 (W1 food-cost D4 — the D1–D4 track is complete and live), #193, #194 (WhatsApp silent-non-delivery observability, **inert until the operator sets `TWILIO_STATUS_CALLBACK_URL`**) and #195 (this groom).
 
 **⚠ Two live guest-facing failures found by the W2 trace, neither fixed by #194 — both need Meta template approval (the external long-pole; batch one submission):** booking confirmations and queue "Table is Ready" messages are going out as freeform and are silently dropped outside WhatsApp's 24-hour window. See the two rows in the Bug Triage Queue. **W2's own blocker is separate and cheaper:** the nudge rail runs perfectly but is silent by construction because `nextDueDate` is unset on both founder workflows.
 

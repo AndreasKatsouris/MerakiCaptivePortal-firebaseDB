@@ -1,6 +1,6 @@
 {
   "lastUpdated": "2026-07-26",
-  "lastUpdatedNote": "Weekly groom **+** a W2 trace that turned up two live guest-facing failures. **Groom:** struck queue card Q3 (PR #188, unstruck since 07-24), recovered a 4th orphaned scan branch (2026-07-23, never a PR — 1 Critical + 2 High root-`package-lock.json` findings + 2 reopens), refilled the queue to Q4–Q11 (8 cards). **Same day, merged:** W1 food-cost D1–D4 complete and live (#192); WhatsApp silent-non-delivery observability (#194).",
+  "lastUpdatedNote": "Four PRs merged (#192/#193/#194/#195). **W1 food-cost D1–D4 is complete and live.** A W2 trace found the nudge rail healthy but **silent by construction** (`nextDueDate` unset) and turned up **two live guest-facing WhatsApp failures** (booking confirmations + queue \"Table is Ready\" going out as freeform and silently dropped) — observability shipped in #194, but both need Meta template approval to actually fix. Groom recovered a 4th orphaned scan branch (1 Critical + 2 High on root `package-lock.json`) and refilled the queue to Q4–Q11.",
   "sprint": {
     "goal": "Effective implementation of Hi-Fi v2, with ROSS as the central post-login surface for every subscribed user",
     "started": "2026-04-30",
