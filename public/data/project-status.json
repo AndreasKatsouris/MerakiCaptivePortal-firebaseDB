@@ -1,6 +1,6 @@
 {
-  "lastUpdated": "2026-07-25",
-  "lastUpdatedNote": "D2 eval 23/23 LIVE + D4 strip-and-harden BUILT (PR pending): 3 dead files deleted, firebase-service stripped, non-admin root-stockUsage writes closed (deployed + probed), console strip, shims out. **W1 food-cost track COMPLETE pending D4 merge.**",
+  "lastUpdated": "2026-07-26",
+  "lastUpdatedNote": "**D4 MERGED (#192) — the W1 food-cost track (D1–D4) is COMPLETE and fully live** (hosting auto-deploys on merge; `rossChat` was deployed 4 min after the merge — the recurring manual-hosting-deploy warning was stale and both \"gaps\" were phantom). **New Medium security row:** 3 live credentials sit in plaintext env vars on all 119 functions — rotate + move to `defineSecret`.",
   "sprint": {
     "goal": "Effective implementation of Hi-Fi v2, with ROSS as the central post-login surface for every subscribed user",
     "started": "2026-04-30",
@@ -290,6 +290,11 @@
   "inProgress": [],
   "recentlyCompleted": [
     {
+      "title": "ROSS-FoodCost-v2 D4 — strip-and-harden (closes the W1 food-cost track) — every deletion census'd, then the census independently adversarially verified before anything was removed, which paid off twice. Deleted 3 census-dead files (database-operations-v2.js, react-adapter.js — whose dynamic-import target didn't even exist, migration-helpers.js); did NOT delete order-calculator-calculus.js — the verifier proved it's a LIVE user-selectable \"Calculus\" PO mode, answering the parent design's \"delete if unwired\" with *wired*. services/firebase-service.js stripped 324→77 lines (one live export, kept byte-identical). Root stockUsage non-admin writes closed (rules deployed; probe: non-admin write 401 / read 200 — an admin probe would have false-passed). The verifier also REFUTED my own C7 claim: the global root admin .write (database.rules.json:3) cascades into stockUsage and can't be revoked at a child, so the closure is the non-admin arm only and .validate was deliberately kept for the residual admin arm — the PR says so rather than overclaiming. 54 tenant-data console.* statements stripped from the v1 parse chain (which is also v2's), v2 store shims removed, and D1's P6 sanitizeText backported (+ guard test). Same session closed D2's last item: live eval 23/23. Automated review: no blockers. Net −1,200 lines. ⚠ The sanitizeText backport awaits a rossChat functions deploy.",
+      "pr": 192,
+      "mergedAt": "2026-07-25"
+    },
+    {
       "title": "Framework housecleaning + backlog automation — session-start reads −38% (narrative note archived to BACKLOG_HISTORY.md; SELF_OPTIMIZATION 101→13 observed rows; LESSONS corrupted row fixed + guarded entries compressed; SCORECARD capped at 10 × ≤100 words). New npm run status:sync generator (scripts/generate-project-status.js, 18 fixture tests) replaces the hand-maintained project-status.json lockstep, with -- --check for the pre-push self-review. Added the 🤖 Next Up — Automation Queue (cards Q1–Q6) plus two scheduled tasks: backlog-runner (weekday mornings, one card per run, never deploys, never self-merges) and backlog-groomer (weekly reconcile + refill). Dedup is merge-atomic — the runner's PR strikes its own card row.",
       "pr": 178,
       "mergedAt": "2026-07-22"
@@ -512,12 +517,20 @@
   ],
   "bugs": [
     {
-      "title": "D1 getFoodCostSummary output strings are uncapped — P6 backport candidate.",
-      "severity": "medium",
-      "discoveredAt": "2026-07-24",
-      "discoveredOn": "D2 security review F4",
+      "title": "Three live credentials are stored as PLAINTEXT env vars on all 119 deployed functions, while the project already has a defineSecret pattern for four others — and a prior audit pass scored this area \"clean\".",
+      "severity": "critical",
+      "discoveredAt": "2026-07-26",
+      "discoveredOn": "deploy-timestamp lookup",
       "blockingSprint": "False",
-      "notes": "The D2 build (PR #189) sanitizes every tenant-CSV string entering the model conversation (control-strip + 120-char cap: itemCode, description, supplierName, criticalityReason — security F4, injection-via-data). D1's summariseFoodCost (functions/agent/food-cost-summary.js:66-71) predates this and returns itemCode/description verbatim from lowStockItems — unbounded length, control chars intact, same super-admin-session priv-esc surface. Fix: apply the same sanitizeText (or import it) in food-cost-summary.js + 1 test. Well-bounded → groomer: card this."
+      "notes": "firebase functions:list --json returns environmentVariables in the clear for every function: TWILIO_TOKEN, SENDGRID_API_KEY, GOOGLE_PLACES_API_KEY (the rest — TWILIO_SID/TWILIO_PHONE/GOOGLE_PLACE_ID/TWILIO_SIGNATURE_MODE/TWILIO_WEBHOOK_URL — are identifiers/config, not secrets). Meanwhile ANTHROPIC_API_KEY, MERAKI_SHARED_SECRET, INITIAL_ADMIN_SETUP_SECRET and PAYSTACK_SECRET_KEY ARE correctly managed via defineSecret, so the fix is to extend an established in-repo pattern, not invent one. Three reasons this is worse than generic hygiene: (1) the values ride on all 119 functions rather than the handful that need them, so any function compromise or any principal holding cloudfunctions.functions.get reads all three; (2) TWILIO_TOKEN is security-load-bearing — it is the HMAC key behind the CRIT-07 webhook signature verification closed and live-enforced in June (#162/#164); if it leaks, that control fails open and the forge-a-guest-message vector (voucher redemption / queue ops / data deletion) reopens; (3) the 2026-07-04/05 audit pass recorded \"hardcoded secrets (all via process.env/defineSecret())\" as clean (see the checked-and-clean paragraph in the OWASP section) — that conflated *not hardcoded in source* with *properly managed*, the same over-trust-a-clean-scan shape as the retracted HIGH-08 CVE closure. Not public — reading them requires GCP project access, hence Medium not Critical. Fix: migrate the three to defineSecret + scope each to only the functions that consume it, then rotate all three (they were surfaced into a session transcript on 2026-07-26 during a routine deploy-time lookup, which is itself the point — they are trivially readable). Note functions/.env is gitignored and holds these locally (2026-06-16 LESSON) — rotation must update it or the next deploy re-publishes the old values. Found 2026-07-26 while checking a deploy timestamp."
+    },
+    {
+      "title": "D4 post-soak sweep list — 4 more food-cost dead-code candidates + the root stockUsage read retirement.",
+      "severity": "low",
+      "discoveredAt": "2026-07-25",
+      "discoveredOn": "D4 #192",
+      "blockingSprint": "False",
+      "notes": "D4 (#192) deliberately deferred these until the D3/D4 changes have soaked: public/js/modules/food-cost/refactored-app-component.js, the browser copy of the order calculator, all-components.js (the last client-SDK writer of root stockUsage — zero importers, which is what made #192's write-closure safe), and public/backup/food-cost-refactored.js (also the dangling importer of the now-deleted migration-helpers.js, flagged as a nit in #192's review — pre-existing dead code, not a regression). Plus: retire the root stockUsage read path once no consumer needs it (#192 closed only the non-admin *write* arm; .validate was deliberately kept to constrain the residual admin arm, which cannot be revoked at a child because the global root admin .write at database.rules.json:3 cascades). Each deletion needs its own census — this codebase has had \"dead\" files turn out live three times now (base order-calculator.js in D1, order-calculator-calculus.js in D4). Suggest ~1 week soak from 2026-07-25, then one grooming card."
     },
     {
       "title": "No monitoring on the WhatsApp channel — it can die upstream with ZERO server-side signal.",
