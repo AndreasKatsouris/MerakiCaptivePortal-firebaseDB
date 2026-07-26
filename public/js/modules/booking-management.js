@@ -791,8 +791,12 @@ const BookingManagementApp = {
                 console.log('Booking notification sent successfully:', result);
 
             } catch (error) {
-                console.error('Error sending booking notification:', error);
-                throw error;
+                // Do NOT rethrow: the booking is already saved by this point, and
+                // rethrowing surfaced a "Failed to save booking" error with the modal
+                // still open — inviting a re-submit and a DUPLICATE booking. Notifying
+                // the guest is best-effort; the same rule the queue path already uses.
+                // Server-side delivery failures are visible in the WHATSAPP_* logs.
+                console.error('Error sending booking notification (booking WAS saved):', error);
             }
         },
 
@@ -813,8 +817,10 @@ const BookingManagementApp = {
                 console.log('Status notification sent successfully:', result);
 
             } catch (error) {
-                console.error('Error sending status notification:', error);
-                throw error;
+                // Best-effort, same rule as sendBookingNotification: the status change
+                // is already persisted, so a notification failure must not read as a
+                // save failure and must not block the UI from closing.
+                console.error('Error sending status notification (status WAS saved):', error);
             }
         },
 
