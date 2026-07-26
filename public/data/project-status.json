@@ -1,6 +1,6 @@
 {
   "lastUpdated": "2026-07-26",
-  "lastUpdatedNote": "**D4 MERGED (#192) — the W1 food-cost track (D1–D4) is COMPLETE and fully live** (hosting auto-deploys on merge; `rossChat` was deployed 4 min after the merge — the recurring manual-hosting-deploy warning was stale and both \"gaps\" were phantom). **New Medium security row:** 3 live credentials sit in plaintext env vars on all 119 functions — rotate + move to `defineSecret`.",
+  "lastUpdatedNote": "**W2 traced: the nudge rail is healthy but silent by construction (`nextDueDate` unset), and the trace found booking confirmations silently undelivered — 2 new High bug rows + a fix PR.** Earlier same day: **D4 MERGED (#192) — the W1 food-cost track (D1–D4) is COMPLETE and fully live** (hosting auto-deploys on merge; `rossChat` was deployed 4 min after the merge — the recurring manual-hosting-deploy warning was stale and both \"gaps\" were phantom). **New Medium security row:** 3 live credentials sit in plaintext env vars on all 119 functions — rotate + move to `defineSecret`.",
   "sprint": {
     "goal": "Effective implementation of Hi-Fi v2, with ROSS as the central post-login surface for every subscribed user",
     "started": "2026-04-30",
@@ -533,6 +533,22 @@
       "notes": "D4 (#192) deliberately deferred these until the D3/D4 changes have soaked: public/js/modules/food-cost/refactored-app-component.js, the browser copy of the order calculator, all-components.js (the last client-SDK writer of root stockUsage — zero importers, which is what made #192's write-closure safe), and public/backup/food-cost-refactored.js (also the dangling importer of the now-deleted migration-helpers.js, flagged as a nit in #192's review — pre-existing dead code, not a regression). Plus: retire the root stockUsage read path once no consumer needs it (#192 closed only the non-admin *write* arm; .validate was deliberately kept to constrain the residual admin arm, which cannot be revoked at a child because the global root admin .write at database.rules.json:3 cascades). Each deletion needs its own census — this codebase has had \"dead\" files turn out live three times now (base order-calculator.js in D1, order-calculator-calculus.js in D4). Suggest ~1 week soak from 2026-07-25, then one grooming card."
     },
     {
+      "title": "Booking confirmations are almost certainly not reaching guests — the booking_confirmation template is unconfigured, so every send silently degrades to freeform and Meta drops it outside the 24-hour window.",
+      "severity": "high",
+      "discoveredAt": "2026-07-26",
+      "discoveredOn": "W2 soak trace",
+      "blockingSprint": "False",
+      "notes": "Traced 2026-07-26 end to end: the flow is LIVE (booking-management.js:687 on create and :769 on status change, plus 2 admin-tool call sites, all POSTing sendGuestBookingNotification; a booking was created 2026-07-26 08:48) → sendBookingConfirmationTemplate → sendWhatsAppTemplate('booking_confirmation', …) → RTDB whatsapp-template-config/booking_confirmation is enabled=false with an EMPTY contentSid → the freeform fallback path. A freeform message is deliverable only inside the customer-service window the guest opens by messaging us; a booking confirmation is business-initiated, so for any guest who hasn't messaged recently Twilio accepts it, returns a sid, and Meta never delivers it. 6 of 8 templates are in this state (booking_confirmation, booking_reminder, booking_status_update, queue_manual_addition, receipt_confirmation, welcome_message); only admin_new_booking_notification and ross_daily_digest have ContentSids. receipt_confirmation is fine in practice — it replies inside a guest-initiated conversation. booking_reminder has NO caller at all (dead code — reminders aren't silently failing, they're simply never sent). Partially addressed by this PR (degradation now logs at ERROR + statusCallback wiring + staged enforce refusal), but the actual remediation is external: get the business-initiated templates approved by Meta and set their ContentSids. Operator: quantify the damage in the Twilio console — those sends will sit at sent/accepted and never reach delivered, or fail with 63016."
+    },
+    {
+      "title": "W2 proactive nudge has run daily and correctly for 6 weeks with ZERO findings to report — nextDueDate is unset on both founder workflows.",
+      "severity": "high",
+      "discoveredAt": "2026-07-26",
+      "discoveredOn": "W2 soak trace",
+      "blockingSprint": "False",
+      "notes": "rossProactiveSweep fires exactly on schedule (05:00 UTC = 07:00 SAST) with {\"scanned\":1,\"sent\":0,\"silent\":1,\"errors\":0} every day; opt-in is enabled; the rail is healthy. But both workflows (-OuNaBBB_0 monthly, -Ouvh8HFau weekly) have no nextDueDate, and the selector classifies overdue by comparing that field to now — so nothing can ever be a finding and the sweep is silent by construction. ross/proactiveLog holds exactly 2 markers ever (2026-06-11 deploy-day smoke, 2026-06-17). Consequence: the founder soak has produced no evaluable data — timing/wording/silent-day feel were never actually tested. Two questions to separate: (a) why is nextDueDate unset — do rossActivateWorkflow/rossCreateWorkflow still fail to set it (live bug, related to the recurrence-engine gap row below), or do these two records predate it (data repair)? (b) design: silent-if-empty currently conflates *\"nothing is wrong\"* with *\"nothing is known\"*, which is indistinguishable from a dead rail — the sweep should say so when it scans an owner whose workflows carry no due dates."
+    },
+    {
       "title": "No monitoring on the WhatsApp channel — it can die upstream with ZERO server-side signal.",
       "severity": "medium",
       "discoveredAt": "2026-07-23",
@@ -707,14 +723,6 @@
       "discoveredOn": "PR #158 build",
       "blockingSprint": "False",
       "notes": "the bookings block (~line 302) embeds literal newlines inside rule-expression strings; Firebase CLI's lenient parser accepts it (deployed as-is for months) but JSON.parse, jq, and most tooling reject the file. Bit the PR #158 verification step (plan's parse check failed on a clean edit). Fix: normalize the multi-line rule strings to single-line (pure formatting, no semantic change), then strict-parse becomes a usable pre-deploy guard — candidate for guard-backfill 3c (a tiny vitest that JSON.parses the rules file)."
-    },
-    {
-      "title": "WhatsApp client PII log scrub (remainder)",
-      "severity": "low",
-      "discoveredAt": "2026-06-11",
-      "discoveredOn": "PR #158 review",
-      "blockingSprint": "False",
-      "notes": "PR #158 masked the recipient phone at whatsappClient.js template-send (the daily unattended path). Remaining unmasked phone logs in the same family: whatsappClient.js:60 (sendWhatsAppMessage, used by booking/queue flows + the sweep's options.fallbackMessage path — currently unused by the sweep) and the OWASP H-10-adjacent inbound logs already partially addressed in #93. One small scrub PR: mask or drop to across utils/whatsappClient.js."
     }
   ],
   "backlog": {

@@ -2746,6 +2746,11 @@ exports.sendWhatsAppTestMessage = functions.https.onRequest(async (req, res) => 
 // Enhanced WhatsApp Message Handler with Multi-Location Routing
 exports.receiveWhatsAppMessageEnhanced = functions.https.onRequest(receiveWhatsAppMessageEnhanced);
 
+// Twilio delivery-status callback — turns "Twilio accepted it" into "WhatsApp
+// delivered it". Signature-gated by the same TWILIO_SIGNATURE_MODE staging.
+const { whatsappStatusCallback } = require('./whatsappStatusCallback');
+exports.whatsappStatusCallback = functions.https.onRequest(whatsappStatusCallback);
+
 // WhatsApp Migration Functions
 exports.checkWhatsAppMigrationStatus = functions.https.onRequest(async (req, res) => {
     cors(req, res, async () => {
