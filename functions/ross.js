@@ -1048,31 +1048,83 @@ exports.rossUpdateWorkflow = onRequest(async (req, res) => {
  * Delete a workflow
  * Access: All admins (own workflows only)
  */
+/**
+ * Resolve the OWNER uid of a workflow for a caller who may not own it.
+ *
+ * Why this exists: `rossGetWorkflows` lists workflows by resolving
+ * (workflowId -> ownerUid) from `ross/workflowsByLocation` across every location
+ * the caller can see, so a super admin sees ALL owners' workflows. Delete used
+ * to look only under `ross/workflows/{callerUid}/…`, so every workflow the
+ * caller could see but did not own returned 404 "Workflow not found" — six of
+ * seven in prod. The read path was owner-aware and the delete path was not.
+ *
+ * SECURITY (the #144 IDOR class): resolving an owner from the GLOBAL index with
+ * no caller check is exactly how `getRunHistory` leaked another tenant's data.
+ * So resolution is scoped to locations the caller can actually see, and
+ * cross-owner deletion is restricted to super admins — a co-located non-admin
+ * can already SEE a peer's workflow, but letting them DELETE it would widen a
+ * destructive capability, which this fix deliberately does not do.
+ *
+ * @returns {Promise<string|null>} owner uid, or null meaning "not found for this
+ *   caller". Callers must treat null as 404 and must never fall back to their
+ *   own uid.
+ */
+async function resolveWorkflowOwnerForCaller({ uid, isSuperAdmin, workflowId, locationId }) {
+    // Fast path: the caller owns it. Unchanged behaviour for the common case.
+    const own = await db.ref(`ross/workflows/${uid}/${workflowId}`).once('value');
+    if (own.exists()) return uid;
+
+    // Cross-owner delete is super-admin only (see SECURITY note above).
+    if (!isSuperAdmin) return null;
+
+    if (locationId) {
+        await verifyLocationAccess(uid, [locationId], isSuperAdmin);
+        const snap = await db.ref(`ross/workflowsByLocation/${locationId}/${workflowId}`).once('value');
+        const owner = snap.val();
+        return (typeof owner === 'string' && owner) ? owner : null;
+    }
+
+    const allLocs = await db.ref('ross/workflowsByLocation').once('value');
+    const visibleLocationIds = Object.keys(allLocs.val() || {});
+    const found = await Promise.all(visibleLocationIds.map(async (locId) => {
+        const snap = await db.ref(`ross/workflowsByLocation/${locId}/${workflowId}`).once('value');
+        const owner = snap.val();
+        return (typeof owner === 'string' && owner) ? owner : null;
+    }));
+    return found.find(Boolean) || null;
+}
+
 exports.rossDeleteWorkflow = onRequest(async (req, res) => {
     return cors(req, res, async () => {
         if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' });
         try {
             const decodedToken = await verifyAuthToken(req);
-            const { uid } = await verifyUserOrAdmin(decodedToken);
+            const { uid, isSuperAdmin } = await verifyUserOrAdmin(decodedToken);
 
             const data = req.body.data || req.body;
-            const { workflowId } = data;
+            const { workflowId, locationId } = data;
             if (!workflowId) return res.status(400).json({ error: 'Workflow ID is required' });
-            const existing = await db.ref(`ross/workflows/${uid}/${workflowId}`).once('value');
+
+            // Resolve the owner the same way the READ path does, scoped to what
+            // this caller can see. Never trust an ownerUid from the client.
+            const ownerUid = await resolveWorkflowOwnerForCaller({ uid, isSuperAdmin, workflowId, locationId });
+            if (!ownerUid) return res.status(404).json({ error: 'Workflow not found' });
+
+            const existing = await db.ref(`ross/workflows/${ownerUid}/${workflowId}`).once('value');
             if (!existing.exists()) return res.status(404).json({ error: 'Workflow not found' });
 
             const workflow = existing.val() || {};
             const attachedLocationIds = Object.keys(workflow.locations || {});
 
             const atomicDelete = {
-                [`ross/workflows/${uid}/${workflowId}`]: null,
+                [`ross/workflows/${ownerUid}/${workflowId}`]: null,
                 ...locationIndexRemovals(workflowId, attachedLocationIds)
             };
             await db.ref().update(atomicDelete);
-            // Clean up ownerIndex if this was the last workflow
-            const remainingSnap = await db.ref(`ross/workflows/${uid}`).once('value');
+            // Clean up ownerIndex if this was the OWNER's last workflow (not the caller's).
+            const remainingSnap = await db.ref(`ross/workflows/${ownerUid}`).once('value');
             if (!remainingSnap.exists()) {
-                await db.ref(`ross/ownerIndex/${uid}`).remove();
+                await db.ref(`ross/ownerIndex/${ownerUid}`).remove();
             }
             res.json({ result: { success: true, workflowId } });
         } catch (error) {
@@ -1998,3 +2050,4 @@ module.exports.updateWorkflowAsOwner = updateWorkflowAsOwner;
 module.exports.workflowOpStatus = workflowOpStatus;
 // Test seam.
 module.exports.__setDbForTests = __setDbForTests;
+module.exports.resolveWorkflowOwnerForCaller = resolveWorkflowOwnerForCaller;
