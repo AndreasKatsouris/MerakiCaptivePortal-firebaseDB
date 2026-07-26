@@ -1,6 +1,6 @@
 {
   "lastUpdated": "2026-07-26",
-  "lastUpdatedNote": "**D4 MERGED (#192) — the W1 food-cost track (D1–D4) is COMPLETE and fully live** (hosting auto-deploys on merge; `rossChat` was deployed 4 min after the merge — the recurring manual-hosting-deploy warning was stale and both \"gaps\" were phantom). **New Medium security row:** 3 live credentials sit in plaintext env vars on all 119 functions — rotate + move to `defineSecret`.",
+  "lastUpdatedNote": "Weekly groom: reconciled queue card Q3 (PR #188, was unstruck); recovered a 4th orphaned scan branch (2026-07-23, never a PR) — 1 new Critical + 2 new High dependency findings on root `package-lock.json` + 2 small code-level reopens, logged below. Automation queue refilled to Q4–Q11 (8 cards).",
   "sprint": {
     "goal": "Effective implementation of Hi-Fi v2, with ROSS as the central post-login surface for every subscribed user",
     "started": "2026-04-30",
@@ -578,14 +578,6 @@
       "discoveredOn": "auth.token.admin === true",
       "blockingSprint": "",
       "notes": "salesData/forecasts .write root cascade bypass — any authed tenant can OVERWRITE another tenant's EXISTING record, not just create new ones — database.rules.json:495-521. RTDB write-rule cascades are permissive-only: the collection-level .write: \"auth != null\" already grants access before the child ownership check runs, and there is no .validate reasserting newData.child('userId').val() === auth.uid independent of write path — so the child check is dead code for existing records. Original 2026-05-31 finding (preserved below) only caught the create-new-record case; the 2026-07-04 fresh OWASP scan (docs/security/owasp-audit-2026-07-04.md) traced the full cascade and found the more serious overwrite-existing-record variant (financial data corruption/fabrication across tenants), independently re-confirmed 2026-07-05. Bundle into the same coordinated RTDB-rules PR as whatsapp-numbers/location-whatsapp-mapping (new finding, below) and the existing HIGH-04/HIGH-05/MED-06 write-cascade items — full writer census first (CLAUDE.md step 5e; plan already drafted in PR #166). _Original 2026-05-31 text:_ the H-2 work (PR #96) tightened salesData *reads* to admin + per-child owner, but the root .write remains auth != null. The per-child .validate guards *overwriting* an existing record (owner check), but any authenticated user can still create NEW salesData records under arbitrary keys (no userId-match enforced on create). Fix: add a .validate mirroring the rewards node's pattern — `!data.exists()"
-    },
-    {
-      "title": "v-html=\"data.diagnosis.detail\" in FoodCostApp.vue — same latent stored-XSS class as the closed #147",
-      "severity": "low",
-      "discoveredAt": "2026-07-02",
-      "discoveredOn": "scheduled security scan",
-      "blockingSprint": "False",
-      "notes": "public/js/modules/food-cost/v2/components/FoodCostApp.vue:102 renders diagnosis.detail via v-html. Currently safe: diagnosis is sourced only from static public/js/modules/food-cost/v2/content.js (ROSS_DIAGNOSIS). But the queued W1 work (High Priority item — wiring the food-cost reader CF so Ross can see real food-cost data) will plausibly route live/agent-derived diagnosis text into this same field, at which point it becomes exploitable. Checked 2026-07-05: PR #167 (the food-cost reader, currently open) does NOT touch FoodCostApp.vue or diagnosis — it's a backend-only agent adapter (functions/agent/food-cost-summary.js + tools.js), so this finding is not yet triggered by that PR. Still worth fixing proactively: swap to {{ data.diagnosis.detail }} now (the same discipline applied in #147); the not-yet-enabled vue/no-v-html eslint guard (backlog item 3c) would catch this automatically. Found by the 2026-07-02 scheduled OWASP scan, re-confirmed 2026-07-05."
     },
     {
       "title": "rewardsProcessor.js:646 modulo bias in generateFallbackCode",
