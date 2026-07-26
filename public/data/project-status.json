@@ -723,6 +723,14 @@
       "discoveredOn": "PR #158 build",
       "blockingSprint": "False",
       "notes": "the bookings block (~line 302) embeds literal newlines inside rule-expression strings; Firebase CLI's lenient parser accepts it (deployed as-is for months) but JSON.parse, jq, and most tooling reject the file. Bit the PR #158 verification step (plan's parse check failed on a clean edit). Fix: normalize the multi-line rule strings to single-line (pure formatting, no semantic change), then strict-parse becomes a usable pre-deploy guard — candidate for guard-backfill 3c (a tiny vitest that JSON.parses the rules file)."
+    },
+    {
+      "title": "The bigger silent-drop surface is freeform-by-design, not template degradation — queueWhatsAppIntegration.js sends the most time-critical guest messages with no template at all.",
+      "severity": "critical",
+      "discoveredAt": "2026-07-26",
+      "discoveredOn": "PR #194 security review",
+      "blockingSprint": "False",
+      "notes": "\"🔔 Your Table is Ready!\", position updates and wait reminders (functions/queueWhatsAppIntegration.js:667-686) go through sendWhatsAppMessage — pure freeform, business-initiated (an admin clicks Notify), no template anywhere in the path. They are subject to the identical 24-hour-window drop as the booking confirmations above, and a table-ready message that arrives never is worse than most failures in the product. The 2026-07-26 PR gives them statusCallback (so failures at least become observable) but deliberately does NOT classify or enforce them — enforcement without an approved template would simply block the send. Fix: a queue_table_ready content template through Meta approval, then route these via sendWhatsAppTemplate. Same external long-pole as the booking templates; worth batching into one Meta submission. Found by the security review of that PR."
     }
   ],
   "backlog": {

@@ -345,6 +345,20 @@ function buildFallbackMessage(templateType, params) {
         case TEMPLATE_TYPES.POINTS_UPDATE:
             return `🎯 *Points Update*\n\nHi ${params[0]},\n\nYour points balance has been updated:\n\n➕ *Points Earned:* ${params[1]}\n🏅 *Total Points:* ${params[2]}\n📋 *Transaction:* ${params[3]}\n\nReply "check my points" to see your balance anytime!\n\n🤖 Keep earning points with every visit!`;
 
+        // These three had no case, so every send fell through to the generic
+        // "🤖 System notification" default. RECEIPT_CONFIRMATION is the live one:
+        // it has no ContentSid, so guests who WhatsApp a receipt have been getting
+        // the placeholder instead of their rewards. Params per
+        // buildReceiptConfirmationParams / buildBookingReminderParams.
+        case TEMPLATE_TYPES.RECEIPT_CONFIRMATION:
+            return `🧾 *Receipt Received!*\n\nHi ${params[0]},\n\nThanks — your receipt has been processed.\n\n🎁 *Rewards earned:*\n${params[1]}\n\n🏅 *Total Points:* ${params[2]}\n\nReply "view rewards" to see everything available to you.\n\n🤖 Keep sending receipts to keep earning!`;
+
+        case TEMPLATE_TYPES.BOOKING_REMINDER:
+            return `⏰ *Booking Reminder*\n\nHi ${params[0]},\n\nThis is a reminder about your upcoming reservation:\n\n📋 *Booking Details:*\n• Date: ${params[1]}\n• Time: ${params[2]}\n• Location: ${params[3]}\n• Number of Guests: ${params[4]}\n\nWe look forward to seeing you! Reply if you need to make any changes.\n\n🤖 This is an automated reminder.`;
+
+        case TEMPLATE_TYPES.BOOKING_CANCELLATION:
+            return `❌ *Booking Cancelled*\n\nHi ${params[0]},\n\nYour reservation has been cancelled.\n\n📋 *Booking ID:* ${params[1]}\n\nIf this was not expected, please reply to this message and we'll help sort it out.\n\n🤖 This is an automated message.`;
+
         case TEMPLATE_TYPES.ROSS_DAILY_DIGEST:
             return `☀️ Morning ${params[0]} — ${params[1]}:\n\n${params[2]}\n\nTap to sort the most urgent:\nhttps://merakicaptiveportal-firebasedb.web.app/ross.html?${params[3]}\n\n— Ross`;
 

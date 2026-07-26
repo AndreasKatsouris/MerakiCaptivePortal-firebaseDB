@@ -15,15 +15,18 @@
  *
  * Log-only by design — no RTDB write. Persisting delivery status would mean a
  * new node holding guest phone numbers plus the security-rules change that
- * implies; Cloud Logging is where alerting happens anyway. Persistence can be a
- * follow-up with its own rules review.
+ * implies; Cloud Logging is where alerting happens anyway.
  *
- * Signature verification reuses the CRIT-07 helper and honours the same
- * TWILIO_SIGNATURE_MODE staging (monitor → enforce). Because gen2 strips the
- * function-name path from `req.originalUrl`, the signed URL cannot be
- * reconstructed — it must be configured. Both the status-callback URL and the
- * inbound webhook URL are offered as candidates (valid-if-any; accepting extra
- * candidates is safe because forging still requires the auth token).
+ * SECURITY — every field below is attacker-controlled until proven otherwise.
+ * The endpoint is publicly reachable and its whole product value is a log line
+ * an operator will alert on, which makes that log line a target: an unsanitized
+ * newline inside `MessageSid` splits the entry on Cloud Run and lets an
+ * anonymous caller emit a byte-perfect forged `WHATSAPP_DELIVERY_FAILED`
+ * record, or bury real ones under volume. So each field is charset- and
+ * length-restricted before it is interpolated, and the signature check here
+ * defaults to ENFORCE rather than inheriting the inbound webhook's monitor
+ * default — failing closed is nearly free on a brand-new log-only endpoint
+ * with no legitimate traffic to protect.
  */
 
 const { evaluateTwilioRequest } = require('./utils/twilio-signature');
@@ -34,15 +37,52 @@ const { evaluateTwilioRequest } = require('./utils/twilio-signature');
  */
 const FAILED_STATUSES = new Set(['failed', 'undelivered']);
 
-function maskPhone(v) {
-    return `${String(v || '').slice(0, 4)}***`;
+/** Every status Twilio documents for a message resource. Anything else is rejected. */
+const KNOWN_STATUSES = new Set([
+    'accepted', 'queued', 'sending', 'sent', 'receiving', 'received',
+    'delivered', 'read', 'undelivered', 'failed', 'canceled', 'scheduled',
+]);
+
+/**
+ * Collapse an untrusted value to a short, single-line, log-safe token.
+ * Anything outside the whitelist becomes `invalid` — never partially-stripped
+ * attacker text, which would still let fragments through.
+ */
+function safeToken(value, pattern, fallback = 'unknown') {
+    if (value === null || value === undefined) return fallback;
+    if (typeof value === 'object') return 'invalid'; // objects can throw on coercion
+    const s = String(value);
+    return pattern.test(s) ? s : 'invalid';
 }
 
-/** Candidate URLs Twilio may have signed, newline/space separated (valid-if-any). */
+const SID_RE = /^[A-Za-z0-9_-]{1,64}$/;
+const ERROR_CODE_RE = /^[0-9]{1,10}$/;
+
+/** Mask a recipient for logs, tolerating the `whatsapp:` prefix Twilio sends. */
+function maskPhone(v) {
+    if (v === null || v === undefined || typeof v === 'object') return '***';
+    const bare = String(v).replace(/^whatsapp:/i, '');
+    if (!/^\+?[0-9]{4,20}$/.test(bare)) return '***';
+    return `${bare.slice(0, 4)}***`;
+}
+
+/** Candidate URLs Twilio may have signed, space separated (valid-if-any). */
 function signatureUrls(env = process.env) {
     return [env.TWILIO_STATUS_CALLBACK_URL, env.TWILIO_WEBHOOK_URL]
         .filter(Boolean)
         .join(' ');
+}
+
+/**
+ * Signature mode for THIS endpoint. Defaults to `enforce` — unlike the inbound
+ * webhook, there is no pre-existing live traffic that a strict check could
+ * dark-out. `TWILIO_STATUS_SIGNATURE_MODE` overrides (monitor/off) if a rollout
+ * ever needs it; it deliberately does NOT inherit `TWILIO_SIGNATURE_MODE`,
+ * so enforcing here never forces enforcing on the inbound webhook.
+ */
+function statusSignatureEnv(env = process.env) {
+    const override = String(env.TWILIO_STATUS_SIGNATURE_MODE || '').trim().toLowerCase();
+    return { ...env, TWILIO_SIGNATURE_MODE: override || 'enforce' };
 }
 
 /**
@@ -54,18 +94,25 @@ async function whatsappStatusCallback(req, res) {
         return res.status(405).send('Method not allowed');
     }
 
-    const check = evaluateTwilioRequest(req, { webhookUrl: signatureUrls() });
+    const check = evaluateTwilioRequest(req, {
+        webhookUrl: signatureUrls(),
+        env: statusSignatureEnv(),
+    });
     if (!check.allow) {
         return res.status(check.rejection.status).send(check.rejection.body);
     }
 
-    const body = req.body || {};
-    const status = String(body.MessageStatus || body.SmsStatus || '').toLowerCase();
+    const body = (req.body && typeof req.body === 'object') ? req.body : {};
 
-    // PII-free: sid + status + error code only, recipient masked.
+    const rawStatus = (typeof body.MessageStatus === 'object' || typeof body.SmsStatus === 'object')
+        ? ''
+        : String(body.MessageStatus || body.SmsStatus || '').toLowerCase();
+    const status = KNOWN_STATUSES.has(rawStatus) ? rawStatus : 'invalid';
+
+    // PII-free and injection-free: whitelisted tokens only, recipient masked.
     const summary =
-        `sid=${body.MessageSid || 'unknown'} status=${status || 'unknown'} ` +
-        `errorCode=${body.ErrorCode || 'none'} to=${maskPhone(body.To)}`;
+        `sid=${safeToken(body.MessageSid, SID_RE)} status=${status} ` +
+        `errorCode=${safeToken(body.ErrorCode, ERROR_CODE_RE, 'none')} to=${maskPhone(body.To)}`;
 
     if (FAILED_STATUSES.has(status)) {
         console.error(`❌ WHATSAPP_DELIVERY_FAILED ${summary}`);
@@ -78,4 +125,12 @@ async function whatsappStatusCallback(req, res) {
     return res.status(204).send('');
 }
 
-module.exports = { whatsappStatusCallback, FAILED_STATUSES, signatureUrls };
+module.exports = {
+    whatsappStatusCallback,
+    FAILED_STATUSES,
+    KNOWN_STATUSES,
+    signatureUrls,
+    statusSignatureEnv,
+    safeToken,
+    maskPhone,
+};

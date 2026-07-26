@@ -50,10 +50,18 @@ async function getTemplateConfig(templateType) {
 // template->freeform degradation on a business-initiated send is an INVISIBLE
 // outage: every log line reads as success and nothing arrives.
 //
-// RECEIPT_CONFIRMATION is the only template sent as a reply inside a conversation
-// the guest started. Everything else is business-initiated — and anything not
-// listed here (including templates added later) counts as business-initiated,
-// so the strict classification is the default rather than the opt-in.
+// RECEIPT_CONFIRMATION is the only template with a LIVE caller that replies
+// inside a conversation the guest started (processReward, invoked synchronously
+// from the inbound webhook). Anything not listed here — including templates
+// added later — counts as business-initiated, so the strict classification is
+// the default rather than the opt-in.
+//
+// Deliberately NOT listed, though they would be replies if wired: WELCOME_MESSAGE
+// and POINTS_UPDATE. Both are currently callerless (their senders are imported by
+// the two receivers but never invoked). Classifying a dead template as
+// session-initiated on the strength of its intended use would silently permit an
+// undeliverable freeform send the day someone wires it up; leaving them strict
+// makes that day fail loudly instead. Move them here WITH their caller, not before.
 const SESSION_INITIATED_TEMPLATES = new Set([TEMPLATE_TYPES.RECEIPT_CONFIRMATION]);
 
 // Twilio client seam. `client` is null when credentials are absent, so tests
@@ -95,13 +103,36 @@ class UndeliverableTemplateError extends Error {
 }
 
 function maskPhone(to) {
-    return `${String(to || '').slice(0, 4)}***`;
+    const bare = String(to == null ? '' : to).replace(/^whatsapp:/i, '');
+    if (!/^\+?[0-9]{4,20}$/.test(bare)) return '***';
+    return `${bare.slice(0, 4)}***`;
 }
 
-/** Ask Twilio to report FINAL delivery status, so "accepted" stops reading as "delivered". */
+/**
+ * PII-safe error detail. A Twilio error's `.message` routinely embeds the
+ * recipient number, so only the numeric code / error name is ever logged.
+ */
+function safeErrorDetail(error) {
+    if (!error) return 'unknown';
+    return String(error.code || error.name || 'error');
+}
+
+/**
+ * Ask Twilio to report FINAL delivery status, so "accepted" stops reading as
+ * "delivered". The URL is validated because this param rides on ALL three send
+ * paths (template, degraded freeform, plain freeform) — Twilio rejects a
+ * malformed statusCallback with error 21609, so an unvalidated typo here would
+ * fail the send, its fallback, and the fallback's fallback: a total channel
+ * outage from one bad env var. Invalid → omit the param and keep sending.
+ */
 function statusCallbackParams(env = process.env) {
     const url = String((env && env.TWILIO_STATUS_CALLBACK_URL) || '').trim();
-    return url ? { statusCallback: url } : {};
+    if (!url) return {};
+    if (!/^https:\/\/[^\s]+$/i.test(url)) {
+        console.error(`❌ TWILIO_STATUS_CALLBACK_URL is not a valid https URL — delivery status disabled (sends continue).`);
+        return {};
+    }
+    return { statusCallback: url };
 }
 
 /**
@@ -156,7 +187,10 @@ async function sendWhatsAppMessage(to, message) {
             ...statusCallbackParams()
         });
     } catch (error) {
-        console.error('Error sending WhatsApp message:', error);
+        // Code/name only: a Twilio error's `.message` can embed the recipient
+        // number (e.g. 21211 "The 'To' number whatsapp:+27… is not valid"), so
+        // logging the raw error object leaks PII (same rule as sweep.js:169-171).
+        console.error('Error sending WhatsApp message:', safeErrorDetail(error));
         throw error;
     }
 }
@@ -202,8 +236,11 @@ async function sendWhatsAppTemplate(to, templateType, contentVariables, options 
             console.log(`✅ Template sent: ${templateType} sid=${message.sid}`);
             return message;
         } catch (templateError) {
+            // Keep code AND status: on network/SDK failures `code` is undefined,
+            // and a bare "twilio_error_unknown" is undiagnosable. Never the
+            // message — it can embed the recipient number.
             return await degradeToFreeform(to, whatsappTo, templateType, contentVariables,
-                `twilio_error_${templateError.code || 'unknown'}`);
+                `twilio_error_${safeErrorDetail(templateError)}${templateError.status ? `_http${templateError.status}` : ''}`);
         }
 
     } catch (error) {
@@ -212,7 +249,7 @@ async function sendWhatsAppTemplate(to, templateType, contentVariables, options 
         if (error instanceof UndeliverableTemplateError) {
             throw error;
         }
-        console.error('Error sending WhatsApp template:', error);
+        console.error('Error sending WhatsApp template:', safeErrorDetail(error));
         if (options.fallbackMessage) {
             return await sendWhatsAppMessage(to, options.fallbackMessage);
         }

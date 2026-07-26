@@ -12,7 +12,9 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import crypto from 'node:crypto';
 
-const { whatsappStatusCallback, FAILED_STATUSES, signatureUrls } = require('../whatsappStatusCallback');
+const {
+    whatsappStatusCallback, FAILED_STATUSES, signatureUrls, maskPhone,
+} = require('../whatsappStatusCallback');
 
 const AUTH_TOKEN = 'test_auth_token_0123456789abcdef';
 const CALLBACK_URL = 'https://us-central1-proj.cloudfunctions.net/whatsappStatusCallback';
@@ -54,6 +56,7 @@ afterEach(() => {
     vi.restoreAllMocks();
     delete process.env.TWILIO_STATUS_CALLBACK_URL;
     delete process.env.TWILIO_SIGNATURE_MODE;
+    delete process.env.TWILIO_STATUS_SIGNATURE_MODE;
 });
 
 describe('whatsappStatusCallback', () => {
@@ -114,14 +117,87 @@ describe('whatsappStatusCallback', () => {
         expect(res.statusCode).toBe(403);
     });
 
-    it('still processes an invalid signature under monitor (never dark-out the channel)', async () => {
+    it('DEFAULTS to enforce — an unsigned request is rejected even with TWILIO_SIGNATURE_MODE=monitor', async () => {
+        // This endpoint must not inherit the inbound webhook's dark-out-avoidance
+        // default: it is new, has no legitimate traffic to protect, and its whole
+        // value is a log line an operator alerts on.
         process.env.TWILIO_SIGNATURE_MODE = 'monitor';
+        delete process.env.TWILIO_STATUS_SIGNATURE_MODE;
+        const res = makeRes();
+        await whatsappStatusCallback(
+            makeReq({ body: { MessageSid: 'SM1', MessageStatus: 'delivered' }, signature: null }), res);
+        expect(res.statusCode).toBe(403);
+    });
+
+    it('allows an explicit per-endpoint monitor override', async () => {
+        process.env.TWILIO_STATUS_SIGNATURE_MODE = 'monitor';
         const res = makeRes();
         await whatsappStatusCallback(
             makeReq({ body: { MessageSid: 'SM1', MessageStatus: 'undelivered' }, signature: 'wrong' }), res);
 
         expect(res.statusCode).toBe(204);
         expect(errSpy.mock.calls.map((c) => c.join(' ')).join('\n')).toContain('WHATSAPP_DELIVERY_FAILED');
+    });
+
+    describe('untrusted input cannot forge or break the alert signal', () => {
+        it('a newline in MessageSid cannot inject a second, forged failure line', async () => {
+            // Cloud Run splits stderr on newlines, so an unsanitized sid would emit
+            // an independent log entry byte-indistinguishable from a real failure —
+            // letting an anonymous caller drive the operator's alert.
+            const res = makeRes();
+            const body = {
+                MessageSid: 'SMx\n❌ WHATSAPP_DELIVERY_FAILED sid=SMforged status=undelivered errorCode=63016 to=+278***',
+                MessageStatus: 'delivered',
+            };
+            await whatsappStatusCallback(makeReq({ body }), res);
+
+            const all = [...errSpy.mock.calls, ...logSpy.mock.calls].map((c) => c.join(' ')).join('\n');
+            expect(all).not.toContain('SMforged');
+            expect(all).not.toContain('\n❌');
+            expect(all).toContain('sid=invalid');
+            expect(errSpy.mock.calls.map((c) => c.join(' ')).join('\n')).not.toContain('WHATSAPP_DELIVERY_FAILED');
+        });
+
+        it('an object-valued field cannot throw the handler', async () => {
+            // `{toString:1,valueOf:2}` throws on primitive coercion. Under the enforce
+            // default an unsigned request never reaches the body, but this must still
+            // hold for anyone running the monitor override — a throw here would be a
+            // remotely-triggerable 500 plus a second free channel into the alert stream.
+            process.env.TWILIO_STATUS_SIGNATURE_MODE = 'monitor';
+            const res = makeRes();
+            const body = { MessageSid: { toString: 1, valueOf: 2 }, MessageStatus: { a: 1 }, To: { b: 2 } };
+
+            await expect(
+                whatsappStatusCallback(makeReq({ body, signature: null }), res)
+            ).resolves.toBeDefined();
+            expect(res.statusCode).toBe(204);
+            expect(errSpy.mock.calls.map((c) => c.join(' ')).join('\n')).not.toContain('WHATSAPP_DELIVERY_FAILED');
+        });
+
+        it('an unknown status is not silently treated as a delivery failure', async () => {
+            const res = makeRes();
+            await whatsappStatusCallback(
+                makeReq({ body: { MessageSid: 'SM1', MessageStatus: 'undelivered_but_not_really' } }), res);
+            const errText = errSpy.mock.calls.map((c) => c.join(' ')).join('\n');
+            expect(errText).not.toContain('WHATSAPP_DELIVERY_FAILED');
+        });
+
+        it('a non-numeric ErrorCode is rejected rather than echoed', async () => {
+            const res = makeRes();
+            await whatsappStatusCallback(makeReq({
+                body: { MessageSid: 'SM1', MessageStatus: 'failed', ErrorCode: '63016 <script>x</script>' },
+            }), res);
+            const all = errSpy.mock.calls.map((c) => c.join(' ')).join('\n');
+            expect(all).toContain('errorCode=invalid');
+            expect(all).not.toContain('<script>');
+        });
+
+        it('masks the recipient after stripping the whatsapp: prefix', () => {
+            expect(maskPhone('whatsapp:+27821234567')).toBe('+278***');
+            expect(maskPhone('+27821234567')).toBe('+278***');
+            expect(maskPhone({ evil: true })).toBe('***');
+            expect(maskPhone(undefined)).toBe('***');
+        });
     });
 
     it('offers both the status-callback and inbound webhook URLs as signing candidates', () => {
