@@ -6,6 +6,20 @@
 
 ---
 
+## 2026-07-26 (weekly groom — Q3 recovered from an orphaned scan branch)
+
+Last updated: 2026-07-26 — **D4 MERGED (#192) — the W1 food-cost track (D1–D4) is COMPLETE and fully live** (hosting auto-deploys on merge; `rossChat` was deployed 4 min after the merge — the recurring manual-hosting-deploy warning was stale and both "gaps" were phantom). **New Medium security row:** 3 live credentials sit in plaintext env vars on all 119 functions — rotate + move to `defineSecret`.
+
+**State right now:** **W1 food-cost is DONE — D1 (#167) + D2 (#189) + D3 (#190) + D4 (#192) all merged.** Nothing in flight; zero open PRs; working tree clean at master.
+
+**Hosting is NOT an operator op — it never was.** `.github/workflows/firebase-hosting-merge.yml` deploys `channelId: live` on every push to `master`, and it ran green for #190/#191/#192. Verified empirically 2026-07-26: live matches master byte-for-byte (`v2/store.js` shims gone, `data-processor.js` at 5 console statements, `firebase-service.js` at 75 lines). The recurring "⚠ run `firebase deploy --only hosting`" warning was **stale and is now retired** — do not re-add it. (Probing a *deleted* path proves nothing here: a catch-all rewrite serves `index.html` with **200** for any missing file, so verify a change POSITIVELY against file content.)
+
+**✅ Nothing is un-deployed — D4 is fully live.** `rossChat` was deployed **2026-07-25T19:57:45Z**, 3m53s AFTER the #192 merge commit (19:53:52Z), so D4's `sanitizeText` backport IS in prod and bug-queue F4 is CLOSED. D4's rules were already deployed + probed (non-admin write 401 / read 200). D4's post-soak sweep list is logged in the Bug Triage Queue.
+
+> **Groom recorded 2026-07-26:** this weekly groom reconciled queue card Q3 (`cleanupOldQueuesScheduled`, PR #188, merged 2026-07-24) — it had shipped but the queue row and its matching bug-triage row were never struck. It also recovered a **fourth orphaned scheduled-scan branch** (`claude/sleepy-einstein-ysrcv5`, 2026-07-23, never a PR — same 2026-07-05 "scan isn't done until a PR is open" pattern as the four branches recovered into #168) carrying 1 new Critical + 2 new High dependency findings (root `package-lock.json`, distinct from `functions/`'s already-fixed HIGH-08) plus a re-opened Low and a new Low — folded into the Bug Triage Queue under a new 2026-07-23 OWASP section. Automation queue refilled Q8–Q11. See the current "Last updated" note for the fresh state.
+
+---
+
 ## 2026-07-26 (D4 merge + hosting-automation correction)
 
 Last updated: 2026-07-25 — D2 eval 23/23 LIVE + D4 strip-and-harden BUILT (PR pending): 3 dead files deleted, firebase-service stripped, non-admin root-stockUsage writes closed (deployed + probed), console strip, shims out. **W1 food-cost track COMPLETE pending D4 merge.**
