@@ -34,7 +34,17 @@ Once any run starts on or after `nextDueDate`, that is **permanently true** — 
 - Task `dueDate = nextDueDate + daysOffset*MS_PER_DAY` (`ross-workflow-builder.js:28`). CONFIRMED.
 - Exclusion set is exactly `once` + `paused` — CONFIRMED, no end-date/archive field exists in `functions/`.
 
-## 3. 🔴 The four decisions that block the build
+## 3. ✅ DECIDED 2026-07-26 (operator delegated the call)
+
+**D1 — Landing rule: the LAST occurrence ≤ today.** Option A. The only rule that satisfies the goal, since the selector never reads `upcoming`.
+
+**D4 — UTC-midnight epoch-ms, in and out.** Not a preference; SAST-midnight reads back a day early.
+
+**D2 — Runs are NOT touched. The falsification dissolves with D1.** The review's `onTime: true` scenario depended on v1 landing in the *future* (`now <= 2026-07-29`). Under D1 the new date is always ≤ today, so `ross.js:1678` `now <= nextDueDate` evaluates **false** — a late completion is correctly marked late. Advancing also un-covers the item by construction: the stale run's `startedAt` (2026-06-17) is now *before* the new `nextDueDate` (2026-07-22), so `runCoversCurrentPeriod` is false and the item reaches `overdue`. What remains — `rossCreateRun` returning a stale open run instead of opening one for the new cycle (`ross.js:1523` dedupes on *any open run*, not on period) — is a **pre-existing defect this job neither creates nor worsens**, and writing to run records to paper over it would put compliance data at risk for no gain. Logged as its own bug row.
+
+**D3 — Task `status` resets to `pending` (and `completedAt` to `null`) when a cycle rolls.** Verified safe: repo-wide, live readers of `task.status` are only `rossCompleteTask`'s guard/setter/all-done check (`ross.js:1299`, `:1302`, `:1307`) and a current-state progress count (`:1401`). **It is current-cycle state, not the audit trail — the trail lives in run `responses` and history records, which this job does not touch.** Not resetting is unshippable anyway (D3 above: every task in the new cycle would 404).
+
+## 4. 🔴 (v1's blocking questions, retained for the record)
 
 ### D1 — The landing rule. v1's choice defeats the entire purpose.
 

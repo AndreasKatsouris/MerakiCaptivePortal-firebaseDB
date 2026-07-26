@@ -2751,6 +2751,11 @@ exports.receiveWhatsAppMessageEnhanced = functions.https.onRequest(receiveWhatsA
 const { whatsappStatusCallback } = require('./whatsappStatusCallback');
 exports.whatsappStatusCallback = functions.https.onRequest(whatsappStatusCallback);
 
+// Nightly recurrence advance — rolls frozen nextDueDate forward so workflows
+// stop being permanently "covered" by an old run and can be overdue again.
+// Runs 03:00 SAST, four hours before the proactive sweep. DRY-RUN by default.
+exports.rossRecurrenceAdvance = require('./agent/recurrence').rossRecurrenceAdvance;
+
 // WhatsApp Migration Functions
 exports.checkWhatsAppMigrationStatus = functions.https.onRequest(async (req, res) => {
     cors(req, res, async () => {
