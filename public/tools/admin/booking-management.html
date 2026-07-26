@@ -1155,8 +1155,10 @@
                 console.log('✅ Booking notification sent successfully:', result);
 
             } catch (error) {
-                console.error('❌ Error sending booking notification:', error);
-                throw error; // Re-throw to handle in calling function
+                // Do NOT rethrow: the booking is already saved, and rethrowing left
+                // the modal open behind a "failed to save" error — inviting a
+                // re-submit and a DUPLICATE booking. Notifying is best-effort.
+                console.error('❌ Error sending booking notification (booking WAS saved):', error);
             }
         }
 
@@ -1178,8 +1180,9 @@
                 console.log('✅ Status notification sent successfully:', result);
 
             } catch (error) {
-                console.error('❌ Error sending status notification:', error);
-                throw error; // Re-throw to handle in calling function
+                // Best-effort: the status change is already persisted, so a
+                // notification failure must not read as a save failure.
+                console.error('❌ Error sending status notification (status WAS saved):', error);
             }
         }
 

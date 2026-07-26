@@ -106,6 +106,7 @@ The project's **first AI-inference CF.** `rossChat` is the v1 reactive engine (r
 | Function | Trigger | Auth | Purpose |
 |----------|---------|------|---------|
 | `sendGuestBookingNotification` | HTTP POST (v1) | None | Sends WhatsApp booking confirmation to guest |
+| `whatsappStatusCallback` | HTTP POST | Twilio signature, **enforced by default** (`TWILIO_STATUS_SIGNATURE_MODE`, own knob — does not inherit `TWILIO_SIGNATURE_MODE`) | Receives Twilio delivery-status callbacks; logs terminal failures (`failed`/`undelivered`) at ERROR so accepted-but-never-delivered messages stop being invisible. All body fields are charset/length-whitelisted before logging (the log line is the alert signal, so it is a forgery target). Log-only — no RTDB write. Set `TWILIO_STATUS_CALLBACK_URL` to activate. |
 | `sendGuestStatusNotification` | HTTP POST (v1) | None | Sends WhatsApp booking status update to guest |
 
 **Input (both):** Booking object with `{ id, phoneNumber, guestName, date, time, location, section, numberOfGuests, status, specialRequests }`

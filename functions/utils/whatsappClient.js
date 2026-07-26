@@ -43,6 +43,127 @@ async function getTemplateConfig(templateType) {
     return (_templateConfigCache && _templateConfigCache[templateType]) || null;
 }
 
+// --- Business-initiated send safety -----------------------------------------
+// WhatsApp delivers a FREEFORM message only inside the 24-hour customer-service
+// window a guest opens by messaging us. Outside it Twilio accepts the call and
+// returns a sid, then Meta silently drops the message (error 63016). So a
+// template->freeform degradation on a business-initiated send is an INVISIBLE
+// outage: every log line reads as success and nothing arrives.
+//
+// RECEIPT_CONFIRMATION is the only template with a LIVE caller that replies
+// inside a conversation the guest started (processReward, invoked synchronously
+// from the inbound webhook). Anything not listed here — including templates
+// added later — counts as business-initiated, so the strict classification is
+// the default rather than the opt-in.
+//
+// Deliberately NOT listed, though they would be replies if wired: WELCOME_MESSAGE
+// and POINTS_UPDATE. Both are currently callerless (their senders are imported by
+// the two receivers but never invoked). Classifying a dead template as
+// session-initiated on the strength of its intended use would silently permit an
+// undeliverable freeform send the day someone wires it up; leaving them strict
+// makes that day fail loudly instead. Move them here WITH their caller, not before.
+const SESSION_INITIATED_TEMPLATES = new Set([TEMPLATE_TYPES.RECEIPT_CONFIRMATION]);
+
+// Twilio client seam. `client` is null when credentials are absent, so tests
+// inject a fake rather than constructing a real one (same shape as the sweep's
+// `__setSenderForTests` in agent/sweep/channels/whatsapp.js).
+let _clientOverride = null;
+function getClient() {
+    return _clientOverride || client;
+}
+/** Test-only: inject a fake Twilio client (null restores the real one). */
+function __setClientForTests(fake) {
+    _clientOverride = fake;
+}
+
+const FALLBACK_MODES = { MONITOR: 'monitor', ENFORCE: 'enforce' };
+
+/**
+ * Refusing to send is itself a change to a live guest-facing channel, so it ships
+ * staged the same way the Twilio signature check did: default `monitor` (log
+ * loudly, still send) so an unset env can never dark-out the channel; flip to
+ * `enforce` once the logs show which sends are actually degrading.
+ */
+function getFallbackMode(env = process.env) {
+    const raw = String((env && env.WHATSAPP_TEMPLATE_FALLBACK_MODE) || '').trim().toLowerCase();
+    return raw === FALLBACK_MODES.ENFORCE ? FALLBACK_MODES.ENFORCE : FALLBACK_MODES.MONITOR;
+}
+
+function isBusinessInitiated(templateType) {
+    return !SESSION_INITIATED_TEMPLATES.has(templateType);
+}
+
+class UndeliverableTemplateError extends Error {
+    constructor(templateType, reason) {
+        super(`Refusing freeform fallback for business-initiated template "${templateType}" (${reason}) — it would be undeliverable outside the 24h window.`);
+        this.name = 'UndeliverableTemplateError';
+        this.templateType = templateType;
+        this.reason = reason;
+    }
+}
+
+function maskPhone(to) {
+    const bare = String(to == null ? '' : to).replace(/^whatsapp:/i, '');
+    if (!/^\+?[0-9]{4,20}$/.test(bare)) return '***';
+    return `${bare.slice(0, 4)}***`;
+}
+
+/**
+ * PII-safe error detail. A Twilio error's `.message` routinely embeds the
+ * recipient number, so only the numeric code / error name is ever logged.
+ */
+function safeErrorDetail(error) {
+    if (!error) return 'unknown';
+    return String(error.code || error.name || 'error');
+}
+
+/**
+ * Ask Twilio to report FINAL delivery status, so "accepted" stops reading as
+ * "delivered". The URL is validated because this param rides on ALL three send
+ * paths (template, degraded freeform, plain freeform) — Twilio rejects a
+ * malformed statusCallback with error 21609, so an unvalidated typo here would
+ * fail the send, its fallback, and the fallback's fallback: a total channel
+ * outage from one bad env var. Invalid → omit the param and keep sending.
+ */
+function statusCallbackParams(env = process.env) {
+    const url = String((env && env.TWILIO_STATUS_CALLBACK_URL) || '').trim();
+    if (!url) return {};
+    if (!/^https:\/\/[^\s]+$/i.test(url)) {
+        console.error(`❌ TWILIO_STATUS_CALLBACK_URL is not a valid https URL — delivery status disabled (sends continue).`);
+        return {};
+    }
+    return { statusCallback: url };
+}
+
+/**
+ * Single funnel for every template->freeform degradation. Logs at ERROR for
+ * business-initiated sends (the alertable signal that a message is about to be
+ * accepted-then-dropped) and, under enforce mode, refuses instead of sending.
+ */
+async function degradeToFreeform(to, whatsappTo, templateType, contentVariables, reason) {
+    const businessInitiated = isBusinessInitiated(templateType);
+    const mode = getFallbackMode();
+    const summary = `template=${templateType} reason=${reason} businessInitiated=${businessInitiated} mode=${mode} to=${maskPhone(to)}`;
+
+    if (businessInitiated) {
+        console.error(`❌ WHATSAPP_TEMPLATE_DEGRADED ${summary}`);
+    } else {
+        console.warn(`⚠️ WHATSAPP_TEMPLATE_DEGRADED ${summary}`);
+    }
+
+    if (businessInitiated && mode === FALLBACK_MODES.ENFORCE) {
+        throw new UndeliverableTemplateError(templateType, reason);
+    }
+
+    const fallbackMessage = buildFallbackMessage(templateType, Object.values(contentVariables));
+    return await getClient().messages.create({
+        body: fallbackMessage,
+        from: `whatsapp:${twilioPhone}`,
+        to: whatsappTo,
+        ...statusCallbackParams()
+    });
+}
+
 /**
  * Send WhatsApp message using Twilio
  * @param {string} to - Recipient phone number (E.164 format without whatsapp: prefix)
@@ -57,14 +178,19 @@ async function sendWhatsAppMessage(to, message) {
         // Ensure proper WhatsApp format
         const whatsappTo = to.startsWith('whatsapp:') ? to : `whatsapp:${to}`;
         
-        console.log('Sending WhatsApp message to:', whatsappTo);
-        await client.messages.create({
+        // Masked: full numbers are PII (bug-queue row "WhatsApp client PII log scrub").
+        console.log('Sending WhatsApp message to:', maskPhone(to));
+        await getClient().messages.create({
             body: message,
             from: `whatsapp:${twilioPhone}`,
-            to: whatsappTo
+            to: whatsappTo,
+            ...statusCallbackParams()
         });
     } catch (error) {
-        console.error('Error sending WhatsApp message:', error);
+        // Code/name only: a Twilio error's `.message` can embed the recipient
+        // number (e.g. 21211 "The 'To' number whatsapp:+27… is not valid"), so
+        // logging the raw error object leaks PII (same rule as sweep.js:169-171).
+        console.error('Error sending WhatsApp message:', safeErrorDetail(error));
         throw error;
     }
 }
@@ -88,49 +214,42 @@ async function sendWhatsAppTemplate(to, templateType, contentVariables, options 
         const config = await getTemplateConfig(templateType);
 
         if (!config || !config.enabled) {
-            console.log(`📋 FALLBACK: ${templateType} ${config ? 'disabled' : 'not configured in RTDB'}`);
-            const fallbackMessage = buildFallbackMessage(templateType, Object.values(contentVariables));
-            return await client.messages.create({
-                body: fallbackMessage,
-                from: `whatsapp:${twilioPhone}`,
-                to: whatsappTo
-            });
+            return await degradeToFreeform(to, whatsappTo, templateType, contentVariables,
+                config ? 'template_disabled' : 'not_configured_in_rtdb');
         }
 
         if (!config.contentSid || !/^HX[a-f0-9]{32}$/.test(config.contentSid)) {
-            console.log(`📋 FALLBACK: ${templateType} contentSid not set`);
-            const fallbackMessage = buildFallbackMessage(templateType, Object.values(contentVariables));
-            return await client.messages.create({
-                body: fallbackMessage,
-                from: `whatsapp:${twilioPhone}`,
-                to: whatsappTo
-            });
+            return await degradeToFreeform(to, whatsappTo, templateType, contentVariables, 'content_sid_missing');
         }
 
         try {
             // Mask the recipient — full numbers are PII and this line fires on every
             // template send, including the daily unattended sweep (PR #158 review).
-            console.log(`📋 Sending Twilio template ${templateType} (${config.contentSid}) to ${String(to).slice(0, 4)}***`);
-            const message = await client.messages.create({
+            console.log(`📋 Sending Twilio template ${templateType} (${config.contentSid}) to ${maskPhone(to)}`);
+            const message = await getClient().messages.create({
                 contentSid: config.contentSid,
                 contentVariables: JSON.stringify(contentVariables),
                 from: `whatsapp:${twilioPhone}`,
-                to: whatsappTo
+                to: whatsappTo,
+                ...statusCallbackParams()
             });
             console.log(`✅ Template sent: ${templateType} sid=${message.sid}`);
             return message;
         } catch (templateError) {
-            console.error(`❌ FALLBACK USED: ${templateType} — Twilio error code=${templateError.code} msg="${templateError.message}"`);
-            const fallbackMessage = buildFallbackMessage(templateType, Object.values(contentVariables));
-            return await client.messages.create({
-                body: fallbackMessage,
-                from: `whatsapp:${twilioPhone}`,
-                to: whatsappTo
-            });
+            // Keep code AND status: on network/SDK failures `code` is undefined,
+            // and a bare "twilio_error_unknown" is undiagnosable. Never the
+            // message — it can embed the recipient number.
+            return await degradeToFreeform(to, whatsappTo, templateType, contentVariables,
+                `twilio_error_${safeErrorDetail(templateError)}${templateError.status ? `_http${templateError.status}` : ''}`);
         }
 
     } catch (error) {
-        console.error('Error sending WhatsApp template:', error);
+        // An enforce-mode refusal must NOT be rescued here: options.fallbackMessage
+        // would send the very freeform message we just refused as undeliverable.
+        if (error instanceof UndeliverableTemplateError) {
+            throw error;
+        }
+        console.error('Error sending WhatsApp template:', safeErrorDetail(error));
         if (options.fallbackMessage) {
             return await sendWhatsAppMessage(to, options.fallbackMessage);
         }
@@ -340,5 +459,12 @@ module.exports = {
     sendAdminNewBookingNotificationTemplate,
     sendRewardNotificationTemplate,
     sendPointsUpdateTemplate,
-    getTemplateInfo
+    getTemplateInfo,
+    // Business-initiated send safety (exported for tests + callers that need the rule)
+    FALLBACK_MODES,
+    getFallbackMode,
+    isBusinessInitiated,
+    statusCallbackParams,
+    UndeliverableTemplateError,
+    __setClientForTests
 };
