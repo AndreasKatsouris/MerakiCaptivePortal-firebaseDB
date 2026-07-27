@@ -317,26 +317,8 @@
       ".write": "auth != null && (auth.token.admin === true || root.child('admin-claims').child(auth.uid).exists())",
       ".indexOn": ["status", "date", "location", "createdAt", "phoneNumber"],
       "$bookingId": {
-        ".read": "auth != null && (
-          auth.token.admin === true || 
-          root.child('admin-claims').child(auth.uid).exists() ||
-          (data.child('location').exists() && (
-            root.child('locations').child(data.child('location').val()).child('ownerId').val() === auth.uid ||
-            root.child('userLocations').child(auth.uid).child(data.child('location').val()).exists()
-          ))
-        )",
-        ".write": "auth != null && (
-          auth.token.admin === true || 
-          root.child('admin-claims').child(auth.uid).exists() ||
-          (newData.child('location').exists() && (
-            root.child('locations').child(newData.child('location').val()).child('ownerId').val() === auth.uid ||
-            root.child('userLocations').child(auth.uid).child(newData.child('location').val()).exists()
-          )) ||
-          (data.child('location').exists() && (
-            root.child('locations').child(data.child('location').val()).child('ownerId').val() === auth.uid ||
-            root.child('userLocations').child(auth.uid).child(data.child('location').val()).exists()
-          ))
-        )",
+        ".read": "auth != null && (auth.token.admin === true || root.child('admin-claims').child(auth.uid).exists() || (data.child('location').exists() && (root.child('locations').child(data.child('location').val()).child('ownerId').val() === auth.uid || root.child('userLocations').child(auth.uid).child(data.child('location').val()).exists())))",
+        ".write": "auth != null && (auth.token.admin === true || root.child('admin-claims').child(auth.uid).exists() || (newData.child('location').exists() && (root.child('locations').child(newData.child('location').val()).child('ownerId').val() === auth.uid || root.child('userLocations').child(auth.uid).child(newData.child('location').val()).exists())) || (data.child('location').exists() && (root.child('locations').child(data.child('location').val()).child('ownerId').val() === auth.uid || root.child('userLocations').child(auth.uid).child(data.child('location').val()).exists())))",
         ".validate": "newData.hasChildren(['guestName', 'phoneNumber', 'date', 'time', 'location', 'numberOfGuests', 'status', 'createdAt'])"
       }
     },
