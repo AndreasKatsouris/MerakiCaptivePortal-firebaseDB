@@ -6,6 +6,14 @@
 
 ---
 
+## 2026-07-26 (four PRs merged — superseded 2026-07-27 for carrying a corrected-elsewhere W2 diagnosis)
+
+Last updated: 2026-07-26 — Four PRs merged (#192/#193/#194/#195). **W1 food-cost D1–D4 is complete and live.** A W2 trace found the nudge rail healthy but **silent by construction** (`nextDueDate` unset) and turned up **two live guest-facing WhatsApp failures** (booking confirmations + queue "Table is Ready" going out as freeform and silently dropped) — observability shipped in #194, but both need Meta template approval to actually fix. Groom recovered a 4th orphaned scan branch (1 Critical + 2 High on root `package-lock.json`) and refilled the queue to Q4–Q11.
+
+> **Why superseded:** this note's "`nextDueDate` unset" claim was the first, wrong W2 reading — it inspected the workflow root, while the digest reads per-location `…/locations/{loc}/nextDueDate`. The Bug Triage Queue row was corrected the same day; the header note was not, so it contradicted the file it summarized for a day. Real cause: a **frozen** `nextDueDate`, fixed in code by #196.
+
+---
+
 ## 2026-07-26 (weekly groom — Q3 recovered from an orphaned scan branch)
 
 Last updated: 2026-07-26 — **D4 MERGED (#192) — the W1 food-cost track (D1–D4) is COMPLETE and fully live** (hosting auto-deploys on merge; `rossChat` was deployed 4 min after the merge — the recurring manual-hosting-deploy warning was stale and both "gaps" were phantom). **New Medium security row:** 3 live credentials sit in plaintext env vars on all 119 functions — rotate + move to `defineSecret`.
