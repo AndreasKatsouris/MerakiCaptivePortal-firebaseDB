@@ -84,6 +84,10 @@ export class SalesDataService {
             await set(salesDataRef, salesDataRecord);
 
             // Update index
+            // ORDER IS LOAD-BEARING: the record set() above must land BEFORE this.
+            // salesDataIndex/byLocation/$loc/$id .write authorises against
+            // root.child('salesData').child($id).child('userId'), so writing the index
+            // first would be denied — the record it checks would not exist yet.
             await this.updateSalesDataIndex(salesDataId, locationId, this.userId);
 
             return {
@@ -215,12 +219,21 @@ export class SalesDataService {
 
             if (snapshot.exists()) {
                 const data = snapshot.val();
-                // Atomic multi-path delete
+                // Atomic multi-path delete.
+                // locationId is guarded because an unguarded interpolation yields
+                // `byLocation/undefined/{id}`, which the index .write rule denies — and
+                // since this update is ATOMIC, one rejected path fails the WHOLE delete,
+                // leaving the owner unable to delete their own record.
+                // byUser is keyed on the RECORD's owner, not the deleter: an admin
+                // deleting someone else's record would otherwise null a path under the
+                // admin's own bucket and orphan the owner's index entry.
                 const updates = {
                     [`salesData/${salesDataId}`]: null,
-                    [`salesDataIndex/byLocation/${data.locationId}/${salesDataId}`]: null,
-                    [`salesDataIndex/byUser/${this.userId}/${salesDataId}`]: null
+                    [`salesDataIndex/byUser/${data.userId || this.userId}/${salesDataId}`]: null
                 };
+                if (data.locationId) {
+                    updates[`salesDataIndex/byLocation/${data.locationId}/${salesDataId}`] = null;
+                }
                 await update(ref(rtdb), updates);
             } else {
                 await remove(dataRef);
@@ -415,9 +428,11 @@ export class SalesDataService {
             if (snapshot.exists()) {
                 const forecast = snapshot.val();
                 // Atomic multi-path delete
+                // byUser is keyed on the RECORD's owner, not the deleter — see the
+                // matching note in deleteHistoricalData().
                 const updates = {
                     [`forecasts/${forecastId}`]: null,
-                    [`forecastIndex/byUser/${this.userId}/${forecastId}`]: null
+                    [`forecastIndex/byUser/${forecast.userId || this.userId}/${forecastId}`]: null
                 };
                 if (forecast.locationId) {
                     updates[`forecastIndex/byLocation/${forecast.locationId}/${forecastId}`] = null;
@@ -502,6 +517,8 @@ export class SalesDataService {
             await set(forecastRef, forecastRecord);
 
             // Update index
+            // ORDER IS LOAD-BEARING — see the note in saveHistoricalData(); the index
+            // .write rule authorises against the forecast record's userId.
             await this.updateForecastIndex(forecastId, locationId);
 
             console.log('[SalesDataService] Saved forecast:', forecastId);
@@ -625,9 +642,13 @@ export class SalesDataService {
                 [`forecasts/${forecastId}/updatedAt`]: Date.now()
             };
 
-            // Also update index
+            // Also update index — guarded, because an unguarded interpolation yields
+            // `byLocation/undefined/...`, which the index .write rule denies, and this
+            // update is ATOMIC: one rejected path would fail the whole archive.
             const forecast = await this.getForecast(forecastId);
-            updates[`forecastIndex/byLocation/${forecast.locationId}/${forecastId}/status`] = 'archived';
+            if (forecast?.locationId) {
+                updates[`forecastIndex/byLocation/${forecast.locationId}/${forecastId}/status`] = 'archived';
+            }
 
             await update(ref(rtdb), updates);
 
@@ -852,9 +873,17 @@ export class SalesDataService {
 
             const existingForecast = snapshot.val();
 
-            // Prepare update with preserved creation data
+            // Prepare update with preserved creation data.
+            // userId/locationId are load-bearing and MUST survive: this is a full
+            // set() replace, and `updatedData` from the caller carries neither. Omitting
+            // them strips ownership off the record, after which the owner's own .read/
+            // .write arms (data.child('userId').val() === auth.uid) deny them and
+            // forecasts/.validate rejects every later write. The `|| this.userId`
+            // fallback repairs records already stripped by this path before the fix.
             const updatePayload = {
                 ...updatedData,
+                userId: existingForecast.userId || this.userId,
+                locationId: updatedData.locationId || existingForecast.locationId,
                 metadata: {
                     ...existingForecast.metadata,
                     ...updatedData.metadata,
