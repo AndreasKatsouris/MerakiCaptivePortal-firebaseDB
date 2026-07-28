@@ -34,7 +34,7 @@ Purchase Orders decide what to buy. They share data by explicit copy, never by c
 | L2 | **Lifecycle is `draft → sent`.** Sending freezes the PO; sent POs *are* the archive — read-only history, no separate archived state. No receiving/GRV, no invoice matching. (A transient `sending` status exists for crash-safety only — §7.2.) | Smallest genuinely-useful scope. The history is what unlocks duplicate-to-reorder, which is the actual weekly job. GRV roughly doubles the build and needs someone at the back door to use it. |
 | L3 | **ROSS sends the email server-side via SendGrid.** From a verified domain, `Reply-To` the restaurant. | Fully automated, gives a real `sentAt` record, and later becomes an agent-confirmable action. Cost: an SPF/DKIM operator prerequisite (§7 R2). |
 | L4 | **Destination now (`/ross.html?tab=orders`), workflow step type later.** | Ships value early and lands the workflow hook on a surface that already works. The step type gets its own spec — explicitly out of scope here (§6). |
-| L5 | **Storage is location-scoped**, not uid-scoped. | The supplier book belongs to the restaurant, not to one person's login. Directly avoids re-running the #199 read/write asymmetry on a new resource (§3 G6). |
+| L5 | **Storage is location-scoped**, not uid-scoped — under a new top-level `purchasing/{locId}` node, **not** nested inside `locations/{locId}`. | The supplier book belongs to the restaurant, not to one person's login. Avoids re-running the #199 read/write asymmetry (§3 G6). The top-level placement is forced: `locations/$locationId` cascades a world-readable `.read` and an owner `.write` into every descendant (§3 G14), which would make CF-mediated writes unenforceable and leak supplier data cross-tenant. |
 | L6 | **Document format v1 = styled HTML email body + CSV attachment. No PDF.** | No PDF library exists in the repo (§3 G5); adding one is a new dependency and a cold-start cost. `render.js` is seamed so `pdfkit` can be added later if suppliers ask for it. |
 | L7 | **Entitlement `features.purchaseOrders`, ON for both Free and All-in at launch.** | Having the entitlement in place means moving it behind All-in later is a config change, not a migration. |
 
@@ -60,6 +60,8 @@ CLAUDE.md Step 0 write-path rule.
 | G11 | `foodCostOverview` already reads `locations/{loc}/stockUsage` with `orderByKey().limitToLast(30)` — up to 30 records are in hand on every call. | `functions/food-cost-overview.js:130` |
 | G12 | `functions/` is CommonJS (no `"type":"module"`). An ESM `export` passes vitest and `SyntaxError`s at deployed `require()` time. | 2026-06-22 LESSON; `functions/package.json` |
 | G13 | The RTDB emulator needs Java, which is not on PATH in this environment. Rules verification is by REST probe. | 2026-07-21 SELF_OPT; `scripts/verify-rules-foodcost-mappings.js` |
+| G14 | **`locations/$locationId` grants both `.read: "auth != null"` and a `.write` to the location owner, and both cascade into every descendant.** Any node nested under `locations/{locId}/` is therefore (a) readable by every authenticated user in the system and (b) client-writable by the location owner — a child `".write": false` would be a dead rule. This is why the PO nodes are **top-level `purchasing/{locId}`**, not nested (§5). | `database.rules.json:43-52`; 2026-05-31 + 2026-07-25 rules-cascade LESSONS |
+| G15 | `stockFlagAudit/{locationId}` is the existing precedent for a top-level, location-keyed node with access expressed explicitly (`userLocations` OR `locations/…/ownerId`) rather than inherited. | `database.rules.json:251-260` |
 
 ---
 
@@ -131,24 +133,37 @@ All four are `onRequest` + CORS + `verifyAuthToken`, matching `foodCostOverview`
 
 ### 4.5 Writes are CF-mediated
 
-RTDB `.write` on all three new nodes denies clients outright, matching the `ross/agent*`
-posture shipped in #138. Given #125, #144 and #199 all landed on the tenant-writable-node
-class, a client-writable PO node is not worth the review cost.
+`".write": false` on `purchasing/$locId` denies non-admin clients outright, matching the
+`ross/agent*` posture shipped in #138. Given #125, #144 and #199 all landed on the
+tenant-writable-node class, a client-writable PO node is not worth the review cost.
 
-**Note the cascade caveat (2026-07-25 LESSON):** the global root admin `.write` at
-`database.rules.json:3` cascades into every node below it. The honest claim for these
-rules is therefore *"the non-admin arm is closed"* — `.validate` is kept to schema-constrain
-the residual admin arm. The verification probe must be explicitly **non-admin**; an admin
-probe would false-pass through the very cascade being relied on.
+**This is only expressible because the node is top-level.** Nested under
+`locations/{locId}`, the parent's owner-`.write` grant would cascade in and a child
+`".write": false` would be a dead rule — the trap named in the 2026-06-02 lesson. See G14
+and §5.1.
+
+**Cascade caveat (2026-07-25 LESSON):** the global root admin `.write` at
+`database.rules.json:3` still cascades into every node below it. The honest claim is
+therefore *"the non-admin arm is closed"* — `.validate` is kept to schema-constrain the
+residual admin arm, and the verification probe must be explicitly **non-admin**, since an
+admin probe would false-pass through the very cascade being relied on.
 
 ---
 
 ## 5. Data model
 
-Three new location-scoped nodes plus one counter.
+**One new top-level node, `purchasing`, keyed by location.** Not nested under
+`locations/{locId}` — see G14: that parent cascades a world-readable `.read` and an owner
+`.write` into every descendant, which would both leak supplier data cross-tenant and make
+§4.5's CF-mediated-writes rule unenforceable. `stockFlagAudit/{locationId}` (G15) is the
+in-repo precedent for this shape.
+
+A single top-level node also keeps the whole feature to **one rules block** with `$locId`
+scoping expressed once, and means D1 never edits the `locations` block — which is what
+takes most of the R1 collision risk off the table.
 
 ```
-locations/{locId}/suppliers/{supplierId}
+purchasing/{locId}/suppliers/{supplierId}
   name              string, required, 1..120
   email             string, required for send; RFC-shape validated, <=200
   phone             string?, normalized SA (reuse existing normalizer)
@@ -161,7 +176,7 @@ locations/{locId}/suppliers/{supplierId}
   active            boolean
   createdAt, createdBy, updatedAt
 
-locations/{locId}/supplierCatalog/{supplierId}/{productId}
+purchasing/{locId}/catalog/{supplierId}/{productId}
   description       string, required, <=200
   unit              string, required, <=20      # kg, ea, case
   packSize          string?, <=60               # "12 x 500ml"
@@ -170,7 +185,7 @@ locations/{locId}/supplierCatalog/{supplierId}/{productId}
   lastPriceAt       number?                     # epoch ms
   active            boolean
 
-locations/{locId}/purchaseOrders/{poId}
+purchasing/{locId}/orders/{poId}
   poNumber          string                      # "PO-0007", per-location
   status            'draft' | 'sending' | 'sent'
   supplierId        string
@@ -187,15 +202,40 @@ locations/{locId}/purchaseOrders/{poId}
   sendMessageId?    string                      # SendGrid id -> reconcilable later
   source            'manual' | 'foodcost:{recordId}' | 'duplicate:{poId}'
 
-locations/{locId}/counters/purchaseOrder        # integer, transaction-allocated
+purchasing/{locId}/counters/purchaseOrder       # integer, transaction-allocated
 ```
+
+### 5.1 The rules block
+
+```jsonc
+"purchasing": {
+  "$locId": {
+    ".read": "auth != null && (auth.token.admin === true || root.child('userLocations').child(auth.uid).child($locId).exists() || root.child('locations').child($locId).child('ownerId').val() === auth.uid)",
+    ".write": false,
+    // .validate children schema-constrain the residual admin arm — see below
+  }
+}
+```
+
+Two honesty requirements, both from the 2026-07-25 cascade lesson:
+
+- **`".write": false` closes the NON-ADMIN arm only.** The global root admin `.write` at
+  `database.rules.json:3` cascades in and cannot be revoked from below. Cloud Functions
+  use the Admin SDK and bypass rules entirely, so CF writes are unaffected. `.validate`
+  is therefore **kept**, to schema-constrain the residual admin arm.
+- **The verification probe must be explicitly NON-admin.** An admin probe would return
+  200 through that very cascade and read as a false pass.
+
+The `.read` expression is copied from `stockFlagAudit/$locationId` (G15) — the
+`userLocations` OR `ownerId` pair matters: users whose `userLocations` was never populated
+would otherwise lose access to their own data (the PR #96 automated-review must-fix).
 
 Four choices worth naming:
 
 - **Supplier fields are snapshotted onto the PO at send time.** Rename a supplier next
   year and last March's PO still shows what was actually sent. A sent PO is a record of a
   communication, not a live view of current data.
-- **The catalogue path is nested** (`supplierCatalog/{supplierId}/{productId}`) rather
+- **The catalogue path is nested** (`catalog/{supplierId}/{productId}`) rather
   than a flat node with a `supplierId` field. The only access pattern is "give me one
   supplier's items", so this is a direct path read — no query, no composite index, no
   unbounded fan-out.
@@ -205,7 +245,7 @@ Four choices worth naming:
 - **`source` carries the record id**, not just `'foodcost'`, so a sent PO can always
   answer "which stock count was this built from?"
 
-### 5.1 Input caps
+### 5.2 Input caps
 
 Mirroring D2's P5 lesson (tenant-writable dimensions are a self-service DoS vector):
 max 200 lines per PO, max 500 suppliers per location, max 2,000 catalogue products per
@@ -252,7 +292,7 @@ Not send-then-stamp. The state machine is `draft → sending → sent`:
 
 1. **Claim.** An RTDB transaction moves `draft → sending`, **aborting if already claimed**.
    Two concurrent sends cannot both proceed.
-2. **Allocate** `poNumber` by transaction on `locations/{locId}/counters/purchaseOrder`.
+2. **Allocate** `poNumber` by transaction on `purchasing/{locId}/counters/purchaseOrder`.
    Per-location, gap-tolerant, **never** derived from a count of existing POs.
 3. **Render** HTML + CSV from the frozen snapshot (pure `render.js`).
 4. **Send** via SendGrid.
@@ -366,7 +406,8 @@ history has needed at least one preview-driven fix round that the automated revi
 
 | # | Risk | Mitigation |
 |---|------|-----------|
-| R1 | **`database.rules.json` collision with the concurrent security session.** CLAUDE.md marks it single-owner-at-a-time. | Decide before D1 starts: serialize the file, or land D1's rules block as its own PR after the security work merges. `functions/index.js` is the same class. |
+| R1 | **`database.rules.json` collision with the concurrent security session.** CLAUDE.md marks it single-owner-at-a-time. **Downgraded by the G14 fix:** D1 now *appends one new top-level `purchasing` block* and edits no existing block, so a merge conflict is textual (adjacent lines) rather than semantic. | Still coordinate — but the resolution is a rebase, not a redesign. `functions/index.js` is the same class and takes one `exports.` line per CF. |
+| R1b | **The G14 finding suggests a live issue outside this feature's scope:** everything nested under `locations/{locId}` — including `stockUsage`, which `foodCostOverview` reads — inherits `".read": "auth != null"`, i.e. is readable by any authenticated user. | **Not this feature's to fix**, and it overlaps the concurrent security session's territory. Log to the Bug Triage Queue with the G14 evidence rather than widening this build. |
 | R2 | **SPF/DKIM on the sending domain is an external long-pole** and gates D3 going live. | Start it now if D3 matters — same reasoning that made the WhatsApp template submission an early task in W2. |
 | R3 | **Supplier emails are hand-entered.** Nothing in the CSV can derive them (G1). Expect this to be the soak's friction point. | Seeded suppliers land in an explicit `needs-email` state — exportable immediately, emailable once filled. Make the state visible, not a silent failure at send time. |
 | R4 | Adding a fourth ROSS tab cuts against the 4-item sidebar that Phase 5 PR 5 deliberately shrank. | Accepted under L4. Revisit when the workflow step type lands and ordering can also be reached from a run. |
