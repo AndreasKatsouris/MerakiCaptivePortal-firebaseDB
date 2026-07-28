@@ -6,6 +6,14 @@
 
 ---
 
+## 2026-07-27 (W2 freeze cleared in prod — the send itself was still unobserved)
+
+Last updated: 2026-07-27 — **W2's six-week freeze is CLEARED IN PROD.** `rossRecurrenceAdvance` deployed in `apply` mode and advanced both founder workflows into `overdue`/`today`; an idempotent re-run (`advanced:0, skipped:2`) proved the writes stuck. **Not yet observed: the 07:00 SAST sweep actually sending** — verify tomorrow's log shows a send, not `silent`. _Prior state:_ **W2's silence was FIXED IN CODE (#196) and waiting on one operator deploy, not on more building.** Since the last note: #196 (nightly recurrence advance), #198, #199 (`rossDeleteWorkflow` owner resolution — the "ghost" workflows), #200, #201 (rules strict-JSON, queue card Q4). **W1 food-cost D1–D4 is complete and live.** The earlier W2 trace found the nudge rail healthy but **silent by construction**; its "`nextDueDate` unset" reading was **WRONG and is superseded** — it read the workflow root, while the digest reads per-location `…/locations/{loc}/nextDueDate`. The real cause is a **frozen** `nextDueDate` that never advances after a run, so `runCoversCurrentPeriod` stays true forever (full corrected diagnosis in the Bug Triage Queue). The same trace also turned up **two live guest-facing WhatsApp failures** (booking confirmations + queue "Table is Ready" going out as freeform and silently dropped) — observability shipped in #194, but both need Meta template approval to actually fix. Groom recovered a 4th orphaned scan branch (1 Critical + 2 High on root `package-lock.json`) and refilled the queue to Q4–Q11.
+
+> **Outcome:** the verification this note asked for came back POSITIVE on 2026-07-28 — the sweep logged `sent:1` and delivered `ross_daily_digest`. This note never reached master under its own PR; it was landed retroactively alongside that confirmation.
+
+---
+
 ## 2026-07-26 (four PRs merged — superseded 2026-07-27 for carrying a corrected-elsewhere W2 diagnosis)
 
 Last updated: 2026-07-26 — Four PRs merged (#192/#193/#194/#195). **W1 food-cost D1–D4 is complete and live.** A W2 trace found the nudge rail healthy but **silent by construction** (`nextDueDate` unset) and turned up **two live guest-facing WhatsApp failures** (booking confirmations + queue "Table is Ready" going out as freeform and silently dropped) — observability shipped in #194, but both need Meta template approval to actually fix. Groom recovered a 4th orphaned scan branch (1 Critical + 2 High on root `package-lock.json`) and refilled the queue to Q4–Q11.
