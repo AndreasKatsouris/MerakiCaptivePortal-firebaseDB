@@ -517,6 +517,38 @@
   ],
   "bugs": [
     {
+      "title": "receipts root .write is \"auth != null\" with NO child rules at all — any authenticated account can PUT /receipts.json and REPLACE EVERY TENANT'S RECEIPTS in one request.",
+      "severity": "critical",
+      "discoveredAt": "2026-07-28",
+      "discoveredOn": "sales/forecast design review",
+      "blockingSprint": "False",
+      "notes": "database.rules.json:134. This is strictly worse than the salesData/forecasts cascade fixed on 2026-07-28, because there is not even a dead child rule underneath to fall back to — the root grant is the *only* rule governing the node. Whole-node destruction, not per-record tampering. Not folded into the sales/forecast PR deliberately: the rewards/receipts/queue census returns 28 client files, and with no child rules there is nothing to preserve legitimate writes once the root grant is removed — tightening it without routing every writer first would break all client receipt writes (the #125 atomic-update class). Needs: full writer census by node name (incl. inline <script> in HTML) → child ownership rules → then lock the root. Receipts records carry guestPhoneNumber/totalAmount, so a scoping field exists, unlike rewards. Found 2026-07-28 by the security review of the sales/forecast design."
+    },
+    {
+      "title": "Same root-grant cascade shape on rewards and queue — the class, not the instance.",
+      "severity": "high",
+      "discoveredAt": "2026-07-28",
+      "discoveredOn": "sales/forecast design review",
+      "blockingSprint": "False",
+      "notes": "rewards (database.rules.json:77) root .write: \"auth != null\" makes its per-$rewardId ownership rule at :80 dead code, exactly as it did for salesData; and .validate does not run on delete, so even a correct validate would not gate reward deletion (independently flagged by the 2026-07-28 scheduled scan). queue (:365, :369, :375, :381) likewise. rewards has an ordering constraint: tightening it would re-break the receipt-driven reward creation flow just repaired in #202, so its client writers must be routed through a CF first. Logged per the 2026-07-21 \"CLASS not one bug\" heuristic — the salesData fix closed 4 of 7 nodes in this family."
+    },
+    {
+      "title": "userLocations/$uid is self-writable with no .validate — any user can assert membership of any location, and four other .write rules trust that assertion.",
+      "severity": "high",
+      "discoveredAt": "2026-07-28",
+      "discoveredOn": "sales/forecast security review",
+      "blockingSprint": "False",
+      "notes": "database.rules.json:57 allows auth.uid === $uid with no constraint on which $locationId keys are written, and a live client path does exactly this (public/js/modules/access-control/services/subscription-service.js:540). Any rule of the form root.child('userLocations').child(auth.uid).child($locationId).exists() is therefore self-authorizing, not an ownership proof. Currently trusted by: stockFlagConfig/$locationId .write (:267), stockItemFlags/$locationId .write (:274), bookings (:317, :321), and the stockFlagAudit read (:253). This nearly shipped as a bypass: the first draft of the sales/forecast index rule used exactly this predicate, and the security review demonstrated the two-step attack (assert membership of a victim location → delete their whole index bucket). That PR switched to record-ownership keying instead; these four other rules still trust it. Fix: add a .validate requiring the location to exist and be owned/shared, or route membership writes through a CF."
+    },
+    {
+      "title": "forecastActuals and forecastAnalytics have NO entry in database.rules.json at all — both flows are already broken, and for reads they are broken for the founder too.",
+      "severity": "medium",
+      "discoveredAt": "2026-07-28",
+      "discoveredOn": "sales/forecast ground-truth review",
+      "blockingSprint": "False",
+      "notes": "Both inherit root: .write admin-only (:3) and — because there is no root .read — reads deny for *everyone*, admins included. Yet both are written client-side from non-admin surfaces: sales-data-service.js:706 (saveActuals) and forecast-analytics.js:101,318,406. Write failures ARE surfaced (:713 rethrows → SweetAlert), but read failures are swallowed — tools/admin/sales-forecasting.html:2740-2748 renders \"no actuals\" and forecast-analytics.js:34-36 renders default zeros — so the feature looks empty rather than broken. Same over-tight-fails-closed class as the locations/ownerId bug (#170), which hid ~7 weeks. Design constraint for the fix: getActuals (:725-730) runs orderByChild('forecastId') against the forecastActuals root, which authorizes at the queried node and cannot be rule-filtered (2026-05-31 read-cascade lesson) — a keyed-path .read will NOT work; it needs a root read + .indexOn, or a client read-path change first. Note forecastAnalytics/systemWide is additionally a client-written GLOBAL shared node. Found 2026-07-28 during the sales/forecast census."
+    },
+    {
       "title": "Three live credentials are stored as PLAINTEXT env vars on all 119 deployed functions, while the project already has a defineSecret pattern for four others — and a prior audit pass scored this area \"clean\".",
       "severity": "critical",
       "discoveredAt": "2026-07-26",

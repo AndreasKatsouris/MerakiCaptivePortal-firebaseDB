@@ -182,9 +182,17 @@ Cases 4/5/7/11 are the **positive** no-regression checks; a denial-only probe pa
 
 ## 8. Open question, deliberately left to empirical resolution
 
-The two reviewers **disagreed** on whether an ancestor `.validate` fires for a write to a path *below* it — material because 5 of the 12 writers write below `$id`, and because hole B's deep-path create depends on it. Security review verified "yes" against the official Firebase docs (the widget `hasChildren` example); ground-truth could not confirm and flagged it as needing empirical evidence.
+Whether an ancestor `.validate` fires for a write to a path *below* it is load-bearing — 5 of the 12 writers write below `$id`, and hole B's deep-path create depends on it. **Three sources disagree, 2–1 against the fix as written:**
 
-**Resolution: probe case 9 settles it against live rules.** Per this project's repeated experience, neither documentation nor reasoning is accepted where live evaluation is available. If case 9 returns 200, hole B's deep-path arm is open and §3.1 needs an additional guard at the deeper level before this ships.
+| Source | Says | Basis |
+|---|---|---|
+| Pre-build security review | **Fires** | Firebase docs, widget `hasChildren` example |
+| Pre-build ground-truth review | **Unknown** | Could not confirm; asked for empirical evidence |
+| `scripts/verify-rules-pr1b.js:128-129` (this repo) | **Does NOT fire** | Prose assertion about exactly this shape — *"a write to a DESCENDANT path does not evaluate the `$rewardId` `.validate` above it"* |
+
+The repo's own prior probe therefore contradicts the security review, on the same question, for the same rule shape. That is not a tiebreak — a comment written by an earlier session is no more ground truth than a doc page — but it does mean **the majority of available opinion says this fix is incomplete**, and it removes any basis for settling the question by argument.
+
+**Resolution: probe case 9 asks production.** If it returns ALLOW, the `.validate` does not reach deep paths, hole B's deep-path arm is **OPEN**, and §3.1 needs an additional guard at the deeper level before this can be called closed. **Record the observed status here either way** — a settled answer retires a disagreement that has now cost two sessions, and if it confirms "does not fire" then `verify-rules-pr1b.js`'s note is right and the `rewards` finding is worse than currently logged.
 
 ---
 
