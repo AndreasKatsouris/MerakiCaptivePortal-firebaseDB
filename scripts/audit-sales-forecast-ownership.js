@@ -88,13 +88,22 @@ async function auditNode(recordNode, indexNode, liveUids) {
     if (reasons.length) stranded.push({ id, userId, locationId, reasons });
   }
 
-  // For anything stranded, try to recover the true owner from the byUser index.
-  for (const rec of stranded) {
-    rec.recoverableFrom = null;
-    for (const uid of liveUids) {
-      const hit = await get(`${indexNode}/byUser/${uid}/${rec.id}`).catch(() => null);
-      if (hit !== null && hit !== undefined) { rec.recoverableFrom = uid; break; }
+  // For anything stranded, recover the true owner from the byUser index.
+  //
+  // ONE request, not (stranded x users). The obvious shape here is a probe of
+  // byUser/{uid}/{recordId} for every uid, but that is a sequential round-trip
+  // per pair — and parallelising it only trades latency for N concurrent
+  // requests per record, which is worse against a growing user base. byUser
+  // holds id->true booleans, so the whole subtree stays small even when the
+  // record nodes do not: fetch it once and invert to recordId -> uid in memory.
+  // Skipped entirely on the clean path, which is the common case.
+  if (stranded.length) {
+    const byUser = (await get(`${indexNode}/byUser`).catch(() => null)) || {};
+    const ownerOf = new Map();
+    for (const [uid, entries] of Object.entries(byUser)) {
+      for (const id of Object.keys(entries || {})) ownerOf.set(id, uid);
     }
+    for (const rec of stranded) rec.recoverableFrom = ownerOf.get(rec.id) || null;
   }
 
   return { total: ids.length, stranded };
