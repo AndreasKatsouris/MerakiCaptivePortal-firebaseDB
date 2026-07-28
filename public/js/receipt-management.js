@@ -1,4 +1,5 @@
 import { auth, rtdb, ref, get, update, push, remove } from './config/firebase-config.js';
+import { buildRewardPayload } from './receipt-management/reward-payload.js';
 
 /**
  * Normalize phone number format by removing + prefix and whatsapp: prefix
@@ -209,6 +210,7 @@ export function initializeReceiptManagement() {
                     campaignId: ''
                 },
                 campaigns: [],
+                rewardTypes: [],
                 selectedReceipt: null,
                 processingReceipt: false
             };
@@ -356,6 +358,18 @@ export function initializeReceiptManagement() {
                     }));
                 } catch (error) {
                     console.error('Error loading campaigns:', error);
+                }
+            },
+            async loadRewardTypes() {
+                try {
+                    const snapshot = await get(ref(rtdb, 'rewardTypes'));
+                    const data = snapshot.val() || {};
+                    this.rewardTypes = Object.entries(data).map(([id, type]) => ({
+                        id,
+                        ...type
+                    }));
+                } catch (error) {
+                    console.error('Error loading reward types:', error);
                 }
             },
             async validateReceipt(receipt) {
@@ -950,15 +964,12 @@ export function initializeReceiptManagement() {
                     // Normalize phone number for consistent database operations
                     const normalizedPhone = normalizePhoneNumber(receipt.guestPhoneNumber);
 
-                    const rewardData = {
-                        receiptId: receipt.id,
-                        campaignId: campaign.id,
-                        guestPhoneNumber: normalizedPhone,
-                        totalAmount: receipt.totalAmount,
-                        status: 'pending',
-                        createdAt: Date.now(),
+                    // Shape mirrors reward-management.js's manual issue flow — rewards/$rewardId
+                    // .validate requires metadata/status/value/expiresAt (database.rules.json)
+                    const rewardData = buildRewardPayload(receipt, campaign, this.rewardTypes, {
+                        normalizedPhone,
                         createdBy: auth.currentUser.uid
-                    };
+                    });
 
                     // Update rewards node
                     await update(ref(rtdb, `rewards/${rewardId}`), rewardData);
@@ -1703,6 +1714,7 @@ export function initializeReceiptManagement() {
         mounted() {
             this.loadReceipts();
             this.loadCampaigns();
+            this.loadRewardTypes();
         }
     });
 
