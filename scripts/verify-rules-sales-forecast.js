@@ -225,6 +225,23 @@ const CHECKS = [
     cleanup: `salesDataIndex/byLocation/${VICTIM_LOCATION_ID}/${PROBE_KEY}`,
   },
 
+  {
+    name: '12. owner writes its OWN record id into a FOREIGN location bucket',
+    needs: 'victim-loc',
+    expect: 'deny',
+    note: 'Index poisoning via an unconstrained $locationId. The first version of the '
+        + 'index rule checked only that the caller OWNS the record, never that the '
+        + '$locationId in the path matched the record\'s actual locationId — so an owner '
+        + 'could insert their own record id into a victim\'s bucket. The victim\'s '
+        + 'getHistoricalDataList then get()s a record it cannot read, the loop throws, '
+        + 'and their list view breaks permanently. Caught by automated review of PR #205; '
+        + 'checks 5/6/10 did not exercise this route. Requires the locationId-match '
+        + 'conjunct in the rule.',
+    run: () => attempt('PUT',
+      `salesDataIndex/byLocation/${VICTIM_LOCATION_ID}/${PROBE_KEY}_own`, USER, true),
+    cleanup: `salesDataIndex/byLocation/${VICTIM_LOCATION_ID}/${PROBE_KEY}_own`,
+  },
+
   // --- Positive regression guard ----------------------------------------------
   {
     name: '11. owner partial-update on own record (post-merge .validate guard)',

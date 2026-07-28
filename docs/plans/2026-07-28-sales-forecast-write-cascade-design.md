@@ -95,7 +95,7 @@ The index nodes have **no child `.write` rules**; their writes are authorised *s
 "salesDataIndex": {
   ".write": false,
   "byLocation": { "$locationId": { "$salesDataId": {
-    ".write": "auth != null && (auth.token.admin === true || root.child('salesData').child($salesDataId).child('userId').val() === auth.uid)" } } },
+    ".write": "auth != null && (auth.token.admin === true || (root.child('salesData').child($salesDataId).child('userId').val() === auth.uid && root.child('salesData').child($salesDataId).child('locationId').val() === $locationId))" } } },
   "byUser": { "$userId": {
     ".write": "auth != null && (auth.token.admin === true || $userId === auth.uid)" } } }
 ```
@@ -114,6 +114,12 @@ Record-ownership keying is not self-assertable. Verified against every call path
 - **archive** (`:630`, writes `.../$fid/status`) is granted by cascade from the `$forecastId` level.
 
 > ⚠️ **This makes "record first, index second" load-bearing.** Add a code comment at `:87` and `:505`.
+
+**The `locationId` conjunct (added after PR #205's automated review).** Checking record ownership alone is **not sufficient**: `$locationId` would remain unconstrained, so a user who legitimately owns `salesData/X` could still write `salesDataIndex/byLocation/{ANY_location}/X` — including a victim's. That re-opens the index-poisoning route this very section cites as the reason to reject the `userLocations` form: the victim's `getHistoricalDataList` reads the index, `get()`s a record it cannot read, and the loop throws at `:139-141`, permanently breaking their list view. Probe checks 5/6/10 did not exercise it; **check 12 now does**.
+
+Verified non-breaking against all five index write sites (`:235`, `:438`, `:650`, `:1042`, `:1054`) — every one already derives the path from the record's own `locationId`.
+
+**Residual, documented not fixed:** `updateForecast` can change a record's `locationId` without updating its index, after which the stale entry is un-deletable under this rule (record's new `locationId` ≠ old path key). The orphaning pre-dates this change; the rule makes it harder to clean up. Low exposure — that method appears dead (its caller guards on `metadata.createdBy`, which nothing writes).
 
 **`byUser` is write-only dead data** — four writers, zero readers. Rule added for minimality rather than deleting the writes; logged as cleanup (§7).
 

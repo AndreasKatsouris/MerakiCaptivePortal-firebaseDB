@@ -878,8 +878,20 @@ export class SalesDataService {
             // set() replace, and `updatedData` from the caller carries neither. Omitting
             // them strips ownership off the record, after which the owner's own .read/
             // .write arms (data.child('userId').val() === auth.uid) deny them and
-            // forecasts/.validate rejects every later write. The `|| this.userId`
-            // fallback repairs records already stripped by this path before the fix.
+            // forecasts/.validate rejects every later write.
+            if (!existingForecast.userId) {
+                // Repair path for records this method stripped before the fix. It
+                // attributes the record to whoever edits it first, which is RIGHT when
+                // that is the original owner and WRONG when it is an admin editing on
+                // someone else's behalf — so make it loud rather than silent. The
+                // authoritative remedy is the pre-deploy ownership backfill
+                // (docs/plans/2026-07-28-sales-forecast-write-cascade-design.md §5),
+                // which should leave this branch unreachable.
+                console.warn(
+                    `[SalesDataService] Forecast ${forecastId} has no userId — repairing `
+                    + `ownership to ${this.userId}. If you are an admin editing another `
+                    + `user's forecast, STOP and run the ownership backfill instead.`);
+            }
             const updatePayload = {
                 ...updatedData,
                 userId: existingForecast.userId || this.userId,

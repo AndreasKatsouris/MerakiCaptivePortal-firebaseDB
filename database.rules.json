@@ -513,7 +513,7 @@
         "$locationId": {
           ".read": "auth != null && (auth.token.admin === true || root.child('userLocations').child(auth.uid).child($locationId).exists() || root.child('locations').child($locationId).child('ownerId').val() === auth.uid)",
           "$salesDataId": {
-            ".write": "auth != null && (auth.token.admin === true || root.child('salesData').child($salesDataId).child('userId').val() === auth.uid)"
+            ".write": "auth != null && (auth.token.admin === true || (root.child('salesData').child($salesDataId).child('userId').val() === auth.uid && root.child('salesData').child($salesDataId).child('locationId').val() === $locationId))"
           }
         }
       },
@@ -540,7 +540,7 @@
         "$locationId": {
           ".read": "auth != null && (auth.token.admin === true || root.child('userLocations').child(auth.uid).child($locationId).exists() || root.child('locations').child($locationId).child('ownerId').val() === auth.uid)",
           "$forecastId": {
-            ".write": "auth != null && (auth.token.admin === true || root.child('forecasts').child($forecastId).child('userId').val() === auth.uid)"
+            ".write": "auth != null && (auth.token.admin === true || (root.child('forecasts').child($forecastId).child('userId').val() === auth.uid && root.child('forecasts').child($forecastId).child('locationId').val() === $locationId))"
           }
         }
       },

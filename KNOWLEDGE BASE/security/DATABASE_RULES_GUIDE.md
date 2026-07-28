@@ -774,6 +774,45 @@ Ensure all code paths normalize phone numbers before writing to the database. Th
 
 ---
 
+## Worked example — `salesData`/`forecasts` write cascade + the index-node pattern (2026-07-28)
+
+**Goal:** close a root `.write: "auth != null"` that made four nodes' per-child ownership rules dead code. Documents two shapes worth reusing.
+
+### Shape 1 — a permissive root grant makes every child rule below it dead
+
+`salesData` carried a correct-looking `$salesDataId` ownership check *and* a root `.write: "auth != null"`. Because `.write` is a **permissive union** evaluated top-down, the root grant was satisfied first and the child check never denied anything. Any authenticated user could overwrite or delete any tenant's records; `PUT /salesData.json` replaced the whole node.
+
+Fix: root `.write` → `false`, so the child rules govern. **Note what `false` does and does not do** — it removes *this node's* grant, but cannot revoke the global root admin `.write` (`database.rules.json:3`), which still cascades. The honest closure claim is *"the non-admin arm is closed"*, never *"the node is closed"*. Any verification probe must therefore run as a **non-admin**; an admin probe returns 200 through the root grant and reads as a false failure.
+
+Removing the root grant closes overwrite **and delete** of existing records (the child rule keys on `data.child('userId')`, the pre-write value). It does **not** close *create*, because the child rule's `!data.exists()` term grants any authenticated create — that needs a `.validate`, and `.validate` **does not run on delete**. So a cascade fix and a validate are complementary; neither alone is sufficient.
+
+```jsonc
+"$salesDataId": {
+  ".validate": "newData.hasChildren(['userId','locationId']) && (auth.token.admin === true || newData.child('userId').val() === auth.uid)"
+}
+```
+
+⚠️ Put the `hasChildren` conjunct **outside** the admin disjunction. With `auth.token.admin === true ||` leading, the whole expression short-circuits for admins and constrains them not at all — a `.validate` that reads like it schema-checks admin writes while doing nothing.
+
+### Shape 2 — scoping an INDEX node's writes
+
+Index nodes (`salesDataIndex/byLocation/$locationId/$recordId`) are the interesting case, and two wrong answers were caught in review before merge:
+
+1. **Do not scope on a self-assertable predicate.** The first draft used `root.child('userLocations').child(auth.uid).child($locationId).exists()`, copied from the node's own `.read`. But `userLocations/$uid` is **self-writable** and a live client path writes it — so the predicate is attacker-controlled. Assert membership of a victim's location, then write their index bucket. *Provenance is not correctness: an expression that is adequate for read scoping can be a capability rather than an ownership proof, and promoting it to write scoping is where that stops being safe.*
+2. **Scope on the RECORD, and constrain the path key too.** Checking only that the caller owns the record still lets an owner insert their own record id into *any* location's bucket — index poisoning: the victim's list view reads the index, `get()`s a record it cannot read, and throws. Both conjuncts are needed:
+
+```jsonc
+"$recordId": {
+  ".write": "auth != null && (auth.token.admin === true || (root.child('salesData').child($recordId).child('userId').val() === auth.uid && root.child('salesData').child($recordId).child('locationId').val() === $locationId))"
+}
+```
+
+**Consequence to document at the call site:** this makes write *ordering* load-bearing — the record must be written before its index entry, or the rule denies the index write because the record it authorises against does not exist yet. Deletes work because `root` is the pre-write snapshot.
+
+**Known residual:** if a record's `locationId` is later changed without updating its index, the stale entry becomes un-deletable under this rule (the record's new `locationId` no longer matches the old path). That orphaning pre-dates the rule; the rule makes it harder to clean up.
+
+---
+
 ## Worked example — `subscriptions/$uid` entitlement lock (Phase 7 ④a PR4)
 
 **Goal:** make the server-side entitlement *resolver* (Admin SDK) the SOLE writer of materialized `features`/`limits`, closing the self-grant vuln where any authed owner could write `subscriptions/{uid}/features/<anyFlag>: true` from the browser console.
