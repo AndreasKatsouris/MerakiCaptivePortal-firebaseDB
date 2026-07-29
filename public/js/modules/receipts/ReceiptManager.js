@@ -1,6 +1,7 @@
 // js/modules/receipts/ReceiptManager.js
 
 import { _ } from 'lodash';
+import { resolveReceiptImageSrc } from '../../receipt-management/receipt-image-url.js';
 
 class ReceiptManager {
     constructor() {
@@ -220,7 +221,7 @@ class ReceiptManager {
                 throw new Error('Receipt not found');
             }
 
-            this.populateReceiptModal(receipt);
+            await this.populateReceiptModal(receiptId, receipt);
             this.detailsModal.show();
         } catch (error) {
             console.error('Error viewing receipt:', error);
@@ -228,7 +229,7 @@ class ReceiptManager {
         }
     }
 
-    populateReceiptModal(receipt) {
+    async populateReceiptModal(receiptId, receipt) {
         // Populate store information
         document.getElementById('modalBrandName').textContent = receipt.brandName || 'N/A';
         document.getElementById('modalStoreName').textContent = receipt.storeName || 'N/A';
@@ -260,10 +261,13 @@ class ReceiptManager {
         // Set total
         document.getElementById('modalTotal').textContent = `R${receipt.totalAmount.toFixed(2)}`;
 
-        // Show receipt image if available
+        // Show receipt image if available — prefer the private-storage signed
+        // URL (CRIT-09 F2, queue Q7) over the legacy Twilio imageUrl.
         const imageElement = document.getElementById('modalReceiptImage');
         if (imageElement) {
-            imageElement.src = receipt.imageUrl || '/images/placeholder-receipt.png';
+            const idToken = await firebase.auth().currentUser?.getIdToken();
+            const receiptImageSrc = await resolveReceiptImageSrc(receipt, receiptId, idToken);
+            imageElement.src = receiptImageSrc || '/images/placeholder-receipt.png';
         }
     }
 

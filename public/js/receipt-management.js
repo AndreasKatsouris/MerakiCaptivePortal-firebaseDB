@@ -1,5 +1,6 @@
 import { auth, rtdb, ref, get, update, push, remove } from './config/firebase-config.js';
 import { buildRewardPayload } from './receipt-management/reward-payload.js';
+import { resolveReceiptImageSrc } from './receipt-management/receipt-image-url.js';
 
 /**
  * Normalize phone number format by removing + prefix and whatsapp: prefix
@@ -989,6 +990,12 @@ export function initializeReceiptManagement() {
             async viewReceipt(receipt) {
                 this.selectedReceipt = receipt;
 
+                // Prefer the private-storage signed URL (CRIT-09 F2, queue Q7) over
+                // the legacy Twilio imageUrl; resolveReceiptImageSrc falls back
+                // automatically for pre-PR-B records with no storagePath.
+                const idToken = await auth.currentUser?.getIdToken();
+                const receiptImageSrc = await resolveReceiptImageSrc(receipt, receipt.id, idToken);
+
                 // Format items for display
                 const itemsHtml = receipt.items ? receipt.items.map(item => `
                     <tr>
@@ -1040,10 +1047,10 @@ export function initializeReceiptManagement() {
                                 <p><strong>Total Amount:</strong> R${(receipt.totalAmount || 0).toFixed(2)}</p>
                             </div>
                             
-                            ${receipt.imageUrl ? `
+                            ${receiptImageSrc ? `
                                 <div class="receipt-image mb-3">
                                     <h6>Receipt Image</h6>
-                                    <img src="${receipt.imageUrl}" alt="Receipt" class="img-fluid">
+                                    <img src="${receiptImageSrc}" alt="Receipt" class="img-fluid">
                                 </div>
                             ` : ''}
                         </div>

@@ -42,6 +42,7 @@ const ADMIN_ONLY_CFS = [
     'removeGuestFromQueue',     // queue mutator
     'updateQueueEntryStatus',   // queue mutator
     'processQueueMessage',      // queue message
+    'getReceiptImageUrl',       // mints a signed URL into private guest-PII receipt storage (CRIT-09 F2, queue Q7)
 ];
 
 // ── source parsing ─────────────────────────────────────────────────────────────
