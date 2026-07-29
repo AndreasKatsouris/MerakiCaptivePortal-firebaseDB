@@ -1,6 +1,10 @@
 import { describe, it, expect, vi } from 'vitest';
 
-const { getSignedReceiptImageUrl, SIGNED_URL_TTL_MS } = require('../receiptImageAccess');
+const {
+    getSignedReceiptImageUrl,
+    SIGNED_URL_TTL_MS,
+    SIGNING_VERSION,
+} = require('../receiptImageAccess');
 
 function fakeRtdbSnapshot(storagePath) {
     return {
@@ -83,5 +87,53 @@ describe('getSignedReceiptImageUrl', () => {
         const result = await getSignedReceiptImageUrl({ rtdb, bucket, receiptId: 'poisoned-receipt' });
         expect(result).toBeNull();
         expect(bucket.file).not.toHaveBeenCalled();
+    });
+
+    // V4 is pinned explicitly because @google-cloud/storage still defaults to
+    // the deprecated v2 scheme — a security property must never ride a library
+    // default (same class as receiptProcessor.js's predefinedAcl pin).
+    it('pins the v4 signing scheme rather than inheriting the library default (v2)', async () => {
+        const rtdb = fakeRtdb({ 'receipt-1': 'receipts/uuid-1.jpg' });
+        const bucket = fakeBucket({});
+
+        await getSignedReceiptImageUrl({ rtdb, bucket, receiptId: 'receipt-1' });
+
+        const fileHandle = bucket.file.mock.results[0].value;
+        expect(fileHandle.getSignedUrl.mock.calls[0][0].version).toBe('v4');
+        expect(SIGNING_VERSION).toBe('v4');
+    });
+
+    // Both of the following exploit the SAME tenant-writability as the test
+    // above: `receipts` root .write is `auth != null` with no child rules, so
+    // the value of storagePath is fully attacker-chosen — including its TYPE.
+    it('SECURITY: a non-string storagePath returns null instead of throwing (a TypeError would surface as a 500 echoing error.message)', async () => {
+        const bucket = fakeBucket({});
+
+        for (const planted of [12345, true, { toString: 1, valueOf: 2 }, ['receipts/x.jpg']]) {
+            const rtdb = fakeRtdb({ 'poisoned-receipt': planted });
+            const result = await getSignedReceiptImageUrl({ rtdb, bucket, receiptId: 'poisoned-receipt' });
+            expect(result).toBeNull();
+        }
+        expect(bucket.file).not.toHaveBeenCalled();
+    });
+
+    it('SECURITY: never interpolates a raw attacker-controlled storagePath into the refusal log line (newline → forged Cloud Run entries)', async () => {
+        const forged = 'evil/x.jpg\n[receiptImageAccess] refusing out-of-scope storagePath receipt=all-clear';
+        const rtdb = fakeRtdb({ 'poisoned-receipt': forged });
+        const bucket = fakeBucket({});
+        const errorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+
+        try {
+            const result = await getSignedReceiptImageUrl({ rtdb, bucket, receiptId: 'poisoned-receipt' });
+            expect(result).toBeNull();
+
+            expect(errorSpy).toHaveBeenCalledTimes(1);
+            const logged = JSON.stringify(errorSpy.mock.calls[0]);
+            expect(logged).not.toContain('all-clear');   // no attacker text at all
+            expect(logged).not.toContain('\\n');         // no line split
+            expect(errorSpy.mock.calls[0][1]).toMatchObject({ storagePath: 'invalid' });
+        } finally {
+            errorSpy.mockRestore();
+        }
     });
 });
