@@ -62,6 +62,9 @@ CLAUDE.md Step 0 write-path rule.
 | G13 | The RTDB emulator needs Java, which is not on PATH in this environment. Rules verification is by REST probe. | 2026-07-21 SELF_OPT; `scripts/verify-rules-foodcost-mappings.js` |
 | G14 | **`locations/$locationId` grants both `.read: "auth != null"` and a `.write` to the location owner, and both cascade into every descendant.** Any node nested under `locations/{locId}/` is therefore (a) readable by every authenticated user in the system and (b) client-writable by the location owner — a child `".write": false` would be a dead rule. This is why the PO nodes are **top-level `purchasing/{locId}`**, not nested (§5). | `database.rules.json:43-52`; 2026-05-31 + 2026-07-25 rules-cascade LESSONS |
 | G15 | `stockFlagAudit/{locationId}` is the existing precedent for a top-level, location-keyed node with access expressed explicitly (`userLocations` OR `locations/…/ownerId`) rather than inherited. | `database.rules.json:251-260` |
+| G16 | **Whether an ancestor `.validate` fires for a write to a path BELOW it is an OPEN question in this repo, with three sources disagreeing 2–1.** #205 deferred it to an empirical probe (`scripts/verify-rules-sales-forecast.js` check 9) which **has not yet been run** — its design §8 still says "record the observed status". `scripts/verify-rules-pr1b.js:128-129` asserts in prose that it does **not** fire. **Consequence for §5.1: place every `.validate` at the LEAF, never on an ancestor expecting it to reach down.** Then the design is correct under either answer. | `docs/plans/2026-07-28-sales-forecast-write-cascade-design.md` §8 (origin/master); `scripts/verify-rules-sales-forecast.js:36-51` |
+| G17 | **`.validate` does not constrain our own Cloud Functions at all** — the Admin SDK bypasses every rule, `.validate` included. On `purchasing` it constrains only a human admin writing via the client SDK. Worth having as defence-in-depth; not worth overstating. | Firebase Admin SDK semantics; corroborated by #205's "residual admin arm" framing |
+| G18 | Re-verified on `origin/master` at `e04eb098` (2026-07-28, after #204/#205/#206): **G14 and G15 both unchanged**, and `"purchasing"` is not an existing key in `database.rules.json` — no collision. #205 fixed the same *class* on `salesData`/`forecasts` but did not touch `locations`. | `git show origin/master:database.rules.json` |
 
 ---
 
@@ -210,21 +213,42 @@ purchasing/{locId}/counters/purchaseOrder       # integer, transaction-allocated
 ```jsonc
 "purchasing": {
   "$locId": {
+    // Read CASCADES down to every child — intended. Copied from stockFlagAudit (G15).
     ".read": "auth != null && (auth.token.admin === true || root.child('userLocations').child(auth.uid).child($locId).exists() || root.child('locations').child($locId).child('ownerId').val() === auth.uid)",
-    ".write": false,
-    // .validate children schema-constrain the residual admin arm — see below
+    ".write": false,               // documentary — see honesty note 1
+    "suppliers":  { "$supplierId": { /* LEAF .validate — see honesty note 3 */ } },
+    "catalog":    { "$supplierId": { "$productId": { /* LEAF .validate */ } } },
+    "orders":     { "$poId":       { /* LEAF .validate */ } },
+    "counters":   { "purchaseOrder": { ".validate": "newData.isNumber() && newData.val() >= 0" } }
   }
 }
 ```
 
-Two honesty requirements, both from the 2026-07-25 cascade lesson:
+There is deliberately **no `.read` on the `purchasing` root**, so nobody can query across
+locations; reads authorize at `$locId` or below.
 
-- **`".write": false` closes the NON-ADMIN arm only.** The global root admin `.write` at
-  `database.rules.json:3` cascades in and cannot be revoked from below. Cloud Functions
-  use the Admin SDK and bypass rules entirely, so CF writes are unaffected. `.validate`
-  is therefore **kept**, to schema-constrain the residual admin arm.
-- **The verification probe must be explicitly NON-admin.** An admin probe would return
-  200 through that very cascade and read as a false pass.
+Four honesty requirements. The first two are the 2026-07-25 cascade lesson; the third and
+fourth come from re-reading master after #205 (G16/G17):
+
+1. **`".write": false` is documentary, not the control.** Non-admin writes at any depth
+   under `purchasing` are denied because **no ancestor grants them** — not because of this
+   `false`. Stating it precisely matters: a `false` cannot revoke an ancestor grant.
+2. **The residual admin arm cannot be closed.** The global root admin `.write`
+   (`database.rules.json:3`) cascades in. So the honest claim is *"the non-admin arm is
+   closed"* — never *"the node is closed"*. **The verification probe must therefore be
+   explicitly NON-admin**; an admin probe returns 200 through that cascade and reads as a
+   false failure.
+3. **Every `.validate` sits at the LEAF, never on an ancestor.** Whether an ancestor
+   `.validate` reaches a deeper write is an open question in this repo — three sources
+   disagree 2–1 and #205's settling probe has not been run (G16). Placing validation at
+   the leaf makes this design correct **under either answer**, and removes any dependency
+   on a question that has already cost two sessions.
+4. **`.validate` does not constrain our Cloud Functions.** The Admin SDK bypasses all
+   rules (G17). Here it constrains only a human admin writing via the client SDK — real
+   defence-in-depth, but it should not be described as the schema guard for the feature.
+   **The load-bearing validation is the CF's Zod boundary** (§5.2); these rules are the
+   outer fence, exactly as `verify-rules-foodcost-mappings.js` documents for
+   `foodCostMappings`.
 
 The `.read` expression is copied from `stockFlagAudit/$locationId` (G15) — the
 `userLocations` OR `ownerId` pair matters: users whose `userLocations` was never populated
@@ -406,8 +430,9 @@ history has needed at least one preview-driven fix round that the automated revi
 
 | # | Risk | Mitigation |
 |---|------|-----------|
-| R1 | **`database.rules.json` collision with the concurrent security session.** CLAUDE.md marks it single-owner-at-a-time. **Downgraded by the G14 fix:** D1 now *appends one new top-level `purchasing` block* and edits no existing block, so a merge conflict is textual (adjacent lines) rather than semantic. | Still coordinate — but the resolution is a rebase, not a redesign. `functions/index.js` is the same class and takes one `exports.` line per CF. |
-| R1b | **The G14 finding suggests a live issue outside this feature's scope:** everything nested under `locations/{locId}` — including `stockUsage`, which `foodCostOverview` reads — inherits `".read": "auth != null"`, i.e. is readable by any authenticated user. | **Not this feature's to fix**, and it overlaps the concurrent security session's territory. Log to the Bug Triage Queue with the G14 evidence rather than widening this build. |
+| R1 | **`database.rules.json` collision with the concurrent security session.** CLAUDE.md marks it single-owner-at-a-time. **Downgraded twice:** the G14 fix means D1 *appends one new top-level `purchasing` block* and edits no existing block; and #205 (that session's rules PR) has now **merged**, so the file is currently free. But the session continues — `receipts` root `.write` is its next item and is Critical — so it will touch the file again. | Coordinate on timing, but the resolution is a rebase, not a redesign. `functions/index.js` is the same class and takes one `exports.` line per CF. |
+| R1b | **The G14 finding is a live cross-tenant DISCLOSURE issue that is NOT yet carded**, and it is outside this feature's scope. Everything nested under `locations/{locId}` inherits `".read": "auth != null"` — including `locations/{locId}/stockUsage`, the node `foodCostOverview` reads — so any authenticated user can read any tenant's stock/financial data. **Checked against master at `e04eb098`:** the backlog's `locations` rows cover the **write** side only (HIGH-04 closed; NEW-HIGH-01 = `ownerId`-hijack blast radius, open). The read side is a distinct finding with no row. | **Not this feature's to fix.** Hand the G14 evidence to the security session so it lands as a Bug Triage row there, rather than editing a hot shared file from this branch or widening this build. |
+| R1c | **An unresolved repo-wide rules question sits next to this design:** does an ancestor `.validate` fire on a deeper write? #205 deferred it to probe check 9, unrun (G16). | **Neutralised, not inherited** — §5.1 places every `.validate` at the leaf, so D1 is correct under either answer. If the security session does run check 9, record the result; it would also confirm whether `verify-rules-pr1b.js`'s prose note is right and the `rewards` finding is worse than logged. |
 | R2 | **SPF/DKIM on the sending domain is an external long-pole** and gates D3 going live. | Start it now if D3 matters — same reasoning that made the WhatsApp template submission an early task in W2. |
 | R3 | **Supplier emails are hand-entered.** Nothing in the CSV can derive them (G1). Expect this to be the soak's friction point. | Seeded suppliers land in an explicit `needs-email` state — exportable immediately, emailable once filled. Make the state visible, not a silent failure at send time. |
 | R4 | Adding a fourth ROSS tab cuts against the 4-item sidebar that Phase 5 PR 5 deliberately shrank. | Accepted under L4. Revisit when the workflow step type lands and ordering can also be reached from a run. |
