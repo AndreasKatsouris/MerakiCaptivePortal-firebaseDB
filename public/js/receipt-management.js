@@ -1,6 +1,7 @@
 import { auth, rtdb, ref, get, update, push, remove } from './config/firebase-config.js';
 import { buildRewardPayload } from './receipt-management/reward-payload.js';
 import { resolveReceiptImageSrc } from './receipt-management/receipt-image-url.js';
+import { buildReceiptDetailsHtml } from './receipt-management/receipt-details-html.js';
 
 /**
  * Normalize phone number format by removing + prefix and whatsapp: prefix
@@ -996,65 +997,17 @@ export function initializeReceiptManagement() {
                 const idToken = await auth.currentUser?.getIdToken();
                 const receiptImageSrc = await resolveReceiptImageSrc(receipt, receipt.id, idToken);
 
-                // Format items for display
-                const itemsHtml = receipt.items ? receipt.items.map(item => `
-                    <tr>
-                        <td>${item.name || 'N/A'}</td>
-                        <td>${item.quantity || 0}</td>
-                        <td>R${(item.unitPrice || 0).toFixed(2)}</td>
-                        <td>R${(item.totalPrice || 0).toFixed(2)}</td>
-                    </tr>
-                `).join('') : '';
-
-                // Show receipt details modal
+                // Show receipt details modal. Body built by a pure, guard-tested
+                // helper — every receipt field is tenant-writable and this string
+                // lands in innerHTML, so escaping is mandatory (see the module's
+                // SECURITY header).
                 const result = await Swal.fire({
                     title: 'Receipt Details',
-                    html: `
-                        <div class="receipt-details">
-                            <div class="store-info mb-3">
-                                <h5>${receipt.fullStoreName || receipt.brandName}</h5>
-                                <p>${receipt.storeAddress || ''}</p>
-                            </div>
-                            
-                            <div class="receipt-meta mb-3">
-                                <p><strong>Invoice Number:</strong> ${receipt.invoiceNumber}</p>
-                                <p><strong>Date:</strong> ${receipt.date} ${receipt.time || ''}</p>
-                                <p><strong>Guest Phone:</strong> ${receipt.guestPhoneNumber}</p>
-                                <p><strong>Table:</strong> ${receipt.tableNumber || 'N/A'}</p>
-                                <p><strong>Waiter:</strong> ${receipt.waiterName || 'N/A'}</p>
-                                <p><strong>Status:</strong> <span class="badge ${this.getStatusBadgeClass(receipt.status)}">${receipt.status}</span></p>
-                            </div>
-                            
-                            <div class="items-table mb-3">
-                                <table class="table table-sm">
-                                    <thead>
-                                        <tr>
-                                            <th>Item</th>
-                                            <th>Qty</th>
-                                            <th>Unit Price</th>
-                                            <th>Total</th>
-                                        </tr>
-                                    </thead>
-                                    <tbody>
-                                        ${itemsHtml}
-                                    </tbody>
-                                </table>
-                            </div>
-                            
-                            <div class="totals mb-3">
-                                <p><strong>Subtotal:</strong> R${(receipt.subtotal || 0).toFixed(2)}</p>
-                                <p><strong>VAT (15%):</strong> R${(receipt.vatAmount || 0).toFixed(2)}</p>
-                                <p><strong>Total Amount:</strong> R${(receipt.totalAmount || 0).toFixed(2)}</p>
-                            </div>
-                            
-                            ${receiptImageSrc ? `
-                                <div class="receipt-image mb-3">
-                                    <h6>Receipt Image</h6>
-                                    <img src="${receiptImageSrc}" alt="Receipt" class="img-fluid">
-                                </div>
-                            ` : ''}
-                        </div>
-                    `,
+                    html: buildReceiptDetailsHtml(
+                        receipt,
+                        receiptImageSrc,
+                        (status) => this.getStatusBadgeClass(status)
+                    ),
                     width: '800px',
                     showCancelButton: true,
                     showDenyButton: receipt.status === 'pending',
