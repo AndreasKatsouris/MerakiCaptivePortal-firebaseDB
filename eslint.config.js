@@ -1,3 +1,5 @@
+import pluginVue from 'eslint-plugin-vue';
+
 export default [
     {
         ignores: [
@@ -73,6 +75,25 @@ export default [
         },
         rules: {
             // Vue-specific rules can be added here
+        }
+    },
+    {
+        // Scoped `vue/no-v-html` guard (3c item 2, automation queue Q6).
+        // Global lint is unusable (152k errors over public/), so this rule is
+        // deliberately narrowed to the two v2 surfaces that are actively
+        // developed and already free of v-html — see CLAUDE.md Step 11's
+        // guard-first default (LESSONS 2026-06-04 vue/escaping: `{{ }}`
+        // auto-escapes, `v-html` is the one thing to keep off tenant/agent
+        // content).
+        files: [
+            'public/js/modules/ross/v2/**/*.vue',
+            'public/js/modules/food-cost/v2/**/*.vue'
+        ],
+        plugins: {
+            vue: pluginVue
+        },
+        rules: {
+            'vue/no-v-html': 'error'
         }
     }
 ];
