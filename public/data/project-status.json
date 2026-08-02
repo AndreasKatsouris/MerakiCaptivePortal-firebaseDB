@@ -1,6 +1,6 @@
 {
-  "lastUpdated": "2026-07-28",
-  "lastUpdatedNote": "**W2 IS SENDING — the launch gate's second wheel is live end-to-end.** The 07:00 SAST sweep on 2026-07-28 logged `{\"scanned\":1,\"sent\":1,\"silent\":0,\"skipped\":0,\"errors\":0}`, delivering `ross_daily_digest` (`HX9736a1e8…`, the Meta-approved template) — **the first `sent` in the rail's history**; 07-25/26/27 all logged `silent:1`. That closes the six-week freeze traced on 07-26 and fixed in code by #196, then flipped to `apply` in prod on 07-27. **DELIVERY CONFIRMED by the founder the same morning** — the digest arrived on WhatsApp, so the rail is verified end-to-end (composed → accepted by Twilio → delivered by Meta → read by a human), not merely accepted. That distinction matters here because the 2026-06-11 lesson is exactly that an accepted send can still be silently dropped; the approved-template path held. **Still worth doing: set `TWILIO_STATUS_CALLBACK_URL`** — today's confirmation was a human eyeballing a phone, which does not scale past the founder and gives no signal when a future send fails (#194 is inert without it). Since the last note: **#201** (rules strict-JSON, queue Q4) and **#202** (receipt reward payload, queue Q5) merged — automation queue Q1–Q5 are all shipped; **Q6–Q11 remain**. W1 food-cost D1–D4 remains complete and live.",
+  "lastUpdated": "2026-08-02",
+  "lastUpdatedNote": "**Scheduled groom: reconciled #203–#206, recovered a 5th stranded scan branch, refilled the automation queue.** Since the 07-28 note: **#205** closed the `salesData`/`forecasts` write-cascade (first security remediation since #178, non-admin arm); **#206** measured the retention debt (`scanningData` 101,197 / `wifiLogins` 18,198 / `activeUsers` 16,805 records) and carded the scheduled prune (**Q13**). **7 PRs are open awaiting operator review — the highest count in a while:** #208/#209/#210 (queue cards Q7/Q6/Q8, ready to merge), #211 (new ROSS Purchase Orders design+plan), #212/#213 (scheduled security scans; **#213 flags an unverified possible functional regression in #205's delete path** — see Bug Triage Queue), #207 (a stale reflect PR whose content this groom's predecessor already landed — safe to close unmerged). Recovered `claude/sleepy-einstein-3xgyap` (a 2026-07-31 scan that never got a PR — reconciliation-only, one new Low) and folded its finding in below.",
   "sprint": {
     "goal": "Effective implementation of Hi-Fi v2, with ROSS as the central post-login surface for every subscribed user",
     "started": "2026-04-30",
@@ -516,6 +516,14 @@
     }
   ],
   "bugs": [
+    {
+      "title": "Recovered from a stranded scan branch (claude/sleepy-einstein-3xgyap, never had a PR — 2026-08-02 groom).",
+      "severity": "low",
+      "discoveredAt": "2026-07-31",
+      "discoveredOn": "scheduled OWASP scan, recovered 2026-08-02",
+      "blockingSprint": "False",
+      "notes": "locations root .read is \"auth != null\" (database.rules.json:44) — any authenticated user can enumerate every tenant's location name/address/ownerId platform-wide. The write side is already closed (:45, HIGH-04); this is the read-cascade counterpart, same pattern class as CRIT-08 (guests) / HIGH-05 (queue) / the stockUsage row below. Found by the 2026-07-31 scheduled OWASP scan, which was otherwise reconciliation-only (zero new Critical/High — every other finding mapped to an already-open row). Fold into the same RTDB-rules-batch writer-census work as the rest of the read-cascade family; do not fix in isolation (writer census first, per CLAUDE.md step 5e)."
+    },
     {
       "title": "receipts root .write is \"auth != null\" with NO child rules at all — any authenticated account can PUT /receipts.json and REPLACE EVERY TENANT'S RECEIPTS in one request.",
       "severity": "critical",
