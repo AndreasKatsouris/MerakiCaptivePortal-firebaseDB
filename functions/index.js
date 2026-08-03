@@ -3319,6 +3319,8 @@ const {
 } = require('./receiptTemplateManager');
 
 const { detectReceiptText } = require('./receiptProcessor');
+const { getSignedReceiptImageUrl } = require('./receiptImageAccess');
+const { bucket: receiptsBucket } = require('./config/firebase-admin.js');
 
 /**
  * Get all receipt templates (with optional filtering)
@@ -3676,6 +3678,39 @@ exports.getTemplatePerformance = onRequest({ cors: true }, async (req, res) => {
                 success: false,
                 error: error.message
             });
+        }
+    });
+});
+
+/**
+ * Mint a short-TTL signed URL for a receipt's privately-archived image
+ * (CRIT-09 spec fork F2 — queue card Q7). Falls back to the legacy Twilio
+ * `imageUrl` client-side for pre-PR-B records that have no `storagePath`.
+ * POST /getReceiptImageUrl { receiptId }
+ */
+exports.getReceiptImageUrl = onRequest({ cors: true }, async (req, res) => {
+    cors(req, res, async () => {
+        if (req.method !== 'POST') {
+            return res.status(405).json({ error: 'Method not allowed' });
+        }
+
+        try {
+            if (!await requireAdmin(req, res)) return;
+
+            const { receiptId } = req.body || {};
+            if (!receiptId) {
+                return res.status(400).json({ error: 'receiptId is required' });
+            }
+
+            const result = await getSignedReceiptImageUrl({ rtdb: admin.database(), bucket: receiptsBucket, receiptId });
+            if (!result) {
+                return res.status(404).json({ error: 'Receipt has no stored image' });
+            }
+
+            return res.status(200).json({ signedUrl: result.signedUrl });
+        } catch (error) {
+            console.error('Error minting receipt image signed URL:', error);
+            return res.status(500).json({ error: error.message });
         }
     });
 });
