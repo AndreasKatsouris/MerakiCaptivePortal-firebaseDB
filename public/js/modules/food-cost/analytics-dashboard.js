@@ -91,6 +91,7 @@ export const FoodCostAnalyticsDashboard = {
       },
       recommendations: [],
       errorMessage: '',
+      showNoDataHelp: false,
       debugMode: false,
       itemListData: [],
       itemListFilters: {
@@ -228,7 +229,8 @@ export const FoodCostAnalyticsDashboard = {
     async loadAnalytics() {
       this.isLoading = true;
       this.errorMessage = null; // Clear any previous errors
-      
+      this.showNoDataHelp = false;
+
       // Destroy existing charts before loading new data
       this.destroyAllCharts();
       
@@ -1046,18 +1048,8 @@ export const FoodCostAnalyticsDashboard = {
     showNoDataMessage() {
       // Show a message when no data is available
       console.log('No stock usage data found for the selected location and date range');
-      this.errorMessage = `
-        <div>
-          <p>No stock usage data found for the selected location and date range.</p>
-          <p>You can:</p>
-          <ul>
-                                <li>Save stock data from the <a href="/js/modules/food-cost/cost-driver.html" target="_blank">Food Cost module</a></li>
-            <li><a href="/generate-test-stock-data.html" target="_blank">Generate test data</a> for this location</li>
-            <li>Check if you have the correct location selected</li>
-            <li>Adjust the date range to include days with data</li>
-          </ul>
-        </div>
-      `;
+      this.errorMessage = 'No stock usage data found for the selected location and date range.';
+      this.showNoDataHelp = true;
     },
     
     exportReport() {
@@ -1163,7 +1155,16 @@ export const FoodCostAnalyticsDashboard = {
       <!-- Error State -->
       <div v-if="errorMessage" class="alert alert-warning" role="alert">
         <h4 class="alert-heading"><i class="fas fa-info-circle me-2"></i>No Data Available</h4>
-        <div v-html="errorMessage"></div>
+        <div>{{ errorMessage }}</div>
+        <div v-if="showNoDataHelp">
+          <p>You can:</p>
+          <ul>
+            <li>Save stock data from the <a href="/js/modules/food-cost/cost-driver.html" target="_blank">Food Cost module</a></li>
+            <li><a href="/generate-test-stock-data.html" target="_blank">Generate test data</a> for this location</li>
+            <li>Check if you have the correct location selected</li>
+            <li>Adjust the date range to include days with data</li>
+          </ul>
+        </div>
       </div>
       
       <!-- Loading State -->
