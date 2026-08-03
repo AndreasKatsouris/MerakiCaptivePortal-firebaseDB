@@ -645,11 +645,20 @@
       "notes": "functions/queueAnalytics.js:343 does exports.cleanupOldQueuesScheduled = onSchedule('every 24 hours', …), but line 357's module.exports = { … } REPLACES the whole exports object (CommonJS), dropping that assignment. So require('./queueAnalytics').cleanupOldQueuesScheduled is undefined, functions/index.js:2243 exports undefined, and firebase reports No function matches the filter: cleanupOldQueuesScheduled — it's never been a deployable function. Consequence: automated daily queue pruning is NOT running (only the manual cleanupOldQueues HTTP fn works), compounding the unbounded-node retention bug below. Found 2026-06-01 during the Phase 7 ① ledger deploy (106 deployed vs 107 exports → traced to this phantom). Fix: include cleanupOldQueuesScheduled in the module.exports = {…} object (or move the assignment after it). One-line merge + redeploy."
     },
     {
-      "title": "SEVERITY RAISED to High 2026-07-04",
-      "severity": "unspecified",
-      "discoveredOn": "auth.token.admin === true",
-      "blockingSprint": "",
-      "notes": "salesData/forecasts .write root cascade bypass — any authed tenant can OVERWRITE another tenant's EXISTING record, not just create new ones — database.rules.json:495-521. RTDB write-rule cascades are permissive-only: the collection-level .write: \"auth != null\" already grants access before the child ownership check runs, and there is no .validate reasserting newData.child('userId').val() === auth.uid independent of write path — so the child check is dead code for existing records. Original 2026-05-31 finding (preserved below) only caught the create-new-record case; the 2026-07-04 fresh OWASP scan (docs/security/owasp-audit-2026-07-04.md) traced the full cascade and found the more serious overwrite-existing-record variant (financial data corruption/fabrication across tenants), independently re-confirmed 2026-07-05. Bundle into the same coordinated RTDB-rules PR as whatsapp-numbers/location-whatsapp-mapping (new finding, below) and the existing HIGH-04/HIGH-05/MED-06 write-cascade items — full writer census first (CLAUDE.md step 5e; plan already drafted in PR #166). _Original 2026-05-31 text:_ the H-2 work (PR #96) tightened salesData *reads* to admin + per-child owner, but the root .write remains auth != null. The per-child .validate guards *overwriting* an existing record (owner check), but any authenticated user can still create NEW salesData records under arbitrary keys (no userId-match enforced on create). Fix: add a .validate mirroring the rewards node's pattern — `!data.exists()"
+      "title": "NEW 2026-08-01 (scheduled scan) — sales-data-service.js:886-902's legacy-ownership auto-repair silently re-attributes a pre-#205 record with no userId to the CURRENT EDITOR rather than blocking the write.",
+      "severity": "low",
+      "discoveredAt": "2026-08-01",
+      "discoveredOn": "scheduled OWASP scan",
+      "blockingSprint": "False",
+      "notes": "updateForecast() logs a console.warn but does not throw when existingForecast.userId is missing — a realistic state for any record written before the #205 migration and before scripts/audit-sales-forecast-ownership.js backfills it. If an admin edits another tenant's un-migrated forecast first, it is silently and permanently re-owned to the admin's uid, transferring it out of the original tenant's byUser index and access scope. Not externally exploitable (requires existing admin/owner write access), but a data-integrity/tenant-isolation footgun the PR introduced. The code's own comment says this branch \"should [be] unreachable\" — make that structural: throw for a non-admin caller instead of silently repairing, forcing the backfill script to run first. Found by the 2026-08-01 scheduled security-auditor scan (delta review of commits since 2026-07-28)."
+    },
+    {
+      "title": "NEW 2026-08-01 (scheduled scan) — firebase-admin pinned at ^12.7.0 in BOTH root package.json:37 and functions/package.json:22, needs >=14.2.0 (semver-major); not previously tracked (prior npm-audit rows only named axios/grpc-js as High and form-data/js-yaml/brace-expansion/ws as Medium, root-only).",
+      "severity": "moderate",
+      "discoveredAt": "2026-08-01",
+      "discoveredOn": "scheduled OWASP scan",
+      "blockingSprint": "False",
+      "notes": "This one is more load-bearing than those because it's outdated in functions/ — the production Cloud Functions runtime — not just root tooling. It's the root cause of 7 of the 10 moderate advisories in functions/'s npm audit (@google-cloud/firestore, @google-cloud/storage, google-gax, gaxios, retry-request, teeny-request, uuid) and the equivalent set in root. All moderate-severity, transitive GCP-SDK advisories, no known active RCE — but the version gap is real and needs a major-version bump + deploy-testing pass, not a plain npm audit fix. Worth its own card, separate from the lockfile-only Q8 bundle (CRIT-13/HIGH-12/HIGH-13/MED-11). Found by the 2026-08-01 scheduled security-auditor scan."
     },
     {
       "title": "rewardsProcessor.js:646 modulo bias in generateFallbackCode",
