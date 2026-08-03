@@ -30,6 +30,10 @@
  */
 
 const { evaluateTwilioRequest } = require('./utils/twilio-signature');
+// safeToken lives in utils/log-safe.js so receiptImageAccess.js (and any future
+// log-emitting surface) shares this implementation instead of copying it.
+// Still re-exported below — this module's public surface is unchanged.
+const { safeToken } = require('./utils/log-safe');
 
 /**
  * Twilio's terminal failure states. `undelivered` is where the outside-the-window
@@ -42,18 +46,6 @@ const KNOWN_STATUSES = new Set([
     'accepted', 'queued', 'sending', 'sent', 'receiving', 'received',
     'delivered', 'read', 'undelivered', 'failed', 'canceled', 'scheduled',
 ]);
-
-/**
- * Collapse an untrusted value to a short, single-line, log-safe token.
- * Anything outside the whitelist becomes `invalid` — never partially-stripped
- * attacker text, which would still let fragments through.
- */
-function safeToken(value, pattern, fallback = 'unknown') {
-    if (value === null || value === undefined) return fallback;
-    if (typeof value === 'object') return 'invalid'; // objects can throw on coercion
-    const s = String(value);
-    return pattern.test(s) ? s : 'invalid';
-}
 
 const SID_RE = /^[A-Za-z0-9_-]{1,64}$/;
 const ERROR_CODE_RE = /^[0-9]{1,10}$/;
