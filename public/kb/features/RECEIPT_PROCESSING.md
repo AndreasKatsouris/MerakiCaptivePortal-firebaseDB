@@ -15,6 +15,8 @@ The Receipt Processing module handles the end-to-end pipeline for restaurant rec
 | `public/js/modules/receipt-settings.js` | Frontend receipt settings module |
 | `public/js/modules/receipt-template-creator.js` | Template creation/editing UI logic |
 | `functions/receiveWhatsappMessage.js` | WhatsApp handler that triggers receipt processing on image messages |
+| `functions/receiptImageAccess.js` | `getSignedReceiptImageUrl()` — DI'd core that signs a receipt's `storagePath` into a ≤15-min read URL; refuses anything outside the `receipts/` prefix (CRIT-09 F2, queue Q7) |
+| `public/js/receipt-management/receipt-image-url.js` | `resolveReceiptImageSrc()` — shared client helper both admin viewers call to prefer the signed-URL CF over the legacy `imageUrl` |
 
 ## Data Model (RTDB Paths)
 
@@ -25,7 +27,7 @@ Processed receipt records (auto-generated push key):
 ```json
 {
   "imageUrl": "https://api.twilio.com/2010-04-01/Accounts/.../Media/... (the original Twilio MediaUrl0 — NOT a storage.googleapis.com URL; corrected 2026-07-22, CRIT-09 census)",
-  "storagePath": "receipts/{uuid}.jpg (private GCS archival copy, predefinedAcl:'private', unguessable name — since CRIT-09 PR-B; null for pre-PR-B records. Serving via short-TTL signed URLs = F2 follow-up)",
+  "storagePath": "receipts/{uuid}.jpg (private GCS archival copy, predefinedAcl:'private', unguessable name — since CRIT-09 PR-B; null for pre-PR-B records. Served to admins via short-TTL signed URLs — see 'Serving Admin Receipt Images' below, shipped by queue card Q7)",
   "guestPhoneNumber": "+27827001116",
   "processedAt": 1721234567890,
   "status": "validated",
@@ -174,6 +176,16 @@ Legacy extraction throws errors for:
 ### Step 6: Storage
 
 Receipt data is saved to `receipts/{pushKey}` with status `pending_validation`. Status progresses to `validated` when rewards are processed.
+
+## Serving Admin Receipt Images (CRIT-09 F2, queue Q7)
+
+Admin surfaces that render a receipt image (`public/js/receipt-management.js`'s `viewReceipt`, `public/js/modules/receipts/ReceiptManager.js`'s `populateReceiptModal`) never read `imageUrl` directly — they call the shared `resolveReceiptImageSrc(receipt, receiptId, idToken)` helper (`public/js/receipt-management/receipt-image-url.js`), which:
+
+1. If `receipt.storagePath` is set (records archived since CRIT-09 PR-B, #183), POSTs `{ receiptId }` to the admin-only `getReceiptImageUrl` Cloud Function and uses the returned `signedUrl`.
+2. Otherwise (pre-PR-B records, `storagePath` still `null`), falls back to the legacy Twilio `imageUrl` directly — no CF call.
+3. If the CF call itself fails (network error, non-2xx, missing image), falls back to `imageUrl` rather than showing a broken image.
+
+`getReceiptImageUrl` (`functions/index.js`, core logic in `functions/receiptImageAccess.js`) is gated by `requireAdmin` (dual-factor: `admin` custom claim + `admin-claims/{uid}` RTDB record) and mints a signed URL with `expires` ≤15 minutes out — never persisted, always minted fresh at read time. It also refuses to sign any `storagePath` outside the `receipts/` prefix: the `receipts` root `.write` rule is currently `auth != null` with no child validation (see Security Rules below and the Bug Triage Queue), so a non-admin could otherwise plant an arbitrary `storagePath` on their own receipt record and have an admin's own view of it mint a signed URL for any object in the bucket.
 
 ## Receipt Settings Admin UI
 
