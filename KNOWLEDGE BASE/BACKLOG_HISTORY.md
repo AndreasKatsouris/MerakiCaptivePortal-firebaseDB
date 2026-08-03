@@ -6,6 +6,14 @@
 
 ---
 
+## 2026-08-03 (PR-queue clearance — 6 merged, 4 superseded; corrected same day)
+
+Last updated: 2026-08-03 — **The open-PR queue is CLEARED: all 9 PRs reviewed for mergeability, 6 merged, 4 superseded and closed.** Every PR was mergeable against master *individually*; all conflicts were PR-vs-PR and confined to this file and its siblings — two clusters, one editorial (three competing `Last updated` notes) and one trivial (adjacent queue-card strike rows). **#216** consolidated the four docs PRs (#207/#212/#213/#214, all now closed unmerged with their content preserved), then **#208** (Q7 signed-URL receipt images), **#209** (Q6 scoped `vue/no-v-html`), **#210** (Q8 root npm audit), **#215** (Q11 v-html swap) and **#211** (ROSS Purchase Orders design + D1 plan) merged in that order. Master verified after every step: build green, vitest **36 failed / 953 passed** against the pre-merge baseline of **36 failed / 924 passed** — identical failing-file set, **zero regressions**, +29 tests. **Automation queue Q1–Q8 + Q11 are now all shipped; Q9/Q10/Q12/Q13/Q14/Q15 remain.**
+
+> **Superseded by:** the same-day correction pass, which found the reconciliation had imported a FALSE rule-semantics claim (the 2026-08-02 scan's post-update-tree premise) into LESSONS and the backlog. The merge/verification facts recorded above remain accurate — an independent audit confirmed zero content loss — but the #205 delete-regression item they pointed at is refuted.
+
+---
+
 ## 2026-08-03 (docs reconciliation — #216, superseded hours later by the merge-execution pass)
 
 Last updated: 2026-08-03 — **Doc-state reconciliation: the four open docs PRs (#207 / #212 / #213 / #214) are consolidated here, so the operator merges once instead of hand-resolving three competing "Last updated" notes.** Superseded the same day by the merge-execution session below, which cleared the entire PR queue.
