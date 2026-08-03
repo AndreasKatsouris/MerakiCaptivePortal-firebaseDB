@@ -6,6 +6,12 @@
 
 ---
 
+## 2026-08-03 (docs reconciliation — #216, superseded hours later by the merge-execution pass)
+
+Last updated: 2026-08-03 — **Doc-state reconciliation: the four open docs PRs (#207 / #212 / #213 / #214) are consolidated here, so the operator merges once instead of hand-resolving three competing "Last updated" notes.** Superseded the same day by the merge-execution session below, which cleared the entire PR queue.
+
+---
+
 ## 2026-08-02 (weekly groom — #203–#206 reconciled, queue refilled, 5th stranded scan branch recovered)
 
 Last updated: 2026-08-02 — **Scheduled groom: reconciled #203–#206, recovered a 5th stranded scan branch, refilled the automation queue.** Since the 07-28 note: **#205** closed the `salesData`/`forecasts` write-cascade (first security remediation since #178, non-admin arm); **#206** measured the retention debt (`scanningData` 101,197 / `wifiLogins` 18,198 / `activeUsers` 16,805 records) and carded the scheduled prune (**Q13**). **7 PRs are open awaiting operator review — the highest count in a while:** #208/#209/#210 (queue cards Q7/Q6/Q8, ready to merge), #211 (new ROSS Purchase Orders design+plan), #212/#213 (scheduled security scans; **#213 flags an unverified possible functional regression in #205's delete path** — see Bug Triage Queue), #207 (a stale reflect PR whose content this groom's predecessor already landed — safe to close unmerged). Recovered `claude/sleepy-einstein-3xgyap` (a 2026-07-31 scan that never got a PR — reconciliation-only, one new Low) and folded its finding in below.
