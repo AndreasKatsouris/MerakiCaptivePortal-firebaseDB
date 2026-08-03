@@ -6,6 +6,12 @@
 
 ---
 
+## 2026-08-03 (correction pass — false rule-semantics lesson retracted, #218)
+
+Last updated: 2026-08-03 — **Correction pass (second session today): an adversarial re-review of the #216 reconciliation found that it imported a FALSE rule-semantics claim into the session-start files, and this fixes it.** The 2026-08-02 scan's central finding — that RTDB evaluates multi-path `update()` rules against the post-update tree, so #205 broke non-admin deletes — **is refuted**: `root` is the PRE-write snapshot (`newData` is the only post-write view), so all three paths of the atomic delete grant and normal deletes succeed. The claim had been generalised into a LESSONS heuristic and was driving `Next major`; it is now retracted in place, and the Bug Triage row is narrowed to the one case that IS real — a legacy record with **no `userId`** is undeletable by its non-admin owner. Also fixed here: a false `byUser` ownership claim, an inconsistent Critical/High count carried in from merging two scans' prose verbatim, a stale "Master at #211", the un-noted `whatsappStatusCallback` deploy, and the Q14/Q15 queue reorder (reverted — reordering belongs to the groomer). **The reconciliation itself was sound** — an independent line-by-line audit confirmed zero content loss across all four superseded PRs; the defect was that "nothing lost" was audited and "nothing wrong" was not.
+
+---
+
 ## 2026-08-03 (PR-queue clearance — 6 merged, 4 superseded; corrected same day)
 
 Last updated: 2026-08-03 — **The open-PR queue is CLEARED: all 9 PRs reviewed for mergeability, 6 merged, 4 superseded and closed.** Every PR was mergeable against master *individually*; all conflicts were PR-vs-PR and confined to this file and its siblings — two clusters, one editorial (three competing `Last updated` notes) and one trivial (adjacent queue-card strike rows). **#216** consolidated the four docs PRs (#207/#212/#213/#214, all now closed unmerged with their content preserved), then **#208** (Q7 signed-URL receipt images), **#209** (Q6 scoped `vue/no-v-html`), **#210** (Q8 root npm audit), **#215** (Q11 v-html swap) and **#211** (ROSS Purchase Orders design + D1 plan) merged in that order. Master verified after every step: build green, vitest **36 failed / 953 passed** against the pre-merge baseline of **36 failed / 924 passed** — identical failing-file set, **zero regressions**, +29 tests. **Automation queue Q1–Q8 + Q11 are now all shipped; Q9/Q10/Q12/Q13/Q14/Q15 remain.**
