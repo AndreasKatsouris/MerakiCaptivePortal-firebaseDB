@@ -6,6 +6,12 @@
 
 ---
 
+## 2026-08-04 (PO backlog reconciliation — #221)
+
+Last updated: 2026-08-04 — **ROSS Purchase Orders is on the backlog for the first time, and D1 is starting.** The design + D1 plan merged as **#211** on 08-03, but the reconciliation the design itself specifies (§11) was never applied to this file — until today there was **zero mention** of Purchase Orders anywhere in it. Closed here: the **PO track** (D1 supplier book → D2 draft + CSV + F7 → D3 send path → D4 food-cost pre-fill) is logged under High Priority as an **operator-chosen sequencing decision (design R6)** — it runs *ahead of* the launch gate's remaining items, which stay open and unstarted rather than being silently displaced. **FC-v2.1c is withdrawn** as superseded (its F7 CSV-sanitizer requirement carries into D2); **FC-v2.1b** is marked partially satisfied by D4's count picker; **FC-v2.1a** is unaffected. The design's un-carded **R1b** finding is logged as a Bug Triage row for the first time, **re-verified against master `75300b35` this session** rather than inherited from the design doc.
+
+---
+
 ## 2026-08-03 (sync-verification pass — the two owed function deploys shipped, #219)
 
 Last updated: 2026-08-03 — **Sync-verification pass (third session today): master confirmed in sync with `origin/master`, local branch/worktree debt cleared, and the two owed function deploys SHIPPED.** `getReceiptImageUrl` and `whatsappStatusCallback` are live and ACTIVE (nodejs22, uploaded 17:47–17:48 SAST; `functions:list` went 121 → 123). Both were **creates, not updates** — confirming `whatsappStatusCallback` had never been deployed since #194 merged on 07-26, i.e. the drift was 8 days old, not same-day. **CRIT-09 F2 is still NOT closed in production** for a narrower reason than before: the CF is deployed, but the `iam.serviceAccounts.signBlob` grant on the runtime SA is **unverified** (gcloud needs interactive reauth), so signed-URL generation may still fail at runtime. Cleanup: 10 local + 29 remote stale branches (incl. the stranded `claude/sleepy-einstein-3xgyap`), 2 registered worktrees and 18 orphaned worktree directories (~335 MB), and an empty stash — all removed; master untouched, tree clean at #218. Four findings logged in the Bug Triage Queue below, and the recorded test baseline is corrected (the previously-cited 36/989 does not reproduce).
