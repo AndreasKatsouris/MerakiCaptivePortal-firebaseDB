@@ -69,6 +69,39 @@ export const useOrdersStore = defineStore('rossOrders', {
     needsEmailCount: (state) => state.suppliers.filter((s) => s.needsEmail).length,
 
     /**
+     * Every item in the reviewed stock count, assigned and unassigned alike, as
+     * one flat list the owner can filter and multi-select.
+     *
+     * Deliberately NOT grouped by category. Grouping was the first attempt and
+     * it was wrong: a category like "Butchery" routinely spans several
+     * suppliers, so assigning a whole category is too blunt to be correct.
+     * Category and cost centre are FILTERS here, not units of assignment.
+     */
+    seedAllItems: (state) => {
+      const p = state.seedPreview
+      if (!p) return []
+      const assigned = Array.isArray(p.items) ? p.items : []
+      const unassigned = Array.isArray(p.unassigned?.items) ? p.unassigned.items : []
+      return [...assigned, ...unassigned]
+        .map((i) => ({ ...i, assigned: !!i.supplierName }))
+        .sort((a, b) => String(a.description).localeCompare(String(b.description)))
+    },
+
+    /** Distinct filter values, so the UI never invents a chip with nothing behind it. */
+    seedFilterOptions() {
+      const cats = new Set()
+      const centres = new Set()
+      for (const i of this.seedAllItems) {
+        if (i.category) cats.add(i.category)
+        if (i.costCenter) centres.add(i.costCenter)
+      }
+      return {
+        categories: [...cats].sort((a, b) => a.localeCompare(b)),
+        costCentres: [...centres].sort((a, b) => a.localeCompare(b)),
+      }
+    },
+
+    /**
      * Derived supplier names that look like the same company, grouped so the
      * review screen can offer a one-action merge. The server supplies `mergeKey`
      * (case, accent and punctuation folded); grouping is a UI affordance only —

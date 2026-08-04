@@ -56,7 +56,13 @@ function rowsFromPreview(preview) {
   }))
 }
 
-watch(() => store.seedPreview, (p) => { rows.value = rowsFromPreview(p) })
+watch(() => store.seedPreview, (p) => {
+  rows.value = rowsFromPreview(p)
+  assignments.value = []
+  selectedKeys.value = new Set()
+  assignSupplier.value = ''
+  clearFilters()
+})
 
 const tickedCount = computed(() => rows.value.filter((r) => r.ticked).length)
 
@@ -65,11 +71,14 @@ const tickedCount = computed(() => rows.value.filter((r) => r.ticked).length)
 // above a disabled "Import 0 suppliers" button, with Cancel the only way out.
 // The stock CSV's supplier column is auto-detected by header name, so the usual
 // cause is a column that is absent or named something unrecognised.
+// Only a true dead end when there is nothing to import AND nothing to assign.
+// Before D1.1 an all-unassigned count landed here with no way forward at all.
 const nothingToImport = computed(() => (
-  !!store.seedPreview && rows.value.length === 0
+  !!store.seedPreview && rows.value.length === 0 && store.seedAllItems.length === 0
 ))
 const canCommit = computed(() => (
-  tickedCount.value > 0 && rows.value.every((r) => !r.ticked || r.name.trim().length > 0)
+  (tickedCount.value > 0 || assignments.value.length > 0)
+  && rows.value.every((r) => !r.ticked || r.name.trim().length > 0)
 ))
 
 // Groups still worth offering a merge for: those whose members are all still
@@ -89,6 +98,86 @@ function mergeGroup(group) {
   }
   rows.value = [merged, ...kept]
 }
+
+// --- D1.1: assigning stock items to suppliers -------------------------------
+// A stock file with no supplier column puts every item in the unassigned bucket,
+// and a category routinely spans several suppliers — so this is a filterable
+// list with multi-select, NOT category buckets. Assignment is a setup task done
+// once, so a few minutes of real work is fine; being impossible is not.
+//
+// Assignments are STAGED and sent with the same commit as the derived
+// suppliers: the owner reviews everything once and writes once.
+const assignments = ref([])        // [{ id, supplierName, keys, itemCount }]
+const selectedKeys = ref(new Set())
+const assignSupplier = ref('')
+const filterCategory = ref('')
+const filterCostCentre = ref('')
+const filterText = ref('')
+const showOnlyUnassigned = ref(false)
+
+// Keys already staged — hidden from the list so the owner cannot assign one item
+// to two suppliers by accident in a single pass.
+const stagedKeys = computed(() => new Set(assignments.value.flatMap((a) => a.keys)))
+
+const visibleItems = computed(() => {
+  const q = filterText.value.trim().toLowerCase()
+  return store.seedAllItems.filter((i) => {
+    if (stagedKeys.value.has(i.key)) return false
+    if (showOnlyUnassigned.value && i.assigned) return false
+    if (filterCategory.value && i.category !== filterCategory.value) return false
+    if (filterCostCentre.value && i.costCenter !== filterCostCentre.value) return false
+    if (q && !`${i.description} ${i.itemCode}`.toLowerCase().includes(q)) return false
+    return true
+  })
+})
+
+const selectedCount = computed(() => selectedKeys.value.size)
+const allVisibleSelected = computed(() => (
+  visibleItems.value.length > 0 && visibleItems.value.every((i) => selectedKeys.value.has(i.key))
+))
+
+function toggleItem(key) {
+  const next = new Set(selectedKeys.value)
+  if (next.has(key)) next.delete(key)
+  else next.add(key)
+  selectedKeys.value = next
+}
+
+/** Select-all applies to the CURRENT FILTER, which is the whole point of filtering first. */
+function toggleAllVisible() {
+  const next = new Set(selectedKeys.value)
+  if (allVisibleSelected.value) visibleItems.value.forEach((i) => next.delete(i.key))
+  else visibleItems.value.forEach((i) => next.add(i.key))
+  selectedKeys.value = next
+}
+
+function clearFilters() {
+  filterCategory.value = ''
+  filterCostCentre.value = ''
+  filterText.value = ''
+  showOnlyUnassigned.value = false
+}
+
+function stageAssignment() {
+  const supplierName = assignSupplier.value.trim()
+  if (!supplierName || !selectedCount.value) return
+  assignments.value = [...assignments.value, {
+    id: `${supplierName}::${assignments.value.length}`,
+    supplierName,
+    keys: [...selectedKeys.value],
+    itemCount: selectedKeys.value.size,
+  }]
+  selectedKeys.value = new Set()
+  assignSupplier.value = ''
+}
+
+function undoAssignment(id) {
+  assignments.value = assignments.value.filter((a) => a.id !== id)
+}
+
+const assignedItemCount = computed(
+  () => assignments.value.reduce((n, a) => n + a.itemCount, 0),
+)
 
 function tickAll(value) {
   rows.value = rows.value.map((r) => ({ ...r, ticked: value }))
@@ -139,13 +228,20 @@ async function startImport() {
 }
 
 async function confirmImport() {
-  const selections = rows.value
-    .filter((r) => r.ticked)
-    .map((r) => ({ name: r.name.trim(), sourceNames: r.sourceNames }))
+  const selections = [
+    ...rows.value
+      .filter((r) => r.ticked)
+      .map((r) => ({ name: r.name.trim(), sourceNames: r.sourceNames })),
+    // Hand-assigned groups ride the same commit. `itemKeys` are the server's own
+    // keys from the preview, so the server can still refuse anything it did not
+    // derive itself.
+    ...assignments.value.map((a) => ({ name: a.supplierName, itemKeys: a.keys })),
+  ]
   saving.value = true
   const out = await store.commitSeed({ locationId: selectedLocationId.value, selections })
   saving.value = false
   if (out) {
+    assignments.value = []
     successMsg.value = `Imported ${out.suppliersCreated} supplier`
       + `${out.suppliersCreated === 1 ? '' : 's'} and ${out.productsCreated} product`
       + `${out.productsCreated === 1 ? '' : 's'}.`
@@ -266,14 +362,109 @@ watch(selectedLocationId, () => {
           </div>
 
           <template v-if="!nothingToImport">
-          <!-- Things that would otherwise vanish quietly -->
-          <div v-if="store.seedPreview.unassigned.itemCount > 0" class="ord__notice">
-            <HfIcon name="alert" :size="12" />
-            <span>
-              {{ store.seedPreview.unassigned.itemCount }} items have no supplier in your
-              stock file. They won't be imported — you can add them to a supplier by hand later.
-            </span>
+          <!-- Assign stock items to suppliers. A category spans several
+               suppliers, so category and cost centre are FILTERS here, never the
+               unit of assignment: filter down, select, assign, repeat. -->
+          <div v-if="store.seedAllItems.length" class="ord__assign">
+            <h4 class="ord__assign-title">Assign items to suppliers</h4>
+            <p class="ord__assign-sub">
+              <template v-if="store.seedPreview.unassigned.itemCount">
+                {{ store.seedPreview.unassigned.itemCount }} of
+                {{ store.seedAllItems.length }} items have no supplier in your stock file.
+              </template>
+              Filter the list, select what belongs to one supplier, then assign. Repeat per
+              supplier — anything you leave is skipped and can be assigned later.
+            </p>
+
+            <div class="ord__filters">
+              <input
+                v-model="filterText"
+                class="ord__review-name"
+                placeholder="Search description or code"
+                aria-label="Search items"
+              />
+              <select v-model="filterCostCentre" class="ord__select" aria-label="Filter by cost centre">
+                <option value="">All cost centres</option>
+                <option v-for="c in store.seedFilterOptions.costCentres" :key="c" :value="c">{{ c }}</option>
+              </select>
+              <select v-model="filterCategory" class="ord__select" aria-label="Filter by category">
+                <option value="">All categories</option>
+                <option v-for="c in store.seedFilterOptions.categories" :key="c" :value="c">{{ c }}</option>
+              </select>
+              <label class="ord__filter-check">
+                <input v-model="showOnlyUnassigned" type="checkbox" class="ord__check" />
+                <span>Only unassigned</span>
+              </label>
+              <HfButton variant="ghost" @click="clearFilters">Clear</HfButton>
+            </div>
+
+            <div class="ord__assign-bar">
+              <label class="ord__filter-check">
+                <input
+                  type="checkbox"
+                  class="ord__check"
+                  :checked="allVisibleSelected"
+                  :disabled="!visibleItems.length"
+                  aria-label="Select all shown"
+                  @change="toggleAllVisible"
+                />
+                <span>Select all {{ visibleItems.length }} shown</span>
+              </label>
+              <div class="ord__assign-input">
+                <input
+                  v-model="assignSupplier"
+                  class="ord__review-name"
+                  list="ord-supplier-names"
+                  placeholder="Assign selected to…"
+                  aria-label="Supplier for the selected items"
+                  @keyup.enter="stageAssignment"
+                />
+                <HfButton
+                  variant="solid"
+                  :disabled="!selectedCount || !assignSupplier.trim()"
+                  @click="stageAssignment"
+                >Assign {{ selectedCount }}</HfButton>
+              </div>
+            </div>
+
+            <!-- Existing suppliers offered as suggestions so owners reuse one
+                 rather than typing a near-duplicate. -->
+            <datalist id="ord-supplier-names">
+              <option v-for="s in suppliers" :key="s.supplierId" :value="s.name" />
+            </datalist>
+
+            <ul class="ord__items">
+              <li v-for="i in visibleItems" :key="i.key" class="ord__item">
+                <input
+                  type="checkbox"
+                  class="ord__check"
+                  :checked="selectedKeys.has(i.key)"
+                  :aria-label="`Select ${i.description}`"
+                  @change="toggleItem(i.key)"
+                />
+                <span class="ord__item-desc">{{ i.description }}</span>
+                <span class="hf-mono ord__item-meta">{{ i.costCenter }} · {{ i.category }}</span>
+                <HfChip v-if="i.assigned" tone="default">{{ i.supplierName }}</HfChip>
+                <HfChip v-else tone="warn">No supplier</HfChip>
+              </li>
+              <li v-if="!visibleItems.length" class="ord__item ord__item--empty">
+                Nothing matches those filters.
+              </li>
+            </ul>
+
+            <ul v-if="assignments.length" class="ord__assign-done">
+              <li v-for="a in assignments" :key="a.id" class="ord__assign-done-row">
+                <HfIcon name="check" :size="12" />
+                <span>{{ a.itemCount }} items → <strong>{{ a.supplierName }}</strong></span>
+                <button class="ord__assign-undo" @click="undoAssignment(a.id)">Undo</button>
+              </li>
+            </ul>
           </div>
+
+          <!-- Things that would otherwise vanish quietly. Deleted by accident in
+               the picker rework and restored: the unit flag is half of the
+               "default to ea, FLAG for review" decision, and hiding truncation
+               makes a partial import read as a complete one. -->
           <div v-if="store.seedPreview.unitDefaultedCount > 0" class="ord__notice">
             <HfIcon name="alert" :size="12" />
             <span>
@@ -296,7 +487,9 @@ watch(selectedLocationId, () => {
           </div>
 
           <div class="ord__review-tools">
-            <span class="hf-mono ord__panel-sub">{{ tickedCount }} of {{ rows.length }} selected</span>
+            <span class="hf-mono ord__panel-sub">
+              {{ tickedCount }} of {{ rows.length }} selected<template v-if="assignedItemCount"> · {{ assignedItemCount }} items assigned</template>
+            </span>
             <div class="ord__review-tool-btns">
               <HfButton variant="ghost" @click="tickAll(true)">Select all</HfButton>
               <HfButton variant="ghost" @click="tickAll(false)">Select none</HfButton>
@@ -328,7 +521,7 @@ watch(selectedLocationId, () => {
           <div class="ord__review-actions">
             <HfButton variant="ghost" :disabled="saving" @click="store.clearSeedPreview()">Cancel</HfButton>
             <HfButton variant="solid" :disabled="!canCommit || saving" @click="confirmImport">
-              {{ saving ? 'Importing…' : `Import ${tickedCount} supplier${tickedCount === 1 ? '' : 's'}` }}
+              {{ saving ? 'Importing…' : `Import ${tickedCount + assignments.length} supplier${(tickedCount + assignments.length) === 1 ? '' : 's'}` }}
             </HfButton>
           </div>
           </template>
@@ -496,6 +689,33 @@ watch(selectedLocationId, () => {
 .ord__review-name:disabled { opacity: 0.5; }
 .ord__review-count { font-size: 11px; color: var(--hf-ink-3); flex-shrink: 0; }
 .ord__review-actions { display: flex; justify-content: flex-end; gap: 8px; margin-top: 16px; }
+.ord__assign { border: 1px dashed var(--hf-warn, #b9770e); border-radius: 8px; padding: 14px; margin-bottom: 14px; }
+.ord__assign-title { margin: 0 0 4px; font-size: 14px; font-weight: 600; color: var(--hf-ink); }
+.ord__assign-sub { margin: 0 0 12px; font-size: 13px; color: var(--hf-ink-2); line-height: 1.5; }
+.ord__assign-done { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 8px; }
+.ord__filters { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; margin-bottom: 10px; }
+.ord__select {
+  border: 1px solid var(--hf-line); border-radius: 6px; padding: 6px 10px;
+  font-size: 13px; background: var(--hf-surface); color: var(--hf-ink);
+}
+.ord__filter-check { display: inline-flex; align-items: center; gap: 6px; font-size: 13px; color: var(--hf-ink-2); }
+.ord__assign-bar {
+  display: flex; align-items: center; justify-content: space-between; gap: 12px;
+  flex-wrap: wrap; padding: 10px 0; border-top: 1px solid var(--hf-line);
+  border-bottom: 1px solid var(--hf-line); margin-bottom: 8px;
+}
+.ord__items { list-style: none; margin: 0; padding: 0; max-height: 420px; overflow-y: auto; }
+.ord__item {
+  display: flex; align-items: center; gap: 10px; padding: 6px 2px;
+  border-bottom: 1px solid var(--hf-line); font-size: 13px;
+}
+.ord__item--empty { color: var(--hf-ink-3); justify-content: center; padding: 18px 0; border-bottom: none; }
+.ord__item-desc { flex: 1 1 160px; min-width: 0; color: var(--hf-ink); }
+.ord__item-meta { font-size: 11px; color: var(--hf-ink-3); flex: 0 1 auto; }
+.ord__assign-input { display: flex; gap: 6px; align-items: center; flex: 0 1 320px; }
+.ord__assign-done { margin-top: 12px; padding-top: 10px; border-top: 1px dashed var(--hf-line); }
+.ord__assign-done-row { display: flex; align-items: center; gap: 8px; font-size: 13px; color: var(--hf-ink-2); }
+.ord__assign-undo { background: none; border: none; color: var(--hf-ink-3); cursor: pointer; font-size: 12px; text-decoration: underline; padding: 0; }
 .ord__deadend-msg { margin: 0 0 8px; font-size: 14px; color: var(--hf-ink); font-weight: 600; }
 .ord__deadend-why { margin: 0 0 16px; font-size: 13px; color: var(--hf-ink-2); line-height: 1.6; }
 .ord__deadend-why em { font-style: normal; font-family: var(--hf-font-mono, monospace); font-size: 12px; }

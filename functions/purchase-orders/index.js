@@ -33,6 +33,8 @@ const { commitSeedBook } = require('./commit');
 const LOCATION_ID_RE = /^[a-zA-Z0-9_-]+$/;
 const MAX_RECORDS = 30;          // same bounded read as foodCostOverview
 const MAX_SEED_NAMES = 500;      // matches MAX_SUPPLIERS
+const MAX_SEED_ITEM_KEYS = 2000; // matches MAX_PRODUCTS per supplier
+const KEY_SAFE_RE = /^[A-Za-z0-9_-]+$/;
 const DENIED = { hasData: false };
 
 /**
@@ -189,13 +191,27 @@ function normaliseSelections(body) {
       return { error: 'selections must be an array of at most 500 entries' };
     }
     for (const s of sel) {
-      const okName = s && typeof s === 'object'
-        && typeof s.name === 'string' && s.name.trim().length > 0;
-      const okSources = s && Array.isArray(s.sourceNames)
-        && s.sourceNames.length > 0 && s.sourceNames.length <= MAX_SEED_NAMES
-        && s.sourceNames.every((n) => typeof n === 'string');
-      if (!okName || !okSources) {
-        return { error: 'each selection needs a non-empty name and a sourceNames array' };
+      if (!s || typeof s !== 'object') {
+        return { error: 'each selection must be an object' };
+      }
+      // A selection targets EITHER an existing supplier by id, or a name to
+      // find-or-create. D1.1 added the id form so hand-assigned items can go to
+      // a supplier the owner typed in themselves.
+      const hasId = typeof s.supplierId === 'string' && KEY_SAFE_RE.test(s.supplierId);
+      const hasName = typeof s.name === 'string' && s.name.trim().length > 0;
+      if (!hasId && !hasName) {
+        return { error: 'each selection needs a supplierId or a non-empty name' };
+      }
+      const okSources = s.sourceNames === undefined || (Array.isArray(s.sourceNames)
+        && s.sourceNames.length <= MAX_SEED_NAMES
+        && s.sourceNames.every((n) => typeof n === 'string'));
+      const okItems = s.itemKeys === undefined || (Array.isArray(s.itemKeys)
+        && s.itemKeys.length <= MAX_SEED_ITEM_KEYS
+        && s.itemKeys.every((k) => typeof k === 'string'));
+      if (!okSources) return { error: 'sourceNames must be an array of at most 500 strings' };
+      if (!okItems) return { error: 'itemKeys must be an array of at most 2000 strings' };
+      if ((s.sourceNames || []).length === 0 && (s.itemKeys || []).length === 0) {
+        return { error: 'each selection needs at least one sourceName or itemKey' };
       }
     }
     return { selections: sel };

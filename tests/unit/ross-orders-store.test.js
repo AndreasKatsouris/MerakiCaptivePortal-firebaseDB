@@ -153,6 +153,51 @@ describe('seed flow', () => {
   })
 })
 
+// D1.1. Grouping by category was the first attempt and it was wrong — a
+// category routinely spans several suppliers, so it is a FILTER, not a unit of
+// assignment. The owner needs the full list, filterable, with multi-select.
+describe('seedAllItems / seedFilterOptions', () => {
+  const previewWith = (items, unassigned) => ({
+    hasData: true, sourceTimestamp: 1, truncated: false,
+    suppliers: [], items,
+    unassigned: { itemCount: unassigned.length, items: unassigned },
+  })
+  const it_ = (description, supplierName, category, costCenter) => ({
+    description, supplierName, category, costCenter, unit: 'ea', itemCode: '',
+    lastPrice: null, key: `d:${description}`,
+  })
+
+  it('merges assigned and unassigned into one list, flagging which is which', async () => {
+    service.previewSeed.mockResolvedValue(previewWith(
+      [it_('water', 'Peninsula', 'Beverages', 'Bar')],
+      [it_('beef', '', 'Butchery', 'Kitchen')],
+    ))
+    const store = useOrdersStore()
+    await store.loadSeedPreview('loc1')
+
+    expect(store.seedAllItems.map((i) => i.description)).toEqual(['beef', 'water'])
+    const byDesc = Object.fromEntries(store.seedAllItems.map((i) => [i.description, i.assigned]))
+    expect(byDesc).toEqual({ beef: false, water: true })
+  })
+
+  it('offers only filter values that actually occur', async () => {
+    service.previewSeed.mockResolvedValue(previewWith(
+      [it_('water', 'P', 'Beverages', 'Bar')],
+      [it_('beef', '', 'Butchery', 'Kitchen')],
+    ))
+    const store = useOrdersStore()
+    await store.loadSeedPreview('loc1')
+    expect(store.seedFilterOptions.categories).toEqual(['Beverages', 'Butchery'])
+    expect(store.seedFilterOptions.costCentres).toEqual(['Bar', 'Kitchen'])
+  })
+
+  it('is empty with no preview loaded', () => {
+    const store = useOrdersStore()
+    expect(store.seedAllItems).toEqual([])
+    expect(store.seedFilterOptions).toEqual({ categories: [], costCentres: [] })
+  })
+})
+
 // The stock CSV's supplier column is free text, so one company arrives under
 // several spellings. The server supplies a mergeKey per derived supplier; the
 // review screen needs them grouped so the owner can merge with one action.

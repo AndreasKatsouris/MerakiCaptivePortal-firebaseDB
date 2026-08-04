@@ -106,8 +106,24 @@ const ProductInput = z.object({
   active: z.boolean().default(true),
 });
 
+/**
+ * Stable dedupe/reference key for a catalogue product or a derived stock item.
+ *
+ * NAMESPACED: an un-namespaced `itemCode || description` let one row's
+ * description collide with another row's code and silently drop a real product.
+ *
+ * Lives here, in the pure module, because BOTH the derivation (seed.js) and the
+ * write core (commit.js) need it — seed.js importing the db-injected core to get
+ * it would invert this module's layering.
+ */
+function productKey(p) {
+  const code = String((p && p.itemCode) || '').trim().toLowerCase();
+  if (code) return `c:${code}`;
+  return `d:${String((p && p.description) || '').trim().toLowerCase()}`;
+}
+
 // ALL exports in ONE assignment — the #188 export-clobber trap.
 module.exports = {
-  sanitizeText, stripControl, cleanString, SupplierInput, ProductInput,
+  sanitizeText, stripControl, cleanString, productKey, SupplierInput, ProductInput,
   MAX_TEXT, MAX_SUPPLIERS, MAX_PRODUCTS,
 };
