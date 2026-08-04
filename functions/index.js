@@ -3796,6 +3796,11 @@ exports.rossAgentPrune = require('./agent/prune').rossAgentPrune;
 exports.rossProactiveSweep = require('./agent/sweep/sweep').rossProactiveSweep;
 // D3 read-only food-cost overview for the v2 dashboard (reuses the D1/D2 cores).
 exports.foodCostOverview = require('./food-cost-overview').foodCostOverview;
+// ROSS Purchase Orders D1 — supplier book (docs/plans/2026-07-28-ross-purchase-orders-design.md).
+// Both read/write `purchasing/{locId}`, a TOP-LEVEL node: nesting under
+// locations/ would inherit that parent's world-readable .read (design G14).
+exports.poCatalog = require('./purchase-orders').poCatalog;
+exports.poSeedFromStock = require('./purchase-orders').poSeedFromStock;
 
 // ============================================
 // SUBSCRIPTION STATUS MANAGEMENT
