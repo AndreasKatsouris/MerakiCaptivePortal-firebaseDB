@@ -2751,6 +2751,10 @@ exports.receiveWhatsAppMessageEnhanced = functions.https.onRequest(receiveWhatsA
 const { whatsappStatusCallback } = require('./whatsappStatusCallback');
 exports.whatsappStatusCallback = functions.https.onRequest(whatsappStatusCallback);
 
+// Daily Twilio account-dormancy check — catches the whole channel dying
+// upstream (2026-07-23 incident), which is invisible to per-message signals.
+exports.whatsappAccountStatusCheck = require('./whatsappAccountStatusCheck').whatsappAccountStatusCheck;
+
 // Nightly recurrence advance — rolls frozen nextDueDate forward so workflows
 // stop being permanently "covered" by an old run and can be overdue again.
 // Runs 03:00 SAST, four hours before the proactive sweep. DRY-RUN by default.
