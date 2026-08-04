@@ -312,6 +312,55 @@
         }
       }
     },
+    "purchasing": {
+      "$locId": {
+        ".read": "auth != null && (auth.token.admin === true || root.child('userLocations').child(auth.uid).child($locId).exists() || root.child('locations').child($locId).child('ownerId').val() === auth.uid)",
+        ".write": false,
+        "suppliers": {
+          "$supplierId": {
+            ".validate": "newData.hasChildren(['name', 'active', 'createdAt'])",
+            "name": { ".validate": "newData.isString() && newData.val().length >= 1 && newData.val().length <= 120" },
+            "email": { ".validate": "newData.isString() && newData.val().length <= 200" },
+            "phone": { ".validate": "newData.isString() && newData.val().length <= 40" },
+            "contactName": { ".validate": "newData.isString() && newData.val().length <= 120" },
+            "accountNumber": { ".validate": "newData.isString() && newData.val().length <= 60" },
+            "notes": { ".validate": "newData.isString() && newData.val().length <= 1000" },
+            "leadTimeDays": { ".validate": "newData.isNumber() && newData.val() >= 0 && newData.val() <= 60" },
+            "minimumOrderValue": { ".validate": "newData.isNumber() && newData.val() >= 0" },
+            "deliveryDays": { "$i": { ".validate": "newData.isNumber() && newData.val() >= 0 && newData.val() <= 6" } },
+            "active": { ".validate": "newData.isBoolean()" },
+            "createdAt": { ".validate": "newData.isNumber()" },
+            "createdBy": { ".validate": "newData.isString() && newData.val().length <= 128" },
+            "updatedAt": { ".validate": "newData.isNumber()" },
+            "$other": { ".validate": false }
+          }
+        },
+        "catalog": {
+          "$supplierId": {
+            "$productId": {
+              ".validate": "newData.hasChildren(['description', 'unit'])",
+              "description": { ".validate": "newData.isString() && newData.val().length >= 1 && newData.val().length <= 200" },
+              "unit": { ".validate": "newData.isString() && newData.val().length >= 1 && newData.val().length <= 20" },
+              "packSize": { ".validate": "newData.isString() && newData.val().length <= 60" },
+              "itemCode": { ".validate": "newData.isString() && newData.val().length <= 60" },
+              "lastPrice": { ".validate": "newData.isNumber() && newData.val() >= 0" },
+              "lastPriceAt": { ".validate": "newData.isNumber()" },
+              "active": { ".validate": "newData.isBoolean()" },
+              "updatedAt": { ".validate": "newData.isNumber()" },
+              "$other": { ".validate": false }
+            }
+          }
+        },
+        "orders": {
+          "$poId": {
+            ".validate": "newData.hasChildren(['status', 'supplierId'])"
+          }
+        },
+        "counters": {
+          "purchaseOrder": { ".validate": "newData.isNumber() && newData.val() >= 0" }
+        }
+      }
+    },
     "bookings": {
       ".read": "auth != null && (auth.token.admin === true || root.child('admin-claims').child(auth.uid).exists())",
       ".write": "auth != null && (auth.token.admin === true || root.child('admin-claims').child(auth.uid).exists())",
