@@ -16,12 +16,13 @@ import RossHomeMobile from './RossHomeMobile.vue'
 import RossPlaybook from './RossPlaybook.vue'
 import RossActivity from './RossActivity.vue'
 import RossPeople from './RossPeople.vue'
+import RossOrders from './RossOrders.vue'
 import RossRun from './RossRun.vue'
 
 const isDesktop = ref(true)
 let mql = null
 
-const VALID_TABS = new Set(['home', 'playbook', 'activity', 'people', 'run'])
+const VALID_TABS = new Set(['home', 'playbook', 'activity', 'people', 'run', 'orders'])
 const tab = ref('home')
 const runWorkflowId = ref('')
 const runLocationId = ref('')
@@ -46,6 +47,7 @@ const view = computed(() => {
     case 'playbook': return 'playbook'
     case 'activity': return 'activity'
     case 'people':   return 'people'
+    case 'orders':   return 'orders'
     case 'run':      return 'run'
     default:         return isDesktop.value ? 'home-desktop' : 'home-mobile'
   }
@@ -71,6 +73,7 @@ onBeforeUnmount(() => {
   <RossPlaybook v-else-if="view === 'playbook'" />
   <RossActivity v-else-if="view === 'activity'" />
   <RossPeople v-else-if="view === 'people'" />
+  <RossOrders v-else-if="view === 'orders'" />
   <RossRun
     v-else-if="view === 'run'"
     :workflow-id="runWorkflowId"

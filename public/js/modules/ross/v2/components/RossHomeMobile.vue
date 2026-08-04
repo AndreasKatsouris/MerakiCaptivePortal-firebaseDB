@@ -44,6 +44,7 @@ const bottomNav = [
   { icon: 'check', label: 'Playbook',                href: '/ross.html?tab=playbook' },
   { icon: 'line',  label: 'Activity',                href: '/ross.html?tab=activity' },
   { icon: 'users', label: 'People',                  href: '/ross.html?tab=people' },
+  { icon: 'cart',  label: 'Orders',                  href: '/ross.html?tab=orders' },
 ]
 
 const chipFor = (c) => ({

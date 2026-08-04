@@ -47,7 +47,6 @@ function commit(id) {
 
       <div class="ordl__actions">
         <HfButton variant="ghost" :disabled="busyId === s.supplierId" @click="emit('edit', s.supplierId)">
-          <template #leading><HfIcon name="edit" :size="12" /></template>
           Edit
         </HfButton>
         <HfButton

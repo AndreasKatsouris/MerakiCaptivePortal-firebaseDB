@@ -112,6 +112,7 @@ const navSections = [
     { label: 'Playbook', icon: 'check', href: '/ross.html?tab=playbook' },
     { label: 'Activity', icon: 'line',  href: '/ross.html?tab=activity' },
     { label: 'People',   icon: 'users', href: '/ross.html?tab=people' },
+    { label: 'Orders',   icon: 'cart',  href: '/ross.html?tab=orders' },
   ]},
 ]
 

@@ -172,7 +172,7 @@ watch(selectedLocationId, () => {
     <main class="ord__main">
       <section class="ord__intro">
         <div class="hf-eyebrow">
-          <HfIcon name="box" :size="11" color="var(--hf-accent)" />
+          <HfIcon name="cart" :size="11" color="var(--hf-accent)" />
           Orders
         </div>
         <h1 class="ord__title">
