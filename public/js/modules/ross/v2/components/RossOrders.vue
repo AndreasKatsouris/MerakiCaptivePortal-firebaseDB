@@ -461,6 +461,22 @@ watch(selectedLocationId, () => {
             </ul>
           </div>
 
+          <!-- Things that would otherwise vanish quietly. Deleted by accident in
+               the picker rework and restored: the unit flag is half of the
+               "default to ea, FLAG for review" decision, and hiding truncation
+               makes a partial import read as a complete one. -->
+          <div v-if="store.seedPreview.unitDefaultedCount > 0" class="ord__notice">
+            <HfIcon name="alert" :size="12" />
+            <span>
+              {{ store.seedPreview.unitDefaultedCount }} items had no unit in your stock file
+              and will be imported as “ea”. You can correct them per supplier afterwards.
+            </span>
+          </div>
+          <div v-if="store.seedPreview.truncated" class="ord__notice">
+            <HfIcon name="alert" :size="12" />
+            <span>Only the first 2,000 items of that count were read.</span>
+          </div>
+
           <!-- Merge prompts -->
           <div v-for="g in openMergeGroups" :key="g.mergeKey" class="ord__merge">
             <div class="ord__merge-body">
