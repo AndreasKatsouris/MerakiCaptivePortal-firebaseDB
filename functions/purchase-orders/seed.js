@@ -107,6 +107,7 @@ function deriveCatalogFromStock(records) {
 
   const items = [];
   const unassignedItems = [];
+  let ordinal = 0;
   const counts = new Map();
   let unitDefaultedCount = 0;
 
@@ -121,8 +122,8 @@ function deriveCatalogFromStock(records) {
     const product = {
       supplierName: sanitizeText(it.supplierName).trim(),
       description,
-      // Defaults mirror the CSV parser's own (data-processor.js:400-405) so a
-      // grouping UI never renders a nameless bucket.
+      // Defaults mirror the CSV parser's own (data-processor.js:400-405) so the
+      // picker's filters never offer a nameless option.
       category: sanitizeText(it.category).trim() || 'Uncategorized',
       costCenter: sanitizeText(it.costCenter).trim() || 'Main',
       unit: unit || 'ea',
@@ -132,11 +133,24 @@ function deriveCatalogFromStock(records) {
       itemCode: isGeneratedItemCode(itemCode) ? '' : itemCode,
       lastPrice: priceOf(it),
     };
-    // Stable handle the client sends back on commit to say "assign THIS item to
-    // that supplier". Deliberately the same key the catalogue dedupes on, so an
-    // assignment and an existing product collapse rather than duplicate. Two
-    // codeless items sharing a description share a key — they are duplicates of
-    // each other anyway and dedupe would have merged them regardless.
+    // TWO DIFFERENT IDENTIFIERS, deliberately:
+    //
+    //  `ref`  — an OPAQUE, positionally-unique handle the client sends back to
+    //           say "assign THIS row". Unique by construction, so it identifies
+    //           exactly one row.
+    //  `key`  — the CONTENT key the catalogue dedupes on (code, else
+    //           description). NOT unique: every codeless row keys on its
+    //           description alone, and seed.js strips the parser's generated
+    //           ITEM-<n> codes, so collisions are routine.
+    //
+    // These were the same field until it corrupted data: two rows sharing a
+    // description (different unit, price, cost centre, supplier — NOT duplicates)
+    // collapsed in a last-wins Map, so selecting one row wrote the other's unit
+    // and price with no warning. A `case @ R120` line silently became `ea @ R12`.
+    //
+    // `ref` is positional, so it is only meaningful within ONE derivation —
+    // which is why commit round-trips `sourceTimestamp` and refuses a stale one.
+    product.ref = `r${ordinal++}`;
     product.key = productKey(product);
     if (product.unitDefaulted) unitDefaultedCount += 1;
 

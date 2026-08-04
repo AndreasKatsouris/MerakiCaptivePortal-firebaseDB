@@ -31,6 +31,7 @@ const busyId = ref('')
 const saving = ref(false)
 const saveError = ref('')
 const successMsg = ref('')
+const resultTone = ref('ok')
 
 const editingSupplier = computed(() => (
   editingId.value && editingId.value !== 'new'
@@ -59,7 +60,7 @@ function rowsFromPreview(preview) {
 watch(() => store.seedPreview, (p) => {
   rows.value = rowsFromPreview(p)
   assignments.value = []
-  selectedKeys.value = new Set()
+  selectedRefs.value = new Set()
   assignSupplier.value = ''
   clearFilters()
 })
@@ -71,11 +72,6 @@ const tickedCount = computed(() => rows.value.filter((r) => r.ticked).length)
 // above a disabled "Import 0 suppliers" button, with Cancel the only way out.
 // The stock CSV's supplier column is auto-detected by header name, so the usual
 // cause is a column that is absent or named something unrecognised.
-// Only a true dead end when there is nothing to import AND nothing to assign.
-// Before D1.1 an all-unassigned count landed here with no way forward at all.
-const nothingToImport = computed(() => (
-  !!store.seedPreview && rows.value.length === 0 && store.seedAllItems.length === 0
-))
 const canCommit = computed(() => (
   (tickedCount.value > 0 || assignments.value.length > 0)
   && rows.value.every((r) => !r.ticked || r.name.trim().length > 0)
@@ -107,8 +103,11 @@ function mergeGroup(group) {
 //
 // Assignments are STAGED and sent with the same commit as the derived
 // suppliers: the owner reviews everything once and writes once.
-const assignments = ref([])        // [{ id, supplierName, keys, itemCount }]
-const selectedKeys = ref(new Set())
+const assignments = ref([])        // [{ id, supplierName, refs, itemCount }]
+// Monotonic: `name::length` repeated an id after an undo, so one Undo removed
+// two groups and v-for saw duplicate keys.
+let assignmentSeq = 0
+const selectedRefs = ref(new Set())
 const assignSupplier = ref('')
 const filterCategory = ref('')
 const filterCostCentre = ref('')
@@ -117,12 +116,12 @@ const showOnlyUnassigned = ref(false)
 
 // Keys already staged — hidden from the list so the owner cannot assign one item
 // to two suppliers by accident in a single pass.
-const stagedKeys = computed(() => new Set(assignments.value.flatMap((a) => a.keys)))
+const stagedRefs = computed(() => new Set(assignments.value.flatMap((a) => a.refs)))
 
 const visibleItems = computed(() => {
   const q = filterText.value.trim().toLowerCase()
   return store.seedAllItems.filter((i) => {
-    if (stagedKeys.value.has(i.key)) return false
+    if (stagedRefs.value.has(i.ref)) return false
     if (showOnlyUnassigned.value && i.assigned) return false
     if (filterCategory.value && i.category !== filterCategory.value) return false
     if (filterCostCentre.value && i.costCenter !== filterCostCentre.value) return false
@@ -131,24 +130,24 @@ const visibleItems = computed(() => {
   })
 })
 
-const selectedCount = computed(() => selectedKeys.value.size)
+const selectedCount = computed(() => selectedRefs.value.size)
 const allVisibleSelected = computed(() => (
-  visibleItems.value.length > 0 && visibleItems.value.every((i) => selectedKeys.value.has(i.key))
+  visibleItems.value.length > 0 && visibleItems.value.every((i) => selectedRefs.value.has(i.ref))
 ))
 
 function toggleItem(key) {
-  const next = new Set(selectedKeys.value)
+  const next = new Set(selectedRefs.value)
   if (next.has(key)) next.delete(key)
   else next.add(key)
-  selectedKeys.value = next
+  selectedRefs.value = next
 }
 
 /** Select-all applies to the CURRENT FILTER, which is the whole point of filtering first. */
 function toggleAllVisible() {
-  const next = new Set(selectedKeys.value)
-  if (allVisibleSelected.value) visibleItems.value.forEach((i) => next.delete(i.key))
-  else visibleItems.value.forEach((i) => next.add(i.key))
-  selectedKeys.value = next
+  const next = new Set(selectedRefs.value)
+  if (allVisibleSelected.value) visibleItems.value.forEach((i) => next.delete(i.ref))
+  else visibleItems.value.forEach((i) => next.add(i.ref))
+  selectedRefs.value = next
 }
 
 function clearFilters() {
@@ -162,18 +161,24 @@ function stageAssignment() {
   const supplierName = assignSupplier.value.trim()
   if (!supplierName || !selectedCount.value) return
   assignments.value = [...assignments.value, {
-    id: `${supplierName}::${assignments.value.length}`,
+    id: `a${assignmentSeq++}`,
     supplierName,
-    keys: [...selectedKeys.value],
-    itemCount: selectedKeys.value.size,
+    refs: [...selectedRefs.value],
+    itemCount: selectedRefs.value.size,
   }]
-  selectedKeys.value = new Set()
+  selectedRefs.value = new Set()
   assignSupplier.value = ''
 }
 
 function undoAssignment(id) {
   assignments.value = assignments.value.filter((a) => a.id !== id)
 }
+
+// True when the stock file supplied no supplier for anything — the signature of
+// a missing or unmapped supplier column.
+const allUnassigned = computed(() => (
+  store.seedAllItems.length > 0 && store.seedAllItems.every((i) => !i.assigned)
+))
 
 const assignedItemCount = computed(
   () => assignments.value.reduce((n, a) => n + a.itemCount, 0),
@@ -235,16 +240,33 @@ async function confirmImport() {
     // Hand-assigned groups ride the same commit. `itemKeys` are the server's own
     // keys from the preview, so the server can still refuse anything it did not
     // derive itself.
-    ...assignments.value.map((a) => ({ name: a.supplierName, itemKeys: a.keys })),
+    ...assignments.value.map((a) => ({ name: a.supplierName, itemRefs: a.refs })),
   ]
   saving.value = true
-  const out = await store.commitSeed({ locationId: selectedLocationId.value, selections })
+  // Echo the preview we reviewed. Refs are positional within ONE derivation, so
+  // if a newer stock count landed meanwhile the server refuses rather than
+  // silently binding them to different rows.
+  const out = await store.commitSeed({
+    locationId: selectedLocationId.value,
+    selections,
+    sourceTimestamp: store.seedPreview?.sourceTimestamp,
+  })
   saving.value = false
   if (out) {
     assignments.value = []
-    successMsg.value = `Imported ${out.suppliersCreated} supplier`
+    let msg = `Imported ${out.suppliersCreated} supplier`
       + `${out.suppliersCreated === 1 ? '' : 's'} and ${out.productsCreated} product`
       + `${out.productsCreated === 1 ? '' : 's'}.`
+    if (out.reactivated) msg += ` ${out.reactivated} restored from archive.`
+    // Never let a zero-effect import read as a clean success.
+    if (out.ignoredCount) {
+      msg += ` ${out.ignoredCount} selection${out.ignoredCount === 1 ? '' : 's'} no longer `
+        + 'matched your stock count and were skipped.'
+    }
+    if (out.truncated) msg += ' Only the first 2,000 items of that count were read.'
+    successMsg.value = msg
+    resultTone.value = (out.ignoredCount || (!out.suppliersCreated && !out.productsCreated))
+      ? 'warn' : 'ok'
   }
 }
 
@@ -323,7 +345,7 @@ watch(selectedLocationId, () => {
           </span>
         </header>
 
-        <div v-if="successMsg" class="ord__banner ord__banner--ok">
+        <div v-if="successMsg" class="ord__banner" :class="`ord__banner--${resultTone}`">
           <HfIcon name="check" :size="12" />
           <span>{{ successMsg }}</span>
         </div>
@@ -339,29 +361,6 @@ watch(selectedLocationId, () => {
             <p class="ord__review-sub">{{ seedHeadline }}</p>
           </div>
 
-          <!-- Nothing importable: explain the cause and offer a way forward,
-               rather than an empty list above a disabled button. -->
-          <div v-if="nothingToImport" class="ord__deadend">
-            <p class="ord__deadend-msg">
-              None of the {{ store.seedPreview.unassigned.itemCount }} items in this stock
-              count have a supplier name, so there's nothing to import yet.
-            </p>
-            <p class="ord__deadend-why">
-              Ross reads the supplier from a column in your stock file — one headed
-              <em>Supplier</em>, <em>Vendor</em> or <em>Distributor</em>. If that column is
-              missing, or the mapping skipped it when you uploaded, every item arrives
-              without one. Re-upload the count with that column mapped, or add your
-              suppliers by hand.
-            </p>
-            <div class="ord__deadend-actions">
-              <HfButton variant="solid" @click="store.clearSeedPreview(); openCreate()">
-                Add a supplier by hand
-              </HfButton>
-              <HfButton variant="ghost" @click="store.clearSeedPreview()">Close</HfButton>
-            </div>
-          </div>
-
-          <template v-if="!nothingToImport">
           <!-- Assign stock items to suppliers. A category spans several
                suppliers, so category and cost centre are FILTERS here, never the
                unit of assignment: filter down, select, assign, repeat. -->
@@ -374,6 +373,15 @@ watch(selectedLocationId, () => {
               </template>
               Filter the list, select what belongs to one supplier, then assign. Repeat per
               supplier — anything you leave is skipped and can be assigned later.
+            </p>
+            <!-- The only place that explains WHY nothing has a supplier. Shown
+                 when the stock file supplied none at all, which is what a missing
+                 or unmapped supplier column looks like from here. -->
+            <p v-if="allUnassigned" class="ord__assign-why">
+              Ross reads the supplier from a column in your stock file — one headed
+              <em>Supplier</em>, <em>Vendor</em> or <em>Distributor</em>. None was found, so
+              every item arrived without one. Re-upload the count with that column mapped if
+              you'd rather not assign them by hand.
             </p>
 
             <div class="ord__filters">
@@ -434,13 +442,13 @@ watch(selectedLocationId, () => {
             </datalist>
 
             <ul class="ord__items">
-              <li v-for="i in visibleItems" :key="i.key" class="ord__item">
+              <li v-for="i in visibleItems" :key="i.ref" class="ord__item">
                 <input
                   type="checkbox"
                   class="ord__check"
-                  :checked="selectedKeys.has(i.key)"
+                  :checked="selectedRefs.has(i.ref)"
                   :aria-label="`Select ${i.description}`"
-                  @change="toggleItem(i.key)"
+                  @change="toggleItem(i.ref)"
                 />
                 <span class="ord__item-desc">{{ i.description }}</span>
                 <span class="hf-mono ord__item-meta">{{ i.costCenter }} · {{ i.category }}</span>
@@ -524,7 +532,6 @@ watch(selectedLocationId, () => {
               {{ saving ? 'Importing…' : `Import ${tickedCount + assignments.length} supplier${(tickedCount + assignments.length) === 1 ? '' : 's'}` }}
             </HfButton>
           </div>
-          </template>
         </div>
 
         <!-- ============ EMPTY BOOK ============ -->
@@ -716,10 +723,8 @@ watch(selectedLocationId, () => {
 .ord__assign-done { margin-top: 12px; padding-top: 10px; border-top: 1px dashed var(--hf-line); }
 .ord__assign-done-row { display: flex; align-items: center; gap: 8px; font-size: 13px; color: var(--hf-ink-2); }
 .ord__assign-undo { background: none; border: none; color: var(--hf-ink-3); cursor: pointer; font-size: 12px; text-decoration: underline; padding: 0; }
-.ord__deadend-msg { margin: 0 0 8px; font-size: 14px; color: var(--hf-ink); font-weight: 600; }
-.ord__deadend-why { margin: 0 0 16px; font-size: 13px; color: var(--hf-ink-2); line-height: 1.6; }
-.ord__deadend-why em { font-style: normal; font-family: var(--hf-font-mono, monospace); font-size: 12px; }
-.ord__deadend-actions { display: flex; gap: 8px; flex-wrap: wrap; }
+.ord__assign-why { margin: 0 0 12px; font-size: 13px; color: var(--hf-ink-2); line-height: 1.6; }
+.ord__assign-why em { font-style: normal; font-family: var(--hf-font-mono, monospace); font-size: 12px; }
 @media (max-width: 640px) {
   .ord__main { padding: 24px 16px 48px; }
   .ord__title { font-size: 24px; }

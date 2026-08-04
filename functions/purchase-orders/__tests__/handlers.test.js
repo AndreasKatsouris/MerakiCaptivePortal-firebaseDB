@@ -362,7 +362,7 @@ describe('handleSeedRequest — rename and merge', () => {
     await mod.handleSeedRequest(req({
       action: 'commit',
       locationId: 'loc1',
-      selections: [{ name: 'ABC Meats', itemKeys: ['c:9001'] }],
+      selections: [{ name: 'ABC Meats', itemRefs: ['r0'] }],
     }), r);
     expect(r.body).toMatchObject({ suppliersCreated: 1, productsCreated: 1 });
   });
@@ -370,7 +370,7 @@ describe('handleSeedRequest — rename and merge', () => {
   it('400s a selection with neither a supplierId nor a name', async () => {
     const r = res();
     await mod.handleSeedRequest(req({
-      action: 'commit', locationId: 'loc1', selections: [{ itemKeys: ['c:1'] }],
+      action: 'commit', locationId: 'loc1', selections: [{ itemRefs: ['r0'] }],
     }), r);
     expect(r.statusCode).toBe(400);
   });
@@ -378,7 +378,7 @@ describe('handleSeedRequest — rename and merge', () => {
   it('400s a selection that selects nothing at all', async () => {
     const r = res();
     await mod.handleSeedRequest(req({
-      action: 'commit', locationId: 'loc1', selections: [{ name: 'A', sourceNames: [], itemKeys: [] }],
+      action: 'commit', locationId: 'loc1', selections: [{ name: 'A', sourceNames: [], itemRefs: [] }],
     }), r);
     expect(r.statusCode).toBe(400);
   });
@@ -386,7 +386,7 @@ describe('handleSeedRequest — rename and merge', () => {
   it('400s a key-unsafe supplierId before it reaches a path', async () => {
     const r = res();
     await mod.handleSeedRequest(req({
-      action: 'commit', locationId: 'loc1', selections: [{ supplierId: '../evil', itemKeys: ['c:1'] }],
+      action: 'commit', locationId: 'loc1', selections: [{ supplierId: '../evil', name: 'Legit', itemRefs: ['r0'] }],
     }), r);
     expect(r.statusCode).toBe(400);
   });

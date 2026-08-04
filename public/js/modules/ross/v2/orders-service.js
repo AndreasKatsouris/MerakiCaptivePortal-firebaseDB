@@ -62,7 +62,14 @@ export async function saveProduct({ locationId, supplierId, productId, product }
  *
  * Returns the server's derivation verbatim:
  *   { hasData, sourceTimestamp, truncated, unitDefaultedCount, duplicateGroupCount,
- *     suppliers:[{name, itemCount, mergeKey}], items:[…], unassigned:{itemCount, items} }
+ *     suppliers:[{name, itemCount, mergeKey}],
+ *     items:[{ref, key, supplierName, description, unit, unitDefaulted, itemCode,
+ *              lastPrice, category, costCenter}],
+ *     unassigned:{itemCount, items:[same shape, supplierName '']} }
+ *
+ * `ref` is an OPAQUE positional handle valid only for THIS derivation — it is
+ * what commit takes in `itemRefs`. `key` is the catalogue's content dedupe key
+ * and is NOT unique per row; never use it to identify a row.
  * — or a bare { hasData: false }.
  */
 export async function previewSeed(locationId) {
@@ -73,16 +80,25 @@ export async function previewSeed(locationId) {
  * Import the supplier book the owner reviewed. Idempotent on supplier name AND
  * on products, so re-running adds nothing.
  *
- * `selections: [{ name, sourceNames: [] }]` is the real contract — it carries the
- * owner's RENAMES and MERGES, since the stock CSV's supplier column is free text
- * and one company routinely appears under several spellings. `sourceNames` must
- * be names the SERVER derived; the server ignores any it did not, so a renamed
- * supplier is fine but an invented source is not.
+ * `selections: [{ name?, supplierId?, sourceNames?: [], itemRefs?: [] }]` is the
+ * real contract:
+ *   - `name` finds-or-creates a supplier; `supplierId` targets an existing one.
+ *   - `sourceNames` are derived supplier names to import wholesale.
+ *   - `itemRefs` are individual stock rows the owner assigned by hand. A
+ *     hand-assigned row WINS over the supplier it derived under — assignment is
+ *     a correction, and a catalogue entry cannot point at two suppliers.
+ * The server ignores any name or ref it did not itself derive, and reports the
+ * count in `ignoredCount`.
+ *
+ * `sourceTimestamp` echoes the preview being committed. Refs are positional
+ * within one derivation, so the server refuses a stale preview rather than
+ * binding them to different rows.
  *
  * `supplierNames: []` is the plain tick-only form, accepted for the simple case.
  */
-export async function commitSeed({ locationId, selections, supplierNames }) {
+export async function commitSeed({ locationId, selections, supplierNames, sourceTimestamp }) {
   const payload = { action: 'commit', locationId }
+  if (sourceTimestamp !== undefined) payload.sourceTimestamp = sourceTimestamp
   if (Array.isArray(selections)) payload.selections = selections
   else payload.supplierNames = Array.isArray(supplierNames) ? supplierNames : []
   return callFunction('poSeedFromStock', payload)
