@@ -153,52 +153,48 @@ describe('seed flow', () => {
   })
 })
 
-// D1.1: when the stock file has no supplier column every item lands here, and
-// per-item assignment across hundreds of rows is not a task anyone finishes.
-// Category is already on each item, so grouping turns it into ~15 decisions.
-describe('seedUnassignedGroups', () => {
-  const previewWith = (items) => ({
+// D1.1. Grouping by category was the first attempt and it was wrong — a
+// category routinely spans several suppliers, so it is a FILTER, not a unit of
+// assignment. The owner needs the full list, filterable, with multi-select.
+describe('seedAllItems / seedFilterOptions', () => {
+  const previewWith = (items, unassigned) => ({
     hasData: true, sourceTimestamp: 1, truncated: false,
-    suppliers: [], items: [],
-    unassigned: { itemCount: items.length, items },
+    suppliers: [], items,
+    unassigned: { itemCount: unassigned.length, items: unassigned },
   })
-  const un = (description, category, key) => ({
-    description, category, costCenter: 'Kitchen', key, unit: 'ea', itemCode: '', lastPrice: null,
+  const it_ = (description, supplierName, category, costCenter) => ({
+    description, supplierName, category, costCenter, unit: 'ea', itemCode: '',
+    lastPrice: null, key: `d:${description}`,
   })
 
-  it('groups unassigned items by category, largest group first', async () => {
-    service.previewSeed.mockResolvedValue(previewWith([
-      un('beef', 'Butchery', 'd:beef'),
-      un('lamb', 'Butchery', 'd:lamb'),
-      un('cola', 'Beverages', 'd:cola'),
-    ]))
+  it('merges assigned and unassigned into one list, flagging which is which', async () => {
+    service.previewSeed.mockResolvedValue(previewWith(
+      [it_('water', 'Peninsula', 'Beverages', 'Bar')],
+      [it_('beef', '', 'Butchery', 'Kitchen')],
+    ))
     const store = useOrdersStore()
     await store.loadSeedPreview('loc1')
 
-    expect(store.seedUnassignedGroups.map((g) => g.category)).toEqual(['Butchery', 'Beverages'])
-    expect(store.seedUnassignedGroups[0]).toMatchObject({ itemCount: 2 })
-    expect(store.seedUnassignedGroups[0].keys).toEqual(['d:beef', 'd:lamb'])
+    expect(store.seedAllItems.map((i) => i.description)).toEqual(['beef', 'water'])
+    const byDesc = Object.fromEntries(store.seedAllItems.map((i) => [i.description, i.assigned]))
+    expect(byDesc).toEqual({ beef: false, water: true })
   })
 
-  it('carries a short sample so the owner can tell what is in a group', async () => {
-    service.previewSeed.mockResolvedValue(previewWith([
-      un('beef', 'Butchery', 'd:beef'), un('lamb', 'Butchery', 'd:lamb'),
-      un('pork', 'Butchery', 'd:pork'), un('veal', 'Butchery', 'd:veal'),
-    ]))
+  it('offers only filter values that actually occur', async () => {
+    service.previewSeed.mockResolvedValue(previewWith(
+      [it_('water', 'P', 'Beverages', 'Bar')],
+      [it_('beef', '', 'Butchery', 'Kitchen')],
+    ))
     const store = useOrdersStore()
     await store.loadSeedPreview('loc1')
-    expect(store.seedUnassignedGroups[0].sample).toEqual(['beef', 'lamb', 'pork'])
-  })
-
-  it('is empty when nothing is unassigned', async () => {
-    service.previewSeed.mockResolvedValue(previewWith([]))
-    const store = useOrdersStore()
-    await store.loadSeedPreview('loc1')
-    expect(store.seedUnassignedGroups).toEqual([])
+    expect(store.seedFilterOptions.categories).toEqual(['Beverages', 'Butchery'])
+    expect(store.seedFilterOptions.costCentres).toEqual(['Bar', 'Kitchen'])
   })
 
   it('is empty with no preview loaded', () => {
-    expect(useOrdersStore().seedUnassignedGroups).toEqual([])
+    const store = useOrdersStore()
+    expect(store.seedAllItems).toEqual([])
+    expect(store.seedFilterOptions).toEqual({ categories: [], costCentres: [] })
   })
 })
 

@@ -56,12 +56,19 @@ async function commitSeedBook(db, locId, uid, { selections, derived }, now) {
   const derivedNames = new Set(derived.suppliers.map((s) => s.name));
 
   // D1.1: items the owner attaches to a supplier by hand, for stock files whose
-  // supplier column is absent or unmapped — which leaves EVERY item here.
+  // supplier column is absent or unmapped — which leaves EVERY item unassigned.
+  //
+  // Covers EVERY derived item, not only the unassigned ones, so an item that
+  // came in under the wrong supplier can be reassigned. An item reachable both
+  // ways (its derived supplier ticked AND assigned here) lands in both
+  // catalogues, which is correct: a product genuinely can have two suppliers,
+  // and that is exactly the backup-supplier case.
+  //
   // Indexed by the server's own key so a client can only ever reference stock
   // the server itself derived; an invented key is reported, never trusted (the
   // 2026-06-05 attacker-controlled-arg rule, same as sourceNames).
-  const unassignedByKey = new Map(
-    (derived.unassigned && derived.unassigned.items ? derived.unassigned.items : [])
+  const derivedByKey = new Map(
+    [...derived.items, ...((derived.unassigned && derived.unassigned.items) || [])]
       .map((i) => [i.key || productKey(i), i]),
   );
 
@@ -96,7 +103,7 @@ async function commitSeedBook(db, locId, uid, { selections, derived }, now) {
 
     const assigned = [];
     for (const k of itemKeys) {
-      const hit = unassignedByKey.get(k);
+      const hit = derivedByKey.get(k);
       if (hit) assigned.push(hit);
       else ignoredItemKeys.push(k);
     }

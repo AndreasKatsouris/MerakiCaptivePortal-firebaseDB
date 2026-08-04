@@ -245,6 +245,22 @@ describe('assigning unassigned items to a supplier', () => {
       .rejects.toThrow(/limit is 5000/);
   });
 
+  it('reassigns an item that came in under a derived supplier', async () => {
+    const derived = {
+      hasData: true, sourceTimestamp: 1000, truncated: false,
+      suppliers: [{ name: 'Wrong Co', itemCount: 1, mergeKey: 'wrong co' }],
+      items: [{ ...item('Wrong Co', 'beef', '9001'), key: 'c:9001' }],
+      unassigned: { itemCount: 0, items: [] },
+    };
+    const out = await commitSeedBook(db, LOC, UID, {
+      selections: [{ name: 'Right Co', sourceNames: [], itemKeys: ['c:9001'] }], derived,
+    }, 1000);
+    expect(out.productsCreated).toBe(1);
+    const s = (await catalog.listSuppliers(db, LOC))[0];
+    expect(s.name).toBe('Right Co');
+    expect((await catalog.listProducts(db, LOC, s.supplierId))[0].description).toBe('beef');
+  });
+
   it('still works alongside a normal derived-supplier selection', async () => {
     const derived = {
       hasData: true, sourceTimestamp: 1000, truncated: false,

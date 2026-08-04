@@ -69,35 +69,36 @@ export const useOrdersStore = defineStore('rossOrders', {
     needsEmailCount: (state) => state.suppliers.filter((s) => s.needsEmail).length,
 
     /**
-     * Unassigned stock items grouped by category, so a file with no supplier
-     * column becomes a manageable number of decisions instead of one per item.
+     * Every item in the reviewed stock count, assigned and unassigned alike, as
+     * one flat list the owner can filter and multi-select.
      *
-     * This is the whole reason D1.1 exists: the supplier column is auto-detected
-     * by header name and is frequently absent, which puts EVERY item here — and
-     * nobody hand-assigns 388 rows. Category is already parsed from the CSV, so
-     * grouping by it costs nothing and typically collapses hundreds of items
-     * into ten or twenty groups.
+     * Deliberately NOT grouped by category. Grouping was the first attempt and
+     * it was wrong: a category like "Butchery" routinely spans several
+     * suppliers, so assigning a whole category is too blunt to be correct.
+     * Category and cost centre are FILTERS here, not units of assignment.
      */
-    seedUnassignedGroups: (state) => {
-      const items = state.seedPreview?.unassigned?.items
-      if (!Array.isArray(items) || !items.length) return []
+    seedAllItems: (state) => {
+      const p = state.seedPreview
+      if (!p) return []
+      const assigned = Array.isArray(p.items) ? p.items : []
+      const unassigned = Array.isArray(p.unassigned?.items) ? p.unassigned.items : []
+      return [...assigned, ...unassigned]
+        .map((i) => ({ ...i, assigned: !!i.supplierName }))
+        .sort((a, b) => String(a.description).localeCompare(String(b.description)))
+    },
 
-      const byCategory = new Map()
-      for (const it of items) {
-        const key = it.category || 'Uncategorized'
-        if (!byCategory.has(key)) byCategory.set(key, [])
-        byCategory.get(key).push(it)
+    /** Distinct filter values, so the UI never invents a chip with nothing behind it. */
+    seedFilterOptions() {
+      const cats = new Set()
+      const centres = new Set()
+      for (const i of this.seedAllItems) {
+        if (i.category) cats.add(i.category)
+        if (i.costCenter) centres.add(i.costCenter)
       }
-
-      return [...byCategory.entries()]
-        .map(([category, members]) => ({
-          category,
-          itemCount: members.length,
-          keys: members.map((m) => m.key),
-          // Enough to recognise the group without opening it.
-          sample: members.slice(0, 3).map((m) => m.description),
-        }))
-        .sort((a, b) => b.itemCount - a.itemCount)
+      return {
+        categories: [...cats].sort((a, b) => a.localeCompare(b)),
+        costCentres: [...centres].sort((a, b) => a.localeCompare(b)),
+      }
     },
 
     /**
