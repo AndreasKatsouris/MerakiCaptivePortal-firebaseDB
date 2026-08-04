@@ -17,9 +17,19 @@
  * WHAT THIS NODE CLAIMS, precisely:
  *  - non-admin WRITES are denied at every depth (all writes are CF-mediated;
  *    Cloud Functions use the Admin SDK and bypass rules entirely);
- *  - READS are allowed only to admins, `userLocations` members, and the
- *    location owner — and the read grant CASCADES to children by design.
- * It does NOT claim the node is closed to admins. It is not, and saying so
+ *  - READS are allowed only to admins, and to `userLocations` members / the
+ *    location owner WHO ALSO HOLD the `purchaseOrders` entitlement — the read
+ *    grant CASCADES to children by design.
+ *
+ * THE PROBE USER MUST HOLD THE ENTITLEMENT. The rule deliberately mirrors
+ * access.js's gate: an earlier version omitted the entitlement term, so the rule
+ * was strictly broader than the CF and a non-entitled tenant could read the
+ * whole supplier book straight over REST, bypassing the paywall the CF enforces.
+ * If the POSITIVE checks below fail, verify
+ * `subscriptions/{uid}/features/purchaseOrders === true` before concluding the
+ * rules are broken.
+ *
+ * This does NOT claim the node is closed to admins. It is not, and saying so
  * would be the overclaim the 2026-07-25 census refuted.
  *
  * The `.validate` rules are NOT exercisable by a non-admin here, because the

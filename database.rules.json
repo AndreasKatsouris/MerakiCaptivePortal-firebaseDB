@@ -314,7 +314,7 @@
     },
     "purchasing": {
       "$locId": {
-        ".read": "auth != null && (auth.token.admin === true || root.child('userLocations').child(auth.uid).child($locId).exists() || root.child('locations').child($locId).child('ownerId').val() === auth.uid)",
+        ".read": "auth != null && (auth.token.admin === true || root.child('admins').child(auth.uid).exists() || (root.child('subscriptions').child(auth.uid).child('features').child('purchaseOrders').val() === true && (root.child('userLocations').child(auth.uid).child($locId).exists() || root.child('locations').child($locId).child('ownerId').val() === auth.uid)))",
         ".write": false,
         "suppliers": {
           "$supplierId": {

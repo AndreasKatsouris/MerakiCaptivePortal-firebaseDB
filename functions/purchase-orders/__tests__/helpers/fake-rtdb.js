@@ -57,6 +57,20 @@ function makeFakeRtdb(seed = {}) {
         return node;
     }
 
+    // Real RTDB DROPS keys whose value is null; the upstream fake kept them, so
+    // a test could assert `lastPrice: null` forever while production returned a
+    // record with no lastPrice key at all. That is the mock-vs-server divergence
+    // CLAUDE.md step 5b targets, and D4's pre-fill would branch on it.
+    function stripNulls(v) {
+        if (v === null || typeof v !== 'object' || Array.isArray(v)) return v;
+        const out = {};
+        for (const [k, val] of Object.entries(v)) {
+            if (val === null || val === undefined) continue;
+            out[k] = stripNulls(val);
+        }
+        return out;
+    }
+
     function setNode(path, val) {
         const parts = segs(path);
         let node = store;
@@ -68,7 +82,7 @@ function makeFakeRtdb(seed = {}) {
         if (val === null || val === undefined) {
             delete node[parts[parts.length - 1]];
         } else {
-            node[parts[parts.length - 1]] = val;
+            node[parts[parts.length - 1]] = stripNulls(val);
         }
     }
 

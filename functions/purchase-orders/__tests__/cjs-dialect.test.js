@@ -2,9 +2,15 @@
 //
 // This guard exists because vitest CANNOT catch the defect it guards. Vitest's
 // loader transforms ESM, so an `export` statement in a functions/ module passes
-// every test in this repo and then throws SyntaxError at deployed require()
-// time (2026-06-22 LESSON — it shipped once already). The only way to see it is
-// to read the bytes and to require() the file as plain CommonJS.
+// every test in this repo and then throws at deployed require() time
+// (2026-06-22 LESSON — it shipped once already).
+//
+// THE BYTE REGEX IS THE LOAD-BEARING CHECK. functions/package.json declares
+// node 22 and no "type", and Node >=22.12 supports require(esm) with module
+// syntax detection — so an ESM file may load WITHOUT throwing here even though
+// the deployed behaviour differs. The require() check below is a smoke test for
+// unrelated load-time errors, not the ESM guard. An earlier version of this
+// header claimed otherwise.
 import { describe, it, expect } from 'vitest';
 
 const fs = require('fs');
@@ -26,8 +32,10 @@ describe('functions/purchase-orders is CommonJS', () => {
 
   it.each(files)('%s uses no ESM import/export statements', (file) => {
     const src = fs.readFileSync(file, 'utf8');
-    expect(src).not.toMatch(/^\s*import\s/m);
-    expect(src).not.toMatch(/^\s*export\s/m);
+    // [\s{*] not \s: `export{x}` and `import{x}from'y'` have no space after
+    // the keyword and slipped past the original pattern.
+    expect(src).not.toMatch(/^\s*import[\s{*]/m);
+    expect(src).not.toMatch(/^\s*export[\s{*]/m);
   });
 
   it.each(files)('%s is require()-able as CommonJS', (file) => {

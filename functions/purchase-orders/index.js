@@ -22,10 +22,13 @@ const { onRequest } = require('firebase-functions/v2/https');
 const { corsOptions } = require('../cors-allowlist');
 const cors = require('cors')(corsOptions);
 
+const { ZodError } = require('zod');
 const access = require('./access');
 const catalog = require('./catalog');
+const { ClientError } = catalog;
 const { deriveCatalogFromStock } = require('./seed');
-const { SupplierInput, ProductInput } = require('./validate');
+const { SupplierInput, ProductInput, sanitizeText } = require('./validate');
+const { commitSeedBook } = require('./commit');
 
 const LOCATION_ID_RE = /^[a-zA-Z0-9_-]+$/;
 const MAX_RECORDS = 30;          // same bounded read as foodCostOverview
@@ -63,7 +66,12 @@ async function authenticate(req, res, tag) {
     return await getVerifyAuth()(req);
   } catch (err) {
     const isAuthErr = /authorization|token/i.test(err.message || '');
-    console.warn(`[${tag}] auth rejected:`, err && err.message);
+    // sanitizeText, NOT raw: firebase-admin's verifyContent runs BEFORE
+    // verifySignature (token-verifier.js:160-161) and interpolates the caller's
+    // own `aud`/`iss` claims into the message. An UNSIGNED token therefore
+    // reaches this line, so a newline in a claim forges log entries -- the #194
+    // log-injection class, in the same module whose access.js avoids it.
+    console.warn(`[${tag}] auth rejected:`, sanitizeText(err && err.message));
     res.status(isAuthErr ? 401 : 403).json({
       error: isAuthErr ? 'Authentication failed' : 'Access denied',
     });
@@ -104,7 +112,12 @@ async function handleCatalogRequest(req, res) {
   try {
     switch (body.action) {
       case 'listSuppliers':
-        res.json({ hasData: true, suppliers: await catalog.listSuppliers(db, locationId) });
+        res.json({
+          hasData: true,
+          suppliers: await catalog.listSuppliers(db, locationId, {
+            includeArchived: body.includeArchived === true,
+          }),
+        });
         return;
       case 'saveSupplier': {
         SupplierInput.parse(body.supplier); // surface a 400 before touching the db
@@ -120,7 +133,9 @@ async function handleCatalogRequest(req, res) {
       case 'listProducts':
         res.json({
           hasData: true,
-          products: await catalog.listProducts(db, locationId, body.supplierId),
+          products: await catalog.listProducts(db, locationId, body.supplierId, {
+            includeArchived: body.includeArchived === true,
+          }),
         });
         return;
       case 'saveProduct': {
@@ -139,13 +154,16 @@ async function handleCatalogRequest(req, res) {
     // Client errors (validation, not-found, caps) are 400 with a safe message;
     // anything else is a 500 with nothing tenant-shaped in it.
     const msg = String((err && err.message) || '');
-    const isClient = /required|not found|limit reached|key-safe|invalid|expected|must be/i.test(msg);
+    // TYPE, not regex. The old message regex false-positived on infrastructure
+    // failures -- "Invalid Firebase Database URL" and "connection was forcefully
+    // killed; invalid token" both matched /invalid/ and were answered as 400s.
+    const isClient = err instanceof ClientError || err instanceof ZodError;
     if (isClient) {
-      console.warn('[poCatalog] rejected:', msg);
+      console.warn('[poCatalog] rejected:', sanitizeText(msg));
       res.status(400).json({ error: 'The supplier or product details were not accepted' });
       return;
     }
-    console.error('[poCatalog] failed:', msg);
+    console.error('[poCatalog] failed:', sanitizeText(msg));
     res.status(500).json({ error: 'Failed to update the supplier book' });
   }
 }
@@ -238,59 +256,19 @@ async function handleSeedRequest(req, res) {
 
     if (body.action === 'preview') { res.json(derived); return; }
 
-    // COMMIT. Only names present in the DERIVED set are honoured — a name the
-    // client invents is ignored rather than trusted (the tool-arg-is-attacker-
-    // controlled rule, 2026-06-05 LESSON). The owner may rename freely, but the
-    // SOURCE of every imported row must be something the server itself derived.
-    const derivedNames = new Set(derived.suppliers.map((s) => s.name));
-
-    // Idempotent on NAME: re-running the import must not duplicate the book.
-    const existing = await catalog.listSuppliers(db, locationId, { includeArchived: true });
-    const existingByName = new Map(existing.map((s) => [s.name, s.supplierId]));
-
-    const now = Date.now();
-    let suppliersCreated = 0;
-    let productsCreated = 0;
-
-    for (const sel of selections) {
-      const sources = sel.sourceNames.filter((n) => derivedNames.has(n));
-      if (!sources.length) continue; // nothing the server actually derived
-
-      let supplierId = existingByName.get(sel.name);
-      if (!supplierId) {
-        ({ supplierId } = await catalog.saveSupplier(
-          db, locationId, decoded.uid, { name: sel.name }, now,
-        ));
-        suppliersCreated++;
-        existingByName.set(sel.name, supplierId);
-      }
-
-      // Idempotent on PRODUCTS too, and deduped ACROSS the merged spellings.
-      // Seeded from what is already stored, so a second import adds nothing —
-      // without this, clicking Import twice doubles the whole catalogue.
-      const already = await catalog.listProducts(
-        db, locationId, supplierId, { includeArchived: true },
-      );
-      const seen = new Set(already.map(productKey));
-
-      for (const item of derived.items) {
-        if (!sources.includes(item.supplierName)) continue;
-        const key = productKey(item);
-        if (seen.has(key)) continue;
-        seen.add(key);
-        await catalog.saveProduct(db, locationId, supplierId, {
-          description: item.description,
-          unit: item.unit,
-          itemCode: item.itemCode,
-          lastPrice: item.lastPrice === null ? undefined : item.lastPrice,
-        }, now);
-        productsCreated++;
-      }
-    }
-
-    res.json({ hasData: true, suppliersCreated, productsCreated });
+    // COMMIT. Delegated to the db-injected core so it is unit-testable without
+    // HTTP -- both reviews traced this slice's defects to it living in the shell.
+    const out = await commitSeedBook(db, locationId, decoded.uid, { selections, derived }, Date.now());
+    res.json({ hasData: true, ...out });
   } catch (err) {
-    console.error('[poSeedFromStock] failed:', err && err.message);
+    // Typed client errors answer 400 and leave nothing half-written -- the
+    // commit core validates every selection before its first write.
+    if (err instanceof ClientError) {
+      console.warn('[poSeedFromStock] rejected:', sanitizeText(err.message));
+      res.status(400).json({ error: err.message });
+      return;
+    }
+    console.error('[poSeedFromStock] failed:', sanitizeText(err && err.message));
     res.status(500).json({ error: 'Failed to import the supplier book' });
   }
 }

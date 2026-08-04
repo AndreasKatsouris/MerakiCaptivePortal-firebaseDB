@@ -148,6 +148,11 @@ function deriveCatalogFromStock(records) {
   // how many groups the owner is being asked to look at, not how many rows.
   const byKey = new Map();
   for (const s of suppliers) {
+    // An EMPTY mergeKey means "no ASCII alphanumerics to fold" — e.g. names in
+    // Cyrillic, Japanese or pure punctuation. Those are not duplicates of each
+    // other, and grouping them would propose merging unrelated companies, which
+    // is precisely the outcome this hint exists to avoid.
+    if (!s.mergeKey) continue;
     byKey.set(s.mergeKey, (byKey.get(s.mergeKey) || 0) + 1);
   }
   let duplicateGroupCount = 0;

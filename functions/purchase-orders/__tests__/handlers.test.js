@@ -77,13 +77,20 @@ describe('handleCatalogRequest — envelope', () => {
   });
 });
 
-// THE GATE GUARD. Every action must pass through assertLocationAccess. This is
-// written to fail when a NEW action is added without a gate, which is the way
-// an action-routed CF grows a hole: the router is correct on day one and some
-// later action forgets the check. Enumerating the exported action list means the
-// test covers actions that do not exist yet.
+// THE GATE GUARD.
+//
+// Scope, stated honestly. The gate is a single check BEFORE the switch
+// (index.js), so any action added to CATALOG_ACTIONS is gated automatically and
+// the two "is it gated" cases below cannot realistically fail under this
+// structure -- they pin the structure, and would only catch a future refactor to
+// per-action gating. The load-bearing cases are the two ROUTING ones, which
+// compare the exported action set against the switch's own `case` labels read
+// from the source, catching a mismatch in BOTH directions.
+//
+// An earlier version of this comment claimed the both-directions property while
+// only iterating the Set, which caught nothing in the second direction.
 describe('every catalog action is gated', () => {
-  it('exports the action list the router actually uses', () => {
+  it('exports a non-empty action list', () => {
     expect(mod.CATALOG_ACTIONS.size).toBeGreaterThan(0);
   });
 
@@ -121,6 +128,23 @@ describe('every catalog action is gated', () => {
   // Catches a set/switch MISMATCH in both directions: an action listed but never
   // implemented falls through to the default arm, and an action implemented but
   // not listed is unreachable (the router rejects it before the switch).
+  // Reads the router's own bytes, the pattern cjs-dialect.test.js establishes.
+  // Catches an action IMPLEMENTED BUT NOT LISTED -- unreachable, because the
+  // router rejects unknown actions before the switch -- which iterating the Set
+  // can never see.
+  it('the switch cases and CATALOG_ACTIONS are exactly the same set', () => {
+    const fs = require('fs');
+    const path = require('path');
+    const src = fs.readFileSync(path.join(__dirname, '..', 'index.js'), 'utf8');
+    // Search FORWARD from the switch: authenticate() has its own earlier
+    // `} catch (err)`, so an unanchored search sliced backwards and matched
+    // nothing -- a guard that silently compared two empty sets.
+    const start = src.indexOf('switch (body.action)');
+    const body = src.slice(start, src.indexOf('} catch (err)', start));
+    const cases = new Set([...body.matchAll(/case '([a-zA-Z]+)':/g)].map((m) => m[1]));
+    expect([...cases].sort()).toEqual([...mod.CATALOG_ACTIONS].sort());
+  });
+
   it('routes every listed action to a real implementation', async () => {
     vi.spyOn(access, 'assertLocationAccess').mockResolvedValue(true);
     for (const action of mod.CATALOG_ACTIONS) {

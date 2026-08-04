@@ -142,7 +142,12 @@ describe('products', () => {
     const { supplierId } = await saveSupplier(db, LOC, UID, { name: 'A' }, 1000);
     const out = await saveProduct(db, LOC, supplierId, { description: 'water', unit: 'ea' }, 1000);
     const v = (await db.ref(`purchasing/${LOC}/catalog/${supplierId}/${out.productId}`).once('value')).val();
-    expect(v).toMatchObject({ description: 'water', unit: 'ea', active: true, lastPrice: null });
+    expect(v).toMatchObject({ description: 'water', unit: 'ea', active: true });
+    // An unknown price is an ABSENT key, not a stored null: RTDB drops null
+    // values on write. Asserting `lastPrice: null` passed forever against the
+    // old fake and would never have been true in production -- D4's pre-fill
+    // must branch on absence, not on === null.
+    expect(v).not.toHaveProperty('lastPrice');
   });
 
   it('stamps lastPriceAt when a price is supplied', async () => {

@@ -25,14 +25,30 @@ const MAX_PRODUCTS = 2000; // per supplier   (§5.2)
  * Also removes CR/LF, which is the header-injection precursor for D3's email
  * subject and display name.
  */
-function sanitizeText(v) {
+function sanitizeText(v, max = MAX_TEXT) {
   // eslint-disable-next-line no-control-regex
-  return String(v == null ? '' : v).replace(/[\x00-\x1F\x7F]/g, '').slice(0, MAX_TEXT);
+  return String(v == null ? '' : v).replace(/[\x00-\x1F\x7F]/g, '').slice(0, max);
 }
 
-/** Trimmed, control-stripped string with a max visible length. */
+/** Strip control characters WITHOUT truncating. Length is zod's job. */
+function stripControl(v) {
+  // eslint-disable-next-line no-control-regex
+  return String(v == null ? '' : v).replace(/[\x00-\x1F\x7F]/g, '');
+}
+
+/**
+ * Trimmed, control-stripped string, length enforced by zod.
+ *
+ * Deliberately does NOT slice. Routing this through `sanitizeText` clipped every
+ * field at MAX_TEXT (200) BEFORE `.max(max)` could run, which made
+ * `optionalString(1000)` unreachable and silently truncated `notes` to 200 while
+ * database.rules.json advertised 1000 — code and deployed rule disagreeing.
+ * Slicing to `max` instead would have been worse: an over-long name would be
+ * quietly accepted-and-shortened rather than rejected. Over-long input is now a
+ * validation error, which is what the caller can actually act on.
+ */
 function cleanString(max) {
-  return z.preprocess((v) => sanitizeText(v).trim(), z.string().max(max));
+  return z.preprocess((v) => stripControl(v).trim(), z.string().max(max));
 }
 
 /** Optional free-text field: absent/null/'' all normalise to ''. */
@@ -92,6 +108,6 @@ const ProductInput = z.object({
 
 // ALL exports in ONE assignment — the #188 export-clobber trap.
 module.exports = {
-  sanitizeText, cleanString, SupplierInput, ProductInput,
+  sanitizeText, stripControl, cleanString, SupplierInput, ProductInput,
   MAX_TEXT, MAX_SUPPLIERS, MAX_PRODUCTS,
 };

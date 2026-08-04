@@ -29,14 +29,37 @@ const { SupplierInput, ProductInput, MAX_SUPPLIERS, MAX_PRODUCTS } = require('./
  */
 const KEY_SAFE = /^[A-Za-z0-9_-]+$/;
 
-function assertKeySafe(label, key) {
-  if (typeof key !== 'string' || !KEY_SAFE.test(key)) {
-    throw new Error(`${label} must be a key-safe string ([A-Za-z0-9_-])`);
+/**
+ * Errors the CALLER caused (bad input, not found, cap reached) — distinguished
+ * by type so the shell can answer 400 without regexing `err.message`, which
+ * false-positived on infrastructure failures like "Invalid Firebase Database
+ * URL" and "connection was forcefully killed; invalid token".
+ */
+class ClientError extends Error {
+  constructor(message) {
+    super(message);
+    this.name = 'ClientError';
   }
 }
 
-function suppliersRef(db, locId) { return db.ref(`purchasing/${locId}/suppliers`); }
-function catalogRef(db, locId, supplierId) { return db.ref(`purchasing/${locId}/catalog/${supplierId}`); }
+function assertKeySafe(label, key) {
+  if (typeof key !== 'string' || !KEY_SAFE.test(key)) {
+    throw new ClientError(`${label} must be a key-safe string ([A-Za-z0-9_-])`);
+  }
+}
+
+function suppliersRef(db, locId) {
+  // locId is the highest-value id in the path and was previously interpolated
+  // unvalidated, while this module's own comment claimed every caller-supplied
+  // id was guarded. Both shells validate it, but these cores are explicitly
+  // reusable and D2-D4 will add call sites.
+  assertKeySafe('locationId', locId);
+  return db.ref(`purchasing/${locId}/suppliers`);
+}
+function catalogRef(db, locId, supplierId) {
+  assertKeySafe('locationId', locId);
+  return db.ref(`purchasing/${locId}/catalog/${supplierId}`);
+}
 
 async function countChildren(ref) {
   const snap = await ref.once('value');
@@ -51,19 +74,23 @@ async function saveSupplier(db, locId, uid, input, now, supplierId) {
   if (supplierId !== undefined) {
     assertKeySafe('supplierId', supplierId);
     const snap = await suppliersRef(db, locId).child(supplierId).once('value');
-    if (!snap.exists()) throw new Error('Supplier not found');
+    if (!snap.exists()) throw new ClientError('Supplier not found');
     existing = snap.val();
   } else if (await countChildren(suppliersRef(db, locId)) >= MAX_SUPPLIERS) {
     // Cap CREATE only — an update at the cap must remain possible, otherwise a
     // full book becomes uneditable.
-    throw new Error(`Supplier limit reached (${MAX_SUPPLIERS} per location)`);
+    throw new ClientError(`Supplier limit reached (${MAX_SUPPLIERS} per location)`);
   }
 
   const id = supplierId !== undefined ? supplierId : suppliersRef(db, locId).push().key;
   const record = {
     ...data,
-    createdAt: existing ? existing.createdAt : now,
-    createdBy: existing ? existing.createdBy : uid,
+    // `|| now` / `|| uid`: a record written by some other path (an admin via the
+    // client SDK, a future writer) may lack these, and spreading `undefined`
+    // into a set() is a hard 500 -- the Admin SDK rejects undefined values and
+    // the app does not set ignoreUndefinedProperties.
+    createdAt: (existing && existing.createdAt) || now,
+    createdBy: (existing && existing.createdBy) || uid,
     updatedAt: now,
   };
   await suppliersRef(db, locId).child(id).set(record);
@@ -74,7 +101,7 @@ async function archiveSupplier(db, locId, supplierId, now) {
   assertKeySafe('supplierId', supplierId);
   const ref = suppliersRef(db, locId).child(supplierId);
   const snap = await ref.once('value');
-  if (!snap.exists()) throw new Error('Supplier not found');
+  if (!snap.exists()) throw new ClientError('Supplier not found');
   await ref.set({ ...snap.val(), active: false, updatedAt: now });
   return { supplierId, active: false };
 }
@@ -100,7 +127,7 @@ async function listSuppliers(db, locId, { includeArchived = false } = {}) {
 async function saveProduct(db, locId, supplierId, input, now, productId) {
   assertKeySafe('supplierId', supplierId);
   const supplier = await suppliersRef(db, locId).child(supplierId).once('value');
-  if (!supplier.exists()) throw new Error('Supplier not found');
+  if (!supplier.exists()) throw new ClientError('Supplier not found');
 
   const data = ProductInput.parse(input);
   const ref = catalogRef(db, locId, supplierId);
@@ -108,9 +135,9 @@ async function saveProduct(db, locId, supplierId, input, now, productId) {
   if (productId !== undefined) {
     assertKeySafe('productId', productId);
     const snap = await ref.child(productId).once('value');
-    if (!snap.exists()) throw new Error('Product not found');
+    if (!snap.exists()) throw new ClientError('Product not found');
   } else if (await countChildren(ref) >= MAX_PRODUCTS) {
-    throw new Error(`Product limit reached (${MAX_PRODUCTS} per supplier)`);
+    throw new ClientError(`Product limit reached (${MAX_PRODUCTS} per supplier)`);
   }
 
   const id = productId !== undefined ? productId : ref.push().key;
@@ -130,7 +157,39 @@ async function listProducts(db, locId, supplierId, { includeArchived = false } =
     .sort((a, b) => String(a.description || '').localeCompare(String(b.description || '')));
 }
 
+/**
+ * Create many products for one supplier in ONE read and ONE atomic multi-path
+ * write.
+ *
+ * Replaces N sequential saveProduct calls in the seed import. Each of those did
+ * a supplier read plus a countChildren that downloaded the supplier's ENTIRE
+ * catalogue just to call Object.keys().length -- so importing n products pulled
+ * down 0+1+...+(n-1) records. Measured at the 2000-product cap that is ~260 MB
+ * and ~6,000 round-trips, which does not finish inside the 60s function timeout.
+ *
+ * @param {number} currentCount products already stored (caller has it in hand)
+ * @returns {Promise<number>} how many were written
+ */
+async function createProductsBulk(db, locId, supplierId, inputs, now, currentCount) {
+  assertKeySafe('supplierId', supplierId);
+  if (!inputs.length) return 0;
+  if (currentCount + inputs.length > MAX_PRODUCTS) {
+    throw new ClientError(`Product limit reached (${MAX_PRODUCTS} per supplier)`);
+  }
+  const ref = catalogRef(db, locId, supplierId);
+  const updates = {};
+  for (const input of inputs) {
+    const data = ProductInput.parse(input);
+    const record = { ...data, updatedAt: now };
+    if (data.lastPrice !== null) record.lastPriceAt = now;
+    updates[ref.push().key] = record;
+  }
+  await ref.update(updates);
+  return Object.keys(updates).length;
+}
+
 // ALL exports in ONE assignment — the #188 export-clobber trap.
 module.exports = {
   saveSupplier, archiveSupplier, listSuppliers, saveProduct, listProducts,
+  createProductsBulk, assertKeySafe, ClientError,
 };
