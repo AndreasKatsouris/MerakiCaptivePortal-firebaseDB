@@ -1,6 +1,6 @@
 {
   "lastUpdated": "2026-08-04",
-  "lastUpdatedNote": "**ROSS Purchase Orders is on the backlog for the first time, and D1 is starting.** The design + D1 plan merged as **#211** on 08-03, but the reconciliation the design itself specifies (§11) was never applied to this file — until today there was **zero mention** of Purchase Orders anywhere in it. Closed here: the **PO track** (D1 supplier book → D2 draft + CSV + F7 → D3 send path → D4 food-cost pre-fill) is logged under High Priority as an **operator-chosen sequencing decision (design R6)** — it runs *ahead of* the launch gate's remaining items, which stay open and unstarted rather than being silently displaced. **FC-v2.1c is withdrawn** as superseded (its F7 CSV-sanitizer requirement carries into D2); **FC-v2.1b** is marked partially satisfied by D4's count picker; **FC-v2.1a** is unaffected. The design's un-carded **R1b** finding is logged as a Bug Triage row for the first time, **re-verified against master `75300b35` this session** rather than inherited from the design doc.",
+  "lastUpdatedNote": "**ROSS Purchase Orders D1 + D1.1 are BUILT, MERGED and DEPLOYED (#221 / #222 / #223 / #224).** An owner can open `/ross.html?tab=orders`, build a supplier book by hand or by reviewed import from a stock count, and — new in D1.1 — attach individual stock items to suppliers with a filterable multi-select picker, which is what makes the importer work for the common case of a CSV with **no supplier column** (the operator's real file: 388 of 388 items unassigned). `poCatalog` + `poSeedFromStock` are live on nodejs22, source stamped 15:18–15:19Z **after** #224 merged at 15:17Z — verified against `functions:list`, not inferred from a deploy exit code. **#224 is the uncomfortable part of this session:** two independent reviews blocked D1.1 *after it merged*, the worst finding being silent data corruption I introduced (see SCORECARD + LESSONS). Production was never exposed only because the functions deploy was deliberately held. **`purchasing` RTDB rules are still NOT deployed** (defence in depth only — every access is CF-mediated) and **`features.purchaseOrders` is set nowhere**, so the tab works for admins and is empty for everyone else.",
   "sprint": {
     "goal": "Effective implementation of Hi-Fi v2, with ROSS as the central post-login surface for every subscribed user",
     "started": "2026-04-30",
@@ -290,6 +290,21 @@
   "inProgress": [],
   "recentlyCompleted": [
     {
+      "title": "ROSS Purchase Orders D1.1 — assign stock items to suppliers, then fold two blocking reviews — operator testing of D1 hit the real case: a stock CSV with no supplier column, leaving 388 of 388 items unassigned and the importer useless. D1.1 added a filterable multi-select picker (cost centre / category / search, select-all-applies-to-current-filter). A first design grouped by category and was rejected by the operator — a category routinely spans several suppliers — so category became a *filter*, never a unit of assignment. Two independent reviews then blocked it after merge: the worst was silent data corruption, productKey being reused as a row reference when it ignores cost centre, so selecting Coca Cola case @ R120 wrote coca cola ea @ R12. Fixed by splitting an opaque positional ref from the content dedupe key, plus: hand-assignment now MOVES rather than clones (it had contradicted design L8 *in the same PR*), a strict PLAN/WRITE split after partial writes recurred twice, plan coalescing (500 selections on one supplier drove 500 full-catalogue reads), archived-product revival, hard-rejected supplierId, aggregate caps, and rendering the ignored/truncated results the server had returned and the client dropped. Production was never exposed — the functions deploy was deliberately held. Also unblocked component testing repo-wide: any such test previously died at transform time on the Hi-Fi barrel's absolute import.",
+      "pr": "223, 224",
+      "mergedAt": "2026-08-04"
+    },
+    {
+      "title": "ROSS Purchase Orders D1 — the supplier book — a first-class ordering destination at /ross.html?tab=orders, replacing v1's ephemeral 1,386-line po-modal.js. Suppliers + products at the new top-level purchasing/{locId} (nesting under locations/ would inherit a world-readable .read — design G14), all writes CF-mediated via poCatalog / poSeedFromStock, seeding from the latest stock count with a review screen that surfaces what would otherwise vanish quietly (unassigned items, guessed units, truncation, duplicate spellings). 12 plan tasks, TDD throughout. The merged plan had a defect in every task — its test code could not even run (require('vitest')) — so it was treated as a draft and verified against live code task by task. A prior review round found 6 MUST-FIX + 1 HIGH, all folded pre-merge. CFs deployed and verified by source timestamp.",
+      "pr": 222,
+      "mergedAt": "2026-08-04"
+    },
+    {
+      "title": "ROSS Purchase Orders — backlog reconciliation — the design + D1 plan merged as #211 on 08-03 but were never reconciled into the backlog; there was zero mention of Purchase Orders anywhere in it. Added the PO track, recorded the R6 sequencing decision explicitly (PO ahead of the launch gate, W1/W2 open and unstarted), withdrew FC-v2.1c as superseded with its F7 requirement carried into D2, marked FC-v2.1b partially satisfied by D4, and carded the design's un-carded R1b finding — the locations read-cascade making locations/{locId}/stockUsage cross-tenant readable — re-verified against live rules rather than inherited from the doc.",
+      "pr": 221,
+      "mergedAt": "2026-08-04"
+    },
+    {
       "title": "ROSS Purchase Orders — design + D1 supplier-book plan (docs-only, no source touched) — a standalone ordering destination at /ross.html?tab=orders, replacing the ephemeral v1 po-modal.js with a persisted supplier book, draft POs, a server-side SendGrid send path, and sent-PO history you can duplicate to reorder. Locked: ROSS owns its own supplier catalogue (Food Cost is an optional copy-in, never a dependency), draft → sent lifecycle with no GRV, HTML+CSV and no PDF, features.purchaseOrders ON for both tiers. Storage is top-level purchasing/{locId} rather than nested under locations/ — the design's G14 finding is that the parent cascades a world-readable .read and an owner .write into every descendant, which would have leaked supplier emails and prices cross-tenant and made \".write\": false a dead rule. That same finding is now carded as a High security row in its own right. 450-line design + 2,350-line D1 plan (12 TDD tasks). Backlog reconciliation (design §11) was NOT applied at merge time — done separately on 2026-08-04, which is also when this row was added.",
       "pr": 211,
       "mergedAt": "2026-08-03"
@@ -521,6 +536,30 @@
     }
   ],
   "bugs": [
+    {
+      "title": "LESSONS.md is at 40 rows / 59 KB against a ~20 soft cap, and every session pays that at start.",
+      "severity": "low",
+      "discoveredAt": "2026-08-04",
+      "discoveredOn": "reflect",
+      "blockingSprint": "False",
+      "notes": "Not evicted this session deliberately: the file's own policy evicts by REDUNDANCY, warns that a guard covering an INSTANCE does not retire the CLASS, and forbids ever FIFO-ing out an inherently-process lesson — so a rushed pass at the end of a long session is exactly how real wisdom gets deleted (#207 evicted a lesson as \"mechanized\" while an open PR was reintroducing the identical defect). Wants a dedicated pass: for each row, name the guard file and ask what it would say about a NEW module; drop only rows where the answer is genuinely \"caught\". Candidates to examine first are the ones with repo-wide mechanical guards, not the oldest ones."
+    },
+    {
+      "title": "features.purchaseOrders is set NOWHERE, so the Orders tab is empty for every non-admin user.",
+      "severity": "medium",
+      "discoveredAt": "2026-08-04",
+      "discoveredOn": "D1 deploy",
+      "blockingSprint": "False",
+      "notes": "functions/purchase-orders/access.js gates on admins/{uid} first, then on subscriptions/{uid}/features/purchaseOrders === true. Grep of functions/entitlements/, the resolver and every seed finds no such flag; features are materialised from subscriptionTiers/{tierId}/features in RTDB, which nothing sets. Design L7 says it should be ON for BOTH tiers at launch. The admin-first ordering is what makes this dangerous: the operator testing as an admin sees a working tab while every real user sees an empty one — the same false-pass shape as the 2026-07-25 admin-probe lesson. Fix is config, not code:** add purchaseOrders: true to both tier definitions and re-run the entitlement resolver. Also note the deployed purchasing .read rule now requires the same entitlement, so the REST probe needs a non-admin token that holds it."
+    },
+    {
+      "title": "No Vue component in this repo has a component test, and until 2026-08-04 none COULD.",
+      "severity": "medium",
+      "discoveredAt": "2026-08-04",
+      "discoveredOn": "D1.1 review",
+      "blockingSprint": "False",
+      "notes": "Components under public/ import the Hi-Fi barrel by the absolute /js/design-system/hifi/index.js path the browser uses; vite refuses to resolve that from publicDir, so any component test died at transform time before a single assertion. #224 fixed the barrier in vitest.config.js (map /js/ → public/js/, publicDir: false) and added the first 10 tests, against the REAL components. Every other v2 surface is still untested — RossPeople, RossPlaybook, RossRun, RossActivity, RossHome*, FoodCostApp. Two reviews independently traced 3 of D1.1's 4 MUST-FIXes to this gap. Worth a deliberate backfill pass, prioritising the edit-capable surfaces."
+    },
     {
       "title": "firebase deploy --only functions:… fails outright on this codebase with the CLI's default 10 s discovery budget — the first deploy attempt of the day will fail for a reason that looks nothing like its cause.",
       "severity": "medium",
