@@ -279,6 +279,55 @@ before any work.
 
 ---
 
+## 5.3 Seed import mechanism (added 2026-08-04, D1.1 + review fold)
+
+D1.1 let the owner attach stock items to suppliers by hand, because a stock CSV
+with no supplier column leaves every item unassigned. Two reviews then found the
+mechanism below; it is recorded here because §5 is the canonical description of
+how this feature writes, and inline JSDoc is not where the next person looks.
+
+**Two identifiers, deliberately distinct.** Each derived row carries both:
+
+| Field | Purpose | Unique per row? |
+|-------|---------|-----------------|
+| `ref` | opaque positional handle the client sends back in `itemRefs` | **yes**, by construction |
+| `key` | content dedupe key for the catalogue (`c:<code>` / `d:<description>`) | **no**, deliberately |
+
+They were one field until it corrupted data. `key` ignores cost centre, and a
+stock count routinely counts one item once per cost centre — so two rows with
+different unit and price shared a key, and a last-wins lookup silently wrote one
+row's figures under the other's selection. **Never identify a row by `key`.**
+
+**`ref` is positional within ONE derivation**, so `commit` round-trips the
+preview's `sourceTimestamp` and refuses a stale one rather than binding refs to
+rows the owner never reviewed.
+
+**Hand-assignment is a MOVE, not a copy.** An item assigned by hand is excluded
+from the supplier it derived under: a catalogue entry means *"we normally buy
+this here"* and cannot truthfully point at two suppliers. The genuine
+backup-supplier case is an order line — see L8, and do not conflate them.
+
+**PLAN then WRITE.** `commitSeedBook` runs every read, every `ProductInput.parse`
+and every cap check (per-supplier `MAX_PRODUCTS`, per-location `MAX_SUPPLIERS`,
+per-commit `MAX_SEED_PRODUCTS_PER_COMMIT`, `MAX_PLANS_PER_COMMIT`) *before* the
+first write. The write phase must contain nothing that can fail on caller input —
+the failure this prevents is a half-written book that every retry reproduces, and
+it recurred twice, most recently via the supplier cap enforced inside
+`saveSupplier`.
+
+**Plans are coalesced by target.** N selections naming one supplier cost ONE
+catalogue read. Before this, 500 selections naming the same supplier passed the
+product budget while driving 500 full-catalogue reads.
+
+**Wire contract.** `poSeedFromStock` `commit` takes
+`{ locationId, sourceTimestamp?, selections: [{ name? | supplierId?, sourceNames?: [], itemRefs?: [] }] }`,
+or the tick-only `{ supplierNames: [] }`. It returns
+`{ suppliersCreated, productsCreated, reactivated, ignoredNames, ignoredItemRefs, ignoredCount, truncated }` —
+and the client **must render** the ignored/truncated fields, or a zero-effect
+import reads as a clean success.
+
+---
+
 ## 6. Slices
 
 | Slice | Ships | Depends on |

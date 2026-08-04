@@ -17,7 +17,9 @@
  */
 
 const catalog = require('./catalog');
-const { SupplierInput, ProductInput, productKey, MAX_PRODUCTS } = require('./validate');
+const {
+  SupplierInput, ProductInput, productKey, MAX_PRODUCTS, MAX_SUPPLIERS,
+} = require('./validate');
 
 const { ClientError } = catalog;
 
@@ -116,6 +118,19 @@ async function commitSeedBook(db, locId, uid, { selections, derived, sourceTimes
   for (const [k, p] of [...plans]) if (!p.sources.size && !p.refs.size) plans.delete(k);
   if (plans.size > MAX_PLANS_PER_COMMIT) {
     throw new ClientError(`An import may touch at most ${MAX_PLANS_PER_COMMIT} suppliers at a time.`);
+  }
+
+  // SUPPLIER CAP, checked here rather than inside saveSupplier. catalog.js
+  // enforces it per-create, which meant a commit crossing the cap partway
+  // through wrote its earlier suppliers and then threw — the exact partial write
+  // the PLAN/WRITE split exists to prevent, and the one case that slipped
+  // through it. Counting includes archived suppliers, matching countChildren.
+  const willCreate = [...plans.values()].filter((p) => !p.supplierId).length;
+  if (existingAll.length + willCreate > MAX_SUPPLIERS) {
+    throw new ClientError(
+      `This location already has ${existingAll.length} suppliers and this import would add `
+      + `${willCreate}; the limit is ${MAX_SUPPLIERS}. Import fewer suppliers at a time.`,
+    );
   }
 
   // A hand-assigned item WINS over the supplier it was derived under: the owner

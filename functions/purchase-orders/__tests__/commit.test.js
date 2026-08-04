@@ -168,6 +168,45 @@ describe('work budget', () => {
     expect(await names()).toEqual([]);
   });
 
+  // The PLAN/WRITE split missed one path: catalog.js enforces the per-location
+  // supplier cap per-create, so a commit crossing it partway through wrote its
+  // earlier suppliers and then threw.
+  it('rejects an import that would cross the supplier cap, writing NOTHING', async () => {
+    const { MAX_SUPPLIERS } = require('../validate');
+    const seed = {};
+    for (let i = 0; i < MAX_SUPPLIERS - 1; i++) {
+      seed[`s${i}`] = { name: `S${i}`, active: true, createdAt: 1 };
+    }
+    await db.ref(`purchasing/${LOC}/suppliers`).set(seed);
+
+    const derived = derivedOf(['New A', 'New B'], [item('New A', 'a'), item('New B', 'b')]);
+    await expect(commitSeedBook(db, LOC, UID, {
+      selections: [
+        { name: 'New A', sourceNames: ['New A'] },
+        { name: 'New B', sourceNames: ['New B'] },
+      ],
+      derived,
+    }, 1000)).rejects.toThrow(/limit is 500/);
+
+    // Not 500: the first supplier must NOT have been written before the throw.
+    const after = await catalog.listSuppliers(db, LOC, { includeArchived: true });
+    expect(after).toHaveLength(MAX_SUPPLIERS - 1);
+  });
+
+  it('still allows an import that exactly fills the remaining room', async () => {
+    const { MAX_SUPPLIERS } = require('../validate');
+    const seed = {};
+    for (let i = 0; i < MAX_SUPPLIERS - 1; i++) {
+      seed[`s${i}`] = { name: `S${i}`, active: true, createdAt: 1 };
+    }
+    await db.ref(`purchasing/${LOC}/suppliers`).set(seed);
+    const derived = derivedOf(['New A'], [item('New A', 'a')]);
+    const out = await commitSeedBook(db, LOC, UID, {
+      selections: [{ name: 'New A', sourceNames: ['New A'] }], derived,
+    }, 1000);
+    expect(out.suppliersCreated).toBe(1);
+  });
+
   it('exposes the budget constant', () => {
     expect(MAX_SEED_PRODUCTS_PER_COMMIT).toBe(5000);
   });
