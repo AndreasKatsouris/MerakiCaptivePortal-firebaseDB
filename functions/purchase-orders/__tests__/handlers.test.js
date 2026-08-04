@@ -352,6 +352,45 @@ describe('handleSeedRequest — rename and merge', () => {
     expect(r.body.suppliersCreated).toBe(0);
   });
 
+  // D1.1: assigning unassigned items to a supplier by hand.
+  it('accepts itemKeys and attaches the chosen stock items', async () => {
+    await db.ref('locations/loc1/stockUsage/r1').set({
+      timestamp: 1000,
+      stockItems: [{ itemCode: '9001', description: 'beef', unit: 'kg' }],
+    });
+    const r = res();
+    await mod.handleSeedRequest(req({
+      action: 'commit',
+      locationId: 'loc1',
+      selections: [{ name: 'ABC Meats', itemKeys: ['c:9001'] }],
+    }), r);
+    expect(r.body).toMatchObject({ suppliersCreated: 1, productsCreated: 1 });
+  });
+
+  it('400s a selection with neither a supplierId nor a name', async () => {
+    const r = res();
+    await mod.handleSeedRequest(req({
+      action: 'commit', locationId: 'loc1', selections: [{ itemKeys: ['c:1'] }],
+    }), r);
+    expect(r.statusCode).toBe(400);
+  });
+
+  it('400s a selection that selects nothing at all', async () => {
+    const r = res();
+    await mod.handleSeedRequest(req({
+      action: 'commit', locationId: 'loc1', selections: [{ name: 'A', sourceNames: [], itemKeys: [] }],
+    }), r);
+    expect(r.statusCode).toBe(400);
+  });
+
+  it('400s a key-unsafe supplierId before it reaches a path', async () => {
+    const r = res();
+    await mod.handleSeedRequest(req({
+      action: 'commit', locationId: 'loc1', selections: [{ supplierId: '../evil', itemKeys: ['c:1'] }],
+    }), r);
+    expect(r.statusCode).toBe(400);
+  });
+
   it('400s a malformed selections payload', async () => {
     for (const selections of ['x', [{ name: 'A' }], [{ sourceNames: ['A'] }], [{ name: '', sourceNames: ['A'] }]]) {
       const r = res();

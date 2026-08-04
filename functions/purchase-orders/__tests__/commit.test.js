@@ -171,6 +171,100 @@ describe('work budget', () => {
 });
 
 // ---------------------------------------------------------------------------
+// D1.1. A stock file with no supplier column leaves every item unassigned, so
+// the book can only be built by attaching items to suppliers by hand.
+describe('assigning unassigned items to a supplier', () => {
+  const unassignedDerived = (items) => ({
+    hasData: true, sourceTimestamp: 1000, truncated: false,
+    suppliers: [], items: [],
+    unassigned: { itemCount: items.length, items },
+  });
+  const un = (description, itemCode = '', category = 'Butchery') => ({
+    supplierName: '', description, unit: 'ea', itemCode, lastPrice: null,
+    category, costCenter: 'Kitchen', key: itemCode ? `c:${itemCode}` : `d:${description}`,
+  });
+
+  it('creates a supplier from a NAME and attaches the chosen items', async () => {
+    const derived = unassignedDerived([un('beef', '9001'), un('lamb'), un('cola', '', 'Bar')]);
+    const out = await commitSeedBook(db, LOC, UID, {
+      selections: [{ name: 'ABC Meats', sourceNames: [], itemKeys: ['c:9001', 'd:lamb'] }],
+      derived,
+    }, 1000);
+
+    expect(out.suppliersCreated).toBe(1);
+    expect(out.productsCreated).toBe(2);
+    const supplierId = (await catalog.listSuppliers(db, LOC))[0].supplierId;
+    const products = await catalog.listProducts(db, LOC, supplierId);
+    expect(products.map((p) => p.description).sort()).toEqual(['beef', 'lamb']);
+  });
+
+  it('attaches items to an EXISTING supplier by supplierId', async () => {
+    const { supplierId } = await catalog.saveSupplier(db, LOC, UID, { name: 'Hand Made' }, 500);
+    const derived = unassignedDerived([un('beef', '9001')]);
+    const out = await commitSeedBook(db, LOC, UID, {
+      selections: [{ supplierId, itemKeys: ['c:9001'] }], derived,
+    }, 1000);
+
+    expect(out.suppliersCreated).toBe(0);
+    expect(out.productsCreated).toBe(1);
+    expect((await catalog.listProducts(db, LOC, supplierId))[0].description).toBe('beef');
+  });
+
+  it('IGNORES an item key the server did not derive — the client cannot invent stock', async () => {
+    const derived = unassignedDerived([un('beef', '9001')]);
+    const out = await commitSeedBook(db, LOC, UID, {
+      selections: [{ name: 'ABC', sourceNames: [], itemKeys: ['c:9001', 'c:INVENTED'] }], derived,
+    }, 1000);
+    expect(out.productsCreated).toBe(1);
+    expect(out.ignoredItemKeys).toEqual(['c:INVENTED']);
+  });
+
+  it('rejects an unknown supplierId rather than silently creating one', async () => {
+    const derived = unassignedDerived([un('beef', '9001')]);
+    await expect(commitSeedBook(db, LOC, UID, {
+      selections: [{ supplierId: 'nope', itemKeys: ['c:9001'] }], derived,
+    }, 1000)).rejects.toBeInstanceOf(catalog.ClientError);
+    expect(await names()).toEqual([]);
+  });
+
+  it('is idempotent — re-assigning the same items adds nothing', async () => {
+    const derived = unassignedDerived([un('beef', '9001'), un('lamb')]);
+    const sel = [{ name: 'ABC Meats', sourceNames: [], itemKeys: ['c:9001', 'd:lamb'] }];
+    await commitSeedBook(db, LOC, UID, { selections: sel, derived }, 1000);
+    const again = await commitSeedBook(db, LOC, UID, { selections: sel, derived }, 2000);
+    expect(again).toMatchObject({ suppliersCreated: 0, productsCreated: 0 });
+  });
+
+  it('counts assigned items against the per-commit budget', async () => {
+    const many = Array.from({ length: 200 }, (_, i) => un(`item ${i}`, `c${i}`));
+    const derived = unassignedDerived(many);
+    const selections = Array.from({ length: 30 }, (_, i) => (
+      { name: `S ${i}`, sourceNames: [], itemKeys: many.map((m) => m.key) }
+    ));
+    await expect(commitSeedBook(db, LOC, UID, { selections, derived }, 1000))
+      .rejects.toThrow(/limit is 5000/);
+  });
+
+  it('still works alongside a normal derived-supplier selection', async () => {
+    const derived = {
+      hasData: true, sourceTimestamp: 1000, truncated: false,
+      suppliers: [{ name: 'Peninsula', itemCount: 1, mergeKey: 'peninsula' }],
+      items: [item('Peninsula', 'water')],
+      unassigned: { itemCount: 1, items: [un('beef', '9001')] },
+    };
+    const out = await commitSeedBook(db, LOC, UID, {
+      selections: [
+        { name: 'Peninsula', sourceNames: ['Peninsula'] },
+        { name: 'ABC Meats', sourceNames: [], itemKeys: ['c:9001'] },
+      ],
+      derived,
+    }, 1000);
+    expect(out.suppliersCreated).toBe(2);
+    expect(out.productsCreated).toBe(2);
+  });
+});
+
+// ---------------------------------------------------------------------------
 describe('reporting what was dropped', () => {
   it('reports source names the server did not derive instead of swallowing them', async () => {
     const derived = derivedOf(['Peninsula'], [item('Peninsula', 'water')]);

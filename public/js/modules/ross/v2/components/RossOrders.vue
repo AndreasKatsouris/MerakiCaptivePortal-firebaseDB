@@ -56,7 +56,11 @@ function rowsFromPreview(preview) {
   }))
 }
 
-watch(() => store.seedPreview, (p) => { rows.value = rowsFromPreview(p) })
+watch(() => store.seedPreview, (p) => {
+  rows.value = rowsFromPreview(p)
+  assignments.value = []
+  assignTarget.value = {}
+})
 
 const tickedCount = computed(() => rows.value.filter((r) => r.ticked).length)
 
@@ -65,11 +69,14 @@ const tickedCount = computed(() => rows.value.filter((r) => r.ticked).length)
 // above a disabled "Import 0 suppliers" button, with Cancel the only way out.
 // The stock CSV's supplier column is auto-detected by header name, so the usual
 // cause is a column that is absent or named something unrecognised.
+// Only a true dead end when there is nothing to import AND nothing to assign.
+// Before D1.1 an all-unassigned count landed here with no way forward at all.
 const nothingToImport = computed(() => (
-  !!store.seedPreview && rows.value.length === 0
+  !!store.seedPreview && rows.value.length === 0 && store.seedUnassignedGroups.length === 0
 ))
 const canCommit = computed(() => (
-  tickedCount.value > 0 && rows.value.every((r) => !r.ticked || r.name.trim().length > 0)
+  (tickedCount.value > 0 || assignments.value.length > 0)
+  && rows.value.every((r) => !r.ticked || r.name.trim().length > 0)
 ))
 
 // Groups still worth offering a merge for: those whose members are all still
@@ -89,6 +96,37 @@ function mergeGroup(group) {
   }
   rows.value = [merged, ...kept]
 }
+
+// --- D1.1: assigning unassigned items --------------------------------------
+// A stock file with no supplier column puts every item in the unassigned bucket.
+// Assignments are STAGED here and sent with the same commit as the derived
+// suppliers, so the owner reviews everything once and writes once.
+const assignments = ref([])          // [{ category, keys, itemCount, supplierName }]
+const assignTarget = ref({})         // category -> typed supplier name
+
+const unassignedGroups = computed(() => store.seedUnassignedGroups.filter(
+  (g) => !assignments.value.some((a) => a.category === g.category),
+))
+
+function assignGroup(group) {
+  const supplierName = String(assignTarget.value[group.category] || '').trim()
+  if (!supplierName) return
+  assignments.value = [...assignments.value, {
+    category: group.category,
+    keys: group.keys,
+    itemCount: group.itemCount,
+    supplierName,
+  }]
+  assignTarget.value = { ...assignTarget.value, [group.category]: '' }
+}
+
+function undoAssignment(category) {
+  assignments.value = assignments.value.filter((a) => a.category !== category)
+}
+
+const assignedItemCount = computed(
+  () => assignments.value.reduce((n, a) => n + a.itemCount, 0),
+)
 
 function tickAll(value) {
   rows.value = rows.value.map((r) => ({ ...r, ticked: value }))
@@ -139,13 +177,20 @@ async function startImport() {
 }
 
 async function confirmImport() {
-  const selections = rows.value
-    .filter((r) => r.ticked)
-    .map((r) => ({ name: r.name.trim(), sourceNames: r.sourceNames }))
+  const selections = [
+    ...rows.value
+      .filter((r) => r.ticked)
+      .map((r) => ({ name: r.name.trim(), sourceNames: r.sourceNames })),
+    // Hand-assigned groups ride the same commit. `itemKeys` are the server's own
+    // keys from the preview, so the server can still refuse anything it did not
+    // derive itself.
+    ...assignments.value.map((a) => ({ name: a.supplierName, itemKeys: a.keys })),
+  ]
   saving.value = true
   const out = await store.commitSeed({ locationId: selectedLocationId.value, selections })
   saving.value = false
   if (out) {
+    assignments.value = []
     successMsg.value = `Imported ${out.suppliersCreated} supplier`
       + `${out.suppliersCreated === 1 ? '' : 's'} and ${out.productsCreated} product`
       + `${out.productsCreated === 1 ? '' : 's'}.`
@@ -266,13 +311,57 @@ watch(selectedLocationId, () => {
           </div>
 
           <template v-if="!nothingToImport">
-          <!-- Things that would otherwise vanish quietly -->
-          <div v-if="store.seedPreview.unassigned.itemCount > 0" class="ord__notice">
-            <HfIcon name="alert" :size="12" />
-            <span>
-              {{ store.seedPreview.unassigned.itemCount }} items have no supplier in your
-              stock file. They won't be imported — you can add them to a supplier by hand later.
-            </span>
+          <!-- Items with no supplier: assignable, not merely reported. The stock
+               file's supplier column is auto-detected by header name, so when it
+               is missing EVERY item lands here. -->
+          <div v-if="store.seedUnassignedGroups.length" class="ord__assign">
+            <h4 class="ord__assign-title">
+              {{ store.seedPreview.unassigned.itemCount }} items have no supplier in your stock file
+            </h4>
+            <p class="ord__assign-sub">
+              Give each group a supplier and they'll be imported with the rest. Anything you
+              leave blank is skipped — you can assign it later.
+            </p>
+
+            <ul class="ord__assign-rows">
+              <li v-for="g in unassignedGroups" :key="g.category" class="ord__assign-row">
+                <div class="ord__assign-body">
+                  <span class="ord__assign-cat">{{ g.category }}</span>
+                  <span class="hf-mono ord__assign-count">{{ g.itemCount }} items</span>
+                  <span class="hf-mono ord__assign-sample">{{ g.sample.join(' · ') }}…</span>
+                </div>
+                <div class="ord__assign-input">
+                  <input
+                    :value="assignTarget[g.category] || ''"
+                    class="ord__review-name"
+                    list="ord-supplier-names"
+                    placeholder="Supplier name"
+                    :aria-label="`Supplier for ${g.category}`"
+                    @input="assignTarget = { ...assignTarget, [g.category]: $event.target.value }"
+                    @keyup.enter="assignGroup(g)"
+                  />
+                  <HfButton
+                    variant="ghost"
+                    :disabled="!(assignTarget[g.category] || '').trim()"
+                    @click="assignGroup(g)"
+                  >Assign</HfButton>
+                </div>
+              </li>
+            </ul>
+
+            <!-- Existing suppliers offered as suggestions so the owner reuses one
+                 rather than creating a near-duplicate by typing. -->
+            <datalist id="ord-supplier-names">
+              <option v-for="s in suppliers" :key="s.supplierId" :value="s.name" />
+            </datalist>
+
+            <ul v-if="assignments.length" class="ord__assign-done">
+              <li v-for="a in assignments" :key="a.category" class="ord__assign-done-row">
+                <HfIcon name="check" :size="12" />
+                <span>{{ a.category }} ({{ a.itemCount }} items) → <strong>{{ a.supplierName }}</strong></span>
+                <button class="ord__assign-undo" @click="undoAssignment(a.category)">Undo</button>
+              </li>
+            </ul>
           </div>
           <div v-if="store.seedPreview.unitDefaultedCount > 0" class="ord__notice">
             <HfIcon name="alert" :size="12" />
@@ -296,7 +385,9 @@ watch(selectedLocationId, () => {
           </div>
 
           <div class="ord__review-tools">
-            <span class="hf-mono ord__panel-sub">{{ tickedCount }} of {{ rows.length }} selected</span>
+            <span class="hf-mono ord__panel-sub">
+              {{ tickedCount }} of {{ rows.length }} selected<template v-if="assignedItemCount"> · {{ assignedItemCount }} items assigned</template>
+            </span>
             <div class="ord__review-tool-btns">
               <HfButton variant="ghost" @click="tickAll(true)">Select all</HfButton>
               <HfButton variant="ghost" @click="tickAll(false)">Select none</HfButton>
@@ -328,7 +419,7 @@ watch(selectedLocationId, () => {
           <div class="ord__review-actions">
             <HfButton variant="ghost" :disabled="saving" @click="store.clearSeedPreview()">Cancel</HfButton>
             <HfButton variant="solid" :disabled="!canCommit || saving" @click="confirmImport">
-              {{ saving ? 'Importing…' : `Import ${tickedCount} supplier${tickedCount === 1 ? '' : 's'}` }}
+              {{ saving ? 'Importing…' : `Import ${tickedCount + assignments.length} supplier${(tickedCount + assignments.length) === 1 ? '' : 's'}` }}
             </HfButton>
           </div>
           </template>
@@ -496,6 +587,19 @@ watch(selectedLocationId, () => {
 .ord__review-name:disabled { opacity: 0.5; }
 .ord__review-count { font-size: 11px; color: var(--hf-ink-3); flex-shrink: 0; }
 .ord__review-actions { display: flex; justify-content: flex-end; gap: 8px; margin-top: 16px; }
+.ord__assign { border: 1px dashed var(--hf-warn, #b9770e); border-radius: 8px; padding: 14px; margin-bottom: 14px; }
+.ord__assign-title { margin: 0 0 4px; font-size: 14px; font-weight: 600; color: var(--hf-ink); }
+.ord__assign-sub { margin: 0 0 12px; font-size: 13px; color: var(--hf-ink-2); line-height: 1.5; }
+.ord__assign-rows, .ord__assign-done { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 8px; }
+.ord__assign-row { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; }
+.ord__assign-body { display: flex; align-items: baseline; gap: 8px; flex-wrap: wrap; min-width: 0; }
+.ord__assign-cat { font-size: 13px; font-weight: 600; color: var(--hf-ink); }
+.ord__assign-count { font-size: 11px; color: var(--hf-ink-3); }
+.ord__assign-sample { font-size: 11px; color: var(--hf-ink-3); overflow: hidden; text-overflow: ellipsis; }
+.ord__assign-input { display: flex; gap: 6px; align-items: center; flex: 0 1 320px; }
+.ord__assign-done { margin-top: 12px; padding-top: 10px; border-top: 1px dashed var(--hf-line); }
+.ord__assign-done-row { display: flex; align-items: center; gap: 8px; font-size: 13px; color: var(--hf-ink-2); }
+.ord__assign-undo { background: none; border: none; color: var(--hf-ink-3); cursor: pointer; font-size: 12px; text-decoration: underline; padding: 0; }
 .ord__deadend-msg { margin: 0 0 8px; font-size: 14px; color: var(--hf-ink); font-weight: 600; }
 .ord__deadend-why { margin: 0 0 16px; font-size: 13px; color: var(--hf-ink-2); line-height: 1.6; }
 .ord__deadend-why em { font-style: normal; font-family: var(--hf-font-mono, monospace); font-size: 12px; }

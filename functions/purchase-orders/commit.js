@@ -16,7 +16,7 @@
  */
 
 const catalog = require('./catalog');
-const { SupplierInput } = require('./validate');
+const { SupplierInput, productKey } = require('./validate');
 
 const { ClientError } = catalog;
 
@@ -28,20 +28,6 @@ const { ClientError } = catalog;
  * all. This is that promise, kept.
  */
 const MAX_SEED_PRODUCTS_PER_COMMIT = 5000;
-
-/**
- * Dedupe key for a catalogue product.
- *
- * NAMESPACED. An un-namespaced `itemCode || description` let one row's
- * description collide with another row's code and silently drop a real product
- * — not exotic, since seed.js strips generated ITEM-<n> codes and so routinely
- * produces "no code + numeric-looking description".
- */
-function productKey(p) {
-  const code = String(p.itemCode || '').trim().toLowerCase();
-  if (code) return `c:${code}`;
-  return `d:${String(p.description || '').trim().toLowerCase()}`;
-}
 
 /**
  * Normalise a client-supplied supplier name through the SAME schema that will
@@ -62,32 +48,70 @@ function normaliseName(raw) {
 }
 
 /**
- * @param {object[]} selections [{name, sourceNames[]}] — already shape-checked
+ * @param {object[]} selections [{name?, supplierId?, sourceNames[], itemKeys[]}] — shape-checked
  * @param {object} derived      the server's own derivation for this location
  * @returns {Promise<{suppliersCreated, productsCreated, reactivated, ignoredNames, truncated}>}
  */
 async function commitSeedBook(db, locId, uid, { selections, derived }, now) {
   const derivedNames = new Set(derived.suppliers.map((s) => s.name));
 
+  // D1.1: items the owner attaches to a supplier by hand, for stock files whose
+  // supplier column is absent or unmapped — which leaves EVERY item here.
+  // Indexed by the server's own key so a client can only ever reference stock
+  // the server itself derived; an invented key is reported, never trusted (the
+  // 2026-06-05 attacker-controlled-arg rule, same as sourceNames).
+  const unassignedByKey = new Map(
+    (derived.unassigned && derived.unassigned.items ? derived.unassigned.items : [])
+      .map((i) => [i.key || productKey(i), i]),
+  );
+
   // VALIDATE EVERYTHING FIRST, WRITE NOTHING YET. Previously a bad name surfaced
   // its ZodError from inside the write loop, so earlier selections were already
   // persisted when the request 500'd — a partial import the owner could neither
   // see nor cleanly retry.
+  const existingAll = await catalog.listSuppliers(db, locId, { includeArchived: true });
+  const byId = new Map(existingAll.map((s) => [s.supplierId, s]));
+
   const planned = [];
   const ignoredNames = [];
+  const ignoredItemKeys = [];
   for (const sel of selections) {
-    const name = normaliseName(sel.name);
-    const sources = new Set(sel.sourceNames.filter((n) => derivedNames.has(n)));
-    for (const n of sel.sourceNames) if (!derivedNames.has(n)) ignoredNames.push(n);
-    if (!sources.size) continue; // nothing the server actually derived
-    planned.push({ name, sources });
+    const sourceNames = sel.sourceNames || [];
+    const itemKeys = sel.itemKeys || [];
+
+    // Target: an existing supplier by id, or a name to find-or-create.
+    let target;
+    if (sel.supplierId) {
+      const match = byId.get(sel.supplierId);
+      // Refuse rather than silently creating one — a stale id from a page open
+      // across an archive+purge would otherwise fork the book invisibly.
+      if (!match) throw new ClientError('Supplier not found');
+      target = { supplierId: sel.supplierId, name: match.name };
+    } else {
+      target = { name: normaliseName(sel.name) };
+    }
+
+    const sources = new Set(sourceNames.filter((n) => derivedNames.has(n)));
+    for (const n of sourceNames) if (!derivedNames.has(n)) ignoredNames.push(n);
+
+    const assigned = [];
+    for (const k of itemKeys) {
+      const hit = unassignedByKey.get(k);
+      if (hit) assigned.push(hit);
+      else ignoredItemKeys.push(k);
+    }
+
+    if (!sources.size && !assigned.length) continue; // nothing real selected
+    planned.push({ ...target, sources, assigned });
   }
 
   // Budget the whole request before any write. `sources` is a Set so the
   // membership test below is O(1) rather than a linear scan inside a nested
-  // 500 x 2000 loop.
+  // 500 x 2000 loop. Hand-assigned items count too — they are writes like any
+  // other, and 500 selections x 2000 items is reachable through them as well.
   const plannedProducts = planned.reduce(
-    (n, p) => n + derived.items.filter((i) => p.sources.has(i.supplierName)).length, 0,
+    (n, p) => n + derived.items.filter((i) => p.sources.has(i.supplierName)).length
+      + p.assigned.length, 0,
   );
   if (plannedProducts > MAX_SEED_PRODUCTS_PER_COMMIT) {
     throw new ClientError(
@@ -96,16 +120,17 @@ async function commitSeedBook(db, locId, uid, { selections, derived }, now) {
     );
   }
 
-  const existing = await catalog.listSuppliers(db, locId, { includeArchived: true });
-  const existingByName = new Map(existing.map((s) => [s.name, s]));
+  const existingByName = new Map(existingAll.map((s) => [s.name, s]));
 
   let suppliersCreated = 0;
   let productsCreated = 0;
   let reactivated = 0;
 
-  for (const { name, sources } of planned) {
-    const match = existingByName.get(name);
-    let supplierId;
+  for (const plan of planned) {
+    const { name, sources, assigned } = plan;
+    // An explicit supplierId skips the find-or-create entirely.
+    const match = plan.supplierId ? byId.get(plan.supplierId) : existingByName.get(name);
+    let supplierId = plan.supplierId;
 
     if (!match) {
       ({ supplierId } = await catalog.saveSupplier(db, locId, uid, { name }, now));
@@ -128,9 +153,12 @@ async function commitSeedBook(db, locId, uid, { selections, derived }, now) {
     const seen = new Set(already.map(productKey));
 
     const toCreate = [];
-    for (const item of derived.items) {
-      if (!sources.has(item.supplierName)) continue;
-      const key = productKey(item);
+    const consider = [
+      ...derived.items.filter((i) => sources.has(i.supplierName)),
+      ...assigned,
+    ];
+    for (const item of consider) {
+      const key = item.key || productKey(item);
       if (seen.has(key)) continue;
       seen.add(key);
       toCreate.push({
@@ -154,6 +182,7 @@ async function commitSeedBook(db, locId, uid, { selections, derived }, now) {
     // uploaded between preview and commit can invalidate the owner's ticks and
     // return zeros that otherwise read as success.
     ignoredNames,
+    ignoredItemKeys,
     truncated: derived.truncated === true,
   };
 }

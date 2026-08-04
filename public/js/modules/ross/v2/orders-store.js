@@ -69,6 +69,38 @@ export const useOrdersStore = defineStore('rossOrders', {
     needsEmailCount: (state) => state.suppliers.filter((s) => s.needsEmail).length,
 
     /**
+     * Unassigned stock items grouped by category, so a file with no supplier
+     * column becomes a manageable number of decisions instead of one per item.
+     *
+     * This is the whole reason D1.1 exists: the supplier column is auto-detected
+     * by header name and is frequently absent, which puts EVERY item here — and
+     * nobody hand-assigns 388 rows. Category is already parsed from the CSV, so
+     * grouping by it costs nothing and typically collapses hundreds of items
+     * into ten or twenty groups.
+     */
+    seedUnassignedGroups: (state) => {
+      const items = state.seedPreview?.unassigned?.items
+      if (!Array.isArray(items) || !items.length) return []
+
+      const byCategory = new Map()
+      for (const it of items) {
+        const key = it.category || 'Uncategorized'
+        if (!byCategory.has(key)) byCategory.set(key, [])
+        byCategory.get(key).push(it)
+      }
+
+      return [...byCategory.entries()]
+        .map(([category, members]) => ({
+          category,
+          itemCount: members.length,
+          keys: members.map((m) => m.key),
+          // Enough to recognise the group without opening it.
+          sample: members.slice(0, 3).map((m) => m.description),
+        }))
+        .sort((a, b) => b.itemCount - a.itemCount)
+    },
+
+    /**
      * Derived supplier names that look like the same company, grouped so the
      * review screen can offer a one-action merge. The server supplies `mergeKey`
      * (case, accent and punctuation folded); grouping is a UI affordance only —

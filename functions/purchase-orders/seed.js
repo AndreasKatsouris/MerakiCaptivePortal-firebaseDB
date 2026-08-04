@@ -20,7 +20,7 @@
  * owner reviews and ticks; `poSeedFromStock` commit writes only what came back.
  */
 
-const { sanitizeText } = require('./validate');
+const { sanitizeText, productKey } = require('./validate');
 
 const MAX_SEED_ITEMS = 2000; // matches suggest.js MAX_ITEMS_PER_RECORD (P5)
 
@@ -121,6 +121,10 @@ function deriveCatalogFromStock(records) {
     const product = {
       supplierName: sanitizeText(it.supplierName).trim(),
       description,
+      // Defaults mirror the CSV parser's own (data-processor.js:400-405) so a
+      // grouping UI never renders a nameless bucket.
+      category: sanitizeText(it.category).trim() || 'Uncategorized',
+      costCenter: sanitizeText(it.costCenter).trim() || 'Main',
       unit: unit || 'ea',
       // Surfaced so the review UI can offer a bulk unit fix instead of leaving
       // the owner to spot every silently-defaulted row by eye.
@@ -128,6 +132,12 @@ function deriveCatalogFromStock(records) {
       itemCode: isGeneratedItemCode(itemCode) ? '' : itemCode,
       lastPrice: priceOf(it),
     };
+    // Stable handle the client sends back on commit to say "assign THIS item to
+    // that supplier". Deliberately the same key the catalogue dedupes on, so an
+    // assignment and an existing product collapse rather than duplicate. Two
+    // codeless items sharing a description share a key — they are duplicates of
+    // each other anyway and dedupe would have merged them regardless.
+    product.key = productKey(product);
     if (product.unitDefaulted) unitDefaultedCount += 1;
 
     if (!product.supplierName) {

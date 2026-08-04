@@ -153,6 +153,55 @@ describe('seed flow', () => {
   })
 })
 
+// D1.1: when the stock file has no supplier column every item lands here, and
+// per-item assignment across hundreds of rows is not a task anyone finishes.
+// Category is already on each item, so grouping turns it into ~15 decisions.
+describe('seedUnassignedGroups', () => {
+  const previewWith = (items) => ({
+    hasData: true, sourceTimestamp: 1, truncated: false,
+    suppliers: [], items: [],
+    unassigned: { itemCount: items.length, items },
+  })
+  const un = (description, category, key) => ({
+    description, category, costCenter: 'Kitchen', key, unit: 'ea', itemCode: '', lastPrice: null,
+  })
+
+  it('groups unassigned items by category, largest group first', async () => {
+    service.previewSeed.mockResolvedValue(previewWith([
+      un('beef', 'Butchery', 'd:beef'),
+      un('lamb', 'Butchery', 'd:lamb'),
+      un('cola', 'Beverages', 'd:cola'),
+    ]))
+    const store = useOrdersStore()
+    await store.loadSeedPreview('loc1')
+
+    expect(store.seedUnassignedGroups.map((g) => g.category)).toEqual(['Butchery', 'Beverages'])
+    expect(store.seedUnassignedGroups[0]).toMatchObject({ itemCount: 2 })
+    expect(store.seedUnassignedGroups[0].keys).toEqual(['d:beef', 'd:lamb'])
+  })
+
+  it('carries a short sample so the owner can tell what is in a group', async () => {
+    service.previewSeed.mockResolvedValue(previewWith([
+      un('beef', 'Butchery', 'd:beef'), un('lamb', 'Butchery', 'd:lamb'),
+      un('pork', 'Butchery', 'd:pork'), un('veal', 'Butchery', 'd:veal'),
+    ]))
+    const store = useOrdersStore()
+    await store.loadSeedPreview('loc1')
+    expect(store.seedUnassignedGroups[0].sample).toEqual(['beef', 'lamb', 'pork'])
+  })
+
+  it('is empty when nothing is unassigned', async () => {
+    service.previewSeed.mockResolvedValue(previewWith([]))
+    const store = useOrdersStore()
+    await store.loadSeedPreview('loc1')
+    expect(store.seedUnassignedGroups).toEqual([])
+  })
+
+  it('is empty with no preview loaded', () => {
+    expect(useOrdersStore().seedUnassignedGroups).toEqual([])
+  })
+})
+
 // The stock CSV's supplier column is free text, so one company arrives under
 // several spellings. The server supplies a mergeKey per derived supplier; the
 // review screen needs them grouped so the owner can merge with one action.
