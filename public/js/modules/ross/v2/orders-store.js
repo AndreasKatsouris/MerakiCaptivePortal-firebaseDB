@@ -7,6 +7,8 @@
 // 2026-08-04), and the CFs exist for D2's draft builder to consume.
 
 import { defineStore } from 'pinia'
+import { auth, rtdb, ref, get } from '../../../config/firebase-config.js'
+import { fetchLocationNames } from './utils/location-names.js'
 import {
   listSuppliers as apiListSuppliers,
   saveSupplier as apiSaveSupplier,
@@ -19,8 +21,29 @@ function messageFor(err) {
   return (err && err.message) || 'Something went wrong. Please try again.'
 }
 
+/**
+ * Read userLocations/{uid}, then enrich the ids via the SHARED name helper
+ * rather than re-implementing the per-id read a third time (people-store still
+ * carries its own inline copy; this is the extracted one).
+ * Best-effort: returns whatever was readable.
+ */
+async function fetchUserLocations() {
+  const user = auth.currentUser
+  if (!user) return []
+  const snap = await get(ref(rtdb, `userLocations/${user.uid}`))
+  if (!snap.exists()) return []
+  const ids = Object.keys(snap.val() || {})
+  const names = await fetchLocationNames(ids)
+  return ids.map((id) => ({ id, name: names.get(id) || id }))
+}
+
 export const useOrdersStore = defineStore('rossOrders', {
   state: () => ({
+    locations: [],
+    locationsLoading: false,
+    locationsError: '',
+    selectedLocationId: null,
+
     suppliers: [],
     loading: false,
     error: '',
@@ -39,6 +62,8 @@ export const useOrdersStore = defineStore('rossOrders', {
   }),
 
   getters: {
+    selectedLocation: (state) => state.locations.find((l) => l.id === state.selectedLocationId) || null,
+
     // A supplier with no email can be exported but not emailed (design §3 R3).
     // DERIVED server-side from an empty email and passed through — never stored.
     needsEmailCount: (state) => state.suppliers.filter((s) => s.needsEmail).length,
@@ -78,6 +103,35 @@ export const useOrdersStore = defineStore('rossOrders', {
   },
 
   actions: {
+    async loadLocations() {
+      this.locationsLoading = true
+      this.locationsError = ''
+      try {
+        const locs = await fetchUserLocations()
+        locs.sort((a, b) => (a.name || a.id).localeCompare(b.name || b.id))
+        this.locations = locs
+        // Auto-select when there's only one — saves a click for the common case
+        // of a single-restaurant owner.
+        if (!this.selectedLocationId && locs.length === 1) {
+          await this.selectLocation(locs[0].id)
+        }
+      } catch (err) {
+        this.locationsError = messageFor(err)
+      } finally {
+        this.locationsLoading = false
+      }
+    },
+
+    async selectLocation(locationId) {
+      if (this.selectedLocationId === locationId) return
+      this.selectedLocationId = locationId
+      // A preview belongs to the location it was derived from — carrying one
+      // across a switch would let the owner commit another location's book.
+      this.clearSeedPreview()
+      this.suppliers = []
+      await this.loadSuppliers(locationId)
+    },
+
     async loadSuppliers(locationId) {
       if (!locationId) {
         this.error = 'Choose a location first.'
