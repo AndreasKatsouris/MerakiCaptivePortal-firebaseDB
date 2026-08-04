@@ -59,6 +59,15 @@ function rowsFromPreview(preview) {
 watch(() => store.seedPreview, (p) => { rows.value = rowsFromPreview(p) })
 
 const tickedCount = computed(() => rows.value.filter((r) => r.ticked).length)
+
+// Every item in the count lacked a supplier name, so there is nothing to build a
+// book from. Without this the review screen is a dead end: an empty tick-list
+// above a disabled "Import 0 suppliers" button, with Cancel the only way out.
+// The stock CSV's supplier column is auto-detected by header name, so the usual
+// cause is a column that is absent or named something unrecognised.
+const nothingToImport = computed(() => (
+  !!store.seedPreview && rows.value.length === 0
+))
 const canCommit = computed(() => (
   tickedCount.value > 0 && rows.value.every((r) => !r.ticked || r.name.trim().length > 0)
 ))
@@ -234,6 +243,29 @@ watch(selectedLocationId, () => {
             <p class="ord__review-sub">{{ seedHeadline }}</p>
           </div>
 
+          <!-- Nothing importable: explain the cause and offer a way forward,
+               rather than an empty list above a disabled button. -->
+          <div v-if="nothingToImport" class="ord__deadend">
+            <p class="ord__deadend-msg">
+              None of the {{ store.seedPreview.unassigned.itemCount }} items in this stock
+              count have a supplier name, so there's nothing to import yet.
+            </p>
+            <p class="ord__deadend-why">
+              Ross reads the supplier from a column in your stock file — one headed
+              <em>Supplier</em>, <em>Vendor</em> or <em>Distributor</em>. If that column is
+              missing, or the mapping skipped it when you uploaded, every item arrives
+              without one. Re-upload the count with that column mapped, or add your
+              suppliers by hand.
+            </p>
+            <div class="ord__deadend-actions">
+              <HfButton variant="solid" @click="store.clearSeedPreview(); openCreate()">
+                Add a supplier by hand
+              </HfButton>
+              <HfButton variant="ghost" @click="store.clearSeedPreview()">Close</HfButton>
+            </div>
+          </div>
+
+          <template v-if="!nothingToImport">
           <!-- Things that would otherwise vanish quietly -->
           <div v-if="store.seedPreview.unassigned.itemCount > 0" class="ord__notice">
             <HfIcon name="alert" :size="12" />
@@ -299,6 +331,7 @@ watch(selectedLocationId, () => {
               {{ saving ? 'Importing…' : `Import ${tickedCount} supplier${tickedCount === 1 ? '' : 's'}` }}
             </HfButton>
           </div>
+          </template>
         </div>
 
         <!-- ============ EMPTY BOOK ============ -->
@@ -463,6 +496,10 @@ watch(selectedLocationId, () => {
 .ord__review-name:disabled { opacity: 0.5; }
 .ord__review-count { font-size: 11px; color: var(--hf-ink-3); flex-shrink: 0; }
 .ord__review-actions { display: flex; justify-content: flex-end; gap: 8px; margin-top: 16px; }
+.ord__deadend-msg { margin: 0 0 8px; font-size: 14px; color: var(--hf-ink); font-weight: 600; }
+.ord__deadend-why { margin: 0 0 16px; font-size: 13px; color: var(--hf-ink-2); line-height: 1.6; }
+.ord__deadend-why em { font-style: normal; font-family: var(--hf-font-mono, monospace); font-size: 12px; }
+.ord__deadend-actions { display: flex; gap: 8px; flex-wrap: wrap; }
 @media (max-width: 640px) {
   .ord__main { padding: 24px 16px 48px; }
   .ord__title { font-size: 24px; }
