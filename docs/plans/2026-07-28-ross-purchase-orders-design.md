@@ -36,8 +36,8 @@ Purchase Orders decide what to buy. They share data by explicit copy, never by c
 | L4 | **Destination now (`/ross.html?tab=orders`), workflow step type later.** | Ships value early and lands the workflow hook on a surface that already works. The step type gets its own spec — explicitly out of scope here (§6). |
 | L5 | **Storage is location-scoped**, not uid-scoped — under a new top-level `purchasing/{locId}` node, **not** nested inside `locations/{locId}`. | The supplier book belongs to the restaurant, not to one person's login. Avoids re-running the #199 read/write asymmetry (§3 G6). The top-level placement is forced: `locations/$locationId` cascades a world-readable `.read` and an owner `.write` into every descendant (§3 G14), which would make CF-mediated writes unenforceable and leak supplier data cross-tenant. |
 | L6 | **Document format v1 = styled HTML email body + CSV attachment. No PDF.** | No PDF library exists in the repo (§3 G5); adding one is a new dependency and a cold-start cost. `render.js` is seamed so `pdfkit` can be added later if suppliers ask for it. |
-| L8 | **A PO may contain items that are NOT in that supplier's catalogue.** D2's draft builder must let an owner start an order for any supplier and add lines picked from ALL stock items, without touching the catalogue. (Operator, 2026-08-04.) | The backup-supplier case: when the usual butcher can't deliver, you order lamb from someone else *this once*. Ordering from a backup must never silently rewrite who you normally buy from — a catalogue entry means "we normally buy this here", an order line means "we bought this here this time". Conflating them would corrupt next month's suggested order. Uses the same item picker D1.1 built for assignment. |
 | L7 | **Entitlement `features.purchaseOrders`, ON for both Free and All-in at launch.** | Having the entitlement in place means moving it behind All-in later is a config change, not a migration. |
+| L8 | **A PO may contain items that are NOT in that supplier's catalogue.** D2's draft builder must let an owner start an order for any supplier and add lines picked from ALL stock items, without touching the catalogue. (Operator, 2026-08-04.) | The backup-supplier case: when the usual butcher can't deliver, you order lamb from someone else *this once*. Ordering from a backup must never silently rewrite who you normally buy from — a catalogue entry means "we normally buy this here", an order line means "we bought this here this time". Conflating them would corrupt next month's suggested order. Uses the same item picker D1.1 built for assignment. |
 
 ---
 
@@ -276,6 +276,55 @@ Mirroring D2's P5 lesson (tenant-writable dimensions are a self-service DoS vect
 max 200 lines per PO, max 500 suppliers per location, max 2,000 catalogue products per
 supplier, max 100 POs returned per history page. Enforced at the Zod boundary in the CF,
 before any work.
+
+---
+
+## 5.3 Seed import mechanism (added 2026-08-04, D1.1 + review fold)
+
+D1.1 let the owner attach stock items to suppliers by hand, because a stock CSV
+with no supplier column leaves every item unassigned. Two reviews then found the
+mechanism below; it is recorded here because §5 is the canonical description of
+how this feature writes, and inline JSDoc is not where the next person looks.
+
+**Two identifiers, deliberately distinct.** Each derived row carries both:
+
+| Field | Purpose | Unique per row? |
+|-------|---------|-----------------|
+| `ref` | opaque positional handle the client sends back in `itemRefs` | **yes**, by construction |
+| `key` | content dedupe key for the catalogue (`c:<code>` / `d:<description>`) | **no**, deliberately |
+
+They were one field until it corrupted data. `key` ignores cost centre, and a
+stock count routinely counts one item once per cost centre — so two rows with
+different unit and price shared a key, and a last-wins lookup silently wrote one
+row's figures under the other's selection. **Never identify a row by `key`.**
+
+**`ref` is positional within ONE derivation**, so `commit` round-trips the
+preview's `sourceTimestamp` and refuses a stale one rather than binding refs to
+rows the owner never reviewed.
+
+**Hand-assignment is a MOVE, not a copy.** An item assigned by hand is excluded
+from the supplier it derived under: a catalogue entry means *"we normally buy
+this here"* and cannot truthfully point at two suppliers. The genuine
+backup-supplier case is an order line — see L8, and do not conflate them.
+
+**PLAN then WRITE.** `commitSeedBook` runs every read, every `ProductInput.parse`
+and every cap check (per-supplier `MAX_PRODUCTS`, per-location `MAX_SUPPLIERS`,
+per-commit `MAX_SEED_PRODUCTS_PER_COMMIT`, `MAX_PLANS_PER_COMMIT`) *before* the
+first write. The write phase must contain nothing that can fail on caller input —
+the failure this prevents is a half-written book that every retry reproduces, and
+it recurred twice, most recently via the supplier cap enforced inside
+`saveSupplier`.
+
+**Plans are coalesced by target.** N selections naming one supplier cost ONE
+catalogue read. Before this, 500 selections naming the same supplier passed the
+product budget while driving 500 full-catalogue reads.
+
+**Wire contract.** `poSeedFromStock` `commit` takes
+`{ locationId, sourceTimestamp?, selections: [{ name? | supplierId?, sourceNames?: [], itemRefs?: [] }] }`,
+or the tick-only `{ supplierNames: [] }`. It returns
+`{ suppliersCreated, productsCreated, reactivated, ignoredNames, ignoredItemRefs, ignoredCount, truncated }` —
+and the client **must render** the ignored/truncated fields, or a zero-effect
+import reads as a clean success.
 
 ---
 

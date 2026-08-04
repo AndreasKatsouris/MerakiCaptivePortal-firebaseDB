@@ -34,6 +34,7 @@ const LOCATION_ID_RE = /^[a-zA-Z0-9_-]+$/;
 const MAX_RECORDS = 30;          // same bounded read as foodCostOverview
 const MAX_SEED_NAMES = 500;      // matches MAX_SUPPLIERS
 const MAX_SEED_ITEM_KEYS = 2000; // matches MAX_PRODUCTS per supplier
+const MAX_REF_LEN = 16;          // refs are server-issued `r<ordinal>`
 const KEY_SAFE_RE = /^[A-Za-z0-9_-]+$/;
 const DENIED = { hasData: false };
 
@@ -190,6 +191,7 @@ function normaliseSelections(body) {
     if (!Array.isArray(sel) || sel.length > MAX_SEED_NAMES) {
       return { error: 'selections must be an array of at most 500 entries' };
     }
+    let totalRefs = 0;
     for (const s of sel) {
       if (!s || typeof s !== 'object') {
         return { error: 'each selection must be an object' };
@@ -197,7 +199,14 @@ function normaliseSelections(body) {
       // A selection targets EITHER an existing supplier by id, or a name to
       // find-or-create. D1.1 added the id form so hand-assigned items can go to
       // a supplier the owner typed in themselves.
-      const hasId = typeof s.supplierId === 'string' && KEY_SAFE_RE.test(s.supplierId);
+      // HARD REJECT, not classification. Treating a malformed supplierId as
+      // merely "not the id form" let an unsafe value through whenever a name was
+      // also present, leaving one Map.get between caller input and a path.
+      if (s.supplierId !== undefined
+          && (typeof s.supplierId !== 'string' || !KEY_SAFE_RE.test(s.supplierId))) {
+        return { error: 'supplierId must be a key-safe string ([A-Za-z0-9_-])' };
+      }
+      const hasId = typeof s.supplierId === 'string';
       const hasName = typeof s.name === 'string' && s.name.trim().length > 0;
       if (!hasId && !hasName) {
         return { error: 'each selection needs a supplierId or a non-empty name' };
@@ -205,14 +214,21 @@ function normaliseSelections(body) {
       const okSources = s.sourceNames === undefined || (Array.isArray(s.sourceNames)
         && s.sourceNames.length <= MAX_SEED_NAMES
         && s.sourceNames.every((n) => typeof n === 'string'));
-      const okItems = s.itemKeys === undefined || (Array.isArray(s.itemKeys)
-        && s.itemKeys.length <= MAX_SEED_ITEM_KEYS
-        && s.itemKeys.every((k) => typeof k === 'string'));
+      const okItems = s.itemRefs === undefined || (Array.isArray(s.itemRefs)
+        && s.itemRefs.length <= MAX_SEED_ITEM_KEYS
+        && s.itemRefs.every((k) => typeof k === 'string' && k.length <= MAX_REF_LEN));
       if (!okSources) return { error: 'sourceNames must be an array of at most 500 strings' };
-      if (!okItems) return { error: 'itemKeys must be an array of at most 2000 strings' };
-      if ((s.sourceNames || []).length === 0 && (s.itemKeys || []).length === 0) {
-        return { error: 'each selection needs at least one sourceName or itemKey' };
+      if (!okItems) return { error: 'itemRefs must be an array of at most 2000 short strings' };
+      if ((s.sourceNames || []).length === 0 && (s.itemRefs || []).length === 0) {
+        return { error: 'each selection needs at least one sourceName or itemRef' };
       }
+      totalRefs += (s.itemRefs || []).length;
+    }
+    // AGGREGATE cap: per-selection limits alone allowed 500 x 2000 = 1,000,000
+    // refs, none of which counted against the write budget because unmatched
+    // refs create nothing.
+    if (totalRefs > MAX_SEED_ITEM_KEYS) {
+      return { error: `at most ${MAX_SEED_ITEM_KEYS} itemRefs in total` };
     }
     return { selections: sel };
   }
@@ -229,10 +245,6 @@ function normaliseSelections(body) {
   return { error: 'commit requires either selections or supplierNames' };
 }
 
-/** Dedupe key for a catalogue product: its code if it has a real one, else its name. */
-function productKey(p) {
-  return String(p.itemCode || p.description || '').trim().toLowerCase();
-}
 
 async function handleSeedRequest(req, res) {
   if (req.method !== 'POST') { res.status(405).json({ error: 'Method not allowed' }); return; }
@@ -274,14 +286,21 @@ async function handleSeedRequest(req, res) {
 
     // COMMIT. Delegated to the db-injected core so it is unit-testable without
     // HTTP -- both reviews traced this slice's defects to it living in the shell.
-    const out = await commitSeedBook(db, locationId, decoded.uid, { selections, derived }, Date.now());
+    const out = await commitSeedBook(
+      db, locationId, decoded.uid,
+      { selections, derived, sourceTimestamp: body.sourceTimestamp }, Date.now(),
+    );
     res.json({ hasData: true, ...out });
   } catch (err) {
     // Typed client errors answer 400 and leave nothing half-written -- the
     // commit core validates every selection before its first write.
-    if (err instanceof ClientError) {
+    if (err instanceof ClientError || err instanceof ZodError) {
       console.warn('[poSeedFromStock] rejected:', sanitizeText(err.message));
-      res.status(400).json({ error: err.message });
+      res.status(400).json({
+        error: err instanceof ClientError
+          ? err.message
+          : 'Some stock rows could not be imported. Check units and item codes.',
+      });
       return;
     }
     console.error('[poSeedFromStock] failed:', sanitizeText(err && err.message));

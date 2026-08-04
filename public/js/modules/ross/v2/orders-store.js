@@ -243,16 +243,22 @@ export const useOrdersStore = defineStore('rossOrders', {
     },
 
     /**
-     * Commit the reviewed book. Pass `selections:[{name, sourceNames}]` to carry
-     * renames and merges, or `supplierNames:[]` for a plain tick.
+     * Commit the reviewed book.
+     *
+     * `selections:[{name?, supplierId?, sourceNames?, itemRefs?}]` carries
+     * renames, merges and hand-assigned stock rows; `supplierNames:[]` is the
+     * plain tick-only form. `sourceTimestamp` echoes the preview so the server
+     * can refuse a stale one.
      * @returns {Promise<object|null>} the server summary, or null on failure
      */
-    async commitSeed({ locationId, selections, supplierNames }) {
+    async commitSeed({ locationId, selections, supplierNames, sourceTimestamp }) {
       this.error = ''
       let out
       try {
         out = await apiCommitSeed(
-          selections ? { locationId, selections } : { locationId, supplierNames },
+          selections
+            ? { locationId, selections, sourceTimestamp }
+            : { locationId, supplierNames, sourceTimestamp },
         )
       } catch (err) {
         // Keep the preview: the owner is mid-review and losing their ticks,

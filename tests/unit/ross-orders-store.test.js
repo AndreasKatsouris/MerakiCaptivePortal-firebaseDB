@@ -122,7 +122,9 @@ describe('seed flow', () => {
     service.listSuppliers.mockResolvedValue([{ supplierId: 's1', name: 'P' }])
     const store = useOrdersStore()
     const out = await store.commitSeed({ locationId: 'loc1', supplierNames: ['P'] })
-    expect(service.commitSeed).toHaveBeenCalledWith({ locationId: 'loc1', supplierNames: ['P'] })
+    expect(service.commitSeed).toHaveBeenCalledWith({
+      locationId: 'loc1', supplierNames: ['P'], sourceTimestamp: undefined,
+    })
     expect(out.suppliersCreated).toBe(1)
     expect(store.suppliers).toHaveLength(1)
     expect(store.seedPreview).toBeNull()
@@ -134,7 +136,9 @@ describe('seed flow', () => {
     const selections = [{ name: 'ABC Meats (Pty) Ltd', sourceNames: ['ABC Meats', 'abc meats'] }]
     const store = useOrdersStore()
     await store.commitSeed({ locationId: 'loc1', selections })
-    expect(service.commitSeed).toHaveBeenCalledWith({ locationId: 'loc1', selections })
+    expect(service.commitSeed).toHaveBeenCalledWith({
+      locationId: 'loc1', selections, sourceTimestamp: undefined,
+    })
   })
 
   it('surfaces a commit failure without clearing the preview the owner is mid-review on', async () => {
