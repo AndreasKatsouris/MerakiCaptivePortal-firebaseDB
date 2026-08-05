@@ -108,10 +108,8 @@
     
     <!-- Firebase -->
     <script type="module">
-        import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.7.0/firebase-app.js';
-        import { getAuth, onAuthStateChanged } from 'https://www.gstatic.com/firebasejs/10.7.0/firebase-auth.js';
-        import { getDatabase, ref, get, set, update } from 'https://www.gstatic.com/firebasejs/10.7.0/firebase-database.js';
-        
+        import { auth, rtdb as database, onAuthStateChanged, ref, get, set, update } from '../../js/config/firebase-config.js';
+
         // Import feature access control with error handling
         let featureAccessControl, platformFeatures;
         try {
@@ -125,22 +123,7 @@
             document.getElementById('userStatus').innerHTML = '<div class="alert alert-danger">Error loading modules: ' + error.message + '</div>';
         }
         
-        // Firebase config
-        const firebaseConfig = {
-            apiKey: "AIzaSyBJol6F-qAh6Pa_GZZqCSZWqgL91OJaL5s",
-            authDomain: "merakicaptiveportal-firebasedb.firebaseapp.com",
-            databaseURL: "https://merakicaptiveportal-firebasedb-default-rtdb.firebaseio.com",
-            projectId: "merakicaptiveportal-firebasedb",
-            storageBucket: "merakicaptiveportal-firebasedb.appspot.com",
-            messagingSenderId: "543702556849",
-            appId: "1:543702556849:web:b967bab2e7b964ec9ca78c"
-        };
-        
-        // Initialize Firebase
-        const app = initializeApp(firebaseConfig);
-        const auth = getAuth(app);
-        const database = getDatabase(app);
-        
+        // Firebase comes from the shared config module — no inline config literal.
         window.rtdb = database;
         
         // Current user

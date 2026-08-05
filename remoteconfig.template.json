@@ -1,8 +1,8 @@
 {
     "parameters": {
       "GOOGLE_PLACES_API_KEY": {
-        "defaultValue": "AIzaSyBSvEPNoh0ZBSnxZhwXeVIEeXLkkP9arw4",
-        "description": "Google Places API Key for accessing Places API services",
+        "defaultValue": "REPLACE_IN_REMOTE_CONFIG_CONSOLE",
+        "description": "Google Places API Key. Do NOT commit the real value — set it in the Firebase Remote Config console. This template ships a placeholder only; publishing it as-is will not overwrite a console-set value unless you deploy remoteconfig explicitly.",
         "valueType": "STRING"
       },
       "GOOGLE_PLACE_ID": {

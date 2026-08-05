@@ -81,3 +81,10 @@ node_modules/
 # Local agent / editor state — never tracked
 .superpowers/
 CLAUDE - OLD.md
+
+# Database exports / dumps — never commit production data.
+# A tracked RTDB export (guest PII + a Twilio Account SID) was found in the repo
+# during the 2026-08-05 API-key incident. Enforced by scripts/scan-secrets.js.
+*-default-rtdb.json
+firebase-export/
+*.rtdb-backup.json

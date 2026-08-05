@@ -9,7 +9,6 @@ Diagnostic, debugging, and testing utilities for development purposes.
 - check-user-auth.html
 - debug-auth-session.html
 - test-auth-status.html
-- test-booking-access.html
 
 ### Tier & Subscription Testing
 - check-tier-features.html
@@ -52,10 +51,6 @@ Diagnostic, debugging, and testing utilities for development purposes.
 - test-wms-navigation-fix.html
 - test-location-resolution.js
 
-### Phone Number Management
-- test-phone-protection.html
-- fix-phone-numbers.html
-
 ### QMS Testing
 - qms-tier-test-execution.js
 - qms-upgrade-flow-test.js
@@ -76,3 +71,12 @@ These tools are for development and testing only. They should **NOT** be accessi
 ---
 
 **Last Updated**: 2025-12-15
+
+> **Removed 2026-08-05** (API key incident): `test-booking-access.html`, `test-phone-protection.html`,
+> `test-feature-67-pagination.html`, `test-feature-70-multi-tab-auth-production.html` and the
+> `public/test-*.html` set. Each carried a hand-written Firebase config with a fabricated
+> `messagingSenderId`/`appId`, so none of them could initialise Firebase — and all were being
+> served in production. See `docs/security/API_KEY_INCIDENT_2026-08-05.md`.
+>
+> New dev tools must import from `public/js/config/firebase-config.js`. A config literal
+> anywhere else fails `npm run security:scan` in CI.

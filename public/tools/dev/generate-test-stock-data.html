@@ -92,26 +92,9 @@
     
     <!-- Firebase Scripts -->
     <script type="module">
-        import { initializeApp } from 'https://www.gstatic.com/firebasejs/11.2.0/firebase-app.js';
-        import { getAuth, signInAnonymously } from 'https://www.gstatic.com/firebasejs/11.2.0/firebase-auth.js';
-        import { getDatabase, ref, set, get } from 'https://www.gstatic.com/firebasejs/11.2.0/firebase-database.js';
-        
-        // Firebase configuration
-        const firebaseConfig = {
-            apiKey: "AIzaSyAagtKLQXBhEPvA3J4xFPSHxq1L8nNvvAQ",
-            authDomain: "merakicaptiveportal-firebasedb.firebaseapp.com",
-            databaseURL: "https://merakicaptiveportal-firebasedb-default-rtdb.firebaseio.com",
-            projectId: "merakicaptiveportal-firebasedb",
-            storageBucket: "merakicaptiveportal-firebasedb.appspot.com",
-            messagingSenderId: "935338193813",
-            appId: "1:935338193813:web:a0c019ad90b2171f12e8c3"
-        };
-        
-        // Initialize Firebase
-        const app = initializeApp(firebaseConfig);
-        const auth = getAuth();
-        const db = getDatabase();
-        
+        // Firebase comes from the shared config module — no inline config literal.
+        import { auth, rtdb as db, signInAnonymously, ref, set, get } from '../../js/config/firebase-config.js';
+
         // Sign in anonymously for testing
         signInAnonymously(auth).then(() => {
             console.log('Signed in anonymously');
