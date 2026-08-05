@@ -13,10 +13,11 @@
 5. [Storage Security Rules](#storage-security-rules)
 6. [Cloud Functions Security](#cloud-functions-security)
 7. [Client-Side Security](#client-side-security)
-8. [Data Protection](#data-protection)
-9. [Strengths](#strengths)
-10. [Weaknesses and Risks](#weaknesses-and-risks)
-11. [Recommendations](#recommendations)
+8. [Credential Hygiene (CI-enforced)](#credential-hygiene-ci-enforced)
+9. [Data Protection](#data-protection)
+10. [Strengths](#strengths)
+11. [Weaknesses and Risks](#weaknesses-and-risks)
+12. [Recommendations](#recommendations)
 
 ---
 
@@ -88,20 +89,24 @@ Client (Browser)
 
 ### What Needs Improvement
 
-1. **`admin-claims` node is world-readable and world-writable** -- `database.rules.json:53-54`:
+1. ~~**`admin-claims` node is world-readable and world-writable**~~ — ✅ **CLOSED. Verified against live `database.rules.json` on 2026-08-05:**
    ```json
    "admin-claims": {
-     ".read": "auth != null",
-     ".write": "auth != null"
+     ".read": "auth != null && auth.token.admin === true",
+     ".write": "auth != null && auth.token.admin === true"
    }
    ```
-   **CRITICAL:** Any authenticated user can add themselves as an admin by writing to this node. The `admin-claims` node is used in campaign and booking rules (`root.child('admin-claims').child(auth.uid).exists()`) to grant elevated access. This means any logged-in user can grant themselves admin-level access to campaigns, bookings, and other resources.
+   Both `.read` and `.write` are admin-only. The read side was closed and probe-verified as backlog LOW-03 (#171, 2026-07-21). **This section previously described the closed state as a live Critical** — corrected during PR #228. _Historical:_ any authenticated user could add themselves as an admin by writing to this node. The `admin-claims` node is used in campaign and booking rules (`root.child('admin-claims').child(auth.uid).exists()`) to grant elevated access. This means any logged-in user can grant themselves admin-level access to campaigns, bookings, and other resources.
 
-2. **`subscriptions` self-write allows tier escalation** -- `database.rules.json:28`:
+2. ~~**`subscriptions` self-write allows tier escalation**~~ — ✅ **CLOSED by the #125 rule lock. Verified against live `database.rules.json` on 2026-08-05:**
    ```json
-   ".write": "auth != null && (auth.uid === $uid || auth.token.admin === true)"
+   "$uid": {
+     ".write": "auth != null && auth.token.admin === true",
+     "features": { ".validate": false },
+     "limits":   { ".validate": false }
+   }
    ```
-   A user can write to their own subscription node, which means they could change their `tierId` from `free` to `enterprise`. While `subscription-validation.js` validates on the client side, security rules should enforce server-side tier validation.
+   Self-write is gone; the entitlements resolver is the sole writer of materialized `features`/`limits`. _Historical:_ a user could change their own `tierId` from `free` to `enterprise`.
 
 3. **Several nodes allow any authenticated user to write** -- These nodes have overly permissive write rules:
    - `wifiLogins` (`:189`): `.write: true` (no auth required)
@@ -132,7 +137,7 @@ See [DATABASE_RULES_GUIDE.md](./DATABASE_RULES_GUIDE.md) for a detailed breakdow
 | Strong | 12 | Proper owner/admin checks with validation |
 | Adequate | 8 | Basic auth checks, could be tighter |
 | Weak | 5 | Overly permissive or world-writable |
-| Critical | 2 | `admin-claims` world-writable, `wifiLogins` etc. no auth |
+| Critical | 1 | `wifiLogins` etc. no auth. (~~`admin-claims` world-writable~~ closed — verified 2026-08-05) |
 
 ### Data Validation
 
@@ -242,6 +247,22 @@ Firebase exports are attached to `window.firebaseExports` (`:76-102`) and `windo
 
 ---
 
+## Credential Hygiene (CI-enforced)
+
+Added 2026-08-05 after a Google Cloud abuse notification for a publicly-exposed API key. Full incident analysis and the operator runbook: `docs/security/API_KEY_INCIDENT_2026-08-05.md`.
+
+**`npm run security:scan`** (`scripts/scan-secrets.js`) runs in **both** GitHub Actions workflows, positioned between `npm ci` and `npm run build` — so a committed credential fails the PR *before* a preview channel publishes it, and blocks a live deploy on merge. Guarded by `scripts/__tests__/scan-secrets.test.js`.
+
+The scanner enforces three rules:
+
+1. **Exactly one Firebase config literal exists**, in `public/js/config/firebase-config.js`. Duplicates are how stale/incorrect project IDs creep in — the OWASP audit of 2026-05-30 reported this as finding H-3, it was never actioned, and 67 days later the same defect drew the abuse report.
+2. **No other Google API key is committed** — Places/Maps/server keys belong in Remote Config or `defineSecret`.
+3. **No database export or provider credential is tracked** — private-key blocks, service-account JSON, SendGrid/Twilio secrets, `*-default-rtdb.json` exports.
+
+**Deliberate non-goal:** the Firebase **web** API key is *not* treated as a secret. It is public by design, ships in every browser bundle, and grants no access on its own — the control is Cloud Console key restriction plus App Check, not concealment. The scanner allowlists it in its one canonical module precisely so that nobody "fixes" a future notification by moving it to an env var and shipping it in the bundle anyway.
+
+> **App Check is not yet in use anywhere in this codebase.** Referrer restrictions on the web key are spoofable, so App Check is the only non-bypassable control against off-origin quota abuse. Enabling enforcement before the client SDK registers a provider would lock out every user — start in monitoring mode. Tracked in the Bug Triage Queue.
+
 ## Data Protection
 
 ### Phone Number Protection
@@ -294,7 +315,6 @@ It also logs validation errors to `_system/subscription-validation-errors` for m
 
 | Issue | Location | Risk | Impact |
 |-------|----------|------|--------|
-| `admin-claims` world-writable | `database.rules.json:53-54` | Any authenticated user can grant themselves admin access | Full privilege escalation |
 | Open writes to `wifiLogins`, `activeUsers`, `userPreferences` | `database.rules.json:189,193,197` | No authentication required to write | Data pollution, potential abuse |
 | Open storage writes for receipts | `storage.rules:17` | Unauthenticated file uploads | Storage abuse, cost escalation |
 
@@ -321,13 +341,7 @@ It also logs validation errors to `_system/subscription-validation-errors` for m
 
 ### Immediate (Critical Fixes)
 
-1. **Lock down `admin-claims`** -- Change to admin-only write:
-   ```json
-   "admin-claims": {
-     ".read": "auth != null",
-     ".write": "auth != null && auth.token.admin === true"
-   }
-   ```
+1. ~~**Lock down `admin-claims`**~~ — ✅ **DONE.** Live rules are admin-only on both `.read` and `.write` (verified 2026-08-05); the read side was probe-verified in #171.
 
 2. **Require auth for `wifiLogins`, `activeUsers`, `userPreferences`:**
    ```json

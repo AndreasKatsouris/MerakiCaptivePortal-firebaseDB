@@ -175,24 +175,17 @@
 
     <!-- Firebase -->
     <script type="module">
-        import { auth, rtdb, onAuthStateChanged, ref, get, query, orderByKey, limitToFirst } from '../../js/config/firebase-config.js';
+        import { app, auth, rtdb, onAuthStateChanged, ref, get, query, orderByKey, limitToFirst } from '../../js/config/firebase-config.js';
 
         let currentUser = null;
         let isCurrentUserAdmin = false;
 
-        const firebaseConfig = {
-            apiKey: "AIzaSyBqXVRPtq-DGbXMUAhxHH8B10MOV5OZkzI",
-            authDomain: "merakicaptiveportal-firebasedb.firebaseapp.com",
-            databaseURL: "https://merakicaptiveportal-firebasedb-default-rtdb.firebaseio.com",
-            projectId: "merakicaptiveportal-firebasedb",
-            storageBucket: "merakicaptiveportal-firebasedb.appspot.com",
-            messagingSenderId: "854311920907",
-            appId: "1:854311920907:web:dd6e51c7f0989887c6c3bc"
-        };
-
+        // Project identity comes from the one initialized app — never re-declare a
+        // config literal here. A stale duplicate silently pointed this tool at a
+        // non-existent project (OWASP audit 2026-05-30, finding H-3).
         function getFunctionsBaseUrl() {
             const region = 'us-central1';
-            return `https://${region}-${firebaseConfig.projectId}.cloudfunctions.net`;
+            return `https://${region}-${app.options.projectId}.cloudfunctions.net`;
         }
 
         console.log('[GrantAdminClaims] Initializing...');

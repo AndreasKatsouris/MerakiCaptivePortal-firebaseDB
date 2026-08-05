@@ -7,7 +7,7 @@ Historical migration scripts and one-time fix tools. These are kept for referenc
 - **repair-data-integrity.html** - Data integrity repair tool (2025-06-20)
 - **fix-guest-name-consistency.html** - Fix guest name issues (2025-07-09)
 - **fix-user-roles.html** - Fix user role assignments (2025-06-18)
-- **fix-phone-numbers.html** - Phone number fixing utility (2025-07-12)
+- **fix-phone-numbers.html** - Phone number fixing utility (2025-07-12) — _deleted 2026-08-05, see `docs/security/API_KEY_INCIDENT_2026-08-05.md`_
 - **cleanup-orphaned-rewards.html** - Clean up orphaned rewards (2025-07-02)
 
 ### Tier Setup
