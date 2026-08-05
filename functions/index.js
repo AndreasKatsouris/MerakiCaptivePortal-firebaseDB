@@ -3563,7 +3563,7 @@ exports.ocrReceiptForTemplate = onRequest({ cors: true }, async (req, res) => {
             }
 
             const authHeader = req.headers.authorization;
-            console.log('Authorization header received:', authHeader ? `Bearer ${authHeader.substring(7, 27)}...` : 'none');
+            console.log('Authorization header received:', authHeader ? 'present' : 'none');
 
             if (!authHeader.startsWith('Bearer ')) {
                 console.error('Invalid authorization header format');
