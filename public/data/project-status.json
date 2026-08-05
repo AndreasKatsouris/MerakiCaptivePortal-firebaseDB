@@ -537,6 +537,22 @@
   ],
   "bugs": [
     {
+      "title": "Two surviving dev pages write RTDB directly, bypassing Cloud Functions — but both are already dead against live rules.",
+      "severity": "low",
+      "discoveredAt": "2026-08-05",
+      "discoveredOn": "",
+      "blockingSprint": "False",
+      "notes": "Raised by the #228 automated review. Verified: public/tools/dev/test-tier-access.html:156 does a client-SDK update(ref(db, 'subscriptions/{uid}'), {tierName, tierId, status}) — a self-service tier escalation on its face — but the live rule is .write: auth != null && auth.token.admin === true (the #125 lock), so a non-admin's write is rejected. The escalation is NOT exploitable; the page's tier switcher just fails silently for non-admins. generate-test-stock-data.html similarly writes locations/* + stock data after an anonymous sign-in. Neither was introduced by #228 (import-only rewiring), but they are the only two dev pages that PR kept alive. Fix shape: route both through CFs, or delete them as the other 12 were. Related: public/ still has no dev-page exclusion, so any scratch page ships to production."
+    },
+    {
+      "title": "SECURITY_OVERVIEW.md documented two CLOSED findings as live Criticals until 2026-08-05.",
+      "severity": "low",
+      "discoveredAt": "2026-08-05",
+      "discoveredOn": "",
+      "blockingSprint": "False",
+      "notes": "admin-claims was described as world-readable/world-writable (live rules: admin-only on BOTH, read side probe-verified in #171) and subscriptions self-write as an open tier-escalation (closed by the #125 rule lock). Corrected in #228 with live-rule evidence, and the Critical count moved 2 → 1. Process point: a security doc that reports fixed Criticals as live is not a harmless stale doc — it inflates the tracked Critical count and trains readers to discount the whole file. Worth a sweep of the remaining rows against live database.rules.json before the next audit."
+    },
+    {
       "title": "A production RTDB export was tracked in the repo for 15 days",
       "severity": "critical",
       "discoveredAt": "2026-08-05",
