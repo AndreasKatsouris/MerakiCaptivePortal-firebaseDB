@@ -642,11 +642,17 @@ function isTimeInRange(time, start, end) {
  */
 function generateFallbackCode() {
     // CSPRNG, not Math.random — voucher codes must be unguessable.
+    // Rejection sampling avoids modulo bias: 256 % 36 === 4, so a plain
+    // `byte % 36` over-represents chars 0-3 by ~14%. Bytes >= 252 (the last
+    // incomplete group of 36) are discarded and redrawn instead of reduced.
     const chars = '0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ';
-    const bytes = crypto.randomBytes(6);
+    const REJECTION_THRESHOLD = 252; // largest multiple of 36 that fits in a byte
     let code = '';
-    for (let i = 0; i < 6; i++) {
-        code += chars.charAt(bytes[i] % chars.length);
+    while (code.length < 6) {
+        const byte = crypto.randomBytes(1)[0];
+        if (byte < REJECTION_THRESHOLD) {
+            code += chars.charAt(byte % chars.length);
+        }
     }
     return code;
 }
@@ -679,4 +685,4 @@ async function rollbackRewards(rewards, phoneNumber, campaignId) {
     }
 }
 
-module.exports = { processReward };
+module.exports = { processReward, generateFallbackCode };
