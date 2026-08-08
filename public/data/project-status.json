@@ -911,6 +911,54 @@
       "discoveredOn": "PR #194 security review",
       "blockingSprint": "False",
       "notes": "\"🔔 Your Table is Ready!\", position updates and wait reminders (functions/queueWhatsAppIntegration.js:667-686) go through sendWhatsAppMessage — pure freeform, business-initiated (an admin clicks Notify), no template anywhere in the path. They are subject to the identical 24-hour-window drop as the booking confirmations above, and a table-ready message that arrives never is worse than most failures in the product. The 2026-07-26 PR gives them statusCallback (so failures at least become observable) but deliberately does NOT classify or enforce them — enforcement without an approved template would simply block the send. Fix: a queue_table_ready content template through Meta approval, then route these via sendWhatsAppTemplate. Same external long-pole as the booking templates; worth batching into one Meta submission. Found by the security review of that PR. Measured 2026-07-26 (Twilio logs): 22 sends lifetime, 18 read / 1 delivered / 3 undelivered (63016) — a 13.6% drop rate, worse than booking confirmations. But it has not fired since 2026-05-05, so its clean recent record is un-exercised, not healthy; treat the 13.6% as the live rate whenever the queue is next used in anger."
+    },
+    {
+      "title": "NEW 2026-08-08 — a full production RTDB export, committed to git, discloses which UID holds admin privileges plus real guest PII.",
+      "severity": "critical",
+      "discoveredAt": "2026-08-08",
+      "discoveredOn": "scheduled OWASP scan",
+      "blockingSprint": "False",
+      "notes": "merakicaptiveportal-firebasedb-default-rtdb.json (tracked since commit ecdef10, 2026-07-21) is a 60KB dump containing guests, guest-receipts, users, admin-claims, rewards, campaigns. admin-claims maps a real uid (owning an @askgroupholdings.com email in users) to true — a standing, permanent admin-targeting map independent of any RTDB rule, plus a real SA guest phone/name/WhatsApp-consent record. Deleting the file today does not remove it from git history. Requires a destructive fix (history rewrite + force-push) — needs explicit operator authorization before acting, not something this scan performs. Interim: add *-default-rtdb.json/*.rtdb.json to .gitignore and a pre-commit guard for RTDB-export filename patterns (docs-only, safe to do immediately). Found by the 2026-08-08 scheduled OWASP scan."
+    },
+    {
+      "title": "NEW 2026-08-08 — client-side self-service Super Admin escalation with zero server-side authorization.",
+      "severity": "critical",
+      "discoveredAt": "2026-08-08",
+      "discoveredOn": "scheduled OWASP scan",
+      "blockingSprint": "False",
+      "notes": "public/tools/admin/grant-super-admin.html:245-256 does a direct client-SDK set() of admins/{currentUser.uid} with {superAdmin: true, ...} — the only gate is a SweetAlert confirm dialog. database.rules.json allows the write for anyone already holding the plain admin custom claim (admins/$uid.write: auth.token.admin === true). Combined with the row below (any admin can mint new admins), the full chain is: get admin claim for any reason → call setAdminClaim to promote a second account you control → visit this page and self-grant superAdmin: true, no second admin's approval, no CF in the path, no audit trail. superAdmin gates ross/auditLog and the Project Management admin node, so this is a real privilege jump. Fix: delete/gate this page behind a CF requiring the CALLER to already be superAdmin, and never allow currentUser.uid as the target. Audit admins/* for superAdmin: true entries with unexplained createdAt. Found by the 2026-08-08 scheduled OWASP scan."
+    },
+    {
+      "title": "NEW 2026-08-08 — setAdminClaim lets ANY admin mint arbitrary new admins, no superAdmin gate, no per-target restriction.",
+      "severity": "critical",
+      "discoveredAt": "2026-08-08",
+      "discoveredOn": "scheduled OWASP scan",
+      "blockingSprint": "False",
+      "notes": "functions/index.js:735-801 checks only callerToken.admin === true before admin.auth().setCustomUserClaims(uid, {admin: true}) for an arbitrary caller-supplied uid — nothing stops an admin promoting an account they control, and grants are logged only via console.log (not a queryable/alertable audit trail). One over-provisioned or compromised admin account can mint unlimited further admins, feeding directly into the row above. Fix: require callerToken.superAdmin === true (verified against RTDB admins/{uid}/superAdmin, matching the dual-check pattern already used elsewhere in this file) before granting admin to a *different* uid; write every grant/revoke to a real audit-log node. Found by the 2026-08-08 scheduled OWASP scan."
+    },
+    {
+      "title": "NEW 2026-08-08 — unauthenticated, wildcard-CORS Cloud Functions trigger arbitrary WhatsApp sends to any phone number.",
+      "severity": "critical",
+      "discoveredAt": "2026-08-08",
+      "discoveredOn": "scheduled OWASP scan",
+      "blockingSprint": "False",
+      "notes": "functions/index.js:298-343 (sendGuestBookingNotification) and the adjacent sendGuestStatusNotification set Access-Control-Allow-Origin: *, check only req.method === 'POST' and booking.phoneNumber presence, then call sendBookingConfirmationTemplate(booking.phoneNumber, booking) with no auth check and no validation that booking.id corresponds to a real record. Anyone on the internet can script repeated POSTs with arbitrary numbers — free spam-as-a-service on the business's own Twilio/WhatsApp Business account, billed per-send with no rate limit, and high volume risks Meta suspending the number the W2 proactive-nudge feature depends on. Fix: require an authenticated-admin caller (matching the pattern already used by markVoucherRedeemed), or restrict to server-side CF-to-CF calls only; at minimum validate booking.id against a real bookings/{id} record and add rate limiting. Found by the 2026-08-08 scheduled OWASP scan."
+    },
+    {
+      "title": "NEW 2026-08-08 — every public/tools/admin/*.html and public/admin_tools/*.html page is served to anyone who requests the URL, with protection resting entirely on client-side JS getting its auth check right.",
+      "severity": "high",
+      "discoveredAt": "2026-08-08",
+      "discoveredOn": "scheduled OWASP scan",
+      "blockingSprint": "False",
+      "notes": "firebase.json hosting config has no path-based access restriction on these directories; the row above (grant-super-admin.html) shows at least one page's client-side check is insufficient. Sensitive-sounding tool pages (grant-admin-claims.html, tier-visibility-manager.html, admin-phone-mapping.html) are discoverable by guessing/enumerating the path, and tools/admin/index.html links them together. Fix: move these behind a CF requiring auth, or at minimum add X-Robots-Tag: noindex + App Check, since the model currently depends on every page's client JS independently getting its auth gate right. Found by the 2026-08-08 scheduled OWASP scan."
+    },
+    {
+      "title": "NEW 2026-08-08 — three low/moderate items from the scheduled scan, batched.",
+      "severity": "medium",
+      "discoveredAt": "2026-08-08",
+      "discoveredOn": "scheduled OWASP scan",
+      "blockingSprint": "False",
+      "notes": "(1) merakiWebhook's shared-secret check (functions/index.js:467) uses non-constant-time !== instead of crypto.timingSafeEqual — inconsistent with the HMAC verification already used for the Twilio webhook, low practical risk but a one-line fix. (2) Same handler logs the full raw payload after verification (:473) — Meraki payloads carry client MAC addresses and other device/location identifiers; trim to only the fields actually used. (3) public/js/jquery-3.2.1.min.js (2017, multiple known CVEs) is committed but a .html-scoped grep found no <script> reference to it — looks like dead vendored code; confirm with a full-repo reference check (not just .html) before deleting. Found by the 2026-08-08 scheduled OWASP scan."
     }
   ],
   "backlog": {
