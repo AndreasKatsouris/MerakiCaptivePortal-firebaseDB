@@ -3792,6 +3792,10 @@ exports.recomputeExpiringEntitlements = entitlements.recomputeExpiringEntitlemen
 exports.rossChat = require('./agent/rossChat').rossChat;
 // Daily prune of expired pending confirm-actions + stale debit guards (slice 7, no RTDB TTL).
 exports.rossAgentPrune = require('./agent/prune').rossAgentPrune;
+// Daily age-based prune of scanningData/wifiLogins/activeUsers (queue Q13) — ships
+// DORMANT, not deployed by this PR; retention windows are suggested defaults pending
+// operator confirmation (see functions/retentionPrune.js header).
+exports.retentionPrune = require('./retentionPrune').retentionPrune;
 // W2 proactive nudge: daily 07:00 SAST WhatsApp digest per opted-in owner.
 exports.rossProactiveSweep = require('./agent/sweep/sweep').rossProactiveSweep;
 // D3 read-only food-cost overview for the v2 dashboard (reuses the D1/D2 cores).
