@@ -8,6 +8,7 @@
     "test:watch": "vitest",
     "verify": "node scripts/verify-setup.js",
     "status:sync": "node scripts/generate-project-status.js",
+    "branches:check": "node scripts/check-stranded-branches.js",
     "eval": "node functions/agent/evals/run.js",
     "dev": "vite",
     "build": "node scripts/build.js",
