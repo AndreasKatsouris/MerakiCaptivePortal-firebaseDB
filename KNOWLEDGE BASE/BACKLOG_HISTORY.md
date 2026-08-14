@@ -6,6 +6,22 @@
 
 ---
 
+## 2026-08-09 → 08-14 (unmerged groomer #232 + a stranded CRIT-14 finding, folded into the 08-16 groom)
+
+Last updated: 2026-08-09 — **Scheduled backlog groom: reconciled #194–#226 into Recently Completed** (stale since 07-22), refilled the automation queue to 7 cards (Q12–Q18), and recovered 2 stranded scan branches with NO PR ever opened — one carries 3 unverified Critical findings, incl. a client-side self-service Super Admin escalation (see below).
+
+**⚠ URGENT, unverified: a possible live privilege-escalation path** (`grant-super-admin.html` self-grant + `setAdminClaim` missing a superAdmin gate) was found by a 2026-08-08 scan that never opened a PR — recovered into the Bug Triage Queue verbatim by this groom but **NOT independently re-verified**. Needs a dedicated security session ASAP to confirm and fix; see the 2026-08-08 OWASP section below.
+
+**5 PRs open awaiting operator review**, oldest first: **#228** (4+ days) — remediation for a 2026-08-05 Google Cloud abuse notification (committed RTDB export with guest PII/MACs/Twilio SID; does NOT rewrite git history; does not cover the escalation path above). #229 (Q14), #230 (OWASP re-scan 08-07), #231 (Q15).
+
+**State right now:** Master at #227 (unchanged — this groom's own PR, #232, was never merged). PO D1+D1.1 (08-04) is the newest shipped feature; D2 is next.
+
+**Security debt — CRIT-14 (new, 2026-08-14, found on a 3rd stranded branch never wrapped in a PR) is now the top open item: unescaped `displayName`/`email` `innerHTML` in `grant-admin-claims.html` + `user-management.js` chains to full unprivileged→admin escalation via `setAdminClaim`, no admin click required.** Still open: **12 Criticals + 11 Highs** — Criticals moved 11 → 12 on 2026-08-14 by CRIT-14's addition (one false positive rejected on re-read: `receiptProcessor.js` SSRF was re-verified as already allowlisted). `receipts` root `.write` (Critical, 2026-07-28) remains open and unchanged, now the #2 tracked item.
+
+Next major: **ROSS Purchase Orders — D2 draft builder** (after the security session above). Launch gate (W1/W2) open, unstarted; payment rail dormant.
+
+---
+
 ## 2026-08-04 (D1 + D1.1 shipped, deployed — #221 through #224)
 
 Last updated: 2026-08-04 — **ROSS Purchase Orders D1 + D1.1 are BUILT, MERGED and DEPLOYED (#221 / #222 / #223 / #224).** An owner can open `/ross.html?tab=orders`, build a supplier book by hand or by reviewed import from a stock count, and — new in D1.1 — attach individual stock items to suppliers with a filterable multi-select picker, which is what makes the importer work for the common case of a CSV with **no supplier column** (the operator's real file: 388 of 388 items unassigned). `poCatalog` + `poSeedFromStock` are live on nodejs22, source stamped 15:18–15:19Z **after** #224 merged at 15:17Z — verified against `functions:list`, not inferred from a deploy exit code. **#224 is the uncomfortable part of this session:** two independent reviews blocked D1.1 *after it merged*, the worst finding being silent data corruption I introduced (see SCORECARD + LESSONS). Production was never exposed only because the functions deploy was deliberately held. **`purchasing` RTDB rules are still NOT deployed** (defence in depth only — every access is CF-mediated) and **`features.purchaseOrders` is set nowhere**, so the tab works for admins and is empty for everyone else.

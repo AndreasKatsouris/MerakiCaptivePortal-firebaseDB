@@ -3,15 +3,15 @@
 > Claude reads this file at the start of every session and updates it at the end.
 > The Sprint Goal is the contract for the session — don't deviate without explicit user confirmation.
 
-Last updated: 2026-08-09 — **Scheduled backlog groom: reconciled #194–#226 into Recently Completed** (stale since 07-22), refilled the automation queue to 7 cards (Q12–Q18), and recovered 2 stranded scan branches with NO PR ever opened — one carries 3 unverified Critical findings, incl. a client-side self-service Super Admin escalation (see below).
+Last updated: 2026-08-16 — **Scheduled groom supersedes the never-merged #232 (08-09) and recovers a 3rd stranded Critical (CRIT-14, 08-14).** Master is unchanged since #227 (08-05) — operator PR review has stalled for 11 days.
 
 > **Note discipline:** this note is CURRENT STATE ONLY (≤10 lines, first line always `Last updated: YYYY-MM-DD — <one-line note>`). At each update, move the outgoing narrative to `KNOWLEDGE BASE/BACKLOG_HISTORY.md` (newest first). Per-session detail lives in SCORECARD.md and PR bodies — never here.
 
-**⚠ URGENT, unverified: a possible live privilege-escalation path** (`grant-super-admin.html` self-grant + `setAdminClaim` missing a superAdmin gate) was found by a 2026-08-08 scan that never opened a PR — recovered into the Bug Triage Queue verbatim by this groom but **NOT independently re-verified**. Needs a dedicated security session ASAP to confirm and fix; see the new 2026-08-08 OWASP section below.
+**⚠ Two unverified Critical privilege-escalation findings sit unfixed, on branches that never had a PR:** (a) `grant-super-admin.html` self-grant + `setAdminClaim` missing a superAdmin gate (08-08 scan); (b) **CRIT-14** — unescaped `displayName`/`email` `innerHTML` in `grant-admin-claims.html` + `user-management.js` chains to full unprivileged→admin escalation via `setAdminClaim`, no admin click required (08-14 scan). Both recovered into the Bug Triage Queue by this groom but **NOT independently re-verified** — needs a dedicated security session.
 
-**5 PRs open awaiting operator review**, oldest first: **#228** (4+ days) — remediation for a 2026-08-05 Google Cloud abuse notification (committed RTDB export with guest PII/MACs/Twilio SID; does NOT rewrite git history; does not cover the escalation path above). #229 (Q14), #230 (OWASP re-scan 08-07), #231 (Q15).
+**8 PRs open awaiting operator review**, oldest first: **#228** (11 days) — remediation for a 2026-08-05 Google Cloud credential-abuse notification. #229 (Q14), #230 (OWASP re-scan 08-07), #231 (Q15), #232 (superseded by this groom — safe to close unmerged), #233 (Q13), #234 (Q12), #235 (OWASP re-scan 08-12).
 
-**State right now:** Master at #227. PO D1+D1.1 (08-04) is the newest shipped feature; D2 is next. Security debt: `receipts` root `.write` still the top *tracked* open Critical; 11+11 baseline unchanged since 08-04, +3 unverified Criticals/+1 High pending the session above.
+**State right now:** Master at #227. PO D1+D1.1 (08-04) is the newest shipped feature; D2 is next. Security debt: **12 Criticals + 11 Highs** tracked (CRIT-14 addition), +1 more unverified pending confirmation. `receipts` root `.write` remains the top *tracked* open Critical.
 
 Next major: **ROSS Purchase Orders — D2 draft builder** (after the security session above). Launch gate (W1/W2) open, unstarted; payment rail dormant.
 
@@ -312,6 +312,20 @@ Scheduled scan via `security-auditor` agent. Since the 2026-07-28 scan, the only
 **npm audit deltas — no new CVE since 2026-07-23.** Root: 15 vulns (1 critical `websocket-driver`, 4 high, 9 moderate, 1 low) — all already-logged families (grpc-js/uuid/protobufjs transitive tree, already-logged HIGH-12/13/CRIT-13/MED-11). `functions/`: 11 vulns (1 high `brace-expansion`, already logged; 10 moderate, `ts-deepmerge` dev-only + same uuid/firebase-admin chain).
 
 ---
+
+### 🔐 OWASP Security Audit — 2026-08-14 Findings (scheduled scan)
+
+Scheduled full-codebase scan via `security-auditor` agent — a broad OWASP Top-10 sweep, not a delta review, so every finding was cross-checked against this queue before logging anything as new. Most of what the agent independently re-derived maps to already-tracked rows and is **not** re-logged: `guests` root-read cascade = CRIT-08; `receipts` RTDB `.read`/`.write` = CRIT-05; unauthenticated `sendGuestBookingNotification`/`sendGuestStatusNotification` = CRIT-01; `queue` cross-tenant write = HIGH-05; `performanceTestHTTP` origin-reflection with `credentials:true` = HIGH-02; `rewards` root-cascade = CRIT-11 family; root/`functions/` `npm audit` deltas = existing CRIT-13/HIGH-12/HIGH-13/MED-11/firebase-admin rows. **One flagged finding was a false positive, verified and rejected by direct code read:** the agent called `downloadAndStoreImage()` (`functions/receiptProcessor.js:393`) an unvalidated-URL SSRF risk, but its only caller — `detectReceiptText()` (`:311-337`) — already gates on an https-only + `.twilio.com`/Firebase-Storage hostname allowlist before `downloadAndStoreImage` is ever invoked. The 2026-07-28 scan's "SSRF allowlist re-confirmed correct" note stands; no regression.
+
+**One genuinely new finding, verified against live code (not taken on the scanning agent's word):**
+
+| ID | Finding | Severity | OWASP | Location | Sprint-blocking? |
+|----|---------|----------|-------|----------|-----------------|
+| CRIT-14 | **Escalates MED-03 from Medium to Critical and adds two file locations MED-03 never covered.** `public/tools/admin/grant-admin-claims.html:303-335` (`renderUserCard`) and `public/js/admin/user-management.js:147-157` both interpolate unescaped `displayName`/`email` into `innerHTML` (the former also into a `data-email="..."` attribute) — same unescaped-`innerHTML` class as MED-03's `admin-activity-monitor.js`, each site read in full and confirmed, not assumed. Enabler unchanged: `users/$uid` has no `.validate` on `displayName`/`email` (`database.rules.json:25-31`), so any authenticated non-admin can self-write a script payload into their own profile fields. **What's new:** `grant-admin-claims.html` is the page an admin uses to grant/revoke admin claims. It holds `currentUser` and calls `setAdminClaim` with a live Bearer ID token (`:382`) from `grantAdminClaims(uid, email, button)` (`:357-390`), gated only by a SweetAlert2 confirm dialog inside that helper function — a UI gate, not an authorization gate. A malicious `displayName` rendered into that admin's DOM runs as arbitrary script in the admin's own authenticated session and can call `fetch()` directly against `setAdminClaim` with `{uid: <attacker>, isAdmin: true}` and the admin's own token, bypassing the confirm dialog entirely since it never has to go through `grantAdminClaims()` at all. Net effect: unprivileged user → full admin, triggered the next time any admin opens this page, no admin click required beyond loading the page. | **Critical** | A03 → A01 | `public/tools/admin/grant-admin-claims.html:303-335,357-390`; `public/js/admin/user-management.js:147-157`; enabler `database.rules.json:25-31` | No |
+
+**Not fixed this session, per the Bug Triage Rule** — this is a scheduled scan with no live user present to authorize a scope pivot, so it's logged for the next interactive session rather than fixed inline. Suggested fix, consistent with MED-03's existing recommendation: apply the codebase's `escapeHtml()` convention (or switch to `textContent`/DOM-node construction) at all three now-known sites in one PR, plus a defense-in-depth `.validate` length/charset cap on `users/$uid/displayName` and `email`. A full grep sweep of `.innerHTML =` in `public/js/admin/**` and `public/tools/admin/**` is recommended before closing this out — only these three sites (two new + MED-03's original) were read in full for this scan; the class may have more members.
+
+**Reconciled total: 12 Criticals + 11 Highs open** (11+11 from the tracked families, plus this session's CRIT-14). Nothing else closed or newly opened since #178/#205/#224.
 
 ### 🔐 OWASP Security Audit — 2026-08-01 Findings (scheduled scan)
 
