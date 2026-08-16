@@ -1,6 +1,6 @@
 {
-  "lastUpdated": "2026-08-09",
-  "lastUpdatedNote": "**Scheduled backlog groom: reconciled #194–#226 into Recently Completed** (stale since 07-22), refilled the automation queue to 7 cards (Q12–Q18), and recovered 2 stranded scan branches with NO PR ever opened — one carries 3 unverified Critical findings, incl. a client-side self-service Super Admin escalation (see below).",
+  "lastUpdated": "2026-08-16",
+  "lastUpdatedNote": "**Scheduled groom supersedes the never-merged #232 (08-09) and recovers a 3rd stranded Critical (CRIT-14, 08-14).** Master is unchanged since #227 (08-05) — operator PR review has stalled for 11 days.",
   "sprint": {
     "goal": "Effective implementation of Hi-Fi v2, with ROSS as the central post-login surface for every subscribed user",
     "started": "2026-04-30",
