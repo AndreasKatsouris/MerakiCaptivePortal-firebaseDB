@@ -6,6 +6,36 @@
 
 ---
 
+## 2026-08-09 → 08-14 (unmerged groomer #232 + a stranded CRIT-14 finding, folded into the 08-16 groom)
+
+Last updated: 2026-08-09 — **Scheduled backlog groom: reconciled #194–#226 into Recently Completed** (stale since 07-22), refilled the automation queue to 7 cards (Q12–Q18), and recovered 2 stranded scan branches with NO PR ever opened — one carries 3 unverified Critical findings, incl. a client-side self-service Super Admin escalation (see below).
+
+**⚠ URGENT, unverified: a possible live privilege-escalation path** (`grant-super-admin.html` self-grant + `setAdminClaim` missing a superAdmin gate) was found by a 2026-08-08 scan that never opened a PR — recovered into the Bug Triage Queue verbatim by this groom but **NOT independently re-verified**. Needs a dedicated security session ASAP to confirm and fix; see the 2026-08-08 OWASP section below.
+
+**5 PRs open awaiting operator review**, oldest first: **#228** (4+ days) — remediation for a 2026-08-05 Google Cloud abuse notification (committed RTDB export with guest PII/MACs/Twilio SID; does NOT rewrite git history; does not cover the escalation path above). #229 (Q14), #230 (OWASP re-scan 08-07), #231 (Q15).
+
+**State right now:** Master at #227 (unchanged — this groom's own PR, #232, was never merged). PO D1+D1.1 (08-04) is the newest shipped feature; D2 is next.
+
+**Security debt — CRIT-14 (new, 2026-08-14, found on a 3rd stranded branch never wrapped in a PR) is now the top open item: unescaped `displayName`/`email` `innerHTML` in `grant-admin-claims.html` + `user-management.js` chains to full unprivileged→admin escalation via `setAdminClaim`, no admin click required.** Still open: **12 Criticals + 11 Highs** — Criticals moved 11 → 12 on 2026-08-14 by CRIT-14's addition (one false positive rejected on re-read: `receiptProcessor.js` SSRF was re-verified as already allowlisted). `receipts` root `.write` (Critical, 2026-07-28) remains open and unchanged, now the #2 tracked item.
+
+Next major: **ROSS Purchase Orders — D2 draft builder** (after the security session above). Launch gate (W1/W2) open, unstarted; payment rail dormant.
+
+---
+
+## 2026-08-04 (D1 + D1.1 shipped, deployed — #221 through #224)
+
+Last updated: 2026-08-04 — **ROSS Purchase Orders D1 + D1.1 are BUILT, MERGED and DEPLOYED (#221 / #222 / #223 / #224).** An owner can open `/ross.html?tab=orders`, build a supplier book by hand or by reviewed import from a stock count, and — new in D1.1 — attach individual stock items to suppliers with a filterable multi-select picker, which is what makes the importer work for the common case of a CSV with **no supplier column** (the operator's real file: 388 of 388 items unassigned). `poCatalog` + `poSeedFromStock` are live on nodejs22, source stamped 15:18–15:19Z **after** #224 merged at 15:17Z — verified against `functions:list`, not inferred from a deploy exit code. **#224 is the uncomfortable part of this session:** two independent reviews blocked D1.1 *after it merged*, the worst finding being silent data corruption I introduced (see SCORECARD + LESSONS). Production was never exposed only because the functions deploy was deliberately held. **`purchasing` RTDB rules are still NOT deployed** (defence in depth only — every access is CF-mediated) and **`features.purchaseOrders` is set nowhere**, so the tab works for admins and is empty for everyone else.
+
+**State right now (as of 08-04):** Master at #224. D1 + D1.1 complete, merged and deployed; D2 (draft builder + CSV + the F7 sanitizer) is next. Two owed operator actions, neither code: deploy the `purchasing` rules block, and set `features.purchaseOrders` on the tier definitions. CRIT-09 F2 still needs `iam.serviceAccounts.signBlob` confirmed; #194's delivery observability is inert until `TWILIO_STATUS_CALLBACK_URL` is set.
+
+**⚠ Two process gaps found during this reconciliation:** (1) CI does not run tests — a green check only proves the bundle compiles. (2) `functions/vitest.setup.js` is referenced but untracked in git, so the functions suite cannot run from a fresh clone (works only because the root `vitest.config.js` covers `functions/**/__tests__`).
+
+**Security debt:** `receipts` root `.write` (Critical, 2026-07-28) is the top open vulnerability. 11 Criticals + 11 Highs open (High count moved 10→11 on 08-04 by an addition — the `locations` descendant read-cascade making `stockUsage` cross-tenant readable, carded from the PO design's R1b hand-off).
+
+Next major: **ROSS Purchase Orders — D2 draft builder.** Launch gate (W1/W2) remains open and unstarted; payment rail dormant until launch.
+
+---
+
 ## 2026-08-04 (PO backlog reconciliation — #221)
 
 Last updated: 2026-08-04 — **ROSS Purchase Orders is on the backlog for the first time, and D1 is starting.** The design + D1 plan merged as **#211** on 08-03, but the reconciliation the design itself specifies (§11) was never applied to this file — until today there was **zero mention** of Purchase Orders anywhere in it. Closed here: the **PO track** (D1 supplier book → D2 draft + CSV + F7 → D3 send path → D4 food-cost pre-fill) is logged under High Priority as an **operator-chosen sequencing decision (design R6)** — it runs *ahead of* the launch gate's remaining items, which stay open and unstarted rather than being silently displaced. **FC-v2.1c is withdrawn** as superseded (its F7 CSV-sanitizer requirement carries into D2); **FC-v2.1b** is marked partially satisfied by D4's count picker; **FC-v2.1a** is unaffected. The design's un-carded **R1b** finding is logged as a Bug Triage row for the first time, **re-verified against master `75300b35` this session** rather than inherited from the design doc.

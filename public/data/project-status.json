@@ -1,6 +1,6 @@
 {
-  "lastUpdated": "2026-08-04",
-  "lastUpdatedNote": "**ROSS Purchase Orders D1 + D1.1 are BUILT, MERGED and DEPLOYED (#221 / #222 / #223 / #224).** An owner can open `/ross.html?tab=orders`, build a supplier book by hand or by reviewed import from a stock count, and — new in D1.1 — attach individual stock items to suppliers with a filterable multi-select picker, which is what makes the importer work for the common case of a CSV with **no supplier column** (the operator's real file: 388 of 388 items unassigned). `poCatalog` + `poSeedFromStock` are live on nodejs22, source stamped 15:18–15:19Z **after** #224 merged at 15:17Z — verified against `functions:list`, not inferred from a deploy exit code. **#224 is the uncomfortable part of this session:** two independent reviews blocked D1.1 *after it merged*, the worst finding being silent data corruption I introduced (see SCORECARD + LESSONS). Production was never exposed only because the functions deploy was deliberately held. **`purchasing` RTDB rules are still NOT deployed** (defence in depth only — every access is CF-mediated) and **`features.purchaseOrders` is set nowhere**, so the tab works for admins and is empty for everyone else.",
+  "lastUpdated": "2026-08-16",
+  "lastUpdatedNote": "**Scheduled groom supersedes the never-merged #232 (08-09) and recovers a 3rd stranded Critical (CRIT-14, 08-14).** Master is unchanged since #227 (08-05) — operator PR review has stalled for 11 days.",
   "sprint": {
     "goal": "Effective implementation of Hi-Fi v2, with ROSS as the central post-login surface for every subscribed user",
     "started": "2026-04-30",
@@ -290,6 +290,11 @@
   "inProgress": [],
   "recentlyCompleted": [
     {
+      "title": "Automation queue Q10 — re-closed the bearer-token log-prefix leak. functions/index.js's OCR auth-header log line still interpolated a 20-char bearer-token prefix despite #98's claimed closure — recovered from the 2026-07-23 scan and independently re-verified before the fix (per the card's own open question about what #98 actually shipped). New whole-tree guard test (no-token-prefix-logging.test.js, shape copied from no-make-public.test.js) scans every functions/**/*.js file for a token-slice reaching console.*, RED before / GREEN after.",
+      "pr": 226,
+      "mergedAt": "2026-08-05"
+    },
+    {
       "title": "ROSS Purchase Orders D1.1 — assign stock items to suppliers, then fold two blocking reviews — operator testing of D1 hit the real case: a stock CSV with no supplier column, leaving 388 of 388 items unassigned and the importer useless. D1.1 added a filterable multi-select picker (cost centre / category / search, select-all-applies-to-current-filter). A first design grouped by category and was rejected by the operator — a category routinely spans several suppliers — so category became a *filter*, never a unit of assignment. Two independent reviews then blocked it after merge: the worst was silent data corruption, productKey being reused as a row reference when it ignores cost centre, so selecting Coca Cola case @ R120 wrote coca cola ea @ R12. Fixed by splitting an opaque positional ref from the content dedupe key, plus: hand-assignment now MOVES rather than clones (it had contradicted design L8 *in the same PR*), a strict PLAN/WRITE split after partial writes recurred twice, plan coalescing (500 selections on one supplier drove 500 full-catalogue reads), archived-product revival, hard-rejected supplierId, aggregate caps, and rendering the ignored/truncated results the server had returned and the client dropped. Production was never exposed — the functions deploy was deliberately held. Also unblocked component testing repo-wide: any such test previously died at transform time on the Hi-Fi barrel's absolute import.",
       "pr": "223, 224",
       "mergedAt": "2026-08-04"
@@ -305,9 +310,64 @@
       "mergedAt": "2026-08-04"
     },
     {
+      "title": "Automation queue Q9 — Twilio account-dormancy monitoring CF. A daily scheduled CF calls Twilio's account/sender status API and logs an ERROR-severity line on any non-active status, closing the \"channel can die upstream with zero server-side signal\" gap from the 2026-07-23 dormancy incident. Unit-tested against a status-API mock (active→no-op, non-active→ERROR); ships dormant pending operator deploy.",
+      "pr": 220,
+      "mergedAt": "2026-08-04"
+    },
+    {
       "title": "ROSS Purchase Orders — design + D1 supplier-book plan (docs-only, no source touched) — a standalone ordering destination at /ross.html?tab=orders, replacing the ephemeral v1 po-modal.js with a persisted supplier book, draft POs, a server-side SendGrid send path, and sent-PO history you can duplicate to reorder. Locked: ROSS owns its own supplier catalogue (Food Cost is an optional copy-in, never a dependency), draft → sent lifecycle with no GRV, HTML+CSV and no PDF, features.purchaseOrders ON for both tiers. Storage is top-level purchasing/{locId} rather than nested under locations/ — the design's G14 finding is that the parent cascades a world-readable .read and an owner .write into every descendant, which would have leaked supplier emails and prices cross-tenant and made \".write\": false a dead rule. That same finding is now carded as a High security row in its own right. 450-line design + 2,350-line D1 plan (12 TDD tasks). Backlog reconciliation (design §11) was NOT applied at merge time — done separately on 2026-08-04, which is also when this row was added.",
       "pr": 211,
       "mergedAt": "2026-08-03"
+    },
+    {
+      "title": "Automation queue Q11 — analytics-dashboard.js v-html → interpolation swap. Closed the same anti-pattern class as the FoodCostApp.vue fix (#184): errorMessage rendered via v-html (not yet exploitable, same latent-XSS shape). Mirrors the fixed pattern already used next door in FlagBadge.js.",
+      "pr": 215,
+      "mergedAt": "2026-08-03"
+    },
+    {
+      "title": "Automation queue Q8 — root npm audit fix (lockfile-only). Closed websocket-driver, root's separate @grpc/grpc-js copy (same advisory range HIGH-08 fixed in functions/), plus form-data/js-yaml/brace-expansion/ws — all fixAvailable, no package.json bump.",
+      "pr": 210,
+      "mergedAt": "2026-08-03"
+    },
+    {
+      "title": "Automation queue Q6 — scoped vue/no-v-html eslint rule. Enabled for ross/v2/ + food-cost/v2/ only (global lint is unusable at 152k pre-existing errors); fires on a v-html fixture, clean on both scoped dirs post-Q2/Q11.",
+      "pr": 209,
+      "mergedAt": "2026-08-03"
+    },
+    {
+      "title": "Automation queue Q7 — CRIT-09 F2, receipt images via short-TTL signed URLs. New getReceiptImageUrl callable (admin-gated) mints a ≤15-min v4 signed URL from receipts/{id}/storagePath; the two admin consumers prefer it when storagePath is set, falling back to imageUrl for pre-PR-B records. Ships undeployed (needs the iam.serviceAccounts.signBlob grant confirmed — CRIT-09's remaining tail).",
+      "pr": 208,
+      "mergedAt": "2026-08-03"
+    },
+    {
+      "title": "salesData/forecasts write-cascade closed — first security remediation since #178. Parent .write:false everywhere, .validate on $salesDataId/$forecastId requiring userId match, and an ownership-checked .write on the salesDataIndex/byLocation sub-path (the specific gap the 07-28 design review had flagged open). Two pre-build reviews found the index rule was bypassable (self-writable userLocations used as an ownership proof) and the admin-disjunct rationale was logically false; a third review after the fix found the remaining gap (unconstrained $locationId). Deployed + read back from prod; closure verified 2026-08-01 (a follow-up correction narrowed an over-read of the fix — see Bug Triage Queue).",
+      "pr": "205, 206",
+      "mergedAt": "2026-07-28"
+    },
+    {
+      "title": "Automation queue Q5 — receipt reward payload fix. processRewards now writes the metadata/status/value/expiresAt shape rewards/$rewardId .validate actually requires (mirroring reward-management.js's working manual-issue path) — unblocks a revenue/loyalty flow that had been silently rejected by rules.",
+      "pr": 202,
+      "mergedAt": "2026-07-28"
+    },
+    {
+      "title": "Automation queue Q4 — database.rules.json strict-JSON guard. Normalized the bookings block's multi-line rule strings to single-line (formatting only, zero semantic change, diff-verified) and added a vitest that JSON.parses the file — a pre-deploy guard tooling can now actually run.",
+      "pr": 201,
+      "mergedAt": "2026-07-27"
+    },
+    {
+      "title": "\"Ghost\" workflows fixed — visible but undeletable, 404 on rossDeleteWorkflow. The read path resolved workflow ownership from a location-scoped index; the delete path looked only under the caller's own uid. Of 7 workflows the operator could see in prod, 6 were undeletable (not corrupted — the index was healthy, the handler's ownership assumption was wrong). New resolveWorkflowOwnerForCaller mirrors the read path's resolution, scoped to locations the caller can see; cross-owner delete stays super-admin only.",
+      "pr": 199,
+      "mergedAt": "2026-07-26"
+    },
+    {
+      "title": "Nightly recurrence advance — unfroze W2's six-week-silent proactive nudge. nextDueDate never advanced after a run completed, so every workflow read as permanently \"covered\" and could never be overdue again — the same frozen digest also fed Ross's home concierge card, which read \"all clear\" for the same reason. An adversarial design review overturned the first landing rule (which would have advanced into upcoming, a bucket the nudge selector never reads, producing zero user-visible effect) in favor of landing in overdue. Ships dry-run; the operator flip to apply (2026-07-27) is what actually unfroze prod.",
+      "pr": 196,
+      "mergedAt": "2026-07-26"
+    },
+    {
+      "title": "WhatsApp silent-delivery visibility — degradation logging + Twilio status callback. Business-initiated template sends silently falling back to freeform (deliverable only inside a guest-opened 24h window) now log at ERROR with a statusCallback wired for future automated alerting, plus a staged enforce-by-default refusal mode scoped to the new endpoint only. A security review found the new public callback endpoint's own log line was forgeable via an unsanitized field (fixed before merge) — the tool built to detect silent failure could otherwise have been used to fake or mask it.",
+      "pr": 194,
+      "mergedAt": "2026-07-26"
     },
     {
       "title": "ROSS-FoodCost-v2 D4 — strip-and-harden (closes the W1 food-cost track) — every deletion census'd, then the census independently adversarially verified before anything was removed, which paid off twice. Deleted 3 census-dead files (database-operations-v2.js, react-adapter.js — whose dynamic-import target didn't even exist, migration-helpers.js); did NOT delete order-calculator-calculus.js — the verifier proved it's a LIVE user-selectable \"Calculus\" PO mode, answering the parent design's \"delete if unwired\" with *wired*. services/firebase-service.js stripped 324→77 lines (one live export, kept byte-identical). Root stockUsage non-admin writes closed (rules deployed; probe: non-admin write 401 / read 200 — an admin probe would have false-passed). The verifier also REFUTED my own C7 claim: the global root admin .write (database.rules.json:3) cascades into stockUsage and can't be revoked at a child, so the closure is the non-admin arm only and .validate was deliberately kept for the residual admin arm — the PR says so rather than overclaiming. 54 tenant-data console.* statements stripped from the v1 parse chain (which is also v2's), v2 store shims removed, and D1's P6 sanitizeText backported (+ guard test). Same session closed D2's last item: live eval 23/23. Automated review: no blockers. Net −1,200 lines. ⚠ The sanitizeText backport awaits a rossChat functions deploy.",
@@ -752,6 +812,14 @@
       "notes": "processRewards (public/js/receipt-management.js:952-964) writes a reward payload of {receiptId, campaignId, guestPhoneNumber, totalAmount, status, createdAt, createdBy}, but rewards/$rewardId .validate requires newData.hasChildren(['metadata','status','value','expiresAt']) — the payload has status only, and the hasChildren term is an unconditional AND that not even an admin bypasses. The two follow-on writes fail as well: campaign-rewards/{cid}/{rid} requires admin (database.rules.json:93,96) and guest-rewards/{phone}/{rid} requires auth.token.phone_number === $phoneNumber (:88), which per the row above is null for every user. Sibling reward-management.js:661 (manual reward issue) supplies all four keys and works — presumably why this went unnoticed. Fix: add the missing fields to the payload (mirror reward-management.js:661), or route reward creation through a CF. Not bundled into PR #176 — it is a client payload bug, not a rules bug. Third live bug a rules census has surfaced (after locations/ownerId and this), all three hidden behind a client catch that only console.errors. Found 2026-07-21 during the PR-1b census, independently confirmed by security review."
     },
     {
+      "title": "Recovered from a stranded scan branch (claude/sleepy-einstein-prq6sv, never had a PR — 2026-08-09 groom).",
+      "severity": "low",
+      "discoveredAt": "2026-08-05",
+      "discoveredOn": "scheduled OWASP scan, recovered 2026-08-09",
+      "blockingSprint": "False",
+      "notes": "performanceTestHTTP reflects req.headers.origin into Access-Control-Allow-Origin alongside Access-Control-Allow-Credentials: true (functions/index.js:3063,3073) — classic CORS-misconfig pattern, but the endpoint already gates on admin custom claims via a Bearer-token check *before* the CORS headers are set, and the payload disclosed is infra telemetry only (response time, memory, cold-start, region), not tenant data. Fix (small, isolated): replace with the repo's existing functions/cors-allowlist.js pattern on both the success and error paths. Not independently re-verified by this groom — recovered verbatim from the stranded branch's commit."
+    },
+    {
       "title": "cleanupOldQueuesScheduled cron has never deployed — export clobbered by module.exports reassignment",
       "severity": "medium",
       "discoveredAt": "2026-06-01",
@@ -911,6 +979,54 @@
       "discoveredOn": "PR #194 security review",
       "blockingSprint": "False",
       "notes": "\"🔔 Your Table is Ready!\", position updates and wait reminders (functions/queueWhatsAppIntegration.js:667-686) go through sendWhatsAppMessage — pure freeform, business-initiated (an admin clicks Notify), no template anywhere in the path. They are subject to the identical 24-hour-window drop as the booking confirmations above, and a table-ready message that arrives never is worse than most failures in the product. The 2026-07-26 PR gives them statusCallback (so failures at least become observable) but deliberately does NOT classify or enforce them — enforcement without an approved template would simply block the send. Fix: a queue_table_ready content template through Meta approval, then route these via sendWhatsAppTemplate. Same external long-pole as the booking templates; worth batching into one Meta submission. Found by the security review of that PR. Measured 2026-07-26 (Twilio logs): 22 sends lifetime, 18 read / 1 delivered / 3 undelivered (63016) — a 13.6% drop rate, worse than booking confirmations. But it has not fired since 2026-05-05, so its clean recent record is un-exercised, not healthy; treat the 13.6% as the live rate whenever the queue is next used in anger."
+    },
+    {
+      "title": "Recovered from a stranded scan branch (claude/sleepy-einstein-a6yf8e, never had a PR — 2026-08-09 groom). NOT independently re-verified against live code by this groom.",
+      "severity": "critical",
+      "discoveredAt": "2026-08-08",
+      "discoveredOn": "scheduled OWASP scan, recovered 2026-08-09",
+      "blockingSprint": "False",
+      "notes": "A full production RTDB export, committed to git, discloses which UID holds admin privileges plus real guest PII. merakicaptiveportal-firebasedb-default-rtdb.json (tracked since commit ecdef10, 2026-07-21) is a 60KB dump containing guests, guest-receipts, users, admin-claims, rewards, campaigns. admin-claims maps a real uid (owning an @askgroupholdings.com email in users) to true — a standing, permanent admin-targeting map independent of any RTDB rule, plus a real SA guest phone/name/WhatsApp-consent record. Deleting the file today does not remove it from git history. Requires a destructive fix (history rewrite + force-push) — needs explicit operator authorization before acting. ⚠ Likely overlaps open PR #228 (2026-08-05, \"remediate exposed credentials\"), which untracks this same export file from HEAD — but #228 explicitly does NOT rewrite git history, so this finding's core claim (the data is still recoverable from history) stands regardless of #228's merge state; verify against #228's actual diff before treating this as closed."
+    },
+    {
+      "title": "Recovered from a stranded scan branch (claude/sleepy-einstein-a6yf8e) — NOT independently re-verified by this groom.",
+      "severity": "critical",
+      "discoveredAt": "2026-08-08",
+      "discoveredOn": "scheduled OWASP scan, recovered 2026-08-09",
+      "blockingSprint": "False",
+      "notes": "Client-side self-service Super Admin escalation with zero server-side authorization. public/tools/admin/grant-super-admin.html:245-256 does a direct client-SDK set() of admins/{currentUser.uid} with {superAdmin: true, ...} — the only gate is a SweetAlert confirm dialog. database.rules.json allows the write for anyone already holding the plain admin custom claim. Combined with the row below (any admin can mint new admins), the full chain is: get admin claim for any reason → call setAdminClaim to promote a second account you control → visit this page and self-grant superAdmin: true — no second admin's approval, no CF in the path, no audit trail. superAdmin gates ross/auditLog and the Project Management admin node. Fix: delete/gate this page behind a CF requiring the CALLER to already be superAdmin, never allow currentUser.uid as the target; audit admins/* for superAdmin: true entries with unexplained createdAt. Not covered by open PR #228 (scope is credentials/PII, not this escalation path) — appears to still be a live, unaddressed exploit path as of this groom."
+    },
+    {
+      "title": "Recovered from a stranded scan branch (claude/sleepy-einstein-a6yf8e) — NOT independently re-verified by this groom.",
+      "severity": "critical",
+      "discoveredAt": "2026-08-08",
+      "discoveredOn": "scheduled OWASP scan, recovered 2026-08-09",
+      "blockingSprint": "False",
+      "notes": "setAdminClaim lets ANY admin mint arbitrary new admins, no superAdmin gate, no per-target restriction. functions/index.js:735-801 checks only callerToken.admin === true before admin.auth().setCustomUserClaims(uid, {admin: true}) for an arbitrary caller-supplied uid — nothing stops an admin promoting an account they control, and grants are logged only via console.log (not a queryable/alertable audit trail). Feeds directly into the row above. Fix: require callerToken.superAdmin === true (verified against RTDB admins/{uid}/superAdmin) before granting admin to a *different* uid; write every grant/revoke to a real audit-log node. Not covered by open PR #228."
+    },
+    {
+      "title": "Recovered from a stranded scan branch (claude/sleepy-einstein-a6yf8e) — NOT independently re-verified by this groom.",
+      "severity": "critical",
+      "discoveredAt": "2026-08-08",
+      "discoveredOn": "scheduled OWASP scan, recovered 2026-08-09",
+      "blockingSprint": "False",
+      "notes": "Unauthenticated, wildcard-CORS Cloud Functions trigger arbitrary WhatsApp sends to any phone number. functions/index.js:298-343 (sendGuestBookingNotification) and the adjacent sendGuestStatusNotification set Access-Control-Allow-Origin: *, check only req.method === 'POST' and booking.phoneNumber presence, then send with no auth check and no validation that booking.id corresponds to a real record. Anyone on the internet can script repeated POSTs with arbitrary numbers — free spam-as-a-service on the business's Twilio/WhatsApp account, billed per-send with no rate limit, risking Meta suspending the number W2's proactive nudge depends on. This is the SAME finding as CRIT-01 (2026-06-15 audit, functions/index.js:298,344, still open per that section below) — the 2026-08-08 scan independently re-derived it rather than cross-referencing; count once."
+    },
+    {
+      "title": "Recovered from a stranded scan branch (claude/sleepy-einstein-a6yf8e) — NOT independently re-verified by this groom.",
+      "severity": "high",
+      "discoveredAt": "2026-08-08",
+      "discoveredOn": "scheduled OWASP scan, recovered 2026-08-09",
+      "blockingSprint": "False",
+      "notes": "Every public/tools/admin/*.html and public/admin_tools/*.html page is served to anyone who requests the URL, with protection resting entirely on client-side JS getting its auth check right — firebase.json hosting config has no path-based access restriction, and the Super Admin row above shows at least one page's client-side check is insufficient. Fix: move behind a CF requiring auth, or at minimum X-Robots-Tag: noindex + App Check. Same blind spot class as the already-tracked test-*.html/public/tools/** NEW-LOW row (2026-07-04 section below) — consider folding together."
+    },
+    {
+      "title": "Recovered from a stranded scan branch (claude/sleepy-einstein-a6yf8e) — NOT independently re-verified by this groom.",
+      "severity": "medium",
+      "discoveredAt": "2026-08-08",
+      "discoveredOn": "scheduled OWASP scan, recovered 2026-08-09",
+      "blockingSprint": "False",
+      "notes": "Three low/moderate items, batched: (1) merakiWebhook's shared-secret check (functions/index.js:467) uses non-constant-time !== instead of crypto.timingSafeEqual (same class as OWASP INFO-01, already tracked below — likely the same finding, verify before double-counting). (2) Same handler logs the full raw payload after verification (:473) — Meraki payloads carry client MAC addresses; trim to only fields used. (3) public/js/jquery-3.2.1.min.js (2017, known CVEs) is committed but a .html-scoped grep found no <script> reference — looks like dead vendored code; confirm with a full-repo reference check before deleting."
     }
   ],
   "backlog": {
