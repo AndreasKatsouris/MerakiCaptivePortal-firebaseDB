@@ -911,6 +911,30 @@
       "discoveredOn": "PR #194 security review",
       "blockingSprint": "False",
       "notes": "\"🔔 Your Table is Ready!\", position updates and wait reminders (functions/queueWhatsAppIntegration.js:667-686) go through sendWhatsAppMessage — pure freeform, business-initiated (an admin clicks Notify), no template anywhere in the path. They are subject to the identical 24-hour-window drop as the booking confirmations above, and a table-ready message that arrives never is worse than most failures in the product. The 2026-07-26 PR gives them statusCallback (so failures at least become observable) but deliberately does NOT classify or enforce them — enforcement without an approved template would simply block the send. Fix: a queue_table_ready content template through Meta approval, then route these via sendWhatsAppTemplate. Same external long-pole as the booking templates; worth batching into one Meta submission. Found by the security review of that PR. Measured 2026-07-26 (Twilio logs): 22 sends lifetime, 18 read / 1 delivered / 3 undelivered (63016) — a 13.6% drop rate, worse than booking confirmations. But it has not fired since 2026-05-05, so its clean recent record is un-exercised, not healthy; treat the 13.6% as the live rate whenever the queue is next used in anger."
+    },
+    {
+      "title": "NEW-CRIT-02 — Stored XSS in public/tools/admin/grant-admin-claims.html chains to admin privilege escalation.",
+      "severity": "critical",
+      "discoveredAt": "2026-08-18",
+      "discoveredOn": "scheduled scan",
+      "blockingSprint": "False",
+      "notes": "renderUserCard() (lines 303-335) interpolates displayName/email/phoneNumber from users/{uid} directly into an innerHTML template literal with no escapeHtml() (the project's own helper, public/js/utils/html-escape.js, is not imported on this page). displayName is attacker-controlled at signup (built client-side in public/js/modules/signup/v2/signup-service.js:99, mirrored server-side in functions/index.js:570) with no HTML sanitization, and users/$uid has no .validate restricting content (database.rules.json:25-31). An unprivileged user can sign up with an onerror-payload name that calls setAdminClaim using the viewing admin's live ID token the moment an admin opens this page (which lists all users by design) — self-granting the attacker platform admin. setAdminClaim itself is correctly admin-gated server-side, but that gate is moot once script runs as an authenticated admin. Distinct from the already-closed MED-03 (admin-activity-monitor.js only) and corrects the existing public/tools/** backlog note (row 271, \"not a privilege-escalation path\") — that conclusion only considered a direct unauthenticated RTDB write, not this XSS route. Fix: import escapeHtml() and wrap all four interpolated fields in renderUserCard. Found 2026-08-18 (scheduled security-auditor scan)."
+    },
+    {
+      "title": "NEW-HIGH-02 — functions/projectManagement.js:14 uses cors({ origin: true }), reflecting any origin.",
+      "severity": "high",
+      "discoveredAt": "2026-08-18",
+      "discoveredOn": "scheduled scan",
+      "blockingSprint": "False",
+      "notes": "This is the exact pattern already fixed in ross.js and documented as vulnerable in functions/cors-allowlist.js's header comment (\"OWASP H-5\"), but projectManagement.js was never migrated to the shared allowlist. Impact is currently limited — every route here re-verifies a Bearer token server-side (verifyAuthToken/verifySuperAdmin) rather than relying on cookies, so a third-party site can't forge the Authorization header — but it's a live regression of a pattern already flagged Critical elsewhere in this codebase (same class as the already-tracked HIGH-02, which only covers performanceTestHTTP). Fix: migrate to the shared cors-allowlist.js helper. Found 2026-08-18 (scheduled security-auditor scan)."
+    },
+    {
+      "title": "Minor hygiene — public/tools/admin/grant-admin-claims.html:183-191 hardcodes a second, different Firebase client config",
+      "severity": "low",
+      "discoveredAt": "2026-08-18",
+      "discoveredOn": "scheduled scan",
+      "blockingSprint": "False",
+      "notes": "(different apiKey/appId/messagingSenderId) than public/js/config/firebase-config.js, used only to build the Cloud Functions base URL string. Not itself a secret (Firebase client keys are public-by-design), but it's dead/inconsistent config — worth confirming this second project isn't a forgotten, less-locked-down environment, and cleaning up as hygiene. Found 2026-08-18 (scheduled security-auditor scan)."
     }
   ],
   "backlog": {
