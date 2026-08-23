@@ -1,6 +1,6 @@
 {
-  "lastUpdated": "2026-08-04",
-  "lastUpdatedNote": "**ROSS Purchase Orders D1 + D1.1 are BUILT, MERGED and DEPLOYED (#221 / #222 / #223 / #224).** An owner can open `/ross.html?tab=orders`, build a supplier book by hand or by reviewed import from a stock count, and — new in D1.1 — attach individual stock items to suppliers with a filterable multi-select picker, which is what makes the importer work for the common case of a CSV with **no supplier column** (the operator's real file: 388 of 388 items unassigned). `poCatalog` + `poSeedFromStock` are live on nodejs22, source stamped 15:18–15:19Z **after** #224 merged at 15:17Z — verified against `functions:list`, not inferred from a deploy exit code. **#224 is the uncomfortable part of this session:** two independent reviews blocked D1.1 *after it merged*, the worst finding being silent data corruption I introduced (see SCORECARD + LESSONS). Production was never exposed only because the functions deploy was deliberately held. **`purchasing` RTDB rules are still NOT deployed** (defence in depth only — every access is CF-mediated) and **`features.purchaseOrders` is set nowhere**, so the tab works for admins and is empty for everyone else.",
+  "lastUpdated": "2026-08-23",
+  "lastUpdatedNote": "**Weekly groom: zero PRs merged since #227 (2026-08-05) — 10 PRs are now open awaiting operator review, the oldest 18 days old.** Recovered 4 more stranded scan branches that never opened a PR (2026-08-05 → 08-19); folded their findings into Bug Triage below, most urgently a **live** git-tracked PII/admin-UID export and an admin self-escalation chain, both independently re-verified against master today. See `KNOWLEDGE BASE/BACKLOG_HISTORY.md` for the 2026-08-04 → 08-23 narrative this note replaces.",
   "sprint": {
     "goal": "Effective implementation of Hi-Fi v2, with ROSS as the central post-login surface for every subscribed user",
     "started": "2026-04-30",
@@ -536,6 +536,70 @@
     }
   ],
   "bugs": [
+    {
+      "title": "merakicaptiveportal-firebasedb-default-rtdb.json (repo root) is a real production RTDB export tracked in git since 2026-07-21, containing a real admin UID and real guest PII — confirmed still present on master 2026-08-23, independently found by two separate scheduled scans 11 days apart (2026-08-08 and 2026-08-19) neither of which reached master.",
+      "severity": "critical",
+      "discoveredAt": "2026-08-08",
+      "discoveredOn": ", reconfirmed 2026-08-19; recovered + re-verified live 2026-08-23",
+      "blockingSprint": "False",
+      "notes": "Parsed directly this groom (literal values deliberately redacted here — reproducing them in a doc this backlog builds into a publicly-served project-status.json would itself leak them): admin-claims maps a real uid (redacted, an @askgroupholdings.com-domain account) to true; guests is keyed by a real SA phone number (redacted) with name/consent/tier; also users, receipts, scanningData, consent-history, campaigns, rewards. Deleting the file today does not remove it from git history — anyone with git-history read access (collaborators, or if the repo is ever forked/made public) can extract it permanently. Fix needs explicit operator authorization before any agent acts (history rewrite via git filter-repo/BFG + coordinated force-push across the 10 open branches, .gitignore the export pattern, rotate/notify the affected guest + admin account). Interim, safe to do immediately: add *-default-rtdb.json/*.rtdb.json to .gitignore and a pre-commit guard for RTDB-export filename patterns — docs/config only, no history rewrite. Recovered from stranded branches claude/sleepy-einstein-a6yf8e (2026-08-08) and claude/sleepy-einstein-fepggm (2026-08-19), neither of which ever had a PR."
+    },
+    {
+      "title": "Client-side self-service Super Admin escalation with zero server-side authorization — confirmed live 2026-08-23.",
+      "severity": "critical",
+      "discoveredAt": "2026-08-08",
+      "discoveredOn": "; recovered + re-verified live 2026-08-23",
+      "blockingSprint": "False",
+      "notes": "public/tools/admin/grant-super-admin.html:255-256 does a direct client-SDK set() of admins/{currentUser.uid} with {superAdmin: true, ...}, gated only by a SweetAlert confirm dialog. database.rules.json allows the write for anyone already holding the plain admin custom claim. Chains with the row below: get admin claim → use setAdminClaim to promote a second account you control → visit this page and self-grant superAdmin: true — no second admin's approval, no CF in the path, no audit trail. superAdmin gates ross/auditLog and the Project Management admin node. Fix: delete/gate this page behind a CF requiring the CALLER to already be superAdmin, never allow currentUser.uid as the target; audit admins/* for superAdmin: true entries with unexplained createdAt. Recovered from stranded branch claude/sleepy-einstein-a6yf8e (2026-08-08 scheduled OWASP scan), which never had a PR."
+    },
+    {
+      "title": "setAdminClaim lets ANY admin mint arbitrary new admins, no superAdmin gate, no per-target restriction — confirmed live 2026-08-23.",
+      "severity": "critical",
+      "discoveredAt": "2026-08-08",
+      "discoveredOn": "; recovered + re-verified live 2026-08-23",
+      "blockingSprint": "False",
+      "notes": "functions/index.js:735-801 checks only callerToken.admin === true (line 766: if (callerToken.admin !== true)) before granting admin to an arbitrary caller-supplied uid; nothing stops an admin promoting an account they control, and grants are logged only via console.log, not a queryable/alertable audit trail. Feeds directly into the row above. Fix: require callerToken.superAdmin === true (verified against RTDB admins/{uid}/superAdmin, matching the dual-check pattern already used elsewhere in this codebase) before granting admin to a *different* uid; write every grant/revoke to a real audit-log node. Recovered from stranded branch claude/sleepy-einstein-a6yf8e (2026-08-08 scheduled OWASP scan), which never had a PR."
+    },
+    {
+      "title": "Unauthenticated, wildcard-CORS Cloud Functions trigger arbitrary WhatsApp sends to any phone number.",
+      "severity": "critical",
+      "discoveredAt": "2026-08-08",
+      "discoveredOn": "; recovered 2026-08-23",
+      "blockingSprint": "False",
+      "notes": "functions/index.js:298-343 (sendGuestBookingNotification) and the adjacent sendGuestStatusNotification set Access-Control-Allow-Origin: *, check only req.method === 'POST' and booking.phoneNumber presence, then send with no auth check and no validation that booking.id corresponds to a real record. Anyone on the internet can script repeated POSTs with arbitrary numbers — free spam-as-a-service on the business's own Twilio/WhatsApp account, billed per-send with no rate limit; high volume risks Meta suspending the number W2's proactive-nudge feature depends on. Fix: require an authenticated-admin caller (matching markVoucherRedeemed's pattern), or restrict to server-side CF-to-CF calls; at minimum validate booking.id against a real record and add rate limiting. Recovered from stranded branch claude/sleepy-einstein-a6yf8e (2026-08-08 scheduled OWASP scan), which never had a PR."
+    },
+    {
+      "title": "Every public/tools/admin/*.html and public/admin_tools/*.html page is served to anyone who requests the URL, with protection resting entirely on client-side JS getting its auth check right.",
+      "severity": "high",
+      "discoveredAt": "2026-08-08",
+      "discoveredOn": "; recovered 2026-08-23",
+      "blockingSprint": "False",
+      "notes": "firebase.json hosting config has no path-based access restriction on these directories; the row above (grant-super-admin.html) shows at least one page's client-side check is insufficient. Sensitive tool pages (grant-admin-claims.html, tier-visibility-manager.html, admin-phone-mapping.html) are discoverable by path-guessing, and tools/admin/index.html links them together. Fix: move behind a CF requiring auth, or at minimum X-Robots-Tag: noindex + App Check. Recovered from stranded branch claude/sleepy-einstein-a6yf8e (2026-08-08 scheduled OWASP scan), which never had a PR."
+    },
+    {
+      "title": "Three low/moderate items from the 2026-08-08 scheduled scan, batched.",
+      "severity": "medium",
+      "discoveredAt": "2026-08-08",
+      "discoveredOn": "; recovered 2026-08-23",
+      "blockingSprint": "False",
+      "notes": "(1) merakiWebhook's shared-secret check (functions/index.js:467) uses non-constant-time !== instead of crypto.timingSafeEqual — inconsistent with the Twilio HMAC verification already used elsewhere, low practical risk but a one-line fix. (2) Same handler logs the full raw payload after verification (:473) — Meraki payloads carry client MAC addresses and device/location identifiers; trim to fields actually used. (3) public/js/jquery-3.2.1.min.js (2017, multiple known CVEs) is committed but a .html-scoped grep found no <script> reference — looks like dead vendored code; confirm with a full-repo reference check before deleting. Recovered from stranded branch claude/sleepy-einstein-a6yf8e, which never had a PR."
+    },
+    {
+      "title": "CRIT-14 — admin-panel unescaped-innerHTML chains into the same admin self-escalation as the rows above.",
+      "severity": "critical",
+      "discoveredAt": "2026-08-14",
+      "discoveredOn": "; recovered 2026-08-23",
+      "blockingSprint": "False",
+      "notes": "public/tools/admin/grant-admin-claims.html:303-335 (renderUserCard) and public/js/admin/user-management.js:147-157 both interpolate unescaped displayName/email into innerHTML (the former also into a data-email=\"...\" attribute) — same class as the already-tracked MED-03 (admin-activity-monitor.js), each site read in full and confirmed. Enabler: users/$uid has no .validate on displayName/email (database.rules.json:25-31), so any authenticated non-admin can self-write a script payload into their own profile fields. What escalates this to Critical: grant-admin-claims.html is the page an admin uses to grant/revoke admin claims — it holds currentUser and calls setAdminClaim with a live Bearer ID token. A malicious displayName rendered into that admin's DOM runs as arbitrary script in the admin's own authenticated session and can call fetch() directly against setAdminClaim with {uid: <attacker>, isAdmin: true}, bypassing the UI's confirm dialog entirely. Net effect: unprivileged user → full admin, triggered the next time any admin opens this page, no admin click required beyond loading it. Fix: apply the codebase's escapeHtml() convention (or textContent/DOM-node construction) at all three now-known sites in one PR, plus a defense-in-depth .validate length/charset cap on users/$uid/displayName + email. A full grep sweep of .innerHTML = in public/js/admin/ + public/tools/admin/ is recommended before closing — only 3 sites were read in full for the originating scan; the class may have more members. Recovered from stranded branch claude/sleepy-einstein-m3d4d8 (2026-08-14 scheduled OWASP scan), which never had a PR."
+    },
+    {
+      "title": "performanceTestHTTP reflects req.headers.origin into Access-Control-Allow-Origin alongside Access-Control-Allow-Credentials: true.",
+      "severity": "low",
+      "discoveredAt": "2026-08-05",
+      "discoveredOn": "; recovered 2026-08-23",
+      "blockingSprint": "False",
+      "notes": "functions/index.js:3063 (success path) and :3073 (error path) — the classic CORS-misconfig pattern (OWASP A05), though lower severity than usual here since the endpoint already gates on admin custom claims via a Bearer token *before* the CORS headers are set, and auth is a header the caller must already possess, not an ambient cookie. Payload disclosed is infra telemetry only (response time, memory, cold-start flag, region). Fix (small, isolated): replace the reflected-origin headers with the repo's existing functions/cors-allowlist.js pattern on both paths. Recovered from stranded branch claude/sleepy-einstein-prq6sv (2026-08-05 scheduled OWASP scan, scoped to the then-unaudited ROSS Purchase Orders code — this was the one new item outside that scope), which never had a PR."
+    },
     {
       "title": "LESSONS.md is at 40 rows / 59 KB against a ~20 soft cap, and every session pays that at start.",
       "severity": "low",
