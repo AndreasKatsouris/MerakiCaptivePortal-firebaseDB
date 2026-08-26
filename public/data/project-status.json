@@ -537,6 +537,22 @@
   ],
   "bugs": [
     {
+      "title": "Stored XSS in public/tools/admin/grant-admin-claims.html → credible path to platform-admin takeover — new, not a duplicate of the existing \"internal tool exposure\" row.",
+      "severity": "critical",
+      "discoveredAt": "2026-08-26",
+      "discoveredOn": "scheduled OWASP scan",
+      "blockingSprint": "False",
+      "notes": "renderUserCard() (grant-admin-claims.html:303-335) interpolates userData.displayName/.email/.phoneNumber directly into innerHTML with no escapeHtml() call, violating the project's own documented XSS convention. database.rules.json:27-30 (users/$uid) lets any authenticated uid write those fields to their own record with no shape/content .validate — and per the already-tracked anonymous-WiFi-auth findings (CRIT-08/HIGH-05 family), \"authenticated\" includes any WiFi guest. Exploit: attacker sets their own displayName to an HTML/JS payload; when a platform admin opens this tool to manage users, the payload executes in the admin's live authenticated session (their ID token already in page context) and can silently call setAdminClaim to grant the attacker's own uid admin. The existing NEW-LOW row (scripts/build.js:22 / public/tools/ exposure) only assessed this file's write-path gating (\"admins/$uid RTDB write and setAdminClaim CF are both correctly admin-gated\") — it did not check the render path for XSS, so this is a distinct, more severe finding on the same file. Fix:** escapeHtml() every interpolated field in renderUserCard() (and audit sibling public/tools/admin/*.html pages for the same pattern). Found 2026-08-26 (scheduled OWASP scan)."
+    },
+    {
+      "title": "setAdminClaim (functions/index.js:735-801) checks only the caller's JWT claim (callerToken.admin !== true), not the dual-factor admin-claims RTDB lookup requireAdmin() uses elsewhere in the same file — and no code path ever calls admin.auth().revokeRefreshTokens(uid) after revocation.",
+      "severity": "high",
+      "discoveredAt": "2026-08-26",
+      "discoveredOn": "scheduled OWASP scan",
+      "blockingSprint": "False",
+      "notes": "Firebase ID tokens remain valid (and keep stale custom claims) for up to their ~1h expiry unless refresh tokens are explicitly revoked. Net effect: a just-revoked admin can replay their still-valid, pre-revocation ID token against setAdminClaim within that window to reinstate their own admin status (or grant it to another uid), because the endpoint never re-checks the current admin-claims/{uid} truth in RTDB. Fix: apply the same dual-factor check requireAdmin() already uses (JWT claim AND admin-claims/{uid} RTDB read) to setAdminClaim, and call revokeRefreshTokens(uid) whenever admin is revoked. Found 2026-08-26 (scheduled OWASP scan)."
+    },
+    {
       "title": "LESSONS.md is at 40 rows / 59 KB against a ~20 soft cap, and every session pays that at start.",
       "severity": "low",
       "discoveredAt": "2026-08-04",
