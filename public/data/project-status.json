@@ -1,6 +1,6 @@
 {
-  "lastUpdated": "2026-08-04",
-  "lastUpdatedNote": "**ROSS Purchase Orders D1 + D1.1 are BUILT, MERGED and DEPLOYED (#221 / #222 / #223 / #224).** An owner can open `/ross.html?tab=orders`, build a supplier book by hand or by reviewed import from a stock count, and — new in D1.1 — attach individual stock items to suppliers with a filterable multi-select picker, which is what makes the importer work for the common case of a CSV with **no supplier column** (the operator's real file: 388 of 388 items unassigned). `poCatalog` + `poSeedFromStock` are live on nodejs22, source stamped 15:18–15:19Z **after** #224 merged at 15:17Z — verified against `functions:list`, not inferred from a deploy exit code. **#224 is the uncomfortable part of this session:** two independent reviews blocked D1.1 *after it merged*, the worst finding being silent data corruption I introduced (see SCORECARD + LESSONS). Production was never exposed only because the functions deploy was deliberately held. **`purchasing` RTDB rules are still NOT deployed** (defence in depth only — every access is CF-mediated) and **`features.purchaseOrders` is set nowhere**, so the tab works for admins and is empty for everyone else.",
+  "lastUpdated": "2026-08-30",
+  "lastUpdatedNote": "**Review throughput, not automation, is the blocker: master hasn't moved since #227 (2026-08-05) — 25 days idle.** 12 PRs sit open awaiting review (#228–#239), including **3 unmerged prior weekly backlog-groom PRs** (#232 08-09, #236 08-16, #238 08-23) whose reconciliation content overlaps this one — recommend reviewing/merging **#238** (newest, most complete) and closing #232/#236 as superseded rather than merging all three. **Most urgent open item, independently re-found by 4 separate scheduled scans (08-23/25/26/27), none yet merged:** a real production RTDB export containing guest PII + an admin UID has been tracked in git since 2026-07-21 (#174) — needs an **operator-authorized git-history rewrite**. A chained stored-XSS → admin-claim self-escalation in `grant-admin-claims.html` was found the same way (2 independent scans). Both consolidated into two new Bug Triage rows below. Nothing else reconciled this pass — no PRs merged since #227, so no backlog content to move.",
   "sprint": {
     "goal": "Effective implementation of Hi-Fi v2, with ROSS as the central post-login surface for every subscribed user",
     "started": "2026-04-30",
@@ -536,6 +536,30 @@
     }
   ],
   "bugs": [
+    {
+      "title": "A real production RTDB export tracked in git contains live guest PII + an admin UID, unremediated for 5+ weeks.",
+      "severity": "critical",
+      "discoveredAt": "2026-07-21",
+      "discoveredOn": "introduced, #174",
+      "blockingSprint": "False",
+      "notes": "merakicaptiveportal-firebasedb-default-rtdb.json (repo root, ~60 KB) was committed 2026-07-21 by ecdef10c (#174, an eval-fixture accident — check-test-users.cjs require()s it and passes it to admin.credential.cert() as if it were a service-account key) and is still tracked on master today. Contains a real guest phone number + name, real receipt/order line items, WhatsApp consent records, a real admin UID, the account owner's real email, and a live Twilio Account SID embedded in a receipt imageUrl. Not gitignored (*-adminsdk-*.json doesn't match this filename) and permanently retrievable from git history even after a working-tree delete. Independently re-discovered by 4 separate scheduled scans over 5 days (2026-08-23 #238, 08-25, 08-26, 08-27 — none merged) — repeated independent discovery is corroboration, not duplicate work. Fix needs an operator-authorized git-history rewrite (BFG / git filter-repo), not a code change — this groom does not perform one. Also needed: a .gitignore rule for *-rtdb.json/*-default-rtdb*.json, rotation of anything the exposed IDs touch, and check-test-users.cjs rewritten to use a real service-account credential. Highest-severity open item in the whole backlog — live-exploitable today by anyone who can git clone this repo, no application bug required."
+    },
+    {
+      "title": "Stored XSS in public/tools/admin/grant-admin-claims.html chains to full platform-admin takeover — corrects an earlier scan's \"not directly exploitable\" verdict",
+      "severity": "critical",
+      "discoveredAt": "2026-08-25",
+      "discoveredOn": "/26 (2 independent scheduled scans)",
+      "blockingSprint": "False",
+      "notes": "(that pass checked only the page's RTDB write-gating, not its render path). renderUserCard() interpolates displayName/email/phoneNumber — attacker-controlled via registerUser's length-capped-only firstName/lastName — into innerHTML with no escapeHtml(), unlike sibling admin-tools pages. Exploit chain: attacker self-registers an XSS payload as firstName → any admin opens this tool (first 20 users load unprompted) → payload runs in the admin's session, reads their live ID token off the unconditionally-exposed window.firebaseExports.auth, and calls setAdminClaim to self-grant admin. Compounding gap in the same endpoint: setAdminClaim checks only the caller's JWT claim, not the dual-factor admin-claims RTDB lookup requireAdmin() uses elsewhere in the same file, and no code path calls revokeRefreshTokens on revocation — so a just-revoked admin can replay their still-valid token within its ~1h expiry to reinstate access. Same missing-escapeHtml() class also found in booking-management.html (guest-supplied specialRequests/guestName → innerHTML, reachable from the WhatsApp booking flow). Independently found by 2 separate scheduled scans (08-25, 08-26). Fix: escapeHtml() every interpolated field in both admin-tool pages; add the RTDB dual-check + revokeRefreshTokens to setAdminClaim."
+    },
+    {
+      "title": "Review throughput, not automation, is the current bottleneck — 12 PRs open awaiting operator review as of this groom, oldest 25 days old",
+      "severity": "medium",
+      "discoveredAt": "2026-08-30",
+      "discoveredOn": "this groom",
+      "blockingSprint": "False",
+      "notes": "(#228, opened 2026-08-05). Includes 3 unmerged prior weekly backlog-groom PRs (#232 08-09, #236 08-16, #238 08-23) whose reconciliation content overlaps this one, 4 automation-queue fixes (#229/#231/#233/#234 = Q14/Q15/Q13/Q12), 4 OWASP-scan reconciliations (#230/#235/#237/#239), and a credential-remediation PR (#228). None have merged since #227 (2026-08-05). This is not a code defect — it's a process signal: the scheduled scans and queue runner are working correctly and surfacing real, corroborated findings (including the two Critical rows above), but nothing ships until reviewed. Recommend triaging the review queue starting with security-labelled PRs."
+    },
     {
       "title": "LESSONS.md is at 40 rows / 59 KB against a ~20 soft cap, and every session pays that at start.",
       "severity": "low",
