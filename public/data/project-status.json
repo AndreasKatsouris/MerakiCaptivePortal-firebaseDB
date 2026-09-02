@@ -1,6 +1,6 @@
 {
-  "lastUpdated": "2026-08-04",
-  "lastUpdatedNote": "**ROSS Purchase Orders D1 + D1.1 are BUILT, MERGED and DEPLOYED (#221 / #222 / #223 / #224).** An owner can open `/ross.html?tab=orders`, build a supplier book by hand or by reviewed import from a stock count, and — new in D1.1 — attach individual stock items to suppliers with a filterable multi-select picker, which is what makes the importer work for the common case of a CSV with **no supplier column** (the operator's real file: 388 of 388 items unassigned). `poCatalog` + `poSeedFromStock` are live on nodejs22, source stamped 15:18–15:19Z **after** #224 merged at 15:17Z — verified against `functions:list`, not inferred from a deploy exit code. **#224 is the uncomfortable part of this session:** two independent reviews blocked D1.1 *after it merged*, the worst finding being silent data corruption I introduced (see SCORECARD + LESSONS). Production was never exposed only because the functions deploy was deliberately held. **`purchasing` RTDB rules are still NOT deployed** (defence in depth only — every access is CF-mediated) and **`features.purchaseOrders` is set nowhere**, so the tab works for admins and is empty for everyone else.",
+  "lastUpdated": "2026-09-02",
+  "lastUpdatedNote": "**Scheduled OWASP scan (no code changes — repo has had zero commits since 2026-08-05, #227).** Delta review since the 2026-08-01 baseline confirmed 4 closures (CRIT-09 receipts-storage signed URLs, CRIT-13/HIGH-13 root grpc-js+websocket-driver, HIGH-12 root axios — all via #208/#210) and surfaced one new Critical: **NEW-CRIT-02**, logged in the Bug Triage Queue — ROSS Purchase Orders D1/D1.1 gates its new `purchasing` RTDB rules and CFs on the same self-writable `userLocations` primitive CRIT-10 already flags, so it inherits that IDOR (read **and write** this time) the moment `features.purchaseOrders` gets set. Currently inert (that flag is unset for everyone), but the two rows should be fixed together before either ships. **Security debt: 10 Criticals + 9 Highs open** (was 11+11), nothing fixed by hand since #178, both closures this scan were incidental to unrelated feature/dependency PRs. Full detail: `### 🔐 OWASP Security Audit — 2026-09-02 Findings` below.",
   "sprint": {
     "goal": "Effective implementation of Hi-Fi v2, with ROSS as the central post-login surface for every subscribed user",
     "started": "2026-04-30",
@@ -536,6 +536,14 @@
     }
   ],
   "bugs": [
+    {
+      "title": "NEW-CRIT-02 — ROSS Purchase Orders reuses the CRIT-10-broken userLocations trust primitive to gate a new financial resource; dormant today, primed to go live cross-tenant the moment the operator flips features.purchaseOrders on.",
+      "severity": "critical",
+      "discoveredAt": "2026-09-02",
+      "discoveredOn": "scheduled OWASP scan",
+      "blockingSprint": "False",
+      "notes": "database.rules.json's new purchasing.$locId.read rule (~line 316, added by D1 #222) and functions/purchase-orders/access.js:29 (assertLocationAccess, gating all of poCatalog/poSeedFromStock — list/save/archive suppliers, list/save products, seed preview/commit) both trust functions/agent/tools.js:82-87's callerHasLocationAccess, which checks only userLocations/{auth.uid}/{locId}.exists(). userLocations/$uid is still self-writable with no .validate (CRIT-10, unfixed, row above) — any authed user can set('userLocations/{ownUid}/{victimLocId}', true) and satisfy both gates for a location they don't own, reading and writing a competitor's supplier contacts, catalogue pricing (lastPrice), and purchase orders. Worse than CRIT-10's original ROSS-workflow blast radius because this one is writable, not just readable. Why it's inert right now: the CF gate additionally requires subscriptions/{uid}/features/purchaseOrders === true, and per the row directly below (\"features.purchaseOrders is set NOWHERE\"), that flag isn't set for anyone — so today this cannot be exploited by a non-admin, full stop. The two rows are coupled and that coupling is the actual risk: the row below already frames flipping that flag as pure config, no code — the moment it ships, this IDOR goes live for every tenant simultaneously, unless CRIT-10 (userLocations .validate) lands in the same change. Recommend: block the entitlement-flag flip on fixing CRIT-10 first (tie $locationId to locations/{locId}/ownerId, or route membership writes through an admin-only CF), not ship them as two independent \"config only\" / \"next sprint\" items. Found by the 2026-09-02 scheduled OWASP scan (security-auditor agent, delta review since the 2026-08-01 baseline)."
+    },
     {
       "title": "LESSONS.md is at 40 rows / 59 KB against a ~20 soft cap, and every session pays that at start.",
       "severity": "low",
