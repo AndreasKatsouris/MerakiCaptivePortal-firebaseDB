@@ -2,6 +2,8 @@
 
 > Security posture analysis of the Sparks Hospitality platform: what is done well, what needs improvement, and actionable recommendations.
 
+> ⚠️ **This is a point-in-time prose analysis, not a living tracker — it has no scan-freshness marker and can silently go stale when a fix lands in a PR that never touches this file (confirmed 2026-09-03: five items below were already closed).** For **current, re-verified status** of every tracked Critical/High/Medium/Low finding, use the `CRIT-XX`/`HIGH-XX`/`MED-XX`/`LOW-XX` table and dated "🔐 OWASP Security Audit" scan sections in `KNOWLEDGE BASE/PROJECT_BACKLOG.md` — every scheduled scan updates that table in place. This document is useful for architecture/design-level narrative; treat any specific "open" claim below as unverified until cross-checked against the backlog table.
+
 ---
 
 ## Table of Contents
@@ -88,30 +90,23 @@ Client (Browser)
 
 ### What Needs Improvement
 
-1. **`admin-claims` node is world-readable and world-writable** -- `database.rules.json:53-54`:
+1. ✅ **CLOSED (verified 2026-09-03).** ~~**`admin-claims` node is world-readable and world-writable**~~ -- `database.rules.json:67-70` now reads:
    ```json
    "admin-claims": {
-     ".read": "auth != null",
-     ".write": "auth != null"
+     ".read": "auth != null && auth.token.admin === true",
+     ".write": "auth != null && auth.token.admin === true"
    }
    ```
-   **CRITICAL:** Any authenticated user can add themselves as an admin by writing to this node. The `admin-claims` node is used in campaign and booking rules (`root.child('admin-claims').child(auth.uid).exists()`) to grant elevated access. This means any logged-in user can grant themselves admin-level access to campaigns, bookings, and other resources.
+   Admin-only both ways. Closed alongside the `#125` entitlements rule-lock work; this document was not updated at the time.
 
-2. **`subscriptions` self-write allows tier escalation** -- `database.rules.json:28`:
-   ```json
-   ".write": "auth != null && (auth.uid === $uid || auth.token.admin === true)"
-   ```
-   A user can write to their own subscription node, which means they could change their `tierId` from `free` to `enterprise`. While `subscription-validation.js` validates on the client side, security rules should enforce server-side tier validation.
+2. ✅ **CLOSED (verified 2026-09-03).** ~~**`subscriptions` self-write allows tier escalation**~~ -- `database.rules.json:32-37` now scopes `.write` at the `$uid` level to `auth != null && auth.token.admin === true` (the entitlements resolver is the sole writer; child `features`/`limits` carry `.validate: false` so a client-supplied value there is rejected outright), closed by the `#125` rule-lock referenced in `KNOWLEDGE BASE/PROJECT_BACKLOG.md`.
 
-3. **Several nodes allow any authenticated user to write** -- These nodes have overly permissive write rules:
-   - `wifiLogins` (`:189`): `.write: true` (no auth required)
-   - `activeUsers` (`:193`): `.write: true` (no auth required)
-   - `userPreferences` (`:197`): `.write: true` (no auth required)
-   - `receiptPatternLogs` (`:286`): `.write: true` (no auth required)
-   - `debug/ocr-logs` (`:301`): `.write: true` (no auth required)
-   - `receipts` (`:115`): `.write: "auth != null"` (any authenticated user)
-   - `scanningData` (`:90`): `.write: "auth != null"` (any authenticated user)
-   - `queue` (`:254-264`): `.write: "auth != null"` (any authenticated user)
+3. **Several nodes allow any authenticated user (or fully unauthenticated callers) to write** -- status as of 2026-09-03, re-verified live against `database.rules.json`:
+   - ✅ CLOSED: `wifiLogins` (`:206-209`), `activeUsers` (`:227-230`), `userPreferences` (`:232-235`) -- all now `auth != null && auth.token.admin === true`.
+   - Still open (not re-verified this pass; treat as unconfirmed): `receiptPatternLogs`, `debug/ocr-logs`.
+   - Still open (confirmed 2026-09-03, tracked as **CRIT-05** in the backlog): `receipts` -- `.read`/`.write: "auth != null"` at `database.rules.json:131-135`. This remains the platform's top open vulnerability.
+   - ✅ CLOSED (confirmed 2026-09-03, was **CRIT-04**): `scanningData` -- deployed + verified 401 for non-admin writes 2026-07-21 (#171).
+   - Still open (not re-verified this pass; treat as unconfirmed): `queue`.
 
 4. **Locations collection-level write is permissive** -- `database.rules.json:33`:
    ```json
@@ -165,16 +160,15 @@ The rules include `.indexOn` for 30+ fields across nodes. This is well-done and 
 
 1. **Logos** (`/logos/{logoName}`): Read/write for any authenticated user -- Adequate
 2. **Receipt templates** (`/receipt-templates/{templateFile}`): Read for auth users, write for admin -- Good
-3. **Receipts** (`/receipts/{receiptFile}`): Read for auth users, **write for anyone** -- Problematic
+3. **Receipts** (`/receipts/{receiptFile}`): Read for auth users (no ownership scoping -- tracked as **CRIT-09**, still open), write is now closed
 
-The receipt write rule (`:17`):
+✅ **CLOSED (verified 2026-09-03).** The receipt write rule at `storage.rules:17` now reads:
 ```
-allow write: if true; // Allow functions to write (no auth context)
+allow write: if false; // Cloud Functions use the Admin SDK and bypass rules; no client writes
 ```
+Closed via `#208` (short-TTL signed URLs for admin receipt image access), which made the open write path unnecessary. This document previously described the write rule as `allow write: if true` -- that was already stale by the time of this correction.
 
-This allows **unauthenticated** writes to the receipts storage bucket. The comment explains the intent (Cloud Functions writing receipts don't have a user auth context), but this creates an attack surface for storage abuse.
-
-**Recommendation:** Use Firebase App Check or a signed URL approach instead of open writes.
+**Still open:** the **read** rule (`allow read: if request.auth != null`) has no ownership scoping -- any authenticated user across all tenants can read any tenant's receipt images. Tracked as **CRIT-09** in `KNOWLEDGE BASE/PROJECT_BACKLOG.md`.
 
 ---
 
@@ -292,19 +286,29 @@ It also logs validation errors to `_system/subscription-validation-errors` for m
 
 ### Critical
 
-| Issue | Location | Risk | Impact |
-|-------|----------|------|--------|
-| `admin-claims` world-writable | `database.rules.json:53-54` | Any authenticated user can grant themselves admin access | Full privilege escalation |
-| Open writes to `wifiLogins`, `activeUsers`, `userPreferences` | `database.rules.json:189,193,197` | No authentication required to write | Data pollution, potential abuse |
-| Open storage writes for receipts | `storage.rules:17` | Unauthenticated file uploads | Storage abuse, cost escalation |
+| Issue | Location | Risk | Impact | Status (2026-09-03) |
+|-------|----------|------|--------|------|
+| ~~`admin-claims` world-writable~~ | `database.rules.json:67-70` | ~~Any authenticated user can grant themselves admin access~~ | ~~Full privilege escalation~~ | ✅ CLOSED -- admin-only both ways |
+| ~~Open writes to `wifiLogins`, `activeUsers`, `userPreferences`~~ | `database.rules.json:206-235` | ~~No authentication required to write~~ | ~~Data pollution, potential abuse~~ | ✅ CLOSED -- admin-only both ways |
+| ~~Open storage writes for receipts~~ | `storage.rules:17` | ~~Unauthenticated file uploads~~ | ~~Storage abuse, cost escalation~~ | ✅ CLOSED (#208) -- `allow write: if false` |
+| `receipts` RTDB node open read/write | `database.rules.json:131-135` | Any authenticated user reads/writes any tenant's receipts | Cross-tenant PII disclosure, data corruption | **Still open (CRIT-05) -- top open vulnerability** |
+| `receipts` Storage read has no ownership scoping | `storage.rules:16` | Any authenticated user reads any tenant's receipt images | Cross-tenant PII disclosure | **Still open (CRIT-09)** |
+| Unauthenticated WhatsApp/SMS notification endpoints | `functions/index.js:298,344` | Any internet caller triggers billed messages with attacker-controlled content | Cost abuse, guest-facing spam | **Still open (CRIT-01)** |
+| Unauthenticated queue metrics enumeration | `functions/index.js:2237` | Any internet caller enumerates any location's queue | Cross-tenant data disclosure | **Still open (CRIT-02)** |
+| Migration endpoints -- token verified, no admin check | `functions/index.js:2877,2900` | Any authenticated user triggers DB migrations | Data corruption/loss | **Still open (CRIT-03)** |
+
+See `KNOWLEDGE BASE/PROJECT_BACKLOG.md`'s `CRIT-XX` table for the full current Critical list (10 open as of 2026-09-03) -- this row set is illustrative, not exhaustive.
 
 ### High
 
-| Issue | Location | Risk | Impact |
-|-------|----------|------|--------|
-| Subscription self-write allows tier escalation | `database.rules.json:28` | Users can upgrade their own tier | Feature access bypass |
-| Test/debug endpoints in production | `functions/index.js:115,981,1025` | Data deletion, test data creation | Data loss, pollution |
-| CORS wildcard on some endpoints | `functions/index.js:118` | Bypasses origin whitelist | CSRF potential |
+| Issue | Location | Risk | Impact | Status (2026-09-03) |
+|-------|----------|------|--------|------|
+| ~~Subscription self-write allows tier escalation~~ | `database.rules.json:32-37` | ~~Users can upgrade their own tier~~ | ~~Feature access bypass~~ | ✅ CLOSED (#125) -- admin-only write, `.validate:false` on `features`/`limits` |
+| Test/debug endpoints in production | `functions/index.js:164` (`createTestData`, gated by `ENABLE_TEST_DATA` env var) | Data seeding if the gate is ever misconfigured | Data pollution | Mitigated by an explicit env gate, not removed -- see MED-05 in the backlog |
+| CORS wildcard reflecting any origin | `functions/index.js` (`performanceTestHTTP`) | Bypasses origin whitelist | CSRF potential | **Still open (HIGH-02)** |
+| `setAdminClaim` checks JWT claim only, not DB state | `functions/index.js:766` | Revoked admin retains promotion power until JWT expires | Delayed privilege revocation | **Still open (HIGH-03)** |
+
+See `KNOWLEDGE BASE/PROJECT_BACKLOG.md`'s `HIGH-XX` table for the full current High list (9 open as of 2026-09-03) -- this row set is illustrative, not exhaustive.
 
 ### Medium
 
@@ -321,41 +325,19 @@ It also logs validation errors to `_system/subscription-validation-errors` for m
 
 ### Immediate (Critical Fixes)
 
-1. **Lock down `admin-claims`** -- Change to admin-only write:
-   ```json
-   "admin-claims": {
-     ".read": "auth != null",
-     ".write": "auth != null && auth.token.admin === true"
-   }
-   ```
+Items 1, 2, 3 and 5 below are ✅ **CLOSED** (verified 2026-09-03) -- kept here as a record of what was fixed and how, not as outstanding work.
 
-2. **Require auth for `wifiLogins`, `activeUsers`, `userPreferences`:**
-   ```json
-   "wifiLogins": {
-     ".read": "auth != null",
-     ".write": "auth != null"
-   }
-   ```
+1. ✅ **DONE -- Lock down `admin-claims`.** `database.rules.json:67-70` is exactly this shape today.
 
-3. **Restrict receipt storage writes** -- Use a Cloud Function to generate signed upload URLs instead of allowing unauthenticated writes.
+2. ✅ **DONE -- Require admin auth for `wifiLogins`, `activeUsers`, `userPreferences`.** All three are `auth != null && auth.token.admin === true` at `database.rules.json:206-235`.
 
-4. **Remove or protect test/debug endpoints** -- Delete `createTestData`, `tempClearData`, `clearScanningData` from production, or gate them behind admin auth.
+3. ✅ **DONE -- Restrict receipt storage writes.** `#208` closed this via short-TTL signed URLs; `storage.rules:17` is now `allow write: if false`.
 
-### Short-Term (High Priority)
+4. **Still open -- lock down `receipts` (RTDB `.read`/`.write` at `database.rules.json:131-135`, and Storage `read` at `storage.rules:16`).** This is the platform's current top open vulnerability (CRIT-05 + CRIT-09 in the backlog table) -- neither the RTDB node nor the Storage read path has ownership scoping.
 
-5. **Prevent subscription tier self-escalation** -- Add validation rules:
-   ```json
-   "subscriptions": {
-     "$uid": {
-       ".write": "auth != null && (auth.uid === $uid || auth.token.admin === true)",
-       "tierId": {
-         ".validate": "!data.exists() || data.val() === newData.val() || auth.token.admin === true"
-       }
-     }
-   }
-   ```
+5. ✅ **DONE -- Prevent subscription tier self-escalation.** `#125`'s entitlements rule-lock made the resolver the sole writer of `subscriptions/$uid`; `features`/`limits` children carry `.validate: false` so a client cannot write either directly.
 
-6. **Remove CORS wildcard overrides** -- Use the centralized CORS middleware for all endpoints.
+6. **Still open -- remove CORS wildcard overrides.** `performanceTestHTTP` still reflects `req.headers.origin` (HIGH-02); `sendGuestBookingNotification`/`sendGuestStatusNotification` still hardcode `Access-Control-Allow-Origin: *` with no auth at all (CRIT-01) -- the latter is materially worse than a wildcard override since there is no auth layer behind it either.
 
 7. **Add `.validate` rules** to guest data, queue entries, and receipt nodes.
 
