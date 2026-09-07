@@ -537,6 +537,46 @@
   ],
   "bugs": [
     {
+      "title": "N1 (A01) — storage.rules /receipts/{receiptFile} grants allow read: if request.auth != null: any authenticated user, any tenant, can read any other tenant's receipt image",
+      "severity": "high",
+      "discoveredAt": "2026-09-07",
+      "discoveredOn": "scheduled OWASP scan",
+      "blockingSprint": "False",
+      "notes": "via the Storage SDK/REST directly, independent of the earlier CRIT-09 GCS-ACL fix (which only closed the *public/anonymous* GCS path, never touched this rule). Chained with the still-open CRIT-05 (receipts RTDB root .write/.read cascade, which leaks the storage path to any authed user), this is an end-to-end cross-tenant receipt disclosure (PII + financial data). Fix: scope the read to request.auth.token.admin == true or an owning phone/tenant check — normal app usage already goes through server-signed short-TTL URLs (#208), not this rule."
+    },
+    {
+      "title": "N2 (A06) — form-data <2.5.6 CRLF injection via unescaped multipart field/filenames (GHSA-hmw2-7cc7-3qxx, CVSS 7.5)",
+      "severity": "high",
+      "discoveredAt": "2026-09-07",
+      "discoveredOn": "scheduled OWASP scan",
+      "blockingSprint": "False",
+      "notes": ", present in both root and functions/ lockfiles (form-data@2.5.5), fixAvailable:true lockfile-only. Was folded into MED-11 at the wrong severity (Medium) — npm audit rates it High. Fix: npm audit fix in both root and functions/."
+    },
+    {
+      "title": "N3 (A06) — nanoid <3.3.18 indefinite loop when a custom generator's size is 0 (GHSA-2v37-7h3g-55p8)",
+      "severity": "high",
+      "discoveredAt": "2026-09-07",
+      "discoveredOn": "scheduled OWASP scan",
+      "blockingSprint": "False",
+      "notes": ", root package-lock.json (nanoid@3.3.16) only, fixAvailable:true, not previously tracked anywhere. Fix: npm audit fix (lockfile-only)."
+    },
+    {
+      "title": "N4 (A03) — the backlog's \"F7 '-prefix neutralization\" CSV-export convention is named only in the Purchase-Orders design doc; the live v1 food-cost CSV export has no formula-injection guard at all.",
+      "severity": "medium",
+      "discoveredAt": "2026-09-07",
+      "discoveredOn": "scheduled OWASP scan",
+      "blockingSprint": "False",
+      "notes": "Grep for csvEscape/sanitizeCsv/formula-neutralization finds zero hits in actual code. public/js/modules/food-cost/order-calculator.js:456-499 (called from public/js/modules/food-cost/components/purchase-order/po-modal.js:441-479) interpolates user-controlled item.description/itemCode/category/supplierName with only quote-escaping — no leading =/+/-/@ neutralization — classic CSV/Formula Injection into whatever spreadsheet app opens the exported PO. Same unguarded pattern likely in sibling order-calculator-advanced.js/order-calculator-calculus.js exports (not individually re-checked). Fix: add a shared sanitizeCsvField() (prefix any leading =+-@/tab/CR with ') at the one export boundary all three calculators share, before PO D2 builds its own CSV path on the same pattern."
+    },
+    {
+      "title": "N5 (A09) — Meraki webhook handler logs the entire req.body, including the secret field it just validated",
+      "severity": "medium",
+      "discoveredAt": "2026-09-07",
+      "discoveredOn": "scheduled OWASP scan",
+      "blockingSprint": "False",
+      "notes": ", via functions/index.js:472-473's console.log('Verified secret. Data received:', JSON.stringify(data,...)) where data = req.body. Distinct sibling of the #226 fix (which only guarded .substring/.slice/.substr truncation of token-like strings on a different log line, not whole-object logging of a body containing a secret) — #226 did not catch this one. Fix: log a redacted copy of data (omit secret) or just the fields actually needed for debugging."
+    },
+    {
       "title": "LESSONS.md is at 40 rows / 59 KB against a ~20 soft cap, and every session pays that at start.",
       "severity": "low",
       "discoveredAt": "2026-08-04",
@@ -750,14 +790,6 @@
       "discoveredOn": "rules-batch PR-1b census",
       "blockingSprint": "False",
       "notes": "processRewards (public/js/receipt-management.js:952-964) writes a reward payload of {receiptId, campaignId, guestPhoneNumber, totalAmount, status, createdAt, createdBy}, but rewards/$rewardId .validate requires newData.hasChildren(['metadata','status','value','expiresAt']) — the payload has status only, and the hasChildren term is an unconditional AND that not even an admin bypasses. The two follow-on writes fail as well: campaign-rewards/{cid}/{rid} requires admin (database.rules.json:93,96) and guest-rewards/{phone}/{rid} requires auth.token.phone_number === $phoneNumber (:88), which per the row above is null for every user. Sibling reward-management.js:661 (manual reward issue) supplies all four keys and works — presumably why this went unnoticed. Fix: add the missing fields to the payload (mirror reward-management.js:661), or route reward creation through a CF. Not bundled into PR #176 — it is a client payload bug, not a rules bug. Third live bug a rules census has surfaced (after locations/ownerId and this), all three hidden behind a client catch that only console.errors. Found 2026-07-21 during the PR-1b census, independently confirmed by security review."
-    },
-    {
-      "title": "cleanupOldQueuesScheduled cron has never deployed — export clobbered by module.exports reassignment",
-      "severity": "medium",
-      "discoveredAt": "2026-06-01",
-      "discoveredOn": "ledger deploy",
-      "blockingSprint": "False",
-      "notes": "functions/queueAnalytics.js:343 does exports.cleanupOldQueuesScheduled = onSchedule('every 24 hours', …), but line 357's module.exports = { … } REPLACES the whole exports object (CommonJS), dropping that assignment. So require('./queueAnalytics').cleanupOldQueuesScheduled is undefined, functions/index.js:2243 exports undefined, and firebase reports No function matches the filter: cleanupOldQueuesScheduled — it's never been a deployable function. Consequence: automated daily queue pruning is NOT running (only the manual cleanupOldQueues HTTP fn works), compounding the unbounded-node retention bug below. Found 2026-06-01 during the Phase 7 ① ledger deploy (106 deployed vs 107 exports → traced to this phantom). Fix: include cleanupOldQueuesScheduled in the module.exports = {…} object (or move the assignment after it). One-line merge + redeploy."
     },
     {
       "title": "LESSONS.md is at 36 rows against its own ~20 soft cap, and today's sessions added 5 with no eviction pass.",
