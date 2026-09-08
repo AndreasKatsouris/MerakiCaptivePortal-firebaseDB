@@ -537,6 +537,22 @@
   ],
   "bugs": [
     {
+      "title": "qs@6.15.2 (pulled by express/body-parser in BOTH root and functions/ lockfiles) is inside the vulnerable range for two DoS advisories, reachable PRE-AUTH.",
+      "severity": "medium",
+      "discoveredAt": "2026-09-08",
+      "discoveredOn": "scheduled OWASP scan",
+      "blockingSprint": "False",
+      "notes": "GHSA-x5fp-wj9c-mxmx (array-limit bypass, CVSS 3.7) and GHSA-4mjr-xmp4-gh2g (attacker-controlled isBuffer, CVSS 5.3) both cover qs<6.16.0; qs parses the query string of every Express-based Cloud Function before any requireAdmin/verifyAuthToken check runs, so this is an unauthenticated, remotely-reachable availability surface (OWASP A06:2021). Confirmed via npm audit --json at root: effects: [\"body-parser\",\"express\"], fixAvailable: true (lockfile-only, no package.json bump) — same shape as the already-shipped Q1/#180 and Q8/#210 npm-audit-fix cards. Found by the 2026-09-08 scheduled OWASP scan (delta review since 08-02)."
+    },
+    {
+      "title": "Dead-but-unescaped receipt-row renderer — latent, not live.",
+      "severity": "low",
+      "discoveredAt": "2026-09-08",
+      "discoveredOn": "scheduled OWASP scan",
+      "blockingSprint": "False",
+      "notes": "public/js/modules/receipts/ReceiptManager.js:173-185 (generateReceiptRow()) builds an admin receipt-list row via raw template-string interpolation of guestPhoneNumber/invoiceNumber/storeName/status into tbody.innerHTML with no escaping — the same stored-XSS class #208 explicitly fixed in the sibling receipt-details-html.js (given the still-open receipts root .write: auth != null with no child validation, every field here is attacker-controlled). Repo-wide import grep confirms no HTML page or Vite entry currently wires this function in — populateReceiptModal() in the same file (which #208 did touch) already uses safe .textContent. Logging so it isn't \"discovered\" as newly-live if a future PR wires this path up without noticing; fix is to delete the dead function or route it through receipt-details-html.js's escaping helpers before it's ever called. Found by the 2026-09-08 scheduled OWASP scan."
+    },
+    {
       "title": "LESSONS.md is at 40 rows / 59 KB against a ~20 soft cap, and every session pays that at start.",
       "severity": "low",
       "discoveredAt": "2026-08-04",
