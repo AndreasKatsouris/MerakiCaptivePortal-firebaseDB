@@ -537,6 +537,30 @@
   ],
   "bugs": [
     {
+      "title": "No persisted audit trail on admin-privilege grants/revocations",
+      "severity": "medium",
+      "discoveredAt": "2026-09-12",
+      "discoveredOn": "scheduled scan",
+      "blockingSprint": "False",
+      "notes": "setAdminClaim (functions/index.js:735), the admin-claim branch of createUserAccount (:983-992), and setupInitialAdmin (:1276) only console.log the actor/target/action; no durable admin-audit/{pushId} record like the ross/auditLog/stockFlagAudit/compliance patterns elsewhere in the schema. Found by the 2026-09-12 scheduled OWASP scan (full detail in that dated section below)."
+    },
+    {
+      "title": "KNOWLEDGE BASE/security/SECURITY_OVERVIEW.md is stale",
+      "severity": "low",
+      "discoveredAt": "2026-09-12",
+      "discoveredOn": "scheduled scan",
+      "blockingSprint": "False",
+      "notes": "describes several issues as open that are already fixed live (world-writable admin-claims, no-auth wifiLogins/activeUsers/userPreferences writes, permissive locations collection write, subscriptions self-escalation, unrestricted createTestData). Risk: a future audit re-fixes closed issues or trusts it as current-state. Found by the 2026-09-12 scheduled OWASP scan."
+    },
+    {
+      "title": "Dead unauthenticated WhatsApp webhook handler left in the codebase",
+      "severity": "low",
+      "discoveredAt": "2026-09-12",
+      "discoveredOn": "scheduled scan",
+      "blockingSprint": "False",
+      "notes": "functions/receiveWhatsappMessage.js's validateRequest does no Twilio signature check at all; currently inert because functions/index.js:295 wires the exported CF name to receiveWhatsAppMessageEnhanced instead (the one with staged/enforced signature verification per CRIT-07). A future refactor re-wiring the import would silently reintroduce an unauthenticated webhook. Recommend deleting the file. Found by the 2026-09-12 scheduled OWASP scan."
+    },
+    {
       "title": "LESSONS.md is at 40 rows / 59 KB against a ~20 soft cap, and every session pays that at start.",
       "severity": "low",
       "discoveredAt": "2026-08-04",
